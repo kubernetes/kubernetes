@@ -315,11 +315,13 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeVali
 					oldDriverCopy.Allocatable = nil // +k8s:verify-mutation:reason=clone
 					newDriverCopy.Allocatable = nil // +k8s:verify-mutation:reason=clone
 
-					if !apiequality.Semantic.DeepEqual(oldDriverCopy, newDriverCopy) {
-						allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
-					}
-				} else if !apiequality.Semantic.DeepEqual(oldDriver, newDriver) {
-					allErrs = append(allErrs, field.Invalid(field.NewPath("CSINodeDriver"), newDriver, "field is immutable"))
+					allErrs = append(allErrs,
+						apivalidation.ValidateImmutableField(newDriverCopy, oldDriverCopy, field.NewPath("spec").Child("drivers"))...,
+					)
+				} else {
+					allErrs = append(allErrs,
+						apivalidation.ValidateImmutableField(newDriver, oldDriver, field.NewPath("spec").Child("drivers"))...,
+					)
 				}
 			}
 		}
