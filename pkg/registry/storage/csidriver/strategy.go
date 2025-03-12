@@ -50,6 +50,9 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		csiDriver.Spec.SELinuxMount = nil
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		csiDriver.Spec.NodeAllocatableUpdatePeriodSeconds = nil
+	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -81,6 +84,11 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if oldCSIDriver.Spec.SELinuxMount == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.SELinuxMountReadWriteOncePod) {
 		newCSIDriver.Spec.SELinuxMount = nil
+	}
+
+	if oldCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		newCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds = nil
 	}
 
 	// Any changes to the spec increment the generation number.
