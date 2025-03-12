@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -122,9 +123,7 @@ func TestGenericListerListMethod(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(expectedOutput, actualOutput) {
-		t.Fatalf("unexpected object has been returned expected = %v actual = %v, diff = %v", expectedOutput, actualOutput, cmp.Diff(expectedOutput, actualOutput))
-	}
+	assert.ElementsMatch(t, expectedOutput, actualOutput)
 }
 
 func TestGenericListerByNamespaceMethod(t *testing.T) {
