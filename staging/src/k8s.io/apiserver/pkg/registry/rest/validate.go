@@ -116,7 +116,7 @@ func CompareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, takeover)
 	for _, detail := range mismatchDetails {
 		// Log information about the mismatch using contextual logger
-		logger.Info(detail)
+		logger.Error(nil, detail)
 
 		// Increment the metric for the mismatch
 		validationmetrics.Metrics.IncDeclarativeValidationMismatchMetric()
@@ -231,20 +231,20 @@ func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.Er
 				// If takeover is enabled, output as a validation error as authoritative validator panicked and validation should error
 				*errs = append(*errs, field.InternalError(nil, fmt.Errorf(errorFmt, r)))
 			} else {
-				// if takeover not enabled, log the panic as an info message
-				logger.Info(fmt.Sprintf(errorFmt, r))
+				// if takeover not enabled, log the panic as an error message
+				logger.Error(nil, fmt.Sprintf(errorFmt, r))
 			}
 		}
 	}
 }
 
-// withRecover wraps a validation function with panic recovery logic.
+// panicSafeValidateFunc wraps a validation function with panic recovery logic.
 // It takes a validation function with the ValidateDeclaratively signature
 // and returns a function with the same signature.
 // The returned function will execute the wrapped function and handle any panics by
 // incrementing the panic metric, and logging an error message
 // if takeover=false, and adding a validation error if takeover=true.
-func withRecover(
+func panicSafeValidateFunc(
 	validateFunc func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object) field.ErrorList,
 	takeover bool,
 ) func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object) field.ErrorList {
@@ -255,13 +255,13 @@ func withRecover(
 	}
 }
 
-// withRecoverUpdate wraps an update validation function with panic recovery logic.
+// panicSafeValidateUpdateFunc wraps an update validation function with panic recovery logic.
 // It takes a validation function with the ValidateUpdateDeclaratively signature
 // and returns a function with the same signature.
 // The returned function will execute the wrapped function and handle any panics by
 // incrementing the panic metric, and logging an error message
 // if takeover=false, and adding a validation error if takeover=true.
-func withRecoverUpdate(
+func panicSafeValidateUpdateFunc(
 	validateUpdateFunc func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object) field.ErrorList,
 	takeover bool,
 ) func(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object) field.ErrorList {
@@ -292,7 +292,7 @@ func withRecoverUpdate(
 // conversion fails, or if a panic occurs during validation when
 // takeover is true.
 func ValidateDeclarativelyWithRecovery(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj runtime.Object, takeover bool) field.ErrorList {
-	return withRecover(ValidateDeclaratively, takeover)(ctx, options, scheme, obj)
+	return panicSafeValidateFunc(ValidateDeclaratively, takeover)(ctx, options, scheme, obj)
 }
 
 // ValidateUpdateDeclarativelyWithRecovery validates obj and oldObj against declarative
@@ -315,5 +315,5 @@ func ValidateDeclarativelyWithRecovery(ctx context.Context, options sets.Set[str
 // conversion fails, or if a panic occurs during validation when
 // takeover is true.
 func ValidateUpdateDeclarativelyWithRecovery(ctx context.Context, options sets.Set[string], scheme *runtime.Scheme, obj, oldObj runtime.Object, takeover bool) field.ErrorList {
-	return withRecoverUpdate(ValidateUpdateDeclaratively, takeover)(ctx, options, scheme, obj, oldObj)
+	return panicSafeValidateUpdateFunc(ValidateUpdateDeclaratively, takeover)(ctx, options, scheme, obj, oldObj)
 }

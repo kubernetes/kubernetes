@@ -394,8 +394,8 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			declarativeErrs: field.ErrorList{errA},
 			takeover:        true,
 			expectLogs:      true,
-			// logs have a prefix of the form - I0309 21:05:33.865030 1926106 validate.go:199]
-			expectedRegex: "I.*Unexpected difference between hand written validation and declarative validation error results.*Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
+			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
+			expectedRegex: "E.*Unexpected difference between hand written validation and declarative validation error results.*Consider disabling the DeclarativeValidationTakeover feature gate to keep data persisted in etcd consistent with prior versions of Kubernetes",
 		},
 		{
 			name:            "matching errors, don't log info",
@@ -468,8 +468,8 @@ func TestWithRecover(t *testing.T) {
 			},
 			takeoverEnabled: false,
 			wantErrs:        nil,
-			// logs have a prefix of the form - I0309 21:05:33.865030 1926106 validate.go:199]
-			expectLogRegex: "I.*panic during declarative validation: test panic",
+			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
+			expectLogRegex: "E.*panic during declarative validation: test panic",
 		},
 		{
 			name: "panic with takeover enabled",
@@ -500,8 +500,8 @@ func TestWithRecover(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			// Pass the takeover flag to withRecover instead of relying on the feature gate
-			wrapped := withRecover(tc.validateFn, tc.takeoverEnabled)
+			// Pass the takeover flag to panicSafeValidateFunc instead of relying on the feature gate
+			wrapped := panicSafeValidateFunc(tc.validateFn, tc.takeoverEnabled)
 			gotErrs := wrapped(ctx, options, scheme, obj)
 
 			klog.Flush()
@@ -509,7 +509,7 @@ func TestWithRecover(t *testing.T) {
 
 			// Compare gotErrs vs. tc.wantErrs
 			if !equalErrorLists(gotErrs, tc.wantErrs) {
-				t.Errorf("withRecover() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
+				t.Errorf("panicSafeValidateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
 			}
 
 			// Check logs if needed
@@ -562,8 +562,8 @@ func TestWithRecoverUpdate(t *testing.T) {
 			},
 			takeoverEnabled: false,
 			wantErrs:        nil,
-			// logs have a prefix of the form - I0309 21:05:33.865030 1926106 validate.go:199]
-			expectLogRegex: "I.*panic during declarative validation: test update panic",
+			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
+			expectLogRegex: "E.*panic during declarative validation: test update panic",
 		},
 		{
 			name: "panic with takeover enabled",
@@ -594,8 +594,8 @@ func TestWithRecoverUpdate(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			// Pass the takeover flag to withRecoverUpdate instead of relying on the feature gate
-			wrapped := withRecoverUpdate(tc.validateFn, tc.takeoverEnabled)
+			// Pass the takeover flag to panicSafeValidateUpdateFunc instead of relying on the feature gate
+			wrapped := panicSafeValidateUpdateFunc(tc.validateFn, tc.takeoverEnabled)
 			gotErrs := wrapped(ctx, options, scheme, obj, oldObj)
 
 			klog.Flush()
@@ -603,7 +603,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 
 			// Compare gotErrs with wantErrs
 			if !equalErrorLists(gotErrs, tc.wantErrs) {
-				t.Errorf("withRecoverUpdate() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
+				t.Errorf("panicSafeValidateUpdateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
 			}
 
 			// Verify log output
