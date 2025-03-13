@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
 Copyright 2022 The Kubernetes Authors.
 
@@ -42,14 +45,6 @@ const userNsLength = (1 << 16)
 // Create a new map when we removed enough pods to avoid memory leaks
 // since Go maps never free memory.
 const mapReInitializeThreshold = 1000
-
-type userNsPodsManager interface {
-	HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error)
-	GetPodDir(podUID types.UID) string
-	ListPodsFromDisk() ([]types.UID, error)
-	GetKubeletMappings() (uint32, uint32, error)
-	GetMaxPods() int
-}
 
 type UsernsManager struct {
 	used    *allocator.AllocationBitmap
