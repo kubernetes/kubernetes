@@ -32,6 +32,11 @@ setting `maxSurge` to a value larger than zero enables such a seamless upgrade.
 
 ### In a plugin
 
+*Note*: For DRA, the
+[k8s.io/dynamic-resource-allocation](https://pkg.go.dev/k8s.io/dynamic-resource-allocation/kubeletplugin)
+helper package offers the `RollingUpdate` option which implements the socket
+handling as described in this section.
+
 To support seamless upgrades, each plugin instance must use a unique
 socket filename. Otherwise the following could happen:
 - The old instance is registered with `plugin.example.com-reg.sock`.

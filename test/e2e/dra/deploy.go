@@ -77,6 +77,7 @@ const (
 
 type Nodes struct {
 	NodeNames []string
+	tempDir   string
 }
 
 type Resources struct {
@@ -112,6 +113,8 @@ func NewNodesNow(ctx context.Context, f *framework.Framework, minNodes, maxNodes
 }
 
 func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) {
+	nodes.tempDir = ginkgo.GinkgoT().TempDir()
+
 	ginkgo.By("selecting nodes")
 	// The kubelet plugin is harder. We deploy the builtin manifest
 	// after patching in the driver name and all nodes on which we
@@ -219,6 +222,12 @@ func (d *Driver) Run(nodes *Nodes, configureResources func() Resources, devicesP
 	ginkgo.DeferCleanup(d.TearDown)
 }
 
+// NewGetSlices generates a function for gomega.Eventually/Consistently which
+// returns the ResourceSliceList.
+func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList] {
+	return framework.ListObjects(d.f.ClientSet.ResourceV1beta1().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+}
+
 type MethodInstance struct {
 	Nodename   string
 	FullMethod string
@@ -239,6 +248,10 @@ type Driver struct {
 	// instances of the same driver. Used to generate unique objects in the API server.
 	// The socket path is still the same.
 	InstanceSuffix string
+
+	// RollingUpdate can be set to true to enable using different socket names
+	// for different pods and thus seamless upgrades. Must be supported by the kubelet!
+	RollingUpdate bool
 
 	// Name gets derived automatically from the current test namespace and
 	// (if set) the NameSuffix while setting up the driver for a test.
@@ -351,7 +364,6 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 	numNodes := int32(len(nodes.NodeNames))
 	pluginDataDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name)
 	registrarDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
-	registrarSocketFilename := d.Name + "-reg.sock"
 	instanceName := d.Name + d.InstanceSuffix
 	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
@@ -447,6 +459,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 		// All listeners running in this pod use a new unique local port number
 		// by atomically incrementing this variable.
 		listenerPort := int32(9000)
+		rollingUpdateUID := pod.UID
+		serialize := true
+		if !d.RollingUpdate {
+			rollingUpdateUID = ""
+			// A test might have to execute two gRPC calls in parallel, so only
+			// serialize when we explicitly want to test a rolling update.
+			serialize = false
+		}
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -456,11 +476,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
 
+			kubeletplugin.RollingUpdate(rollingUpdateUID),
+			kubeletplugin.Serialize(serialize),
+			kubeletplugin.FlockDirectoryPath(nodes.tempDir),
+
 			kubeletplugin.PluginDataDirectoryPath(pluginDataDirectoryPath),
 			kubeletplugin.PluginListener(listen(d.f, &pod, &listenerPort)),
 
 			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
-			kubeletplugin.RegistrarSocketFilename(registrarSocketFilename),
 			kubeletplugin.RegistrarListener(listen(d.f, &pod, &listenerPort)),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
