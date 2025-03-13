@@ -43,6 +43,9 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var scheme = runtime.NewScheme()
@@ -187,6 +190,7 @@ func TestBasicResponseProtobuf(t *testing.T) {
 
 // V2Beta1 should still be served
 func TestV2Beta1SkewSupport(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
 	manager := discoveryendpoint.NewResourceManager("apis")
 
 	apis := fuzzAPIGroups(1, 3, 10)

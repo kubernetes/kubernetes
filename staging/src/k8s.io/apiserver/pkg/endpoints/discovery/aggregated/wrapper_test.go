@@ -24,6 +24,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 const discoveryPath = "/apis"
@@ -103,6 +106,9 @@ func TestAggregationEnabled(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		if tc.accept == aggregatedV2Beta1JSONAccept || tc.accept == aggregatedV2Beta1ProtoAccept {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AggregatedDiscoveryRemoveBetaType, false)
+		}
 		body := fetchPath(wrapped, discoveryPath, tc.accept)
 		assert.Equal(t, tc.expected, body)
 	}
