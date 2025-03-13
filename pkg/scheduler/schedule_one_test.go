@@ -967,23 +967,21 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 	waitOnPermitErr := errors.New("wait on permit")
 
 	table := []struct {
-		name                                   string
-		sendPod                                *v1.Pod
-		registerPluginFuncs                    []tf.RegisterPluginFunc
-		injectSchedulingError                  error
-		injectBindError                        error
-		mockScheduleResult                     ScheduleResult
-		mockWaitOnPermitResult                 *framework.Status
-		mockRunPreBindPluginsResult            *framework.Status
-		expectErrorPod                         *v1.Pod
-		expectAssumedPod                       *v1.Pod
-		expectError                            error
-		expectBind                             *v1.Binding
-		eventReason                            string
-		expectedNumCallsToFailureHandler       int
-		expectPodIsInFlightAtFailureHandler    bool
-		expectPodIsInFlightAtWaitOnPermit      bool
-		expectPodIsInFlightAtRunPreBindPlugins bool
+		name                                string
+		sendPod                             *v1.Pod
+		registerPluginFuncs                 []tf.RegisterPluginFunc
+		injectSchedulingError               error
+		injectBindError                     error
+		mockScheduleResult                  ScheduleResult
+		mockWaitOnPermitResult              *framework.Status
+		mockRunPreBindPluginsResult         *framework.Status
+		expectErrorPod                      *v1.Pod
+		expectAssumedPod                    *v1.Pod
+		expectError                         error
+		expectBind                          *v1.Binding
+		eventReason                         string
+		expectPodIsInFlightAtFailureHandler bool
+		expectPodIsInFlightAtWaitOnPermit   bool
 	}{
 		{
 			name:               "error on permit",
@@ -996,7 +994,6 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectAssumedPod:                    podWithID("foo", testNode.Name),
 			expectError:                         fmt.Errorf(`running Permit plugin "FakePermit": %w`, permitErr),
 			eventReason:                         "FailedScheduling",
-			expectedNumCallsToFailureHandler:    1,
 			expectPodIsInFlightAtFailureHandler: true,
 		},
 		{
@@ -1010,7 +1007,6 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectAssumedPod:                    podWithID("foo", testNode.Name),
 			expectError:                         makePredicateError("1 on permit"),
 			eventReason:                         "FailedScheduling",
-			expectedNumCallsToFailureHandler:    1,
 			expectPodIsInFlightAtFailureHandler: true,
 		},
 		{
@@ -1020,15 +1016,13 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Wait), time.Minute)),
 			},
-			mockWaitOnPermitResult:                 framework.AsStatus(waitOnPermitErr),
-			expectErrorPod:                         podWithID("foo", testNode.Name),
-			expectAssumedPod:                       podWithID("foo", testNode.Name),
-			expectError:                            waitOnPermitErr,
-			eventReason:                            "FailedScheduling",
-			expectedNumCallsToFailureHandler:       1,
-			expectPodIsInFlightAtFailureHandler:    true,
-			expectPodIsInFlightAtWaitOnPermit:      true,
-			expectPodIsInFlightAtRunPreBindPlugins: false,
+			mockWaitOnPermitResult:              framework.AsStatus(waitOnPermitErr),
+			expectErrorPod:                      podWithID("foo", testNode.Name),
+			expectAssumedPod:                    podWithID("foo", testNode.Name),
+			expectError:                         waitOnPermitErr,
+			eventReason:                         "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler: true,
+			expectPodIsInFlightAtWaitOnPermit:   true,
 		},
 		{
 			name:               "pod rejected while wait on permit",
@@ -1037,15 +1031,13 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPermitPlugin("FakePermit", tf.NewFakePermitPlugin(framework.NewStatus(framework.Wait), time.Minute)),
 			},
-			mockWaitOnPermitResult:                 framework.NewStatus(framework.Unschedulable, "wait on permit"),
-			expectErrorPod:                         podWithID("foo", testNode.Name),
-			expectAssumedPod:                       podWithID("foo", testNode.Name),
-			expectError:                            makePredicateError("1 wait on permit"),
-			eventReason:                            "FailedScheduling",
-			expectedNumCallsToFailureHandler:       1,
-			expectPodIsInFlightAtFailureHandler:    true,
-			expectPodIsInFlightAtWaitOnPermit:      true,
-			expectPodIsInFlightAtRunPreBindPlugins: false,
+			mockWaitOnPermitResult:              framework.NewStatus(framework.Unschedulable, "wait on permit"),
+			expectErrorPod:                      podWithID("foo", testNode.Name),
+			expectAssumedPod:                    podWithID("foo", testNode.Name),
+			expectError:                         makePredicateError("1 wait on permit"),
+			eventReason:                         "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler: true,
+			expectPodIsInFlightAtWaitOnPermit:   true,
 		},
 		{
 			name:               "error prebind pod",
@@ -1054,30 +1046,26 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			registerPluginFuncs: []tf.RegisterPluginFunc{
 				tf.RegisterPreBindPlugin("FakePreBind", tf.NewFakePreBindPlugin(framework.NewStatus(framework.Unschedulable))),
 			},
-			mockWaitOnPermitResult:                 framework.NewStatus(framework.Success),
-			mockRunPreBindPluginsResult:            framework.NewStatus(framework.Unschedulable, preBindErr.Error()),
-			expectErrorPod:                         podWithID("foo", testNode.Name),
-			expectAssumedPod:                       podWithID("foo", testNode.Name),
-			expectError:                            preBindErr,
-			eventReason:                            "FailedScheduling",
-			expectedNumCallsToFailureHandler:       1,
-			expectPodIsInFlightAtFailureHandler:    false,
-			expectPodIsInFlightAtWaitOnPermit:      true,
-			expectPodIsInFlightAtRunPreBindPlugins: false,
+			mockWaitOnPermitResult:              framework.NewStatus(framework.Success),
+			mockRunPreBindPluginsResult:         framework.NewStatus(framework.Unschedulable, preBindErr.Error()),
+			expectErrorPod:                      podWithID("foo", testNode.Name),
+			expectAssumedPod:                    podWithID("foo", testNode.Name),
+			expectError:                         preBindErr,
+			eventReason:                         "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler: false,
+			expectPodIsInFlightAtWaitOnPermit:   true,
 		},
 		{
-			name:                                   "bind assumed pod scheduled",
-			sendPod:                                podWithID("foo", ""),
-			mockScheduleResult:                     scheduleResultOk,
-			expectBind:                             bindingOk,
-			expectAssumedPod:                       podWithID("foo", testNode.Name),
-			mockWaitOnPermitResult:                 framework.NewStatus(framework.Success),
-			mockRunPreBindPluginsResult:            framework.NewStatus(framework.Success),
-			eventReason:                            "Scheduled",
-			expectedNumCallsToFailureHandler:       0,
-			expectPodIsInFlightAtFailureHandler:    false,
-			expectPodIsInFlightAtWaitOnPermit:      true,
-			expectPodIsInFlightAtRunPreBindPlugins: false,
+			name:                                "bind assumed pod scheduled",
+			sendPod:                             podWithID("foo", ""),
+			mockScheduleResult:                  scheduleResultOk,
+			expectBind:                          bindingOk,
+			expectAssumedPod:                    podWithID("foo", testNode.Name),
+			mockWaitOnPermitResult:              framework.NewStatus(framework.Success),
+			mockRunPreBindPluginsResult:         framework.NewStatus(framework.Success),
+			eventReason:                         "Scheduled",
+			expectPodIsInFlightAtFailureHandler: false,
+			expectPodIsInFlightAtWaitOnPermit:   true,
 		},
 		{
 			name:                                "error pod failed scheduling",
@@ -1087,35 +1075,30 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 			expectError:                         schedulingErr,
 			expectErrorPod:                      podWithID("foo", ""),
 			eventReason:                         "FailedScheduling",
-			expectedNumCallsToFailureHandler:    1,
 			expectPodIsInFlightAtFailureHandler: true,
 		},
 		{
-			name:                                   "error bind forget pod failed scheduling",
-			sendPod:                                podWithID("foo", ""),
-			mockScheduleResult:                     scheduleResultOk,
-			mockWaitOnPermitResult:                 framework.NewStatus(framework.Success),
-			mockRunPreBindPluginsResult:            framework.NewStatus(framework.Success),
-			expectBind:                             bindingOk,
-			expectAssumedPod:                       podWithID("foo", testNode.Name),
-			injectBindError:                        bindingErr,
-			expectError:                            fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", bindingErr),
-			expectErrorPod:                         podWithID("foo", testNode.Name),
-			eventReason:                            "FailedScheduling",
-			expectedNumCallsToFailureHandler:       1,
-			expectPodIsInFlightAtFailureHandler:    false,
-			expectPodIsInFlightAtWaitOnPermit:      true,
-			expectPodIsInFlightAtRunPreBindPlugins: false,
+			name:                                "error bind forget pod failed scheduling",
+			sendPod:                             podWithID("foo", ""),
+			mockScheduleResult:                  scheduleResultOk,
+			mockWaitOnPermitResult:              framework.NewStatus(framework.Success),
+			mockRunPreBindPluginsResult:         framework.NewStatus(framework.Success),
+			expectBind:                          bindingOk,
+			expectAssumedPod:                    podWithID("foo", testNode.Name),
+			injectBindError:                     bindingErr,
+			expectError:                         fmt.Errorf("running Bind plugin %q: %w", "DefaultBinder", bindingErr),
+			expectErrorPod:                      podWithID("foo", testNode.Name),
+			eventReason:                         "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler: false,
+			expectPodIsInFlightAtWaitOnPermit:   true,
 		},
 		{
-			name:                                   "deleting pod",
-			sendPod:                                deletingPod("foo"),
-			mockScheduleResult:                     emptyScheduleResult,
-			eventReason:                            "FailedScheduling",
-			expectedNumCallsToFailureHandler:       0,
-			expectPodIsInFlightAtFailureHandler:    false,
-			expectPodIsInFlightAtWaitOnPermit:      false,
-			expectPodIsInFlightAtRunPreBindPlugins: false,
+			name:                                "deleting pod",
+			sendPod:                             deletingPod("foo"),
+			mockScheduleResult:                  emptyScheduleResult,
+			eventReason:                         "FailedScheduling",
+			expectPodIsInFlightAtFailureHandler: false,
+			expectPodIsInFlightAtWaitOnPermit:   false,
 		},
 	}
 
@@ -1238,9 +1221,11 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				if diff := cmp.Diff(item.expectBind, gotBinding); diff != "" {
 					t.Errorf("Unexpected binding (-want,+got):\n%s", diff)
 				}
-				if item.expectedNumCallsToFailureHandler != gotCallsToFailureHandler {
-					t.Errorf("expected %v calls to FailureHandlerFn, got %v",
-						item.expectedNumCallsToFailureHandler, gotCallsToFailureHandler)
+				if item.expectError != nil && gotCallsToFailureHandler != 1 {
+					t.Errorf("expected 1 call to FailureHandlerFn, got %v", gotCallsToFailureHandler)
+				}
+				if item.expectError == nil && gotCallsToFailureHandler != 0 {
+					t.Errorf("expected 0 calls to FailureHandlerFn, got %v", gotCallsToFailureHandler)
 				}
 				if (item.expectPodIsInFlightAtFailureHandler && qHintEnabled) != gotPodIsInFlightAtFailureHandler {
 					t.Errorf("unexpected pod being in flight in FailureHandlerFn, expected %v but got %v.",
@@ -1250,9 +1235,8 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					t.Errorf("unexpected pod being in flight at start of WaiOnPermit, expected %v but got %v",
 						item.expectPodIsInFlightAtWaitOnPermit, gotPodIsInFlightAtWaitOnPermit)
 				}
-				if (item.expectPodIsInFlightAtRunPreBindPlugins && qHintEnabled) != gotPodIsInFlightAtRunPreBindPlugins {
-					t.Errorf("unexpected pod being in flight at start of RunPreBindPlugins, expected %v but got %v",
-						item.expectPodIsInFlightAtRunPreBindPlugins, gotPodIsInFlightAtRunPreBindPlugins)
+				if gotPodIsInFlightAtRunPreBindPlugins {
+					t.Errorf("unexpected pod being in flight at start of RunPreBindPlugins")
 				}
 				// We have to use wait here
 				// because the Pod goes to the binding cycle in some test cases and the inflight pods might not be empty immediately at this point in such case.
