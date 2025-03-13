@@ -38,6 +38,8 @@ export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export LOG_LEVEL=4
 
+export KUBE_GOMAXPROCS_SCALE_FACTOR=2
+
 cd "${GOPATH}/src/k8s.io/kubernetes"
 
 ./hack/install-etcd.sh
