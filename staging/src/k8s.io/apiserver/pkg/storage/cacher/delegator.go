@@ -49,12 +49,12 @@ var (
 	// List latency SLO (30 seconds) and timeout (1 minute).
 	ConsistencyCheckPeriod = 5 * time.Minute
 	// ConsistencyCheckerEnabled enables the consistency checking mechanism for cache.
-	// Based on KUBE_WATCHCACHE_CONSISTANCY_CHECKER environment variable.
+	// Based on KUBE_WATCHCACHE_CONSISTENCY_CHECKER environment variable.
 	ConsistencyCheckerEnabled = false
 )
 
 func init() {
-	ConsistencyCheckerEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHCACHE_CONSISTANCY_CHECKER"))
+	ConsistencyCheckerEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHCACHE_CONSISTENCY_CHECKER"))
 }
 
 func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegator {
