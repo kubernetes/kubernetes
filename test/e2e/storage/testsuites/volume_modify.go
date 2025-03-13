@@ -281,7 +281,7 @@ func SetPVCVACName(ctx context.Context, origPVC *v1.PersistentVolumeClaim, name 
 
 		patchedPVC, err = c.CoreV1().PersistentVolumeClaims(origPVC.Namespace).Patch(ctx, pvcName, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 		return err
-	}, timeout, modifyPollInterval).Should(gomega.BeNil())
+	}, timeout, modifyPollInterval).Should(gomega.Succeed())
 
 	return patchedPVC
 }

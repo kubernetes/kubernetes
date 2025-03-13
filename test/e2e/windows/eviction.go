@@ -18,6 +18,7 @@ package windows
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -176,21 +177,20 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		framework.ExpectNoError(err)
 
 		framework.Logf("Waiting for pod2 to get evicted")
-		gomega.Eventually(ctx, func() bool {
+		gomega.Eventually(ctx, func() error {
 			eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 			if err != nil {
-				framework.Logf("Error getting events: %v", err)
-				return false
+				return fmt.Errorf("error getting events: %w", err)
 			}
 			for _, e := range eventList.Items {
 				// Look for an event that shows FailedScheduling
 				if e.Type == "Warning" && e.Reason == "Evicted" && strings.Contains(e.Message, "pod2") {
 					framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
-					return true
+					return nil
 				}
 			}
-			return false
-		}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("Eviction Event was not found"))
+			return fmt.Errorf("did not find any FailedScheduling event for pod %s", pod2.ObjectMeta.Name)
+		}, 10*time.Minute, 10*time.Second).Should(gomega.Succeed())
 
 		ginkgo.By("Waiting for node.kubernetes.io/memory-pressure taint to be removed")
 		// ensure e2e test framework catches the memory-pressure taint

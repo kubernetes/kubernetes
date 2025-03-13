@@ -237,14 +237,16 @@ func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	// Wait for the Kubelet to be ready.
-	gomega.Eventually(ctx, func(ctx context.Context) bool {
+	gomega.Eventually(ctx, func(ctx context.Context) error {
 		nodes, err := e2enode.TotalReady(ctx, f.ClientSet)
 		if err != nil {
-			framework.Logf("Error getting ready nodes: %v", err)
-			return false
+			return fmt.Errorf("error getting ready nodes: %w", err)
 		}
-		return nodes == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in ready state"))
+		if nodes != 1 {
+			return fmt.Errorf("expected 1 ready node, got %d", nodes)
+		}
+		return nil
+	}, time.Minute, time.Second).Should(gomega.Succeed())
 }
 
 func deleteStateFile(stateFileName string) {
