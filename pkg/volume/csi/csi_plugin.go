@@ -191,7 +191,7 @@ func updateCSIDriver(pluginName string) error {
 
 func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {
 	if spec == nil || spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
-		klog.InfoS("Invalid volume spec for CSI")
+		klog.ErrorS(nil, "Invalid volume spec for CSI", "nodeName", nodeName)
 		return
 	}
 
