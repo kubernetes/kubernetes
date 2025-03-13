@@ -141,7 +141,9 @@ type Pool struct {
 // Slice is turned into one ResourceSlice by the controller.
 type Slice struct {
 	// Devices lists all devices which are part of the slice.
-	Devices []resourceapi.Device
+	Devices                []resourceapi.Device
+	SharedCounters         []resourceapi.CounterSet
+	PerDeviceNodeSelection *bool
 }
 
 // +k8s:deepcopy-gen=true
@@ -548,7 +550,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
 				!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
 				currentSlice.Spec.AllNodes != desiredAllNodes ||
-				!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) {
+				!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
 				changedDesiredSlices.Insert(i)
 				logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
 			}
@@ -588,6 +592,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			// have listed the existing slice.
 			slice.Spec.NodeSelector = pool.NodeSelector
 			slice.Spec.AllNodes = desiredAllNodes
+			slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
+			slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 			// Preserve TimeAdded from existing device, if there is a matching device and taint.
 			slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
@@ -639,12 +645,14 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 					GenerateName:    generateName,
 				},
 				Spec: resourceapi.ResourceSliceSpec{
-					Driver:       c.driverName,
-					Pool:         desiredPool,
-					NodeName:     nodeName,
-					NodeSelector: pool.NodeSelector,
-					AllNodes:     desiredAllNodes,
-					Devices:      pool.Slices[i].Devices,
+					Driver:                 c.driverName,
+					Pool:                   desiredPool,
+					NodeName:               nodeName,
+					NodeSelector:           pool.NodeSelector,
+					AllNodes:               desiredAllNodes,
+					Devices:                pool.Slices[i].Devices,
+					SharedCounters:         pool.Slices[i].SharedCounters,
+					PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
 				},
 			}
 

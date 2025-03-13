@@ -27,48 +27,72 @@ import (
 	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
+func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+	switch {
+	case nodeNameToMatch != "":
+		return node != nil && node.Name == nodeNameToMatch, nil
+	case allNodesMatch:
+		return true, nil
+	case nodeSelector != nil:
+		selector, err := nodeaffinity.NewNodeSelector(nodeSelector)
+		if err != nil {
+			return false, fmt.Errorf("failed to parse node selector %s: %w", nodeSelector.String(), err)
+		}
+		return selector.Match(node), nil
+	}
+
+	return false, nil
+}
+
 // GatherPools collects information about all resource pools which provide
 // devices that are accessible from the given node.
 //
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, partitionableDevicesEnabled bool) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, features Features) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
-	nodeName := ""
-	if node != nil {
-		nodeName = node.Name
-	}
 
 	for _, slice := range slices {
+		if !features.PartitionableDevices && (len(slice.Spec.SharedCounters) > 0 || slice.Spec.PerDeviceNodeSelection != nil) {
+			continue
+		}
+
 		switch {
-		case slice.Spec.NodeName != "":
-			if slice.Spec.NodeName == nodeName {
-				if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
-					return nil, fmt.Errorf("add node slice %s: %w", slice.Name, err)
-				}
-			}
-		case slice.Spec.AllNodes:
-			if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
-				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
-			}
-		case slice.Spec.NodeSelector != nil:
-			// TODO: move conversion into api.
-			selector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
+		case slice.Spec.NodeName != "" || slice.Spec.AllNodes || slice.Spec.NodeSelector != nil:
+			match, err := nodeMatches(node, slice.Spec.NodeName, slice.Spec.AllNodes, slice.Spec.NodeSelector)
 			if err != nil {
-				return nil, fmt.Errorf("node selector in resource slice %s: %w", slice.Name, err)
+				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
-			if selector.Match(node) {
-				if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
-					return nil, fmt.Errorf("add matching slice %s: %w", slice.Name, err)
+			if match {
+				if err := addSlice(pools, slice); err != nil {
+					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 				}
 			}
-		case slice.Spec.PerDeviceNodeSelection:
-			// We add the slice here regardless of whether the partitionable devices feature is
-			// enabled. If we don't, the full slice will be considered incomplete. So we filter
-			// out devices that have fields from the partitionable devices feature set later.
-			if err := addSlice(pools, slice, node, partitionableDevicesEnabled); err != nil {
-				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
+		case slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection:
+			for _, device := range slice.Spec.Devices {
+				if device.Basic == nil {
+					continue
+				}
+				var nodeName string
+				var allNodes bool
+				if device.Basic.NodeName != nil {
+					nodeName = *device.Basic.NodeName
+				}
+				if device.Basic.AllNodes != nil {
+					allNodes = *device.Basic.AllNodes
+				}
+				match, err := nodeMatches(node, nodeName, allNodes, device.Basic.NodeSelector)
+				if err != nil {
+					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
+						device.String(), slice.Name, err)
+				}
+				if match {
+					if err := addSlice(pools, slice); err != nil {
+						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
+					}
+					break
+				}
 			}
 		default:
 			// Nothing known was set. This must be some future, unknown extension,
@@ -94,16 +118,9 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	return result, nil
 }
 
-func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice, node *v1.Node, partitionableDevicesEnabled bool) error {
+func addSlice(pools map[PoolID]*Pool, s *resourceapi.ResourceSlice) error {
 	var slice draapi.ResourceSlice
-	sliceScope := draapi.SliceScope{
-		SliceContext: draapi.SliceContext{
-			Slice:                       s,
-			Node:                        node,
-			PartitionableDevicesEnabled: partitionableDevicesEnabled,
-		},
-	}
-	if err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(s, &slice, sliceScope); err != nil {
+	if err := draapi.Convert_v1beta1_ResourceSlice_To_api_ResourceSlice(s, &slice, nil); err != nil {
 		return fmt.Errorf("convert ResourceSlice: %w", err)
 	}
 
