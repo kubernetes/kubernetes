@@ -19,7 +19,6 @@ package request
 import (
 	"math"
 	"net/http"
-	"net/url"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -86,8 +85,8 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 		}
 	}
-
-	isListFromCache := requestInfo.Verb == "watch" || !shouldListFromStorage(query, &listOptions)
+	listFromStorage, _ := shouldListFromStorage(&listOptions)
+	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
@@ -163,30 +162,32 @@ func key(requestInfo *apirequest.RequestInfo) string {
 // NOTICE: Keep in sync with shouldDelegateList function in
 //
 //	staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
+func shouldListFromStorage(opts *metav1.ListOptions) (shouldDeletage, consistentRead bool) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
+	consistentRead = false
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true
+		return true, consistentRead
 	case metav1.ResourceVersionMatchNotOlderThan:
-		return false
+		return false, consistentRead
 	case "":
 		// Legacy exact match
 		if opts.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true
+			return true, consistentRead
 		}
 		// Continue
 		if len(opts.Continue) > 0 {
-			return true
+			return true, consistentRead
 		}
 		// Consistent Read
 		if opts.ResourceVersion == "" {
+			consistentRead = true
 			consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 			requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-			return !consistentListFromCacheEnabled || !requestWatchProgressSupported
+			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead
 		}
-		return false
+		return false, consistentRead
 	default:
-		return true
+		return true, consistentRead
 	}
 }
