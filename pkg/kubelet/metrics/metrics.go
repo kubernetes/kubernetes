@@ -153,6 +153,11 @@ const (
 
 	// Metrics to track kubelet admission rejections.
 	AdmissionRejectionsTotalKey = "admission_rejections_total"
+
+	// Image Volume metrics
+	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
+	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
+	ImageVolumeMountedErrorsTotalKey  = "image_volume_mounted_errors_total"
 )
 
 type imageSizeBucket struct {
@@ -1020,6 +1025,36 @@ var (
 		},
 		[]string{"reason"},
 	)
+
+	// ImageVolumeRequestedTotal trakcs the number of requested image volumes.
+	ImageVolumeRequestedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeRequestedTotalKey,
+			Help:           "Number of requested image volumes.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// ImageVolumeMountedSucceedTotal tracks the number of successful image volume mounts.
+	ImageVolumeMountedSucceedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeMountedSucceedTotalKey,
+			Help:           "Number of successful image volume mounts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// ImageVolumeMountedErrorsTotal tracks the number of failed image volume mounts.
+	ImageVolumeMountedErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ImageVolumeMountedErrorsTotalKey,
+			Help:           "Number of failed image volume mounts.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1120,6 +1155,12 @@ func Register(collectors ...metrics.StableCollector) {
 		}
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+			legacyregistry.MustRegister(ImageVolumeRequestedTotal)
+			legacyregistry.MustRegister(ImageVolumeMountedSucceedTotal)
+			legacyregistry.MustRegister(ImageVolumeMountedErrorsTotal)
+		}
 	})
 }
 

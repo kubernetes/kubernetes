@@ -284,13 +284,34 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		var (
-			hostPath string
-			image    *runtimeapi.ImageSpec
-			err      error
+			hostPath     string
+			image        *runtimeapi.ImageSpec
+			imageSubPath string
+			err          error
 		)
+
+		subPath := mount.SubPath
+		if mount.SubPathExpr != "" {
+			subPath, err = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
+
+			if err != nil {
+				return nil, cleanupAction, err
+			}
+		}
+
+		if subPath != "" {
+			if utilfs.IsAbs(subPath) {
+				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
+			}
+
+			if err := volumevalidation.ValidatePathNoBacksteps(subPath); err != nil {
+				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %w", subPath, err)
+			}
+		}
 
 		if imageVolumes != nil && utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 			image = imageVolumes[mount.Name]
+			imageSubPath = subPath
 		}
 
 		if image == nil {
@@ -299,25 +320,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, err
 			}
 
-			subPath := mount.SubPath
-			if mount.SubPathExpr != "" {
-				subPath, err = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
-
-				if err != nil {
-					return nil, cleanupAction, err
-				}
-			}
-
 			if subPath != "" {
-				if utilfs.IsAbs(subPath) {
-					return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
-				}
-
-				err = volumevalidation.ValidatePathNoBacksteps(subPath)
-				if err != nil {
-					return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %w", subPath, err)
-				}
-
 				volumePath := hostPath
 				hostPath = filepath.Join(volumePath, subPath)
 
@@ -386,6 +389,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			ContainerPath:     containerPath,
 			HostPath:          hostPath,
 			Image:             image,
+			ImageSubPath:      imageSubPath,
 			ReadOnly:          mount.ReadOnly || mustMountRO,
 			RecursiveReadOnly: rro,
 			SELinuxRelabel:    relabelVolume,

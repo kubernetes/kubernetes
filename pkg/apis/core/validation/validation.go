@@ -2946,16 +2946,6 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("mountPath"), mnt.MountPath, "must not already exist as a path in volumeDevices"))
 		}
 
-		// Disallow subPath/subPathExpr for image volumes
-		if v, ok := volumes[mnt.Name]; ok && v.Image != nil {
-			if len(mnt.SubPath) != 0 {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPath"), mnt.SubPath, "not allowed in image volume sources"))
-			}
-			if len(mnt.SubPathExpr) != 0 {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("subPathExpr"), mnt.SubPathExpr, "not allowed in image volume sources"))
-			}
-		}
-
 		if len(mnt.SubPath) > 0 {
 			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
 		}

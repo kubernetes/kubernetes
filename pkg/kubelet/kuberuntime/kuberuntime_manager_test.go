@@ -24,6 +24,7 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,8 +44,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	crierror "k8s.io/cri-api/pkg/errors"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -53,6 +56,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
@@ -3369,6 +3373,127 @@ func TestDoPodResizeAction(t *testing.T) {
 			}
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
+		})
+	}
+}
+
+func TestIncrementImageVolumeMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+	metrics.Register()
+
+	testCases := map[string]struct {
+		err          error
+		msg          string
+		volumeMounts []v1.VolumeMount
+		imageVolumes kubecontainer.ImageVolumes
+		wants        string
+	}{
+		"without error": {
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 2
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"with error": {
+			err: ErrCreateContainer,
+			msg: crierror.ErrImageVolumeMountFailed.Error(),
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 2
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"with unknown CRI error from message": {
+			err: ErrCreateContainer,
+			msg: "",
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 2
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"without used volume": {
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 0
+			`,
+		},
+	}
+
+	// Run tests.
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			metrics.ImageVolumeRequestedTotal.Reset()
+			metrics.ImageVolumeMountedErrorsTotal.Reset()
+			metrics.ImageVolumeMountedSucceedTotal.Reset()
+
+			// Call the function.
+			incrementImageVolumeMetrics(tc.err, tc.msg, &v1.Container{VolumeMounts: tc.volumeMounts}, tc.imageVolumes)
+
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants),
+				"kubelet_"+metrics.ImageVolumeRequestedTotalKey,
+				"kubelet_"+metrics.ImageVolumeMountedSucceedTotalKey,
+				"kubelet_"+metrics.ImageVolumeMountedErrorsTotalKey,
+			); err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }

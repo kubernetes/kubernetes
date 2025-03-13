@@ -472,6 +472,9 @@ type Mount struct {
 	Propagation runtimeapi.MountPropagation
 	// Image is set if an OCI volume as image ID or digest should get mounted (special case).
 	Image *runtimeapi.ImageSpec
+	// ImageSubPath is set if an image volume sub path should get mounted. This
+	// field is only required if the above Image is set.
+	ImageSubPath string
 }
 
 // ImageVolumes is a map of image specs by volume name.

@@ -23,6 +23,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -1297,7 +1298,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		}
 
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
-		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs, imageVolumes); err != nil {
+		msg, err = m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs, imageVolumes)
+		incrementImageVolumeMetrics(err, msg, spec.container, imageVolumes)
+		if err != nil {
 			// startContainer() returns well-defined error codes that have reasonable cardinality for metrics and are
 			// useful to cluster administrators to distinguish "server errors" from "user errors".
 			metrics.StartedContainersErrorsTotal.WithLabelValues(metricLabel, err.Error()).Inc()
@@ -1372,6 +1375,27 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	return
+}
+
+// incrementImageVolumeMetrics increments the image volume mount metrics
+// depending on the provided error and the usage of the image volume mount
+// within the container.
+func incrementImageVolumeMetrics(err error, msg string, container *v1.Container, imageVolumes kubecontainer.ImageVolumes) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
+		return
+	}
+
+	metrics.ImageVolumeRequestedTotal.Add(float64(len(imageVolumes)))
+
+	for _, m := range container.VolumeMounts {
+		if _, exists := imageVolumes[m.Name]; exists {
+			if errors.Is(err, ErrCreateContainer) && strings.HasPrefix(msg, crierror.ErrImageVolumeMountFailed.Error()) {
+				metrics.ImageVolumeMountedErrorsTotal.Inc()
+			} else {
+				metrics.ImageVolumeMountedSucceedTotal.Inc()
+			}
+		}
+	}
 }
 
 // imageVolumePulls are the pull results for each image volume name.
