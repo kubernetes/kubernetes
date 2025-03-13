@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/certificate/csr"
+	"k8s.io/utils/ptr"
 
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	podutilv1 "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -1123,7 +1124,7 @@ func printReplicationController(obj *api.ReplicationController, options printers
 		Object: runtime.RawExtension{Object: obj},
 	}
 
-	desiredReplicas := obj.Spec.Replicas
+	desiredReplicas := ptr.Deref(obj.Spec.Replicas, 0)
 	currentReplicas := obj.Status.Replicas
 	readyReplicas := obj.Status.ReadyReplicas
 

@@ -16670,7 +16670,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 		update: core.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 			Spec: core.ReplicationControllerSpec{
-				Replicas: 3,
+				Replicas: ptr.To[int32](3),
 				Selector: validSelector,
 				Template: &validPodTemplate.Template,
 			},
@@ -16702,7 +16702,7 @@ func TestValidateReplicationControllerStatusUpdate(t *testing.T) {
 			update: core.ReplicationController{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: core.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: ptr.To[int32](2),
 					Selector: validSelector,
 					Template: &validPodTemplate.Template,
 				},
@@ -16725,7 +16725,7 @@ func mkValidReplicationController(tweaks ...func(rc *core.ReplicationController)
 	rc := core.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 		Spec: core.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: ptr.To[int32](1),
 			Selector: map[string]string{"a": "b"},
 			Template: &core.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -16748,17 +16748,17 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	}{{
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 0
+			rc.Spec.Replicas = ptr.To[int32](0)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 3
+			rc.Spec.Replicas = ptr.To[int32](3)
 		}),
 	}, {
 		old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		update: mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 2
+			rc.Spec.Replicas = ptr.To[int32](2)
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
 				podtest.SetVolumes(
 					core.Volume{
@@ -16816,10 +16816,19 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		"negative replicas": {
 			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
 			update: mkValidReplicationController(func(rc *core.ReplicationController) {
-				rc.Spec.Replicas = -1
+				rc.Spec.Replicas = ptr.To[int32](-1)
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nil replicas": {
+			old: mkValidReplicationController(func(rc *core.ReplicationController) {}),
+			update: mkValidReplicationController(func(rc *core.ReplicationController) {
+				rc.Spec.Replicas = nil
+			}),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 	}
@@ -16839,7 +16848,7 @@ func TestValidateReplicationController(t *testing.T) {
 		mkValidReplicationController(func(rc *core.ReplicationController) {}),
 		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Name = "abc-123" }),
 		mkValidReplicationController(func(rc *core.ReplicationController) {
-			rc.Spec.Replicas = 2
+			rc.Spec.Replicas = ptr.To[int32](2)
 			rc.Spec.Template.Spec = podtest.MakePodSpec(
 				podtest.SetVolumes(
 					core.Volume{
@@ -16860,9 +16869,9 @@ func TestValidateReplicationController(t *testing.T) {
 					}))),
 			)
 		}),
-		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 0 }),
-		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 1 }),
-		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = 100 }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](0) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](1) }),
+		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](100) }),
 	}
 	for _, tc := range successCases {
 		if errs := ValidateReplicationController(&tc, PodValidationOptions{}); len(errs) != 0 {
@@ -16905,9 +16914,15 @@ func TestValidateReplicationController(t *testing.T) {
 			},
 		},
 		"negative replicas": {
-			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = -1 }),
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = ptr.To[int32](-1) }),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec.replicas"), nil, "").WithOrigin("minimum"),
+			},
+		},
+		"nil replicas": {
+			input: mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.Replicas = nil }),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec.replicas"), ""),
 			},
 		},
 		"invalid label": {
