@@ -236,6 +236,17 @@ const (
 	//
 	// Allow the API server to serve consistent lists from cache
 	ConsistentListFromCache featuregate.Feature = "ConsistentListFromCache"
+
+	// owner: @lavacat
+	//
+	// enable etcd grpc client health checking
+	// see https://grpc.io/docs/guides/health-checking/#enabling-client-health-checking
+	//
+	// etcd has server side health service enabled since 3.5.0
+	// https://github.com/etcd-io/etcd/commit/c1e3172e3a7157e812c5c76eaedc9a97fe257716
+	// etcd 3.5.14 added `--experimental-stop-grpc-service-on-defrag` that will set NOT_SERVING during defragmentation
+	// https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md#v3514-2024-05-29
+	EtcdGrpcHealthcheck featuregate.Feature = "EtcdGrpcHealthcheck"
 )
 
 func init() {
@@ -308,6 +319,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	CoordinatedLeaderElection: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	EtcdGrpcHealthcheck: {
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	KMSv1: {
