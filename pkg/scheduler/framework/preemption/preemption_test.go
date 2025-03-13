@@ -63,6 +63,10 @@ var (
 	}
 )
 
+func init() {
+	metrics.Register()
+}
+
 type FakePostFilterPlugin struct {
 	numViolatingVictim int
 }
@@ -140,7 +144,6 @@ func (pl *FakePreemptionScorePostFilterPlugin) OrderedScoreFuncs(ctx context.Con
 }
 
 func TestDryRunPreemption(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name               string
 		nodes              []*v1.Node

@@ -46,6 +46,10 @@ var nodeInfoCmpOpts = []cmp.Option{
 	cmpopts.IgnoreFields(framework.PodInfo{}, "cachedResource"),
 }
 
+func init() {
+	metrics.Register()
+}
+
 func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.NodeInfo) error {
 	if (actual == nil) != (expected == nil) {
 		return errors.New("one of the actual or expected is nil and the other is not")
@@ -273,7 +277,6 @@ func assumeAndFinishBinding(logger klog.Logger, cache *cacheImpl, pod *v1.Pod, a
 // TestExpirePod tests that assumed pods will be removed if expired.
 // The removal will be reflected in node info.
 func TestExpirePod(t *testing.T) {
-	metrics.Register()
 	nodeName := "node"
 	testPods := []*v1.Pod{
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),

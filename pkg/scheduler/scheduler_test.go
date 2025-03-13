@@ -64,6 +64,10 @@ import (
 	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
 )
 
+func init() {
+	metrics.Register()
+}
+
 func TestSchedulerCreation(t *testing.T) {
 	invalidRegistry := map[string]frameworkruntime.PluginFactory{
 		defaultbinder.Name: defaultbinder.New,
