@@ -2403,7 +2403,6 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	// fakePodWorkers trigger syncPodFn synchronously on update, but entering
 	// kubelet.SyncPod while holding the podResizeMutex can lead to deadlock.
@@ -2837,8 +2836,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
-				kubelet.statusManager = status.NewFakeManager()
-
 				var originalPod *v1.Pod
 				var originalCtr *v1.Container
 				if isSidecarContainer {
