@@ -629,9 +629,9 @@ kube::golang::setup_gomaxprocs() {
       GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
     fi
     if command -v ncpu >/dev/null 2>&1; then
-      GOMAXPROCS=$(ncpu)
+      GOMAXPROCS=$(( $(ncpu) * ${KUBE_GOMAXPROCS_SCALE_FACTOR:-1} ))
       export GOMAXPROCS
-      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS}"
+      kube::log::status "Set GOMAXPROCS automatically to ${GOMAXPROCS} with a scale factor of ${KUBE_GOMAXPROCS_SCALE_FACTOR:-1}."
     fi
   fi
 }
