@@ -1802,6 +1802,91 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
+	ginkgo.It("rolling update", func(ctx context.Context) {
+		nodes := NewNodesNow(ctx, f, 1, 1)
+
+		oldDriver := NewDriverInstance(f)
+		oldDriver.InstanceSuffix = "-old"
+		oldDriver.RollingUpdate = true
+		oldDriver.Run(nodes, perNode(1, nodes))
+
+		// We expect one ResourceSlice per node from the driver.
+		getSlices := oldDriver.NewGetSlices()
+		gomega.Eventually(ctx, getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+		initialSlices, err := getSlices(ctx)
+		framework.ExpectNoError(err)
+
+		// Same driver name, different socket paths because of rolling update.
+		newDriver := NewDriverInstance(f)
+		newDriver.InstanceSuffix = "-new"
+		newDriver.RollingUpdate = true
+		newDriver.Run(nodes, perNode(1, nodes))
+
+		// Stop old driver instance.
+		oldDriver.TearDown(ctx)
+
+		// Build behaves the same for both driver instances.
+		b := newBuilderNow(ctx, f, oldDriver)
+		claim := b.externalClaim()
+		pod := b.podExternal()
+		b.create(ctx, claim, pod)
+		b.testPod(ctx, f, pod)
+
+		// The exact same slices should still exist.
+		finalSlices, err := getSlices(ctx)
+		framework.ExpectNoError(err)
+		gomega.Expect(finalSlices.Items).Should(gomega.Equal(initialSlices.Items))
+
+		// We need to clean up explicitly because the normal
+		// cleanup doesn't work (driver shuts down first).
+		// framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+	})
+
+	ginkgo.It("failed update", func(ctx context.Context) {
+		nodes := NewNodesNow(ctx, f, 1, 1)
+
+		oldDriver := NewDriverInstance(f)
+		oldDriver.InstanceSuffix = "-old"
+		oldDriver.RollingUpdate = true
+		oldDriver.Run(nodes, perNode(1, nodes))
+
+		// We expect one ResourceSlice per node from the driver.
+		getSlices := oldDriver.NewGetSlices()
+		gomega.Eventually(ctx, getSlices).Should(gomega.HaveField("Items", gomega.HaveLen(len(nodes.NodeNames))))
+		initialSlices, err := getSlices(ctx)
+		framework.ExpectNoError(err)
+
+		// Same driver name, different socket paths because of rolling update.
+		newDriver := NewDriverInstance(f)
+		newDriver.InstanceSuffix = "-new"
+		newDriver.RollingUpdate = true
+		newDriver.Run(nodes, perNode(1, nodes))
+
+		// Stop new driver instance, simulating the failure of the new instance.
+		// The kubelet should still have the old instance.
+		newDriver.TearDown(ctx)
+
+		// Build behaves the same for both driver instances.
+		b := newBuilderNow(ctx, f, oldDriver)
+		claim := b.externalClaim()
+		pod := b.podExternal()
+		b.create(ctx, claim, pod)
+		b.testPod(ctx, f, pod)
+
+		// The exact same slices should still exist.
+		finalSlices, err := getSlices(ctx)
+		framework.ExpectNoError(err)
+		gomega.Expect(finalSlices.Items).Should(gomega.Equal(initialSlices.Items))
+
+		// We need to clean up explicitly because the normal
+		// cleanup doesn't work (driver shuts down first).
+		// framework.ExpectNoError(f.ClientSet.ResourceV1beta1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{}))
+		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
+	})
+
 	f.It("sequential update with pods replacing each other", framework.WithSlow(), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
@@ -1823,7 +1908,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 		// "Update" the driver by taking it down and bringing up a new one.
 		// Pods never run in parallel, similar to how a DaemonSet would update
-		// its pods.
+		// its pods when maxSurge is zero.
 		ginkgo.By("reinstall driver")
 		start := time.Now()
 		oldDriver.TearDown(ctx)

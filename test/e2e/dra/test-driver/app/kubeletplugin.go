@@ -168,7 +168,6 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.KubeClient(kubeClient),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
-		kubeletplugin.Serialize(false), // The example plugin does its own locking.
 	)
 	d, err := kubeletplugin.Start(ctx, ex, opts...)
 	if err != nil {
