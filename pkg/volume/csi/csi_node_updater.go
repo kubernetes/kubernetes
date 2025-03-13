@@ -131,6 +131,7 @@ func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
 	}
 	driver, ok := obj.(*v1.CSIDriver)
 	if !ok {
+		klog.InfoS("Invalid CSIDriver object type", "driver", driverName)
 		return
 	}
 
@@ -142,12 +143,16 @@ func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
 		return
 	}
 
+	newStopCh := make(chan struct{})
+	prevStopCh, loaded := u.driverUpdaters.Swap(driverName, newStopCh)
 	// If an updater is already running, stop it so we can reconfigure.
-	u.unregisterDriver(driverName)
+	if loaded && prevStopCh != nil {
+		if stopCh, ok := prevStopCh.(chan struct{}); ok {
+			close(stopCh)
+		}
+	}
 
 	// Start the periodic update goroutine.
-	newStopCh := make(chan struct{})
-	u.driverUpdaters.Store(driverName, newStopCh)
 	go u.runPeriodicUpdate(driverName, period, newStopCh)
 }
 
