@@ -131,4 +131,3 @@ func TestObjectObjectFieldsRatcheting(t *testing.T) {
 			"small": 501,
 		}}, validation.WithRatcheting(nil)).IsValid())
 }
-

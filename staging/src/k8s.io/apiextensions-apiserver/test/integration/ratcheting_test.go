@@ -1115,7 +1115,7 @@ func TestRatchetingFunctionality(t *testing.T) {
 					Properties: map[string]apiextensionsv1.JSONSchemaProps{
 						"field": {
 							Type:         "array",
-							XListType: ptr.To("map"),
+							XListType:    ptr.To("map"),
 							XListMapKeys: []string{"name", "port"},
 							Items: &apiextensionsv1.JSONSchemaPropsOrArray{
 								Schema: &apiextensionsv1.JSONSchemaProps{
