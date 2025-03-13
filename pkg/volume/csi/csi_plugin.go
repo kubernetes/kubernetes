@@ -65,7 +65,6 @@ const (
 
 type csiPlugin struct {
 	host                      volume.VolumeHost
-	csiNodeUpdater            *csiNodeUpdater
 	csiDriverLister           storagelisters.CSIDriverLister
 	csiDriverInformer         cache.SharedIndexInformer
 	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
@@ -94,6 +93,8 @@ type RegistrationHandler struct {
 var csiDrivers = &DriversStore{}
 
 var nim nodeinfomanager.Interface
+
+var csiNodeUpdaterVar *csiNodeUpdater
 
 // PluginHandler is the plugin registration handler interface passed to the
 // pluginwatcher module in kubelet
@@ -161,8 +162,8 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	if h.csiPlugin.csiNodeUpdater != nil {
-		h.csiPlugin.csiNodeUpdater.syncDriverUpdater(pluginName)
+	if csiNodeUpdaterVar != nil {
+		csiNodeUpdaterVar.syncDriverUpdater(pluginName)
 	}
 
 	return nil
@@ -270,8 +271,8 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
 	}
 
-	if h.csiPlugin.csiNodeUpdater != nil {
-		h.csiPlugin.csiNodeUpdater.syncDriverUpdater(pluginName)
+	if csiNodeUpdaterVar != nil {
+		csiNodeUpdaterVar.syncDriverUpdater(pluginName)
 	}
 }
 
@@ -349,25 +350,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	// This function prevents Kubelet from posting Ready status until CSINode
 	// is both installed and initialized
-	if err := initializeCSINode(host); err != nil {
+	if err := initializeCSINode(host, p.csiDriverInformer); err != nil {
 		return errors.New(log("failed to initialize CSINode: %v", err))
-	}
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
-		if p.csiDriverLister != nil && p.csiDriverInformer != nil {
-			csiNodeUpdater, err := NewCSINodeUpdater(p.csiDriverInformer)
-			if err != nil {
-				klog.ErrorS(err, "Failed to create CSINodeUpdater")
-			} else {
-				p.csiNodeUpdater = csiNodeUpdater
-				go p.csiNodeUpdater.Run()
-			}
-		}
 	}
 	return nil
 }
 
-func initializeCSINode(host volume.VolumeHost) error {
+func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedIndexInformer) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
 		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
@@ -422,6 +411,18 @@ func initializeCSINode(host volume.VolumeHost) error {
 			klog.Fatalf("Failed to initialize CSINode after retrying: %v", err)
 		}
 	}()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) && csiNodeUpdaterVar == nil {
+		if csiDriverInformer != nil {
+			var err error
+			csiNodeUpdaterVar, err = NewCSINodeUpdater(csiDriverInformer)
+			if err != nil {
+				klog.ErrorS(err, "Failed to create CSINodeUpdater")
+			} else {
+				go csiNodeUpdaterVar.Run()
+			}
+		}
+	}
 	return nil
 }
 

@@ -143,15 +143,22 @@ func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
 	}
 
 	// If an updater is already running, stop it so we can reconfigure.
-	newStopCh := make(chan struct{})
-	prev, loaded := u.driverUpdaters.Swap(driverName, newStopCh)
-	if loaded {
-		close(prev.(chan struct{}))
-	}
+	u.unregisterDriver(driverName)
 
 	// Start the periodic update goroutine.
+	newStopCh := make(chan struct{})
 	u.driverUpdaters.Store(driverName, newStopCh)
 	go u.runPeriodicUpdate(driverName, period, newStopCh)
+}
+
+// unregisterDriver stops any running periodic update goroutine for the given driver.
+func (u *csiNodeUpdater) unregisterDriver(driverName string) {
+	prev, loaded := u.driverUpdaters.LoadAndDelete(driverName)
+	if loaded && prev != nil {
+		if stopCh, ok := prev.(chan struct{}); ok {
+			close(stopCh)
+		}
+	}
 }
 
 // runPeriodicUpdate runs the periodic update loop for a driver.
@@ -169,15 +176,6 @@ func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Durati
 			klog.InfoS("Stopping periodic updates for driver", "driver", driverName, "period", period)
 			return
 		}
-	}
-}
-
-// unregisterDriver stops any running periodic update goroutine for the given driver.
-func (u *csiNodeUpdater) unregisterDriver(driverName string) {
-	prev, loaded := u.driverUpdaters.Swap(driverName, nil)
-	if loaded {
-		close(prev.(chan struct{}))
-		u.driverUpdaters.Delete(driverName)
 	}
 }
 
