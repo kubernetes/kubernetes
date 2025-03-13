@@ -244,6 +244,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.31"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: CPUCFSQuotaPeriod
   versionedSpecs:
   - default: false

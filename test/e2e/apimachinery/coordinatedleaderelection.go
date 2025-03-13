@@ -58,7 +58,7 @@ var _ = SIGDescribe("CoordinatedLeaderElection", feature.CoordinatedLeaderElecti
 		_ = clientset.CoordinationV1().Leases(ns).Delete(ctx, "baz", metav1.DeleteOptions{})
 		_ = clientset.CoordinationV1().Leases(ns).Delete(ctx, "bar", metav1.DeleteOptions{})
 		_ = clientset.CoordinationV1().Leases(ns).Delete(ctx, "foobar", metav1.DeleteOptions{})
-		_ = clientset.CoordinationV1alpha2().LeaseCandidates(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+		_ = clientset.CoordinationV1beta1().LeaseCandidates(ns).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
 	})
 
 	/*

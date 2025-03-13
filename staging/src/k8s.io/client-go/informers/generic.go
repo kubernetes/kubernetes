@@ -213,6 +213,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=coordination.k8s.io, Version=v1beta1
 	case coordinationv1beta1.SchemeGroupVersion.WithResource("leases"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1beta1().Leases().Informer()}, nil
+	case coordinationv1beta1.SchemeGroupVersion.WithResource("leasecandidates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Coordination().V1beta1().LeaseCandidates().Informer()}, nil
 
 		// Group=core, Version=v1
 	case corev1.SchemeGroupVersion.WithResource("componentstatuses"):

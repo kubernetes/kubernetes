@@ -25,7 +25,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha2 "k8s.io/api/coordination/v1alpha2"
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,7 +42,7 @@ func TestReconcileElectionStep(t *testing.T) {
 	tests := []struct {
 		name                    string
 		leaseNN                 types.NamespacedName
-		candidates              []*v1alpha2.LeaseCandidate
+		candidates              []*v1beta1.LeaseCandidate
 		existingLease           *v1.Lease
 		expectLease             bool
 		expectedHolderIdentity  *string
@@ -55,7 +55,7 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:                   "no candidates, no lease, noop",
 			leaseNN:                types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates:             []*v1alpha2.LeaseCandidate{},
+			candidates:             []*v1beta1.LeaseCandidate{},
 			existingLease:          nil,
 			expectLease:            false,
 			expectedHolderIdentity: nil,
@@ -66,7 +66,7 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:                   "no candidates, lease exists. noop, not managed by CLE",
 			leaseNN:                types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates:             []*v1alpha2.LeaseCandidate{},
+			candidates:             []*v1beta1.LeaseCandidate{},
 			existingLease:          &v1.Lease{},
 			expectLease:            false,
 			expectedHolderIdentity: nil,
@@ -77,13 +77,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, no existing lease should create lease",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -102,13 +102,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, lease exists, unoptimal should set preferredHolder",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -121,7 +121,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						Namespace: "default",
 						Name:      "component-identity-2",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.18.0",
 						BinaryVersion:    "1.18.0",
@@ -151,13 +151,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, should only elect leader from acked candidates",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -171,7 +171,7 @@ func TestReconcileElectionStep(t *testing.T) {
 						Namespace: "default",
 						Name:      "component-identity-2",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.20.0",
 						BinaryVersion:    "1.20.0",
@@ -191,13 +191,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, lease exists, lease expired",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -226,13 +226,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, no acked candidates should return error",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -251,13 +251,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, should ping on election",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -277,13 +277,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidate exist, pinged candidate should have until electionDuration until election decision is made",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -302,13 +302,13 @@ func TestReconcileElectionStep(t *testing.T) {
 		{
 			name:    "candidates exist, lease exists, lease expired, 3rdparty strategy",
 			leaseNN: types.NamespacedName{Namespace: "default", Name: "component-A"},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "default",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -344,9 +344,9 @@ func TestReconcileElectionStep(t *testing.T) {
 
 			controller, err := NewController(
 				informerFactory.Coordination().V1().Leases(),
-				informerFactory.Coordination().V1alpha2().LeaseCandidates(),
+				informerFactory.Coordination().V1beta1().LeaseCandidates(),
 				client.CoordinationV1(),
-				client.CoordinationV1alpha2(),
+				client.CoordinationV1beta1(),
 			)
 			controller.clock = fakeClock
 			if err != nil {
@@ -363,7 +363,7 @@ func TestReconcileElectionStep(t *testing.T) {
 
 			// Set up the fake client with the candidates
 			for _, candidate := range tc.candidates {
-				_, err = client.CoordinationV1alpha2().LeaseCandidates(candidate.Namespace).Create(ctx, candidate, metav1.CreateOptions{})
+				_, err = client.CoordinationV1beta1().LeaseCandidates(candidate.Namespace).Create(ctx, candidate, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -414,11 +414,11 @@ func TestReconcileElectionStep(t *testing.T) {
 			// Verify that ping to candidate was issued
 			if tc.candidatesPinged {
 				pinged := false
-				candidatesList, err := client.CoordinationV1alpha2().LeaseCandidates(tc.leaseNN.Namespace).List(ctx, metav1.ListOptions{})
+				candidatesList, err := client.CoordinationV1beta1().LeaseCandidates(tc.leaseNN.Namespace).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					t.Fatal(err)
 				}
-				oldCandidateMap := make(map[string]*v1alpha2.LeaseCandidate)
+				oldCandidateMap := make(map[string]*v1beta1.LeaseCandidate)
 				for _, candidate := range tc.candidates {
 					oldCandidateMap[candidate.Name] = candidate
 				}
@@ -443,20 +443,20 @@ func TestController(t *testing.T) {
 	cases := []struct {
 		name                            string
 		leases                          []*v1.Lease
-		candidates                      []*v1alpha2.LeaseCandidate
-		createAfterControllerStart      []*v1alpha2.LeaseCandidate
+		candidates                      []*v1beta1.LeaseCandidate
+		createAfterControllerStart      []*v1beta1.LeaseCandidate
 		deleteLeaseAfterControllerStart []types.NamespacedName
 		expectedLeaderLeases            []*v1.Lease
 	}{
 		{
 			name: "single candidate leader election",
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -479,13 +479,13 @@ func TestController(t *testing.T) {
 		},
 		{
 			name: "multiple candidate leader election",
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -498,7 +498,7 @@ func TestController(t *testing.T) {
 						Namespace: "kube-system",
 						Name:      "component-identity-2",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.20.0",
@@ -511,7 +511,7 @@ func TestController(t *testing.T) {
 						Namespace: "kube-system",
 						Name:      "component-identity-3",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.20.0",
 						BinaryVersion:    "1.20.0",
@@ -547,13 +547,13 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -593,13 +593,13 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -636,13 +636,13 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			candidates: []*v1alpha2.LeaseCandidate{
+			candidates: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-1",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.20.0",
 						BinaryVersion:    "1.20.0",
@@ -651,13 +651,13 @@ func TestController(t *testing.T) {
 					},
 				},
 			},
-			createAfterControllerStart: []*v1alpha2.LeaseCandidate{
+			createAfterControllerStart: []*v1beta1.LeaseCandidate{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "kube-system",
 						Name:      "component-identity-2",
 					},
-					Spec: v1alpha2.LeaseCandidateSpec{
+					Spec: v1beta1.LeaseCandidateSpec{
 						LeaseName:        "component-A",
 						EmulationVersion: "1.19.0",
 						BinaryVersion:    "1.19.0",
@@ -693,9 +693,9 @@ func TestController(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 			controller, err := NewController(
 				informerFactory.Coordination().V1().Leases(),
-				informerFactory.Coordination().V1alpha2().LeaseCandidates(),
+				informerFactory.Coordination().V1beta1().LeaseCandidates(),
 				client.CoordinationV1(),
-				client.CoordinationV1alpha2(),
+				client.CoordinationV1beta1(),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -710,7 +710,7 @@ func TestController(t *testing.T) {
 			}
 			for _, obj := range tc.candidates {
 				t.Logf("Pre-creating lease candidate %s/%s", obj.Namespace, obj.Name)
-				_, err := client.CoordinationV1alpha2().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				_, err := client.CoordinationV1beta1().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error pre-creating lease candidate %s/%s: %v", obj.Namespace, obj.Name, err)
 				}
@@ -748,7 +748,7 @@ func TestController(t *testing.T) {
 							if *ph == *l.Spec.HolderIdentity {
 								continue
 							}
-							if _, err := client.CoordinationV1alpha2().LeaseCandidates(expectedLease.Namespace).Get(ctx, *l.Spec.HolderIdentity, metav1.GetOptions{}); err != nil {
+							if _, err := client.CoordinationV1beta1().LeaseCandidates(expectedLease.Namespace).Get(ctx, *l.Spec.HolderIdentity, metav1.GetOptions{}); err != nil {
 								continue // only candidate-aware controllers will follow preferredHolder
 							}
 
@@ -772,7 +772,7 @@ func TestController(t *testing.T) {
 					case <-ctx.Done():
 						return
 					case <-ticker.C:
-						cs, err := client.CoordinationV1alpha2().LeaseCandidates("").List(ctx, metav1.ListOptions{})
+						cs, err := client.CoordinationV1beta1().LeaseCandidates("").List(ctx, metav1.ListOptions{})
 						if err != nil {
 							t.Logf("Error listing lease candidates: %v", err)
 							continue
@@ -781,7 +781,7 @@ func TestController(t *testing.T) {
 							if c.Spec.PingTime != nil && (c.Spec.RenewTime == nil || c.Spec.PingTime.Time.After(c.Spec.RenewTime.Time)) {
 								t.Logf("Answering ping for %s/%s", c.Namespace, c.Name)
 								c.Spec.RenewTime = &metav1.MicroTime{Time: time.Now()}
-								_, err = client.CoordinationV1alpha2().LeaseCandidates(c.Namespace).Update(ctx, &c, metav1.UpdateOptions{})
+								_, err = client.CoordinationV1beta1().LeaseCandidates(c.Namespace).Update(ctx, &c, metav1.UpdateOptions{})
 								if err != nil {
 									t.Logf("Error updating lease candidate %s/%s: %v", c.Namespace, c.Name, err)
 								}
@@ -793,7 +793,7 @@ func TestController(t *testing.T) {
 
 			for _, obj := range tc.createAfterControllerStart {
 				t.Logf("Post-creating lease candidate %s/%s", obj.Namespace, obj.Name)
-				_, err := client.CoordinationV1alpha2().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
+				_, err := client.CoordinationV1beta1().LeaseCandidates(obj.Namespace).Create(ctx, obj, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error post-creating lease candidate %s/%s: %v", obj.Namespace, obj.Name, err)
 				}

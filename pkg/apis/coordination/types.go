@@ -108,6 +108,8 @@ type LeaseCandidate struct {
 // LeaseCandidateSpec is a specification of a Lease.
 type LeaseCandidateSpec struct {
 	// LeaseName is the name of the lease for which this candidate is contending.
+	// The limits on this field are the same as on Lease.name. Multiple lease candidates
+	// may reference the same Lease.name.
 	// This field is immutable.
 	// +required
 	LeaseName string
