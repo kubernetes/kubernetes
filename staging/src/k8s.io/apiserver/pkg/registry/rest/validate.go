@@ -102,10 +102,12 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 	if len(subresourcePath) == 0 {
 		return nil, nil
 	}
-	if subresourcePath[0] != '/' {
-		return nil, fmt.Errorf("invalid subresource path: %s", subresourcePath)
+	parts := strings.Split(subresourcePath, "/")
+	for _, part := range parts {
+		if len(part) == 0 {
+			return nil, fmt.Errorf("invalid subresource path: %s", subresourcePath)
+		}
 	}
-	parts := strings.Split(subresourcePath[1:], "/")
 	return parts, nil
 }
 

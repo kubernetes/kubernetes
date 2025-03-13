@@ -85,15 +85,22 @@ func TestValidateDeclaratively(t *testing.T) {
 			expected:  field.ErrorList{invalidRestartPolicyErr, mutatedRestartPolicyErr},
 		},
 		{
-			name:        "update subresource",
-			subresource: "/status",
+			name:        "update subresource with declarative validation",
+			subresource: "status",
 			object:      valid,
 			oldObject:   valid,
 			expected:    field.ErrorList{invalidStatusErr},
 		},
 		{
+			name:        "update subresource without declarative validation",
+			subresource: "scale",
+			object:      valid,
+			oldObject:   valid,
+			expected:    field.ErrorList{}, // Expect no errors if there is no registered validation
+		},
+		{
 			name:        "invalid subresource",
-			subresource: "invalid/status",
+			subresource: "/invalid/status",
 			object:      valid,
 			oldObject:   valid,
 			expected:    field.ErrorList{invalidSubresourceErr},
