@@ -63,7 +63,7 @@ func (u *csiNodeUpdater) Run() {
 			klog.ErrorS(err, "Failed to add event handler for CSI driver informer")
 			return
 		}
-		klog.InfoS("csiNodeUpdater initialized successfully")
+		klog.V(4).InfoS("csiNodeUpdater initialized successfully")
 	})
 }
 
@@ -73,7 +73,7 @@ func (u *csiNodeUpdater) onDriverAdd(obj interface{}) {
 	if !ok {
 		return
 	}
-	klog.V(4).InfoS("onDriverAdd event", "driver", driver.Name)
+	klog.V(7).InfoS("onDriverAdd event", "driver", driver.Name)
 	u.syncDriverUpdater(driver.Name)
 }
 
@@ -92,7 +92,7 @@ func (u *csiNodeUpdater) onDriverUpdate(oldObj, newObj interface{}) {
 	oldPeriod := getNodeAllocatableUpdatePeriod(oldDriver)
 	newPeriod := getNodeAllocatableUpdatePeriod(newDriver)
 	if oldPeriod != newPeriod {
-		klog.InfoS("NodeAllocatableUpdatePeriodSeconds updated", "driver", newDriver.Name, "oldPeriod", oldPeriod, "newPeriod", newPeriod)
+		klog.V(4).InfoS("NodeAllocatableUpdatePeriodSeconds updated", "driver", newDriver.Name, "oldPeriod", oldPeriod, "newPeriod", newPeriod)
 		u.syncDriverUpdater(newDriver.Name)
 	}
 }
@@ -103,7 +103,7 @@ func (u *csiNodeUpdater) onDriverDelete(obj interface{}) {
 	if !ok {
 		return
 	}
-	klog.V(4).InfoS("onDriverDelete event", "driver", driver.Name)
+	klog.V(7).InfoS("onDriverDelete event", "driver", driver.Name)
 	u.syncDriverUpdater(driver.Name)
 }
 
@@ -131,14 +131,14 @@ func (u *csiNodeUpdater) syncDriverUpdater(driverName string) {
 	}
 	driver, ok := obj.(*v1.CSIDriver)
 	if !ok {
-		klog.InfoS("Invalid CSIDriver object type", "driver", driverName)
+		klog.ErrorS(fmt.Errorf("invalid CSIDriver object type"), "failed to cast CSIDriver object", "driver", driverName)
 		return
 	}
 
 	// Get the update period.
 	period := getNodeAllocatableUpdatePeriod(driver)
 	if period == 0 {
-		klog.InfoS("NodeAllocatableUpdatePeriodSeconds is not configured; disabling updates", "driver", driverName)
+		klog.V(7).InfoS("NodeAllocatableUpdatePeriodSeconds is not configured; disabling updates", "driver", driverName)
 		u.unregisterDriver(driverName)
 		return
 	}
@@ -170,7 +170,7 @@ func (u *csiNodeUpdater) unregisterDriver(driverName string) {
 func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Duration, stopCh <-chan struct{}) {
 	ticker := time.NewTicker(period)
 	defer ticker.Stop()
-	klog.InfoS("Starting periodic updates for driver", "driver", driverName, "period", period)
+	klog.V(7).InfoS("Starting periodic updates for driver", "driver", driverName, "period", period)
 	for {
 		select {
 		case <-ticker.C:
@@ -178,7 +178,7 @@ func (u *csiNodeUpdater) runPeriodicUpdate(driverName string, period time.Durati
 				klog.ErrorS(err, "Failed to update CSIDriver", "driver", driverName)
 			}
 		case <-stopCh:
-			klog.InfoS("Stopping periodic updates for driver", "driver", driverName, "period", period)
+			klog.V(4).InfoS("Stopping periodic updates for driver", "driver", driverName, "period", period)
 			return
 		}
 	}
