@@ -20,7 +20,7 @@ limitations under the License.
 package oom
 
 import (
-	"context"
+	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -35,6 +35,6 @@ func NewWatcher(_ record.EventRecorder) (Watcher, error) {
 	return &oomWatcherUnsupported{}, nil
 }
 
-func (ow *oomWatcherUnsupported) Start(_ context.Context, _ *v1.ObjectReference) error {
+func (ow *oomWatcherUnsupported) Start(_ klog.Logger, _ *v1.ObjectReference) error {
 	return nil
 }

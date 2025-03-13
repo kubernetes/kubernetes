@@ -74,7 +74,7 @@ func isSubpath(subpath, path string) bool {
 //	/runningPods/*	=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=pods,proxy
 //	/healthz/* 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=healthz,proxy
 //	/configz 		=> verb=<api verb from request>, resource=nodes, name=<node name>, subresource(s)=configz,proxy
-func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *http.Request) []authorizer.Attributes {
+func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(logger klog.Logger, u user.Info, r *http.Request) []authorizer.Attributes {
 
 	apiVerb := ""
 	switch r.Method {
@@ -141,7 +141,7 @@ func (n nodeAuthorizerAttributesGetter) GetRequestAttributes(u user.Info, r *htt
 		attrs = append(attrs, attr)
 	}
 
-	klog.V(5).InfoS("Node request attributes", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
+	logger.V(5).Info("Node request attributes", "user", attrs[0].GetUser().GetName(), "verb", attrs[0].GetVerb(), "resource", attrs[0].GetResource(), "subresource(s)", subresources)
 
 	return attrs
 }
