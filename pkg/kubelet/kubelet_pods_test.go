@@ -56,7 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
-	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -3925,7 +3924,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 			kl := testKubelet.kubelet
 
 			oldStatus := test.pod.Status
-			kl.statusManager = status.NewFakeManager()
 			kl.statusManager.SetPodStatus(test.pod, oldStatus)
 			actual := kl.generateAPIPodStatus(test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
 
@@ -4727,7 +4725,6 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	idx := 0
 	for tdesc, tc := range map[string]struct {
@@ -5181,7 +5178,6 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	for tdesc, tc := range map[string]struct {
 		testPodStatus           *kubecontainer.PodStatus
