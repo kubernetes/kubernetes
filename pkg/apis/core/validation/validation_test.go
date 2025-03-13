@@ -26758,3 +26758,64 @@ func TestValidatePodResize(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNodeSwapStatus(t *testing.T) {
+	makeNode := func(nodeSwapStatus *core.NodeSwapStatus) core.Node {
+		node := makeNode("test-node", nil)
+		node.Status.NodeInfo.Swap = nodeSwapStatus
+
+		return node
+	}
+	makeSwapStatus := func(capacity int64) *core.NodeSwapStatus {
+		return &core.NodeSwapStatus{
+			Capacity: ptr.To(capacity),
+		}
+	}
+
+	testCases := []struct {
+		name        string
+		expectError bool
+		node        core.Node
+	}{
+		{
+			name:        "node with nil nodeSwapStatus",
+			expectError: false,
+			node:        makeNode(nil),
+		},
+		{
+			name:        "node with nil nodeSwapStatus.Capacity",
+			expectError: false,
+			node:        makeNode(&core.NodeSwapStatus{}),
+		},
+		{
+			name:        "node with positive capacity",
+			expectError: false,
+			node:        makeNode(makeSwapStatus(123456)),
+		},
+		{
+			name:        "node with zero capacity should be invalid (nodeSwapStatus should be nil)",
+			expectError: true,
+			node:        makeNode(makeSwapStatus(0)),
+		},
+		{
+			name:        "node with negative capacity should be invalid",
+			expectError: true,
+			node:        makeNode(makeSwapStatus(-123456)),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateNode(&tc.node)
+
+			if len(errs) == 0 && tc.expectError {
+				t.Errorf("expected failure for %s, but there were none", tc.name)
+				return
+			}
+			if len(errs) != 0 && !tc.expectError {
+				t.Errorf("expected success for %s, but there were errors: %v", tc.name, errs)
+				return
+			}
+		})
+	}
+}
