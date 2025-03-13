@@ -19,20 +19,11 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Runs test-cmd,
-# producing JUnit-style XML test
-# reports in ${WORKSPACE}/artifacts. This script is intended to be run from
-# kubekins-test container with a kubernetes repo mapped in. See
-# k8s.io/test-infra/scenarios/kubernetes_verify.py
+# Runs test-cmd, intended to be run in prow.k8s.io
+set -x;
 
-export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
-
-# Set artifacts directory
-export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
-
-cd "${GOPATH}/src/k8s.io/kubernetes"
-
-./hack/install-etcd.sh
+# TODO: make test-cmd should handle this automatically
+source ./hack/install-etcd.sh
 
 make test-cmd
 
