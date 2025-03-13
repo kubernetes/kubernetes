@@ -969,8 +969,8 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			panic(fmt.Sprintf("unexpected type-validations on type %v, kind %s", thisNode.valueType, thisNode.valueType.Kind))
 		}
 		sw.Do("// type $.inType|raw$\n", targs)
-		emitCallsToValidators(c, validations.Functions, sw)
 		emitComments(validations.Comments, sw)
+		emitCallsToValidators(c, validations.Functions, sw)
 		sw.Do("\n", nil)
 		didSome = true
 	}
@@ -998,8 +998,8 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 
 			validations := fld.fieldValidations
 			if !validations.Empty() {
-				emitCallsToValidators(c, validations.Functions, bufsw)
 				emitComments(validations.Comments, bufsw)
+				emitCallsToValidators(c, validations.Functions, bufsw)
 			}
 
 			// If the node is nil, this must be a type in a package we are not
