@@ -115,13 +115,19 @@ func (preferCloseHeuristic) needsUpdate(slice *discoveryv1.EndpointSlice) bool {
 		if !endpointReady(endpoint) {
 			continue
 		}
-		var zone string
-		if endpoint.Zone != nil {
-			zone = *endpoint.Zone
-		}
 
-		if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
-			return true
+		if endpoint.Zone != nil {
+			// We want a zone hint.
+			if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != *endpoint.Zone {
+				// ...but either it's missing or it's incorrect
+				return true
+			}
+		} else {
+			// We don't want a zone hint.
+			if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+				// ...but we have a stale hint.
+				return true
+			}
 		}
 	}
 	return false
@@ -134,10 +140,17 @@ func (preferCloseHeuristic) update(slice *discoveryv1.EndpointSlice) {
 			continue
 		}
 
-		var zone string
+		var forZones []discoveryv1.ForZone
 		if endpoint.Zone != nil {
-			zone = *endpoint.Zone
+			forZones = []discoveryv1.ForZone{{Name: *endpoint.Zone}}
 		}
-		slice.Endpoints[i].Hints = &discoveryv1.EndpointHints{ForZones: []discoveryv1.ForZone{{Name: zone}}}
+
+		if forZones != nil {
+			slice.Endpoints[i].Hints = &discoveryv1.EndpointHints{
+				ForZones: forZones,
+			}
+		} else {
+			slice.Endpoints[i].Hints = nil
+		}
 	}
 }
