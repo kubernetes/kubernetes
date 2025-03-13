@@ -325,13 +325,15 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	defer func() {
 		if rerr != nil {
 			metrics.CPUManagerPinningErrorsTotal.Inc()
+			if p.options.FullPhysicalCPUsOnly {
+				metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
+			}
 			return
 		}
-		if !p.options.FullPhysicalCPUsOnly {
+		if p.options.FullPhysicalCPUsOnly {
 			// increment only if we know we allocate aligned resources
-			return
+			metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 		}
-		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Inc()
 	}()
 
 	if p.options.FullPhysicalCPUsOnly {
@@ -752,6 +754,7 @@ func (p *staticPolicy) getAlignedCPUs(numaAffinity bitmask.BitMask, allocatableC
 func (p *staticPolicy) initializeMetrics(s state.State) {
 	metrics.CPUManagerSharedPoolSizeMilliCores.Set(float64(p.GetAvailableCPUs(s).Size() * 1000))
 	metrics.CPUManagerExclusiveCPUsAllocationCount.Set(float64(countExclusiveCPUs(s)))
+	metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopeContainer, metrics.AlignedPhysicalCPU).Add(0) // ensure the value exists
 }
 
 func (p *staticPolicy) updateMetricsOnAllocate(cset cpuset.CPUSet) {
