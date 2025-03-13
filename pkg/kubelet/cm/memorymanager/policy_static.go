@@ -451,7 +451,7 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 	// and the value configured with runtime.
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		containerStatuses := pod.Status.ContainerStatuses
-		if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && podutil.IsRestartableInitContainer(container) {
+		if podutil.IsRestartableInitContainer(container) {
 			if len(pod.Status.InitContainerStatuses) != 0 {
 				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
 			}
