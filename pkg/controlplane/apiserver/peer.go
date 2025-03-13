@@ -62,6 +62,7 @@ func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, l
 		}}
 
 	return utilpeerproxy.NewPeerProxyHandler(
+		IdentityLeaseComponentLabelKey+"="+KubeAPIServer,
 		versionedInformer,
 		apiServerID,
 		reconciler,

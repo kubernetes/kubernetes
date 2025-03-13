@@ -46,7 +46,6 @@ import (
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apiserverproxyutil "k8s.io/apiserver/pkg/util/proxy"
-	coordinationv1 "k8s.io/client-go/listers/coordination/v1"
 	restclient "k8s.io/client-go/rest"
 )
 
@@ -62,8 +61,6 @@ type peerAggDiscoveryInfo struct {
 type peerProxyHandler struct {
 	name                      string
 	apiserverIdentityInformer cache.SharedIndexInformer
-	// ApiserverIdentityLister is used to fetch all apiservers in the cluster.
-	apiserverIdentityLister coordinationv1.LeaseLister
 	// identity for this server
 	serverId string
 	// reconciler that is used to fetch host port of peer apiserver when proxying request to a peer
@@ -92,7 +89,8 @@ func (h *peerProxyHandler) HasFinishedSync() bool {
 }
 
 func (h *peerProxyHandler) WaitForCacheSync(stopCh <-chan struct{}) error {
-	ok := cache.WaitForNamedCacheSync("unknown-version-proxy", stopCh, h.apiserverIdentityInformer.HasSynced)
+	go h.apiserverIdentityInformer.Run(stopCh)
+	ok := cache.WaitForNamedCacheSync("mixed-version-proxy", stopCh, h.apiserverIdentityInformer.HasSynced)
 	if !ok {
 		return fmt.Errorf("error while waiting for initial cache sync")
 	}
@@ -237,14 +235,14 @@ func (h *peerProxyHandler) findServiceableByPeerFromAggDiscoveryCache(gvr schema
 
 	h.peerAggDiscoveryCacheLock.RLock()
 	defer h.peerAggDiscoveryCacheLock.RUnlock()
-	for peerID, discoveryDoc := range h.peerAggDiscoveryResponseCache {
+	for peerID, peerDiscoveryInfo := range h.peerAggDiscoveryResponseCache {
 		// Ignore local apiserver.
 		if peerID == h.serverId {
 			continue
 		}
 
 		foundResource = false
-		for gv, resources := range discoveryDoc.servedResources {
+		for gv, resources := range peerDiscoveryInfo.servedResources {
 			if gv.Group == gvr.Group && gv.Version == gvr.Version {
 				for _, resource := range resources {
 					if resource == gvr.Resource {

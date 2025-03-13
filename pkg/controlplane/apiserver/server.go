@@ -74,6 +74,8 @@ const (
 	//   1. the lease is an identity lease (different from leader election leases)
 	//   2. which component owns this lease
 	IdentityLeaseComponentLabelKey = "apiserver.kubernetes.io/identity"
+	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
+	KubeAPIServer = "kube-apiserver"
 )
 
 // Server is a struct that contains a generic control plane apiserver instance

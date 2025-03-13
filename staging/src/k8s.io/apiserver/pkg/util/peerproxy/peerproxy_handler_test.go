@@ -27,7 +27,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/api/apitesting"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -43,7 +42,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 
-	v1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -51,7 +49,6 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	coordinationv1 "k8s.io/client-go/listers/coordination/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
@@ -70,26 +67,6 @@ type server struct {
 type reconciler struct {
 	do      bool
 	servers []server
-}
-
-type fakeApiserverIdentityLister struct {
-	apiservers []interface{}
-}
-
-func (l *fakeApiserverIdentityLister) Leases(namespace string) coordinationv1.LeaseNamespaceLister {
-	return l
-}
-
-func (l *fakeApiserverIdentityLister) List(selector labels.Selector) ([]*v1.Lease, error) {
-	result := make([]*v1.Lease, len(l.apiservers))
-	for i, lease := range l.apiservers {
-		result[i] = lease.(*v1.Lease)
-	}
-	return result, nil
-}
-
-func (l *fakeApiserverIdentityLister) Get(name string) (*v1.Lease, error) {
-	return &v1.Lease{}, nil
 }
 
 func TestPeerProxy(t *testing.T) {
@@ -225,9 +202,8 @@ func TestPeerProxy(t *testing.T) {
 			for peerID := range tt.peerCache {
 				serverIDs = append(serverIDs, peerID)
 			}
-			fakeApiserverIdentityLister := fakeApiserverIdentityLeases(serverIDs)
 			fakeReconciler := newFakePeerEndpointReconciler(t)
-			handler := newHandlerChain(t, tt.informerFinishedSync, lastHandler, fakeApiserverIdentityLister, fakeReconciler, tt.localCache, tt.peerCache)
+			handler := newHandlerChain(t, tt.informerFinishedSync, lastHandler, fakeReconciler, tt.localCache, tt.peerCache)
 			server, requestGetter := createHTTP2ServerWithClient(handler, requestTimeout*2)
 			defer server.Close()
 
@@ -288,11 +264,11 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 }
 
 func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handler,
-	apiserverIdentityLister *fakeApiserverIdentityLister, reconciler reconcilers.PeerEndpointLeaseReconciler,
+	reconciler reconcilers.PeerEndpointLeaseReconciler,
 	localCache map[schema.GroupVersion][]string, peerCache map[string]*peerAggDiscoveryInfo) http.Handler {
 	// Add peerproxy handler
 	s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
-	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, apiserverIdentityLister, reconciler, localServerID, s, localCache, peerCache)
+	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, reconciler, localServerID, s, localCache, peerCache)
 	if err != nil {
 		t.Fatalf("Error creating peer proxy handler: %v", err)
 	}
@@ -308,7 +284,7 @@ func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handl
 	return handler
 }
 
-func newFakePeerProxyHandler(informerFinishedSync bool, apiserverIdentityLister *fakeApiserverIdentityLister,
+func newFakePeerProxyHandler(informerFinishedSync bool,
 	reconciler reconcilers.PeerEndpointLeaseReconciler, id string, s runtime.NegotiatedSerializer,
 	localCache map[schema.GroupVersion][]string, peerCache map[string]*peerAggDiscoveryInfo) (*peerProxyHandler, error) {
 	clientset := fake.NewSimpleClientset()
@@ -318,9 +294,9 @@ func newFakePeerProxyHandler(informerFinishedSync bool, apiserverIdentityLister 
 			Insecure: false,
 		}}
 	loopbackClientConfig := &rest.Config{
-		Host: "///:://localhost",
+		Host: "localhost:1010",
 	}
-	ppH, err := NewPeerProxyHandler(informerFactory, id, reconciler, s, loopbackClientConfig, clientConfig)
+	ppH, err := NewPeerProxyHandler("identity=testserver", informerFactory, id, reconciler, s, loopbackClientConfig, clientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -328,8 +304,6 @@ func newFakePeerProxyHandler(informerFinishedSync bool, apiserverIdentityLister 
 	ppH.peerAggDiscoveryResponseCache = peerCache
 
 	ppH.finishedSync.Store(informerFinishedSync)
-
-	ppH.apiserverIdentityLister = apiserverIdentityLister
 	return ppH, nil
 }
 
@@ -352,25 +326,4 @@ func createHTTP2ServerWithClient(handler http.Handler, clientTimeout time.Durati
 	return server, func(req *http.Request) (*http.Response, error) {
 		return cli.Do(req)
 	}
-}
-
-func fakeApiserverIdentityLeases(apiserverIds []string) *fakeApiserverIdentityLister {
-	apiserverLeases := make([]interface{}, len(apiserverIds))
-	for i, id := range apiserverIds {
-		apiserverLeases[i] = &v1.Lease{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      id,
-				Namespace: metav1.NamespaceSystem,
-				Labels: map[string]string{
-					"apiserver.kubernetes.io/identity": "kube-apiserver",
-				},
-			},
-		}
-	}
-
-	lister := &fakeApiserverIdentityLister{
-		apiservers: apiserverLeases,
-	}
-
-	return lister
 }

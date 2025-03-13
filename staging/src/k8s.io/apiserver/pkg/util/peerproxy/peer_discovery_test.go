@@ -37,36 +37,59 @@ func TestAddPeerDiscoveryInfo(t *testing.T) {
 	testCases := []struct {
 		desc                string
 		lease               *v1.Lease
+		labelselector       string
 		reconcilerEndpoints map[string]string
 		existingCache       map[string]*peerAggDiscoveryInfo
 		wantCache           map[string]*peerAggDiscoveryInfo
 	}{
 		{
-			desc:      "nil leaser",
+			desc:      "invalid lease: nil",
 			lease:     nil,
 			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 		{
-			desc: "valid lease, nil holderIdentity",
+			desc:          "invalid lease: missing label",
+			labelselector: "apiserver-identity=testserver",
 			lease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "remote-1",
+				},
+				Spec: v1.LeaseSpec{},
 			},
 			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 		{
-			desc: "valid local apiserver lease",
+			desc:          "valid lease, nil holderIdentity",
+			labelselector: "apiserver-identity=testserver",
 			lease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: localServerID},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{},
 			},
 			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 		{
-			desc: "valid lease, new server",
+			desc:          "valid lease, local apiserver",
+			labelselector: "apiserver-identity=testserver",
 			lease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   localServerID,
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+			},
+			wantCache: map[string]*peerAggDiscoveryInfo{},
+		},
+		{
+			desc:          "valid lease, new server",
+			labelselector: "apiserver-identity=testserver",
+			lease: &v1.Lease{
+				ObjectMeta: metav1.ObjectMeta{Name: "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			reconcilerEndpoints: map[string]string{
 				"remote-1": "127.0.0.1:6443",
@@ -78,10 +101,14 @@ func TestAddPeerDiscoveryInfo(t *testing.T) {
 			},
 		},
 		{
-			desc: "valid lease, existing server, different holderIdentity",
+			desc:          "valid lease, existing server, different holderIdentity",
+			labelselector: "apiserver-identity=testserver",
 			lease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 			},
 			reconcilerEndpoints: map[string]string{
 				"remote-1": "127.0.0.1:6443",
@@ -114,7 +141,7 @@ func TestAddPeerDiscoveryInfo(t *testing.T) {
 				h.peerAggDiscoveryResponseCache = make(map[string]*peerAggDiscoveryInfo)
 			}
 
-			h.addPeerDiscoveryInfo(tt.lease)
+			h.addPeerDiscoveryInfo(tt.lease, tt.labelselector)
 			assert.Equal(t, tt.wantCache, h.peerAggDiscoveryResponseCache)
 
 		})
@@ -124,20 +151,11 @@ func TestAddPeerDiscoveryInfo(t *testing.T) {
 func TestDeletePeerDiscoveryInfo(t *testing.T) {
 	testCases := []struct {
 		desc          string
+		labelselector string
 		lease         *v1.Lease
 		existingCache map[string]*peerAggDiscoveryInfo
 		wantCache     map[string]*peerAggDiscoveryInfo
 	}{
-		{
-			desc: "valid lease, existing server",
-			lease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-			},
-			existingCache: map[string]*peerAggDiscoveryInfo{
-				"remote-1": {holderIdentity: "holder-1", servedResources: map[schema.GroupVersion][]string{}},
-			},
-			wantCache: map[string]*peerAggDiscoveryInfo{},
-		},
 		{
 			desc:  "nil lease",
 			lease: nil,
@@ -149,16 +167,18 @@ func TestDeletePeerDiscoveryInfo(t *testing.T) {
 			},
 		},
 		{
-			desc: "valid lease, non-existing server",
+			desc:          "valid lease, existing server",
+			labelselector: "apiserver-identity=testserver",
 			lease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-2"},
+				ObjectMeta: metav1.ObjectMeta{Name: "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder")},
 			},
 			existingCache: map[string]*peerAggDiscoveryInfo{
 				"remote-1": {holderIdentity: "holder-1", servedResources: map[schema.GroupVersion][]string{}},
 			},
-			wantCache: map[string]*peerAggDiscoveryInfo{
-				"remote-1": {holderIdentity: "holder-1", servedResources: map[schema.GroupVersion][]string{}},
-			},
+			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 	}
 
@@ -169,7 +189,7 @@ func TestDeletePeerDiscoveryInfo(t *testing.T) {
 				peerAggDiscoveryResponseCache: tt.existingCache,
 			}
 
-			h.deletePeerDiscoveryInfo(tt.lease)
+			h.deletePeerDiscoveryInfo(tt.lease, tt.labelselector)
 
 			assert.Equal(t, tt.wantCache, h.peerAggDiscoveryResponseCache)
 		})
@@ -180,6 +200,7 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 	localServerID := "local-server"
 	testCases := []struct {
 		desc                string
+		labelselector       string
 		oldLease            *v1.Lease
 		newLease            *v1.Lease
 		reconcilerEndpoints map[string]string
@@ -193,11 +214,15 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 		{
-			desc:     "nil old lease, valid new lease",
-			oldLease: nil,
+			desc:          "nil old lease, valid new lease",
+			labelselector: "apiserver-identity=testserver",
+			oldLease:      nil,
 			newLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			reconcilerEndpoints: map[string]string{
 				"remote-1": "127.0.0.1:6443",
@@ -207,10 +232,14 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 			},
 		},
 		{
-			desc: "valid old lease, nil new lease",
+			desc:          "valid old lease, nil new lease",
+			labelselector: "apiserver-identity=testserver",
 			oldLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			newLease: nil,
 			existingCache: map[string]*peerAggDiscoveryInfo{
@@ -219,26 +248,40 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 		{
-			desc: "local server lease update, no change",
+			desc:          "local server lease update, no change",
+			labelselector: "apiserver-identity=testserver",
 			oldLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: localServerID},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   localServerID,
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			newLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: localServerID},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   localServerID,
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			wantCache: map[string]*peerAggDiscoveryInfo{},
 		},
 		{
-			desc: "valid old lease, valid new lease, same holderIdentity",
+			desc:          "valid old lease, valid new lease, same holderIdentity",
+			labelselector: "apiserver-identity=testserver",
 			oldLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			newLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			existingCache: map[string]*peerAggDiscoveryInfo{
 				"remote-1": {holderIdentity: "holder-1", servedResources: map[schema.GroupVersion][]string{}},
@@ -248,14 +291,21 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 			},
 		},
 		{
-			desc: "valid old lease, valid new lease, different holderIdentity",
+			desc:          "valid old lease, valid new lease, different holderIdentity",
+			labelselector: "apiserver-identity=testserver",
 			oldLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			newLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 			},
 			reconcilerEndpoints: map[string]string{
 				"remote-1": "127.0.0.1:6443",
@@ -268,14 +318,21 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 			},
 		},
 		{
-			desc: "valid old lease, valid new lease, different name",
+			desc:          "valid old lease, valid new lease, different name",
+			labelselector: "apiserver-identity=testserver",
 			oldLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-1"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-1",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-1")},
 			},
 			newLease: &v1.Lease{
-				ObjectMeta: metav1.ObjectMeta{Name: "remote-2"},
-				Spec:       v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "remote-2",
+					Labels: map[string]string{"apiserver-identity": "testserver"},
+				},
+				Spec: v1.LeaseSpec{HolderIdentity: proto.String("holder-2")},
 			},
 			reconcilerEndpoints: map[string]string{
 				"remote-2": "127.0.0.1:6443",
@@ -308,7 +365,7 @@ func TestUpdatePeerDiscoveryInfo(t *testing.T) {
 				h.peerAggDiscoveryResponseCache = make(map[string]*peerAggDiscoveryInfo)
 			}
 
-			h.updatePeerDiscoveryInfo(tt.oldLease, tt.newLease)
+			h.updatePeerDiscoveryInfo(tt.oldLease, tt.newLease, tt.labelselector)
 			assert.Equal(t, tt.wantCache, h.peerAggDiscoveryResponseCache)
 		})
 	}
