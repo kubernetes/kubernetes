@@ -243,14 +243,14 @@ func compositeDevice(name string, capacity any, attributes map[resourceapi.Quali
 
 	device := resourceapi.Device{
 		Name: name,
-		Composite: &resourceapi.CompositeDevice{
+		Basic: &resourceapi.BasicDevice{
 			Attributes: attributes,
 		},
 	}
 
 	switch capacity := capacity.(type) {
 	case map[resourceapi.QualifiedName]resource.Quantity:
-		device.Composite.Capacity = toDeviceCapacity(capacity)
+		device.Basic.Capacity = toDeviceCapacity(capacity)
 	case string:
 		if capacity == fromDeviceCapacityConsumption {
 			c := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
@@ -262,7 +262,7 @@ func compositeDevice(name string, capacity any, attributes map[resourceapi.Quali
 					c[name] = cap
 				}
 			}
-			device.Composite.Capacity = c
+			device.Basic.Capacity = c
 		} else {
 			panic(fmt.Sprintf("unexpected capacity value %q", capacity))
 		}
@@ -272,7 +272,7 @@ func compositeDevice(name string, capacity any, attributes map[resourceapi.Quali
 		panic(fmt.Sprintf("unexpected capacity type %T: %+v", capacity, capacity))
 	}
 
-	device.Composite.ConsumesCapacity = consumesCapacity
+	device.Basic.ConsumesCapacity = consumesCapacity
 	return device
 }
 
@@ -282,14 +282,14 @@ func compositeDeviceWithNodeSelector(name string, nodeSelection any, capacity an
 
 	switch nodeSelection := nodeSelection.(type) {
 	case *v1.NodeSelector:
-		device.Composite.NodeSelector = nodeSelection
+		device.Basic.NodeSelector = nodeSelection
 	case string:
 		if nodeSelection == nodeSelectionAll {
-			device.Composite.AllNodes = true
+			device.Basic.AllNodes = true
 		} else if nodeSelection == nodeSelectionPerDevice {
 			panic("nodeSelectionPerDevice is not supported for devices")
 		} else {
-			device.Composite.NodeName = nodeSelection
+			device.Basic.NodeName = nodeSelection
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
@@ -1075,7 +1075,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"all-devices-slice-without-devices-prioritized-list": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1101,7 +1103,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"all-devices-no-slices-prioritized-list": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1126,7 +1130,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"all-devices-some-allocated-prioritized-list": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1658,7 +1664,9 @@ func TestAllocator(t *testing.T) {
 			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
 		},
 		"prioritized-list-first-unavailable": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classB, 1),
 				subRequest(subReq1, classA, 1),
@@ -1673,7 +1681,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-non-available": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classB, 2),
 				subRequest(subReq1, classA, 2),
@@ -1688,7 +1698,9 @@ func TestAllocator(t *testing.T) {
 			expectResults: nil,
 		},
 		"prioritized-list-device-config": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithAll(claim0,
 					objects(
@@ -1729,7 +1741,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-class-config": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classA, 2),
 				subRequest(subReq1, classB, 2),
@@ -1765,7 +1779,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-expressions": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req0, classA, 1, resourceapi.DeviceSelector{
@@ -1807,7 +1823,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-constraints-ref-parent-request": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0,
 					[]resourceapi.DeviceConstraint{
@@ -1875,7 +1893,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-constraints-ref-sub-request": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0,
 					[]resourceapi.DeviceConstraint{
@@ -1935,7 +1955,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-allocation-mode-all": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1967,7 +1989,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-allocation-mode-all-multiple-requests": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req0, classA, 1),
@@ -1998,7 +2022,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-disabled": {
-			prioritizedList: false,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -2017,7 +2043,9 @@ func TestAllocator(t *testing.T) {
 			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has subrequests, but the DRAPrioritizedList feature is disabled")),
 		},
 		"prioritized-list-multi-request": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req1, classA, 1, resourceapi.DeviceSelector{
@@ -2066,7 +2094,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-with-backtracking": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					requestWithPrioritizedList(req0,
@@ -2115,7 +2145,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-too-many-in-first-subrequest": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classB, 500),
 				subRequest(subReq1, classA, 1),
