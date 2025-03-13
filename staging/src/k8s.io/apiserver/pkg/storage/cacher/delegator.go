@@ -249,25 +249,26 @@ func shouldDelegateList(opts storage.ListOptions) bool {
 	case metav1.ResourceVersionMatchExact:
 		return true
 	case metav1.ResourceVersionMatchNotOlderThan:
+		return false
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
 			return true
 		}
+		// Continue
+		if len(opts.Predicate.Continue) > 0 {
+			return true
+		}
+		// Consistent Read
+		if opts.ResourceVersion == "" {
+			consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+			requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+			return !consistentListFromCacheEnabled || !requestWatchProgressSupported
+		}
+		return false
 	default:
 		return true
 	}
-	// Continue
-	if len(opts.Predicate.Continue) > 0 {
-		return true
-	}
-	// Consistent Read
-	if opts.ResourceVersion == "" {
-		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
-	}
-	return false
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
