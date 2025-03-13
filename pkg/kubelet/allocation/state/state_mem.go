@@ -79,23 +79,11 @@ func (s *stateMemory) SetPodResourceAllocation(podUID types.UID, alloc map[strin
 	return nil
 }
 
-func (s *stateMemory) deleteContainer(podUID types.UID, containerName string) {
-	delete(s.podAllocation[podUID], containerName)
-	if len(s.podAllocation[podUID]) == 0 {
-		delete(s.podAllocation, podUID)
-	}
-	klog.V(3).InfoS("Deleted pod resource allocation", "podUID", podUID, "containerName", containerName)
-}
-
-func (s *stateMemory) Delete(podUID types.UID, containerName string) error {
+func (s *stateMemory) RemovePod(podUID types.UID) error {
 	s.Lock()
 	defer s.Unlock()
-	if len(containerName) == 0 {
-		delete(s.podAllocation, podUID)
-		klog.V(3).InfoS("Deleted pod resource allocation and resize state", "podUID", podUID)
-		return nil
-	}
-	s.deleteContainer(podUID, containerName)
+	delete(s.podAllocation, podUID)
+	klog.V(3).InfoS("Deleted pod resource allocation", "podUID", podUID)
 	return nil
 }
 

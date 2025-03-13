@@ -46,7 +46,7 @@ type Reader interface {
 type writer interface {
 	SetContainerResourceAllocation(podUID types.UID, containerName string, alloc v1.ResourceRequirements) error
 	SetPodResourceAllocation(podUID types.UID, alloc map[string]v1.ResourceRequirements) error
-	Delete(podUID types.UID, containerName string) error
+	RemovePod(podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.
 	RemoveOrphanedPods(remainingPods sets.Set[types.UID])
 }

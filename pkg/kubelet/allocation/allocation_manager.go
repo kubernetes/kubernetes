@@ -176,12 +176,12 @@ func allocationFromPod(pod *v1.Pod) map[string]v1.ResourceRequirements {
 }
 
 func (m *manager) RemovePod(uid types.UID) {
-	if err := m.allocated.Delete(uid, ""); err != nil {
+	if err := m.allocated.RemovePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		klog.V(3).ErrorS(err, "Failed to delete pod allocation", "podUID", uid)
 	}
 
-	if err := m.actuated.Delete(uid, ""); err != nil {
+	if err := m.actuated.RemovePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
 		klog.V(3).ErrorS(err, "Failed to delete pod allocation", "podUID", uid)
 	}
