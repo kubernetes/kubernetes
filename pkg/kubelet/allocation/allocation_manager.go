@@ -163,12 +163,10 @@ func allocationFromPod(pod *v1.Pod) map[string]v1.ResourceRequirements {
 		podAlloc[container.Name] = alloc
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for _, container := range pod.Spec.InitContainers {
-			if podutil.IsRestartableInitContainer(&container) {
-				alloc := *container.Resources.DeepCopy()
-				podAlloc[container.Name] = alloc
-			}
+	for _, container := range pod.Spec.InitContainers {
+		if podutil.IsRestartableInitContainer(&container) {
+			alloc := *container.Resources.DeepCopy()
+			podAlloc[container.Name] = alloc
 		}
 	}
 
