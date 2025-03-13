@@ -55,6 +55,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -338,8 +339,8 @@ func newTestKubeletWithImageList(
 	kubelet.containerGC = containerGC
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
-	kubelet.backOff.Clock = fakeClock
+	kubelet.crashLoopBackOff = flowcontrol.NewBackOff(time.Second, time.Minute)
+	kubelet.crashLoopBackOff.Clock = fakeClock
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
@@ -2900,7 +2901,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				now := kubelet.clock.Now()
 				// Put the container in backoff so we can confirm backoff is reset.
 				backoffKey := kuberuntime.GetStableKey(originalPod, originalCtr)
-				kubelet.backOff.Next(backoffKey, now)
+				kubelet.crashLoopBackOff.Next(backoffKey, now)
 
 				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
 				require.NoError(t, err)
@@ -2922,7 +2923,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				resizeStatus := kubelet.statusManager.GetPodResizeStatus(newPod.UID)
 				assert.Equal(t, tt.expectedResize, resizeStatus)
 
-				isInBackoff := kubelet.backOff.IsInBackOffSince(backoffKey, now)
+				isInBackoff := kubelet.crashLoopBackOff.IsInBackOffSince(backoffKey, now)
 				if tt.expectBackoffReset {
 					assert.False(t, isInBackoff, "container backoff should be reset")
 				} else {
@@ -3408,7 +3409,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.os,
 		kubelet,
 		nil,
-		kubelet.backOff,
+		kubelet.crashLoopBackOff,
 		kubeCfg.SerializeImagePulls,
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
@@ -3937,4 +3938,87 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			require.Equal(t, test.expectHasResize, hasResizedResources, "hasResizedResources")
 		})
 	}
+}
+
+func TestCrashLoopBackOffConfiguration(t *testing.T) {
+	testCases := []struct {
+		name            string
+		featureGates    []featuregate.Feature
+		nodeDecay       metav1.Duration
+		expectedInitial time.Duration
+		expectedMax     time.Duration
+	}{
+		{
+			name:            "Prior behavior",
+			expectedMax:     time.Duration(300 * time.Second),
+			expectedInitial: time.Duration(10 * time.Second),
+		},
+		{
+			name:            "New default only",
+			featureGates:    []featuregate.Feature{features.ReduceDefaultCrashLoopBackOffDecay},
+			expectedMax:     time.Duration(60 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Faster per node config; only node config configured",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
+			nodeDecay:       metav1.Duration{Duration: 2 * time.Second},
+			expectedMax:     time.Duration(2 * time.Second),
+			expectedInitial: time.Duration(2 * time.Second),
+		},
+		{
+			name:            "Faster per node config; new default and node config configured",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
+			nodeDecay:       metav1.Duration{Duration: 2 * time.Second},
+			expectedMax:     time.Duration(2 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Slower per node config; new default and node config configured, set A",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
+			nodeDecay:       metav1.Duration{Duration: 10 * time.Second},
+			expectedMax:     time.Duration(10 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Slower per node config; new default and node config configured, set B",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
+			nodeDecay:       metav1.Duration{Duration: 300 * time.Second},
+			expectedMax:     time.Duration(300 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Slower per node config; only node config configured, set A",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
+			nodeDecay:       metav1.Duration{Duration: 11 * time.Second},
+			expectedMax:     time.Duration(11 * time.Second),
+			expectedInitial: time.Duration(10 * time.Second),
+		},
+		{
+			name:            "Slower per node config; only node config configured, set B",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
+			nodeDecay:       metav1.Duration{Duration: 300 * time.Second},
+			expectedMax:     time.Duration(300 * time.Second),
+			expectedInitial: time.Duration(10 * time.Second),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kubeCfg := &kubeletconfiginternal.KubeletConfiguration{}
+
+			for _, f := range tc.featureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
+			}
+			if tc.nodeDecay.Duration > 0 {
+				kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod = &tc.nodeDecay
+			}
+
+			resultMax, resultInitial := newCrashLoopBackOff(kubeCfg)
+
+			assert.Equalf(t, tc.expectedMax, resultMax, "wrong max calculated, want: %v, got %v", tc.expectedMax, resultMax)
+			assert.Equalf(t, tc.expectedInitial, resultInitial, "wrong base calculated, want: %v, got %v", tc.expectedInitial, resultInitial)
+		})
+	}
+
 }

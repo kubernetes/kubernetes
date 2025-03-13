@@ -85,6 +85,54 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 			doTest(ctx, f, 3, containerName, 13)
 		})
 	})
+
+	ginkgo.Context("Reduced default container restart backs off as expected", func() {
+
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{"ReduceDefaultCrashLoopBackOffDecay": true}
+		})
+
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			err := resetCRIProxyInjector(e2eCriProxy)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("Reduced default restart backs off.", func(ctx context.Context) {
+			// 0s, 0s, 10s, 30s, 60s, 90s, 120s, 150s, 180s, 210s, 240s, 270s, 300s
+			doTest(ctx, f, 3, containerName, 13)
+		})
+	})
+
+	ginkgo.Context("Lower node config container restart takes precedence", func() {
+
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{"ReduceDefaultCrashLoopBackOffDecay": true}
+			initialConfig.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: time.Duration(1 * time.Second)}
+			initialConfig.FeatureGates = map[string]bool{"KubeletCrashLoopBackOffMax": true}
+		})
+
+		ginkgo.BeforeEach(func() {
+			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
+				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
+			}
+		})
+
+		ginkgo.AfterEach(func() {
+			err := resetCRIProxyInjector(e2eCriProxy)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("Reduced default restart backs off.", func(ctx context.Context) {
+			// 0s, 0s, 1s, 2s, 3s, 4s, 5s, 6s, 7s, and so on
+			doTest(ctx, f, 3, containerName, 298)
+		})
+	})
 })
 
 func doTest(ctx context.Context, f *framework.Framework, targetRestarts int, containerName string, maxRestarts int) {
