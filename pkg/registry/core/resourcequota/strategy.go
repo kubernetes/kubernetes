@@ -18,6 +18,7 @@ package resourcequota
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -76,7 +77,26 @@ func (resourcequotaStrategy) Validate(ctx context.Context, obj runtime.Object) f
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (resourcequotaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	resourcequota := obj.(*api.ResourceQuota)
+	allWarnings := make([]string, 0)
+	coreReosurces := []api.ResourceName{
+		api.ResourceCPU, api.ResourceMemory,
+		api.ResourceStorage, api.ResourceEphemeralStorage,
+	}
+	for _, resourceName := range coreReosurces {
+		requestResourceName := fmt.Sprintf("requests.%s", resourceName)
+		requestResource, requestOK := resourcequota.Spec.Hard[api.ResourceName(requestResourceName)]
+		if (resourceName == api.ResourceCPU || resourceName == api.ResourceMemory) && !requestOK {
+			requestResourceName = string(resourceName)
+			requestResource, requestOK = resourcequota.Spec.Hard[api.ResourceName(requestResourceName)]
+		}
+		limitResourceName := fmt.Sprintf("limits.%s", resourceName)
+		limitResource, limitOK := resourcequota.Spec.Hard[api.ResourceName(limitResourceName)]
+		if requestOK && limitOK && requestResource.Cmp(limitResource) == 1 {
+			allWarnings = append(allWarnings, fmt.Sprintf("Create ResourceQuota requests.%s: %s should be less than limits.%s: %s", resourceName, requestResource.String(), resourceName, limitResource.String()))
+		}
+	}
+	return allWarnings
 }
 
 // Canonicalize normalizes the object after validation.
