@@ -52,6 +52,10 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
 // podKind contains the schema.GroupVersionKind for pods.
 var podKind = v1.SchemeGroupVersion.WithKind("Pod")
 
+const StatefulSetIndex = "statefulsetName"
+
+var OrphanPodIndexKey = "Orphan"
+
 // StatefulSetController controls statefulsets.
 type StatefulSetController struct {
 	// client interface
@@ -60,6 +64,8 @@ type StatefulSetController struct {
 	// Abstracted out for testing.
 	control StatefulSetControlInterface
 	// podControl is used for patching pods.
+	// podIndexer allows looking up pods by Statefulset name.
+	podIndexer cache.Indexer
 	podControl controller.PodControlInterface
 	// podLister is able to list/get pods from a shared informer's store
 	podLister corelisters.PodLister
@@ -130,6 +136,26 @@ func NewStatefulSetController(
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
 
+	if err := podInformer.Informer().AddIndexers(cache.Indexers{
+		StatefulSetIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, nil
+			}
+			if ref := metav1.GetControllerOf(pod); ref != nil {
+				if ref.Kind == controllerKind.Kind {
+					return []string{string(ref.UID)}, nil
+				}
+				// Ignore pods controlled by other controllers
+				return nil, nil
+			}
+			return []string{OrphanPodIndexKey}, nil
+		},
+	}); err != nil {
+		return nil
+	}
+
+	ssc.podIndexer = podInformer.Informer().GetIndexer()
 	setInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
@@ -309,11 +335,20 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 // NOTE: Returned Pods are pointers to objects from the cache.
 // If you need to modify one, you need to copy it first.
 func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
-	// List all pods to include the pods that don't match the selector anymore but
-	// has a ControllerRef pointing to this StatefulSet.
-	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
+	// List all pods to include the pods that has a ControllerRef pointing to this StatefulSet or Orphan pods with match labels.
+	podsForSts := []*v1.Pod{}
+	for _, key := range []string{string(set.UID), OrphanPodIndexKey} {
+		if podObjs, err := ssc.podIndexer.ByIndex(StatefulSetIndex, key); err == nil {
+			for _, obj := range podObjs {
+				if pod, ok := obj.(*v1.Pod); ok {
+					podsForSts = append(podsForSts, pod)
+				} else {
+					utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				}
+			}
+		} else {
+			return nil, err
+		}
 	}
 
 	filter := func(pod *v1.Pod) bool {
@@ -322,7 +357,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set
 	}
 
 	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, ssc.canAdoptFunc(ctx, set))
-	return cm.ClaimPods(ctx, pods, filter)
+	return cm.ClaimPods(ctx, podsForSts, filter)
 }
 
 // If any adoptions are attempted, we should first recheck for deletion with
