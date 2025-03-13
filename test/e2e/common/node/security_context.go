@@ -19,6 +19,8 @@ package node
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,6 +45,10 @@ import (
 var (
 	// non-root UID used in tests.
 	nonRootTestUserID = int64(1000)
+
+	// kubelet user used for userns mapping.
+	kubeletUserForUsernsMapping = "kubelet"
+	getsubuidsBinary            = "getsubids"
 )
 
 var _ = SIGDescribe("Security Context", func() {
@@ -109,6 +115,74 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 			if logs1 == logs2 {
 				framework.Failf("two different pods are running with the same user namespace configuration")
+			}
+		})
+
+		f.It("must create the user namespace in the configured hostUID/hostGID range [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
+			// We need to check with the binary "getsubuids" the mappings for the kubelet.
+			// If something is not present, we skip the test as the node wasn't configured to run this test.
+			id, length, err := kubeletUsernsMappings(getsubuidsBinary)
+			if err != nil {
+				e2eskipper.Skipf("node is not setup for userns with kubelet mappings: %v", err)
+			}
+
+			for i := 0; i < 4; i++ {
+				// makePod(false) creates the pod with user namespace
+				podClient := e2epod.PodClientNS(f, f.Namespace.Name)
+				createdPod := podClient.Create(ctx, makePod(false))
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					ginkgo.By("delete the pods")
+					podClient.DeleteSync(ctx, createdPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+				})
+				getLogs := func(pod *v1.Pod) (string, error) {
+					err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
+					if err != nil {
+						return "", err
+					}
+					podStatus, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+					if err != nil {
+						return "", err
+					}
+					return e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, podStatus.Name, containerName)
+				}
+
+				logs, err := getLogs(createdPod)
+				framework.ExpectNoError(err)
+
+				// The hostUID is the second field in the /proc/self/uid_map file.
+				hostMap := strings.Fields(logs)
+				if len(hostMap) != 3 {
+					framework.Failf("can't detect hostUID for container, is the format of /proc/self/uid_map correct?")
+				}
+
+				tmp, err := strconv.ParseUint(hostMap[1], 10, 32)
+				if err != nil {
+					framework.Failf("can't convert hostUID to int: %v", err)
+				}
+				hostUID := uint32(tmp)
+
+				// Here we check the pod got a userns mapping within the range
+				// configured for the kubelet.
+				// To make sure the pod mapping doesn't fall within range by chance,
+				// we do the following:
+				// * The configured kubelet range as small as possible (enough to
+				// fit 110 pods, the default of the kubelet) to minimize the chance
+				// of this range being used "by chance" in the node configuration.
+				// * We also run this in a loop, so it is less likely to get lucky
+				// several times in a row.
+				//
+				// There are 65536 ranges possible and we configured the kubelet to
+				// use 110 of them. The chances of this test passing by chance 4
+				// times in a row and the kubelet not using only the configured
+				// range are:
+				//
+				//	(110/65536) ^ 4 = 4.73e-12. IOW, less than 1 in a trillion.
+				//
+				// Furthermore, the unit tests would also need to be buggy and not
+				// detect the bug. We expect to catch off-by-one errors there.
+				if hostUID < id || hostUID > id+length {
+					framework.Failf("user namespace created outside of the configured range. Expected range: %v-%v, got: %v", id, id+length, hostUID)
+				}
 			}
 		})
 
@@ -682,4 +756,58 @@ func waitForFailure(ctx context.Context, f *framework.Framework, name string, ti
 			}
 		},
 	)).To(gomega.Succeed(), "wait for pod %q to fail", name)
+}
+
+// parseGetSubIdsOutput parses the output from the `getsubids` tool, which is used to query subordinate user or group ID ranges for
+// a given user or group. getsubids produces a line for each mapping configured.
+// Here we expect that there is a single mapping, and the same values are used for the subordinate user and group ID ranges.
+// The output is something like:
+// $ getsubids kubelet
+// 0: kubelet 65536 2147483648
+// $ getsubids -g kubelet
+// 0: kubelet 65536 2147483648
+// XXX: this is a c&p from pkg/kubelet/kubelet_pods.go. It is simpler to c&p than to try to reuse it.
+func parseGetSubIdsOutput(input string) (uint32, uint32, error) {
+	lines := strings.Split(strings.Trim(input, "\n"), "\n")
+	if len(lines) != 1 {
+		return 0, 0, fmt.Errorf("error parsing line %q: it must contain only one line", input)
+	}
+
+	parts := strings.Fields(lines[0])
+	if len(parts) != 4 {
+		return 0, 0, fmt.Errorf("invalid line %q", input)
+	}
+
+	// Parsing the numbers
+	num1, err := strconv.ParseUint(parts[2], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	num2, err := strconv.ParseUint(parts[3], 10, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("error parsing line %q: %w", input, err)
+	}
+
+	return uint32(num1), uint32(num2), nil
+}
+
+func kubeletUsernsMappings(subuidBinary string) (uint32, uint32, error) {
+	cmd, err := exec.LookPath(getsubuidsBinary)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getsubids binary not found in PATH")
+	}
+	outUids, err := exec.Command(cmd, kubeletUserForUsernsMapping).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("no additional uids for user %q: %w", kubeletUserForUsernsMapping, err)
+	}
+	outGids, err := exec.Command(cmd, "-g", kubeletUserForUsernsMapping).Output()
+	if err != nil {
+		return 0, 0, fmt.Errorf("no additional gids for user %q", kubeletUserForUsernsMapping)
+	}
+	if string(outUids) != string(outGids) {
+		return 0, 0, fmt.Errorf("mismatched subuids and subgids for user %q", kubeletUserForUsernsMapping)
+	}
+
+	return parseGetSubIdsOutput(string(outUids))
 }
