@@ -254,6 +254,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.12"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: CPUManager
   versionedSpecs:
   - default: false
