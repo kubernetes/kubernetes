@@ -127,7 +127,7 @@ func (m *UsernsManager) readMappingsFromFile(pod types.UID) ([]byte, error) {
 func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
 
 	if kubeletMappingID%userNsLength != 0 {
