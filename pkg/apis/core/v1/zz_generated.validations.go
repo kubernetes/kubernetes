@@ -102,6 +102,7 @@ func Validate_ReplicationControllerSpec(ctx context.Context, op operation.Operat
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			// optional value-type fields with zero-value defaults are purely documentation
 			return
 		}(fldPath.Child("minReadySeconds"), &obj.MinReadySeconds, safe.Field(oldObj, func(oldObj *corev1.ReplicationControllerSpec) *int32 { return &oldObj.MinReadySeconds }))...)
 

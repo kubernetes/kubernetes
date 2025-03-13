@@ -5116,6 +5116,7 @@ type ReplicationControllerSpec struct {
 	// without any of its container crashing, for it to be considered available.
 	// Defaults to 0 (pod will be considered available as soon as it is ready)
 	// +optional
+	// +k8s:optional
 	// +default=0
 	// +k8s:minimum=0
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty" protobuf:"varint,4,opt,name=minReadySeconds"`
