@@ -238,31 +238,29 @@ const (
 	fromDeviceCapacityConsumption = "fromDeviceCapacityConsumption"
 )
 
-func compositeDevice(name string, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
-	consumesCapacity ...resourceapi.DeviceCapacityConsumption) resourceapi.Device {
+func partitionableDevice(name string, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
+	consumesCapacity ...resourceapi.DeviceCounterConsumption) resourceapi.Device {
 
 	device := resourceapi.Device{
 		Name: name,
-		Composite: &resourceapi.CompositeDevice{
+		Basic: &resourceapi.BasicDevice{
 			Attributes: attributes,
 		},
 	}
 
 	switch capacity := capacity.(type) {
 	case map[resourceapi.QualifiedName]resource.Quantity:
-		device.Composite.Capacity = toDeviceCapacity(capacity)
+		device.Basic.Capacity = toDeviceCapacity(capacity)
 	case string:
 		if capacity == fromDeviceCapacityConsumption {
 			c := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity)
 			for _, dcc := range consumesCapacity {
-				for name, cap := range dcc.Capacity {
-					if _, found := c[name]; found {
-						panic(fmt.Sprintf("same capacity found in multiple device capacity consumptions %q", name))
-					}
-					c[name] = cap
+				for name, cap := range dcc.Counters {
+					ccap := resourceapi.DeviceCapacity(cap)
+					c[resourceapi.QualifiedName(name)] = ccap
 				}
 			}
-			device.Composite.Capacity = c
+			device.Basic.Capacity = c
 		} else {
 			panic(fmt.Sprintf("unexpected capacity value %q", capacity))
 		}
@@ -272,24 +270,24 @@ func compositeDevice(name string, capacity any, attributes map[resourceapi.Quali
 		panic(fmt.Sprintf("unexpected capacity type %T: %+v", capacity, capacity))
 	}
 
-	device.Composite.ConsumesCapacity = consumesCapacity
+	device.Basic.ConsumesCounter = consumesCapacity
 	return device
 }
 
-func compositeDeviceWithNodeSelector(name string, nodeSelection any, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
-	consumesCapacity ...resourceapi.DeviceCapacityConsumption) resourceapi.Device {
-	device := compositeDevice(name, capacity, attributes, consumesCapacity...)
+func partitionableDeviceWithNodeSelector(name string, nodeSelection any, capacity any, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute,
+	consumesCapacity ...resourceapi.DeviceCounterConsumption) resourceapi.Device {
+	device := partitionableDevice(name, capacity, attributes, consumesCapacity...)
 
 	switch nodeSelection := nodeSelection.(type) {
 	case *v1.NodeSelector:
-		device.Composite.NodeSelector = nodeSelection
+		device.Basic.NodeSelector = nodeSelection
 	case string:
 		if nodeSelection == nodeSelectionAll {
-			device.Composite.AllNodes = true
+			device.Basic.AllNodes = true
 		} else if nodeSelection == nodeSelectionPerDevice {
 			panic("nodeSelectionPerDevice is not supported for devices")
 		} else {
-			device.Composite.NodeName = nodeSelection
+			device.Basic.NodeName = nodeSelection
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
@@ -297,10 +295,10 @@ func compositeDeviceWithNodeSelector(name string, nodeSelection any, capacity an
 	return device
 }
 
-func deviceCapacityConsumption(capacityPool string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.DeviceCapacityConsumption {
-	return resourceapi.DeviceCapacityConsumption{
-		CapacityPool: capacityPool,
-		Capacity:     toDeviceCapacity(capacity),
+func deviceCapacityConsumption(capacityPool string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.DeviceCounterConsumption {
+	return resourceapi.DeviceCounterConsumption{
+		SharedCounter: capacityPool,
+		Counters:      toDeviceCounter(capacity),
 	}
 }
 
@@ -484,17 +482,17 @@ func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver strin
 	return slice(name, nodeSelection, pool, driver, devices...)
 }
 
-func sliceWithCapacityPools(name string, nodeSelection any, pool, driver string, capacityPools []resourceapi.CapacityPool, devices ...resourceapi.Device) *resourceapi.ResourceSlice {
+func sliceWithCapacityPools(name string, nodeSelection any, pool, driver string, sharedCounters []resourceapi.CounterSet, devices ...resourceapi.Device) *resourceapi.ResourceSlice {
 	slice := slice(name, nodeSelection, pool, driver)
-	slice.Spec.CapacityPools = capacityPools
+	slice.Spec.SharedCounters = sharedCounters
 	slice.Spec.Devices = devices
 	return slice
 }
 
-func capacityPool(name string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.CapacityPool {
-	return resourceapi.CapacityPool{
+func counterSet(name string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.CounterSet {
+	return resourceapi.CounterSet{
 		Name:     name,
-		Capacity: toDeviceCapacity(capacity),
+		Counters: toDeviceCounter(capacity),
 	}
 }
 
@@ -502,6 +500,14 @@ func toDeviceCapacity(capacity map[resourceapi.QualifiedName]resource.Quantity) 
 	out := make(map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, len(capacity))
 	for name, quantity := range capacity {
 		out[name] = resourceapi.DeviceCapacity{Value: quantity}
+	}
+	return out
+}
+
+func toDeviceCounter(capacity map[resourceapi.QualifiedName]resource.Quantity) map[string]resourceapi.Counter {
+	out := make(map[string]resourceapi.Counter, len(capacity))
+	for name, quantity := range capacity {
+		out[string(name)] = resourceapi.Counter{Value: quantity}
 	}
 	return out
 }
@@ -1075,7 +1081,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"all-devices-slice-without-devices-prioritized-list": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1101,7 +1109,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"all-devices-no-slices-prioritized-list": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1126,7 +1136,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"all-devices-some-allocated-prioritized-list": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1581,6 +1593,18 @@ func TestAllocator(t *testing.T) {
 
 			expectError: gomega.MatchError(gomega.ContainSubstring("empty constraint (unsupported constraint type?)")),
 		},
+		"unknown-device": {
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(
+				func() *resourceapi.ResourceSlice {
+					slice := sliceWithOneDevice(slice1, node1, pool1, driverA)
+					slice.Spec.Devices[0].Basic = nil /* empty = unknown future extension */
+					return slice
+				}(),
+			),
+			node: node(node1, region1),
+		},
 		"invalid-CEL-one-device": {
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
@@ -1658,7 +1682,9 @@ func TestAllocator(t *testing.T) {
 			expectError: gomega.MatchError(gomega.ContainSubstring("exceeds the claim limit")),
 		},
 		"prioritized-list-first-unavailable": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classB, 1),
 				subRequest(subReq1, classA, 1),
@@ -1673,7 +1699,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-non-available": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classB, 2),
 				subRequest(subReq1, classA, 2),
@@ -1688,7 +1716,9 @@ func TestAllocator(t *testing.T) {
 			expectResults: nil,
 		},
 		"prioritized-list-device-config": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithAll(claim0,
 					objects(
@@ -1729,7 +1759,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-class-config": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classA, 2),
 				subRequest(subReq1, classB, 2),
@@ -1765,7 +1797,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-expressions": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req0, classA, 1, resourceapi.DeviceSelector{
@@ -1807,7 +1841,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-constraints-ref-parent-request": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0,
 					[]resourceapi.DeviceConstraint{
@@ -1875,7 +1911,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-constraints-ref-sub-request": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0,
 					[]resourceapi.DeviceConstraint{
@@ -1935,7 +1973,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-subrequests-with-allocation-mode-all": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -1967,7 +2007,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-allocation-mode-all-multiple-requests": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req0, classA, 1),
@@ -1998,7 +2040,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-disabled": {
-			prioritizedList: false,
+			features: Features{
+				PrioritizedList: false,
+			},
 			claimsToAllocate: objects(
 				func() *resourceapi.ResourceClaim {
 					claim := claimWithRequests(claim0, nil,
@@ -2017,7 +2061,9 @@ func TestAllocator(t *testing.T) {
 			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has subrequests, but the DRAPrioritizedList feature is disabled")),
 		},
 		"prioritized-list-multi-request": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					request(req1, classA, 1, resourceapi.DeviceSelector{
@@ -2066,7 +2112,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-with-backtracking": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil,
 					requestWithPrioritizedList(req0,
@@ -2115,7 +2163,9 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"prioritized-list-too-many-in-first-subrequest": {
-			prioritizedList: true,
+			features: Features{
+				PrioritizedList: true,
+			},
 			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
 				subRequest(subReq0, classB, 500),
 				subRequest(subReq1, classA, 1),
@@ -2139,13 +2189,13 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
 					),
 				),
-				compositeDevice(device1, nil, nil,
+				partitionableDevice(device1, nil, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2159,7 +2209,7 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
-		"partitionable-devices-multiple-devices": {
+		"partitionable-devices-prioritized-list": {
 			features: Features{
 				PrioritizedList:      true,
 				PartitionableDevices: true,
@@ -2184,13 +2234,13 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("8Gi"),
 						},
 					),
 				),
-				compositeDevice(device1,
+				partitionableDevice(device1,
 					map[resourceapi.QualifiedName]resource.Quantity{
 						"memory": resource.MustParse("4Gi"),
 					}, nil,
@@ -2200,7 +2250,7 @@ func TestAllocator(t *testing.T) {
 						},
 					),
 				),
-				compositeDevice(device2,
+				partitionableDevice(device2,
 					map[resourceapi.QualifiedName]resource.Quantity{
 						"memory": resource.MustParse("6Gi"),
 					}, nil,
@@ -2210,7 +2260,7 @@ func TestAllocator(t *testing.T) {
 						},
 					),
 				),
-				compositeDevice(device3, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2223,6 +2273,60 @@ func TestAllocator(t *testing.T) {
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
+			)},
+		},
+		"partitionable-devices-multiple-devices": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					request(req1, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
+				objects(
+					counterSet(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("8Gi"),
+						},
+					),
+				),
+				partitionableDevice(device1,
+					map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("4Gi"),
+					}, nil,
+					deviceCapacityConsumption(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("4Gi"),
+						},
+					),
+				),
+				partitionableDevice(device2,
+					map[resourceapi.QualifiedName]resource.Quantity{
+						"memory": resource.MustParse("6Gi"),
+					}, nil,
+					deviceCapacityConsumption(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("6Gi"),
+						},
+					),
+				),
+				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
+					deviceCapacityConsumption(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("4Gi"),
+						},
+					),
+				),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
 			)},
 		},
 		"partitionable-devices-multiple-capacity-pools": {
@@ -2250,18 +2354,18 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
-					capacityPool(capacityPool2,
+					counterSet(capacityPool2,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"cpus": resource.MustParse("8"),
 						},
 					),
 				),
-				compositeDevice(device1, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2273,7 +2377,7 @@ func TestAllocator(t *testing.T) {
 						},
 					),
 				),
-				compositeDevice(device2, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
@@ -2285,7 +2389,7 @@ func TestAllocator(t *testing.T) {
 						},
 					),
 				),
-				compositeDevice(device3, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2305,6 +2409,82 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req1SubReq1, driverA, pool1, device3, false),
 			)},
 		},
+		"partitionable-devices-multiple-counters": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+					request(req1, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
+				objects(
+					counterSet(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"cpus":   resource.MustParse("8"),
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+					counterSet(capacityPool2,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"cpus":   resource.MustParse("12"),
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+				),
+				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
+					deviceCapacityConsumption(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("4Gi"),
+							"cpus":   resource.MustParse("6"),
+						},
+					),
+					deviceCapacityConsumption(capacityPool2,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"cpus":   resource.MustParse("4"),
+							"memory": resource.MustParse("2Gi"),
+						},
+					),
+				),
+				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
+					deviceCapacityConsumption(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("6Gi"),
+							"cpus":   resource.MustParse("4"),
+						},
+					),
+					deviceCapacityConsumption(capacityPool2,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"cpus":   resource.MustParse("6"),
+							"memory": resource.MustParse("6Gi"),
+						},
+					),
+				),
+				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
+					deviceCapacityConsumption(capacityPool1,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"memory": resource.MustParse("4Gi"),
+							"cpus":   resource.MustParse("4"),
+						},
+					),
+					deviceCapacityConsumption(capacityPool2,
+						map[resourceapi.QualifiedName]resource.Quantity{
+							"cpus":   resource.MustParse("4"),
+							"memory": resource.MustParse("4Gi"),
+						},
+					),
+				),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req1, driverA, pool1, device3, false),
+			)},
+		},
 		"partitionable-devices-no-capacity-available": {
 			features: Features{
 				PartitionableDevices: true,
@@ -2317,20 +2497,20 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
-				compositeDevice(device1, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDevice(device2, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("16Gi"),
@@ -2356,20 +2536,20 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
-				compositeDevice(device1, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDevice(device2, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("20Gi"),
@@ -2395,13 +2575,13 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, node1, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
-				compositeDevice(device1, nil, nil,
+				partitionableDevice(device1, nil, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2411,6 +2591,7 @@ func TestAllocator(t *testing.T) {
 			)),
 			node:          node(node1, region1),
 			expectResults: nil,
+			expectError:   gomega.MatchError(gomega.ContainSubstring("DRAPartitionableDevices disabled with SharedCounters or PerDeviceNodeSelection set in ResourceSlice")),
 		},
 		"partitionable-devices-per-device-node-selection-nodename": {
 			features: Features{
@@ -2436,20 +2617,20 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, nodeSelectionPerDevice, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
-				compositeDeviceWithNodeSelector(device1, node1, fromDeviceCapacityConsumption, nil,
+				partitionableDeviceWithNodeSelector(device1, node1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDeviceWithNodeSelector(device2, node2, fromDeviceCapacityConsumption, nil,
+				partitionableDeviceWithNodeSelector(device2, node2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("6Gi"),
@@ -2474,13 +2655,13 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA)),
 			slices: objects(sliceWithCapacityPools(slice1, nodeSelectionPerDevice, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
-				compositeDeviceWithNodeSelector(device1, nodeLabelSelector(regionKey, region1), fromDeviceCapacityConsumption, nil,
+				partitionableDeviceWithNodeSelector(device1, nodeLabelSelector(regionKey, region1), fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2514,27 +2695,27 @@ func TestAllocator(t *testing.T) {
 			classes: objects(class(classA, driverA), class(classB, driverB)),
 			slices: objects(sliceWithCapacityPools(slice1, nodeSelectionPerDevice, pool1, driverA,
 				objects(
-					capacityPool(capacityPool1,
+					counterSet(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
 				),
-				compositeDeviceWithNodeSelector(device1, nodeLabelSelector(regionKey, region1), fromDeviceCapacityConsumption, nil,
+				partitionableDeviceWithNodeSelector(device1, nodeLabelSelector(regionKey, region1), fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDeviceWithNodeSelector(device2, node1, fromDeviceCapacityConsumption, nil,
+				partitionableDeviceWithNodeSelector(device2, node1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDeviceWithNodeSelector(device3, nodeSelectionAll, fromDeviceCapacityConsumption, nil,
+				partitionableDeviceWithNodeSelector(device3, nodeSelectionAll, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool1,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
@@ -2543,27 +2724,27 @@ func TestAllocator(t *testing.T) {
 				),
 			), sliceWithCapacityPools(slice2, node1, pool2, driverB,
 				objects(
-					capacityPool(capacityPool2,
+					counterSet(capacityPool2,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("12Gi"),
 						},
 					),
 				),
-				compositeDevice(device1, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device1, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool2,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDevice(device2, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device2, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool2,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
 						},
 					),
 				),
-				compositeDevice(device3, fromDeviceCapacityConsumption, nil,
+				partitionableDevice(device3, fromDeviceCapacityConsumption, nil,
 					deviceCapacityConsumption(capacityPool2,
 						map[resourceapi.QualifiedName]resource.Quantity{
 							"memory": resource.MustParse("4Gi"),
