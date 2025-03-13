@@ -317,12 +317,12 @@
     "attachError": {
       "time": "2001-01-01T01:01:01Z",
       "message": "messageValue",
-      "errorCode": "errorCodeValue"
+      "errorCode": 3
     },
     "detachError": {
       "time": "2001-01-01T01:01:01Z",
       "message": "messageValue",
-      "errorCode": "errorCodeValue"
+      "errorCode": 3
     }
   }
 }

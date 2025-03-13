@@ -51438,9 +51438,9 @@ func schema_k8sio_api_storage_v1_VolumeError(ref common.ReferenceCallback) commo
 					},
 					"errorCode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "errorCode specifies the type of error encountered during Attach or Detach operation.",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "errorCode represents the numeric gRPC code for the error.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},
@@ -51940,9 +51940,9 @@ func schema_k8sio_api_storage_v1alpha1_VolumeError(ref common.ReferenceCallback)
 					},
 					"errorCode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "errorCode specifies the type of error encountered during Attach or Detach operation.",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "errorCode represents the numeric gRPC code for the error.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},
@@ -53015,9 +53015,9 @@ func schema_k8sio_api_storage_v1beta1_VolumeError(ref common.ReferenceCallback) 
 					},
 					"errorCode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "errorCode specifies the type of error encountered during Attach or Detach operation.",
-							Type:        []string{"string"},
-							Format:      "",
+							Description: "errorCode represents the numeric gRPC code for the error.",
+							Type:        []string{"integer"},
+							Format:      "int32",
 						},
 					},
 				},

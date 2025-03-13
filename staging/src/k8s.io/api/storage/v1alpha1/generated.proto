@@ -266,8 +266,8 @@ message VolumeError {
   // +optional
   optional string message = 2;
 
-  // errorCode specifies the type of error encountered during Attach or Detach operation.
+  // errorCode represents the numeric gRPC code for the error.
   // +optional
-  optional string errorCode = 3;
+  optional int32 errorCode = 3;
 }
 

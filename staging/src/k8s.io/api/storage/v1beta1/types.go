@@ -222,30 +222,6 @@ type VolumeAttachmentStatus struct {
 	DetachError *VolumeError `json:"detachError,omitempty" protobuf:"bytes,4,opt,name=detachError,casttype=VolumeError"`
 }
 
-const (
-	// VolumeErrorCodeNotFound indicates that a volume or node does not exist.
-	// Maps to gRPC code 5 (NOT_FOUND).
-	VolumeErrorCodeNotFound VolumeErrorCode = "NotFound"
-
-	// VolumeErrorCodeAlreadyExists indicates that a volume has already been published
-	// at the node but is incompatible with the specified parameters.
-	// Maps to gRPC code 6 (ALREADY_EXISTS).
-	VolumeErrorCodeAlreadyExists VolumeErrorCode = "AlreadyExists"
-
-	// VolumeErrorCodeFailedPrecondition indicates that a volume has already been published
-	// at another node and does not have MULTI_NODE volume capability.
-	// Maps to gRPC code 9 (FAILED_PRECONDITION).
-	VolumeErrorCodeFailedPrecondition VolumeErrorCode = "FailedPrecondition"
-
-	// VolumeErrorCodeResourceExhausted indicates that the maximum supported number of
-	// volumes that can be attached to the specified node are already attached.
-	// Maps to gRPC code 8 (RESOURCE_EXHAUSTED).
-	VolumeErrorCodeResourceExhausted VolumeErrorCode = "ResourceExhausted"
-)
-
-// VolumeErrorCode specifies the type of error encountered during a volume operation.
-type VolumeErrorCode string
-
 // VolumeError captures an error encountered during a volume operation.
 type VolumeError struct {
 	// time represents the time the error was encountered.
@@ -258,9 +234,9 @@ type VolumeError struct {
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 
-	// errorCode specifies the type of error encountered during Attach or Detach operation.
+	// errorCode represents the numeric gRPC code for the error.
 	// +optional
-	ErrorCode *VolumeErrorCode `json:"errorCode,omitempty" protobuf:"bytes,3,opt,name=errorCode"`
+	ErrorCode *int32 `json:"errorCode,omitempty" protobuf:"varint,3,opt,name=errorCode"`
 }
 
 // +genclient

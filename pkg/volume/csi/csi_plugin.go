@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -232,7 +233,7 @@ func isResourceExhaustError(attachment *storage.VolumeAttachment) bool {
 		return false
 	}
 	return attachment.Status.AttachError.ErrorCode != nil &&
-		*attachment.Status.AttachError.ErrorCode == storage.VolumeErrorCodeResourceExhausted
+		*attachment.Status.AttachError.ErrorCode == int32(codes.ResourceExhausted)
 }
 
 func (h *RegistrationHandler) validateVersions(callerName, pluginName string, endpoint string, versions []string) (*utilversion.Version, error) {

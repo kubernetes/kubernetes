@@ -192,30 +192,6 @@ type VolumeAttachmentStatus struct {
 	DetachError *VolumeError
 }
 
-// VolumeErrorCode specifies the type of error encountered during a volume operation.
-type VolumeErrorCode string
-
-const (
-	// VolumeErrorCodeNotFound indicates that a volume or node does not exist.
-	// Maps to gRPC code 5 (NOT_FOUND).
-	VolumeErrorCodeNotFound VolumeErrorCode = "NotFound"
-
-	// VolumeErrorCodeAlreadyExists indicates that a volume has already been published
-	// at the node but is incompatible with the specified parameters.
-	// Maps to gRPC code 6 (ALREADY_EXISTS).
-	VolumeErrorCodeAlreadyExists VolumeErrorCode = "AlreadyExists"
-
-	// VolumeErrorCodeFailedPrecondition indicates that a volume has already been published
-	// at another node and does not have MULTI_NODE volume capability.
-	// Maps to gRPC code 9 (FAILED_PRECONDITION).
-	VolumeErrorCodeFailedPrecondition VolumeErrorCode = "FailedPrecondition"
-
-	// VolumeErrorCodeResourceExhausted indicates that the maximum supported number of
-	// volumes that can be attached to the specified node are already attached.
-	// Maps to gRPC code 8 (RESOURCE_EXHAUSTED).
-	VolumeErrorCodeResourceExhausted VolumeErrorCode = "ResourceExhausted"
-)
-
 // Captures an error encountered during a volume operation.
 type VolumeError struct {
 	// Time the error was encountered.
@@ -228,9 +204,9 @@ type VolumeError struct {
 	// +optional
 	Message string
 
-	// errorCode specifies the type of error encountered during Attach or Detach operation.
+	// Numeric gRPC code representing the error.
 	// +optional
-	ErrorCode *VolumeErrorCode
+	ErrorCode *int32
 }
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.

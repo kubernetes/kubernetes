@@ -590,7 +590,7 @@ func (in *VolumeError) DeepCopyInto(out *VolumeError) {
 	in.Time.DeepCopyInto(&out.Time)
 	if in.ErrorCode != nil {
 		in, out := &in.ErrorCode, &out.ErrorCode
-		*out = new(VolumeErrorCode)
+		*out = new(int32)
 		**out = **in
 	}
 	return

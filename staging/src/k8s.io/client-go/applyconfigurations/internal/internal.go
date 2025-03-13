@@ -13783,7 +13783,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: errorCode
       type:
-        scalar: string
+        scalar: numeric
     - name: message
       type:
         scalar: string
@@ -13912,7 +13912,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: errorCode
       type:
-        scalar: string
+        scalar: numeric
     - name: message
       type:
         scalar: string
@@ -14189,7 +14189,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: errorCode
       type:
-        scalar: string
+        scalar: numeric
     - name: message
       type:
         scalar: string

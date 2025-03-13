@@ -128,7 +128,7 @@ var map_VolumeError = map[string]string{
 	"":          "VolumeError captures an error encountered during a volume operation.",
 	"time":      "time represents the time the error was encountered.",
 	"message":   "message represents the error encountered during Attach or Detach operation. This string maybe logged, so it should not contain sensitive information.",
-	"errorCode": "errorCode specifies the type of error encountered during Attach or Detach operation.",
+	"errorCode": "errorCode represents the numeric gRPC code for the error.",
 }
 
 func (VolumeError) SwaggerDoc() map[string]string {

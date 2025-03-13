@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1509,8 +1510,8 @@ func TestIsResourceExhaustError(t *testing.T) {
 				Status: storage.VolumeAttachmentStatus{
 					AttachError: &storage.VolumeError{
 						Message: "volume not found",
-						ErrorCode: func() *storage.VolumeErrorCode {
-							code := storage.VolumeErrorCodeNotFound
+						ErrorCode: func() *int32 {
+							code := int32(codes.NotFound)
 							return &code
 						}(),
 					},
@@ -1524,8 +1525,8 @@ func TestIsResourceExhaustError(t *testing.T) {
 				Status: storage.VolumeAttachmentStatus{
 					AttachError: &storage.VolumeError{
 						Message: "resource exhausted",
-						ErrorCode: func() *storage.VolumeErrorCode {
-							code := storage.VolumeErrorCodeResourceExhausted
+						ErrorCode: func() *int32 {
+							code := int32(codes.ResourceExhausted)
 							return &code
 						}(),
 					},
