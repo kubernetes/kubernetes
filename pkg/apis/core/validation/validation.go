@@ -67,6 +67,7 @@ const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = apimachineryvalidation.FieldImmutableErrorMsg
 const isNotIntegerErrorMsg string = `must be an integer`
 const isNotPositiveErrorMsg string = `must be greater than zero`
+const isRequestLessThanLimits string = `request resource must be less than limits`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 var fileModeErrorMsg = "must be a number between 0 and 0777 (octal), both inclusive"
@@ -7333,6 +7334,7 @@ func ValidateResourceQuotaSpec(resourceQuotaSpec *core.ResourceQuotaSpec, fld *f
 
 	allErrs = append(allErrs, validateResourceQuotaScopes(resourceQuotaSpec, fld)...)
 	allErrs = append(allErrs, validateScopeSelector(resourceQuotaSpec, fld)...)
+	allErrs = append(allErrs, validateResourceQuotaRequestLessThanLimits(resourceQuotaSpec.Hard, fld)...)
 
 	return allErrs
 }
@@ -8764,4 +8766,29 @@ func IsValidIPForLegacyField(fldPath *field.Path, value string, validOldIPs []st
 // value validation; use validation.IsValidCIDR for new fields.
 func IsValidCIDRForLegacyField(fldPath *field.Path, value string, validOldCIDRs []string) field.ErrorList {
 	return validation.IsValidCIDRForLegacyField(fldPath, value, utilfeature.DefaultFeatureGate.Enabled(features.StrictIPCIDRValidation), validOldCIDRs)
+}
+
+// validateResourceQuotaRequestLessThanLimits is validate requests resource less than limits.
+func validateResourceQuotaRequestLessThanLimits(hard core.ResourceList, fld *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	coreReosurces := []core.ResourceName{
+		core.ResourceCPU, core.ResourceMemory,
+		core.ResourceStorage, core.ResourceEphemeralStorage,
+	}
+	fldPath := fld.Child("hard")
+	for _, resourceName := range coreReosurces {
+		requestResourceName := fmt.Sprintf("requests.%s", resourceName)
+		requestResource, requestOK := hard[core.ResourceName(requestResourceName)]
+		if (resourceName == core.ResourceCPU || resourceName == core.ResourceMemory) && !requestOK {
+			requestResourceName = string(resourceName)
+			requestResource, requestOK = hard[core.ResourceName(requestResourceName)]
+		}
+		limitResourceName := fmt.Sprintf("limits.%s", resourceName)
+		limitResource, limitOK := hard[core.ResourceName(limitResourceName)]
+		if requestOK && limitOK && requestResource.Cmp(limitResource) == 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(requestResourceName), requestResource, isRequestLessThanLimits))
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(limitResourceName), limitResource, isRequestLessThanLimits))
+		}
+	}
+	return allErrs
 }
