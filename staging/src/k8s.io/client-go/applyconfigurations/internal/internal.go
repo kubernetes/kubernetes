@@ -5265,6 +5265,10 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.core.v1.ContainerState
       default: {}
+    - name: lifecycle
+      type:
+        namedType: io.k8s.api.core.v1.Lifecycle
+      default: {}
     - name: name
       type:
         scalar: string
@@ -6002,6 +6006,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: preStop
       type:
         namedType: io.k8s.api.core.v1.LifecycleHandler
+    - name: stopSignal
+      type:
+        scalar: string
 - name: io.k8s.api.core.v1.LifecycleHandler
   map:
     fields:

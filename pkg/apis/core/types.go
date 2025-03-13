@@ -2673,6 +2673,47 @@ type GRPCAction struct {
 	Service *string
 }
 
+// Signal defines the stop signal of containers
+// +enum
+type Signal string
+
+const (
+	Sigabrt   Signal = "SIGABRT"
+	Sigalrm   Signal = "SIGALRM"
+	Sigbus    Signal = "SIGBUS"
+	Sigchld   Signal = "SIGCHLD"
+	Sigcld    Signal = "SIGCLD"
+	Sigcont   Signal = "SIGCONT"
+	Sigfpe    Signal = "SIGFPE"
+	Sighup    Signal = "SIGHUP"
+	Sigill    Signal = "SIGILL"
+	Sigint    Signal = "SIGINT"
+	Sigio     Signal = "SIGIO"
+	Sigiot    Signal = "SIGIOT"
+	Sigkill   Signal = "SIGKILL"
+	Sigpipe   Signal = "SIGPIPE"
+	Sigpoll   Signal = "SIGPOLL"
+	Sigprof   Signal = "SIGPROF"
+	Sigpwr    Signal = "SIGPWR"
+	Sigquit   Signal = "SIGQUIT"
+	Sigsegv   Signal = "SIGSEGV"
+	Sigstkflt Signal = "SIGSTKFLT"
+	Sigstop   Signal = "SIGSTOP"
+	Sigsys    Signal = "SIGSYS"
+	Sigterm   Signal = "SIGTERM"
+	Sigtrap   Signal = "SIGTRAP"
+	Sigtstp   Signal = "SIGTSTP"
+	Sigttin   Signal = "SIGTTIN"
+	Sigttou   Signal = "SIGTTOU"
+	Sigurg    Signal = "SIGURG"
+	Sigusr1   Signal = "SIGUSR1"
+	Sigusr2   Signal = "SIGUSR2"
+	Sigvtalrm Signal = "SIGVTALRM"
+	Sigwinch  Signal = "SIGWINCH"
+	Sigxcpu   Signal = "SIGXCPU"
+	Sigxfsz   Signal = "SIGXFSZ"
+)
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2693,6 +2734,9 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler
+	// StopSignal can be used to configure what stop signal would be sent to containers
+	// +optional
+	StopSignal *Signal
 }
 
 // The below types are used by kube_client and api_server.
@@ -2831,6 +2875,10 @@ type ContainerStatus struct {
 	// +featureGate=ResourceHealthStatus
 	// +optional
 	AllocatedResourcesStatus []ResourceStatus
+	// Lifecycle is used to show the container's effective stop signal in the Status
+	// +featureGate=ContainerStopSignals
+	// +optional
+	Lifecycle Lifecycle
 }
 
 type ResourceStatus struct {

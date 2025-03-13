@@ -358,6 +358,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
 	}
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
+	lifecycle := buildContainerConfigLifecycle(container)
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -377,6 +378,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		Stdin:       container.Stdin,
 		StdinOnce:   container.StdinOnce,
 		Tty:         container.TTY,
+		Lifecycle:   &lifecycle,
 	}
 
 	// set platform specific configurations.
@@ -641,6 +643,21 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		cStatusUser = toKubeContainerUser(status.User)
 	}
 
+	var cStatusLifecycle *v1.Lifecycle
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
+		lifecycle := status.GetLifecycle()
+		if lifecycle != nil {
+			signal := lifecycle.StopSignal
+			cStatusLifecycle = &v1.Lifecycle{
+				StopSignal: (*v1.Signal)(&signal),
+			}
+		} else {
+			cStatusLifecycle = &v1.Lifecycle{}
+		}
+	} else {
+		cStatusLifecycle = &v1.Lifecycle{}
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
@@ -657,6 +674,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		CreatedAt:           time.Unix(0, status.CreatedAt),
 		Resources:           cStatusResources,
 		User:                cStatusUser,
+		Lifecycle:           *cStatusLifecycle,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {
@@ -1404,4 +1422,22 @@ func isProbeTerminationGracePeriodSecondsSet(pod *v1.Pod, containerSpec *v1.Cont
 		return true
 	}
 	return false
+}
+
+func buildContainerConfigLifecycle(container *v1.Container) (lifecycle runtimeapi.Lifecycle) {
+	// If the ContainerStopSignals feature gate is enabled and if the container spec
+	// has specified a stop signal, return runtimeapi.Lifecycle object with the specified
+	// stop signal. Else pass an empty lifecycle.
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
+		if container.Lifecycle != nil && container.Lifecycle.StopSignal != nil {
+			lifecycle := runtimeapi.Lifecycle{
+				StopSignal: string(*container.Lifecycle.StopSignal),
+			}
+			return lifecycle
+		} else {
+			return runtimeapi.Lifecycle{}
+		}
+	}
+
+	return runtimeapi.Lifecycle{}
 }

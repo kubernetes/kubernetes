@@ -678,6 +678,58 @@ func dropDisabledFields(
 	dropPodLifecycleSleepAction(podSpec, oldPodSpec)
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
+	dropContainerStopSignals(podSpec, oldPodSpec)
+}
+
+func dropContainerStopSignals(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) || containerStopSignalsInUse(oldPodSpec) {
+		return
+	}
+
+	adjustLifecycle := func(lifecycle *api.Lifecycle) {
+		if lifecycle.StopSignal != nil {
+			lifecycle.StopSignal = nil
+		}
+	}
+
+	for i := range podSpec.Containers {
+		if podSpec.Containers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.Containers[i].Lifecycle)
+	}
+
+	for i := range podSpec.InitContainers {
+		if podSpec.InitContainers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.InitContainers[i].Lifecycle)
+	}
+
+	for i := range podSpec.EphemeralContainers {
+		if podSpec.EphemeralContainers[i].Lifecycle == nil {
+			continue
+		}
+		adjustLifecycle(podSpec.EphemeralContainers[i].Lifecycle)
+	}
+}
+
+func containerStopSignalsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	var inUse bool
+	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
+		if c.Lifecycle == nil {
+			return true
+		}
+		if c.Lifecycle.StopSignal != nil {
+			inUse = true
+			return false
+		}
+		return true
+	})
+	return inUse
 }
 
 func dropDisabledPodLevelResources(podSpec, oldPodSpec *api.PodSpec) {
@@ -713,7 +765,7 @@ func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
 			continue
 		}
 		adjustLifecycle(podSpec.Containers[i].Lifecycle)
-		if podSpec.Containers[i].Lifecycle.PreStop == nil && podSpec.Containers[i].Lifecycle.PostStart == nil {
+		if podSpec.Containers[i].Lifecycle.PreStop == nil && podSpec.Containers[i].Lifecycle.PostStart == nil && podSpec.Containers[i].Lifecycle.StopSignal == nil {
 			podSpec.Containers[i].Lifecycle = nil
 		}
 	}
@@ -723,7 +775,7 @@ func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
 			continue
 		}
 		adjustLifecycle(podSpec.InitContainers[i].Lifecycle)
-		if podSpec.InitContainers[i].Lifecycle.PreStop == nil && podSpec.InitContainers[i].Lifecycle.PostStart == nil {
+		if podSpec.InitContainers[i].Lifecycle.PreStop == nil && podSpec.InitContainers[i].Lifecycle.PostStart == nil && podSpec.Containers[i].Lifecycle.StopSignal == nil {
 			podSpec.InitContainers[i].Lifecycle = nil
 		}
 	}
@@ -733,7 +785,7 @@ func dropPodLifecycleSleepAction(podSpec, oldPodSpec *api.PodSpec) {
 			continue
 		}
 		adjustLifecycle(podSpec.EphemeralContainers[i].Lifecycle)
-		if podSpec.EphemeralContainers[i].Lifecycle.PreStop == nil && podSpec.EphemeralContainers[i].Lifecycle.PostStart == nil {
+		if podSpec.EphemeralContainers[i].Lifecycle.PreStop == nil && podSpec.EphemeralContainers[i].Lifecycle.PostStart == nil && podSpec.Containers[i].Lifecycle.StopSignal == nil {
 			podSpec.EphemeralContainers[i].Lifecycle = nil
 		}
 	}

@@ -1103,6 +1103,11 @@ message ContainerStatus {
   // +listType=map
   // +listMapKey=name
   repeated ResourceStatus allocatedResourcesStatus = 14;
+
+  // Lifecycle is used to show the container's effective stop signal in the Status
+  // +featureGate=ContainerStopSignals
+  // +optional
+  optional Lifecycle lifecycle = 15;
 }
 
 // ContainerUser represents user identity information
@@ -2208,6 +2213,10 @@ message Lifecycle {
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
   optional LifecycleHandler preStop = 2;
+
+  // StopSignal can be used to configure what stop signal would be sent to containers
+  // +optional
+  optional string stopSignal = 3;
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle

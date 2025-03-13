@@ -1173,6 +1173,13 @@ message ContainerConfig {
 
     // CDI devices for the container.
     repeated CDIDevice CDI_devices = 17;
+
+    // Lifecycle includes the custom stop signal for the contianer
+    Lifecycle lifecycle = 18;
+}
+
+message Lifecycle {
+  string stop_signal = 1;
 }
 
 message CreateContainerRequest {
@@ -1346,6 +1353,9 @@ message ContainerStatus {
     string image_id = 17;
     // User identities initially attached to the container
     ContainerUser user = 18;
+
+    // Returns the stop signal used by the container runtime to terminate the container 
+    Lifecycle lifecycle = 19;
 }
 
 message ContainerStatusResponse {

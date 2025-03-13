@@ -378,6 +378,8 @@ type Status struct {
 	User *ContainerUser
 	// Mounts are the volume mounts of the container
 	Mounts []Mount
+	// Lifecycle is used to show the container's effective stop signal in the Status
+	Lifecycle v1.Lifecycle
 }
 
 // ContainerUser represents user identity information
