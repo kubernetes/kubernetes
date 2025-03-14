@@ -1,0 +1,266 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test, usually to spot some issues in the scheduler implementation or scheduler-perf itself.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# Specifically, the CIs use labels like the following:
+# - `ci-kubernetes-integration-master` (`integration-test`): Test cases are chosen based on a tradeoff between code coverage and overall runtime. 
+# It basically covers all test cases but with their smallest workload. 
+# - `pull-kubernetes-integration` (`integration-test`,`short`): Test cases are chosen so that they should take less than total 5 min to complete.
+# - `ci-benchmark-scheduler-perf` (`performance`): Long enough test cases are chosen (ideally, longer than 10 seconds) 
+# to provide meaningful samples for the pod scheduling rate.
+#
+# Also, `performance`+`short` isn't used in the CIs, but it's used to test the performance test locally.
+# (Sometimes, the test cases with `integration-test` are too small to spot issues.)
+#
+# Combining `performance` and `short` selects suitable workloads for a local
+# before/after comparisons with benchstat.
+
+- name: TopologySpreading
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["moon-1", "moon-2", "moon-3"]
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-default.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-with-topology-spreading.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 2000
+  - name: 5000Nodes_5000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 85
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 85
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+
+- name: PreferredTopologySpreading
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["moon-1", "moon-2", "moon-3"]
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-default.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-with-preferred-topology-spreading.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 2000
+  - name: 5000Nodes_5000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    threshold: 125
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    threshold: 125
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 5000
+
+# This test case simulates the scheduling of pods with service.
+# It benchmarks default PodTopologySpread constraints that calculate the label selector from services.
+- name: DefaultTopologySpreading
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+    nodeTemplatePath: ../templates/node-default.yaml
+    labelNodePrepareStrategy:
+      labelKey: "topology.kubernetes.io/zone"
+      labelValues: ["moon-1", "moon-2", "moon-3"]
+  - opcode: createAny
+    namespace: service-ns
+    templatePath: ../templates/service.yaml
+  - opcode: createPods
+    countParam: $initPods
+    podTemplatePath: ../templates/pod-default.yaml
+  - opcode: createPods
+    namespace: service-ns
+    countParam: $measurePods
+    podTemplatePath: ../templates/pod-with-label.yaml
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      initNodes: 5
+      initPods: 10
+      measurePods: 10
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      initNodes: 500
+      initPods: 1000
+      measurePods: 1000
+  - name: 5000Nodes_10000Pods
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 10000
+  - name: 5000Nodes_50000Pods
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
+  - name: 5000Nodes_50000Pods_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 5000
+      measurePods: 50000
+
+- name: SchedulingWithNodeInclusionPolicy
+  featureGates:
+    NodeInclusionPolicyInPodTopologySpread: true
+  defaultPodTemplatePath: ../templates/pod-with-node-inclusion-policy.yaml
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $normalNodes
+  - opcode: createNodes
+    nodeTemplatePath: ../templates/node-with-taint.yaml
+    countParam: $taintNodes
+  - opcode: createPods
+    countParam: $measurePods
+    collectMetrics: true
+  workloads:
+  - name: 5Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      taintNodes: 1
+      normalNodes: 4
+      measurePods: 4
+  - name: 5Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      taintNodes: 1
+      normalNodes: 4
+      measurePods: 4
+  - name: 500Nodes
+    labels: [performance, short]
+    params:
+      taintNodes: 100
+      normalNodes: 400
+      measurePods: 400
+  - name: 5000Nodes
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [performance, short]
+    threshold: 68
+    params:
+      taintNodes: 1000
+      normalNodes: 4000
+      measurePods: 4000
+  - name: 5000Nodes_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [performance, short]
+    threshold: 68
+    params:
+      taintNodes: 1000
+      normalNodes: 4000
+      measurePods: 4000
