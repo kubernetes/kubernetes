@@ -909,7 +909,7 @@ func TestRemoveStaleState(t *testing.T) {
 			mgr.state.SetMemoryAssignments(testCase.assignments)
 			mgr.state.SetMachineState(testCase.machineState)
 
-			mgr.removeStaleState()
+			mgr.removeStaleState(logger)
 
 			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Errorf("Memory Manager removeStaleState() error, expected assignments %v, but got: %v",

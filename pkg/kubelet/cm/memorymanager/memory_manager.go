@@ -265,16 +265,16 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Garbage collect any stranded resources before allocation
 	ctx := context.TODO()
-	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name)
+	logger := klog.FromContext(ctx)
 
-	m.removeStaleState()
+	m.removeStaleState(logger)
 
 	m.Lock()
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container memory if required.
 	if err := m.policy.Allocate(ctx, m.state, pod, container); err != nil {
-		logger.Error(err, "Allocate error")
+		logger.Error(err, "Allocate error", "pod", klog.KObj(pod), "containerName", container.Name)
 		return err
 	}
 	return nil
@@ -306,8 +306,11 @@ func (m *manager) State() state.Reader {
 
 // GetPodTopologyHints returns the topology hints for the topology manager
 func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// This should be replaced with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState()
+	m.removeStaleState(klog.FromContext(ctx))
 	// Delegate to active policy
 	return m.policy.GetPodTopologyHints(context.TODO(), m.state, pod)
 }
@@ -315,14 +318,13 @@ func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.
 // GetTopologyHints returns the topology hints for the topology manager
 func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState()
+	m.removeStaleState(klog.TODO())
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(context.TODO(), m.state, pod, container)
 }
 
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers
-func (m *manager) removeStaleState() {
-	logger := klog.TODO()
+func (m *manager) removeStaleState(logger klog.Logger) {
 
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
