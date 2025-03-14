@@ -3881,7 +3881,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 							AllocatedResources: CPU1AndMem1GAndStorage2GAndCustomResource,
 						},
 					},
-					Resize: "InProgress",
 				},
 			},
 		},
@@ -3912,7 +3911,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 							AllocatedResources: CPU1AndMem1GAndStorage2G,
 						},
 					},
-					Resize: "InProgress",
 				},
 			},
 		},
@@ -3926,9 +3924,10 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 			oldStatus := test.pod.Status
 			kl.statusManager.SetPodStatus(test.pod, oldStatus)
 			actual := kl.generateAPIPodStatus(test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
-
-			if actual.Resize != "" {
-				t.Fatalf("Unexpected Resize status: %s", actual.Resize)
+			for _, c := range actual.Conditions {
+				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
+					t.Fatalf("unexpected resize status: %v", c)
+				}
 			}
 		})
 	}

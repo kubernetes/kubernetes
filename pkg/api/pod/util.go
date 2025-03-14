@@ -791,7 +791,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
-		// Drop Resize and Resources fields
+		// Drop Resources fields
 		dropResourcesField := func(csl []api.ContainerStatus) {
 			for i := range csl {
 				csl[i].Resources = nil
@@ -800,7 +800,6 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropResourcesField(podStatus.ContainerStatuses)
 		dropResourcesField(podStatus.InitContainerStatuses)
 		dropResourcesField(podStatus.EphemeralContainerStatuses)
-		podStatus.Resize = ""
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) ||
 		!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {

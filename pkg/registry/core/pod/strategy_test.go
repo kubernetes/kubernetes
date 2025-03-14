@@ -3072,7 +3072,6 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 				),
 				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(""), // Resize status not set
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("init-container1",
 							api.ResourceList{
