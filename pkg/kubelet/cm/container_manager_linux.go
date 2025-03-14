@@ -202,7 +202,7 @@ func validateSystemRequirements(mountUtil mount.Interface) (features, error) {
 // TODO(vmarmol): Add limits to the system containers.
 // Takes the absolute name of the specified containers.
 // Empty container name disables use of the specified container.
-func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
@@ -335,7 +335,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	cm.topologyManager.AddHintProvider(cm.cpuManager)
 
 	cm.memoryManager, err = memorymanager.NewManager(
-		ctx,
+		context.TODO(),
 		nodeConfig.MemoryManagerPolicy,
 		machineInfo,
 		cm.GetNodeAllocatableReservation(),
