@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -236,6 +238,13 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 	}
 	if len(e.Message) > maxVolumeErrorMessageSize {
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxAttachedVolumeMetadataSize))
+	}
+
+	if e.ErrorCode != nil && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		value := *e.ErrorCode
+		if value < 0 || value > math.MaxInt32 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("errorCode"), value, validation.InclusiveRangeError(0, math.MaxInt32)))
+		}
 	}
 	return allErrs
 }
@@ -453,7 +462,7 @@ func validateCSIDriverSpec(
 // validateNodeAllocatableUpdatePeriodSeconds tests if NodeAllocatableUpdatePeriodSeconds is valid for CSIDriver.
 func validateNodeAllocatableUpdatePeriodSeconds(period *int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if period != nil && *period < 10 {
+	if period != nil && *period < 10 && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		allErrs = append(allErrs, field.Invalid(fldPath, *period, "must be greater than or equal to 10 seconds"))
 	}
 	return allErrs
