@@ -849,6 +849,9 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 			return pl.hasDeviceBindingStatus(ctx, state, pod, nodeName)
 		})
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			err = fmt.Errorf("device binding timeout: %w", err)
+		}
 		return statusError(logger, err)
 	}
 
