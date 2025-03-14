@@ -242,7 +242,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 
 	if e.ErrorCode != nil && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		value := *e.ErrorCode
-		if value < 0 || value > math.MaxInt32 {
+		if value < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("errorCode"), value, validation.InclusiveRangeError(0, math.MaxInt32)))
 		}
 	}
