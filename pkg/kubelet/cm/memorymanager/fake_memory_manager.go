@@ -34,8 +34,9 @@ type fakeManager struct {
 	state  state.State
 }
 
-func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	m.logger.Info("Start()")
+func (m *fakeManager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("Start()")
 	return nil
 }
 
@@ -53,13 +54,15 @@ func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, contain
 	m.logger.Info("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
-func (m *fakeManager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int] {
-	m.logger.Info("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
+func (m *fakeManager) GetMemoryNUMANodes(ctx context.Context, pod *v1.Pod, container *v1.Container) sets.Set[int] {
+	logger := klog.FromContext(ctx)
+	logger.Info("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) RemoveContainer(containerID string) error {
-	m.logger.Info("RemoveContainer", "containerID", containerID)
+func (m *fakeManager) RemoveContainer(ctx context.Context, containerID string) error {
+	logger := klog.FromContext(ctx)
+	logger.Info("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
