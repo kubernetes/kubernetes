@@ -91,10 +91,12 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutosca
 	SetDefaults_HorizontalPodAutoscalerBehavior(obj)
 }
 
-// SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it is not null
+// SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it contains
+// at least one scaling rule policy (for scale-up or scale-down)
 func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPodAutoscaler) {
-	// if behavior is specified, we should fill all the 'nil' values with the default ones
-	if obj.Spec.Behavior != nil {
+	// If behavior contains a scaling rule policy (either for scale-up, scale-down, or both), we
+	// should fill all the 'nil' scaling parameters (e.g. stabilization window) with default values
+	if BehaviorHasPolicySet(obj.Spec.Behavior) {
 		obj.Spec.Behavior.ScaleUp = GenerateHPAScaleUpRules(obj.Spec.Behavior.ScaleUp)
 		obj.Spec.Behavior.ScaleDown = GenerateHPAScaleDownRules(obj.Spec.Behavior.ScaleDown)
 	}
@@ -115,6 +117,16 @@ func GenerateHPAScaleDownRules(scalingRules *autoscalingv2.HPAScalingRules) *aut
 	return copyHPAScalingRules(scalingRules, defaultScalingRules)
 }
 
+// BehaviorHasPolicySet checks if a given behavior contains at least one scaling
+// rule policy (for scale-up or scale-down)
+func BehaviorHasPolicySet(behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) bool {
+	return behavior != nil && (ruleHasPolicySet(behavior.ScaleDown) || ruleHasPolicySet(behavior.ScaleUp))
+}
+
+func ruleHasPolicySet(rule *autoscalingv2.HPAScalingRules) bool {
+	return rule != nil && len(rule.Policies) > 0
+}
+
 // copyHPAScalingRules copies all non-`nil` fields in HPA constraint structure
 func copyHPAScalingRules(from, to *autoscalingv2.HPAScalingRules) *autoscalingv2.HPAScalingRules {
 	if from == nil {
@@ -128,6 +140,9 @@ func copyHPAScalingRules(from, to *autoscalingv2.HPAScalingRules) *autoscalingv2
 	}
 	if from.Policies != nil {
 		to.Policies = from.Policies
+	}
+	if from.Tolerance != nil {
+		to.Tolerance = from.Tolerance
 	}
 	return to
 }
