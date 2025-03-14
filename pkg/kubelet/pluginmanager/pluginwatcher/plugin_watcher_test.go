@@ -288,11 +288,10 @@ func TestPluginDisconnect(t *testing.T) {
 			socketPath := filepath.Join(socketDir, fmt.Sprintf("%s.sock", pluginName))
 			plugin := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 
-			if runtime.GOOS == "windows" {
+			if runtime.GOOS != "windows" {
 				// Windows does not support unlinking socket files
-				test.unlinkSocket = false
+				plugin.SetUnlinkSocket(test.unlinkSocket)
 			}
-			plugin.SetUnlinkSocket(test.unlinkSocket)
 
 			// Run and register it
 			require.NoError(t, plugin.Serve(supportedVersions...))
