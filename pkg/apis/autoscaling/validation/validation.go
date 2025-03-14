@@ -53,7 +53,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
 
-func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, minReplicasLowerBound int32) field.ErrorList {
+func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAutoscalerSpec, fldPath *field.Path, minReplicasLowerBound int32, allowTolerance bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if autoscaler.MinReplicas != nil && *autoscaler.MinReplicas < minReplicasLowerBound {
@@ -72,7 +72,7 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	if refErrs := validateMetrics(autoscaler.Metrics, fldPath.Child("metrics"), autoscaler.MinReplicas); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
-	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior")); len(refErrs) > 0 {
+	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior"), allowTolerance); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
 	}
 	return allErrs
@@ -106,6 +106,9 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName, field.NewPath("metadata"))
 
+	// allowTolerance is true iif spec.behavior.scale(Up,Down).tolerance can be set
+	allowTolerance := utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance)
+
 	// MinReplicasLowerBound represents a minimum value for minReplicas
 	// 0 when HPA scale-to-zero feature is enabled
 	var minReplicasLowerBound int32
@@ -115,7 +118,7 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 	} else {
 		minReplicasLowerBound = 1
 	}
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound)...)
+	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound, allowTolerance)...)
 	return allErrs
 }
 
@@ -123,6 +126,9 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 // ErrorList with any errors.
 func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
+
+	// allowTolerance is true iif spec.behavior.scale(Up,Down).tolerance can be set.
+	allowTolerance := utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance)
 
 	// minReplicasLowerBound represents a minimum value for minReplicas
 	// 0 when HPA scale-to-zero feature is enabled or HPA object already has minReplicas=0
@@ -133,8 +139,7 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 	} else {
 		minReplicasLowerBound = 1
 	}
-
-	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound)...)
+	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"), minReplicasLowerBound, allowTolerance)...)
 	return allErrs
 }
 
@@ -175,13 +180,13 @@ func validateMetrics(metrics []autoscaling.MetricSpec, fldPath *field.Path, minR
 	return allErrs
 }
 
-func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fldPath *field.Path) field.ErrorList {
+func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fldPath *field.Path, allowTolerance bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if behavior != nil {
-		if scaleUpErrs := validateScalingRules(behavior.ScaleUp, fldPath.Child("scaleUp")); len(scaleUpErrs) > 0 {
+		if scaleUpErrs := validateScalingRules(behavior.ScaleUp, fldPath.Child("scaleUp"), allowTolerance); len(scaleUpErrs) > 0 {
 			allErrs = append(allErrs, scaleUpErrs...)
 		}
-		if scaleDownErrs := validateScalingRules(behavior.ScaleDown, fldPath.Child("scaleDown")); len(scaleDownErrs) > 0 {
+		if scaleDownErrs := validateScalingRules(behavior.ScaleDown, fldPath.Child("scaleDown"), allowTolerance); len(scaleDownErrs) > 0 {
 			allErrs = append(allErrs, scaleDownErrs...)
 		}
 	}
@@ -191,7 +196,7 @@ func validateBehavior(behavior *autoscaling.HorizontalPodAutoscalerBehavior, fld
 var validSelectPolicyTypes = sets.NewString(string(autoscaling.MaxPolicySelect), string(autoscaling.MinPolicySelect), string(autoscaling.DisabledPolicySelect))
 var validSelectPolicyTypesList = validSelectPolicyTypes.List()
 
-func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Path) field.ErrorList {
+func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Path, allowTolerance bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if rules != nil {
 		if rules.StabilizationWindowSeconds != nil && *rules.StabilizationWindowSeconds < 0 {
@@ -205,7 +210,8 @@ func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Pat
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("selectPolicy"), rules.SelectPolicy, validSelectPolicyTypesList))
 		}
 		policiesPath := fldPath.Child("policies")
-		if len(rules.Policies) == 0 {
+		hasPolicyFields := rules.StabilizationWindowSeconds != nil || rules.SelectPolicy != nil
+		if len(rules.Policies) == 0 && (rules.Tolerance == nil || hasPolicyFields) {
 			allErrs = append(allErrs, field.Required(policiesPath, "must specify at least one Policy"))
 		}
 		for i, policy := range rules.Policies {
@@ -213,6 +219,13 @@ func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Pat
 			if policyErrs := validateScalingPolicy(policy, idxPath); len(policyErrs) > 0 {
 				allErrs = append(allErrs, policyErrs...)
 			}
+		}
+
+		if rules.Tolerance != nil && !allowTolerance {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("tolerance"), "tolerance is not supported when the HPAConfigurableTolerance feature gate is not enabled"))
+		}
+		if rules.Tolerance != nil && rules.Tolerance.Sign() < 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("tolerance"), rules.Tolerance, "must be greater or equal to zero"))
 		}
 	}
 	return allErrs
