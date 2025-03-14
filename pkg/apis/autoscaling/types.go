@@ -138,12 +138,17 @@ const (
 	DisabledPolicySelect ScalingPolicySelect = "Disabled"
 )
 
-// HPAScalingRules configures the scaling behavior for one direction.
-// These Rules are applied after calculating DesiredReplicas from metrics for the HPA.
+// HPAScalingRules configures the scaling behavior for one direction via
+// scaling Policy Rules and a configurable metric tolerance.
+//
+// Scaling Policy Rules are applied after calculating DesiredReplicas from metrics for the HPA.
 // They can limit the scaling velocity by specifying scaling policies.
 // They can prevent flapping by specifying the stabilization window, so that the
 // number of replicas is not set instantly, instead, the safest value from the stabilization
 // window is chosen.
+//
+// The tolerance is applied to the metric values and prevents scaling too
+// eagerly for small metric variations.
 type HPAScalingRules struct {
 	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
@@ -158,9 +163,18 @@ type HPAScalingRules struct {
 	// +optional
 	SelectPolicy *ScalingPolicySelect
 	// policies is a list of potential scaling polices which can used during scaling.
-	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+	// If tolerance is not set, at least one policy must be specified, otherwise
+	// the HPAScalingRules will be discarded as invalid.
 	// +optional
 	Policies []HPAScalingPolicy
+
+	// tolerance is the tolerance on the ratio between the current and desired
+	// metric value under which no updates are made to the desired number of
+	// replicas. If not set, the default cluster-wide tolerance is applied (by
+	// default 10%). Only supported if the feature gate HPAConfigurableTolerance
+	// is enabled.
+	// +optional
+	Tolerance *resource.Quantity
 }
 
 // HPAScalingPolicyType is the type of the policy which could be used while making scaling decisions.
