@@ -22952,10 +22952,11 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 	honor := core.NodeInclusionPolicyHonor
 
 	testCases := []struct {
-		name            string
-		constraints     []core.TopologySpreadConstraint
-		opts            PodValidationOptions
-		wantFieldErrors field.ErrorList
+		name                               string
+		constraints                        []core.TopologySpreadConstraint
+		opts                               PodValidationOptions
+		wantFieldErrors                    field.ErrorList
+		matchLabelKeysSelectorMergeEnabled bool
 	}{{
 		name: "all required fields ok",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22964,7 +22965,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.DoNotSchedule,
 			MinDomains:        ptr.To[int32](3),
 		}},
-		wantFieldErrors: nil,
+		wantFieldErrors:                    nil,
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "missing MaxSkew",
 		constraints: []core.TopologySpreadConstraint{
@@ -22973,6 +22975,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMaxSkew, nil, "").WithOrigin("minimum"),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "negative MaxSkew",
 		constraints: []core.TopologySpreadConstraint{
@@ -22981,6 +22984,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMaxSkew, nil, "").WithOrigin("minimum"),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "can use MinDomains with ScheduleAnyway, when MinDomains = nil",
 		constraints: []core.TopologySpreadConstraint{{
@@ -22989,7 +22993,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			WhenUnsatisfiable: core.ScheduleAnyway,
 			MinDomains:        nil,
 		}},
-		wantFieldErrors: nil,
+		wantFieldErrors:                    nil,
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "negative minDomains is invalid",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23001,6 +23006,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("minimum"),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "cannot use non-nil MinDomains with ScheduleAnyway",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23012,6 +23018,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("dependsOn"),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "use negative MinDomains with ScheduleAnyway(invalid)",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23024,6 +23031,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("minimum"),
 			field.Invalid(fieldPathMinDomains, nil, "").WithOrigin("dependsOn"),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "missing TopologyKey",
 		constraints: []core.TopologySpreadConstraint{
@@ -23032,6 +23040,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Required(fieldPathTopologyKey, ""),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "missing scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
@@ -23040,6 +23049,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.NotSupported[core.UnsatisfiableConstraintAction](fieldPathWhenUnsatisfiable, nil, nil),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "unsupported scheduling mode",
 		constraints: []core.TopologySpreadConstraint{
@@ -23048,13 +23058,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.NotSupported[core.UnsatisfiableConstraintAction](fieldPathWhenUnsatisfiable, nil, nil),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "multiple constraints ok with all required fields",
 		constraints: []core.TopologySpreadConstraint{
 			{MaxSkew: 1, TopologyKey: "k8s.io/zone", WhenUnsatisfiable: core.DoNotSchedule},
 			{MaxSkew: 2, TopologyKey: "k8s.io/node", WhenUnsatisfiable: core.ScheduleAnyway},
 		},
-		wantFieldErrors: nil,
+		wantFieldErrors:                    nil,
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "multiple constraints missing TopologyKey on partial ones",
 		constraints: []core.TopologySpreadConstraint{
@@ -23064,6 +23076,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Required(fieldPathTopologyKey, ""),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "duplicate constraints",
 		constraints: []core.TopologySpreadConstraint{
@@ -23073,6 +23086,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Duplicate(fieldPathTopologyKeyAndWhenUnsatisfiable, nil),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "supported policy name set on NodeAffinityPolicy and NodeTaintsPolicy",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23082,7 +23096,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			NodeAffinityPolicy: &honor,
 			NodeTaintsPolicy:   &ignore,
 		}},
-		wantFieldErrors: nil,
+		wantFieldErrors:                    nil,
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "unsupported policy name set on NodeAffinityPolicy",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23095,6 +23110,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.NotSupported[core.NodeInclusionPolicy](nodeAffinityField, nil, nil),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "unsupported policy name set on NodeTaintsPolicy",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23107,6 +23123,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.NotSupported[core.NodeInclusionPolicy](nodeTaintsField, nil, nil),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "key in MatchLabelKeys isn't correctly defined",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23119,6 +23136,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
 		},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "key exists in both matchLabelKeys and labelSelector",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23143,9 +23161,54 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 		}},
 		// TODO: This expected message is not perfect, and will be fixed in #129900.
-		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		wantFieldErrors:                    field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Forbidden(fieldPathMatchLabelKeys, ""),
+		},
+		matchLabelKeysSelectorMergeEnabled: true,
+	}, {
+		name: "key in MatchLabelKeys isn't correctly defined when MatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			LabelSelector:     &metav1.LabelSelector{},
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"/simple"},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
+		},
+	}, {
+		name: "key exists in both matchLabelKeys and labelSelector when MatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1", "value2"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("duplicatedLabelKeys"),
+		},
+	}, {
+		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set and MatchLabelKeysInPodTopologySpreadSelectorMerge is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23167,7 +23230,8 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(labelSelectorField.Child("matchLabels"), nil, "").WithOrigin("labelKey"),
 		},
-		opts: PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		opts:                               PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23177,8 +23241,9 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
-		wantFieldErrors: nil,
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
+		wantFieldErrors:                    nil,
+		opts:                               PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}, {
 		name: "valid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
@@ -23188,12 +23253,15 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			MinDomains:        nil,
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "foo"}},
 		}},
-		wantFieldErrors: nil,
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		wantFieldErrors:                    nil,
+		opts:                               PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		matchLabelKeysSelectorMergeEnabled: true,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+
 			errs := validateTopologySpreadConstraints(tc.constraints, fieldPath, tc.opts)
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().RequireOriginWhenInvalid()
 			matcher.Test(t, tc.wantFieldErrors, errs)

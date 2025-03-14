@@ -500,6 +500,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	MatchLabelKeysInPodTopologySpreadSelectorMerge: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	MaxUnavailableStatefulSet: {
 		{Version: version.MustParse("1.24"), Default: false, PreRelease: featuregate.Alpha},
 	},

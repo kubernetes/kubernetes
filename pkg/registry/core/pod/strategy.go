@@ -903,7 +903,7 @@ func applyMatchLabelKeys(constraint *api.TopologySpreadConstraint, labels map[st
 }
 
 func mutateTopologySpreadConstraints(pod *api.Pod) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) || pod.Spec.TopologySpreadConstraints == nil {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread) || !utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge) || pod.Spec.TopologySpreadConstraints == nil {
 		return
 	}
 	topologySpreadConstraints := pod.Spec.TopologySpreadConstraints

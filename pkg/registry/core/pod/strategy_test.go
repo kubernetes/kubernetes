@@ -1793,14 +1793,16 @@ func Test_mutatePodAffinity(t *testing.T) {
 
 func Test_mutateTopologySpreadConstraints(t *testing.T) {
 	tests := []struct {
-		name                  string
-		pod                   *api.Pod
-		wantPod               *api.Pod
-		matchLabelKeysEnabled bool
+		name                               string
+		pod                                *api.Pod
+		wantPod                            *api.Pod
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
 	}{
 		{
-			name:                  "matchLabelKeys are merged into labelSelector with In",
-			matchLabelKeysEnabled: true,
+			name:                               "matchLabelKeys are merged into labelSelector with In",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1854,8 +1856,9 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 			},
 		},
 		{
-			name:                  "keys, which are not found in Pod labels, are ignored",
-			matchLabelKeysEnabled: true,
+			name:                               "keys, which are not found in Pod labels, are ignored",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1904,8 +1907,9 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 			},
 		},
 		{
-			name:                  "matchLabelKeys is ignored if the labelSelector is nil",
-			matchLabelKeysEnabled: true,
+			name:                               "matchLabelKeys is ignored if the labelSelector is nil",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1944,7 +1948,8 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 			},
 		},
 		{
-			name: "the feature gate is disabled and matchLabelKeys is ignored",
+			name:                  "matchLabelKeys are not merged into labelSelector when MatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+			matchLabelKeysEnabled: true,
 			pod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -1989,6 +1994,7 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
 
 			pod := tc.pod
 			mutateTopologySpreadConstraints(pod)
@@ -2002,11 +2008,12 @@ func Test_mutateTopologySpreadConstraints(t *testing.T) {
 func TestUpdateLabelOnPodWithTopologySpreadConstraintsEnabled(t *testing.T) {
 	defaultTerminationGracePeriodSeconds := int64(30)
 	tests := []struct {
-		name                  string
-		pod                   *api.Pod
-		wantPod               *api.Pod
-		updateLabels          map[string]string
-		matchLabelKeysEnabled bool
+		name                               string
+		pod                                *api.Pod
+		wantPod                            *api.Pod
+		updateLabels                       map[string]string
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
 	}{
 		{
 			name: "adding to a new label specified at matchLabelKeys isn't supported",
@@ -2081,8 +2088,9 @@ func TestUpdateLabelOnPodWithTopologySpreadConstraintsEnabled(t *testing.T) {
 					TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
 				},
 			},
-			updateLabels:          map[string]string{"city": "Tokyo"},
-			matchLabelKeysEnabled: true,
+			updateLabels:                       map[string]string{"city": "Tokyo"},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
 		},
 		{
 			name: "updating a label specified at matchLabelKeys isn't supported",
@@ -2163,14 +2171,16 @@ func TestUpdateLabelOnPodWithTopologySpreadConstraintsEnabled(t *testing.T) {
 					TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
 				},
 			},
-			updateLabels:          map[string]string{"city": "Hokkaido"},
-			matchLabelKeysEnabled: true,
+			updateLabels:                       map[string]string{"city": "Hokkaido"},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
 
 			Strategy.PrepareForCreate(genericapirequest.NewContext(), tc.pod)
 			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) != 0 {
