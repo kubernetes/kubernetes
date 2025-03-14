@@ -363,7 +363,7 @@
     version: "1.32"
 - name: DeclarativeValidation
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
