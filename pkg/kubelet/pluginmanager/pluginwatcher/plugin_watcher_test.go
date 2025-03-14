@@ -286,13 +286,14 @@ func TestPluginDisconnect(t *testing.T) {
 			pluginName := "test-plugin-disconnect"
 			socketPath := filepath.Join(socketDir, fmt.Sprintf("%s.sock", pluginName))
 			plugin := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-			defer func() {
-				require.NoError(t, plugin.Stop())
-			}()
+
 			plugin.SetUnlinkSocket(test.unlinkSocket)
 
 			// Run and register it
 			require.NoError(t, plugin.Serve(supportedVersions...))
+			stopPlugin := sync.OnceValue(plugin.Stop)
+			defer stopPlugin()
+
 			pluginInfo := GetPluginInfo(plugin)
 			require.Equal(t, socketPath, pluginInfo.SocketPath)
 			waitForRegistration(t, socketPath, dsw)
@@ -301,7 +302,7 @@ func TestPluginDisconnect(t *testing.T) {
 			require.NoError(t, asw.AddPlugin(pluginInfo))
 
 			// Stop the plugin
-			require.NoError(t, plugin.Stop())
+			require.NoError(t, stopPlugin())
 
 			if !test.unlinkSocket {
 				// Ensure that the stalled socket exists after stopping the plugin
@@ -330,12 +331,12 @@ func TestPluginStuckThenUnstuck(t *testing.T) {
 	pluginName := "test-plugin-stuck-unstuck"
 	socketPath := filepath.Join(socketDir, fmt.Sprintf("%s.sock", pluginName))
 	plugin := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
-	defer func() {
-		require.NoError(t, plugin.Stop())
-	}()
 
 	// Run and register it
 	require.NoError(t, plugin.Serve(supportedVersions...))
+	stopPlugin := sync.OnceValue(plugin.Stop)
+	defer stopPlugin()
+
 	pluginInfo := GetPluginInfo(plugin)
 	require.Equal(t, socketPath, pluginInfo.SocketPath)
 	waitForRegistration(t, socketPath, dsw)
