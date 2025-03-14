@@ -61,7 +61,7 @@ type Manager interface {
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the memory allocation during the container removal
-	AddContainer(p *v1.Pod, c *v1.Container, containerID string)
+	AddContainer(ctx context.Context, p *v1.Pod, c *v1.Container, containerID string)
 
 	// Allocate is called to pre-allocate memory resources during Pod admission.
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
@@ -211,7 +211,7 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 }
 
 // AddContainer saves the value of requested memory for the guaranteed pod under the state and set memory affinity according to the topolgy manager
-func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+func (m *manager) AddContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) {
 	m.Lock()
 	defer m.Unlock()
 

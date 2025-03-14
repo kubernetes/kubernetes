@@ -30,6 +30,7 @@ import (
 )
 
 type fakeManager struct {
+	// Logger is used for background activities
 	logger klog.Logger
 	state  state.State
 }
@@ -50,8 +51,9 @@ func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	m.logger.Info("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
+func (m *fakeManager) AddContainer(ctx context.Context, pod *v1.Pod, container *v1.Container, containerID string) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
 }
 
 func (m *fakeManager) GetMemoryNUMANodes(ctx context.Context, pod *v1.Pod, container *v1.Container) sets.Set[int] {
