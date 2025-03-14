@@ -30,8 +30,12 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
@@ -179,4 +183,138 @@ func TestUpdateStatus(t *testing.T) {
 	if !apiequality.Semantic.DeepEqual(claim.Status, claimOut.Status) {
 		t.Errorf("unexpected object: %s", cmp.Diff(claim.Status, claimOut.Status))
 	}
+}
+
+type testMetrics struct {
+	attempts float64
+	failures float64
+}
+
+func expectMetrics(t *testing.T, em testMetrics) {
+	t.Helper()
+	var m testMetrics
+	var err error
+	m.attempts, err = testutil.GetCounterMetricValue(resourceClaimUpdateStatusDevicesAttempts)
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", resourceClaimUpdateStatusDevicesAttempts.Name, err)
+	}
+	m.failures, err = testutil.GetCounterMetricValue(resourceClaimUpdateStatusDevicesFailures)
+	if err != nil {
+		t.Errorf("failed to get %s value, err: %v", resourceClaimUpdateStatusDevicesFailures.Name, err)
+	}
+	if m != em {
+		t.Fatalf("metrics error: expected %v, received %v", em, m)
+	}
+}
+
+func TestUpdateStatusMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, true)
+	// reset metrics since are stored globally
+	resourceClaimUpdateStatusDevicesAttempts.Reset()
+	resourceClaimUpdateStatusDevicesFailures.Reset()
+
+	storage, statusStorage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
+	ctx := genericapirequest.NewDefaultContext()
+
+	key, _ := storage.KeyFunc(ctx, "foo")
+	claimStart := validNewClaim("foo", metav1.NamespaceDefault)
+	claimStart.Spec = resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{Name: "request"},
+			},
+		},
+	}
+	err := storage.Storage.Create(ctx, key, claimStart, nil, 0, false)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	expectMetrics(t, testMetrics{
+		attempts: 0,
+		failures: 0,
+	})
+
+	claimValid := claimStart.DeepCopy()
+	claimValid.Status = resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{{
+					Request: "request",
+					Driver:  "driver-1",
+					Pool:    "pool-1",
+					Device:  "device-1",
+				}},
+			},
+		},
+		Devices: []resource.AllocatedDeviceStatus{
+			{
+				Driver: "driver-1",
+				Pool:   "pool-1",
+				Device: "device-1",
+				NetworkData: &resource.NetworkDeviceData{
+					IPs: []string{
+						"2001:db8::1/64",
+					},
+				},
+			},
+		},
+	}
+	// success
+	_, _, err = statusStorage.Update(ctx, claimValid.Name, rest.DefaultUpdatedObjectInfo(claimValid), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	expectMetrics(t, testMetrics{
+		attempts: 1,
+		failures: 0,
+	})
+	obj, err := storage.Get(ctx, "foo", &metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	claimOut := obj.(*resource.ResourceClaim)
+	// only compare relevant changes b/c of difference in metadata
+	if !apiequality.Semantic.DeepEqual(claimValid.Status, claimOut.Status) {
+		t.Errorf("unexpected object: %s", cmp.Diff(claimValid.Status, claimOut.Status))
+	}
+	// failures
+	// duplicate IPs and missing request name
+	claimInvalid := claimStart.DeepCopy()
+	claimInvalid.Status = resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{{
+					Request: "", // must reference the Spec request
+					Driver:  "driver-1",
+					Pool:    "pool-1",
+					Device:  "device-1",
+				}},
+			},
+		},
+		Devices: []resource.AllocatedDeviceStatus{
+			{
+				Driver: "driver-1",
+				Pool:   "pool-1",
+				Device: "device-1",
+				NetworkData: &resource.NetworkDeviceData{
+					IPs: []string{
+						"2001:db8::1/64",
+						"2001:db8::1/64", // can not have duplicates
+					},
+				},
+			},
+		},
+	}
+	_, _, err = statusStorage.Update(ctx, claimInvalid.Name, rest.DefaultUpdatedObjectInfo(claimInvalid), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err == nil {
+		t.Fatalf("Unexpected success")
+	}
+	expectMetrics(t, testMetrics{
+		attempts: 2,
+		failures: 1,
+	})
+
 }
