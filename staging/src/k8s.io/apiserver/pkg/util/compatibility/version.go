@@ -55,11 +55,11 @@ func kubeEffectiveVersionFloors(binaryVersion *version.Version) *version.Version
 // We do not enforce the N-3..N emulation version range in tests so that the tests would not automatically fail when there is a version bump.
 // Only used in tests.
 func DefaultKubeEffectiveVersionForTest() basecompatibility.MutableEffectiveVersion {
-	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion).WithInfo(baseversion.Get())
+	binaryVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
 	return basecompatibility.NewEffectiveVersion(binaryVersion, false, version.MustParse("0.0"), version.MustParse("0.0"))
 }
 
 func defaultBuildBinaryVersion() *version.Version {
 	verInfo := baseversion.Get()
-	return version.MustParse(verInfo.String()).WithInfo(verInfo)
+	return version.MustParse(verInfo.String())
 }
