@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -31,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/auth/rbac/validation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -173,6 +176,154 @@ func TestBootstrapClusterRoles(t *testing.T) {
 		list.Items = append(list.Items, roles[name])
 	}
 	testObjects(t, list, "cluster-roles.yaml")
+}
+
+func TestBootstrapClusterRolesWithFeatureGateEnabled(t *testing.T) {
+	expectedDiff := map[string]string{
+		"system:monitoring": `   &v1.ClusterRole{
+			TypeMeta:   {},
+			ObjectMeta: {Name: "system:monitoring", Labels: {"kubernetes.io/bootstrapping": "rbac-defaults"}, Annotations: {"rbac.authorization.kubernetes.io/autoupdate": "true"}},
+			Rules: []v1.PolicyRule{
+				{Verbs: {"get"}, NonResourceURLs: {"/healthz", "/healthz/*", "/livez", "/livez/*", ...}},
+		+ 		{Verbs: []string{"get"}, NonResourceURLs: []string{"/flagz"}},
+		+ 		{Verbs: []string{"get"}, NonResourceURLs: []string{"/statusz"}},
+			},
+			AggregationRule: nil,
+}`,
+		"system:aggregate-to-view": `  &v1.ClusterRole{
+        	TypeMeta:   {},
+        	ObjectMeta: {Name: "system:aggregate-to-view", Labels: {"kubernetes.io/bootstrapping": "rbac-defaults", "rbac.authorization.k8s.io/aggregate-to-view": "true"}, Annotations: {"rbac.authorization.kubernetes.io/autoupdate": "true"}},
+        	Rules: []v1.PolicyRule{
+        		... // 8 identical elements
+        		{Verbs: {"get", "list", "watch"}, APIGroups: {"policy"}, Resources: {"poddisruptionbudgets", "poddisruptionbudgets/status"}},
+        		{Verbs: {"get", "list", "watch"}, APIGroups: {"networking.k8s.io"}, Resources: {"ingresses", "ingresses/status", "networkpolicies"}},
+        +		{
+        +			Verbs:     []string{"get", "list", "watch"},
+        +			APIGroups: []string{"resource.k8s.io"},
+        +			Resources: []string{"resourceclaims", "resourceclaims/status", "resourceclaimtemplates"},
+        +		},
+        	},
+        	AggregationRule: nil,
+        }
+        `,
+		"system:aggregate-to-edit": `&v1.ClusterRole{
+        	TypeMeta:   {},
+        	ObjectMeta: {Name: "system:aggregate-to-edit", Labels: {"kubernetes.io/bootstrapping": "rbac-defaults", "rbac.authorization.k8s.io/aggregate-to-edit": "true"}, Annotations: {"rbac.authorization.kubernetes.io/autoupdate": "true"}},
+        	Rules: []v1.PolicyRule{
+        		... // 11 identical elements
+        		{Verbs: {"create", "delete", "deletecollection", "patch", ...}, APIGroups: {"networking.k8s.io"}, Resources: {"ingresses", "networkpolicies"}},
+        		{Verbs: {"create", "delete", "deletecollection", "get", ...}, APIGroups: {"coordination.k8s.io"}, Resources: {"leases"}},
+        +		{
+        +			Verbs:     []string{"create", "delete", "deletecollection", "patch", "update"},
+        +			APIGroups: []string{"resource.k8s.io"},
+        +			Resources: []string{"resourceclaims", "resourceclaimtemplates"},
+        +		},
+        	},
+        	AggregationRule: nil,
+        }
+        `,
+		"system:node": `  &v1.ClusterRole{
+          	TypeMeta:   {},
+          	ObjectMeta: {Name: "system:node", Labels: {"kubernetes.io/bootstrapping": "rbac-defaults"}, Annotations: {"rbac.authorization.kubernetes.io/autoupdate": "true"}},
+          	Rules: []v1.PolicyRule{
+          		... // 20 identical elements
+          		{Verbs: {"create", "delete", "get", "patch", ...}, APIGroups: {"storage.k8s.io"}, Resources: {"csinodes"}},
+          		{Verbs: {"get", "list", "watch"}, APIGroups: {"node.k8s.io"}, Resources: {"runtimeclasses"}},
+        + 		{
+        + 			Verbs:     []string{"get"},
+        + 			APIGroups: []string{"resource.k8s.io"},
+        + 			Resources: []string{"resourceclaims"},
+        + 		},
+        + 		{
+        + 			Verbs:     []string{"deletecollection"},
+        + 			APIGroups: []string{"resource.k8s.io"},
+        + 			Resources: []string{"resourceslices"},
+        + 		},
+        + 		{
+        + 			Verbs:     []string{"get", "list", "watch"},
+        + 			APIGroups: []string{"certificates.k8s.io"},
+        + 			Resources: []string{"clustertrustbundles"},
+        + 		},
+          	},
+          	AggregationRule: nil,
+          }
+        `,
+		"system:kube-scheduler": `  &v1.ClusterRole{
+          	TypeMeta:   {},
+          	ObjectMeta: {Name: "system:kube-scheduler", Labels: {"kubernetes.io/bootstrapping": "rbac-defaults"}, Annotations: {"rbac.authorization.kubernetes.io/autoupdate": "true"}},
+          	Rules: []v1.PolicyRule{
+          		... // 18 identical elements
+          		{Verbs: {"get", "list", "watch"}, APIGroups: {"storage.k8s.io"}, Resources: {"csidrivers"}},
+          		{Verbs: {"get", "list", "watch"}, APIGroups: {"storage.k8s.io"}, Resources: {"csistoragecapacities"}},
+        + 		{
+        + 			Verbs:     []string{"get", "list", "watch"},
+        + 			APIGroups: []string{"resource.k8s.io"},
+        +			Resources: []string{"deviceclasses"},
+        + 		},
+        + 		{
+        + 			Verbs:     []string{"get", "list", "patch", "update", "watch"},
+        + 			APIGroups: []string{"resource.k8s.io"},
+        + 			Resources: []string{"resourceclaims"},
+        + 		},
+        + 		{
+        + 			Verbs:     []string{"get", "list", "patch", "update", "watch"},
+        + 			APIGroups: []string{"resource.k8s.io"},
+        + 			Resources: []string{"resourceclaims/status"},
+        + 		},
+        + 		{
+        + 			Verbs:     []string{"get", "list", "patch", "update", "watch"},
+        + 			APIGroups: []string{""},
+        + 			Resources: []string{"pods/finalizers"},
+        + 		},
+        + 		{
+        + 			Verbs:     []string{"get", "list", "watch"},
+        + 			APIGroups: []string{"resource.k8s.io"},
+        + 			Resources: []string{"resourceslices"},
+        + 		},
+          	},
+          	AggregationRule: nil,
+          }
+        `,
+		"system:cluster-trust-bundle-discovery": `  any(
+        + 	s"&ClusterRole{ObjectMeta:{system:cluster-trust-bundle-discovery      0 0001-01-01 00:00:00 +0000 UTC <nil> <nil> map[kubernetes.io/bootstrapping:rbac-defaults] map[rbac.authorization.kubernetes.io/autoupdate:true] [] [] []},Rules:[]PolicyRule{PolicyRule{Ver"...,
+          )
+        `,
+	}
+
+	names := sets.NewString()
+	roles := map[string]runtime.Object{}
+	bootstrapRoles := bootstrappolicy.ClusterRoles()
+	for i := range bootstrapRoles {
+		role := bootstrapRoles[i]
+		names.Insert(role.Name)
+		roles[role.Name] = &role
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+
+	bootstrapRoles = bootstrappolicy.ClusterRoles()
+	featureGateList := &api.List{}
+	featureGateNames := sets.NewString()
+	featureGateRoles := map[string]runtime.Object{}
+	for i := range bootstrapRoles {
+		role := bootstrapRoles[i]
+		featureGateNames.Insert(role.Name)
+		featureGateRoles[role.Name] = &role
+		actualDiff := cmp.Diff(roles[role.Name], featureGateRoles[role.Name])
+		//normalize whitespace
+		expectedDiffNormalized := strings.Join(strings.Fields(expectedDiff[role.Name]), " ")
+		actualDiffNormalized := strings.Join(strings.Fields(actualDiff), " ")
+		if expectedDiffNormalized != actualDiffNormalized {
+			t.Errorf("RoleName '%s', diff between regular and feature gate. Expected: [%s], Actual: [%s]", role.Name, expectedDiff[role.Name], actualDiff)
+		}
+	}
+	for _, featureGateName := range featureGateNames.List() {
+		featureGateList.Items = append(featureGateList.Items, featureGateRoles[featureGateName])
+	}
+
+	testObjects(t, featureGateList, "cluster-roles-featuregates.yaml")
+
 }
 
 func TestBootstrapClusterRoleBindings(t *testing.T) {
