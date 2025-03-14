@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestConvertRoundTrip(t *testing.T) {
@@ -45,7 +45,7 @@ func TestConvertRoundTrip(t *testing.T) {
 					Annotations: map[string]string{"key": "value"},
 				},
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32(1),
+					MinReplicas: ptr.To(int32(1)),
 					MaxReplicas: 3,
 					Metrics: []autoscaling.MetricSpec{
 						{
@@ -78,7 +78,7 @@ func TestConvertRoundTrip(t *testing.T) {
 			"Scale-down and scale-up tolerances",
 			&autoscaling.HorizontalPodAutoscaler{
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32(1),
+					MinReplicas: ptr.To(int32(1)),
 					MaxReplicas: 3,
 					Behavior: &autoscaling.HorizontalPodAutoscalerBehavior{
 						ScaleUp: &autoscaling.HPAScalingRules{
@@ -95,7 +95,7 @@ func TestConvertRoundTrip(t *testing.T) {
 			"Scale-down tolerance only",
 			&autoscaling.HorizontalPodAutoscaler{
 				Spec: autoscaling.HorizontalPodAutoscalerSpec{
-					MinReplicas: utilpointer.Int32(1),
+					MinReplicas: ptr.To(int32(1)),
 					MaxReplicas: 3,
 					Behavior: &autoscaling.HorizontalPodAutoscalerBehavior{
 						ScaleDown: &autoscaling.HPAScalingRules{
