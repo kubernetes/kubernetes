@@ -14,10 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cmd
 
-import "k8s.io/kubernetes/test/featuregates_linter/cmd"
+import (
+	"os"
 
-func main() {
-	cmd.Execute()
+	"github.com/spf13/cobra"
+)
+
+var rootCmd = &cobra.Command{
+	Use:   "compatibility-lifecycle",
+	Short: "compatibility-lifecycle",
+	Long:  `compatibility-lifecycle runs verification for compatibility lifecycle.`,
+}
+
+func Execute() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
+
+func init() {
+	rootCmd.AddCommand(NewFeatureGatesCommand())
 }
