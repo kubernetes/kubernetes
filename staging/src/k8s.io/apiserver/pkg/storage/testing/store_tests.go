@@ -30,6 +30,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -1593,43 +1595,49 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 	outPod := &example.Pod{}
 	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	lastObjecRV := outPod.ResourceVersion
+	require.NoError(t, err)
+	writeRV, err := strconv.Atoi(outPod.ResourceVersion)
+	require.NoError(t, err)
+
 	increaseRV(ctx, t)
-	parsedRV, _ := strconv.Atoi(outPod.ResourceVersion)
-	currentRV := fmt.Sprintf("%d", parsedRV+1)
-
-	firstNonConsistentReadRV := lastObjecRV
-	if consistentReadsSupported && !cacheEnabled {
-		firstNonConsistentReadRV = currentRV
-	}
-
-	secondNonConsistentReadRV := lastObjecRV
-	if !cacheEnabled || consistentReadsSupported {
-		secondNonConsistentReadRV = currentRV
-	}
+	consistentRV := writeRV + 1
 
 	tcs := []struct {
-		name             string
-		requestRV        string
-		expectResponseRV string
+		name               string
+		requestRV          string
+		validateResponseRV func(*testing.T, int)
 	}{
 		{
-			name:             "Non-consistent list before sync",
-			requestRV:        "0",
-			expectResponseRV: firstNonConsistentReadRV,
+			name:      "Non-consistent list before sync",
+			requestRV: "0",
+			validateResponseRV: func(t *testing.T, rv int) {
+				if cacheEnabled {
+					// Cache might not yet observed write
+					assert.LessOrEqual(t, rv, writeRV)
+				} else {
+					// Etcd should always be up to date with consistent RV
+					assert.Equal(t, consistentRV, rv)
+				}
+			},
 		},
 		{
-			name:             "Consistent request returns currentRV",
-			requestRV:        "",
-			expectResponseRV: currentRV,
+			name:      "Consistent request returns currentRV",
+			requestRV: "",
+			validateResponseRV: func(t *testing.T, rv int) {
+				assert.Equal(t, consistentRV, rv)
+			},
 		},
 		{
-			name:             "Non-consistent request after sync returns currentRV",
-			requestRV:        "0",
-			expectResponseRV: secondNonConsistentReadRV,
+			name:      "Non-consistent request after sync",
+			requestRV: "0",
+			validateResponseRV: func(t *testing.T, rv int) {
+				// Consistent read is required to sync cache
+				if cacheEnabled && !consistentReadsSupported {
+					assert.LessOrEqual(t, rv, writeRV)
+				} else {
+					assert.Equal(t, consistentRV, rv)
+				}
+			},
 		},
 	}
 	for _, tc := range tcs {
@@ -1640,12 +1648,11 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 				Predicate:       storage.Everything,
 			}
 			err = store.GetList(ctx, "/pods/empty", opts, out)
-			if err != nil {
-				t.Fatalf("GetList failed: %v", err)
-			}
-			if out.ResourceVersion != tc.expectResponseRV {
-				t.Errorf("resourceVersion in list response want=%s, got=%s", tc.expectResponseRV, out.ResourceVersion)
-			}
+			require.NoError(t, err)
+
+			parsedOutRV, err := strconv.Atoi(out.ResourceVersion)
+			require.NoError(t, err)
+			tc.validateResponseRV(t, parsedOutRV)
 		})
 	}
 }
