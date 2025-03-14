@@ -47,6 +47,7 @@ var (
 	validateDeviceClassName = corevalidation.ValidateDNS1123Subdomain
 	validateRequestName     = corevalidation.ValidateDNS1123Label
 
+	// this is the max length limit for domain/ID
 	attributeAndCapacityMaxKeyLength = resource.DeviceMaxDomainLength + 1 + resource.DeviceMaxIDLength
 )
 

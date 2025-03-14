@@ -159,10 +159,7 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 }
 
 func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) {
-		return
-	}
-	if draPartitionableDevicesFeatureInUse(oldSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
 		return
 	}
 
@@ -185,7 +182,6 @@ func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 	}
 
 	spec := slice.Spec
-
 	if len(spec.CapacityPools) > 0 {
 		return true
 	}
