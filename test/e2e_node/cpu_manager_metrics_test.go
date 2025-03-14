@@ -61,7 +61,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
 			_, cpuAlloc, _ := getLocalNodeCPUDetails(ctx, f)
-			smtLevel = getSMTLevel()
+			smtLevel = smtLevelFromSysFS()
 
 			// strict SMT alignment is trivially verified and granted on non-SMT systems
 			if smtLevel < 2 {
