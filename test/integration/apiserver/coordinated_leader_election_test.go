@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/coordination/v1"
-	v1alpha2 "k8s.io/api/coordination/v1alpha2"
+	v1beta1 "k8s.io/api/coordination/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -56,19 +56,20 @@ func TestSingleLeaseCandidate(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer server.TearDownFn()
 	config := server.ClientConfig
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cletest := setupCLE(config, ctx, cancel, t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cletest := setupCLE(config, ctx, t)
 			defer cletest.cleanup()
 			go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20.0", "1.20.0", tc.preferredStrategy)
 			cletest.pollForLease(ctx, "foo", "default", tc.expectedHolderIdentity)
@@ -94,19 +95,20 @@ func TestSingleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 		},
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer server.TearDownFn()
 	config := server.ClientConfig
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cletest := setupCLE(config, ctx, cancel, t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cletest := setupCLE(config, ctx, t)
 			defer cletest.cleanup()
 			go cletest.createAndRunFakeController("foo1", "default", "foo", "1.20.0", "1.20.0", tc.preferredStrategy)
 			cletest.pollForLease(ctx, "foo", "default", tc.expectedHolderIdentity)
@@ -131,7 +133,7 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -139,18 +141,17 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 	defer server.TearDownFn()
 	config := server.ClientConfig
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			cletest := setupCLE(config, ctx, cancel, t)
+			cletest := setupCLE(config, ctx, t)
 			defer cletest.cleanup()
 			go cletest.createAndRunFakeController("baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
 			go cletest.createAndRunFakeController("baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
 			go cletest.createAndRunFakeController("baz3", "default", "baz", "1.19.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz4", "default", "baz", "1.2.0", "1.19.0", tc.preferredStrategy)
-			go cletest.createAndRunFakeController("baz5", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
+			go cletest.createAndRunFakeController("baz4", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
 			cletest.pollForLease(ctx, "baz", "default", tc.expectedHolderIdentity)
 		})
 	}
@@ -174,7 +175,7 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 		},
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
@@ -182,12 +183,13 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 	}
 	defer server.TearDownFn()
 	config := server.ClientConfig
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cletest := setupCLE(config, ctx, cancel, t)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			cletest := setupCLE(config, ctx, t)
 			defer cletest.cleanup()
 			go cletest.createAndRunFakeController("baz1", "default", "baz", "1.20.0", "1.20.0", tc.preferredStrategy)
 			go cletest.createAndRunFakeController("baz2", "default", "baz", "1.20.0", "1.19.0", tc.preferredStrategy)
@@ -202,7 +204,7 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -211,7 +213,8 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	config := server.ClientConfig
 
 	ctx, cancel := context.WithCancel(context.Background())
-	cletest := setupCLE(config, ctx, cancel, t)
+	defer cancel()
+	cletest := setupCLE(config, ctx, t)
 	defer cletest.cleanup()
 
 	go cletest.createAndRunFakeController("bar1", "default", "bar", "1.20.0", "1.20.0", v1.OldestEmulationVersion)
@@ -224,7 +227,7 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 func TestUpgradeSkew(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +237,7 @@ func TestUpgradeSkew(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	cletest := setupCLE(config, ctx, cancel, t)
+	cletest := setupCLE(config, ctx, t)
 	defer cletest.cleanup()
 
 	go cletest.createAndRunFakeLegacyController("foo1-130", "default", "foobar")
@@ -254,7 +257,7 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		apiserver.LeaseCandidateGCPeriod = 30 * time.Minute
 	}()
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1alpha2.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -265,12 +268,12 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expiredLC := &v1alpha2.LeaseCandidate{
+	expiredLC := &v1beta1.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "expired",
 			Namespace: "default",
 		},
-		Spec: v1alpha2.LeaseCandidateSpec{
+		Spec: v1beta1.LeaseCandidateSpec{
 			LeaseName:        "foobaz",
 			BinaryVersion:    "0.1.0",
 			EmulationVersion: "0.1.0",
@@ -280,13 +283,13 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		},
 	}
 	ctx := context.Background()
-	_, err = clientset.CoordinationV1alpha2().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
+	_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Create(ctx, expiredLC, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = wait.PollUntilContextTimeout(ctx, 1000*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		_, err = clientset.CoordinationV1alpha2().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
+		_, err = clientset.CoordinationV1beta1().LeaseCandidates("default").Get(ctx, "expired", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			return true, nil
 		}
@@ -307,11 +310,12 @@ type cleTest struct {
 	clientset *kubernetes.Clientset
 	t         *testing.T
 	mu        sync.Mutex
+	ctx       context.Context
 	ctxList   map[string]ctxCancelPair
 }
 
 func (t *cleTest) createAndRunFakeLegacyController(name string, namespace string, targetLease string) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.ctx)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.ctxList[name+"/"+namespace] = ctxCancelPair{ctx, cancel}
@@ -345,7 +349,7 @@ func (t *cleTest) createAndRunFakeController(name string, namespace string, targ
 		t.t.Error(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.ctx)
 	t.mu.Lock()
 	t.ctxList[name+"/"+namespace] = ctxCancelPair{ctx, cancel}
 	t.mu.Unlock()
@@ -415,7 +419,7 @@ func (t *cleTest) pollForLease(ctx context.Context, name, namespace string, hold
 		return lease.Spec.HolderIdentity != nil && *lease.Spec.HolderIdentity == *holder, nil
 	})
 	if err != nil {
-		t.t.Fatalf("timeout awiting for Lease %s %s err: %v", name, namespace, err)
+		t.t.Fatalf("timeout waiting for Lease %s %s err: %v", name, namespace, err)
 	}
 }
 
@@ -427,28 +431,23 @@ func (t *cleTest) cancelController(name, namespace string) {
 }
 
 func (t *cleTest) cleanup() {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	for _, c := range t.ctxList {
-		c.cancel()
-	}
 	err := t.clientset.CoordinationV1().Leases("kube-system").Delete(context.TODO(), "leader-election-controller", metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		t.t.Error(err)
 	}
 }
 
-func setupCLE(config *rest.Config, ctx context.Context, cancel func(), t *testing.T) *cleTest {
+func setupCLE(config *rest.Config, ctx context.Context, t *testing.T) *cleTest {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	a := ctxCancelPair{ctx, cancel}
 	return &cleTest{
 		config:    config,
 		clientset: clientset,
-		ctxList:   map[string]ctxCancelPair{"main": a},
+		ctx:       ctx,
+		ctxList:   map[string]ctxCancelPair{},
 		t:         t,
 	}
 }

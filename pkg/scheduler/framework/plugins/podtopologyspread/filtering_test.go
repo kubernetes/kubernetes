@@ -63,6 +63,10 @@ var (
 	taints = []v1.Taint{{Key: v1.TaintNodeUnschedulable, Value: "", Effect: v1.TaintEffectNoSchedule}}
 )
 
+func init() {
+	metrics.Register()
+}
+
 func (p *criticalPaths) sort() {
 	if p[0].MatchNum == p[1].MatchNum && p[0].TopologyValue > p[1].TopologyValue {
 		// Swap TopologyValue to make them sorted alphabetically.
@@ -71,7 +75,6 @@ func (p *criticalPaths) sort() {
 }
 
 func TestPreFilterState(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name                      string
 		pod                       *v1.Pod
@@ -2316,7 +2319,6 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 }
 
 func BenchmarkFilter(b *testing.B) {
-	metrics.Register()
 	tests := []struct {
 		name             string
 		pod              *v1.Pod

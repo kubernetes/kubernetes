@@ -66,6 +66,10 @@ const (
 	injectFilterReason = "injected filter status"
 )
 
+func init() {
+	metrics.Register()
+}
+
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
 var _ framework.ScorePlugin = &TestScoreWithNormalizePlugin{}
@@ -460,7 +464,6 @@ func newFrameworkWithQueueSortAndBind(ctx context.Context, r Registry, profile c
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
@@ -2905,7 +2908,6 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 func TestRecordingMetrics(t *testing.T) {
 	state := &framework.CycleState{}
 	state.SetRecordPluginMetrics(true)
-	metrics.Register()
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -3089,7 +3091,6 @@ func TestRecordingMetrics(t *testing.T) {
 }
 
 func TestRunBindPlugins(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name       string
 		injects    []framework.Code
@@ -3206,7 +3207,6 @@ func TestRunBindPlugins(t *testing.T) {
 }
 
 func TestPermitWaitDurationMetric(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name    string
 		inject  injectedResult

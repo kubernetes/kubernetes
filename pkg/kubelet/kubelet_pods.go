@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
@@ -61,9 +60,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
-	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	utilpod "k8s.io/kubernetes/pkg/util/pod"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -132,16 +129,11 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport) {
 		return defaultFirstID, defaultLen, nil
-	} else {
-		kernelVersion, err := utilkernel.GetVersion()
-		if err != nil {
-			return 0, 0, fmt.Errorf("failed to get kernel version, unable to determine if feature %s can be supported : %w",
-				features.UserNamespacesSupport, err)
-		}
-		if kernelVersion != nil && !kernelVersion.AtLeast(version.MustParseGeneric(utilkernel.UserNamespacesSupportKernelVersion)) {
-			klog.InfoS("WARNING: the kernel version is incompatible with the feature gate, which needs as a minimum kernel version",
-				"kernelVersion", kernelVersion, "feature", features.UserNamespacesSupport, "minKernelVersion", utilkernel.UserNamespacesSupportKernelVersion)
-		}
+	}
+
+	// Windows doesn't support user namespaces, let's return the default mappings.
+	if runtime.GOOS == "windows" {
+		return defaultFirstID, defaultLen, nil
 	}
 
 	_, err := user.Lookup(kubeletUser)
@@ -297,13 +289,34 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 		}
 
 		var (
-			hostPath string
-			image    *runtimeapi.ImageSpec
-			err      error
+			hostPath     string
+			image        *runtimeapi.ImageSpec
+			imageSubPath string
+			err          error
 		)
+
+		subPath := mount.SubPath
+		if mount.SubPathExpr != "" {
+			subPath, err = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
+
+			if err != nil {
+				return nil, cleanupAction, err
+			}
+		}
+
+		if subPath != "" {
+			if utilfs.IsAbs(subPath) {
+				return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
+			}
+
+			if err := volumevalidation.ValidatePathNoBacksteps(subPath); err != nil {
+				return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %w", subPath, err)
+			}
+		}
 
 		if imageVolumes != nil && utilfeature.DefaultFeatureGate.Enabled(features.ImageVolume) {
 			image = imageVolumes[mount.Name]
+			imageSubPath = subPath
 		}
 
 		if image == nil {
@@ -312,25 +325,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 				return nil, cleanupAction, err
 			}
 
-			subPath := mount.SubPath
-			if mount.SubPathExpr != "" {
-				subPath, err = kubecontainer.ExpandContainerVolumeMounts(mount, expandEnvs)
-
-				if err != nil {
-					return nil, cleanupAction, err
-				}
-			}
-
 			if subPath != "" {
-				if utilfs.IsAbs(subPath) {
-					return nil, cleanupAction, fmt.Errorf("error SubPath `%s` must not be an absolute path", subPath)
-				}
-
-				err = volumevalidation.ValidatePathNoBacksteps(subPath)
-				if err != nil {
-					return nil, cleanupAction, fmt.Errorf("unable to provision SubPath `%s`: %w", subPath, err)
-				}
-
 				volumePath := hostPath
 				hostPath = filepath.Join(volumePath, subPath)
 
@@ -399,6 +394,7 @@ func makeMounts(pod *v1.Pod, podDir string, container *v1.Container, hostName, h
 			ContainerPath:     containerPath,
 			HostPath:          hostPath,
 			Image:             image,
+			ImageSubPath:      imageSubPath,
 			ReadOnly:          mount.ReadOnly || mustMountRO,
 			RecursiveReadOnly: rro,
 			SELinuxRelabel:    relabelVolume,
@@ -1392,7 +1388,7 @@ func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
 	}
 
 	// Cleanup any backoff entries.
-	kl.backOff.GC()
+	kl.crashLoopBackOff.GC()
 	return nil
 }
 
@@ -1756,86 +1752,6 @@ func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kub
 
 	resizeStatus := kl.statusManager.GetPodResizeStatus(allocatedPod.UID)
 	return resizeStatus
-}
-
-// allocatedResourcesMatchStatus tests whether the resizeable resources in the pod spec match the
-// resources reported in the status.
-func allocatedResourcesMatchStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
-	for _, c := range allocatedPod.Spec.Containers {
-		if !allocatedContainerResourcesMatchStatus(allocatedPod, &c, podStatus) {
-			return false
-		}
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for _, c := range allocatedPod.Spec.InitContainers {
-			if podutil.IsRestartableInitContainer(&c) && !allocatedContainerResourcesMatchStatus(allocatedPod, &c, podStatus) {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// allocatedContainerResourcesMatchStatus returns true if the container resources matches with the container statuses resources.
-func allocatedContainerResourcesMatchStatus(allocatedPod *v1.Pod, c *v1.Container, podStatus *kubecontainer.PodStatus) bool {
-	if cs := podStatus.FindContainerStatusByName(c.Name); cs != nil {
-		if cs.State != kubecontainer.ContainerStateRunning {
-			// If the container isn't running, it isn't resizing.
-			return true
-		}
-
-		cpuReq, hasCPUReq := c.Resources.Requests[v1.ResourceCPU]
-		cpuLim, hasCPULim := c.Resources.Limits[v1.ResourceCPU]
-		memLim, hasMemLim := c.Resources.Limits[v1.ResourceMemory]
-
-		if cs.Resources == nil {
-			if hasCPUReq || hasCPULim || hasMemLim {
-				// Container status is missing Resources information, but the container does
-				// have resizable resources configured.
-				klog.ErrorS(nil, "Missing runtime resources information for resizing container",
-					"pod", format.Pod(allocatedPod), "container", c.Name)
-				return false // We don't want to clear resize status with insufficient information.
-			} else {
-				// No resizable resources configured; this might be ok.
-				return true
-			}
-		}
-
-		// Only compare resizeable resources, and only compare resources that are explicitly configured.
-		if hasCPUReq {
-			if cs.Resources.CPURequest == nil {
-				if !cpuReq.IsZero() {
-					return false
-				}
-			} else if !cpuReq.Equal(*cs.Resources.CPURequest) &&
-				(cpuReq.MilliValue() > cm.MinShares || cs.Resources.CPURequest.MilliValue() > cm.MinShares) {
-				// If both allocated & status CPU requests are at or below MinShares then they are considered equal.
-				return false
-			}
-		}
-		if hasCPULim {
-			if cs.Resources.CPULimit == nil {
-				if !cpuLim.IsZero() {
-					return false
-				}
-			} else if !cpuLim.Equal(*cs.Resources.CPULimit) &&
-				(cpuLim.MilliValue() > cm.MinMilliCPULimit || cs.Resources.CPULimit.MilliValue() > cm.MinMilliCPULimit) {
-				// If both allocated & status CPU limits are at or below the minimum limit, then they are considered equal.
-				return false
-			}
-		}
-		if hasMemLim {
-			if cs.Resources.MemoryLimit == nil {
-				if !memLim.IsZero() {
-					return false
-				}
-			} else if !memLim.Equal(*cs.Resources.MemoryLimit) {
-				return false
-			}
-		}
-	}
-
-	return true
 }
 
 // generateAPIPodStatus creates the final API pod status for a pod, given the

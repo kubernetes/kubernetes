@@ -415,6 +415,9 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 						return nil, status
 					}
 				} else {
+					if !pl.enablePrioritizedList {
+						return nil, statusUnschedulable(logger, fmt.Sprintf("resource claim %s, request %s: has subrequests, but the DRAPrioritizedList feature is disabled", klog.KObj(claim), request.Name))
+					}
 					for _, subRequest := range request.FirstAvailable {
 						qualRequestName := strings.Join([]string{request.Name, subRequest.Name}, "/")
 						if status := pl.validateDeviceClass(logger, subRequest.DeviceClassName, qualRequestName); status != nil {

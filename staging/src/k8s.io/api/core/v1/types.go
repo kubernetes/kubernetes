@@ -217,7 +217,7 @@ type VolumeSource struct {
 	// The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
 	// The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
 	// The volume will be mounted read-only (ro) and non-executable files (noexec).
-	// Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath).
+	// Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
 	// The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
 	// +featureGate=ImageVolume
 	// +optional
@@ -3308,6 +3308,11 @@ type PodCondition struct {
 	// Type is the type of the condition.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
 	Type PodConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=PodConditionType"`
+	// If set, this represents the .metadata.generation that the pod condition was set based upon.
+	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,7,opt,name=observedGeneration"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
@@ -3330,8 +3335,6 @@ type PodCondition struct {
 type PodResizeStatus string
 
 const (
-	// Pod resources resize has been requested and will be evaluated by node.
-	PodResizeStatusProposed PodResizeStatus = "Proposed"
 	// Pod resources resize has been accepted by node and is being actuated.
 	PodResizeStatusInProgress PodResizeStatus = "InProgress"
 	// Node cannot resize the pod at this time and will keep retrying.
@@ -4841,6 +4844,11 @@ type EphemeralContainer struct {
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
 type PodStatus struct {
+	// If set, this represents the .metadata.generation that the pod status was set based upon.
+	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,17,opt,name=observedGeneration"`
 	// The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
 	// The conditions array, the reason and message fields, and the individual container status
 	// arrays contain more detail about the pod's status.
@@ -5334,13 +5342,11 @@ const (
 
 // These are valid values for the TrafficDistribution field of a Service.
 const (
-	// Indicates a preference for routing traffic to endpoints that are
-	// topologically proximate to the client. The interpretation of "topologically
-	// proximate" may vary across implementations and could encompass endpoints
-	// within the same node, rack, zone, or even region. Setting this value gives
-	// implementations permission to make different tradeoffs, e.g. optimizing for
-	// proximity rather than equal distribution of load. Users should not set this
-	// value if such tradeoffs are not acceptable.
+	// Indicates a preference for routing traffic to endpoints that are in the
+	// same zone as the client. Setting this value gives implementations
+	// permission to make different tradeoffs, e.g. optimizing for proximity
+	// rather than equal distribution of load. Users should not set this value
+	// if such tradeoffs are not acceptable.
 	ServiceTrafficDistributionPreferClose = "PreferClose"
 )
 
@@ -5689,13 +5695,12 @@ type ServiceSpec struct {
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicy `json:"internalTrafficPolicy,omitempty" protobuf:"bytes,22,opt,name=internalTrafficPolicy"`
 
-	// TrafficDistribution offers a way to express preferences for how traffic is
-	// distributed to Service endpoints. Implementations can use this field as a
-	// hint, but are not required to guarantee strict adherence. If the field is
-	// not set, the implementation will apply its default routing strategy. If set
-	// to "PreferClose", implementations should prioritize endpoints that are
-	// topologically close (e.g., same zone).
-	// This is a beta field and requires enabling ServiceTrafficDistribution feature.
+	// TrafficDistribution offers a way to express preferences for how traffic
+	// is distributed to Service endpoints. Implementations can use this field
+	// as a hint, but are not required to guarantee strict adherence. If the
+	// field is not set, the implementation will apply its default routing
+	// strategy. If set to "PreferClose", implementations should prioritize
+	// endpoints that are in the same zone.
 	// +featureGate=ServiceTrafficDistribution
 	// +optional
 	TrafficDistribution *string `json:"trafficDistribution,omitempty" protobuf:"bytes,23,opt,name=trafficDistribution"`
@@ -7277,6 +7282,9 @@ const (
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned.
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
+
+	// Match all pvc objects that have volume attributes class mentioned.
+	ResourceQuotaScopeVolumeAttributesClass ResourceQuotaScope = "VolumeAttributesClass"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota.

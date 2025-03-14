@@ -35,10 +35,6 @@ type ListType []string
 // Note: no validation here
 type UnvalidatedPtrType []*string
 
-// +k8s:validateFalse="type ListPtrType"
-// +k8s:eachVal=+k8s:validateFalse="type ListPtrType[*]"
-type ListPtrType []*string
-
 // +k8s:validateFalse="type StringType"
 type StringType string
 
@@ -53,10 +49,6 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.ListField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListField[*]"
 	ListField ListType `json:"listField"`
-
-	// +k8s:validateFalse="field Struct.ListPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
-	ListPtrField ListPtrType `json:"listPtrField"`
 
 	// +k8s:validateFalse="field Struct.ListTypedefField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"

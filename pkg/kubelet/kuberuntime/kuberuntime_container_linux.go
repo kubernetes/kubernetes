@@ -30,7 +30,7 @@ import (
 	"time"
 
 	cadvisorv1 "github.com/google/cadvisor/info/v1"
-	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
+	libcontainercgroups "github.com/opencontainers/cgroups"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"

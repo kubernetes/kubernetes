@@ -257,13 +257,19 @@ message Mount {
     bool recursive_read_only = 8;
     // Mount an image reference (image ID, with or without digest), which is a
     // special use case for image volume mounts. If this field is set, then
-    // host_path should be unset. All OCI mounts are per feature definition
-    // readonly. The kubelet does an PullImage RPC and evaluates the returned
+    // host_path should be unset. All image mounts are per feature definition
+    // readonly (noexec). The kubelet does an PullImage RPC and evaluates the returned
     // PullImageResponse.image_ref value, which is then set to the
     // ImageSpec.image field. Runtimes are expected to mount the image as
     // required.
-    // Introduced in the OCI Volume Source KEP: https://kep.k8s.io/4639
+    // Introduced in the Image Volume Source KEP: https://kep.k8s.io/4639
     ImageSpec image = 9;
+    // Specific image sub path to be used from inside the image instead of its
+    // root, only necessary if the above image field is set. If the sub path is
+    // not empty and does not exist in the image, then runtimes should fail and
+    // return an error.
+    // Introduced in the Image Volume Source KEP beta graduation: https://kep.k8s.io/4639
+    string image_sub_path = 10;
 }
 
 // IDMapping describes host to container ID mappings for a pod sandbox.

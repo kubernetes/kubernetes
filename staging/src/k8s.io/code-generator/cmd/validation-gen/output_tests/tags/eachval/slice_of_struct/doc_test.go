@@ -29,13 +29,10 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		ListField:        []OtherStruct{{}, {}},
-		ListPtrField:     []*OtherStruct{{}, {}},
 		ListTypedefField: []OtherTypedefStruct{{}, {}},
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"listField[0]":        {"field Struct.ListField[*]"},
 		"listField[1]":        {"field Struct.ListField[*]"},
-		"listPtrField[0]":     {"field Struct.ListPtrField[*]"},
-		"listPtrField[1]":     {"field Struct.ListPtrField[*]"},
 		"listTypedefField[0]": {"field Struct.ListTypedefField[*]"},
 		"listTypedefField[1]": {"field Struct.ListTypedefField[*]"},
 	})

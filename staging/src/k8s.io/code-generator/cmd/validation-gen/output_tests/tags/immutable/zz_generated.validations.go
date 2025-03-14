@@ -105,26 +105,12 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }))...)
 
-	// field Struct.SlicePtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []*string) (errs field.ErrorList) {
-			errs = append(errs, validate.ImmutableNonComparable(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("slicePtrField"), obj.SlicePtrField, safe.Field(oldObj, func(oldObj *Struct) []*string { return oldObj.SlicePtrField }))...)
-
 	// field Struct.MapField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
 			errs = append(errs, validate.ImmutableNonComparable(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }))...)
-
-	// field Struct.MapPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]*string) (errs field.ErrorList) {
-			errs = append(errs, validate.ImmutableNonComparable(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("mapPtrField"), obj.MapPtrField, safe.Field(oldObj, func(oldObj *Struct) map[string]*string { return oldObj.MapPtrField }))...)
 
 	// field Struct.ImmutableField
 	errs = append(errs,

@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/randfill"
 )
 
 func TestAPIObjectMeta(t *testing.T) {
@@ -306,7 +306,7 @@ type MyAPIObject2 struct {
 func getObjectMetaAndOwnerReferences() (myAPIObject2 MyAPIObject2, metaOwnerReferences []metav1.OwnerReference) {
 	scheme := runtime.NewScheme()
 	codecs := serializer.NewCodecFactory(scheme)
-	fuzz.New().NilChance(.5).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10).Fuzz(&myAPIObject2)
+	randfill.New().NilChance(.5).NumElements(1, 5).Funcs(metafuzzer.Funcs(codecs)...).MaxDepth(10).Fill(&myAPIObject2)
 	references := myAPIObject2.ObjectMeta.OwnerReferences
 	// This is necessary for the test to pass because the getter will return a
 	// non-nil slice.

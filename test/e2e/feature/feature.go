@@ -61,16 +61,14 @@ var (
 	ClusterSizeAutoscalingScaleUp = framework.WithFeature(framework.ValidFeatures.Add("ClusterSizeAutoscalingScaleUp"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterTrustBundle = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundle"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	ClusterTrustBundleProjection = framework.WithFeature(framework.ValidFeatures.Add("ClusterTrustBundleProjection"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ClusterUpgrade = framework.WithFeature(framework.ValidFeatures.Add("ClusterUpgrade"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
+
+	// Owner: sig-api-machinery
+	// Marks tests that require coordinated leader election
+	CoordinatedLeaderElection = framework.WithFeature(framework.ValidFeatures.Add("CoordinatedLeaderElection"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
@@ -369,6 +367,10 @@ var (
 	// Marks tests that require a cluster with PodLogsQuerySplitStreams
 	// (used for testing specific log stream <https://kep.k8s.io/3288>)
 	PodLogsQuerySplitStreams = framework.WithFeature(framework.ValidFeatures.Add("PodLogsQuerySplitStreams"))
+
+	// Owner: sig-node
+	// Marks tests that require a cluster with PodObservedGenerationTracking
+	PodObservedGenerationTracking = framework.WithFeature(framework.ValidFeatures.Add("PodObservedGenerationTracking"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	PodPriority = framework.WithFeature(framework.ValidFeatures.Add("PodPriority"))

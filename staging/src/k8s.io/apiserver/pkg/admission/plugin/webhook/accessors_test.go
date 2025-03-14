@@ -22,16 +22,16 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	v1 "k8s.io/api/admissionregistration/v1"
+	"sigs.k8s.io/randfill"
 )
 
 func TestMutatingWebhookAccessor(t *testing.T) {
-	f := fuzz.New()
+	f := randfill.New()
 	for i := 0; i < 100; i++ {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
 			orig := &v1.MutatingWebhook{}
-			f.Fuzz(orig)
+			f.Fill(orig)
 
 			// zero out any accessor type specific fields not included in the accessor
 			orig.ReinvocationPolicy = nil
@@ -72,11 +72,11 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 }
 
 func TestValidatingWebhookAccessor(t *testing.T) {
-	f := fuzz.New()
+	f := randfill.New()
 	for i := 0; i < 100; i++ {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
 			orig := &v1.ValidatingWebhook{}
-			f.Fuzz(orig)
+			f.Fill(orig)
 			uid := fmt.Sprintf("test.configuration.admission/%s/0", orig.Name)
 			accessor := NewValidatingWebhookAccessor(uid, "test.configuration.admission", orig)
 			if uid != accessor.GetUID() {

@@ -30,9 +30,6 @@ type Struct struct {
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListField[*]"
 	ListField []string `json:"listField"`
 
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListPtrField[*]"
-	ListPtrField []*string `json:"listPtrField"`
-
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"
 	ListTypedefField []StringType `json:"listTypedefField"`
 }

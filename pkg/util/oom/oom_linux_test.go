@@ -22,7 +22,7 @@ package oom
 import (
 	"os"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/cgroups"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

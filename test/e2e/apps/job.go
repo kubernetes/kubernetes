@@ -85,7 +85,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods for job exist")
@@ -182,7 +182,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -260,7 +260,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -292,7 +292,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Waiting for job to complete")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -417,7 +417,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods with index for job exist")
@@ -458,7 +458,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring all pods have the required index labels")
@@ -502,7 +502,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that job has SuccessCriteriaMet with SuccessPolicy reason condition")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonSuccessPolicy, completions)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the job status to ensure correct final state")
@@ -541,7 +541,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that job has SuccessCriteriaMet with SuccessPolicy reason condition")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), 1)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonSuccessPolicy, 1)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the only appropriately index succeeded")
@@ -580,7 +580,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that the job has SuccessCriteriaMet condition with SuccessPolicy rule")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), 1)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonSuccessPolicy, 1)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the job status to ensure correct final state")
@@ -809,7 +809,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -840,7 +840,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), *job.Spec.Completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, *job.Spec.Completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Verifying the Job status fields to ensure correct final state")
@@ -1035,7 +1035,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods for job exist")
@@ -1241,7 +1241,7 @@ done`}
 		framework.Logf("Job: %v as labels: %v", testJob.Name, testJob.Labels)
 
 		ginkgo.By("Waiting for job to complete")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, ns, jobName, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, ns, jobName, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", ns)
 
 		ginkgo.By("Delete a job collection with a labelselector")

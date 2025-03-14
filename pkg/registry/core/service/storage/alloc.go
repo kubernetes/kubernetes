@@ -151,9 +151,7 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 
 	// Do some loose pre-validation of the input.  This makes it easier in the
 	// rest of allocation code to not have to consider corner cases.
-	// TODO(thockin): when we tighten validation (e.g. to require IPs) we will
-	// need a "strict" and a "loose" form of this.
-	if el := validation.ValidateServiceClusterIPsRelatedFields(service); len(el) != 0 {
+	if el := validation.ValidateServiceClusterIPsRelatedFields(service, oldService); len(el) != 0 {
 		return errors.NewInvalid(api.Kind("Service"), service.Name, el)
 	}
 

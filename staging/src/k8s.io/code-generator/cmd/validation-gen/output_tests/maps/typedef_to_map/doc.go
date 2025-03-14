@@ -35,10 +35,6 @@ type MapType map[string]string
 // Note: no validation here
 type UnvalidatedPtrType map[string]*string
 
-// +k8s:validateFalse="type MapPtrType"
-// +k8s:eachVal=+k8s:validateFalse="type MapPtrType[*]"
-type MapPtrType map[string]*string
-
 // +k8s:validateFalse="type StringType"
 type StringType string
 
@@ -53,10 +49,6 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.MapField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapField[*]"
 	MapField MapType `json:"mapField"`
-
-	// +k8s:validateFalse="field Struct.MapPtrField"
-	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapPtrField[*]"
-	MapPtrField MapPtrType `json:"mapPtrField"`
 
 	// +k8s:validateFalse="field Struct.MapTypedefField"
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.MapTypedefField[*]"

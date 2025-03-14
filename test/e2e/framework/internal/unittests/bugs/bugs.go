@@ -122,8 +122,8 @@ ERROR: some/relative/path/buggy.go:200: with spaces
 `
 	// Used by unittests/list-tests. It's sorted by test name, not source code location.
 	ListTestsOutput = `The following spec names can be used with 'ginkgo run --focus/skip':
-    ../bugs/bugs.go:100: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
-    ../bugs/bugs.go:95: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [FeatureGate:TestAlphaFeature] [Alpha] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
+    ../bugs/bugs.go:100: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [Feature:OffByDefault] [FeatureGate:TestGAFeature] [Feature:OffByDefault] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
+    ../bugs/bugs.go:95: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [Feature:OffByDefault] [FeatureGate:TestGAFeature] [Feature:OffByDefault] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
 
 `
 

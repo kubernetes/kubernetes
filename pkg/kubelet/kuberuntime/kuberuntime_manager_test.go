@@ -24,17 +24,17 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"sort"
+	"strings"
 	"testing"
 	"time"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,8 +44,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/testutil"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
+	crierror "k8s.io/cri-api/pkg/errors"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -54,6 +56,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	imagetypes "k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/ptr"
@@ -2558,9 +2561,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
-	cpu1m := resource.MustParse("1m")
-	cpu2m := resource.MustParse("2m")
-	cpu10m := resource.MustParse("10m")
 	cpu100m := resource.MustParse("100m")
 	cpu200m := resource.MustParse("200m")
 	mem100M := resource.MustParse("100Mi")
@@ -2570,22 +2570,28 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	cpuPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: v1.RestartContainer}
 	memPolicyRestartRequired := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer}
 
+	setupActuatedResources := func(pod *v1.Pod, container *v1.Container, actuatedResources v1.ResourceRequirements) {
+		actuatedContainer := container.DeepCopy()
+		actuatedContainer.Resources = actuatedResources
+		require.NoError(t, m.allocationManager.SetActuatedResources(pod, actuatedContainer))
+	}
+
 	for desc, test := range map[string]struct {
-		setupFn                 func(*v1.Pod, *kubecontainer.PodStatus)
+		setupFn                 func(*v1.Pod)
 		getExpectedPodActionsFn func(*v1.Pod, *kubecontainer.PodStatus) *podActions
 	}{
 		"Update container CPU and memory resources": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu200m.DeepCopy()),
-						MemoryLimit: ptr.To(mem200M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem200M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
@@ -2628,17 +2634,17 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU resources": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu200m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
@@ -2667,17 +2673,17 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container memory resources": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[2]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu200m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu200m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
@@ -2706,16 +2712,16 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Nothing when spec.Resources and status.Resources are equal": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit: ptr.To(cpu200m.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: cpu200m.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				pa := podActions{
@@ -2727,39 +2733,11 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				return &pa
 			},
 		},
-		"Nothing when spec.Resources and status.Resources are equivalent": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+		"Nothing when spec.Resources and status.Resources are equal (besteffort)": {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
-				c.Resources = v1.ResourceRequirements{} // best effort pod
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPURequest: ptr.To(cpu2m.DeepCopy()),
-					}
-				}
-			},
-			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
-				pa := podActions{
-					SandboxID:          podStatus.SandboxStatuses[0].Id,
-					ContainersToKill:   getKillMap(pod, podStatus, []int{}),
-					ContainersToStart:  []int{},
-					ContainersToUpdate: map[v1.ResourceName][]containerToUpdateInfo{},
-				}
-				return &pa
-			},
-		},
-		"Update container CPU resources to equivalent value": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
-				c := &pod.Spec.Containers[1]
-				c.Resources = v1.ResourceRequirements{
-					Requests: v1.ResourceList{v1.ResourceCPU: cpu1m},
-					Limits:   v1.ResourceList{v1.ResourceCPU: cpu1m},
-				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPURequest: ptr.To(cpu2m.DeepCopy()),
-						CPULimit:   ptr.To(cpu10m.DeepCopy()),
-					}
-				}
+				c.Resources = v1.ResourceRequirements{}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				pa := podActions{
@@ -2772,18 +2750,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU and memory resources with Restart policy for CPU": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[0]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[0].Name)
@@ -2803,18 +2781,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU and memory resources with Restart policy for memory": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[2]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
@@ -2834,18 +2812,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container memory resources with Restart policy for CPU": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[1]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartRequired, memPolicyRestartNotRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[1].Name)
@@ -2874,18 +2852,18 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 			},
 		},
 		"Update container CPU resources with Restart policy for memory": {
-			setupFn: func(pod *v1.Pod, status *kubecontainer.PodStatus) {
+			setupFn: func(pod *v1.Pod) {
 				c := &pod.Spec.Containers[2]
 				c.ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartRequired}
 				c.Resources = v1.ResourceRequirements{
 					Limits: v1.ResourceList{v1.ResourceCPU: cpu200m, v1.ResourceMemory: mem100M},
 				}
-				if cStatus := status.FindContainerStatusByName(c.Name); cStatus != nil {
-					cStatus.Resources = &kubecontainer.ContainerResources{
-						CPULimit:    ptr.To(cpu100m.DeepCopy()),
-						MemoryLimit: ptr.To(mem100M.DeepCopy()),
-					}
-				}
+				setupActuatedResources(pod, c, v1.ResourceRequirements{
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    cpu100m.DeepCopy(),
+						v1.ResourceMemory: mem100M.DeepCopy(),
+					},
+				})
 			},
 			getExpectedPodActionsFn: func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *podActions {
 				kcs := podStatus.FindContainerStatusByName(pod.Spec.Containers[2].Name)
@@ -2921,8 +2899,9 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 				pod.Spec.Containers[idx].ResizePolicy = []v1.ContainerResizePolicy{cpuPolicyRestartNotRequired, memPolicyRestartNotRequired}
 			}
 			if test.setupFn != nil {
-				test.setupFn(pod, status)
+				test.setupFn(pod)
 			}
+			t.Cleanup(func() { m.allocationManager.RemovePod(pod.UID) })
 
 			for idx := range pod.Spec.Containers {
 				// compute hash
@@ -3394,6 +3373,127 @@ func TestDoPodResizeAction(t *testing.T) {
 			}
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
+		})
+	}
+}
+
+func TestIncrementImageVolumeMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
+	metrics.Register()
+
+	testCases := map[string]struct {
+		err          error
+		msg          string
+		volumeMounts []v1.VolumeMount
+		imageVolumes kubecontainer.ImageVolumes
+		wants        string
+	}{
+		"without error": {
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 2
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"with error": {
+			err: ErrCreateContainer,
+			msg: crierror.ErrImageVolumeMountFailed.Error(),
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 2
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"with unknown CRI error from message": {
+			err: ErrCreateContainer,
+			msg: "",
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+				{Name: "mount2"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{
+				"mount1": {Image: "image1"},
+				"mount2": {Image: "image2"},
+				"mount3": {Image: "image3"},
+			},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 2
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 3
+			`,
+		},
+		"without used volume": {
+			volumeMounts: []v1.VolumeMount{
+				{Name: "mount1"},
+			},
+			imageVolumes: kubecontainer.ImageVolumes{},
+			wants: `
+				# HELP kubelet_image_volume_mounted_errors_total [ALPHA] Number of failed image volume mounts.
+				# TYPE kubelet_image_volume_mounted_errors_total counter
+        		kubelet_image_volume_mounted_errors_total 0
+        		# HELP kubelet_image_volume_mounted_succeed_total [ALPHA] Number of successful image volume mounts.
+        		# TYPE kubelet_image_volume_mounted_succeed_total counter
+        		kubelet_image_volume_mounted_succeed_total 0
+        		# HELP kubelet_image_volume_requested_total [ALPHA] Number of requested image volumes.
+        		# TYPE kubelet_image_volume_requested_total counter
+        		kubelet_image_volume_requested_total 0
+			`,
+		},
+	}
+
+	// Run tests.
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			metrics.ImageVolumeRequestedTotal.Reset()
+			metrics.ImageVolumeMountedErrorsTotal.Reset()
+			metrics.ImageVolumeMountedSucceedTotal.Reset()
+
+			// Call the function.
+			incrementImageVolumeMetrics(tc.err, tc.msg, &v1.Container{VolumeMounts: tc.volumeMounts}, tc.imageVolumes)
+
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants),
+				"kubelet_"+metrics.ImageVolumeRequestedTotalKey,
+				"kubelet_"+metrics.ImageVolumeMountedSucceedTotalKey,
+				"kubelet_"+metrics.ImageVolumeMountedErrorsTotalKey,
+			); err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }

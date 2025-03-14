@@ -4445,6 +4445,33 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: associative
           keys:
           - type
+- name: io.k8s.api.certificates.v1beta1.ClusterTrustBundle
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.certificates.v1beta1.ClusterTrustBundleSpec
+      default: {}
+- name: io.k8s.api.certificates.v1beta1.ClusterTrustBundleSpec
+  map:
+    fields:
+    - name: signerName
+      type:
+        scalar: string
+    - name: trustBundle
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.coordination.v1.Lease
   map:
     fields:
@@ -4543,6 +4570,46 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.coordination.v1beta1.LeaseSpec
       default: {}
+- name: io.k8s.api.coordination.v1beta1.LeaseCandidate
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.coordination.v1beta1.LeaseCandidateSpec
+      default: {}
+- name: io.k8s.api.coordination.v1beta1.LeaseCandidateSpec
+  map:
+    fields:
+    - name: binaryVersion
+      type:
+        scalar: string
+      default: ""
+    - name: emulationVersion
+      type:
+        scalar: string
+    - name: leaseName
+      type:
+        scalar: string
+      default: ""
+    - name: pingTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
+    - name: renewTime
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.MicroTime
+    - name: strategy
+      type:
+        scalar: string
 - name: io.k8s.api.coordination.v1beta1.LeaseSpec
   map:
     fields:
@@ -6926,6 +6993,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+    - name: observedGeneration
+      type:
+        scalar: numeric
     - name: reason
       type:
         scalar: string
@@ -7290,6 +7360,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nominatedNodeName
       type:
         scalar: string
+    - name: observedGeneration
+      type:
+        scalar: numeric
     - name: phase
       type:
         scalar: string

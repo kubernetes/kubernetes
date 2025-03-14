@@ -24,22 +24,22 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	authorizationv1 "k8s.io/api/authorization/v1"
 	authorizationv1beta1 "k8s.io/api/authorization/v1beta1"
 )
 
 func TestRoundTrip(t *testing.T) {
-	f := fuzz.New()
+	f := randfill.New()
 	seed := time.Now().UnixNano()
 	t.Logf("seed = %v", seed)
 	f.RandSource(rand.New(rand.NewSource(seed)))
 
 	for i := 0; i < 1000; i++ {
 		original := &authorizationv1.SubjectAccessReview{}
-		f.Fuzz(&original.Spec)
-		f.Fuzz(&original.Status)
+		f.Fill(&original.Spec)
+		f.Fill(&original.Status)
 		converted := &authorizationv1beta1.SubjectAccessReview{
 			Spec:   v1SpecToV1beta1Spec(&original.Spec),
 			Status: v1StatusToV1beta1Status(original.Status),

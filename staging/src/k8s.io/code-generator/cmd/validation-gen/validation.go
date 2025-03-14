@@ -277,6 +277,14 @@ func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
 	return nil
 }
 
+// unalias returns the unaliased type.
+func unalias(t *types.Type) *types.Type {
+	for t.Kind == types.Alias {
+		t = t.Underlying
+	}
+	return t
+}
+
 // discover walks the given type recursively and returns a typeNode
 // representing it. This does not distinguish between discovering a type
 // definition and discovering a field of a struct.  The first time it
@@ -292,23 +300,60 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 	}
 
-	// Catch some edge cases that we don't want to handle.
-	if t.Kind == types.Alias && t.Underlying.Kind == types.Pointer {
-		return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
-	}
-	if t.Kind == types.Pointer {
-		pointee := t.Elem
-		if pointee.Kind == types.Alias {
-			pointee = pointee.Underlying
+	// Catch some edge cases that we don't want to handle (yet?).  This happens
+	// as early as possible to make all the other code simpler.
+	switch t.Kind {
+	case types.Builtin, types.Struct:
+		// Allowed
+	case types.Interface:
+		// We can't do much with interfaces, but they pop up in some places
+		// like RawExtension.
+	case types.Alias:
+		if t.Underlying.Kind == types.Pointer {
+			return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
 		}
+	case types.Pointer:
+		pointee := unalias(t.Elem)
 		switch pointee.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): pointers to pointers are not supported", fldPath.String(), t)
-		case types.Slice:
-			return nil, fmt.Errorf("field %s (%s): pointers to slices are not supported", fldPath.String(), t)
+		case types.Slice, types.Array:
+			return nil, fmt.Errorf("field %s (%s): pointers to lists are not supported", fldPath.String(), t)
 		case types.Map:
 			return nil, fmt.Errorf("field %s (%s): pointers to maps are not supported", fldPath.String(), t)
 		}
+	case types.Array:
+		return nil, fmt.Errorf("field %s (%s): fixed-size arrays are not supported", fldPath.String(), t)
+	case types.Slice:
+		elem := unalias(t.Elem)
+		switch elem.Kind {
+		case types.Pointer:
+			return nil, fmt.Errorf("field %s (%s): lists of pointers are not supported", fldPath.String(), t)
+		case types.Slice:
+			if unalias(elem.Elem) != types.Byte {
+				return nil, fmt.Errorf("field %s (%s): lists of lists are not supported", fldPath.String(), t)
+			}
+		case types.Map:
+			return nil, fmt.Errorf("field %s (%s): lists of maps are not supported", fldPath.String(), t)
+		}
+	case types.Map:
+		key := unalias(t.Key)
+		if key != types.String {
+			return nil, fmt.Errorf("field %s (%s): maps with non-string keys are not supported", fldPath.String(), t)
+		}
+		elem := unalias(t.Elem)
+		switch elem.Kind {
+		case types.Pointer:
+			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
+		case types.Slice:
+			if unalias(elem.Elem) != types.Byte {
+				return nil, fmt.Errorf("field %s (%s): maps of lists are not supported", fldPath.String(), t)
+			}
+		case types.Map:
+			return nil, fmt.Errorf("field %s (%s): maps of maps are not supported", fldPath.String(), t)
+		}
+	default:
+		return nil, fmt.Errorf("field %s (%v, kind %v) is not supported", fldPath.String(), t, t.Kind)
 	}
 
 	// Discovery applies to values, not pointers.
@@ -376,7 +421,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		if err := td.discoverStruct(thisNode, fldPath); err != nil {
 			return nil, err
 		}
-	case types.Slice, types.Array:
+	case types.Slice:
 		// Discover the element type.
 		if node, err := td.discover(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
@@ -406,8 +451,6 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 				node:      node,
 			}
 		}
-	default:
-		return nil, fmt.Errorf("field %s (%v, kind %v) is not supported", fldPath.String(), t, t.Kind)
 	}
 
 	// Extract any type-attached validation rules.  We do this AFTER descending
@@ -446,12 +489,12 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		underlying := thisNode.underlying
 
 		switch t.Underlying.Kind {
-		case types.Slice, types.Array:
+		case types.Slice:
 			// Validate each value.
 			if elemNode := underlying.node.elem.node; elemNode == nil {
 				if !thisNode.typeValidations.OpaqueValType {
 					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						fldPath, underlying.node.elem.childType)
 				}
@@ -482,7 +525,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 			if keyNode := underlying.node.key.node; keyNode == nil {
 				if !thisNode.typeValidations.OpaqueKeyType {
 					return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
 						fldPath, underlying.node.elem.childType)
 				}
@@ -512,7 +555,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 			if elemNode := underlying.node.elem.node; elemNode == nil {
 				if !thisNode.typeValidations.OpaqueValType {
 					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						fldPath, underlying.node.elem.childType)
 				}
@@ -611,7 +654,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if child.node == nil { // a non-included type
 				if !child.fieldValidations.OpaqueType {
 					return fmt.Errorf("%v: type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:opaqueType to the field to skip validation",
 						childPath, childType.String())
 				}
@@ -630,12 +673,12 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		// We do this here, rather than in discover() because we need to know
 		// information about the field, not just the type.
 		switch childType.Kind {
-		case types.Slice, types.Array:
+		case types.Slice:
 			// Validate each value of a list field.
 			if elemNode := child.node.elem.node; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						childPath, childType.Elem.String())
 				}
@@ -666,7 +709,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if keyNode := child.node.key.node; keyNode == nil {
 				if !child.fieldValidations.OpaqueKeyType {
 					return fmt.Errorf("%v: key type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
 						childPath, childType.Key.String())
 				}
@@ -696,7 +739,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			if elemNode := child.node.elem.node; elemNode == nil {
 				if !child.fieldValidations.OpaqueValType {
 					return fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --extra-pkg flag, "+
+						"either add this package to validation-gen's --readonly-pkg flag, "+
 						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
 						childPath, childType.Elem.String())
 				}
@@ -936,7 +979,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 	switch inType.Kind {
 	case types.Builtin:
 		// Nothing further.
-	case types.Slice, types.Array:
+	case types.Slice:
 		// Nothing further
 	case types.Map:
 		// Nothing further
@@ -1131,6 +1174,9 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			}
 		}
 
+		for _, comment := range v.Comments() {
+			sw.Do("// $.$\n", comment)
+		}
 		if isShortCircuit {
 			sw.Do("if e := ", nil)
 			emitCall()
@@ -1171,10 +1217,14 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 		return cmp.Compare(a.Var().Name, b.Var().Name)
 	})
 	for _, variable := range variables {
-		supportInitFn, supportInitArgs := variable.Init().SignatureAndArgs()
+		fn := variable.Init()
+		supportInitFn, supportInitArgs := fn.SignatureAndArgs()
 		targs := generator.Args{
 			"varName": c.Universe.Type(types.Name(variable.Var())),
 			"initFn":  c.Universe.Type(supportInitFn),
+		}
+		for _, comment := range fn.Comments() {
+			sw.Do("// $.$\n", comment)
 		}
 		sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
 		typeArgs := variable.Init().TypeArgs()
@@ -1233,6 +1283,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// just use it directly.
 			targs := generator.Args{
 				"funcName": c.Universe.Type(fn),
+			}
+			for _, comment := range v.Function.Comments() {
+				sw.Do("// $.$\n", comment)
 			}
 			sw.Do("$.funcName|raw$", targs)
 		} else {
@@ -1343,36 +1396,9 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	}
 }
 
-// findMemberByFieldName finds the member which matches the specified name.
-// The name is expected to be the "JSON name", rather than the Go name.  This
-// function will descend into embedded types which would appear in JSON to be
-// directly in the parent struct.  If t is not a struct this does nothing.
-// nolint:unused // FIXME: Remove once all validation-gen PRs are merged
-func findMemberByFieldName(t *types.Type, name string) (types.Member, bool) {
-	for _, m := range t.Members {
-		if jsonTag, found := tags.LookupJSON(m); found {
-			// If there is a JSON tag of the exact name, use it.
-			if jsonTag.Name == name {
-				return m, true
-			}
-			// If there is a (non-standard) "inline" tag, look in the type.
-			if jsonTag.Inline {
-				return findMemberByFieldName(m.Type, name)
-			}
-		}
-		// If this field was embedded, look in that type.
-		if m.Embedded {
-			return findMemberByFieldName(m.Type, name)
-		}
-	}
-	return types.Member{}, false
-}
-
 // isNilableType returns true if the argument type can be compared to nil.
 func isNilableType(t *types.Type) bool {
-	for t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	t = unalias(t)
 	switch t.Kind {
 	case types.Pointer, types.Map, types.Slice, types.Interface: // Note: Arrays are not nilable
 		return true

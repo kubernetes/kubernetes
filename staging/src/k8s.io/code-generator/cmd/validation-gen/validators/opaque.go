@@ -50,7 +50,7 @@ func (opaqueTypeTagValidator) Docs() TagDoc {
 			"If a referenced type's package is not included in the generator's current " +
 			"flags, this tag must be set, or code generation will fail (preventing silent " +
 			"mistakes). If the validations should not be ignored, add the type's package " +
-			"to the generator using the --extra-pkg flag.",
+			"to the generator using the --readonly-pkg flag.",
 	}
 	return doc
 }

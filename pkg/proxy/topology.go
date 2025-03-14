@@ -18,9 +18,7 @@ package proxy
 
 import (
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // CategorizeEndpoints returns:
@@ -41,7 +39,7 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 	var useTopology, useServingTerminatingEndpoints bool
 
 	if svcInfo.UsesClusterEndpoints() {
-		useTopology = canUseTopology(endpoints, svcInfo, nodeLabels)
+		useTopology = canUseTopology(endpoints, nodeLabels)
 		clusterEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
 			if !ep.IsReady() {
 				return false
@@ -137,29 +135,11 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 	return
 }
 
-// canUseTopology returns true if topology aware routing is enabled and properly
-// configured in this cluster. That is, it checks that:
-//   - The TopologyAwareHints or ServiceTrafficDistribution feature is enabled.
-//   - If ServiceTrafficDistribution feature gate is not enabled, then the
-//     hintsAnnotation should represent an enabled value.
+// canUseTopology returns true if all of the following is true:
 //   - The node's labels include "topology.kubernetes.io/zone".
 //   - All of the endpoints for this Service have a topology hint.
 //   - At least one endpoint for this Service is hinted for this node's zone.
-func canUseTopology(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) bool {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) && !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution) {
-		return false
-	}
-
-	// Ignore value of hintsAnnotation if the ServiceTrafficDistribution feature
-	// gate is enabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution) {
-		// If the hintsAnnotation has a disabled value, we do not consider hints for route programming.
-		hintsAnnotation := svcInfo.HintsAnnotation()
-		if hintsAnnotation == "" || hintsAnnotation == "disabled" || hintsAnnotation == "Disabled" {
-			return false
-		}
-	}
-
+func canUseTopology(endpoints []Endpoint, nodeLabels map[string]string) bool {
 	zone, foundZone := nodeLabels[v1.LabelTopologyZone]
 	hasEndpointForZone := false
 	for _, endpoint := range endpoints {

@@ -3002,7 +3002,6 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 				),
 				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("init-container1",
 							api.ResourceList{
@@ -3396,6 +3395,161 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "preserve old status.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+		},
+		{
+			description: "preserve old conditions.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:   "old=without,new=with",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "removed-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   "old=with,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -3403,6 +3557,71 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {
 				t.Errorf("StatusStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
+			}
+		})
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *api.Pod
+		warnings []string
+	}{
+		{
+			name:     "no podIPs/hostIPs",
+			pod:      &api.Pod{Status: api.PodStatus{}},
+			warnings: nil,
+		},
+		{
+			name: "valid podIPs/hostIPs",
+			pod: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "1.2.3.4"},
+					},
+					HostIPs: []api.HostIP{
+						{IP: "5.6.7.8"},
+						{IP: "fd00::5678"},
+					},
+				},
+			},
+			warnings: nil,
+		},
+		{
+			name: "bad podIPs/hostIPs",
+			pod: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "01.02.03.04"},
+					},
+					HostIPs: []api.HostIP{
+						{IP: "5.6.7.8"},
+						{IP: "::ffff:9.10.11.12"},
+					},
+				},
+			},
+			warnings: []string{
+				"status.podIPs[0].ip",
+				"status.hostIPs[1].ip",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			warnings := StatusStrategy.WarningsOnUpdate(context.Background(), test.pod, test.pod)
+			ok := len(warnings) == len(test.warnings)
+			if ok {
+				for i := range warnings {
+					if !strings.HasPrefix(warnings[i], test.warnings[i]) {
+						ok = false
+						break
+					}
+				}
+			}
+			if !ok {
+				t.Errorf("Expected warnings for %v, got %v", test.warnings, warnings)
 			}
 		})
 	}

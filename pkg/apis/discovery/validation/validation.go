@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metavalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -28,6 +29,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/discovery"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -54,23 +56,34 @@ var (
 var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
 
 // ValidateEndpointSlice validates an EndpointSlice.
-func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice) field.ErrorList {
+func ValidateEndpointSlice(endpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateAddressType(endpointSlice.AddressType)...)
-	allErrs = append(allErrs, validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))...)
 	allErrs = append(allErrs, validatePorts(endpointSlice.Ports, field.NewPath("ports"))...)
+
+	endpointsErrs := validateEndpoints(endpointSlice.Endpoints, endpointSlice.AddressType, field.NewPath("endpoints"))
+	if len(endpointsErrs) != 0 {
+		// If this is an update, and Endpoints was unchanged, then ignore the
+		// validation errors, since apparently older versions of Kubernetes
+		// considered the data valid. (We only check this after getting a
+		// validation error since Endpoints may be large and DeepEqual is slow.)
+		if oldEndpointSlice != nil && apiequality.Semantic.DeepEqual(oldEndpointSlice.Endpoints, endpointSlice.Endpoints) {
+			endpointsErrs = nil
+		}
+	}
+	allErrs = append(allErrs, endpointsErrs...)
 
 	return allErrs
 }
 
 // ValidateEndpointSliceCreate validates an EndpointSlice when it is created.
 func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.ErrorList {
-	return ValidateEndpointSlice(endpointSlice)
+	return ValidateEndpointSlice(endpointSlice, nil)
 }
 
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	allErrs := ValidateEndpointSlice(newEndpointSlice)
+	allErrs := ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType"))...)
 
 	return allErrs
@@ -99,11 +112,25 @@ func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.Addres
 			// and do not get validated.
 			switch addrType {
 			case discovery.AddressTypeIPv4:
-				allErrs = append(allErrs, validation.IsValidIPv4Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
+				ipErrs := apivalidation.IsValidIPForLegacyField(addressPath.Index(i), address, nil)
+				if len(ipErrs) > 0 {
+					allErrs = append(allErrs, ipErrs...)
+				} else {
+					if !netutils.IsIPv4String(address) {
+						allErrs = append(allErrs, field.Invalid(addressPath, address, "must be an IPv4 address"))
+					}
+					allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				}
 			case discovery.AddressTypeIPv6:
-				allErrs = append(allErrs, validation.IsValidIPv6Address(addressPath.Index(i), address)...)
-				allErrs = append(allErrs, apivalidation.ValidateNonSpecialIP(address, addressPath.Index(i))...)
+				ipErrs := validation.IsValidIP(addressPath.Index(i), address)
+				if len(ipErrs) > 0 {
+					allErrs = append(allErrs, ipErrs...)
+				} else {
+					if !netutils.IsIPv6String(address) {
+						allErrs = append(allErrs, field.Invalid(addressPath, address, "must be an IPv6 address"))
+					}
+					allErrs = append(allErrs, apivalidation.ValidateEndpointIP(address, addressPath.Index(i))...)
+				}
 			case discovery.AddressTypeFQDN:
 				allErrs = append(allErrs, validation.IsFullyQualifiedDomainName(addressPath.Index(i), address)...)
 			}

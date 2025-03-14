@@ -205,21 +205,21 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	}
 
 	// Make sure explicit extra-packages are added.
-	var extraPkgs []string
-	for _, pkg := range args.ExtraPkgs {
+	var readOnlyPkgs []string
+	for _, pkg := range args.ReadOnlyPkgs {
 		// In case someone specifies an extra as a path into vendor, convert
 		// it to its "real" package path.
 		if i := strings.Index(pkg, "/vendor/"); i != -1 {
 			pkg = pkg[i+len("/vendor/"):]
 		}
-		extraPkgs = append(extraPkgs, pkg)
+		readOnlyPkgs = append(readOnlyPkgs, pkg)
 	}
-	if expanded, err := context.FindPackages(extraPkgs...); err != nil {
+	if expanded, err := context.FindPackages(readOnlyPkgs...); err != nil {
 		klog.Fatalf("cannot find extra packages: %v", err)
 	} else {
-		extraPkgs = expanded // now in fully canonical form
+		readOnlyPkgs = expanded // now in fully canonical form
 	}
-	for _, extra := range extraPkgs {
+	for _, extra := range readOnlyPkgs {
 		inputPkgs = append(inputPkgs, extra)
 		pkgToInput[extra] = extra
 	}

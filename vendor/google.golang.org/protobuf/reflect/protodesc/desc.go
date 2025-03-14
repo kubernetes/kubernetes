@@ -132,17 +132,11 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 		}
 		f.L2.Imports[i].IsPublic = true
 	}
-	for _, i := range fd.GetWeakDependency() {
-		if !(0 <= i && int(i) < len(f.L2.Imports)) || f.L2.Imports[i].IsWeak {
-			return nil, errors.New("invalid or duplicate weak import index: %d", i)
-		}
-		f.L2.Imports[i].IsWeak = true
-	}
 	imps := importSet{f.Path(): true}
 	for i, path := range fd.GetDependency() {
 		imp := &f.L2.Imports[i]
 		f, err := r.FindFileByPath(path)
-		if err == protoregistry.NotFound && (o.AllowUnresolvable || imp.IsWeak) {
+		if err == protoregistry.NotFound && o.AllowUnresolvable {
 			f = filedesc.PlaceholderFile(path)
 		} else if err != nil {
 			return nil, errors.New("could not resolve import %q: %v", path, err)

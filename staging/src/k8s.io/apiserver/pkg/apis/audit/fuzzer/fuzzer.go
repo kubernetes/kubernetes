@@ -19,7 +19,7 @@ package fuzzer
 import (
 	"strings"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -29,9 +29,9 @@ import (
 // Funcs returns the fuzzer functions for the audit api group.
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(e *audit.Event, c fuzz.Continue) {
-			c.FuzzNoCustom(e)
-			switch c.RandBool() {
+		func(e *audit.Event, c randfill.Continue) {
+			c.FillNoCustom(e)
+			switch c.Bool() {
 			case true:
 				e.RequestObject = nil
 			case false:
@@ -41,7 +41,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 					ContentType: runtime.ContentTypeJSON,
 				}
 			}
-			switch c.RandBool() {
+			switch c.Bool() {
 			case true:
 				e.ResponseObject = nil
 			case false:
@@ -52,8 +52,8 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			}
 		},
-		func(o *audit.ObjectReference, c fuzz.Continue) {
-			c.FuzzNoCustom(o)
+		func(o *audit.ObjectReference, c randfill.Continue) {
+			c.FillNoCustom(o)
 			switch c.Intn(3) {
 			case 0:
 				// core api group

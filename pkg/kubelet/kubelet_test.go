@@ -40,6 +40,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	core "k8s.io/client-go/testing"
 	"k8s.io/mount-utils"
 
@@ -54,6 +55,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -96,6 +98,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/token"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/userns"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -336,8 +339,8 @@ func newTestKubeletWithImageList(
 	kubelet.containerGC = containerGC
 
 	fakeClock := testingclock.NewFakeClock(time.Now())
-	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
-	kubelet.backOff.Clock = fakeClock
+	kubelet.crashLoopBackOff = flowcontrol.NewBackOff(time.Second, time.Minute)
+	kubelet.crashLoopBackOff.Clock = fakeClock
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
@@ -370,6 +373,10 @@ func newTestKubeletWithImageList(
 		ShutdownGracePeriodCriticalPods: 0,
 	})
 	kubelet.shutdownManager = shutdownManager
+	kubelet.usernsManager, err = userns.MakeUserNsManager(kubelet)
+	if err != nil {
+		t.Fatalf("Failed to create UserNsManager: %v", err)
+	}
 	kubelet.admitHandlers.AddPodAdmitHandler(shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
@@ -2396,7 +2403,6 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	// fakePodWorkers trigger syncPodFn synchronously on update, but entering
 	// kubelet.SyncPod while holding the podResizeMutex can lead to deadlock.
@@ -2568,7 +2574,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.existingPodAllocation != nil {
 				// when kubelet restarts, AllocatedResources has already existed before adding pod
-				err := kubelet.allocationManager.SetPodAllocation(tc.existingPodAllocation)
+				err := kubelet.allocationManager.SetAllocatedResources(tc.existingPodAllocation)
 				if err != nil {
 					t.Fatalf("failed to set pod allocation: %v", err)
 				}
@@ -2595,7 +2601,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
-	cpu1m := resource.MustParse("1m")
 	cpu2m := resource.MustParse("2m")
 	cpu500m := resource.MustParse("500m")
 	cpu1000m := resource.MustParse("1")
@@ -2805,24 +2810,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectBackoffReset:    true,
 		},
 		{
-			name:                  "Equivalent min CPU shares",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1m},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu2m},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu2m},
-			expectedResize:        "",
-			// Even though the resize isn't being actuated, we still clear the container backoff
-			// since the allocation is changing.
-			expectBackoffReset: true,
-		},
-		{
-			name:                  "Equivalent min CPU shares - already allocated",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu2m},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1m},
-			newResourcesAllocated: true,
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1m},
-			expectedResize:        "",
-		},
-		{
 			name:                  "Increase CPU from min limit",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			originalLimits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
@@ -2844,37 +2831,11 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			expectedResize:        v1.PodResizeStatusInProgress,
 			expectBackoffReset:    true,
 		},
-		{
-			name:                  "Equivalent min CPU limit",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			originalLimits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")}, // Unchanged
-			newLimits:             v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			expectedResize:        "",
-			// Even though the resize isn't being actuated, we still clear the container backoff
-			// since the allocation is changing.
-			expectBackoffReset: true,
-		},
-		{
-			name:                  "Equivalent min CPU limit - already allocated",
-			originalRequests:      v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			originalLimits:        v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			newRequests:           v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")}, // Unchanged
-			newLimits:             v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("5m")},
-			newResourcesAllocated: true,
-			expectedResize:        "",
-		},
 	}
 
 	for _, tt := range tests {
 		for _, isSidecarContainer := range []bool{false, true} {
-			t.Run(tt.name, func(t *testing.T) {
-				kubelet.statusManager = status.NewFakeManager()
-
+			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
 				var originalPod *v1.Pod
 				var originalCtr *v1.Container
 				if isSidecarContainer {
@@ -2901,10 +2862,12 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				}
 
 				if !tt.newResourcesAllocated {
-					require.NoError(t, kubelet.allocationManager.SetPodAllocation(originalPod))
+					require.NoError(t, kubelet.allocationManager.SetAllocatedResources(originalPod))
 				} else {
-					require.NoError(t, kubelet.allocationManager.SetPodAllocation(newPod))
+					require.NoError(t, kubelet.allocationManager.SetAllocatedResources(newPod))
 				}
+				require.NoError(t, kubelet.allocationManager.SetActuatedResources(originalPod, nil))
+				t.Cleanup(func() { kubelet.allocationManager.RemovePod(originalPod.UID) })
 
 				podStatus := &kubecontainer.PodStatus{
 					ID:        originalPod.UID,
@@ -2935,7 +2898,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				now := kubelet.clock.Now()
 				// Put the container in backoff so we can confirm backoff is reset.
 				backoffKey := kuberuntime.GetStableKey(originalPod, originalCtr)
-				kubelet.backOff.Next(backoffKey, now)
+				kubelet.crashLoopBackOff.Next(backoffKey, now)
 
 				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
 				require.NoError(t, err)
@@ -2957,7 +2920,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				resizeStatus := kubelet.statusManager.GetPodResizeStatus(newPod.UID)
 				assert.Equal(t, tt.expectedResize, resizeStatus)
 
-				isInBackoff := kubelet.backOff.IsInBackOffSince(backoffKey, now)
+				isInBackoff := kubelet.crashLoopBackOff.IsInBackOffSince(backoffKey, now)
 				if tt.expectBackoffReset {
 					assert.False(t, isInBackoff, "container backoff should be reset")
 				} else {
@@ -3443,7 +3406,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.os,
 		kubelet,
 		nil,
-		kubelet.backOff,
+		kubelet.crashLoopBackOff,
 		kubeCfg.SerializeImagePulls,
 		kubeCfg.MaxParallelImagePulls,
 		float32(kubeCfg.RegistryPullQPS),
@@ -3458,12 +3421,15 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.containerManager,
 		kubelet.containerLogManager,
 		kubelet.runtimeClassManager,
+		kubelet.allocationManager,
 		false,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
 		kubeletutil.NewPodStartupLatencyTracker(),
 		tp,
+		token.NewManager(kubelet.kubeClient),
+		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 	)
 	assert.NoError(t, err)
 
@@ -3714,4 +3680,342 @@ func TestRecordAdmissionRejection(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsPodResizeInProgress(t *testing.T) {
+	type testResources struct {
+		cpuReq, cpuLim, memReq, memLim int64
+	}
+	type testContainer struct {
+		allocated               testResources
+		actuated                *testResources
+		nonSidecarInit, sidecar bool
+		isRunning               bool
+		unstarted               bool // Whether the container is missing from the pod status
+	}
+
+	tests := []struct {
+		name            string
+		containers      []testContainer
+		expectHasResize bool
+	}{{
+		name: "simple running container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			actuated:  &testResources{100, 100, 100, 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "simple unstarted container",
+		containers: []testContainer{{
+			allocated: testResources{100, 100, 100, 100},
+			unstarted: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "simple resized container/cpu req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{150, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/cpu limit",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 300, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/mem req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 150, 200},
+			isRunning: true,
+		}},
+		// Memory requests aren't actuated and should be ignored.
+		expectHasResize: false,
+	}, {
+		name: "simple resized container/cpu+mem req",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{150, 200, 150, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "simple resized container/mem limit",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 300},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "terminated resized container",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200},
+			isRunning: false,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "non-sidecar init container",
+		containers: []testContainer{{
+			allocated:      testResources{100, 200, 100, 200},
+			nonSidecarInit: true,
+			isRunning:      true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "non-resized sidecar",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "resized sidecar",
+		containers: []testContainer{{
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200},
+			sidecar:   true,
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "several containers and a resize",
+		containers: []testContainer{{
+			allocated:      testResources{100, 200, 100, 200},
+			nonSidecarInit: true,
+			isRunning:      true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{100, 200, 100, 200},
+			isRunning: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			unstarted: true,
+		}, {
+			allocated: testResources{100, 200, 100, 200},
+			actuated:  &testResources{200, 200, 100, 200}, // Resized
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}, {
+		name: "best-effort pod",
+		containers: []testContainer{{
+			allocated: testResources{},
+			actuated:  &testResources{},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "burstable pod/not resizing",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100},
+			actuated:  &testResources{cpuReq: 100},
+			isRunning: true,
+		}},
+		expectHasResize: false,
+	}, {
+		name: "burstable pod/resized",
+		containers: []testContainer{{
+			allocated: testResources{cpuReq: 100},
+			actuated:  &testResources{cpuReq: 500},
+			isRunning: true,
+		}},
+		expectHasResize: true,
+	}}
+
+	mkRequirements := func(r testResources) v1.ResourceRequirements {
+		res := v1.ResourceRequirements{
+			Requests: v1.ResourceList{},
+			Limits:   v1.ResourceList{},
+		}
+		if r.cpuReq != 0 {
+			res.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuReq, resource.DecimalSI)
+		}
+		if r.cpuLim != 0 {
+			res.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuLim, resource.DecimalSI)
+		}
+		if r.memReq != 0 {
+			res.Requests[v1.ResourceMemory] = *resource.NewQuantity(r.memReq, resource.DecimalSI)
+		}
+		if r.memLim != 0 {
+			res.Limits[v1.ResourceMemory] = *resource.NewQuantity(r.memLim, resource.DecimalSI)
+		}
+		return res
+	}
+	mkContainer := func(index int, c testContainer) v1.Container {
+		container := v1.Container{
+			Name:      fmt.Sprintf("c%d", index),
+			Resources: mkRequirements(c.allocated),
+		}
+		if c.sidecar {
+			container.RestartPolicy = ptr.To(v1.ContainerRestartPolicyAlways)
+		}
+		return container
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	am := kl.allocationManager
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "12345",
+				},
+			}
+			t.Cleanup(func() { am.RemovePod(pod.UID) })
+			podStatus := &kubecontainer.PodStatus{
+				ID:   pod.UID,
+				Name: pod.Name,
+			}
+			for i, c := range test.containers {
+				// Add the container to the pod
+				container := mkContainer(i, c)
+				if c.nonSidecarInit || c.sidecar {
+					pod.Spec.InitContainers = append(pod.Spec.InitContainers, container)
+				} else {
+					pod.Spec.Containers = append(pod.Spec.Containers, container)
+				}
+
+				// Add the container to the pod status, if it's started.
+				if !test.containers[i].unstarted {
+					cs := kubecontainer.Status{
+						Name: container.Name,
+					}
+					if test.containers[i].isRunning {
+						cs.State = kubecontainer.ContainerStateRunning
+					} else {
+						cs.State = kubecontainer.ContainerStateExited
+					}
+					podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, &cs)
+				}
+
+				// Register the actuated container (if needed)
+				if c.actuated != nil {
+					actuatedContainer := container.DeepCopy()
+					actuatedContainer.Resources = mkRequirements(*c.actuated)
+					require.NoError(t, am.SetActuatedResources(pod, actuatedContainer))
+
+					fetched, found := am.GetActuatedResources(pod.UID, container.Name)
+					require.True(t, found)
+					assert.Equal(t, actuatedContainer.Resources, fetched)
+				} else {
+					_, found := am.GetActuatedResources(pod.UID, container.Name)
+					require.False(t, found)
+				}
+			}
+			require.NoError(t, am.SetAllocatedResources(pod))
+
+			hasResizedResources := kl.isPodResizeInProgress(pod, podStatus)
+			require.Equal(t, test.expectHasResize, hasResizedResources, "hasResizedResources")
+		})
+	}
+}
+
+func TestCrashLoopBackOffConfiguration(t *testing.T) {
+	testCases := []struct {
+		name            string
+		featureGates    []featuregate.Feature
+		nodeDecay       metav1.Duration
+		expectedInitial time.Duration
+		expectedMax     time.Duration
+	}{
+		{
+			name:            "Prior behavior",
+			expectedMax:     time.Duration(300 * time.Second),
+			expectedInitial: time.Duration(10 * time.Second),
+		},
+		{
+			name:            "New default only",
+			featureGates:    []featuregate.Feature{features.ReduceDefaultCrashLoopBackOffDecay},
+			expectedMax:     time.Duration(60 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Faster per node config; only node config configured",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
+			nodeDecay:       metav1.Duration{Duration: 2 * time.Second},
+			expectedMax:     time.Duration(2 * time.Second),
+			expectedInitial: time.Duration(2 * time.Second),
+		},
+		{
+			name:            "Faster per node config; new default and node config configured",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
+			nodeDecay:       metav1.Duration{Duration: 2 * time.Second},
+			expectedMax:     time.Duration(2 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Slower per node config; new default and node config configured, set A",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
+			nodeDecay:       metav1.Duration{Duration: 10 * time.Second},
+			expectedMax:     time.Duration(10 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Slower per node config; new default and node config configured, set B",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax, features.ReduceDefaultCrashLoopBackOffDecay},
+			nodeDecay:       metav1.Duration{Duration: 300 * time.Second},
+			expectedMax:     time.Duration(300 * time.Second),
+			expectedInitial: time.Duration(1 * time.Second),
+		},
+		{
+			name:            "Slower per node config; only node config configured, set A",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
+			nodeDecay:       metav1.Duration{Duration: 11 * time.Second},
+			expectedMax:     time.Duration(11 * time.Second),
+			expectedInitial: time.Duration(10 * time.Second),
+		},
+		{
+			name:            "Slower per node config; only node config configured, set B",
+			featureGates:    []featuregate.Feature{features.KubeletCrashLoopBackOffMax},
+			nodeDecay:       metav1.Duration{Duration: 300 * time.Second},
+			expectedMax:     time.Duration(300 * time.Second),
+			expectedInitial: time.Duration(10 * time.Second),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			kubeCfg := &kubeletconfiginternal.KubeletConfiguration{}
+
+			for _, f := range tc.featureGates {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
+			}
+			if tc.nodeDecay.Duration > 0 {
+				kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod = &tc.nodeDecay
+			}
+
+			resultMax, resultInitial := newCrashLoopBackOff(kubeCfg)
+
+			assert.Equalf(t, tc.expectedMax, resultMax, "wrong max calculated, want: %v, got %v", tc.expectedMax, resultMax)
+			assert.Equalf(t, tc.expectedInitial, resultInitial, "wrong base calculated, want: %v, got %v", tc.expectedInitial, resultInitial)
+		})
+	}
+
 }

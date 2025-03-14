@@ -18,12 +18,20 @@ package cacher
 
 import (
 	"context"
+	"fmt"
+	"hash"
+	"hash/fnv"
+	"os"
+	"strconv"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
@@ -35,16 +43,45 @@ import (
 	"k8s.io/klog/v2"
 )
 
+var (
+	// ConsistencyCheckPeriod is the period of checking consistency between etcd and cache.
+	// 5 minutes were proposed to match the default compaction period. It's magnitute higher than
+	// List latency SLO (30 seconds) and timeout (1 minute).
+	ConsistencyCheckPeriod = 5 * time.Minute
+	// ConsistencyCheckerEnabled enables the consistency checking mechanism for cache.
+	// Based on KUBE_WATCHCACHE_CONSISTENCY_CHECKER environment variable.
+	ConsistencyCheckerEnabled = false
+)
+
+func init() {
+	ConsistencyCheckerEnabled, _ = strconv.ParseBool(os.Getenv("KUBE_WATCHCACHE_CONSISTENCY_CHECKER"))
+}
+
 func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegator {
-	return &CacheDelegator{
+	d := &CacheDelegator{
 		cacher:  cacher,
 		storage: storage,
+		stopCh:  make(chan struct{}),
 	}
+	if ConsistencyCheckerEnabled {
+		d.checker = newConsistencyChecker(cacher.resourcePrefix, cacher.newListFunc, cacher, storage)
+		d.wg.Add(1)
+		go func() {
+			defer d.wg.Done()
+			d.checker.startChecking(d.stopCh)
+		}()
+	}
+	return d
 }
 
 type CacheDelegator struct {
 	cacher  *Cacher
 	storage storage.Interface
+	checker *consistencyChecker
+
+	wg       sync.WaitGroup
+	stopOnce sync.Once
+	stopCh   chan struct{}
 }
 
 var _ storage.Interface = (*CacheDelegator)(nil)
@@ -139,7 +176,8 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	if shouldDelegateList(opts) {
+	shouldDelegate, consistentRead := shouldDelegateList(opts)
+	if shouldDelegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
@@ -161,21 +199,23 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 			return c.storage.GetList(ctx, key, opts, listObj)
 		}
 	}
-	requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-	consistentRead := opts.ResourceVersion == "" && utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && requestWatchProgressSupported
 	if consistentRead {
 		listRV, err = c.storage.GetCurrentResourceVersion(ctx)
 		if err != nil {
 			return err
 		}
+		// Setting resource version for consistent read in cache based on current ResourceVersion in etcd.
+		opts.ResourceVersion = strconv.FormatInt(int64(listRV), 10)
 	}
-	err = c.cacher.GetList(ctx, key, opts, listObj, listRV)
+	err = c.cacher.GetList(ctx, key, opts, listObj)
 	success := "true"
 	fallback := "false"
 	if err != nil {
 		if consistentRead {
 			if storage.IsTooLargeResourceVersion(err) {
 				fallback = "true"
+				// Reset resourceVersion during fallback from consistent read.
+				opts.ResourceVersion = ""
 				err = c.storage.GetList(ctx, key, opts, listObj)
 			}
 			if err != nil {
@@ -202,31 +242,34 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 // NOTICE: Keep in sync with shouldListFromStorage function in
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) bool {
+func shouldDelegateList(opts storage.ListOptions) (shouldDeletage, consistentRead bool) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
+	consistentRead = false
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true
+		return true, consistentRead
 	case metav1.ResourceVersionMatchNotOlderThan:
+		return false, consistentRead
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true
+			return true, consistentRead
 		}
+		// Continue
+		if len(opts.Predicate.Continue) > 0 {
+			return true, consistentRead
+		}
+		// Consistent Read
+		if opts.ResourceVersion == "" {
+			consistentRead = true
+			consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+			requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead
+		}
+		return false, consistentRead
 	default:
-		return true
+		return true, consistentRead
 	}
-	// Continue
-	if len(opts.Predicate.Continue) > 0 {
-		return true
-	}
-	// Consistent Read
-	if opts.ResourceVersion == "" {
-		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
-	}
-	return false
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
@@ -257,4 +300,157 @@ func (c *CacheDelegator) ReadinessCheck() error {
 
 func (c *CacheDelegator) RequestWatchProgress(ctx context.Context) error {
 	return c.storage.RequestWatchProgress(ctx)
+}
+
+func (c *CacheDelegator) Stop() {
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+	})
+	c.wg.Wait()
+}
+
+func newConsistencyChecker(resourcePrefix string, newListFunc func() runtime.Object, cacher getListerReady, etcd getLister) *consistencyChecker {
+	return &consistencyChecker{
+		resourcePrefix: resourcePrefix,
+		newListFunc:    newListFunc,
+		cacher:         cacher,
+		etcd:           etcd,
+	}
+}
+
+type consistencyChecker struct {
+	resourcePrefix string
+	newListFunc    func() runtime.Object
+
+	cacher getListerReady
+	etcd   getLister
+}
+
+type getListerReady interface {
+	getLister
+	Ready() bool
+}
+
+type getLister interface {
+	GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error
+}
+
+func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
+	err := wait.PollUntilContextCancel(wait.ContextForChannel(stopCh), ConsistencyCheckPeriod, false, func(ctx context.Context) (done bool, err error) {
+		c.check(ctx)
+		return false, nil
+	})
+	if err != nil {
+		klog.InfoS("Cache consistency check exiting", "resource", c.resourcePrefix, "err", err)
+	}
+}
+
+func (c *consistencyChecker) check(ctx context.Context) {
+	digests, err := c.calculateDigests(ctx)
+	if err != nil {
+		klog.ErrorS(err, "Cache consistentency check error", "resource", c.resourcePrefix)
+		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "error").Inc()
+		return
+	}
+	if digests.CacheDigest == digests.EtcdDigest {
+		klog.V(3).InfoS("Cache consistentency check passed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
+		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "success").Inc()
+	} else {
+		klog.ErrorS(nil, "Cache consistentency check failed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "failure").Inc()
+	}
+}
+
+func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDigest, error) {
+	if !c.cacher.Ready() {
+		return nil, fmt.Errorf("cache is not ready")
+	}
+	cacheDigest, resourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, storage.ListOptions{
+		ResourceVersion:      "0",
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
+	}
+	etcdDigest, _, err := c.calculateStoreDigest(ctx, c.etcd, storage.ListOptions{
+		ResourceVersion:      resourceVersion,
+		Predicate:            storage.Everything,
+		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed calculating etcd digest: %w", err)
+	}
+	return &storageDigest{
+		ResourceVersion: resourceVersion,
+		CacheDigest:     cacheDigest,
+		EtcdDigest:      etcdDigest,
+	}, nil
+}
+
+type storageDigest struct {
+	ResourceVersion string
+	CacheDigest     string
+	EtcdDigest      string
+}
+
+func (c *consistencyChecker) calculateStoreDigest(ctx context.Context, store getLister, opts storage.ListOptions) (digest, rv string, err error) {
+	// TODO: Implement pagination
+	resp := c.newListFunc()
+	err = store.GetList(ctx, c.resourcePrefix, opts, resp)
+	if err != nil {
+		return "", "", err
+	}
+	digest, err = listDigest(resp)
+	if err != nil {
+		return "", "", err
+	}
+	list, err := meta.ListAccessor(resp)
+	if err != nil {
+		return "", "", err
+	}
+	return digest, list.GetResourceVersion(), nil
+}
+
+func listDigest(list runtime.Object) (string, error) {
+	h := fnv.New64()
+	err := meta.EachListItem(list, func(obj runtime.Object) error {
+		objectMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+		err = addObjectToDigest(h, objectMeta)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", h.Sum64()), nil
+}
+
+func addObjectToDigest(h hash.Hash64, objectMeta metav1.Object) error {
+	_, err := h.Write([]byte(objectMeta.GetNamespace()))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte("/"))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte(objectMeta.GetName()))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte("/"))
+	if err != nil {
+		return err
+	}
+	_, err = h.Write([]byte(objectMeta.GetResourceVersion()))
+	if err != nil {
+		return err
+	}
+	return nil
 }

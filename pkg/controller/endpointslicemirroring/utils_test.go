@@ -64,7 +64,7 @@ func TestNewEndpointSlice(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						discovery.LabelServiceName: endpoints.Name,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 					Annotations:     map[string]string{},
 					GenerateName:    fmt.Sprintf("%s-", endpoints.Name),
@@ -86,7 +86,7 @@ func TestNewEndpointSlice(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						discovery.LabelServiceName: endpoints.Name,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 					Annotations:     map[string]string{"foo": "bar"},
 					GenerateName:    fmt.Sprintf("%s-", endpoints.Name),
@@ -109,7 +109,7 @@ func TestNewEndpointSlice(t *testing.T) {
 					Labels: map[string]string{
 						"foo":                      "bar",
 						discovery.LabelServiceName: endpoints.Name,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 					Annotations:     map[string]string{},
 					GenerateName:    fmt.Sprintf("%s-", endpoints.Name),
@@ -134,7 +134,7 @@ func TestNewEndpointSlice(t *testing.T) {
 					Labels: map[string]string{
 						"foo":                      "bar",
 						discovery.LabelServiceName: endpoints.Name,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 					Annotations:     map[string]string{"foo2": "bar2"},
 					GenerateName:    fmt.Sprintf("%s-", endpoints.Name),
@@ -162,7 +162,7 @@ func TestNewEndpointSlice(t *testing.T) {
 					Labels: map[string]string{
 						"foo":                      "bar",
 						discovery.LabelServiceName: endpoints.Name,
-						discovery.LabelManagedBy:   controllerName,
+						discovery.LabelManagedBy:   ControllerName,
 					},
 					Annotations:     map[string]string{"foo2": "bar2"},
 					GenerateName:    fmt.Sprintf("%s-", endpoints.Name),

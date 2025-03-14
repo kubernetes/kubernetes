@@ -30,10 +30,6 @@ func Test(t *testing.T) {
 			{"key1", 1, "one"},
 			{"key2", 2, "two"},
 		},
-		ListPtrField: []*OtherStruct{
-			{"key1", 1, "one"},
-			{"key2", 2, "two"},
-		},
 		ListTypedefField: []OtherTypedefStruct{
 			{"key1", 1, "one"},
 			{"key2", 2, "two"},
@@ -46,10 +42,6 @@ func Test(t *testing.T) {
 			{"key2", 2, "two"},
 			{"key1", 1, "one"},
 		},
-		ListPtrField: []*OtherStruct{
-			{"key2", 2, "two"},
-			{"key1", 1, "one"},
-		},
 		ListTypedefField: []OtherTypedefStruct{
 			{"key2", 2, "two"},
 			{"key1", 1, "one"},
@@ -59,11 +51,6 @@ func Test(t *testing.T) {
 	// Different data.
 	structB := Struct{
 		ListField: []OtherStruct{
-			{"key3", 3, "THREE"},
-			{"key1", 1, "ONE"},
-			{"key2", 2, "TWO"},
-		},
-		ListPtrField: []*OtherStruct{
 			{"key3", 3, "THREE"},
 			{"key1", 1, "ONE"},
 			{"key2", 2, "TWO"},
@@ -82,8 +69,6 @@ func Test(t *testing.T) {
 	st.Value(&structA1).OldValue(&structB).ExpectInvalid(
 		field.Forbidden(field.NewPath("listField").Index(0), "field is immutable"),
 		field.Forbidden(field.NewPath("listField").Index(1), "field is immutable"),
-		field.Forbidden(field.NewPath("listPtrField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listPtrField").Index(1), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(0), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(1), "field is immutable"),
 	)
@@ -92,9 +77,6 @@ func Test(t *testing.T) {
 		field.Forbidden(field.NewPath("listField").Index(0), "field is immutable"),
 		field.Forbidden(field.NewPath("listField").Index(1), "field is immutable"),
 		field.Forbidden(field.NewPath("listField").Index(2), "field is immutable"),
-		field.Forbidden(field.NewPath("listPtrField").Index(0), "field is immutable"),
-		field.Forbidden(field.NewPath("listPtrField").Index(1), "field is immutable"),
-		field.Forbidden(field.NewPath("listPtrField").Index(2), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(0), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(1), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(2), "field is immutable"),

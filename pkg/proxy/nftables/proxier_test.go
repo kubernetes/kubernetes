@@ -21,7 +21,6 @@ package nftables
 
 import (
 	"fmt"
-	"golang.org/x/time/rate"
 	"net"
 	"reflect"
 	"testing"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"

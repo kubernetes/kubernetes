@@ -348,6 +348,12 @@ function start-kube-apiserver {
     fi
     container_env+="{\"name\": \"KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR\", \"value\": \"${ENABLE_KUBE_LIST_FROM_CACHE_INCONSISTENCY_DETECTOR}\"}"
   fi
+  if [[ -n "${ENABLE_KUBE_WATCHCACHE_CONSISTENCY_CHECKER:-}" ]]; then
+    if [[ -n "${container_env}" ]]; then
+      container_env="${container_env}, "
+    fi
+    container_env+="{\"name\": \"KUBE_WATCHCACHE_CONSISTENCY_CHECKER\", \"value\": \"${ENABLE_KUBE_WATCHCACHE_CONSISTENCY_CHECKER}\"}"
+  fi
   if [[ -n "${ENABLE_PATCH_CONVERSION_DETECTOR:-}" ]]; then
     if [[ -n "${container_env}" ]]; then
       container_env="${container_env}, "

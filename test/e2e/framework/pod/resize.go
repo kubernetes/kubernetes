@@ -386,17 +386,30 @@ func verifyContainerRestarts(gotStatuses []v1.ContainerStatus, wantStatuses []v1
 	return utilerrors.NewAggregate(errs)
 }
 
-func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *PodClient, pod *v1.Pod) *v1.Pod {
+func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	// Wait for resize to complete.
-	framework.ExpectNoError(WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "resize status cleared", f.Timeouts.PodStart,
-		func(pod *v1.Pod) (bool, error) {
+
+	framework.ExpectNoError(framework.Gomega().
+		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
+		WithTimeout(f.Timeouts.PodStart).
+		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
 			if pod.Status.Resize == v1.PodResizeStatusInfeasible {
 				// This is a terminal resize state
-				return false, fmt.Errorf("resize is infeasible")
+				return func() string {
+					return "resize is infeasible"
+				}, nil
 			}
-			return pod.Status.Resize == "", nil
-		}), "pod should finish resizing")
+			// TODO: Replace this check with a combination of checking the status.observedGeneration
+			// and the resize status when available.
+			if resourceErrs := VerifyPodStatusResources(pod, expectedContainers); resourceErrs != nil {
+				return func() string {
+					return fmt.Sprintf("container status resources don't match expected: %v", formatErrors(resourceErrs))
+				}, nil
+			}
+			return nil, nil
+		})),
+	)
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
 	framework.ExpectNoError(err, "failed to get resized pod")
@@ -406,19 +419,6 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v1.Pod, expectedContainers []ResizableContainerInfo) {
 	ginkgo.GinkgoHelper()
 
-	// Put each error on a new line for readability.
-	formatErrors := func(err error) error {
-		var agg utilerrors.Aggregate
-		if !errors.As(err, &agg) {
-			return err
-		}
-
-		errStrings := make([]string, len(agg.Errors()))
-		for i, err := range agg.Errors() {
-			errStrings[i] = err.Error()
-		}
-		return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
-	}
 	// Verify Pod Containers Cgroup Values
 	var errs []error
 	if cgroupErrs := VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers); cgroupErrs != nil {
@@ -459,4 +459,18 @@ func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
 	}
 
 	return string(patchBytes), nil
+}
+
+func formatErrors(err error) error {
+	// Put each error on a new line for readability.
+	var agg utilerrors.Aggregate
+	if !errors.As(err, &agg) {
+		return err
+	}
+
+	errStrings := make([]string, len(agg.Errors()))
+	for i, err := range agg.Errors() {
+		errStrings[i] = err.Error()
+	}
+	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
 }

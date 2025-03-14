@@ -17,13 +17,19 @@ limitations under the License.
 package dra
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
@@ -34,10 +40,15 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -54,11 +65,21 @@ var (
 				Container("my-container").
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
 				Obj()
+	class = &resourceapi.DeviceClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: className,
+		},
+	}
 	claim = st.MakeResourceClaim().
 		Name(claimName).
 		Namespace(namespace).
 		Request(className).
 		Obj()
+	claimPrioritizedList = st.MakeResourceClaim().
+				Name(claimName).
+				Namespace(namespace).
+				RequestWithPrioritizedList(className).
+				Obj()
 )
 
 // createTestNamespace creates a namespace with a name that is derived from the
@@ -106,6 +127,7 @@ func TestDRA(t *testing.T) {
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 			},
 		},
@@ -119,11 +141,13 @@ func TestDRA(t *testing.T) {
 				// Additional DRA feature gates go here,
 				// in alphabetical order,
 				// as needed by tests for them.
-				features.DRAAdminAccess: true,
+				features.DRAAdminAccess:     true,
+				features.DRAPrioritizedList: true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
+				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 			},
 		},
 	} {
@@ -146,19 +170,41 @@ func TestDRA(t *testing.T) {
 			etcdOptions := framework.SharedEtcd()
 			apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 			apiServerFlags := framework.DefaultTestServerFlags()
-			// Default kube-apiserver behavior, must be requested explicitly for test server.
-			runtimeConfigs := []string{"api/alpha=false", "api/beta=false"}
+			var runtimeConfigs []string
 			for key, value := range tc.apis {
 				runtimeConfigs = append(runtimeConfigs, fmt.Sprintf("%s=%t", key, value))
 			}
 			apiServerFlags = append(apiServerFlags, "--runtime-config="+strings.Join(runtimeConfigs, ","))
 			server := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, apiServerFlags, etcdOptions)
 			tCtx.Cleanup(server.TearDownFn)
-
 			tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
+
 			tc.f(tCtx)
 		})
 	}
+}
+
+func startScheduler(tCtx ktesting.TContext) {
+	// Run scheduler with default configuration.
+	tCtx.Log("Scheduler starting...")
+	schedulerCtx := klog.NewContext(tCtx, klog.LoggerWithName(tCtx.Logger(), "scheduler"))
+	schedulerCtx, cancel := context.WithCancelCause(schedulerCtx)
+	_, informerFactory := util.StartScheduler(schedulerCtx, tCtx.Client(), tCtx.RESTConfig(), newDefaultSchedulerComponentConfig(tCtx), nil)
+	// Stop clients of the apiserver before stopping the apiserver itself,
+	// otherwise it delays its shutdown.
+	tCtx.Cleanup(informerFactory.Shutdown)
+	tCtx.Cleanup(func() {
+		tCtx.Log("Stoping scheduler...")
+		cancel(errors.New("test is done"))
+	})
+}
+
+func newDefaultSchedulerComponentConfig(tCtx ktesting.TContext) *config.KubeSchedulerConfiguration {
+	gvk := kubeschedulerconfigv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
+	cfg := config.KubeSchedulerConfiguration{}
+	_, _, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(nil, &gvk, &cfg)
+	tCtx.ExpectNoError(err, "decode default scheduler configuration")
+	return &cfg
 }
 
 // testPod creates a pod with a resource claim reference and then checks
@@ -219,4 +265,46 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 			tCtx.Fatal("should drop AdminAccess in ResourceClaim")
 		}
 	}
+}
+
+func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
+	tCtx.Parallel()
+	_, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create class")
+	namespace := createTestNamespace(tCtx)
+	claim := claimPrioritizedList.DeepCopy()
+	claim.Namespace = namespace
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+
+	if !enabled {
+		require.Error(tCtx, err, "claim should have become invalid after dropping FirstAvailable")
+		return
+	}
+
+	require.NotEmpty(tCtx, claim.Spec.Devices.Requests[0].FirstAvailable, "should store FirstAvailable")
+	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
+		startScheduler(tCtx)
+
+		// The fake cluster configuration is not complete enough to actually schedule pods.
+		// That is covered over in test/integration/scheduler_perf.
+		// Here we only test that we get to the point where it notices that, without failing
+		// during PreFilter because of FirstAvailable.
+		pod := podWithClaimName.DeepCopy()
+		pod.Namespace = namespace
+		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, "create pod")
+		schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
+			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				"Type":    gomega.Equal(v1.PodScheduled),
+				"Status":  gomega.Equal(v1.ConditionFalse),
+				"Reason":  gomega.Equal("Unschedulable"),
+				"Message": gomega.Equal("no nodes available to schedule pods"),
+			}),
+		))
+		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+			pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+			tCtx.ExpectNoError(err, "get pod")
+			return pod
+		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
+	})
 }

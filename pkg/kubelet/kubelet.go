@@ -42,6 +42,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
+
 	"k8s.io/client-go/informers"
 	"k8s.io/mount-utils"
 
@@ -68,6 +69,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -153,8 +155,19 @@ const (
 	// DefaultContainerLogsDir is the location of container logs.
 	DefaultContainerLogsDir = "/var/log/containers"
 
-	// MaxContainerBackOff is the max backoff period for container restarts, exported for the e2e test
-	MaxContainerBackOff = v1beta1.MaxContainerBackOff
+	// MaxCrashLoopBackOff is the max backoff period for container restarts, exported for the e2e test
+	MaxCrashLoopBackOff = v1beta1.MaxContainerBackOff
+
+	// reducedMaxCrashLoopBackOff is the default max backoff period for container restarts when the alpha feature
+	// gate ReduceDefaultCrashLoopBackOffDecay is enabled
+	reducedMaxCrashLoopBackOff = 60 * time.Second
+
+	// Initial period for the exponential backoff for container restarts.
+	initialCrashLoopBackOff = time.Second * 10
+
+	// reducedInitialCrashLoopBackOff is the default initial backoff period for container restarts when the alpha feature
+	// gate ReduceDefaultCrashLoopBackOffDecay is enabled
+	reducedInitialCrashLoopBackOff = 1 * time.Second
 
 	// MaxImageBackOff is the max backoff period for image pulls, exported for the e2e test
 	MaxImageBackOff = 300 * time.Second
@@ -203,9 +216,6 @@ const (
 	// backOffPeriod is the period to back off when pod syncing results in an
 	// error.
 	backOffPeriod = time.Second * 10
-
-	// Initial period for the exponential backoff for container restarts.
-	containerBackOffPeriod = time.Second * 10
 
 	// Initial period for the exponential backoff for image pulls.
 	imageBackOffPeriod = time.Second * 10
@@ -292,6 +302,7 @@ type Dependencies struct {
 	Options []Option
 
 	// Injected Dependencies
+	Flagz                     flagz.Reader
 	Auth                      server.AuthInterface
 	CAdvisorInterface         cadvisor.Interface
 	Cloud                     cloudprovider.Interface
@@ -318,6 +329,27 @@ type Dependencies struct {
 	NodeStartupLatencyTracker util.NodeStartupLatencyTracker
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
+}
+
+// newCrashLoopBackOff configures the backoff maximum to be used
+// by kubelet for container restarts depending on the alpha gates
+// and kubelet configuration set
+func newCrashLoopBackOff(kubeCfg *kubeletconfiginternal.KubeletConfiguration) (time.Duration, time.Duration) {
+	boMax := MaxCrashLoopBackOff
+	boInitial := initialCrashLoopBackOff
+	if utilfeature.DefaultFeatureGate.Enabled(features.ReduceDefaultCrashLoopBackOffDecay) {
+		boMax = reducedMaxCrashLoopBackOff
+		boInitial = reducedInitialCrashLoopBackOff
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
+		// operator-invoked configuration always has precedence if valid
+		boMax = kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod.Duration
+		if boMax < boInitial {
+			boInitial = boMax
+		}
+	}
+	return boMax, boInitial
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -616,6 +648,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
+		flagz:                          kubeDeps.Flagz,
 	}
 
 	if klet.cloud != nil {
@@ -714,6 +747,19 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
+	tokenManager := token.NewManager(kubeDeps.KubeClient)
+	getServiceAccount := func(namespace, name string) (*v1.ServiceAccount, error) {
+		return nil, fmt.Errorf("get service account is not implemented")
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletServiceAccountTokenForCredentialProviders) {
+		getServiceAccount = func(namespace, name string) (*v1.ServiceAccount, error) {
+			if klet.kubeClient == nil {
+				return nil, errors.New("cannot get ServiceAccounts when kubelet is in standalone mode")
+			}
+			return klet.kubeClient.CoreV1().ServiceAccounts(namespace).Get(ctx, name, metav1.GetOptions{})
+		}
+	}
+
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
@@ -741,12 +787,15 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.ContainerManager,
 		klet.containerLogManager,
 		klet.runtimeClassManager,
+		klet.allocationManager,
 		seccompDefault,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
 		kubeDeps.PodStartupLatencyTracker,
 		kubeDeps.TracerProvider,
+		tokenManager,
+		getServiceAccount,
 	)
 	if err != nil {
 		return nil, err
@@ -876,21 +925,12 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			kubeDeps.Recorder)
 	}
 
-	tokenManager := token.NewManager(kubeDeps.KubeClient)
-
-	var clusterTrustBundleManager clustertrustbundle.Manager
+	var clusterTrustBundleManager clustertrustbundle.Manager = &clustertrustbundle.NoopManager{}
 	if kubeDeps.KubeClient != nil && utilfeature.DefaultFeatureGate.Enabled(features.ClusterTrustBundleProjection) {
-		kubeInformers := informers.NewSharedInformerFactoryWithOptions(kubeDeps.KubeClient, 0)
-		clusterTrustBundleManager, err = clustertrustbundle.NewInformerManager(ctx, kubeInformers.Certificates().V1alpha1().ClusterTrustBundles(), 2*int(kubeCfg.MaxPods), 5*time.Minute)
-		if err != nil {
-			return nil, fmt.Errorf("while starting informer-based ClusterTrustBundle manager: %w", err)
-		}
-		kubeInformers.Start(wait.NeverStop)
-		klog.InfoS("Started ClusterTrustBundle informer")
+		clusterTrustBundleManager = clustertrustbundle.NewLazyInformerManager(ctx, kubeDeps.KubeClient, 2*int(kubeCfg.MaxPods))
+		klog.InfoS("ClusterTrustBundle informer will be started eventually once a trust bundle is requested")
 	} else {
-		// In static kubelet mode, use a no-op manager.
-		clusterTrustBundleManager = &clustertrustbundle.NoopManager{}
-		klog.InfoS("Not starting ClusterTrustBundle informer because we are in static kubelet mode")
+		klog.InfoS("Not starting ClusterTrustBundle informer because we are in static kubelet mode or the ClusterTrustBundleProjection featuregate is disabled")
 	}
 
 	// NewInitializedVolumePluginMgr initializes some storageErrors on the Kubelet runtimeState (in csi_plugin.go init)
@@ -929,16 +969,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.Recorder,
 		volumepathhandler.NewBlockVolumePathHandler())
 
-	boMax := MaxContainerBackOff
-	base := containerBackOffPeriod
-	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletCrashLoopBackOffMax) {
-		boMax = kubeCfg.CrashLoopBackOff.MaxContainerRestartPeriod.Duration
-		if boMax < containerBackOffPeriod {
-			base = boMax
-		}
-	}
-	klet.backOff = flowcontrol.NewBackOff(base, boMax)
-	klet.backOff.HasExpiredFunc = func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
+	boMax, base := newCrashLoopBackOff(kubeCfg)
+
+	klet.crashLoopBackOff = flowcontrol.NewBackOff(base, boMax)
+	klet.crashLoopBackOff.HasExpiredFunc = func(eventTime time.Time, lastUpdate time.Time, maxDuration time.Duration) bool {
 		return eventTime.Sub(lastUpdate) > 600*time.Second
 	}
 
@@ -1339,7 +1373,7 @@ type Kubelet struct {
 	syncLoopMonitor atomic.Value
 
 	// Container restart Backoff
-	backOff *flowcontrol.Backoff
+	crashLoopBackOff *flowcontrol.Backoff
 
 	// Information about the ports which are opened by daemons on Node running this Kubelet server.
 	daemonEndpoints *v1.NodeDaemonEndpoints
@@ -1426,6 +1460,9 @@ type Kubelet struct {
 
 	// Health check kubelet
 	healthChecker watchdog.HealthChecker
+
+	// flagz is the Reader interface to get flags for flagz page.
+	flagz flagz.Reader
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -2026,7 +2063,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// Use WithoutCancel instead of a new context.TODO() to propagate trace context
 	// Call the container runtime's SyncPod callback
 	sctx := context.WithoutCancel(ctx)
-	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff)
 	kl.reasonCache.Update(pod.UID, result)
 	if err := result.Error(); err != nil {
 		// Do not return error if the only failures were pods in backoff
@@ -2667,7 +2704,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					continue
 				}
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
-				if err := kl.allocationManager.SetPodAllocation(allocatedPod); err != nil {
+				if err := kl.allocationManager.SetAllocatedResources(allocatedPod); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 					klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 				}
@@ -2723,7 +2760,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.RemovePod(pod)
-		kl.allocationManager.DeletePodAllocation(pod.UID)
+		kl.allocationManager.RemovePod(pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
@@ -2836,7 +2873,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
-			if kl.containerManager.GetNodeConfig().MemoryManagerPolicy == "static" {
+			if kl.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
 				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 				return false, v1.PodResizeStatusInfeasible, msg
@@ -2936,8 +2973,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 
 	if !updated {
 		// Desired resources == allocated resources. Check whether a resize is in progress.
-		resizeInProgress := !allocatedResourcesMatchStatus(allocatedPod, podStatus)
-		if resizeInProgress {
+		if kl.isPodResizeInProgress(allocatedPod, podStatus) {
 			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
 			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
 		} else {
@@ -2965,30 +3001,30 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 	fit, resizeStatus, resizeMsg := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := kl.allocationManager.SetPodAllocation(pod); err != nil {
+		if err := kl.allocationManager.SetAllocatedResources(pod); err != nil {
 			return nil, err
 		}
 		for i, container := range pod.Spec.Containers {
 			if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.Containers[i].Resources) {
 				key := kuberuntime.GetStableKey(pod, &container)
-				kl.backOff.Reset(key)
+				kl.crashLoopBackOff.Reset(key)
 			}
 		}
 		for i, container := range pod.Spec.InitContainers {
 			if podutil.IsRestartableInitContainer(&container) {
 				if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.InitContainers[i].Resources) {
 					key := kuberuntime.GetStableKey(pod, &container)
-					kl.backOff.Reset(key)
+					kl.crashLoopBackOff.Reset(key)
 				}
 			}
 		}
 		allocatedPod = pod
 
-		// Special case when the updated allocation matches the actual resources. This can occur
+		// Special case when the updated allocation matches the actuated resources. This can occur
 		// when reverting a resize that hasn't been actuated, or when making an equivalent change
 		// (such as CPU requests below MinShares). This is an optimization to clear the resize
 		// status immediately, rather than waiting for the next SyncPod iteration.
-		if allocatedResourcesMatchStatus(allocatedPod, podStatus) {
+		if !kl.isPodResizeInProgress(allocatedPod, podStatus) {
 			// In this case, consider the resize complete.
 			if kl.statusManager.GetPodResizeStatus(pod.UID) == v1.PodResizeStatusInProgress {
 				msg, error := getPodResizeInfo(pod.ObjectMeta.Name)								
@@ -3012,6 +3048,46 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		}
 	}
 	return allocatedPod, nil
+}
+
+// isPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
+// for any running containers. Specifically, the following differences are ignored:
+// - Non-resizable containers: non-restartable init containers, ephemeral containers
+// - Non-resizable resources: only CPU & memory are resizable
+// - Non-actuated resources: memory requests are not actuated
+// - Non-running containers: they will be sized correctly when (re)started
+func (kl *Kubelet) isPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+	return !podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
+		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) (shouldContinue bool) {
+			if !isResizableContainer(allocatedContainer, containerType) {
+				return true
+			}
+
+			containerStatus := podStatus.FindContainerStatusByName(allocatedContainer.Name)
+			if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+				// If the container isn't running, it doesn't need to be resized.
+				return true
+			}
+
+			actuatedResources, _ := kl.allocationManager.GetActuatedResources(allocatedPod.UID, allocatedContainer.Name)
+			allocatedResources := allocatedContainer.Resources
+
+			// Memory requests are excluded since they don't need to be actuated.
+			return allocatedResources.Requests[v1.ResourceCPU].Equal(actuatedResources.Requests[v1.ResourceCPU]) &&
+				allocatedResources.Limits[v1.ResourceCPU].Equal(actuatedResources.Limits[v1.ResourceCPU]) &&
+				allocatedResources.Limits[v1.ResourceMemory].Equal(actuatedResources.Limits[v1.ResourceMemory])
+		})
+}
+
+func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
+	switch containerType {
+	case podutil.InitContainers:
+		return podutil.IsRestartableInitContainer(container)
+	case podutil.Containers:
+		return true
+	default:
+		return false
+	}
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.
@@ -3099,12 +3175,12 @@ func (kl *Kubelet) BirthCry() {
 // ListenAndServe runs the kubelet HTTP server.
 func (kl *Kubelet) ListenAndServe(kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsOptions *server.TLSOptions,
 	auth server.AuthInterface, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kubeCfg, tlsOptions, auth, tp)
+	server.ListenAndServeKubeletServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, kubeCfg, tlsOptions, auth, tp)
 }
 
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint, tp trace.TracerProvider) {
-	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), address, port, tp)
+	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, kl.containerManager.GetHealthCheckers(), kl.flagz, address, port, tp)
 }
 
 // ListenAndServePodResources runs the kubelet podresources grpc service

@@ -76,15 +76,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }))...)
 
-	// field Struct.OtherStructField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.OtherStructField")...)
-			// optional non-pointer structs are purely documentation
-			errs = append(errs, Validate_OtherStruct(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("otherStructField"), &obj.OtherStructField, safe.Field(oldObj, func(oldObj *Struct) *OtherStruct { return &oldObj.OtherStructField }))...)
-
 	// field Struct.OtherStructPtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {

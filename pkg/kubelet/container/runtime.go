@@ -152,7 +152,7 @@ type StreamingRuntime interface {
 type ImageService interface {
 	// PullImage pulls an image from the network to local storage using the supplied
 	// secrets if necessary. It returns a reference (digest or ID) to the pulled image.
-	PullImage(ctx context.Context, image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, error)
+	PullImage(ctx context.Context, image ImageSpec, pullSecrets []v1.Secret, podSandboxConfig *runtimeapi.PodSandboxConfig, serviceAccountName string) (string, error)
 	// GetImageRef gets the reference (digest or ID) of the image which has already been in
 	// the local storage. It returns ("", nil) if the image isn't in the local storage.
 	GetImageRef(ctx context.Context, image ImageSpec) (string, error)
@@ -472,6 +472,9 @@ type Mount struct {
 	Propagation runtimeapi.MountPropagation
 	// Image is set if an OCI volume as image ID or digest should get mounted (special case).
 	Image *runtimeapi.ImageSpec
+	// ImageSubPath is set if an image volume sub path should get mounted. This
+	// field is only required if the above Image is set.
+	ImageSubPath string
 }
 
 // ImageVolumes is a map of image specs by volume name.

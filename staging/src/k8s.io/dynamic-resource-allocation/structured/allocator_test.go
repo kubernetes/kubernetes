@@ -1923,7 +1923,7 @@ func TestAllocator(t *testing.T) {
 			node:    node(node1, region1),
 
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has subrequests, but the feature is disabled")),
+			expectError:   gomega.MatchError(gomega.ContainSubstring("claim claim-0, request req-0: has subrequests, but the DRAPrioritizedList feature is disabled")),
 		},
 		"prioritized-list-multi-request": {
 			prioritizedList: true,

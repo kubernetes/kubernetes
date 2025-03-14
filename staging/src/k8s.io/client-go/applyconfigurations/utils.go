@@ -624,6 +624,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscertificatesv1beta1.CertificateSigningRequestSpecApplyConfiguration{}
 	case certificatesv1beta1.SchemeGroupVersion.WithKind("CertificateSigningRequestStatus"):
 		return &applyconfigurationscertificatesv1beta1.CertificateSigningRequestStatusApplyConfiguration{}
+	case certificatesv1beta1.SchemeGroupVersion.WithKind("ClusterTrustBundle"):
+		return &applyconfigurationscertificatesv1beta1.ClusterTrustBundleApplyConfiguration{}
+	case certificatesv1beta1.SchemeGroupVersion.WithKind("ClusterTrustBundleSpec"):
+		return &applyconfigurationscertificatesv1beta1.ClusterTrustBundleSpecApplyConfiguration{}
 
 		// Group=coordination.k8s.io, Version=v1
 	case coordinationv1.SchemeGroupVersion.WithKind("Lease"):
@@ -640,6 +644,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=coordination.k8s.io, Version=v1beta1
 	case coordinationv1beta1.SchemeGroupVersion.WithKind("Lease"):
 		return &applyconfigurationscoordinationv1beta1.LeaseApplyConfiguration{}
+	case coordinationv1beta1.SchemeGroupVersion.WithKind("LeaseCandidate"):
+		return &applyconfigurationscoordinationv1beta1.LeaseCandidateApplyConfiguration{}
+	case coordinationv1beta1.SchemeGroupVersion.WithKind("LeaseCandidateSpec"):
+		return &applyconfigurationscoordinationv1beta1.LeaseCandidateSpecApplyConfiguration{}
 	case coordinationv1beta1.SchemeGroupVersion.WithKind("LeaseSpec"):
 		return &applyconfigurationscoordinationv1beta1.LeaseSpecApplyConfiguration{}
 

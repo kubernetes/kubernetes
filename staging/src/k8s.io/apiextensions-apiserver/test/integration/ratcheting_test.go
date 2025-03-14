@@ -49,6 +49,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apiserver/pkg/cel/environment"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -1769,7 +1770,8 @@ func newValidator(customResourceValidation *apiextensionsinternal.JSONSchemaProp
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
 		// TODO: replace with NewStructural(...).ToGoOpenAPI
-		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, apiservervalidation.StripUnsupportedFormatsPostProcess); err != nil {
+		formatPostProcessor := apiservervalidation.StripUnsupportedFormatsPostProcessorForVersion(environment.DefaultCompatibilityVersion())
+		if err := apiservervalidation.ConvertJSONSchemaPropsWithPostProcess(customResourceValidation, openapiSchema, formatPostProcessor); err != nil {
 			return nil, err
 		}
 	}
