@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -287,6 +288,10 @@ func TestPluginDisconnect(t *testing.T) {
 			socketPath := filepath.Join(socketDir, fmt.Sprintf("%s.sock", pluginName))
 			plugin := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
 
+			if runtime.GOOS == "windows" {
+				// Windows does not support unlinking socket files
+				test.unlinkSocket = false
+			}
 			plugin.SetUnlinkSocket(test.unlinkSocket)
 
 			// Run and register it
@@ -304,7 +309,7 @@ func TestPluginDisconnect(t *testing.T) {
 			// Stop the plugin
 			require.NoError(t, stopPlugin())
 
-			if !test.unlinkSocket {
+			if runtime.GOOS != "windows" && !test.unlinkSocket {
 				// Ensure that the stalled socket exists after stopping the plugin
 				require.FileExists(t, socketPath)
 			}
