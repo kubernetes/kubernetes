@@ -227,7 +227,11 @@ type VolumeError struct {
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,2,opt,name=message"`
 
-	// errorCode represents the numeric gRPC code for the error.
+	// errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
+	//
+	// This is an optional, alpha field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+	//
+	// +featureGate=MutableCSINodeAllocatableCount
 	// +optional
 	ErrorCode *int32 `json:"errorCode,omitempty" protobuf:"varint,3,opt,name=errorCode"`
 }
@@ -427,11 +431,11 @@ type CSIDriverSpec struct {
 	// +optional
 	SELinuxMount *bool `json:"seLinuxMount,omitempty" protobuf:"varint,8,opt,name=seLinuxMount"`
 
-	// NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
+	// nodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
 	// the CSINode allocatable capacity for this driver. When set, both periodic updates and
 	// updates triggered by capacity-related failures are enabled. If not set, no updates
 	// occur (neither periodic nor upon detecting capacity-related failures), and the
-	// Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.
+	// allocatable.count remains static. The minimum allowed value for this field is 10 seconds.
 	//
 	// This is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
 	//

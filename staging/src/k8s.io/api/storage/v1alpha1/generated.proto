@@ -266,7 +266,11 @@ message VolumeError {
   // +optional
   optional string message = 2;
 
-  // errorCode represents the numeric gRPC code for the error.
+  // errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
+  //
+  // This is an optional, alpha field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+  //
+  // +featureGate=MutableCSINodeAllocatableCount
   // +optional
   optional int32 errorCode = 3;
 }

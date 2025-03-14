@@ -215,11 +215,11 @@ message CSIDriverSpec {
   // +optional
   optional bool seLinuxMount = 8;
 
-  // NodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
+  // nodeAllocatableUpdatePeriodSeconds specifies the interval between periodic updates of
   // the CSINode allocatable capacity for this driver. When set, both periodic updates and
   // updates triggered by capacity-related failures are enabled. If not set, no updates
   // occur (neither periodic nor upon detecting capacity-related failures), and the
-  // Allocatable.Count remains static. The minimum allowed value for this field is 10 seconds.
+  // allocatable.count remains static. The minimum allowed value for this field is 10 seconds.
   //
   // This is an alpha feature and requires the MutableCSINodeAllocatableCount feature gate to be enabled.
   //
@@ -618,7 +618,11 @@ message VolumeError {
   // +optional
   optional string message = 2;
 
-  // errorCode represents the numeric gRPC code for the error.
+  // errorCode is a numeric gRPC code representing the error encountered during Attach or Detach operations.
+  //
+  // This is an optional, alpha field that requires the MutableCSINodeAllocatableCount feature gate being enabled to be set.
+  //
+  // +featureGate=MutableCSINodeAllocatableCount
   // +optional
   optional int32 errorCode = 3;
 }
