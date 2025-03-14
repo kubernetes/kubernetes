@@ -1411,7 +1411,7 @@ func TestAddContainer(t *testing.T) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
 			}
-			mgr.AddContainer(pod, container, "fakeID")
+			mgr.AddContainer(tCtx, pod, container, "fakeID")
 			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 			if !reflect.DeepEqual(err, testCase.expectedAddContainerError) {
 				t.Errorf("Memory Manager AddContainer() error (%v), expected error: %v, but got: %v",
@@ -2359,12 +2359,12 @@ func TestAllocateAndAddPodWithInitContainers(t *testing.T) {
 
 			// Calls AddContainer for init containers
 			for i, initContainer := range testCase.podAllocate.Spec.InitContainers {
-				mgr.AddContainer(testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
+				mgr.AddContainer(tCtx, testCase.podAllocate, &testCase.podAllocate.Spec.InitContainers[i], initContainer.Name)
 			}
 
 			// Calls AddContainer for apps containers
 			for i, appContainer := range testCase.podAllocate.Spec.Containers {
-				mgr.AddContainer(testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
+				mgr.AddContainer(tCtx, testCase.podAllocate, &testCase.podAllocate.Spec.Containers[i], appContainer.Name)
 			}
 
 			assignments := mgr.state.GetMemoryAssignments()
