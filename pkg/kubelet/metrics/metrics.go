@@ -150,6 +150,7 @@ const (
 
 	AlignedPhysicalCPU = "physical_cpu"
 	AlignedNUMANode    = "numa_node"
+	AlignedUncoreCache = "uncore_cache"
 
 	// Metrics to track kubelet admission rejections.
 	AdmissionRejectionsTotalKey = "admission_rejections_total"
