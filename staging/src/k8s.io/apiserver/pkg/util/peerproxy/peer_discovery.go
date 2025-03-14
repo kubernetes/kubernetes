@@ -17,11 +17,13 @@ limitations under the License.
 package peerproxy
 
 import (
+	"context"
 	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/discovery"
 	"k8s.io/klog/v2"
@@ -29,132 +31,102 @@ import (
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	v1 "k8s.io/api/coordination/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	responsewriterutil "k8s.io/apiserver/pkg/util/responsewriter"
 )
 
-func (h *peerProxyHandler) addPeerDiscoveryInfo(obj interface{}, identityLeaseLabelSelector string) {
-	serverIdentityLease, ok := isValidIdentityLease(obj, identityLeaseLabelSelector)
-	if !ok {
-		klog.ErrorS(fmt.Errorf("serverIdentityLease invalid"), "error adding peer served resources")
-		return
-	}
+const (
+	controllerName = "peer-discovery-cache-sync"
+	maxRetries     = 5
+)
 
-	err := h.addPeerDiscoveryInfoToCache(serverIdentityLease)
+func (h *peerProxyHandler) RunPeerDiscoveryCacheSync(ctx context.Context, workers int) {
+	defer utilruntime.HandleCrash()
+	defer h.peerLeaseQueue.ShutDown()
+	defer func() {
+		err := h.apiserverIdentityInformer.Informer().RemoveEventHandler(h.leaseRegistration)
+		if err != nil {
+			klog.Warning("error removing leaseInformer eventhandler")
+		}
+	}()
+
+	klog.Infof("Workers: %d", workers)
+	for i := 0; i < workers; i++ {
+		klog.Infof("Starting worker")
+		go wait.UntilWithContext(ctx, h.runWorker, time.Second)
+	}
+	<-ctx.Done()
+}
+
+func (h *peerProxyHandler) enqueueLease(lease *v1.Lease) {
+	h.peerLeaseQueue.Add(lease.Name)
+}
+
+func (h *peerProxyHandler) runWorker(ctx context.Context) {
+	for h.processNextElectionItem(ctx) {
+	}
+}
+
+func (h *peerProxyHandler) processNextElectionItem(ctx context.Context) bool {
+	key, shutdown := h.peerLeaseQueue.Get()
+	if shutdown {
+		return false
+	}
+	defer h.peerLeaseQueue.Done(key)
+
+	err := h.syncPeerDiscoveryCache(ctx)
+	h.handleErr(err, key)
+	return true
+}
+
+func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
+	// Rebuild the peer discovery cache from available leases.
+	leases, err := h.apiserverIdentityInformer.Lister().List(h.identityLeaseLabelSelector)
 	if err != nil {
-		klog.ErrorS(err, "error adding peer served resources", "serverID", serverIdentityLease.Name)
-	}
-}
-
-func (h *peerProxyHandler) deletePeerDiscoveryInfo(obj interface{}, identityLeaseLabelSelector string) {
-	serverIdentityLease, ok := isValidIdentityLease(obj, identityLeaseLabelSelector)
-	if !ok {
-		klog.ErrorS(fmt.Errorf("serverIdentityLease invalid"), "error deleting peer served resources")
-		return
+		utilruntime.HandleError(err)
+		return err
 	}
 
-	h.withPeerAggDiscoveryCacheLock(func(cache map[string]*peerAggDiscoveryInfo) {
-		delete(cache, serverIdentityLease.Name)
-	})
-}
-
-func (h *peerProxyHandler) updatePeerDiscoveryInfo(oldObj, newObj interface{}, identityLeaseLabelSelector string) {
-	oldLease, oldLeaseOk := isValidIdentityLease(oldObj, identityLeaseLabelSelector)
-	newLease, newLeaseOk := isValidIdentityLease(newObj, identityLeaseLabelSelector)
-
-	switch {
-	case !oldLeaseOk && !newLeaseOk:
-		return
-	case !oldLeaseOk && newLeaseOk:
-		if err := h.addPeerDiscoveryInfoToCache(newLease); err != nil {
-			klog.ErrorS(err, "error adding peer to discovery cache", "serverID", newLease.Name)
+	newCache := map[string]*peerDiscoveryInfo{}
+	for _, l := range leases {
+		_, ok := h.isValidPeerIdentityLease(l)
+		if !ok {
+			continue
 		}
-	case oldLeaseOk && !newLeaseOk:
-		h.withPeerAggDiscoveryCacheLock(func(cache map[string]*peerAggDiscoveryInfo) {
-			delete(cache, oldLease.Name)
-		})
-	case oldLeaseOk && newLeaseOk:
-		// Delete old discovery info if holderIdentity changed, implying
-		// the server was restarted.
-		if oldLease.Name == newLease.Name && *oldLease.Spec.HolderIdentity != *newLease.Spec.HolderIdentity {
-			h.withPeerAggDiscoveryCacheLock(func(cache map[string]*peerAggDiscoveryInfo) {
-				delete(cache, oldLease.Name)
-			})
+
+		discoveryInfo, err := h.fetchNewDiscoveryFor(ctx, l.Name, *l.Spec.HolderIdentity)
+		if err != nil {
+			return err
 		}
-		if err := h.addPeerDiscoveryInfoToCache(newLease); err != nil {
-			klog.ErrorS(err, "error adding peer to discovery cache", "serverID", newLease.Name)
+
+		if discoveryInfo != nil {
+			newCache[l.Name] = discoveryInfo
 		}
 	}
-}
 
-func (h *peerProxyHandler) addPeerDiscoveryInfoToCache(serverIdentityLease *v1.Lease) error {
-	// Don't record our own discovery info.
-	if serverIdentityLease.Name == h.serverId {
-		return nil
-	}
-
-	var peerDiscoveryInfo *peerAggDiscoveryInfo
-	var ok bool
-	h.withPeerAggDiscoveryCacheRLock(func(cache map[string]*peerAggDiscoveryInfo) {
-		peerDiscoveryInfo, ok = cache[serverIdentityLease.Name]
-	})
-
-	if !ok ||
-		len(peerDiscoveryInfo.servedResources) == 0 ||
-		peerDiscoveryInfo.holderIdentity != *serverIdentityLease.Spec.HolderIdentity {
-		return h.fetchNewDiscoveryFor(serverIdentityLease.Name, *serverIdentityLease.Spec.HolderIdentity)
-	}
-
+	// Overwrite cache with new contents.
+	h.peerDiscoveryInfoCache.Store(newCache)
 	return nil
 }
 
-func isValidIdentityLease(obj interface{}, identityLeaseLabelSelector string) (*v1.Lease, bool) {
-	lease, ok := obj.(*v1.Lease)
-	if !ok {
-		klog.Error(fmt.Errorf("invalid lease object provided, received type: %T", obj))
-		return nil, false
-	}
-
-	if lease == nil {
-		klog.Error(fmt.Errorf("nil lease object provided"))
-		return nil, false
-	}
-
-	labelselector := strings.Split(identityLeaseLabelSelector, "=")
-	identityLeaseComponentLabelKey := labelselector[0]
-	identityLeaseComponentLabelValue := labelselector[1]
-	if lease.Labels == nil ||
-		lease.Labels[identityLeaseComponentLabelKey] != identityLeaseComponentLabelValue {
-		klog.Error(fmt.Errorf("invalid lease object provided, must be an apiserver identity lease"))
-		return nil, false
-	}
-
-	if lease.Spec.HolderIdentity == nil {
-		klog.Error(fmt.Errorf("invalid lease object provided, missing holderIdentity in lease obj"))
-		return nil, false
-	}
-
-	return lease, true
-}
-
-func (h *peerProxyHandler) fetchNewDiscoveryFor(serverID string, holderIdentity string) error {
-	peerDiscoveryInfo := &peerAggDiscoveryInfo{
+func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string, holderIdentity string) (*peerDiscoveryInfo, error) {
+	pdi := &peerDiscoveryInfo{
 		holderIdentity:  holderIdentity,
 		servedResources: make(map[schema.GroupVersion][]string),
 	}
 
 	hostport, err := h.hostportInfo(serverID)
 	if err != nil {
-		return fmt.Errorf("failed to get host port info from identity lease for server %s: %w", serverID, err)
+		return nil, fmt.Errorf("failed to get host port info from identity lease for server %s: %w", serverID, err)
 	}
 
-	klog.V(4).Infof("Proxying an agg-discovery call from %s to %s", h.serverId, serverID)
+	klog.V(4).Infof("Proxying an agg-discovery call from %s to %s", h.serverID, serverID)
 	discoveryPaths := []string{"/api", "/apis"}
 	for _, path := range discoveryPaths {
-		discoveryResponse, err := h.aggregateDiscovery(path, hostport)
+		discoveryResponse, err := h.aggregateDiscovery(ctx, path, hostport)
 		if err != nil {
-			klog.ErrorS(err, "error querying discovery endpoint", "path", path, "serverID", serverID)
-			continue
+			return nil, fmt.Errorf("error querying discovery endpoint for serverID: %s, err: %w", serverID, err)
 		}
 
 		for _, groupDiscovery := range discoveryResponse.Items {
@@ -169,19 +141,16 @@ func (h *peerProxyHandler) fetchNewDiscoveryFor(serverID string, holderIdentity 
 				for _, resource := range version.Resources {
 					resources = append(resources, resource.Resource)
 				}
-				peerDiscoveryInfo.servedResources[gv] = resources
+				pdi.servedResources[gv] = resources
 			}
 		}
 	}
 
-	klog.V(4).Infof("Agg discovery done successfully by %s for %s", h.serverId, serverID)
-	h.withPeerAggDiscoveryCacheLock(func(cache map[string]*peerAggDiscoveryInfo) {
-		cache[serverID] = peerDiscoveryInfo
-	})
-	return nil
+	klog.V(4).Infof("Agg discovery done successfully by %s for %s", h.serverID, serverID)
+	return pdi, nil
 }
 
-func (h *peerProxyHandler) aggregateDiscovery(path string, hostport string) (*apidiscoveryv2.APIGroupDiscoveryList, error) {
+func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, hostport string) (*apidiscoveryv2.APIGroupDiscoveryList, error) {
 	req, err := http.NewRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return nil, err
@@ -193,7 +162,7 @@ func (h *peerProxyHandler) aggregateDiscovery(path string, hostport string) (*ap
 		Groups: []string{user.AllAuthenticated},
 	}
 
-	ctx := apirequest.WithUser(req.Context(), apiServerUser)
+	ctx = apirequest.WithUser(ctx, apiServerUser)
 	req = req.WithContext(ctx)
 
 	req.Header.Add("Accept", discovery.AcceptV2)
@@ -212,14 +181,20 @@ func (h *peerProxyHandler) aggregateDiscovery(path string, hostport string) (*ap
 	return parsed, nil
 }
 
-func (h *peerProxyHandler) withPeerAggDiscoveryCacheLock(f func(cache map[string]*peerAggDiscoveryInfo)) {
-	h.peerAggDiscoveryCacheLock.Lock()
-	defer h.peerAggDiscoveryCacheLock.Unlock()
-	f(h.peerAggDiscoveryResponseCache)
-}
+// handleErr checks if an error happened and makes sure we will retry later.
+func (h *peerProxyHandler) handleErr(err error, key string) {
+	if err == nil {
+		h.peerLeaseQueue.Forget(key)
+		return
+	}
 
-func (h *peerProxyHandler) withPeerAggDiscoveryCacheRLock(f func(cache map[string]*peerAggDiscoveryInfo)) {
-	h.peerAggDiscoveryCacheLock.RLock()
-	defer h.peerAggDiscoveryCacheLock.RUnlock()
-	f(h.peerAggDiscoveryResponseCache)
+	if h.peerLeaseQueue.NumRequeues(key) < maxRetries {
+		klog.Infof("Error syncing discovery for peer lease %v: %v", key, err)
+		h.peerLeaseQueue.AddRateLimited(key)
+		return
+	}
+
+	h.peerLeaseQueue.Forget(key)
+	utilruntime.HandleError(err)
+	klog.Infof("Dropping lease %s out of the queue: %v", key, err)
 }

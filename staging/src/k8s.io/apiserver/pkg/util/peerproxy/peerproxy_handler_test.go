@@ -77,8 +77,8 @@ func TestPeerProxy(t *testing.T) {
 		requestPath          string
 		peerproxiedHeader    string
 		reconcilerConfig     reconciler
-		localCache           map[schema.GroupVersion][]string
-		peerCache            map[string]*peerAggDiscoveryInfo
+		localCache           map[schema.GroupVersionResource]bool
+		peerCache            map[string]*peerDiscoveryInfo
 		wantStatus           int
 		wantMetricsData      string
 	}{
@@ -102,8 +102,8 @@ func TestPeerProxy(t *testing.T) {
 		{
 			desc:        "Serve locally if serviceable",
 			requestPath: "/api/foo/bar",
-			localCache: map[schema.GroupVersion][]string{
-				{Group: "core", Version: "foo"}: {"bar"},
+			localCache: map[schema.GroupVersionResource]bool{
+				{Group: "core", Version: "foo", Resource: "bar"}: true,
 			},
 			wantStatus: http.StatusOK,
 		},
@@ -117,7 +117,7 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if no endpoint fetched from lease",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]*peerAggDiscoveryInfo{
+			peerCache: map[string]*peerDiscoveryInfo{
 				remoteServerID1: {
 					holderIdentity: testHolderIdentity,
 					servedResources: map[schema.GroupVersion][]string{
@@ -131,7 +131,7 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 unreachable peer bind address",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]*peerAggDiscoveryInfo{
+			peerCache: map[string]*peerDiscoveryInfo{
 				remoteServerID1: {
 					holderIdentity: testHolderIdentity,
 					servedResources: map[schema.GroupVersion][]string{
@@ -159,7 +159,7 @@ func TestPeerProxy(t *testing.T) {
 			desc:                 "503 if one apiserver's endpoint lease wasnt found but another valid (unreachable) apiserver was found",
 			requestPath:          "/api/foo/bar",
 			informerFinishedSync: true,
-			peerCache: map[string]*peerAggDiscoveryInfo{
+			peerCache: map[string]*peerDiscoveryInfo{
 				remoteServerID1: {
 					holderIdentity: testHolderIdentity,
 					servedResources: map[schema.GroupVersion][]string{
@@ -265,7 +265,7 @@ func newFakePeerEndpointReconciler(t *testing.T) reconcilers.PeerEndpointLeaseRe
 
 func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handler,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	localCache map[schema.GroupVersion][]string, peerCache map[string]*peerAggDiscoveryInfo) http.Handler {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]*peerDiscoveryInfo) http.Handler {
 	// Add peerproxy handler
 	s := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
 	peerProxyHandler, err := newFakePeerProxyHandler(informerFinishedSync, reconciler, localServerID, s, localCache, peerCache)
@@ -286,9 +286,10 @@ func newHandlerChain(t *testing.T, informerFinishedSync bool, handler http.Handl
 
 func newFakePeerProxyHandler(informerFinishedSync bool,
 	reconciler reconcilers.PeerEndpointLeaseReconciler, id string, s runtime.NegotiatedSerializer,
-	localCache map[schema.GroupVersion][]string, peerCache map[string]*peerAggDiscoveryInfo) (*peerProxyHandler, error) {
+	localCache map[schema.GroupVersionResource]bool, peerCache map[string]*peerDiscoveryInfo) (*peerProxyHandler, error) {
 	clientset := fake.NewSimpleClientset()
 	informerFactory := informers.NewSharedInformerFactory(clientset, 0)
+	leaseInformer := informerFactory.Coordination().V1().Leases()
 	clientConfig := &transport.Config{
 		TLS: transport.TLSConfig{
 			Insecure: false,
@@ -296,12 +297,12 @@ func newFakePeerProxyHandler(informerFinishedSync bool,
 	loopbackClientConfig := &rest.Config{
 		Host: "localhost:1010",
 	}
-	ppH, err := NewPeerProxyHandler("identity=testserver", informerFactory, id, reconciler, s, loopbackClientConfig, clientConfig)
+	ppH, err := NewPeerProxyHandler(id, "identity=testserver", leaseInformer, reconciler, s, loopbackClientConfig, clientConfig)
 	if err != nil {
 		return nil, err
 	}
-	ppH.localDiscoveryResponseCache = localCache
-	ppH.peerAggDiscoveryResponseCache = peerCache
+	ppH.localDiscoveryInfoCache.Store(localCache)
+	ppH.peerDiscoveryInfoCache.Store(peerCache)
 
 	ppH.finishedSync.Store(informerFinishedSync)
 	return ppH, nil

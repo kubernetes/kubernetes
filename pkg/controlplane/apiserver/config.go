@@ -314,8 +314,17 @@ func CreateConfig(
 			return nil, nil, err
 		}
 		if opts.PeerCAFile != "" {
-			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.LoopbackClientConfig, opts.ProxyClientCertFile,
-				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.Generic.Serializer)
+			leaseInformer := versionedInformers.Coordination().V1().Leases()
+			config.PeerProxy, err = BuildPeerProxy(
+				IdentityLeaseComponentLabelKey+"="+KubeAPIServer,
+				leaseInformer,
+				genericConfig.LoopbackClientConfig,
+				opts.ProxyClientCertFile,
+				opts.ProxyClientKeyFile, opts.PeerCAFile,
+				opts.PeerAdvertiseAddress,
+				genericConfig.APIServerID,
+				config.Extra.PeerEndpointLeaseReconciler,
+				config.Generic.Serializer)
 			if err != nil {
 				return nil, nil, err
 			}

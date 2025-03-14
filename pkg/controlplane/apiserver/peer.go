@@ -24,12 +24,13 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/reconcilers"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
+
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
-	clientgoinformers "k8s.io/client-go/informers"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/transport"
+	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
@@ -42,9 +43,16 @@ const (
 	DefaultPeerEndpointReconcilerTTL = 15 * time.Second
 )
 
-func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, loopbackClientConfig *rest.Config,
-	proxyClientCertFile string, proxyClientKeyFile string, peerCAFile string, peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
-	apiServerID string, reconciler reconcilers.PeerEndpointLeaseReconciler, serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
+func BuildPeerProxy(identityLeaseLabelSelector string,
+	leaseInformer coordinationv1informers.LeaseInformer,
+	loopbackClientConfig *rest.Config,
+	proxyClientCertFile string,
+	proxyClientKeyFile string,
+	peerCAFile string,
+	peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
+	apiServerID string,
+	reconciler reconcilers.PeerEndpointLeaseReconciler,
+	serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
 	if proxyClientCertFile == "" {
 		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
 	}
@@ -62,9 +70,9 @@ func BuildPeerProxy(versionedInformer clientgoinformers.SharedInformerFactory, l
 		}}
 
 	return utilpeerproxy.NewPeerProxyHandler(
-		IdentityLeaseComponentLabelKey+"="+KubeAPIServer,
-		versionedInformer,
 		apiServerID,
+		IdentityLeaseComponentLabelKey+"="+KubeAPIServer,
+		leaseInformer,
 		reconciler,
 		serializer,
 		loopbackClientConfig,
