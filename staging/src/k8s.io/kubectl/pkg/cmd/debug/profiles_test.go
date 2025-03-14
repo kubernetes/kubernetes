@@ -1293,3 +1293,77 @@ func TestSysAdminProfile(t *testing.T) {
 		})
 	}
 }
+
+
+func TestWindowsProfile(t *testing.T) {
+
+	tests := map[string]struct {
+		pod           *corev1.Pod
+		containerName string
+		target        runtime.Object
+		expectPod     *corev1.Pod
+		expectErr     bool
+	}{
+		"bad inputs results in error": {
+			pod:           nil,
+			containerName: "dbg",
+			target:        runtime.Object(nil),
+			expectErr:     true,
+		},
+		"debug by node": {
+			pod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								WindowsOptions: &corev1.WindowsSecurityContextOptions{
+									HostProcess:    ptr.To(true),
+									RunAsUserName:  ptr.To("NT AUTHORITY\\SYSTEM"),
+								},
+							},
+						},
+					},
+				},
+			},
+			containerName: "dbg",
+			target:        testNode,
+			expectPod: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Spec: corev1.PodSpec{
+					HostNetwork: true,
+					Containers: []corev1.Container{
+						{
+							Name:  "dbg",
+							Image: "dbgimage",
+							SecurityContext: &corev1.SecurityContext{
+								WindowsOptions: &corev1.WindowsSecurityContextOptions{
+									HostProcess:    ptr.To(true),
+									RunAsUserName:  ptr.To("NT AUTHORITY\\SYSTEM"),
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			applier := &windowsProfile{KeepFlags{InitContainers: true}}
+			err := applier.Apply(test.pod, test.containerName, test.target)
+			if (err != nil) != test.expectErr {
+				t.Fatalf("expect error: %v, got error: %v", test.expectErr, (err != nil))
+			}
+			if err != nil {
+				return
+			}
+			if diff := cmp.Diff(test.expectPod, test.pod); diff != "" {
+				t.Error("unexpected diff in generated object: (-want +got):\n", diff)
+			}
+		})
+	}
+}	

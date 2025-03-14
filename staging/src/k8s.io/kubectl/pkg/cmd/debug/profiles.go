@@ -56,6 +56,8 @@ const (
 	ProfileNetadmin = "netadmin"
 	// ProfileSysadmin offers elevated privileges for debugging.
 	ProfileSysadmin = "sysadmin"
+	// ProfileWindows offers elevated privileges for debugging.
+	ProfileWindows = "windows"
 )
 
 type ProfileApplier interface {
@@ -78,6 +80,8 @@ func NewProfileApplier(profile string, kflags KeepFlags) (ProfileApplier, error)
 		return &netadminProfile{kflags}, nil
 	case ProfileSysadmin:
 		return &sysadminProfile{kflags}, nil
+	case ProfileWindows:
+		return &windowsProfile{kflags}, nil
 	}
 	return nil, fmt.Errorf("unknown profile: %s", profile)
 }
@@ -103,6 +107,10 @@ type netadminProfile struct {
 }
 
 type sysadminProfile struct {
+	KeepFlags
+}
+
+type windowsProfile struct {
 	KeepFlags
 }
 
@@ -320,6 +328,38 @@ func (p *sysadminProfile) Apply(pod *corev1.Pod, containerName string, target ru
 	return nil
 }
 
+func (p *windowsProfile) Apply(pod *corev1.Pod, containerName string, target runtime.Object) error {
+	style, err := getDebugStyle(pod, target)
+	if err != nil {
+		return fmt.Errorf("windows profile: %w", err)
+	}
+	
+	switch style {
+	// Windows for now only supports node debugging via kubectl debug node command
+	case node:
+		// make sure the node is windows
+		node := target.(*corev1.Node)
+		if node.Labels["kubernetes.io/os"] != "windows" {
+			return fmt.Errorf("windows profile: target node is not a Windows node")
+		}
+		// set the container to run as SYSTEM
+		clearSecurityContext(pod, containerName)
+		setPrivilegedWindowsOnOS(pod, containerName)
+		pod.Spec.HostNetwork = true
+
+	case podCopy:
+		// Not supported in windows
+		return fmt.Errorf("Pod debugging is not supported for Windows")
+
+	case ephemeral:
+		// Not supported in windows
+		return fmt.Errorf("ephemeral debugging is not supported for Windows")
+	}
+
+	return nil
+}
+
+
 // mountRootPartition mounts the host's root path at "/host" in the container.
 func mountRootPartition(p *corev1.Pod, containerName string) {
 	const volumeName = "host-root"
@@ -378,6 +418,24 @@ func setPrivileged(p *corev1.Pod, containerName string) {
 			c.SecurityContext = &corev1.SecurityContext{}
 		}
 		c.SecurityContext.Privileged = ptr.To(true)
+		return false
+	})
+}
+
+// setPrivilegedWindowsOS configures the Windows containers as Host Process Container on Windows Server.
+func setPrivilegedWindowsOnOS(p *corev1.Pod, containerName string) {
+	podutils.VisitContainers(&p.Spec, podutils.AllContainers, func(c *corev1.Container, _ podutils.ContainerType) bool {
+		if c.Name != containerName {
+			return true
+		}
+		if c.SecurityContext == nil {
+			c.SecurityContext = &corev1.SecurityContext{}
+		}
+		if c.SecurityContext.WindowsOptions == nil {
+			c.SecurityContext.WindowsOptions = &corev1.WindowsSecurityContextOptions{}
+		}
+		c.SecurityContext.WindowsOptions.HostProcess = ptr.To(true)
+		c.SecurityContext.WindowsOptions.RunAsUserName = ptr.To("NT AUTHORITY\\SYSTEM")
 		return false
 	})
 }
