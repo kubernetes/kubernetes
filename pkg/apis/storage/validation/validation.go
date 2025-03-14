@@ -240,7 +240,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxAttachedVolumeMetadataSize))
 	}
 
-	if e.ErrorCode != nil && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+	if e.ErrorCode != nil {
 		value := *e.ErrorCode
 		if value < 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("errorCode"), value, validation.InclusiveRangeError(0, math.MaxInt32)))
@@ -462,7 +462,7 @@ func validateCSIDriverSpec(
 // validateNodeAllocatableUpdatePeriodSeconds tests if NodeAllocatableUpdatePeriodSeconds is valid for CSIDriver.
 func validateNodeAllocatableUpdatePeriodSeconds(period *int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if period != nil && *period < 10 && utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+	if period != nil && *period < 10 {
 		allErrs = append(allErrs, field.Invalid(fldPath, *period, "must be greater than or equal to 10 seconds"))
 	}
 	return allErrs

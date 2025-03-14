@@ -23,9 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/apis/storage/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -139,4 +141,13 @@ func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 	newVolumeAttachment.Spec = oldVolumeAttachment.Spec
 	metav1.ResetObjectMetaForStatus(&newVolumeAttachment.ObjectMeta, &oldVolumeAttachment.ObjectMeta)
+
+	if !feature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		if newVolumeAttachment.Status.AttachError != nil {
+			newVolumeAttachment.Status.AttachError.ErrorCode = nil
+		}
+		if newVolumeAttachment.Status.DetachError != nil {
+			newVolumeAttachment.Status.DetachError.ErrorCode = nil
+		}
+	}
 }
