@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -127,7 +128,9 @@ func (e *examplePlugin) Serve(services ...string) error {
 		return err
 	}
 
-	lis.(*net.UnixListener).SetUnlinkOnClose(e.unlinkSocket)
+	if runtime.GOOS != "windows" {
+		lis.(*net.UnixListener).SetUnlinkOnClose(e.unlinkSocket)
+	}
 
 	klog.InfoS("Example server started", "endpoint", e.endpoint)
 	e.grpcServer = grpc.NewServer()
@@ -178,7 +181,7 @@ func (e *examplePlugin) Stop() error {
 		return errors.New("timed out on waiting for stop completion")
 	}
 
-	if e.unlinkSocket {
+	if runtime.GOOS != "windows" && e.unlinkSocket {
 		// NOTE: Unix socket gets unlinked by the net.UnixListener.close()
 		// so this is not necessary, but we do it anyway to be explicit.
 		if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {
