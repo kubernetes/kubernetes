@@ -118,7 +118,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 }
 
 // NewContainerManager creates windows container manager.
-func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
+func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, recorder record.EventRecorder, kubeClient clientset.Interface) (ContainerManager, error) {
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -136,7 +136,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 
 	cm.topologyManager = topologymanager.NewFakeManager()
 	cm.cpuManager = cpumanager.NewFakeManager()
-	cm.memoryManager = memorymanager.NewFakeManager(ctx)
+	cm.memoryManager = memorymanager.NewFakeManager(context.TODO())
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		klog.InfoS("Creating topology manager")
@@ -168,7 +168,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 
 		klog.InfoS("Creating memory manager")
 		cm.memoryManager, err = memorymanager.NewManager(
-			ctx,
+			context.TODO(),
 			nodeConfig.MemoryManagerPolicy,
 			machineInfo,
 			cm.GetNodeAllocatableReservation(),
