@@ -471,7 +471,9 @@ func TestRolloutHistoryErrors(t *testing.T) {
 			o.PrintFlags = printFlags
 			o.Revision = tc.revision
 
-			o.Complete(tf, nil, []string{"deployment/foo"})
+			if err := o.Complete(tf, nil, []string{"deployment/foo"}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 
 			err := o.Run()
 			if err != nil && err.Error() != tc.expectedError {
