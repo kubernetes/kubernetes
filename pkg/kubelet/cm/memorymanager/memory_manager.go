@@ -57,7 +57,7 @@ func (s *sourcesReadyStub) AllReady() bool          { return true }
 // Manager interface provides methods for Kubelet to manage pod memory.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the memory allocation during the container removal
@@ -69,7 +69,7 @@ type Manager interface {
 
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, any memory allocated to the container is freed.
-	RemoveContainer(containerID string) error
+	RemoveContainer(ctx context.Context, containerID string) error
 
 	// State returns a read-only interface to the internal memory manager state.
 	State() state.Reader
@@ -85,7 +85,7 @@ type Manager interface {
 	GetPodTopologyHints(*v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
-	GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int]
+	GetMemoryNUMANodes(ctx context.Context, pod *v1.Pod, container *v1.Container) sets.Set[int]
 
 	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
 	GetAllocatableMemory() []state.Block
@@ -182,8 +182,7 @@ func NewManager(ctx context.Context, policyName string, machineInfo *cadvisorapi
 }
 
 // Start starts the memory manager under the kubelet and calls policy start
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	ctx := context.TODO()
+func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting memorymanager", "policy", m.policy.Name())
 	m.sourcesReady = sourcesReady
@@ -240,8 +239,8 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 }
 
 // GetMemoryNUMANodes provides NUMA nodes that used to allocate the container memory
-func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int] {
-	logger := klog.LoggerWithValues(klog.TODO(), "pod", klog.KObj(pod), "containerName", container.Name)
+func (m *manager) GetMemoryNUMANodes(ctx context.Context, pod *v1.Pod, container *v1.Container) sets.Set[int] {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "pod", klog.KObj(pod), "containerName", container.Name)
 
 	// Get NUMA node affinity of blocks assigned to the container during Allocate()
 	numaNodes := sets.New[int]()
@@ -281,8 +280,8 @@ func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 }
 
 // RemoveContainer removes the container from the state
-func (m *manager) RemoveContainer(containerID string) error {
-	logger := klog.LoggerWithValues(klog.TODO(), "containerID", containerID)
+func (m *manager) RemoveContainer(ctx context.Context, containerID string) error {
+	logger := klog.LoggerWithValues(klog.FromContext(ctx), "containerID", containerID)
 
 	m.Lock()
 	defer m.Unlock()

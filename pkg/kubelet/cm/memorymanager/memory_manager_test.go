@@ -1879,7 +1879,7 @@ func TestRemoveContainer(t *testing.T) {
 			mgr.state.SetMemoryAssignments(testCase.assignments)
 			mgr.state.SetMachineState(testCase.machineState)
 
-			err := mgr.RemoveContainer(testCase.removeContainerID)
+			err := mgr.RemoveContainer(tCtx, testCase.removeContainerID)
 			if !reflect.DeepEqual(err, testCase.expectedError) {
 				t.Errorf("Memory Manager RemoveContainer() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedError, err)
