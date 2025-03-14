@@ -226,6 +226,11 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 					t.Fatalf("Creating node error: %v", err)
 				}
 
+				// Ensure node is present in scheduler cache.
+				if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 1); err != nil {
+					t.Fatalf("Waiting for node in cache error: %v", err)
+				}
+
 				// Create initial low-priority pod and wait until it's scheduled.
 				pod, err := testutils.CreatePausePod(testCtx.ClientSet, podLow)
 				if err != nil {
