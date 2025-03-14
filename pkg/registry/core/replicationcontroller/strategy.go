@@ -130,7 +130,8 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	allErrs := corevalidation.ValidateReplicationController(controller, opts)
 
 	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+	// FIXME: isSpecRequest(ctx) limits Declarative validation to the spec until subresource support is introduced.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
@@ -175,7 +176,6 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	newRc := obj.(*api.ReplicationController)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(newRc.Spec.Template, oldRc.Spec.Template)
-	// FIXME: Calling both validator functions here results in redundant calls to ValidateReplicationControllerSpec.
 	// This should be fixed to avoid the redundant calls, but carefully.
 	validationErrorList := corevalidation.ValidateReplicationController(newRc, opts)
 	updateErrorList := corevalidation.ValidateReplicationControllerUpdate(newRc, oldRc, opts)
@@ -199,7 +199,8 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	}
 
 	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
+	// FIXME: This limits Declarative validation to the spec until subresource support is introduced.
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
@@ -216,6 +217,13 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	}
 
 	return errs
+}
+
+func isSpecRequest(ctx context.Context) bool {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return len(requestInfo.Subresource) == 0
+	}
+	return false
 }
 
 // WarningsOnUpdate returns warnings for the given update.
