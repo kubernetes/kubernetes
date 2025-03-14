@@ -131,6 +131,11 @@ func (kl *Kubelet) getKubeletMappings() (uint32, uint32, error) {
 		return defaultFirstID, defaultLen, nil
 	}
 
+	// Windows doesn't support user namespaces, let's return the default mappings.
+	if runtime.GOOS == "windows" {
+		return defaultFirstID, defaultLen, nil
+	}
+
 	_, err := user.Lookup(kubeletUser)
 	if err != nil {
 		var unknownUserErr user.UnknownUserError
