@@ -59,6 +59,10 @@ type KernelCompatTester interface {
 	IsCompatible() error
 }
 
+type HostMacProvider interface {
+	GetHostMac(nodeIP net.IP) string
+}
+
 // CanUseWinKernelProxier returns true if we should use the Kernel Proxier
 // instead of the "classic" userspace Proxier.  This is determined by checking
 // the windows kernel version and for the existence of kernel features.
@@ -723,6 +727,41 @@ func NewProxier(
 	}
 
 	hcnImpl := newHcnImpl()
+	proxier, err := newProxierInternal(
+		ipFamily,
+		hostname,
+		nodeIP,
+		serviceHealthServer,
+		healthzServer,
+		healthzPort,
+		hcnImpl,
+		&localHostMacProvider{},
+		config,
+		true, // waitForHNSOverlay
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	burstSyncs := 2
+	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
+	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
+	return proxier, nil
+}
+
+// allow internal testing of proxier
+func newProxierInternal(
+	ipFamily v1.IPFamily,
+	hostname string,
+	nodeIP net.IP,
+	serviceHealthServer healthcheck.ServiceHealthServer,
+	healthzServer *healthcheck.ProxyHealthServer,
+	healthzPort int,
+	hcnImpl HcnService,
+	hostMacProvider HostMacProvider,
+	config config.KubeProxyWinkernelConfiguration,
+	waitForHNSOverlay bool,
+) (*Proxier, error) {
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
 	hnsNetworkName, err := getNetworkName(config.NetworkName)
 	if err != nil {
@@ -741,7 +780,10 @@ func NewProxier(
 	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
 	// Sleep and update the network to include new information
 	if isOverlay(hnsNetworkInfo) {
-		time.Sleep(10 * time.Second)
+		if waitForHNSOverlay {
+			time.Sleep(10 * time.Second)
+		}
+
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
 			return nil, fmt.Errorf("could not find HNS network %s", hnsNetworkName)
@@ -765,7 +807,7 @@ func NewProxier(
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
-		err = hcn.RemoteSubnetSupported()
+		err = hcnImpl.RemoteSubnetSupported()
 		if err != nil {
 			return nil, err
 		}
@@ -783,17 +825,8 @@ func NewProxier(
 			}
 		}
 
-		interfaces, _ := net.Interfaces() //TODO create interfaces
-		for _, inter := range interfaces {
-			addresses, _ := inter.Addrs()
-			for _, addr := range addresses {
-				addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
-				if addrIP.String() == nodeIP.String() {
-					klog.V(2).InfoS("Record Host MAC address", "addr", inter.HardwareAddr)
-					hostMac = inter.HardwareAddr.String()
-				}
-			}
-		}
+		hostMac = hostMacProvider.GetHostMac(nodeIP)
+
 		if len(hostMac) == 0 {
 			return nil, fmt.Errorf("could not find host mac address for %s", nodeIP)
 		}
@@ -827,9 +860,6 @@ func NewProxier(
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
-	burstSyncs := 2
-	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
 	return proxier, nil
 }
 
@@ -1784,4 +1814,22 @@ func (proxier *Proxier) deleteLoadBalancer(hns HostNetworkService, lbHnsID *stri
 	}
 	*lbHnsID = ""
 	return true
+}
+
+type localHostMacProvider struct{}
+
+func (r *localHostMacProvider) GetHostMac(nodeIP net.IP) string {
+	var hostMac string
+	interfaces, _ := net.Interfaces()
+	for _, inter := range interfaces {
+		addresses, _ := inter.Addrs()
+		for _, addr := range addresses {
+			addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
+			if addrIP.String() == nodeIP.String() {
+				klog.V(2).InfoS("Record Host MAC address", "addr", inter.HardwareAddr)
+				hostMac = inter.HardwareAddr.String()
+			}
+		}
+	}
+	return hostMac
 }

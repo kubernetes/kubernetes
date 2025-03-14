@@ -62,6 +62,7 @@ func NewHcnMock(hnsNetwork *hcn.HostComputeNetwork) *HcnMock {
 				V2: true,
 			},
 			DSR:           true,
+			RemoteSubnet:  true,
 			IPv6DualStack: true,
 		},
 		network: hnsNetwork,
@@ -222,4 +223,12 @@ func (hcnObj HcnMock) DeleteAllHnsLoadBalancerPolicy() {
 	for k := range loadbalancerMap {
 		delete(loadbalancerMap, k)
 	}
+}
+
+func (hcnObj HcnMock) RemoteSubnetSupported() error {
+	if hcnObj.supportedFeatures.RemoteSubnet {
+		return nil
+	}
+
+	return errors.New("remote Subnet Not Supported")
 }
