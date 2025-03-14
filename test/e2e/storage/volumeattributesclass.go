@@ -27,7 +27,6 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -36,7 +35,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = utils.SIGDescribe("VolumeAttributesClass", feature.VolumeAttributesClass, framework.WithFeatureGate(features.VolumeAttributesClass), func() {
+var _ = utils.SIGDescribe("VolumeAttributesClass", framework.WithFeatureGate(features.VolumeAttributesClass), func() {
 
 	f := framework.NewDefaultFramework("csi-volumeattributesclass")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
