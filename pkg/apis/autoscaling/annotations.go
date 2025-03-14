@@ -37,10 +37,10 @@ const DefaultCPUUtilization = 80
 // when converting the `Behavior` field from autoscaling/v2beta2
 const BehaviorSpecsAnnotation = "autoscaling.alpha.kubernetes.io/behavior"
 
-// ToleranceSpecsAnnotation is the annotation which holds the HPA tolerance specs
+// ToleranceScaleDownAnnotation is the annotation which holds the HPA tolerance specs
 // when converting the `ScaleDown.Tolerance` field from autoscaling/v2
-const ToleranceScaleDownAnnotation = "autoscaling.alpha.kubernetes.io/scaleDowntolerance"
+const ToleranceScaleDownAnnotation = "autoscaling.alpha.kubernetes.io/scaleDownTolerance"
 
-// ToleranceSpecsAnnotation is the annotation which holds the HPA tolerance specs
+// ToleranceScaleUpAnnotation is the annotation which holds the HPA tolerance specs
 // when converting the `ScaleUp.Tolerance` field from autoscaling/v2
 const ToleranceScaleUpAnnotation = "autoscaling.alpha.kubernetes.io/scaleUpTolerance"
