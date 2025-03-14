@@ -1149,6 +1149,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: SchedulerPopFromBackoffQ
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: SchedulerQueueingHints
   versionedSpecs:
   - default: false

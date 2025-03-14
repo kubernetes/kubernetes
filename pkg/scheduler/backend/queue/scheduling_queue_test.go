@@ -1443,17 +1443,20 @@ func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framewor
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, "pod name not in allowlists")
 }
 
-func TestPriorityQueue_addToActiveQ(t *testing.T) {
+func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 	tests := []struct {
-		name                  string
-		plugins               []framework.PreEnqueuePlugin
-		pod                   *v1.Pod
-		wantUnschedulablePods int
-		wantSuccess           bool
+		name                   string
+		plugins                []framework.PreEnqueuePlugin
+		pod                    *v1.Pod
+		event                  string
+		popFromBackoffQEnabled []bool
+		wantUnschedulablePods  int
+		wantSuccess            bool
 	}{
 		{
 			name:                  "no plugins registered",
 			pod:                   st.MakePod().Name("p").Label("p", "").Obj(),
+			event:                 framework.EventUnscheduledPodAdd.Label(),
 			wantUnschedulablePods: 0,
 			wantSuccess:           true,
 		},
@@ -1461,6 +1464,7 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 			name:                  "preEnqueue plugin registered, pod name not in allowlists",
 			plugins:               []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
 			pod:                   st.MakePod().Name("p").Label("p", "").Obj(),
+			event:                 framework.EventUnscheduledPodAdd.Label(),
 			wantUnschedulablePods: 1,
 			wantSuccess:           false,
 		},
@@ -1471,8 +1475,35 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 				&preEnqueuePlugin{allowlists: []string{"foo"}},
 			},
 			pod:                   st.MakePod().Name("bar").Label("bar", "").Obj(),
+			event:                 framework.EventUnscheduledPodAdd.Label(),
 			wantUnschedulablePods: 1,
 			wantSuccess:           false,
+		},
+		{
+			// With SchedulerPopFromBackoffQ enabled, the queue assumes the pod has already passed PreEnqueue,
+			// and it doesn't run PreEnqueue again, always puts the pod to activeQ.
+			name: "preEnqueue plugin registered, preEnqueue plugin would reject the pod, but isn't run",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
+			event:                  framework.BackoffComplete,
+			popFromBackoffQEnabled: []bool{false},
+			wantUnschedulablePods:  1,
+			wantSuccess:            false,
+		},
+		{
+			name: "preEnqueue plugin registered, pod would fail one preEnqueue plugin, but is after backoff",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
+			event:                  framework.BackoffComplete,
+			popFromBackoffQEnabled: []bool{true},
+			wantUnschedulablePods:  0,
+			wantSuccess:            true,
 		},
 		{
 			name: "preEnqueue plugin registered, pod passed all preEnqueue plugins",
@@ -1481,37 +1512,141 @@ func TestPriorityQueue_addToActiveQ(t *testing.T) {
 				&preEnqueuePlugin{allowlists: []string{"bar"}},
 			},
 			pod:                   st.MakePod().Name("bar").Label("bar", "").Obj(),
+			event:                 framework.EventUnscheduledPodAdd.Label(),
 			wantUnschedulablePods: 0,
 			wantSuccess:           true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancel(ctx)
-			defer cancel()
+		if tt.popFromBackoffQEnabled == nil {
+			tt.popFromBackoffQEnabled = []bool{true, false}
+		}
+		for _, popFromBackoffQEnabled := range tt.popFromBackoffQEnabled {
+			t.Run(fmt.Sprintf("%s popFromBackoffQEnabled(%v)", tt.name, popFromBackoffQEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, popFromBackoffQEnabled)
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
 
-			m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
-			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
-				WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
-			got := q.moveToActiveQ(logger, q.newQueuedPodInfo(tt.pod), framework.EventUnscheduledPodAdd.Label())
-			if got != tt.wantSuccess {
-				t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
-			}
-			if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
-				t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
-			}
+				m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
+				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
+					WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
+				got := q.moveToActiveQ(logger, q.newQueuedPodInfo(tt.pod), tt.event)
+				if got != tt.wantSuccess {
+					t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
+				}
+				if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
+					t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
+				}
 
-			// Simulate an update event.
-			clone := tt.pod.DeepCopy()
-			metav1.SetMetaDataAnnotation(&clone.ObjectMeta, "foo", "")
-			q.Update(logger, tt.pod, clone)
-			// Ensure the pod is still located in unschedulablePods.
-			if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
-				t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
-			}
-		})
+				// Simulate an update event.
+				clone := tt.pod.DeepCopy()
+				metav1.SetMetaDataAnnotation(&clone.ObjectMeta, "foo", "")
+				q.Update(logger, tt.pod, clone)
+				// Ensure the pod is still located in unschedulablePods.
+				if tt.wantUnschedulablePods != len(q.unschedulablePods.podInfoMap) {
+					t.Errorf("Unexpected unschedulablePods: want %v, but got %v", tt.wantUnschedulablePods, len(q.unschedulablePods.podInfoMap))
+				}
+			})
+		}
+	}
+}
+
+func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
+	tests := []struct {
+		name                   string
+		plugins                []framework.PreEnqueuePlugin
+		pod                    *v1.Pod
+		popFromBackoffQEnabled []bool
+		wantSuccess            bool
+	}{
+		{
+			name:        "no plugins registered",
+			pod:         st.MakePod().Name("p").Label("p", "").Obj(),
+			wantSuccess: true,
+		},
+		{
+			name:                   "preEnqueue plugin registered, pod name would not be in allowlists",
+			plugins:                []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
+			pod:                    st.MakePod().Name("p").Label("p", "").Obj(),
+			popFromBackoffQEnabled: []bool{false},
+			wantSuccess:            true,
+		},
+		{
+			name:                   "preEnqueue plugin registered, pod name not in allowlists",
+			plugins:                []framework.PreEnqueuePlugin{&preEnqueuePlugin{}, &preEnqueuePlugin{}},
+			pod:                    st.MakePod().Name("p").Label("p", "").Obj(),
+			popFromBackoffQEnabled: []bool{true},
+			wantSuccess:            false,
+		},
+		{
+			name: "preEnqueue plugin registered, preEnqueue plugin would reject the pod, but isn't run",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
+			popFromBackoffQEnabled: []bool{false},
+			wantSuccess:            true,
+		},
+		{
+			name: "preEnqueue plugin registered, pod failed one preEnqueue plugin",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"foo"}},
+			},
+			pod:                    st.MakePod().Name("bar").Label("bar", "").Obj(),
+			popFromBackoffQEnabled: []bool{true},
+			wantSuccess:            false,
+		},
+		{
+			name: "preEnqueue plugin registered, pod passed all preEnqueue plugins",
+			plugins: []framework.PreEnqueuePlugin{
+				&preEnqueuePlugin{allowlists: []string{"foo", "bar"}},
+				&preEnqueuePlugin{allowlists: []string{"bar"}},
+			},
+			pod:         st.MakePod().Name("bar").Label("bar", "").Obj(),
+			wantSuccess: true,
+		},
+	}
+
+	for _, tt := range tests {
+		if tt.popFromBackoffQEnabled == nil {
+			tt.popFromBackoffQEnabled = []bool{true, false}
+		}
+		for _, popFromBackoffQEnabled := range tt.popFromBackoffQEnabled {
+			t.Run(fmt.Sprintf("%s popFromBackoffQEnabled(%v)", tt.name, popFromBackoffQEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, popFromBackoffQEnabled)
+				logger, ctx := ktesting.NewTestContext(t)
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+
+				m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
+				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
+					WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
+				pInfo := q.newQueuedPodInfo(tt.pod)
+				got := q.moveToBackoffQ(logger, pInfo, framework.EventUnscheduledPodAdd.Label())
+				if got != tt.wantSuccess {
+					t.Errorf("Unexpected result: want %v, but got %v", tt.wantSuccess, got)
+				}
+				if tt.wantSuccess {
+					if !q.backoffQ.has(pInfo) {
+						t.Errorf("Expected pod to be in backoffQ, but it isn't")
+					}
+					if q.unschedulablePods.get(pInfo.Pod) != nil {
+						t.Errorf("Expected pod not to be in unschedulablePods, but it is")
+					}
+				} else {
+					if q.backoffQ.has(pInfo) {
+						t.Errorf("Expected pod not to be in backoffQ, but it is")
+					}
+					if q.unschedulablePods.get(pInfo.Pod) == nil {
+						t.Errorf("Expected pod to be in unschedulablePods, but it isn't")
+					}
+				}
+			})
+		}
 	}
 }
 

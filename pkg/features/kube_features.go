@@ -632,6 +632,13 @@ const (
 	// which improves the scheduling latency when the preemption involves in.
 	SchedulerAsyncPreemption featuregate.Feature = "SchedulerAsyncPreemption"
 
+	// owner: @macsko
+	// kep: http://kep.k8s.io/5142
+	//
+	// Improves scheduling queue behavior by popping pods from the backoffQ when the activeQ is empty.
+	// This allows to process potentially schedulable pods ASAP, eliminating a penalty effect of the backoff queue.
+	SchedulerPopFromBackoffQ featuregate.Feature = "SchedulerPopFromBackoffQ"
+
 	// owner: @atosatto @yuanchen8911
 	// kep: http://kep.k8s.io/3902
 	//
