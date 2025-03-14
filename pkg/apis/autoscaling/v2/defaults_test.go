@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
@@ -132,14 +133,17 @@ func TestGenerateScaleUpRules(t *testing.T) {
 		rateUpPercentPeriodSeconds int32
 		stabilizationSeconds       *int32
 		selectPolicy               *autoscalingv2.ScalingPolicySelect
+		tolerance                  *resource.Quantity
 
 		expectedPolicies      []autoscalingv2.HPAScalingPolicy
 		expectedStabilization *int32
 		expectedSelectPolicy  string
+		expectedTolerance     *resource.Quantity
 		annotation            string
 	}
 	maxPolicy := autoscalingv2.MaxChangePolicySelect
 	minPolicy := autoscalingv2.MinChangePolicySelect
+	sampleTolerance := resource.MustParse("0.5")
 	tests := []TestCase{
 		{
 			annotation: "Default values",
@@ -208,12 +212,25 @@ func TestGenerateScaleUpRules(t *testing.T) {
 			expectedStabilization: utilpointer.Int32(25),
 			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
 		},
+		{
+			annotation:                 "Percent policy and tolerance is specified",
+			rateUpPercent:              7,
+			rateUpPercentPeriodSeconds: 10,
+			tolerance:                  &sampleTolerance,
+			expectedPolicies: []autoscalingv2.HPAScalingPolicy{
+				{Type: autoscalingv2.PercentScalingPolicy, Value: 7, PeriodSeconds: 10},
+			},
+			expectedStabilization: utilpointer.Int32(0),
+			expectedSelectPolicy:  string(autoscalingv2.MaxChangePolicySelect),
+			expectedTolerance:     &sampleTolerance,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.annotation, func(t *testing.T) {
 			scaleUpRules := &autoscalingv2.HPAScalingRules{
 				StabilizationWindowSeconds: tc.stabilizationSeconds,
 				SelectPolicy:               tc.selectPolicy,
+				Tolerance:                  tc.tolerance,
 			}
 			if tc.rateUpPods != 0 || tc.rateUpPodsPeriodSeconds != 0 {
 				scaleUpRules.Policies = append(scaleUpRules.Policies, autoscalingv2.HPAScalingPolicy{
@@ -234,6 +251,79 @@ func TestGenerateScaleUpRules(t *testing.T) {
 			}
 
 			assert.Equal(t, autoscalingv2.ScalingPolicySelect(tc.expectedSelectPolicy), *up.SelectPolicy)
+			assert.Equal(t, tc.expectedTolerance, up.Tolerance)
+		})
+	}
+}
+
+func TestSetBehaviorDefaults(t *testing.T) {
+	sampleTolerance := resource.MustParse("0.5")
+	maxPolicy := autoscalingv2.MaxChangePolicySelect
+	policies := []autoscalingv2.HPAScalingPolicy{
+		{Type: autoscalingv2.PercentScalingPolicy, Value: 7, PeriodSeconds: 10},
+	}
+	type TestCase struct {
+		behavior         *autoscalingv2.HorizontalPodAutoscalerBehavior
+		expectedBehavior *autoscalingv2.HorizontalPodAutoscalerBehavior
+		annotation       string
+	}
+
+	tests := []TestCase{
+		{
+			annotation:       "Nil behavior",
+			behavior:         nil,
+			expectedBehavior: nil,
+		},
+		{
+			annotation: "Behavior with tolerance only",
+			behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscalingv2.HPAScalingRules{
+					Tolerance: &sampleTolerance,
+				},
+			},
+			expectedBehavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscalingv2.HPAScalingRules{
+					Tolerance: &sampleTolerance,
+				},
+			},
+		},
+		{
+			annotation: "Behavior with policy, without tolerance",
+			behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscalingv2.HPAScalingRules{
+					Policies: policies,
+				},
+			},
+			expectedBehavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscalingv2.HPAScalingRules{
+					SelectPolicy: &maxPolicy,
+					Policies:     policies,
+				},
+				ScaleUp: &autoscalingv2.HPAScalingRules{
+					StabilizationWindowSeconds: utilpointer.Int32(0),
+					SelectPolicy:               &maxPolicy,
+					Policies: []autoscalingv2.HPAScalingPolicy{
+						{Type: autoscalingv2.PodsScalingPolicy, Value: 4, PeriodSeconds: 15},
+						{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.annotation, func(t *testing.T) {
+			hpa := autoscalingv2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					Behavior: tc.behavior,
+				},
+			}
+			expectedHPA := autoscalingv2.HorizontalPodAutoscaler{
+				Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+					Behavior: tc.expectedBehavior,
+				},
+			}
+			SetDefaults_HorizontalPodAutoscalerBehavior(&hpa)
+			assert.Equal(t, expectedHPA, hpa)
 		})
 	}
 }
