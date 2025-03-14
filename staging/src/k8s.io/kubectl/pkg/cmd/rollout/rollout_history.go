@@ -105,7 +105,7 @@ func NewCmdRolloutHistory(f cmdutil.Factory, streams genericiooptions.IOStreams)
 	return cmd
 }
 
-// Complete completes al the required options
+// Complete completes all the required options
 func (o *RolloutHistoryOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 
