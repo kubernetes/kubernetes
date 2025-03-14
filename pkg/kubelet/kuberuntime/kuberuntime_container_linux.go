@@ -206,26 +206,9 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	}
 
 	swapConfigurationHelper := newSwapConfigurationHelper(*m.machineInfo)
-	if m.memorySwapBehavior == kubelettypes.LimitedSwap {
-		if !isCgroup2UnifiedMode() {
-			swapConfigurationHelper.ConfigureNoSwap(lcr)
-			return
-		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
-	}
-
-	if kubelettypes.IsCriticalPod(pod) {
-		swapConfigurationHelper.ConfigureNoSwap(lcr)
-		return
-	}
-
 	// NOTE(ehashman): Behavior is defined in the opencontainers runtime spec:
 	// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
-	switch m.memorySwapBehavior {
+	switch m.getPodSwapBehavior(pod) {
 	case kubelettypes.NoSwap:
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
 	case kubelettypes.LimitedSwap:
@@ -233,6 +216,30 @@ func (m *kubeGenericRuntimeManager) configureContainerSwapResources(lcr *runtime
 	default:
 		swapConfigurationHelper.ConfigureNoSwap(lcr)
 	}
+}
+
+// getPodSwapBehavior checks what swap behavior should be configured for the pod, considering the
+// requirements for enabling swap.
+func (m *kubeGenericRuntimeManager) getPodSwapBehavior(pod *v1.Pod) string {
+	if m.memorySwapBehavior == kubelettypes.LimitedSwap {
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) || !swapControllerAvailable() {
+			return kubelettypes.NoSwap
+		}
+
+		if !isCgroup2UnifiedMode() {
+			return kubelettypes.NoSwap
+		}
+
+		if kubelettypes.IsCriticalPod(pod) {
+			return kubelettypes.NoSwap
+		}
+
+		if kubeapiqos.GetPodQOS(pod) != v1.PodQOSBurstable {
+			return kubelettypes.NoSwap
+		}
+		return m.memorySwapBehavior
+	}
+	return kubelettypes.NoSwap
 }
 
 // generateContainerResources generates platform specific (linux) container resources config for runtime
@@ -420,7 +427,6 @@ func (m swapConfigurationHelper) ConfigureLimitedSwap(lcr *runtimeapi.LinuxConta
 	podQos := kubeapiqos.GetPodQOS(pod)
 	containerDoesNotRequestMemory := container.Resources.Requests.Memory().IsZero() && container.Resources.Limits.Memory().IsZero()
 	memoryRequestEqualsToLimit := container.Resources.Requests.Memory().Cmp(*container.Resources.Limits.Memory()) == 0
-
 	if podQos != v1.PodQOSBurstable || containerDoesNotRequestMemory || !isCgroup2UnifiedMode() || memoryRequestEqualsToLimit {
 		m.ConfigureNoSwap(lcr)
 		return

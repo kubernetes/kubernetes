@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -523,4 +524,13 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.Cont
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
 	return nil, f.Err
+}
+
+func (f *FakeRuntime) IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (bool, string) {
+	// Note: this is a partial implementation of IsInPlacePodVerticalScalingAllowed. We just include
+	// the static pod check so that both outcomes (allowed, not allowed) can be tested.
+	if kubetypes.IsStaticPod(pod) {
+		return false, "In-place resize of static-pods is not supported"
+	}
+	return true, ""
 }

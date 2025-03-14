@@ -26,12 +26,16 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
-func IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg string) {
+func (m *kubeGenericRuntimeManager) IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg string) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		return false, "InPlacePodVerticalScaling is disabled"
 	}
 	if kubetypes.IsStaticPod(pod) {
 		return false, "In-place resize of static-pods is not supported"
+	}
+	// TODO: Remove this temporary restriction after api support for swap GA.
+	if m.getPodSwapBehavior(pod) != kubetypes.NoSwap {
+		return false, "In-place resize of pods that are swapped is not supported"
 	}
 	return true, ""
 }

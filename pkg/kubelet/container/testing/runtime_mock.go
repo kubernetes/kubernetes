@@ -767,6 +767,62 @@ func (_c *MockRuntime_ImageStats_Call) RunAndReturn(run func(context.Context) (*
 	return _c
 }
 
+// IsInPlacePodVerticalScalingAllowed provides a mock function with given fields: pod
+func (_m *MockRuntime) IsInPlacePodVerticalScalingAllowed(pod *corev1.Pod) (bool, string) {
+	ret := _m.Called(pod)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsInPlacePodVerticalScalingAllowed")
+	}
+
+	var r0 bool
+	var r1 string
+	if rf, ok := ret.Get(0).(func(*corev1.Pod) (bool, string)); ok {
+		return rf(pod)
+	}
+	if rf, ok := ret.Get(0).(func(*corev1.Pod) bool); ok {
+		r0 = rf(pod)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	if rf, ok := ret.Get(1).(func(*corev1.Pod) string); ok {
+		r1 = rf(pod)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+
+	return r0, r1
+}
+
+// MockRuntime_IsInPlacePodVerticalScalingAllowed_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsInPlacePodVerticalScalingAllowed'
+type MockRuntime_IsInPlacePodVerticalScalingAllowed_Call struct {
+	*mock.Call
+}
+
+// IsInPlacePodVerticalScalingAllowed is a helper method to define mock.On call
+//   - pod *corev1.Pod
+func (_e *MockRuntime_Expecter) IsInPlacePodVerticalScalingAllowed(pod interface{}) *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call {
+	return &MockRuntime_IsInPlacePodVerticalScalingAllowed_Call{Call: _e.mock.On("IsInPlacePodVerticalScalingAllowed", pod)}
+}
+
+func (_c *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call) Run(run func(pod *corev1.Pod)) *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*corev1.Pod))
+	})
+	return _c
+}
+
+func (_c *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call) Return(allowed bool, msg string) *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call {
+	_c.Call.Return(allowed, msg)
+	return _c
+}
+
+func (_c *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call) RunAndReturn(run func(*corev1.Pod) (bool, string)) *MockRuntime_IsInPlacePodVerticalScalingAllowed_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // KillPod provides a mock function with given fields: ctx, pod, runningPod, gracePeriodOverride
 func (_m *MockRuntime) KillPod(ctx context.Context, pod *corev1.Pod, runningPod container.Pod, gracePeriodOverride *int64) error {
 	ret := _m.Called(ctx, pod, runningPod, gracePeriodOverride)

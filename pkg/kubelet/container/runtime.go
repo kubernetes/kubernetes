@@ -137,6 +137,9 @@ type Runtime interface {
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
 	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+	// IsInPlacePodVerticalScalingAllowed reports whether resizing the given pod is allowed on this node.
+	// If it is not allowed, a message explaining why is returned.
+	IsInPlacePodVerticalScalingAllowed(pod *v1.Pod) (allowed bool, msg string)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
