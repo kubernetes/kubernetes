@@ -178,9 +178,8 @@ func NewCommand() *cobra.Command {
 	}
 	kubeletPluginFlagSets := cliflag.NamedFlagSets{}
 	fs = kubeletPluginFlagSets.FlagSet("kubelet")
-	pluginRegistrationPath := fs.String("plugin-registration-path", "/var/lib/kubelet/plugins_registry", "The directory where kubelet looks for plugin registration sockets, in the filesystem of the driver.")
-	endpoint := fs.String("endpoint", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket where the driver will listen for kubelet requests, in the filesystem of the driver.")
-	draAddress := fs.String("dra-address", "/var/lib/kubelet/plugins/test-driver/dra.sock", "The Unix domain socket that kubelet will connect to for dynamic resource allocation requests, in the filesystem of kubelet.")
+	kubeletRegistryDir := fs.String("plugin-registration-path", kubeletplugin.KubeletRegistryDir, "The directory where kubelet looks for plugin registration sockets.")
+	kubeletPluginsDir := fs.String("datadir", kubeletplugin.KubeletPluginsDir, "The per-driver directory where the DRA Unix domain socket will be created.")
 	fs = kubeletPluginFlagSets.FlagSet("CDI")
 	cdiDir := fs.String("cdi-dir", "/var/run/cdi", "directory for dynamically created CDI JSON files")
 	nodeName := fs.String("node-name", "", "name of the node that the kubelet plugin is responsible for")
@@ -196,7 +195,8 @@ func NewCommand() *cobra.Command {
 		if err := os.MkdirAll(*cdiDir, os.FileMode(0750)); err != nil {
 			return fmt.Errorf("create CDI directory: %w", err)
 		}
-		if err := os.MkdirAll(filepath.Dir(*endpoint), 0750); err != nil {
+		datadir := path.Join(*kubeletPluginsDir, *driverName)
+		if err := os.MkdirAll(filepath.Dir(datadir), 0750); err != nil {
 			return fmt.Errorf("create socket directory: %w", err)
 		}
 
@@ -205,9 +205,8 @@ func NewCommand() *cobra.Command {
 		}
 
 		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{NumDevices: *numDevices},
-			kubeletplugin.PluginSocketPath(*endpoint),
-			kubeletplugin.RegistrarSocketPath(path.Join(*pluginRegistrationPath, *driverName+"-reg.sock")),
-			kubeletplugin.KubeletPluginSocketPath(*draAddress),
+			kubeletplugin.PluginDataDirectoryPath(datadir),
+			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
 		)
 		if err != nil {
 			return fmt.Errorf("start example plugin: %w", err)
