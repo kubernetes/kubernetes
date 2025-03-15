@@ -176,7 +176,14 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 }
 
 func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-	shouldDelegate, consistentRead := shouldDelegateList(opts)
+	_, _, err := storage.ValidateListOptions(c.cacher.resourcePrefix, c.cacher.versioner, opts)
+	if err != nil {
+		return err
+	}
+	shouldDelegate, consistentRead, err := shouldDelegateList(opts, c.cacher)
+	if err != nil {
+		return err
+	}
 	if shouldDelegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
@@ -211,6 +218,9 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	success := "true"
 	fallback := "false"
 	if err != nil {
+		if errors.IsResourceExpired(err) {
+			return c.storage.GetList(ctx, key, opts, listObj)
+		}
 		if consistentRead {
 			if storage.IsTooLargeResourceVersion(err) {
 				fallback = "true"
@@ -242,34 +252,51 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 // NOTICE: Keep in sync with shouldListFromStorage function in
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) (shouldDeletage, consistentRead bool) {
+func shouldDelegateList(opts storage.ListOptions, snapshots snapshotCache) (shouldDeletage, consistentRead bool, err error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
 	consistentRead = false
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true, consistentRead
+		if opts.Recursive {
+			canServe, err := snapshots.CanServeExactRV(opts.ResourceVersion)
+			return !canServe, consistentRead, err
+		}
+		return true, consistentRead, nil
 	case metav1.ResourceVersionMatchNotOlderThan:
-		return false, consistentRead
+		return false, consistentRead, nil
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true, consistentRead
+			if opts.Recursive {
+				canServe, err := snapshots.CanServeExactRV(opts.ResourceVersion)
+				return !canServe, consistentRead, err
+			}
+			return true, consistentRead, nil
 		}
 		// Continue
 		if len(opts.Predicate.Continue) > 0 {
-			return true, consistentRead
+			if opts.Recursive {
+				canServe, err := snapshots.CanServeContinue(opts.Predicate.Continue)
+				return !canServe, consistentRead, err
+			}
+			return true, consistentRead, nil
 		}
 		// Consistent Read
 		if opts.ResourceVersion == "" {
 			consistentRead = true
 			consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
 			requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead
+			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead, nil
 		}
-		return false, consistentRead
+		return false, consistentRead, nil
 	default:
-		return true, consistentRead
+		return true, consistentRead, nil
 	}
+}
+
+type snapshotCache interface {
+	CanServeExactRV(string) (bool, error)
+	CanServeContinue(string) (bool, error)
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {

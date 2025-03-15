@@ -1308,6 +1308,41 @@ func (c *Cacher) Ready() bool {
 	return ok
 }
 
+func (c *Cacher) CanServeExactRV(resourceVersion string) (bool, error) {
+	// Lock not needed. watchcache and snapshots are set once in constructors.
+	if c.watchCache.snapshots == nil {
+		return false, nil
+	}
+	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		return false, err
+	}
+	return c.canServeExactRV(listRV)
+}
+
+func (c *Cacher) CanServeContinue(continueToken string) (bool, error) {
+	// Lock not needed. watchcache and snapshots are set once in constructors.
+	if c.watchCache.snapshots == nil {
+		return false, nil
+	}
+	_, continueRV, err := storage.DecodeContinue(continueToken, c.resourcePrefix)
+	if err != nil {
+		return false, err
+	}
+	return c.canServeExactRV(uint64(continueRV))
+}
+
+func (c *Cacher) canServeExactRV(rv uint64) (bool, error) {
+	// Exact requests on future revision require consistentListFromCache
+	if c.watchCache.notFresh(rv) {
+		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
+		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+		return consistentListFromCacheEnabled && requestWatchProgressSupported, nil
+	}
+	_, ok := c.watchCache.snapshots.GetLessOrEqual(rv)
+	return ok, nil
+}
+
 // errWatcher implements watch.Interface to return a single error
 type errWatcher struct {
 	result chan watch.Event
