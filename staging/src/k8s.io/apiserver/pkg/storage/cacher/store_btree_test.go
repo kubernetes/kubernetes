@@ -137,3 +137,34 @@ func (f fakeOrderedLister) ListPrefix(prefixKey, continueKey string) []interface
 	return nil
 }
 func (f fakeOrderedLister) Count(prefixKey, continueKey string) int { return 0 }
+
+type fakeSnapshotter struct {
+	getLessOrEqual func(rv uint64) (orderedLister, bool)
+}
+
+var _ Snapshotter = (*fakeSnapshotter)(nil)
+
+// Add implements Snapshotter.
+func (f *fakeSnapshotter) Add(rv uint64, indexer orderedLister) {
+}
+
+// GetLessOrEqual implements Snapshotter.
+func (f *fakeSnapshotter) GetLessOrEqual(rv uint64) (orderedLister, bool) {
+	if f.getLessOrEqual == nil {
+		return nil, false
+	}
+	return f.getLessOrEqual(rv)
+}
+
+// Len implements Snapshotter.
+func (f *fakeSnapshotter) Len() int {
+	return 0
+}
+
+// RemoveLess implements Snapshotter.
+func (f *fakeSnapshotter) RemoveLess(rv uint64) {
+}
+
+// Reset implements Snapshotter.
+func (f *fakeSnapshotter) Reset() {
+}
