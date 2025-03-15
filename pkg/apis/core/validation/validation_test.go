@@ -19185,6 +19185,33 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 	}, {
+		name: "aggregate unsupported resources container requests less than pod requests",
+		podResources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceCPU:    resource.MustParse("10"),
+				core.ResourceMemory: resource.MustParse("10Mi"),
+			},
+		},
+		containers: []core.Container{
+			{
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:     resource.MustParse("5"),
+						core.ResourceMemory:  resource.MustParse("5Mi"),
+						core.ResourceStorage: resource.MustParse("5Gi"),
+					},
+				},
+			}, {
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceCPU:              resource.MustParse("4"),
+						core.ResourceMemory:           resource.MustParse("3Mi"),
+						core.ResourceEphemeralStorage: resource.MustParse("2Gi"),
+					},
+				},
+			},
+		},
+	}, {
 		name: "aggregate container requests equal to pod requests",
 		podResources: core.ResourceRequirements{
 			Requests: core.ResourceList{
@@ -19311,7 +19338,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 	}, {
-		name: "indivdual container limits greater than pod limits",
+		name: "individual container limits greater than pod limits",
 		podResources: core.ResourceRequirements{
 			Limits: core.ResourceList{
 				core.ResourceCPU:    resource.MustParse("10"),
