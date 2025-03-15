@@ -17,7 +17,6 @@ limitations under the License.
 package images
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -398,7 +397,7 @@ func TestParallelPuller(t *testing.T) {
 	useSerializedEnv := false
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
@@ -431,7 +430,7 @@ func TestSerializedPuller(t *testing.T) {
 	useSerializedEnv := true
 	for _, c := range cases {
 		t.Run(c.testName, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := ktesting.Init(t)
 			puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 
 			for _, expected := range c.expected {
@@ -496,7 +495,7 @@ func TestPullAndListImageWithPodAnnotations(t *testing.T) {
 
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
-		ctx := context.Background()
+		ctx := ktesting.Init(t)
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
@@ -553,7 +552,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 	useSerializedEnv := true
 	t.Run(c.testName, func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClassInImageCriAPI, true)
-		ctx := context.Background()
+		ctx := ktesting.Init(t)
 		puller, fakeClock, fakeRuntime, container, fakePodPullingTimeRecorder, _ := pullerTestEnv(t, c, useSerializedEnv, nil)
 		fakeRuntime.CalledFunctions = nil
 		fakeRuntime.ImageList = []Image{}
@@ -585,7 +584,7 @@ func TestPullAndListImageWithRuntimeHandlerInImageCriAPIFeatureGate(t *testing.T
 }
 
 func TestMaxParallelImagePullsLimit(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "test_pod",
