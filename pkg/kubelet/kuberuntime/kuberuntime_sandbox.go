@@ -78,6 +78,9 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, error) {
+	// Use klog.TODO() because we currently do not have a proper logger to pass in.
+	// This should be replaced with an appropriate logger when refactoring this function to accept a logger parameter.
+	logger := klog.TODO()
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
 	podUID := string(pod.UID)
@@ -116,7 +119,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 
 	portMappings := []*runtimeapi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
-		containerPortMappings := kubecontainer.MakePortMappings(&c)
+		containerPortMappings := kubecontainer.MakePortMappings(logger, &c)
 
 		for idx := range containerPortMappings {
 			port := containerPortMappings[idx]
