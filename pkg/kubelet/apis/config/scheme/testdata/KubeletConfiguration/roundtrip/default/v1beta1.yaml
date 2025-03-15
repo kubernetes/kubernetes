@@ -92,5 +92,7 @@ streamingConnectionIdleTimeout: 4h0m0s
 syncFrequency: 1m0s
 topologyManagerPolicy: none
 topologyManagerScope: container
+userNamespaces:
+  idsPerPod: 65536
 volumePluginDir: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
 volumeStatsAggPeriod: 1m0s
