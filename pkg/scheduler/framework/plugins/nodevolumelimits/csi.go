@@ -240,6 +240,13 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 		return nil
 	}
 
+	for _, driverName := range newVolumes {
+		if !pl.checkCSIDriverOnNode(driverName, csiNode) {
+			driverNotInstalledMsg := fmt.Sprintf("%s CSI driver is not installed on the node", driverName)
+			return framework.NewStatus(framework.Unschedulable, driverNotInstalledMsg)
+		}
+	}
+
 	// If the node doesn't have volume limits, the predicate will always be true
 	nodeVolumeLimits := getVolumeLimits(csiNode)
 	if len(nodeVolumeLimits) == 0 {
@@ -294,6 +301,19 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	return nil
+}
+
+func (pl *CSILimits) checkCSIDriverOnNode(pluginName string, csiNode *storagev1.CSINode) bool {
+	if csiNode == nil {
+		return false
+	}
+
+	for _, driver := range csiNode.Spec.Drivers {
+		if driver.Name == pluginName {
+			return true
+		}
+	}
+	return false
 }
 
 // filterAttachableVolumes filters the attachable volumes from the pod and adds them to the result map.
