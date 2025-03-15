@@ -429,6 +429,12 @@ const (
 	// Enable MatchLabelKeys in PodTopologySpread.
 	MatchLabelKeysInPodTopologySpread featuregate.Feature = "MatchLabelKeysInPodTopologySpread"
 
+	// owner: @mochizuki875
+	// kep: https://kep.k8s.io/3243
+	//
+	// Enable merging key-value labels into LabelSelector corresponding to MatchLabelKeys in PodTopologySpread.
+	MatchLabelKeysInPodTopologySpreadSelectorMerge featuregate.Feature = "MatchLabelKeysInPodTopologySpreadSelectorMerge"
+
 	// owner: @krmayankk
 	//
 	// Enables maxUnavailable for StatefulSet
