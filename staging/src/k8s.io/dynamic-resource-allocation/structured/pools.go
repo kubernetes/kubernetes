@@ -33,7 +33,7 @@ import (
 // Out-dated slices are silently ignored. Pools may be incomplete (not all
 // required slices available) or invalid (for example, device names not unique).
 // Both is recorded in the result.
-func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node) ([]*Pool, error) {
+func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node *v1.Node, partitionableDevicesEnabled bool) ([]*Pool, error) {
 	pools := make(map[PoolID]*Pool)
 	nodeName := ""
 	if node != nil {
@@ -62,6 +62,11 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				if err := addSlice(pools, slice); err != nil {
 					return nil, fmt.Errorf("add matching slice %s: %w", slice.Name, err)
 				}
+			}
+		case slice.Spec.PerDeviceNodeSelection:
+			// TODO: Implement PerDeviceNodeSelection support
+			if err := addSlice(pools, slice); err != nil {
+				return nil, fmt.Errorf("add cluster slice %s: %w", slice.Name, err)
 			}
 		default:
 			// Nothing known was set. This must be some future, unknown extension,

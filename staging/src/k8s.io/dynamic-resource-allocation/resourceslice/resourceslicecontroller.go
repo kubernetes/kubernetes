@@ -139,7 +139,9 @@ type Pool struct {
 // Slice is turned into one ResourceSlice by the controller.
 type Slice struct {
 	// Devices lists all devices which are part of the slice.
-	Devices []resourceapi.Device
+	Devices                []resourceapi.Device
+	CapacityPools          []resourceapi.CapacityPool
+	PerDeviceNodeSelection bool
 }
 
 // +k8s:deepcopy-gen=true
@@ -546,7 +548,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
 				!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
 				currentSlice.Spec.AllNodes != desiredAllNodes ||
-				!apiequality.Semantic.DeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) {
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.CapacityPools, pool.Slices[i].CapacityPools) ||
+				!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
 				changedDesiredSlices.Insert(i)
 				logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
 			}
@@ -587,6 +591,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			slice.Spec.NodeSelector = pool.NodeSelector
 			slice.Spec.AllNodes = desiredAllNodes
 			slice.Spec.Devices = pool.Slices[i].Devices
+			slice.Spec.CapacityPools = pool.Slices[i].CapacityPools
+			slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 
 			logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
 			slice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
@@ -626,12 +632,14 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 					GenerateName:    generateName,
 				},
 				Spec: resourceapi.ResourceSliceSpec{
-					Driver:       c.driverName,
-					Pool:         desiredPool,
-					NodeName:     nodeName,
-					NodeSelector: pool.NodeSelector,
-					AllNodes:     desiredAllNodes,
-					Devices:      pool.Slices[i].Devices,
+					Driver:                 c.driverName,
+					Pool:                   desiredPool,
+					NodeName:               nodeName,
+					NodeSelector:           pool.NodeSelector,
+					AllNodes:               desiredAllNodes,
+					Devices:                pool.Slices[i].Devices,
+					CapacityPools:          pool.Slices[i].CapacityPools,
+					PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
 				},
 			}
 

@@ -142,6 +142,57 @@ type ResourceSliceSpec struct {
 	// +optional
 	// +listType=atomic
 	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
+
+	// perDeviceNodeSelection defines whether the access from nodes to
+	// resources in the pool is set on the ResourceSlice level or on each
+	// device. If it is set to true, every device defined the ResourceSlice
+	// must specify this individually.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
+	// must be set.
+	//
+	// +optional
+	// +oneOf=NodeSelection
+	PerDeviceNodeSelection bool `json:"perDeviceNodeSelection,omitempty" protobuf:"bytes,7,name=perDeviceNodeSelection"`
+
+	// capacityPools defines a list of capacity pools, each of which
+	// has a name and a list of capacities available in the pool.
+	//
+	// The names of the pools must be unique in the ResourceSlice.
+	//
+	// The maximum number of pools is 32.
+	//
+	// +optional
+	// +listType=atomic
+	CapacityPools []CapacityPool `json:"capacityPools,omitempty" protobuf:"bytes,8,name=capacityPools"`
+}
+
+// CapacityPool defines a named pool of capacities
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The capacities are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the capacity it uses will no longer be available for use
+// by other devices.
+type CapacityPool struct {
+	// Name defines the name of the capacity pool.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// capacity defines the set of capacities for this capacity pool
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +required
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,name=capacity"`
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -222,6 +273,72 @@ type BasicDevice struct {
 	//
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
+
+	// consumesCapacity defines a list of references to capacity
+	// pools and the set of capacities that the device will
+	// consume from those pools.
+	//
+	// The capacities can be defined by listing
+	// the capacities directly.
+	//
+	// There can only be a single entry per capacity pool.
+	//
+	// The maximum number of device capacity consumption entries
+	// is 32. This is the same as the maximum number of capacity
+	// pools allowed in a ResourceSlice.
+	//
+	// +optional
+	// +listType=atomic
+	ConsumesCapacity []DeviceCapacityConsumption `json:"consumesCapacity,omitempty" protobuf:"bytes,3,rep,name=consumesCapacity"`
+
+	// NodeName identifies the node where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,4,opt,name=nodeName"`
+
+	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,5,opt,name=nodeSelector"`
+
+	// AllNodes indicates that all nodes have access to the device.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	AllNodes bool `json:"allNodes,omitempty" protobuf:"bytes,6,opt,name=allNodes"`
+}
+
+// DeviceCapacityConsumption defines a set of capacities that
+// a device will consume from a capacity pool.
+type DeviceCapacityConsumption struct {
+	// capacityPool defines the capacity pool from which the
+	// capacities defined
+	// will be consumed from.
+	//
+	// +required
+	CapacityPool string `json:"capacityPool" protobuf:"bytes,1,opt,name=capacityPool"`
+
+	// capacity defines the capacity that will be consumed by
+	// the device.
+	//
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +optional
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,opt,name=capacity"`
 }
 
 // DeviceCapacity describes a quantity associated with a device.

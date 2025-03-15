@@ -139,6 +139,57 @@ type ResourceSliceSpec struct {
 	// +optional
 	// +listType=atomic
 	Devices []Device
+
+	// perDeviceNodeSelection defines whether the access from nodes to
+	// resources in the pool is set on the ResourceSlice level or on each
+	// device. If it is set to true, every device defined the ResourceSlice
+	// must specify this individually.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
+	// must be set.
+	//
+	// +optional
+	// +oneOf=NodeSelection
+	PerDeviceNodeSelection bool
+
+	// capacityPools defines a list of capacity pools, each of which
+	// has a name and a list of capacities available in the pool.
+	//
+	// The names of the pools must be unique in the ResourceSlice.
+	//
+	// The maximum number of pools is 32.
+	//
+	// +optional
+	// listType=atomic
+	CapacityPools []CapacityPool
+}
+
+// CapacityPool defines a named pool of capacities
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The capacities are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the capacity it uses will no longer be available for use
+// by other devices.
+type CapacityPool struct {
+	// Name defines the name of the capacity pool.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// capacity defines the set of capacities for this capacity pool
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +required
+	Capacity map[QualifiedName]DeviceCapacity
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -186,6 +237,26 @@ const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 
+// Defines the max number of capacity pools that can be specified
+// in a ResourceSlice. This is used to validate the fields:
+// * spec.capacityPools
+const ResourceSliceMaxCapacityPools = 32
+
+// Defines the max number of capacityPools from which a device
+// can consume capacity. This is used to validate the fields:
+// * spec.devices[].consumesCapacity
+const ResourceSliceMaxDeviceCapacityConsumptions = 32
+
+// Defines the max number of attributes and capacities
+// that can be specified for objects in a ResourceSlice.
+// The limit is for the sum of the number of attributes
+// and capacities if both fields are specified. This is
+// used to validate the fields:
+// * spec.capacityPools[].capacity
+// * spec.devices[].attributes and spec.devices[].capacity
+// * spec.devices[].consumesCapacity[].capacity
+const ResourceSliceMaxAttributesAndCapacities = 32
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -218,6 +289,72 @@ type BasicDevice struct {
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
+	Capacity map[QualifiedName]DeviceCapacity
+
+	// consumesCapacity defines a list of references to capacity
+	// pools and the set of capacities that the device will
+	// consume from those pools.
+	//
+	// The capacities can be defined by listing
+	// the capacities directly.
+	//
+	// There can only be a single entry per capacity pool.
+	//
+	// The maximum number of device capacity consumption entries
+	// is 32. This is the same as the maximum number of capacity
+	// pools allowed in a ResourceSlice.
+	//
+	// +optional
+	// +listType=atomic
+	ConsumesCapacity []DeviceCapacityConsumption
+
+	// NodeName identifies the node where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	NodeName string
+
+	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	NodeSelector *core.NodeSelector
+
+	// AllNodes indicates that all nodes have access to the device.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	AllNodes bool
+}
+
+// DeviceCapacityConsumption defines a set of capacities that
+// a device will consume from a capacity pool.
+type DeviceCapacityConsumption struct {
+	// capacityPool defines the capacity pool from which the
+	// capacities defined
+	// will be consumed from.
+	//
+	// +required
+	CapacityPool string
+
+	// capacity defines the capacity that will be consumed by
+	// the device.
+	//
+	//
+	// The maximum number of capacities is 32.
+	//
+	// +required
 	Capacity map[QualifiedName]DeviceCapacity
 }
 

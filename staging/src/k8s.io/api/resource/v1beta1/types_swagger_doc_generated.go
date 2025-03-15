@@ -52,9 +52,13 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 }
 
 var map_BasicDevice = map[string]string{
-	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"":                 "BasicDevice defines one device instance.",
+	"attributes":       "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacity":         "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"consumesCapacity": "consumesCapacity defines a list of references to capacity pools and the set of capacities that the device will consume from those pools.\n\nThe capacities can be defined by listing the capacities directly.\n\nThere can only be a single entry per capacity pool.\n\nThe maximum number of device capacity consumption entries is 32. This is the same as the maximum number of capacity pools allowed in a ResourceSlice.",
+	"nodeName":         "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"nodeSelector":     "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"allNodes":         "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {
@@ -68,6 +72,16 @@ var map_CELDeviceSelector = map[string]string{
 
 func (CELDeviceSelector) SwaggerDoc() map[string]string {
 	return map_CELDeviceSelector
+}
+
+var map_CapacityPool = map[string]string{
+	"":         "CapacityPool defines a named pool of capacities that are available to be used by devices defined in the ResourceSlice.\n\nThe capacities are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the capacity it uses will no longer be available for use by other devices.",
+	"name":     "Name defines the name of the capacity pool. It must be a DNS label.",
+	"capacity": "capacity defines the set of capacities for this capacity pool The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of capacities is 32.",
+}
+
+func (CapacityPool) SwaggerDoc() map[string]string {
+	return map_CapacityPool
 }
 
 var map_Device = map[string]string{
@@ -119,6 +133,16 @@ var map_DeviceCapacity = map[string]string{
 
 func (DeviceCapacity) SwaggerDoc() map[string]string {
 	return map_DeviceCapacity
+}
+
+var map_DeviceCapacityConsumption = map[string]string{
+	"":             "DeviceCapacityConsumption defines a set of capacities that a device will consume from a capacity pool.",
+	"capacityPool": "capacityPool defines the capacity pool from which the capacities defined will be consumed from.",
+	"capacity":     "capacity defines the capacity that will be consumed by the device.\n\nThe maximum number of capacities is 32.",
+}
+
+func (DeviceCapacityConsumption) SwaggerDoc() map[string]string {
+	return map_DeviceCapacityConsumption
 }
 
 var map_DeviceClaim = map[string]string{
@@ -384,13 +408,15 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceSliceSpec = map[string]string{
-	"":             "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
-	"driver":       "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
-	"pool":         "Pool describes the pool that this ResourceSlice belongs to.",
-	"nodeName":     "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
-	"nodeSelector": "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
-	"allNodes":     "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
-	"devices":      "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"":                       "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
+	"driver":                 "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
+	"pool":                   "Pool describes the pool that this ResourceSlice belongs to.",
+	"nodeName":               "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
+	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+	"allNodes":               "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"perDeviceNodeSelection": "perDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+	"capacityPools":          "capacityPools defines a list of capacity pools, each of which has a name and a list of capacities available in the pool.\n\nThe names of the pools must be unique in the ResourceSlice.\n\nThe maximum number of pools is 32.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {

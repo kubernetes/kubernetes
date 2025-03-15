@@ -103,6 +103,13 @@ func (in *Slice) DeepCopyInto(out *Slice) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.CapacityPools != nil {
+		in, out := &in.CapacityPools, &out.CapacityPools
+		*out = make([]v1beta1.CapacityPool, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 
