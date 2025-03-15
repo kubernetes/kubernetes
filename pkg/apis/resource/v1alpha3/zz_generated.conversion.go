@@ -466,6 +466,10 @@ func autoConvert_v1alpha3_BasicDevice_To_resource_BasicDevice(in *resourcev1alph
 	} else {
 		out.Capacity = nil
 	}
+	out.UsageRestrictedToNode = (*bool)(unsafe.Pointer(in.UsageRestrictedToNode))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
@@ -489,6 +493,10 @@ func autoConvert_resource_BasicDevice_To_v1alpha3_BasicDevice(in *resource.Basic
 	} else {
 		out.Capacity = nil
 	}
+	out.UsageRestrictedToNode = (*bool)(unsafe.Pointer(in.UsageRestrictedToNode))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
@@ -855,6 +863,10 @@ func autoConvert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceReques
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.UsageRestrictedToNode = (*bool)(unsafe.Pointer(in.UsageRestrictedToNode))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
@@ -869,6 +881,10 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1alpha3_DeviceReques
 	out.Pool = in.Pool
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
+	out.UsageRestrictedToNode = (*bool)(unsafe.Pointer(in.UsageRestrictedToNode))
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
