@@ -142,5 +142,6 @@ func getServicesHealthCheckURLs() []string {
 }
 
 func SetFeatureGatesForInProcessComponents(featureGates map[string]bool) error {
+	featureGates["ResourceHealthStatus"] = true
 	return utilfeature.DefaultMutableFeatureGate.SetFromMap(featureGates)
 }
