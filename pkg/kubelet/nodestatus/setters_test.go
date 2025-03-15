@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/features"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -911,6 +913,7 @@ func TestMachineInfo(t *testing.T) {
 		expectNode                           *v1.Node
 		expectEvents                         []testEvent
 		disableLocalStorageCapacityIsolation bool
+		featureGateDependencies              []featuregate.Feature
 	}{
 		{
 			desc:    "machine identifiers, basic capacity and allocatable",
@@ -1330,9 +1333,48 @@ func TestMachineInfo(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "with swap info",
+			node: &v1.Node{},
+			machineInfo: &cadvisorapiv1.MachineInfo{
+				SwapCapacity: uint64(20 * 1024 * 1024 * 1024),
+			},
+			expectNode: &v1.Node{
+				Status: v1.NodeStatus{
+					NodeInfo: v1.NodeSystemInfo{
+						Swap: &v1.NodeSwapStatus{
+							Capacity: ptr.To(int64(20 * 1024 * 1024 * 1024)),
+						},
+					},
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+					},
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(0, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(0, resource.BinarySI),
+						v1.ResourcePods:   *resource.NewQuantity(0, resource.DecimalSI),
+					},
+				},
+			},
+			featureGateDependencies: []featuregate.Feature{features.NodeSwap},
+		},
 	}
 
 	for _, tc := range cases {
+		featureGatesMissing := false
+		for _, featureGateDependency := range tc.featureGateDependencies {
+			if !utilfeature.DefaultFeatureGate.Enabled(featureGateDependency) {
+				featureGatesMissing = true
+				break
+			}
+		}
+
+		if featureGatesMissing {
+			continue
+		}
+
 		t.Run(tc.desc, func(t *testing.T) {
 			ctx := context.Background()
 			machineInfoFunc := func() (*cadvisorapiv1.MachineInfo, error) {
