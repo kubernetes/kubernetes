@@ -889,7 +889,8 @@ func isPodUpdated(oldPod, newPod *v1.Pod) bool {
 		p.ResourceVersion = ""
 		p.Generation = 0
 		p.Status = v1.PodStatus{
-			ResourceClaimStatuses: pod.Status.ResourceClaimStatuses,
+			ResourceClaimStatuses:       pod.Status.ResourceClaimStatuses,
+			ExtendedResourceClaimStatus: pod.Status.ExtendedResourceClaimStatus,
 		}
 		p.ManagedFields = nil
 		p.Finalizers = nil

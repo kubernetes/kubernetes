@@ -26,9 +26,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -434,6 +436,10 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 		if modifiedNodeInfo.Allocatable.ScalarResources[rName] > originalNodeInfo.Allocatable.ScalarResources[rName] {
 			return true
 		}
+
+		if _, ok := modifiedNodeInfo.Allocatable.DynamicResources[rName]; ok {
+			return true
+		}
 	}
 	return false
 }
@@ -564,14 +570,18 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			}
 		}
 
-		if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
-			insufficientResources = append(insufficientResources, InsufficientResource{
-				ResourceName: rName,
-				Reason:       fmt.Sprintf("Insufficient %v", rName),
-				Requested:    podRequest.ScalarResources[rName],
-				Used:         nodeInfo.Requested.ScalarResources[rName],
-				Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
-			})
+		_, okScalar := nodeInfo.Allocatable.ScalarResources[rName]
+		_, okDynamic := nodeInfo.Allocatable.DynamicResources[rName]
+		if okScalar || !utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) || !okDynamic {
+			if rQuant > (nodeInfo.Allocatable.ScalarResources[rName] - nodeInfo.Requested.ScalarResources[rName]) {
+				insufficientResources = append(insufficientResources, InsufficientResource{
+					ResourceName: rName,
+					Reason:       fmt.Sprintf("Insufficient %v", rName),
+					Requested:    podRequest.ScalarResources[rName],
+					Used:         nodeInfo.Requested.ScalarResources[rName],
+					Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
+				})
+			}
 		}
 	}
 
