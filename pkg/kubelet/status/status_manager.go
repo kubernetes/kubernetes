@@ -834,7 +834,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	if unchanged {
 		klog.V(3).InfoS("Status for pod is up-to-date", "pod", klog.KObj(pod), "statusVersion", status.version)
 	} else {
-		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus)
+		klog.V(3).InfoS("Status for pod updated successfully", "pod", klog.KObj(pod), "statusVersion", status.version, "status", mergedStatus, "apiStatus", newPod.Status)
 		pod = newPod
 		// We pass a new object (result of API call which contains updated ResourceVersion)
 		m.podStartupLatencyHelper.RecordStatusUpdated(pod)

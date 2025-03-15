@@ -158,9 +158,12 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthS
 			},
 		}
 
-		gomega.Eventually(func() []v1.ResourceStatus {
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			return pod.Status.ContainerStatuses[0].AllocatedResourcesStatus
+		gomega.Eventually(func() ([]v1.ResourceStatus, error) {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get pod %s/%s: %w", f.Namespace.Name, pod.Name, err)
+			}
+			return p.Status.ContainerStatuses[0].AllocatedResourcesStatus, nil
 		}, devicePluginUpdateTimeout, f.Timeouts.Poll).Should(gomega.Equal(expectedStatus))
 
 		// now make the device unhealthy
@@ -172,9 +175,12 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthS
 			Health:     v1.ResourceHealthStatusUnhealthy,
 		}
 
-		gomega.Eventually(func() []v1.ResourceStatus {
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			return pod.Status.ContainerStatuses[0].AllocatedResourcesStatus
+		gomega.Eventually(func() ([]v1.ResourceStatus, error) {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get pod %s/%s: %w", f.Namespace.Name, pod.Name, err)
+			}
+			return p.Status.ContainerStatuses[0].AllocatedResourcesStatus, nil
 		}, devicePluginUpdateTimeout, f.Timeouts.Poll).Should(gomega.Equal(expectedStatus))
 
 		// deleting the pod
@@ -227,9 +233,12 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthS
 			},
 		}
 
-		gomega.Eventually(func() []v1.ResourceStatus {
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			return pod.Status.ContainerStatuses[0].AllocatedResourcesStatus
+		gomega.Eventually(func() ([]v1.ResourceStatus, error) {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get pod %s/%s: %w", f.Namespace.Name, pod.Name, err)
+			}
+			return p.Status.ContainerStatuses[0].AllocatedResourcesStatus, nil
 		}, devicePluginUpdateTimeout, f.Timeouts.Poll).Should(gomega.Equal(expectedStatus))
 
 		// now make the device unhealthy
@@ -241,9 +250,12 @@ var _ = SIGDescribe("Device Plugin Failures Pod Status", feature.ResourceHealthS
 			Health:     "Unhealthy",
 		}
 
-		gomega.Eventually(func() []v1.ResourceStatus {
-			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
-			return pod.Status.ContainerStatuses[0].AllocatedResourcesStatus
+		gomega.Eventually(func() ([]v1.ResourceStatus, error) {
+			p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, fmt.Errorf("failed to get pod %s/%s: %w", f.Namespace.Name, pod.Name, err)
+			}
+			return p.Status.ContainerStatuses[0].AllocatedResourcesStatus, nil
 		}, devicePluginUpdateTimeout, f.Timeouts.Poll).Should(gomega.Equal(expectedStatus))
 
 		// deleting the pod
