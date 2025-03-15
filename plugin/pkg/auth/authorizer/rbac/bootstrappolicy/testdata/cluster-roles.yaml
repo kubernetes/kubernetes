@@ -223,6 +223,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingressclasses
     - ingresses
     - networkpolicies
     verbs:
@@ -374,6 +375,7 @@ items:
   - apiGroups:
     - networking.k8s.io
     resources:
+    - ingressclasses
     - ingresses
     - ingresses/status
     - networkpolicies

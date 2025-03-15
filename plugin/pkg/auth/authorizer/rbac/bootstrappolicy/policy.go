@@ -137,7 +137,7 @@ func viewRules() []rbacv1.PolicyRule {
 
 		rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets", "poddisruptionbudgets/status").RuleOrDie(),
 
-		rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingresses/status").RuleOrDie(),
+		rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingresses/status", "ingressclasses").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
@@ -175,7 +175,7 @@ func editRules() []rbacv1.PolicyRule {
 
 		rbacv1helpers.NewRule(Write...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
 
-		rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
+		rbacv1helpers.NewRule(Write...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingressclasses").RuleOrDie(),
 
 		rbacv1helpers.NewRule(ReadWrite...).Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 	}
