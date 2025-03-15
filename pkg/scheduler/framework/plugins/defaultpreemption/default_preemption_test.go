@@ -43,6 +43,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
@@ -57,16 +58,15 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 var (
@@ -436,13 +436,10 @@ func TestPostFilter(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			p := DefaultPreemption{
-				fh:        f,
-				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory),
-				args:      *getDefaultDefaultPreemptionArgs(),
+			p, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
 			}
-			p.Evaluator = preemption.NewEvaluator(names.DefaultPreemption, f, &p, false)
 
 			state := framework.NewCycleState()
 			// Ensure <state> is populated.
@@ -1189,11 +1186,9 @@ func TestDryRunPreemption(t *testing.T) {
 			if tt.args == nil {
 				tt.args = getDefaultDefaultPreemptionArgs()
 			}
-			pl := &DefaultPreemption{
-				fh:        fwk,
-				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory),
-				args:      *tt.args,
+			pl, err := New(ctx, tt.args, fwk, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
 			}
 
 			// Using 4 as a seed source to test getOffsetAndNumCandidates() deterministically.
@@ -1207,15 +1202,8 @@ func TestDryRunPreemption(t *testing.T) {
 				if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, pod); !status.IsSuccess() {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
-				pe := preemption.Evaluator{
-					PluginName: names.DefaultPreemption,
-					Handler:    pl.fh,
-					PodLister:  pl.podLister,
-					PdbLister:  pl.pdbLister,
-					Interface:  pl,
-				}
 				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1425,6 +1413,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
@@ -1441,24 +1430,20 @@ func TestSelectBestCandidate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			pl := &DefaultPreemption{
-				fh:        fwk,
-				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory),
-				args:      *getDefaultDefaultPreemptionArgs(),
-			}
-			pe := preemption.Evaluator{
-				PluginName: names.DefaultPreemption,
-				Handler:    pl.fh,
-				PodLister:  pl.podLister,
-				PdbLister:  pl.pdbLister,
-				Interface:  pl,
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pe.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
-			s := pe.SelectCandidate(ctx, candidates)
-			if s == nil || len(s.Name()) == 0 {
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			s := pl.Evaluator.SelectCandidate(ctx, candidates)
+			if len(tt.expected) == 0 {
+				if s != nil {
+					t.Errorf("expected no candidates, but got %v", s.Name())
+				}
 				return
+			} else if s == nil || len(s.Name()) == 0 {
+				t.Fatalf("expected any node in %v, but candidate is missing", tt.expected)
 			}
 			found := false
 			for _, nodeName := range tt.expected {
@@ -1469,6 +1454,279 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
+			}
+		})
+	}
+}
+
+func TestCustomSelection(t *testing.T) {
+	podLabelIsEligible := func(key, val string) IsEligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			pval, ok := victim.Pod.Labels[key]
+			if !ok {
+				return false
+			}
+			return pval == val
+		}
+	}
+	nodeNameIsEligible := func(name string) IsEligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			return nodeInfo.Node().Name == name
+		}
+	}
+	priorityBelowThresholdCannotPreempt := func(minPreempting int32) IsEligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			return corev1helpers.PodPriority(preemptor) >= minPreempting
+		}
+	}
+	priorityAboveThresholdCannotBePreempted := func(maxPreemptible int32) IsEligiblePodFunc {
+		return func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+			return corev1helpers.PodPriority(victim.Pod) <= maxPreemptible
+		}
+	}
+
+	orderByOldestStart := func(pod1, pod2 *v1.Pod) bool {
+		return util.GetPodStartTime(pod1).Before(util.GetPodStartTime(pod2))
+	}
+	orderByPodName := func(pod1, pod2 *v1.Pod) bool {
+		return pod1.Name < pod2.Name
+	}
+
+	tests := []struct {
+		name         string
+		eligiblePods IsEligiblePodFunc
+		orderPods    MoreImportantPodFunc
+		nodeNames    []string
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		expected     map[string][]string
+	}{
+		{
+			name:         "filter for matching pod label: high priority",
+			eligiblePods: podLabelIsEligible("preemptible", "yes"),
+			nodeNames:    []string{"node1", "node2", "node3", "node4"},
+			pod:          st.MakePod().Name("p1").UID("p1").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Label("preemptible", "no").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Label("preemptible", "yes").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node4").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
+		},
+		{
+			name:         "filter for matching pod label: mid priority",
+			eligiblePods: podLabelIsEligible("preemptible", "yes"),
+			nodeNames:    []string{"node1", "node2", "node3", "node4"},
+			pod:          st.MakePod().Name("p2").UID("p2").Priority(midPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Label("preemptible", "no").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Label("preemptible", "yes").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node4").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{"node3": {"v3"}},
+		},
+		{
+			name:         "filter for matching pod label: low priority",
+			eligiblePods: podLabelIsEligible("preemptible", "yes"),
+			nodeNames:    []string{"node1", "node2", "node3", "node4"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Label("preemptible", "no").Node("node1").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Label("preemptible", "yes").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Label("preemptible", "yes").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node4").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{},
+		},
+		{
+			name:         "filter for matching victim node: high priority",
+			eligiblePods: nodeNameIsEligible("node1"),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v5").UID("v5").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{"node1": {"v2", "v3"}},
+		},
+		{
+			name:         "filter for matching victim node: mid priority",
+			eligiblePods: nodeNameIsEligible("node1"),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(midPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v5").UID("v5").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{"node1": {"v3"}},
+		},
+		{
+			name:         "filter for matching victim node: low priority",
+			eligiblePods: nodeNameIsEligible("node1"),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p3").UID("p3").Priority(lowPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(lowPriority).Req(smallRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v4").UID("v4").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v5").UID("v5").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			expected: map[string][]string{},
+		},
+		{
+			name:         "only pods at or above specified priority can preempted: high priority",
+			eligiblePods: priorityBelowThresholdCannotPreempt(highPriority),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p1").UID("p1").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			// highPriority can preempt anything, but not other highPriority
+			expected: map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
+		},
+		{
+			name:         "only pods at or above specified priority can preempted: mid priority",
+			eligiblePods: priorityBelowThresholdCannotPreempt(highPriority),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p2").UID("p2").Priority(midPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			// midPriority can't preempt anything
+			expected: map[string][]string{},
+		},
+		{
+			name:         "only pods at or below specified priority can be preempted: high priority",
+			eligiblePods: priorityAboveThresholdCannotBePreempted(midPriority),
+			nodeNames:    []string{"node1", "node2", "node3"},
+			pod:          st.MakePod().Name("p1").UID("p1").Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(highPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node2").Priority(midPriority).Req(largeRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
+			},
+			// the lowPriority pod can be preempted but not the midPriority pod
+			expected: map[string][]string{"node3": {"v3"}},
+		},
+		{
+			name:      "select newest pods",
+			orderPods: orderByOldestStart,
+			nodeNames: []string{"node1"},
+			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
+			// size victims to require at least two to be preempted
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
+			},
+			// the newest two pods are selected, despite one with higher priority
+			expected: map[string][]string{"node1": {"v3", "v1"}},
+		},
+		{
+			name:      "select alphabetically-last pods",
+			orderPods: orderByPodName,
+			nodeNames: []string{"node1"},
+			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
+			// size victims to require at least two to be preempted
+			pods: []*v1.Pod{
+				st.MakePod().Name("foo").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("bar").UID("v2").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("baz").UID("v3").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+			},
+			// the last pods in alphabetic order are selected, despite one with higher priority
+			expected: map[string][]string{"node1": {"baz", "foo"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodes := make([]*v1.Node, len(tt.nodeNames))
+			for i, nodeName := range tt.nodeNames {
+				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
+			}
+
+			var objs []runtime.Object
+			objs = append(objs, tt.pod)
+			for _, pod := range tt.pods {
+				objs = append(objs, pod)
+			}
+			cs := clientsetfake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fwk, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			state := framework.NewCycleState()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Override selection logic
+			if tt.eligiblePods != nil {
+				pl.IsEligiblePod = tt.eligiblePods
+			}
+			if tt.orderPods != nil {
+				pl.MoreImportantPod = tt.orderPods
+			}
+			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			s := pl.Evaluator.SelectCandidate(ctx, candidates)
+			if len(tt.expected) == 0 {
+				if s != nil {
+					t.Errorf("expected no candidates, but got %v", s.Name())
+				}
+				return
+			} else if s == nil || len(s.Name()) == 0 {
+				t.Fatalf("expected any node in %v, but candidate is missing", tt.expected)
+			}
+			expectPodNames, ok := tt.expected[s.Name()]
+			if !ok {
+				t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
+			}
+			gotPodNames := []string{}
+			for _, p := range s.Victims().Pods {
+				gotPodNames = append(gotPodNames, p.Name)
+			}
+			if diff := cmp.Diff(expectPodNames, gotPodNames); diff != "" {
+				t.Errorf("expected pods %v, but got %v", expectPodNames, gotPodNames)
 			}
 		})
 	}
@@ -1534,18 +1792,29 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
 			}
+			var pods []runtime.Object
+			pods = append(pods, test.pod)
+			for _, pod := range test.pods {
+				pods = append(pods, pod)
+			}
+			cs := clientsetfake.NewClientset(pods...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			registeredPlugins := []tf.RegisterPluginFunc{
 				tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			f, err := tf.NewFramework(ctx, registeredPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithLogger(logger),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
-			pl := DefaultPreemption{fh: f, fts: test.fts}
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), f, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
 			if got, _ := pl.PodEligibleToPreemptOthers(ctx, test.pod, test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
@@ -1845,14 +2114,13 @@ func TestPreempt(t *testing.T) {
 					t.Errorf("Unexpected preFilterStatus: %v", s)
 				}
 				// Call preempt and check the expected results.
-				pl := DefaultPreemption{
-					fh:        fwk,
-					podLister: informerFactory.Core().V1().Pods().Lister(),
-					pdbLister: getPDBLister(informerFactory),
-					args:      *getDefaultDefaultPreemptionArgs(),
+				features := feature.Features{
+					EnableAsyncPreemption: asyncPreemptionEnabled,
 				}
-
-				pe := preemption.NewEvaluator(names.DefaultPreemption, pl.fh, &pl, asyncPreemptionEnabled)
+				pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, features)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				// so that these nodes are eligible for preemption, we set their status
 				// to Unschedulable.
@@ -1862,7 +2130,7 @@ func TestPreempt(t *testing.T) {
 					nodeToStatusMap.Set(n.Name, framework.NewStatus(framework.Unschedulable))
 				}
 
-				res, status := pe.Preempt(ctx, state, testPod, nodeToStatusMap)
+				res, status := pl.Evaluator.Preempt(ctx, state, testPod, nodeToStatusMap)
 				if !status.IsSuccess() && !status.IsRejected() {
 					t.Errorf("unexpected error in preemption: %v", status.AsError())
 				}
@@ -1935,7 +2203,7 @@ func TestPreempt(t *testing.T) {
 				mu.RUnlock()
 
 				// Call preempt again and make sure it doesn't preempt any more pods.
-				res, status = pe.Preempt(ctx, state, testPod, framework.NewDefaultNodeToStatus())
+				res, status = pl.Evaluator.Preempt(ctx, state, testPod, framework.NewDefaultNodeToStatus())
 				if !status.IsSuccess() && !status.IsRejected() {
 					t.Errorf("unexpected error in preemption: %v", status.AsError())
 				}
