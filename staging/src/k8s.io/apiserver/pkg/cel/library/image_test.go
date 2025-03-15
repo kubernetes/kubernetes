@@ -180,24 +180,14 @@ func TestImage(t *testing.T) {
 			expectValue: trueVal,
 		},
 		{
-			name:        "identifier_tag",
-			expr:        `image("registry.k8s.io/kube-apiserver-arm64:testtag").identifier()`,
-			expectValue: types.String("testtag"),
-		},
-		{
-			name:        "identifier_digest",
-			expr:        `image("registry.k8s.io/kube-apiserver-arm64@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").identifier()`,
-			expectValue: types.String("sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2"),
-		},
-		{
-			name:        "identifier_digest_and_tag",
-			expr:        `image("registry.k8s.io/kube-apiserver-arm64:latest@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").identifier() == "sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2"`,
-			expectValue: trueVal,
-		},
-		{
 			name:        "default_identifier",
 			expr:        `image("registry.k8s.io/kube-apiserver-arm64").identifier()`,
 			expectValue: types.String("latest"),
+		},
+		{
+			name:        "identifier_tag",
+			expr:        `image("registry.k8s.io/kube-apiserver-arm64:testtag").identifier()`,
+			expectValue: types.String("testtag"),
 		},
 		{
 			name:        "identifer_digest",
@@ -223,11 +213,6 @@ func TestImage(t *testing.T) {
 			name:        "no_tag",
 			expr:        `image("registry.k8s.io/kube-apiserver-arm64@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").tag()`,
 			expectValue: types.String(""),
-		},
-		{
-			name:        "identifier_tag",
-			expr:        `image("registry.k8s.io/kube-apiserver-arm64:testtag").identifier()`,
-			expectValue: types.String("testtag"),
 		},
 		{
 			name:        "no_digest",
