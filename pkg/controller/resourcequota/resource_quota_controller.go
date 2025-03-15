@@ -45,6 +45,15 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 )
 
+const (
+	// maxRetries is the number of times a service will be retried before it is dropped out of the queue.
+	// With the current rate-limiter in use (5ms*2^(maxRetries-1)) the following numbers represent the
+	// sequence of delays between successive queueing.
+	//
+	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
+	maxRetries = 15
+)
+
 // NamespacedResourcesFunc knows how to discover namespaced resources.
 type NamespacedResourcesFunc func() ([]*metav1.APIResourceList, error)
 
@@ -273,8 +282,15 @@ func (rq *Controller) worker(queue workqueue.TypedRateLimitingInterface[string])
 			return false
 		}
 
+		if queue.NumRequeues(key) < maxRetries {
+			logger.Info("Error syncing resource quota, retrying", "key", key, "err", err)
+			queue.AddRateLimited(key)
+			return false
+		}
+
+		logger.Info("Dropping resource quota off the queue", "key", key, "err", err)
+		queue.Forget(key)
 		utilruntime.HandleError(err)
-		queue.AddRateLimited(key)
 
 		return false
 	}
