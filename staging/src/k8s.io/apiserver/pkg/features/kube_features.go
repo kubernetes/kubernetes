@@ -34,6 +34,13 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @jefftree
+	//
+	// Remove the v2beta1 apidiscovery.k8s.io/v2beta1 group version. Aggregated
+	// discovery implements its own handlers and follows a different lifecycle than
+	// traditional k8s resources.
+	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
+
 	// owner: @modulitos
 	//
 	// Allow user.DefaultInfo.UID to be set from x509 cert during cert auth.
@@ -250,6 +257,11 @@ func init() {
 // Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	AggregatedDiscoveryRemoveBetaType: {
+		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
+	},
+
 	AllowParsingUserUIDFromCertAuth: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
