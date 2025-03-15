@@ -2932,7 +2932,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		}
 		// Pod allocation does not need to be updated.
 		return allocatedPod, nil
-	} else if resizable, msg := kuberuntime.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+	} else if resizable, msg := kl.containerRuntime.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeInfeasible, msg)
 		kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInfeasible)

@@ -1,5 +1,5 @@
-//go:build windows
-// +build windows
+//go:build !linux && !windows
+// +build !linux,!windows
 
 /*
 Copyright 2025 The Kubernetes Authors.
@@ -21,6 +21,6 @@ package kuberuntime
 
 import v1 "k8s.io/api/core/v1"
 
-func IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg string) {
-	return false, "In-place pod resize is not supported on Windows"
+func (m *kubeGenericRuntimeManager) IsInPlacePodVerticalScalingAllowed(_ *v1.Pod) (allowed bool, msg string) {
+	return false, "In-place pod resize is not supported on this node"
 }
