@@ -479,6 +479,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: GitRepoVolumeDriver
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.0"
+  - default: false
+    lockToDefault: false
+    preRelease: Deprecated
+    version: "1.33"
 - name: GracefulNodeShutdown
   versionedSpecs:
   - default: false
