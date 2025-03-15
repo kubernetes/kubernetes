@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -206,7 +207,12 @@ func BuildGenericConfig(
 	ctx := wait.ContextForChannel(genericConfig.DrainedNotify())
 
 	// Authentication.ApplyTo requires already applied OpenAPIConfig and EgressSelector if present
-	if lastErr = s.Authentication.ApplyTo(ctx, &genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers, genericConfig.APIServerID); lastErr != nil {
+	var fs *pflag.FlagSet
+	if s.ParsedFlags != nil {
+		fs = s.ParsedFlags.FlagSet("authentication")
+	}
+
+	if lastErr = s.Authentication.ApplyTo(ctx, fs, &genericConfig.Authentication, genericConfig.SecureServing, genericConfig.EgressSelector, genericConfig.OpenAPIConfig, genericConfig.OpenAPIV3Config, clientgoExternalClient, versionedInformers, genericConfig.APIServerID); lastErr != nil {
 		return
 	}
 
