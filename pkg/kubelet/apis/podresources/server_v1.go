@@ -68,7 +68,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 
 		pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 		for _, container := range pod.Spec.InitContainers {
-			if !podutil.IsRestartableInitContainer(&container) {
+			if !podutil.IsRestartableInitContainer(&container) && !req.IncludeInitContainers {
 				continue
 			}
 
@@ -125,7 +125,7 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 
 	podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 	for _, container := range pod.Spec.InitContainers {
-		if !podutil.IsRestartableInitContainer(&container) {
+		if !podutil.IsRestartableInitContainer(&container) && !req.IncludeInitContainers {
 			continue
 		}
 
