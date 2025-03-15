@@ -2861,21 +2861,23 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 
 // canResizePod determines if the requested resize is currently feasible.
 // pod should hold the desired (pre-allocated) spec.
-// Returns true if the resize can proceed.
-func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) {
+// Returns true if the resize can proceed; returns a reason and message
+// otherwise.
+func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManager) {
 			if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
 				msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodResizeStatusInfeasible, msg
+				return false, v1.PodReasonInfeasible, msg
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
 			if kl.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
 				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
 				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodResizeStatusInfeasible, msg
+				return false, v1.PodReasonInfeasible, msg
+
 			}
 		}
 	}
@@ -2898,7 +2900,8 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 		}
 		msg = "Node didn't have enough capacity: " + msg
 		klog.V(3).InfoS(msg, "pod", klog.KObj(pod))
-		return false, v1.PodResizeStatusInfeasible, msg
+		return false, v1.PodReasonInfeasible, msg
+
 	}
 
 	// Treat the existing pod needing resize as a new pod with desired resources seeking admit.
@@ -2909,10 +2912,10 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 	if ok, failReason, failMessage := kl.canAdmitPod(allocatedPods, pod); !ok {
 		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
-		return false, v1.PodResizeStatusDeferred, failMessage
+		return false, v1.PodReasonDeferred, failMessage
 	}
 
-	return true, v1.PodResizeStatusInProgress, ""
+	return true, "", ""
 }
 
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
@@ -2921,33 +2924,43 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, v1.PodResizeStatus, string) 
 func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error) {
 	allocatedPod, updated := kl.allocationManager.UpdatePodFromAllocation(pod)
 
-	if !updated {
-		// Desired resources == allocated resources. Check whether a resize is in progress.
+	// Always check whether a resize is in progress so we can set the PodResizeInProgressCondition
+	// accordingly.
+	var err error
+	defer func() {
+		if err != nil {
+			return
+		}
 		if kl.isPodResizeInProgress(allocatedPod, podStatus) {
 			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
-			kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInProgress)
+			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "")
 		} else {
-			// (Desired == Allocated == Actual) => clear the resize status.
-			kl.statusManager.SetPodResizeStatus(pod.UID, "")
+			// (Allocated == Actual) => clear the resize in-progress status.
+			kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
 		}
-		// Pod allocation does not need to be updated.
+	}()
+
+	if !updated {
+		// Desired resources == allocated resources. Pod allocation does not need to be updated.
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID)
 		return allocatedPod, nil
+
 	} else if resizable, msg := kuberuntime.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
-		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeInfeasible, msg)
-		kl.statusManager.SetPodResizeStatus(pod.UID, v1.PodResizeStatusInfeasible)
+		kl.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
 		return allocatedPod, nil
 	}
 
 	kl.podResizeMutex.Lock()
 	defer kl.podResizeMutex.Unlock()
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, resizeStatus, resizeMsg := kl.canResizePod(pod)
+	fit, reason, message := kl.canResizePod(pod)
 	if fit {
 		// Update pod resource allocation checkpoint
-		if err := kl.allocationManager.SetAllocatedResources(pod); err != nil {
+		if err = kl.allocationManager.SetAllocatedResources(pod); err != nil {
 			return nil, err
 		}
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID)
 		for i, container := range pod.Spec.Containers {
 			if !apiequality.Semantic.DeepEqual(container.Resources, allocatedPod.Spec.Containers[i].Resources) {
 				key := kuberuntime.GetStableKey(pod, &container)
@@ -2963,28 +2976,12 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			}
 		}
 		allocatedPod = pod
+	}
 
-		// Special case when the updated allocation matches the actuated resources. This can occur
-		// when reverting a resize that hasn't been actuated, or when making an equivalent change
-		// (such as CPU requests below MinShares). This is an optimization to clear the resize
-		// status immediately, rather than waiting for the next SyncPod iteration.
-		if !kl.isPodResizeInProgress(allocatedPod, podStatus) {
-			// In this case, consider the resize complete.
-			kl.statusManager.SetPodResizeStatus(pod.UID, "")
-			return allocatedPod, nil
-		}
+	if reason != "" {
+		kl.statusManager.SetPodResizePendingCondition(pod.UID, reason, message)
 	}
-	if resizeStatus != "" {
-		kl.statusManager.SetPodResizeStatus(pod.UID, resizeStatus)
-		if resizeMsg != "" {
-			switch resizeStatus {
-			case v1.PodResizeStatusDeferred:
-				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeDeferred, resizeMsg)
-			case v1.PodResizeStatusInfeasible:
-				kl.recorder.Eventf(pod, v1.EventTypeWarning, events.ResizeInfeasible, resizeMsg)
-			}
-		}
-	}
+
 	return allocatedPod, nil
 }
 

@@ -3278,6 +3278,12 @@ const (
 	// PodReadyToStartContainers pod sandbox is successfully configured and
 	// the pod is ready to launch containers.
 	PodReadyToStartContainers PodConditionType = "PodReadyToStartContainers"
+	// PodResizePending indicates that the pod has been resized, but kubelet has not
+	// yet allocated the resources.
+	PodResizePending PodConditionType = "PodResizePending"
+	// PodResizeInProgress indicates that a resize is in progress, and is present whenever
+	// allocated resources != acknowledged resources.
+	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 )
 
 // These are reasons for a pod's transition to a condition.
@@ -3301,6 +3307,18 @@ const (
 	// PodReasonPreemptionByScheduler reason in DisruptionTarget pod condition indicates that the
 	// disruption was initiated by scheduler's preemption.
 	PodReasonPreemptionByScheduler = "PreemptionByScheduler"
+
+	// PodReasonDeferred reason in PodResizePending pod condition indicates the proposed resize is feasible in
+	// theory (it fits on this node) but is not possible right now.
+	PodReasonDeferred = "Deferred"
+
+	// PodReasonInfeasible reason in PodResizePending pod condition indicates the proposed resize is not
+	// feasible and is rejected; it may not be re-evaluated
+	PodReasonInfeasible = "Infeasible"
+
+	// PodReasonError reason in PodResizeInProgress pod condition indicates that an error occurred while
+	// actuating the resize.
+	PodReasonError = "Error"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -3331,7 +3349,7 @@ type PodCondition struct {
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
 }
 
-// PodResizeStatus shows status of desired resize of a pod's containers.
+// Deprecated: PodResizeStatus shows status of desired resize of a pod's containers.
 type PodResizeStatus string
 
 const (
@@ -4976,6 +4994,9 @@ type PodStatus struct {
 	// Status of resources resize desired for pod's containers.
 	// It is empty if no resources resize is pending.
 	// Any changes to container resources will automatically set this to "Proposed"
+	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
+	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
+	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus `json:"resize,omitempty" protobuf:"bytes,14,opt,name=resize,casttype=PodResizeStatus"`

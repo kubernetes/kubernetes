@@ -2675,7 +2675,6 @@ func TestDropInPlacePodVerticalScaling(t *testing.T) {
 				},
 			},
 			Status: api.PodStatus{
-				Resize: api.PodResizeStatusInProgress,
 				ContainerStatuses: []api.ContainerStatus{
 					{
 						Name:               "c1",

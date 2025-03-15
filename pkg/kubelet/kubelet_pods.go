@@ -1738,14 +1738,15 @@ func getPhase(pod *v1.Pod, info []v1.ContainerStatus, podIsTerminal bool) v1.Pod
 	}
 }
 
-func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus, podIsTerminal bool) v1.PodResizeStatus {
+func (kl *Kubelet) determinePodResizeStatus(allocatedPod *v1.Pod, podIsTerminal bool) []*v1.PodCondition {
 	// If pod is terminal, clear the resize status.
 	if podIsTerminal {
-		kl.statusManager.SetPodResizeStatus(allocatedPod.UID, "")
-		return ""
+		kl.statusManager.ClearPodResizeInProgressCondition(allocatedPod.UID)
+		kl.statusManager.ClearPodResizePendingCondition(allocatedPod.UID)
+		return nil
 	}
 
-	resizeStatus := kl.statusManager.GetPodResizeStatus(allocatedPod.UID)
+	resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
 	return resizeStatus
 }
 
@@ -1759,9 +1760,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		oldPodStatus = pod.Status
 	}
 	s := kl.convertStatusToAPIStatus(pod, podStatus, oldPodStatus)
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		s.Resize = kl.determinePodResizeStatus(pod, podStatus, podIsTerminal)
-	}
 	// calculate the next phase and preserve reason
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(pod, allStatus, podIsTerminal)
@@ -1825,6 +1823,12 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	for _, c := range pod.Status.Conditions {
 		if !kubetypes.PodConditionByKubelet(c.Type) {
 			s.Conditions = append(s.Conditions, c)
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		resizeStatus := kl.determinePodResizeStatus(pod, podIsTerminal)
+		for _, c := range resizeStatus {
+			s.Conditions = append(s.Conditions, *c)
 		}
 	}
 
