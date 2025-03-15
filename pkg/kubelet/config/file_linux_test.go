@@ -40,20 +40,23 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	ch := make(chan interface{}, 1)
 	lw := newSourceFile("/some/fake/file", "localhost", time.Millisecond, ch)
-	err := lw.doWatch()
+	err := lw.doWatch(logger)
 	if err == nil {
 		t.Errorf("Expected error")
 	}
 }
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	ch := make(chan interface{})
-	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
+	NewSourceFile(logger, "random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		update := got.(kubetypes.PodUpdate)
@@ -68,6 +71,7 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 }
 
 func TestReadPodsFromFileExistAlready(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -81,7 +85,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 			file := testCase.writeToFile(dirName, "test_pod_manifest", t)
 
 			ch := make(chan interface{})
-			NewSourceFile(file, hostname, time.Millisecond, ch)
+			NewSourceFile(logger, file, hostname, time.Millisecond, ch)
 			select {
 			case got := <-ch:
 				update := got.(kubetypes.PodUpdate)
@@ -228,6 +232,7 @@ func createSymbolicLink(link, target, name string, t *testing.T) string {
 }
 
 func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -253,9 +258,9 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 
 			ch := make(chan interface{})
 			if watchDir {
-				NewSourceFile(dirName, hostname, 100*time.Millisecond, ch)
+				NewSourceFile(logger, dirName, hostname, 100*time.Millisecond, ch)
 			} else {
-				NewSourceFile(filepath.Join(dirName, fileName), hostname, 100*time.Millisecond, ch)
+				NewSourceFile(logger, filepath.Join(dirName, fileName), hostname, 100*time.Millisecond, ch)
 			}
 			expectEmptyUpdate(t, ch)
 
@@ -281,6 +286,7 @@ func watchFileAdded(watchDir bool, symlink bool, t *testing.T) {
 }
 
 func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hostname := types.NodeName("random-test-hostname")
 	var testCases = getTestCases(hostname)
 
@@ -319,9 +325,9 @@ func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *test
 			}()
 
 			if watchDir {
-				NewSourceFile(dirName, hostname, period, ch)
+				NewSourceFile(logger, dirName, hostname, period, ch)
 			} else {
-				NewSourceFile(file, hostname, period, ch)
+				NewSourceFile(logger, file, hostname, period, ch)
 			}
 
 			// await fsnotify to be ready

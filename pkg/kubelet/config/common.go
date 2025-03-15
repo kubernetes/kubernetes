@@ -54,7 +54,7 @@ func generatePodName(name string, nodeName types.NodeName) string {
 	return fmt.Sprintf("%s-%s", name, strings.ToLower(string(nodeName)))
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
+func applyDefaults(logger klog.Logger, pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		hash.DeepHashObject(hasher, pod)
@@ -67,16 +67,16 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 			fmt.Fprintf(hasher, "url:%s", source)
 		}
 		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
+		logger.V(5).Info("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 	}
 
 	pod.Name = generatePodName(pod.Name, nodeName)
-	klog.V(5).InfoS("Generated pod name", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
+	logger.V(5).Info("Generated pod name", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 
 	if pod.Namespace == "" {
 		pod.Namespace = metav1.NamespaceDefault
 	}
-	klog.V(5).InfoS("Set namespace for pod", "pod", klog.KObj(pod), "source", source)
+	logger.V(5).Info("Set namespace for pod", "pod", klog.KObj(pod), "source", source)
 
 	// Set the Host field to indicate this pod is scheduled on the current node.
 	pod.Spec.NodeName = string(nodeName)
@@ -101,13 +101,13 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 	return nil
 }
 
-type defaultFunc func(pod *api.Pod) error
+type defaultFunc func(logger klog.Logger, pod *api.Pod) error
 
 // A static pod tried to use a ClusterTrustBundle projected volume source.
 var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
 
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
-func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
+func tryDecodeSinglePod(logger klog.Logger, data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
 	// JSON is valid YAML, so this should work for everything.
 	json, err := utilyaml.ToJSON(data)
 	if err != nil {
@@ -129,7 +129,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	}
 
 	// Apply default values and validate the pod.
-	if err = defaultFn(newPod); err != nil {
+	if err = defaultFn(logger, newPod); err != nil {
 		return true, pod, err
 	}
 	if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
@@ -137,7 +137,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	}
 	v1Pod := &v1.Pod{}
 	if err := k8s_api_v1.Convert_core_Pod_To_v1_Pod(newPod, v1Pod, nil); err != nil {
-		klog.ErrorS(err, "Pod failed to convert to v1", "pod", klog.KObj(newPod))
+		logger.Error(err, "Pod failed to convert to v1", "pod", klog.KObj(newPod))
 		return true, nil, err
 	}
 
@@ -156,7 +156,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 	return true, v1Pod, nil
 }
 
-func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.PodList, err error) {
+func tryDecodePodList(logger klog.Logger, data []byte, defaultFn defaultFunc) (parsed bool, pods v1.PodList, err error) {
 	obj, err := runtime.Decode(legacyscheme.Codecs.UniversalDecoder(), data)
 	if err != nil {
 		return false, pods, err
@@ -175,7 +175,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 		if newPod.Name == "" {
 			return true, pods, fmt.Errorf("invalid pod: name is needed for the pod")
 		}
-		if err = defaultFn(newPod); err != nil {
+		if err = defaultFn(logger, newPod); err != nil {
 			return true, pods, err
 		}
 		if errs := validation.ValidatePodCreate(newPod, validation.PodValidationOptions{}); len(errs) > 0 {
