@@ -53,6 +53,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		}
 		if cstat.Cpu != nil {
 			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
+			cpuStats.PSI = &cstat.Cpu.PSI
 		}
 	}
 	if info.Spec.HasMemory && cstat.Memory != nil {
@@ -65,6 +66,7 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 			RSSBytes:        &cstat.Memory.RSS,
 			PageFaults:      &pageFaults,
 			MajorPageFaults: &majorPageFaults,
+			PSI:             &cstat.Memory.PSI,
 		}
 		// availableBytes = memory limit (if known) - workingset
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
@@ -96,6 +98,7 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	result.CPU = cpu
 	result.Memory = memory
 	result.Swap = cadvisorInfoToSwapStats(info)
+	result.IO = cadvisorInfoToIOStats(info)
 
 	// NOTE: if they can be found, log stats will be overwritten
 	// by the caller, as it knows more information about the pod,
@@ -305,6 +308,24 @@ func cadvisorInfoToSwapStats(info *cadvisorapiv2.ContainerInfo) *statsapi.SwapSt
 	}
 
 	return swapStats
+}
+
+func cadvisorInfoToIOStats(info *cadvisorapiv2.ContainerInfo) *statsapi.IOStats {
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return nil
+	}
+
+	var ioStats *statsapi.IOStats
+
+	if info.Spec.HasDiskIo && cstat.DiskIo != nil {
+		ioStats = &statsapi.IOStats{
+			Time: metav1.NewTime(cstat.Timestamp),
+			PSI:  &cstat.DiskIo.PSI,
+		}
+	}
+
+	return ioStats
 }
 
 // latestContainerStats returns the latest container stats from cadvisor, or nil if none exist

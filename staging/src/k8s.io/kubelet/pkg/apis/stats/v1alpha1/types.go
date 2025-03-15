@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -46,6 +47,9 @@ type NodeStats struct {
 	// Stats pertaining to memory (RAM) resources.
 	// +optional
 	Memory *MemoryStats `json:"memory,omitempty"`
+	// Stats pertaining to IO resources.
+	// +optional
+	IO *IOStats `json:"io,omitempty"`
 	// Stats pertaining to network resources.
 	// +optional
 	Network *NetworkStats `json:"network,omitempty"`
@@ -127,6 +131,9 @@ type PodStats struct {
 	// Stats pertaining to memory (RAM) resources consumed by pod cgroup (which includes all containers' resource usage and pod overhead).
 	// +optional
 	Memory *MemoryStats `json:"memory,omitempty"`
+	// Stats pertaining to IO resources consumed by pod cgroup (which includes all containers' resource usage and pod overhead).
+	// +optional
+	IO *IOStats `json:"io,omitempty"`
 	// Stats pertaining to network resources.
 	// +optional
 	Network *NetworkStats `json:"network,omitempty"`
@@ -159,6 +166,9 @@ type ContainerStats struct {
 	// Stats pertaining to memory (RAM) resources.
 	// +optional
 	Memory *MemoryStats `json:"memory,omitempty"`
+	// Stats pertaining to IO resources.
+	// +optional
+	IO *IOStats `json:"io,omitempty"`
 	// Metrics for Accelerators. Each Accelerator corresponds to one element in the array.
 	Accelerators []AcceleratorStats `json:"accelerators,omitempty"`
 	// Stats pertaining to container rootfs usage of filesystem resources.
@@ -225,6 +235,9 @@ type CPUStats struct {
 	// Cumulative CPU usage (sum of all cores) since object creation.
 	// +optional
 	UsageCoreNanoSeconds *uint64 `json:"usageCoreNanoSeconds,omitempty"`
+	// CPU PSI stats.
+	// +optional
+	PSI *cadvisorapi.PSIStats `json:"psi,omitempty"`
 }
 
 // MemoryStats contains data about memory usage.
@@ -252,6 +265,18 @@ type MemoryStats struct {
 	// Cumulative number of major page faults.
 	// +optional
 	MajorPageFaults *uint64 `json:"majorPageFaults,omitempty"`
+	// Memory PSI stats.
+	// +optional
+	PSI *cadvisorapi.PSIStats `json:"psi,omitempty"`
+}
+
+// IOStats contains data about IO usage.
+type IOStats struct {
+	// The time at which these stats were updated.
+	Time metav1.Time `json:"time"`
+	// IO PSI stats.
+	// +optional
+	PSI *cadvisorapi.PSIStats `json:"psi,omitempty"`
 }
 
 // SwapStats contains data about memory usage
