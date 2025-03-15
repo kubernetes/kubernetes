@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -934,7 +933,7 @@ func validateLabelKey(k string, path *field.Path) *field.Error {
 }
 
 func validateLabelValue(k, v string, path *field.Path) *field.Error {
-	if errs := validation.IsValidLabelValue(v); len(errs) != 0 {
+	if errs := content.IsLabelValue(v); len(errs) != 0 {
 		return field.Invalid(path.Key(k), v, strings.Join(errs, "; "))
 	}
 	return nil
