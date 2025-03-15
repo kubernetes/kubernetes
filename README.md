@@ -1,5 +1,21 @@
 # Kubernetes (K8s)
 
+## Table of Contents
+- [Introduction](#introduction)
+- [Prerequisites](#prerequisites)
+- [To Start Using K8s](#to-start-using-k8s)
+- [To Start Developing K8s](#to-start-developing-k8s)
+- [Real-World Usage Example](#real-world-usage-example)
+- [Troubleshooting Tips](#troubleshooting-tips)
+- [Support](#support)
+- [Community Meetings](#community-meetings)
+- [Adopters](#adopters)
+- [Governance](#governance)
+- [Roadmap](#roadmap)
+
+---
+
+# Introduction
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569) [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes/kubernetes)](https://goreportcard.com/report/github.com/kubernetes/kubernetes) ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/kubernetes/kubernetes?sort=semver)
 
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
@@ -22,8 +38,15 @@ For details about who's involved and how Kubernetes plays a role,
 read the CNCF [announcement].
 
 ----
-
-## To start using K8s
+## Prerequisites
+- Ensure you have Docker and Go installed. 
+- Verify your installation using:
+```bash
+docker --version
+go version
+```
+----
+## To Start using K8s
 
 See our documentation on [kubernetes.io].
 
@@ -57,6 +80,49 @@ make quick-release
 ```
 
 For the full story, head over to the [developer's documentation].
+----
+## Real-World Usage Example
+- yaml file
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: example-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: example-app
+  template:
+    metadata:
+      labels:
+        app: example-app
+    spec:
+      containers:
+      - name: example-container
+        image: nginx
+        ports:
+        - containerPort: 80
+
+```
+- Deploy with:
+```
+kubectl apply -f example-deployment.yaml
+```
+
+----
+## Troubleshooting Tips
+- Common Issue: Docker Daemon Not Running
+    - Solution: Start Docker with:
+```
+sudo systemctl start docker
+```
+- Common Issue: Permission Denied
+    - Solution: Ensure correct permissions by adding the user to the Docker group:
+```
+sudo usermod -aG docker $USER
+```
+----
 
 ## Support
 
