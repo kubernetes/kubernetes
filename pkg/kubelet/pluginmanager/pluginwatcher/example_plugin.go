@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 
@@ -43,6 +44,8 @@ type examplePlugin struct {
 	pluginName         string
 	pluginType         string
 	versions           []string
+	unlinkSocket       bool
+	getInfoLock        sync.Mutex
 }
 
 type pluginServiceV1Beta1 struct {
@@ -84,6 +87,7 @@ func NewTestExamplePlugin(pluginName string, pluginType string, endpoint string,
 		endpoint:           endpoint,
 		versions:           advertisedVersions,
 		registrationStatus: make(chan registerapi.RegistrationStatus),
+		unlinkSocket:       true, // delete unix socket file on close
 	}
 }
 
@@ -96,6 +100,8 @@ func GetPluginInfo(plugin *examplePlugin) cache.PluginInfo {
 
 // GetInfo is the RPC invoked by plugin watcher
 func (e *examplePlugin) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
+	e.getInfoLock.Lock()
+	defer e.getInfoLock.Unlock()
 	return &registerapi.PluginInfo{
 		Type:              e.pluginType,
 		Name:              e.pluginName,
@@ -120,6 +126,10 @@ func (e *examplePlugin) Serve(services ...string) error {
 	lis, err := net.Listen("unix", e.endpoint)
 	if err != nil {
 		return err
+	}
+
+	if runtime.GOOS != "windows" {
+		lis.(*net.UnixListener).SetUnlinkOnClose(e.unlinkSocket)
 	}
 
 	klog.InfoS("Example server started", "endpoint", e.endpoint)
@@ -171,9 +181,30 @@ func (e *examplePlugin) Stop() error {
 		return errors.New("timed out on waiting for stop completion")
 	}
 
-	if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {
-		return err
+	if runtime.GOOS != "windows" && e.unlinkSocket {
+		// NOTE: Unix socket gets unlinked by the net.UnixListener.close()
+		// so this is not necessary, but we do it anyway to be explicit.
+		if err := os.Remove(e.endpoint); err != nil && !os.IsNotExist(err) {
+			klog.ErrorS(err, "Failed to remove endpoint", "endpoint", e.endpoint)
+			return err
+		}
 	}
 
+	klog.InfoS("Example server stopped", "endpoint", e.endpoint)
+
 	return nil
+}
+
+func (e *examplePlugin) SetUnlinkSocket(unlinkSocket bool) {
+	e.unlinkSocket = unlinkSocket
+}
+
+// StuckGetInfo locks getInfoLock to simulate a stuck GetInfo call.
+func (e *examplePlugin) StuckGetInfo() {
+	e.getInfoLock.Lock()
+}
+
+// UnstuckGetInfo unlocks getInfoLock to unstuck GetInfo call.
+func (e *examplePlugin) UnstuckGetInfo() {
+	e.getInfoLock.Unlock()
 }
