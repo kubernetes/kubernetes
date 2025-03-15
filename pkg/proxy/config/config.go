@@ -259,12 +259,8 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 // NodeHandler is an abstract interface of objects which receive
 // notifications about node object changes.
 type NodeHandler interface {
-	// OnNodeAdd is called whenever creation of new node object
-	// is observed.
-	OnNodeAdd(node *v1.Node)
-	// OnNodeUpdate is called whenever modification of an existing
-	// node object is observed.
-	OnNodeUpdate(oldNode, node *v1.Node)
+	// OnNodeUpsert is called whenever a node object is created or updated.
+	OnNodeUpsert(node *v1.Node)
 	// OnNodeDelete is called whenever deletion of an existing node
 	// object is observed.
 	OnNodeDelete(node *v1.Node)
@@ -277,11 +273,8 @@ type NodeHandler interface {
 // implemented a full NodeHandler.
 type NoopNodeHandler struct{}
 
-// OnNodeAdd is a noop handler for Node creates.
-func (*NoopNodeHandler) OnNodeAdd(node *v1.Node) {}
-
-// OnNodeUpdate is a noop handler for Node updates.
-func (*NoopNodeHandler) OnNodeUpdate(oldNode, node *v1.Node) {}
+// OnNodeUpsert is a noop handler for Node upsert.
+func (*NoopNodeHandler) OnNodeUpsert(node *v1.Node) {}
 
 // OnNodeDelete is a noop handler for Node deletes.
 func (*NoopNodeHandler) OnNodeDelete(node *v1.Node) {}
@@ -304,11 +297,18 @@ func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, r
 	result := &NodeConfig{
 		logger: klog.FromContext(ctx),
 	}
+	// This handles the case (hollow_proxier) where ProxyServer is instantiated without
+	// the "newProxyServer" function, and "Run" is called which panics as we are creating
+	// the NodeInformers in "newProxyServer" now. Hollow Proxy uses NoopNodeHandler, it
+	// is safe to skip handler registration.
+	if nodeInformer == nil {
+		return result
+	}
 
 	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    result.handleAddNode,
-			UpdateFunc: result.handleUpdateNode,
+			AddFunc:    result.handleUpsertNode,
+			UpdateFunc: func(_, node interface{}) { result.handleUpsertNode(node) },
 			DeleteFunc: result.handleDeleteNode,
 		},
 		resyncPeriod,
@@ -328,42 +328,27 @@ func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
 func (c *NodeConfig) Run(stopCh <-chan struct{}) {
 	c.logger.Info("Starting node config controller")
 
-	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
-		return
-	}
+	if c.listerSynced != nil {
+		if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
+			return
+		}
 
-	for i := range c.eventHandlers {
-		c.logger.V(3).Info("Calling handler.OnNodeSynced()")
-		c.eventHandlers[i].OnNodeSynced()
+		for i := range c.eventHandlers {
+			c.logger.V(3).Info("Calling handler.OnNodeSynced()")
+			c.eventHandlers[i].OnNodeSynced()
+		}
 	}
 }
 
-func (c *NodeConfig) handleAddNode(obj interface{}) {
+func (c *NodeConfig) handleUpsertNode(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
 		return
 	}
 	for i := range c.eventHandlers {
-		c.logger.V(4).Info("Calling handler.OnNodeAdd")
-		c.eventHandlers[i].OnNodeAdd(node)
-	}
-}
-
-func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
-	oldNode, ok := oldObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
-		return
-	}
-	node, ok := newObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
-		return
-	}
-	for i := range c.eventHandlers {
-		c.logger.V(5).Info("Calling handler.OnNodeUpdate")
-		c.eventHandlers[i].OnNodeUpdate(oldNode, node)
+		c.logger.V(4).Info("Calling handler.OnNodeUpsert")
+		c.eventHandlers[i].OnNodeUpsert(node)
 	}
 }
 

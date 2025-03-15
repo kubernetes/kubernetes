@@ -34,12 +34,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	clientgotesting "k8s.io/client-go/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -574,54 +574,64 @@ detectLocalMode: "BridgeInterface"`)
 	}
 }
 
-func Test_waitForPodCIDR(t *testing.T) {
+func Test_getPodCIDRs(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	expected := []string{"192.168.0.0/24", "fd00:1:2::/64"}
+
+	expectedPodCIDRs := []string{"10.0.0.0/24", "2001:db2:1/64"}
+
+	client := clientsetfake.NewClientset()
 	nodeName := "test-node"
-	oldNode := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            nodeName,
-			ResourceVersion: "1000",
-		},
-		Spec: v1.NodeSpec{
-			PodCIDR:  "10.0.0.0/24",
-			PodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
-		},
-	}
-	node := &v1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            nodeName,
-			ResourceVersion: "1",
-		},
-	}
-	updatedNode := node.DeepCopy()
-	updatedNode.Spec.PodCIDRs = expected
-	updatedNode.Spec.PodCIDR = expected[0]
+	informer := informers.NewSharedInformerFactoryWithOptions(client, 0)
+	nodeLister := informer.Core().V1().Nodes().Lister()
+	nodeStore := informer.Core().V1().Nodes().Informer().GetStore()
 
-	// start with the new node
-	client := clientsetfake.NewSimpleClientset()
-	client.AddReactor("list", "nodes", func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
-		obj := &v1.NodeList{}
-		return true, obj, nil
-	})
-	fakeWatch := watch.NewFake()
-	client.PrependWatchReactor("nodes", clientgotesting.DefaultWatchReactor(fakeWatch, nil))
-
+	// add/update nodes in a go-routine
 	go func() {
-		fakeWatch.Add(node)
-		// receive a delete event for the old node
-		fakeWatch.Delete(oldNode)
-		// set the PodCIDRs on the new node
-		fakeWatch.Modify(updatedNode)
+		// "test-node" initially has no PodCIDRs
+		_ = nodeStore.Add(&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            nodeName,
+				ResourceVersion: "1",
+			},
+		})
+		// wait for poll interval
+		time.Sleep(time.Microsecond)
+
+		// "test-node" got updated without PodCIDRs
+		_ = nodeStore.Add(&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            nodeName,
+				ResourceVersion: "2",
+			},
+		})
+		// wait for poll interval
+		time.Sleep(time.Microsecond)
+
+		// "random-node" node got updated with PodCIRDs
+		_ = nodeStore.Add(&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "random-node",
+				ResourceVersion: "1",
+			},
+			Spec: v1.NodeSpec{
+				PodCIDRs: []string{"10.244.0.0/16", "fd00:10:244::/56"},
+			},
+		})
+
+		// "test-node" got updated with PodCIRDs
+		_ = nodeStore.Add(&v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            nodeName,
+				ResourceVersion: "3",
+			},
+			Spec: v1.NodeSpec{
+				PodCIDRs: []string{"10.0.0.0/24", "2001:db2:1/64"},
+			},
+		})
 	}()
-	got, err := waitForPodCIDR(ctx, client, node.Name)
-	if err != nil {
-		t.Errorf("waitForPodCIDR() unexpected error %v", err)
-		return
-	}
-	if !reflect.DeepEqual(got.Spec.PodCIDRs, expected) {
-		t.Errorf("waitForPodCIDR() got %v expected to be %v ", got.Spec.PodCIDRs, expected)
-	}
+
+	podCIDRs, _ := getPodCIDRsWithPollInterval(ctx, nodeLister, nodeName, time.Microsecond)
+	require.Equal(t, expectedPodCIDRs, podCIDRs)
 }
 
 func TestGetConntrackMax(t *testing.T) {
@@ -699,7 +709,7 @@ func TestProxyServer_platformSetup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
-			client := clientsetfake.NewSimpleClientset(tt.node)
+			client := clientsetfake.NewClientset()
 			s := &ProxyServer{
 				Config:   tt.config,
 				Client:   client,
@@ -709,7 +719,18 @@ func TestProxyServer_platformSetup(t *testing.T) {
 					v1.IPv6Protocol: net.IPv6zero,
 				},
 			}
-			err := s.platformSetup(ctx)
+			informer := informers.NewSharedInformerFactoryWithOptions(client, 0)
+			s.nodeInformer = informer.Core().V1().Nodes()
+			// add the node object to node store
+			nodeStore := informer.Core().V1().Nodes().Informer().GetStore()
+			node := tt.node.DeepCopy()
+			node.ObjectMeta.Name = s.Hostname
+			err := nodeStore.Add(node)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = s.platformSetup(ctx)
 			if err != nil {
 				t.Errorf("ProxyServer.createProxier() error = %v", err)
 				return

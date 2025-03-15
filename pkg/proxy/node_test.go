@@ -17,131 +17,142 @@ limitations under the License.
 package proxy
 
 import (
+	"net"
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	netutils "k8s.io/utils/net"
 )
 
-func TestNodePodCIDRHandlerAdd(t *testing.T) {
+func TestNodeManagerUpsert(t *testing.T) {
 	oldKlogOsExit := klog.OsExit
 	defer func() {
 		klog.OsExit = oldKlogOsExit
 	}()
 	klog.OsExit = customExit
 
-	tests := []struct {
-		name            string
-		oldNodePodCIDRs []string
-		newNodePodCIDRs []string
-		expectPanic     bool
-	}{
-		{
-			name: "both empty",
+	baseNode := &v1.Node{
+		Spec: v1.NodeSpec{
+			PodCIDRs: []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
 		},
-		{
-			name:            "initialized correctly",
-			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-		},
-		{
-			name:            "already initialized and same node",
-			oldNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-		},
-		{
-			name:            "already initialized and different node",
-			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-			expectPanic:     true,
+		Status: v1.NodeStatus{
+			Addresses: []v1.NodeAddress{
+				{Type: v1.NodeInternalIP, Address: "192.168.1.1"},
+				{Type: v1.NodeInternalIP, Address: "fd00:1:2:3::1"},
+			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := &NodePodCIDRHandler{
-				podCIDRs: tt.oldNodePodCIDRs,
-			}
-			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-node",
-					ResourceVersion: "1",
-				},
-				Spec: v1.NodeSpec{
-					PodCIDRs: tt.newNodePodCIDRs,
-				},
-			}
-			defer func() {
-				r := recover()
-				if r == nil && tt.expectPanic {
-					t.Errorf("The code did not panic")
-				} else if r != nil && !tt.expectPanic {
-					t.Errorf("The code did panic")
-				}
-			}()
-
-			n.OnNodeAdd(node)
-		})
-	}
-}
-
-func TestNodePodCIDRHandlerUpdate(t *testing.T) {
-	oldKlogOsExit := klog.OsExit
-	defer func() {
-		klog.OsExit = oldKlogOsExit
-	}()
-	klog.OsExit = customExit
 
 	tests := []struct {
-		name            string
-		oldNodePodCIDRs []string
-		newNodePodCIDRs []string
-		expectPanic     bool
+		name string
+		// nodeIPs represent the initial NodeIPs fetched via getNodeIPs() in cmd/kube-proxy/server.go
+		nodeIPs []net.IP
+		// podCIDRs represent the initial PodCIDRs fetched via getPodCIDRs() in cmd/kube-proxy/server_linux.go
+		// note: the initial set of PodCIDRs will never be nil if local mode is NodeCIDR.
+		podCIDRs          []string
+		localModeNodeCIDR bool
+		makeNode           func() *v1.Node
+		expectPanic       bool
 	}{
 		{
-			name: "both empty",
+			name:     "no initial NodeIPs and node updated without NodeIPs",
+			podCIDRs: []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			makeNode: func() *v1.Node {
+				node := baseNode.DeepCopy()
+				node.Status.Addresses = []v1.NodeAddress{}
+				return node
+			},
 		},
 		{
-			name:            "initialize",
-			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
+			name:        "no initial NodeIPs and node updated with NodeIPs",
+			podCIDRs:    []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			makeNode:     func() *v1.Node { return baseNode.DeepCopy() },
+			expectPanic: true,
 		},
 		{
-			name:            "same node",
-			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
+			name:              "DetectLocalMode=NodeCIDR, node updated with same NodeIPs and same PodCIDRs",
+			nodeIPs:           []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			podCIDRs:          []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			localModeNodeCIDR: true,
+			makeNode:           func() *v1.Node { return baseNode.DeepCopy() },
 		},
 		{
-			name:            "different nodes",
-			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-			expectPanic:     true,
+			name:              "DetectLocalMode!=NodeCIDR, node updated with same NodeIPs and same PodCIDRs",
+			nodeIPs:           []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			podCIDRs:          []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			localModeNodeCIDR: false,
+			makeNode:           func() *v1.Node { return baseNode.DeepCopy() },
+		},
+		{
+			name:              "DetectLocalMode=NodeCIDR, node updated with different NodeIPs and same PodCIDRs",
+			nodeIPs:           []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			podCIDRs:          []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			localModeNodeCIDR: true,
+			makeNode: func() *v1.Node {
+				node := baseNode.DeepCopy()
+				node.Status.Addresses = []v1.NodeAddress{
+					{Type: v1.NodeInternalIP, Address: "10.0.1.1"},
+					{Type: v1.NodeInternalIP, Address: "fd00:3:2:1::2"},
+				}
+				return node
+			},
+			expectPanic: true,
+		},
+		{
+			name:              "DetectLocalMode!=NodeCIDR, node updated with different NodeIPs and same PodCIDRs",
+			nodeIPs:           []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			podCIDRs:          []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			localModeNodeCIDR: false,
+			makeNode: func() *v1.Node {
+				node := baseNode.DeepCopy()
+				node.Status.Addresses = []v1.NodeAddress{
+					{Type: v1.NodeInternalIP, Address: "10.0.1.1"},
+					{Type: v1.NodeInternalIP, Address: "fd00:3:2:1::2"},
+				}
+				return node
+			},
+			expectPanic: true,
+		},
+		{
+			name:              "DetectLocalMode=NodeCIDR, node updated with same NodeIPs and different PodCIDRs",
+			nodeIPs:           []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			podCIDRs:          []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			localModeNodeCIDR: true,
+			makeNode: func() *v1.Node {
+				node := baseNode.DeepCopy()
+				node.Spec.PodCIDRs = []string{"192.168.1.0/24", "fd00:3:2:1::/64"}
+				return node
+			},
+			expectPanic: true,
+		},
+		{
+			name:              "DetectLocalMode!=NodeCIDR, node updated with same NodeIPs and different PodCIDRs",
+			nodeIPs:           []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			podCIDRs:          []string{"10.0.0.0/24", "fd00:1:2:3::/64"},
+			localModeNodeCIDR: false,
+			makeNode: func() *v1.Node {
+				node := baseNode.DeepCopy()
+				node.Spec.PodCIDRs = []string{"192.168.1.0/24", "fd00:3:2:1::/64"}
+				return node
+			},
+			expectPanic: false,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := &NodePodCIDRHandler{
-				podCIDRs: tt.oldNodePodCIDRs,
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			n := NewNodeManager(ctx, tc.nodeIPs, tc.podCIDRs, tc.localModeNodeCIDR, &healthcheck.ProxyHealthServer{})
+			if tc.expectPanic {
+				require.Panics(t, func() { n.OnNodeUpsert(tc.makeNode()) })
+			} else {
+				require.NotPanics(t, func() { n.OnNodeUpsert(tc.makeNode()) })
 			}
-			oldNode := &v1.Node{}
-			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-node",
-					ResourceVersion: "1",
-				},
-				Spec: v1.NodeSpec{
-					PodCIDRs: tt.newNodePodCIDRs,
-				},
-			}
-			defer func() {
-				r := recover()
-				if r == nil && tt.expectPanic {
-					t.Errorf("The code did not panic")
-				} else if r != nil && !tt.expectPanic {
-					t.Errorf("The code did panic")
-				}
-			}()
-
-			n.OnNodeUpdate(oldNode, node)
 		})
 	}
 }

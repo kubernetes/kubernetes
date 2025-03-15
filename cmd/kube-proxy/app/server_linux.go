@@ -32,13 +32,8 @@ import (
 	"github.com/google/cadvisor/utils/sysfs"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	toolswatch "k8s.io/client-go/tools/watch"
+	"k8s.io/apimachinery/pkg/util/wait"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -82,12 +77,12 @@ func (s *ProxyServer) platformSetup(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
 		logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
-		node, err := waitForPodCIDR(ctx, s.Client, s.Hostname)
+		podCIDRs, err := getPodCIDRs(ctx, s.nodeInformer.Lister(), s.Hostname)
 		if err != nil {
 			return err
 		}
-		s.podCIDRs = node.Spec.PodCIDRs
-		logger.Info("NodeInfo", "podCIDRs", node.Spec.PodCIDRs)
+		s.podCIDRs = podCIDRs
+		logger.Info("NodeInfo", "podCIDRs", podCIDRs)
 	}
 
 	ct := &realConntracker{}
@@ -381,48 +376,39 @@ func getConntrackMax(ctx context.Context, config proxyconfigapi.KubeProxyConntra
 	return 0, nil
 }
 
-func waitForPodCIDR(ctx context.Context, client clientset.Interface, nodeName string) (*v1.Node, error) {
-	// since allocators can assign the podCIDR after the node registers, we do a watch here to wait
-	// for podCIDR to be assigned, instead of assuming that the Get() on startup will have it.
-	ctx, cancelFunc := context.WithTimeout(ctx, timeoutForNodePodCIDR)
-	defer cancelFunc()
+// getPodCIDRs returns PodCIDR for the node with the provided name. If required, it will wait
+// for the informer cache to have the node object for the node with the provided name, and
+// is populated with PodCIDRs.
+func getPodCIDRs(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string) ([]string, error) {
+	return getPodCIDRsWithPollInterval(ctx, nodeLister, nodeName, time.Second)
+}
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", nodeName).String()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
-			options.FieldSelector = fieldSelector
-			return client.CoreV1().Nodes().List(ctx, options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
-			options.FieldSelector = fieldSelector
-			return client.CoreV1().Nodes().Watch(ctx, options)
-		},
-	}
-	condition := func(event watch.Event) (bool, error) {
-		// don't process delete events
-		if event.Type != watch.Modified && event.Type != watch.Added {
+// getPodCIDRsWithPollInterval implements getPodCIDRs with the given poll interval.
+func getPodCIDRsWithPollInterval(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string, pollInterval time.Duration) ([]string, error) {
+	logger := klog.FromContext(ctx)
+	var podCIDRs []string
+	var node *v1.Node
+	var err error
+
+	pollErr := wait.PollUntilContextCancel(ctx, pollInterval, true, func(context.Context) (bool, error) {
+		node, err = nodeLister.Get(nodeName)
+		if err != nil {
 			return false, nil
 		}
 
-		n, ok := event.Object.(*v1.Node)
-		if !ok {
-			return false, fmt.Errorf("event object not of type Node")
-		}
-		// don't consider the node if is going to be deleted and keep waiting
-		if !n.DeletionTimestamp.IsZero() {
+		podCIDRs = node.Spec.PodCIDRs
+		if len(podCIDRs) == 0 {
 			return false, nil
 		}
-		return n.Spec.PodCIDR != "" && len(n.Spec.PodCIDRs) > 0, nil
-	}
+		return true, nil
+	})
 
-	evt, err := toolswatch.UntilWithSync(ctx, lw, &v1.Node{}, nil, condition)
-	if err != nil {
-		return nil, fmt.Errorf("timeout waiting for PodCIDR allocation to configure detect-local-mode %v: %v", proxyconfigapi.LocalModeNodeCIDR, err)
+	if pollErr != nil {
+		logger.Info("Error to retrieve node PodCIDRs", "error", err)
+		return nil, err
 	}
-	if n, ok := evt.Object.(*v1.Node); ok {
-		return n, nil
-	}
-	return nil, fmt.Errorf("event object not of type node")
+	logger.Info("Successfully retrieved node PodCIDRs", "PodCIDRs", podCIDRs)
+	return podCIDRs, nil
 }
 
 func detectNumCPU() int {

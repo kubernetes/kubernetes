@@ -128,17 +128,11 @@ func (proxier *metaProxier) OnEndpointSlicesSynced() {
 	proxier.ipv6Proxier.OnEndpointSlicesSynced()
 }
 
-// OnNodeAdd is called whenever creation of new node object is observed.
-func (proxier *metaProxier) OnNodeAdd(node *v1.Node) {
-	proxier.ipv4Proxier.OnNodeAdd(node)
-	proxier.ipv6Proxier.OnNodeAdd(node)
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *metaProxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	proxier.ipv4Proxier.OnNodeUpdate(oldNode, node)
-	proxier.ipv6Proxier.OnNodeUpdate(oldNode, node)
+// OnNodeUpsert is called whenever creation of new or
+// modification of an existing node object is observed.
+func (proxier *metaProxier) OnNodeUpsert(node *v1.Node) {
+	proxier.ipv4Proxier.OnNodeUpsert(node)
+	proxier.ipv6Proxier.OnNodeUpsert(node)
 }
 
 // OnNodeDelete is called whenever deletion of an existing node
