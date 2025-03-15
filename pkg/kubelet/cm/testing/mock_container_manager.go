@@ -62,6 +62,52 @@ func (_m *MockContainerManager) EXPECT() *MockContainerManager_Expecter {
 	return &MockContainerManager_Expecter{mock: &_m.Mock}
 }
 
+// CanAllocateExclusively provides a mock function with given fields: res
+func (_m *MockContainerManager) CanAllocateExclusively(res v1.ResourceName) bool {
+	ret := _m.Called(res)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CanAllocateExclusively")
+	}
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(v1.ResourceName) bool); ok {
+		r0 = rf(res)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
+// MockContainerManager_CanAllocateExclusively_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CanAllocateExclusively'
+type MockContainerManager_CanAllocateExclusively_Call struct {
+	*mock.Call
+}
+
+// CanAllocateExclusively is a helper method to define mock.On call
+//   - res v1.ResourceName
+func (_e *MockContainerManager_Expecter) CanAllocateExclusively(res interface{}) *MockContainerManager_CanAllocateExclusively_Call {
+	return &MockContainerManager_CanAllocateExclusively_Call{Call: _e.mock.On("CanAllocateExclusively", res)}
+}
+
+func (_c *MockContainerManager_CanAllocateExclusively_Call) Run(run func(res v1.ResourceName)) *MockContainerManager_CanAllocateExclusively_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(v1.ResourceName))
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_CanAllocateExclusively_Call) Return(_a0 bool) *MockContainerManager_CanAllocateExclusively_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockContainerManager_CanAllocateExclusively_Call) RunAndReturn(run func(v1.ResourceName) bool) *MockContainerManager_CanAllocateExclusively_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ContainerHasExclusiveCPUs provides a mock function with given fields: pod, _a1
 func (_m *MockContainerManager) ContainerHasExclusiveCPUs(pod *v1.Pod, _a1 *v1.Container) bool {
 	ret := _m.Called(pod, _a1)
