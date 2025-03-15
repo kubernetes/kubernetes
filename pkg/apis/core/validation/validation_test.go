@@ -20,8 +20,11 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"math/rand"
 	"reflect"
 	"runtime"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,8 +36,13 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
+	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -44,8 +52,11 @@ import (
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
+	apitest "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install" // register types with scheme for GVK discovery
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -12364,7 +12375,7 @@ func TestValidatePod(t *testing.T) {
 			),
 		},
 		"final PVC name for ephemeral volume must be valid": {
-			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 characters",
+			expectedError: "spec.volumes[1].name: Invalid value: \"" + longVolName + "\": PVC name \"" + longPodName + "-" + longVolName + "\": must be no more than 253 bytes",
 			spec: *podtest.MakePod(longPodName,
 				podtest.SetVolumes(
 					core.Volume{Name: "pvc", VolumeSource: core.VolumeSource{PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "my-pvc"}}},
@@ -17130,9 +17141,12 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 	for _, tc := range successCases {
 		tc.old.ObjectMeta.ResourceVersion = "1"
 		tc.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{}); len(errs) != 0 {
+		errs := ValidateReplicationControllerUpdate(&tc.update, &tc.old, PodValidationOptions{})
+		if len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
+
+		verifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
 	}
 
 	errorCases := map[string]struct {
@@ -17205,6 +17219,8 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 			matcher.Test(t, tc.expectedErrs, errs)
 		})
+
+		verifyVersionedValidationEquivalence(t, &tc.update, &tc.old)
 	}
 }
 
@@ -17242,9 +17258,11 @@ func TestValidateReplicationController(t *testing.T) {
 		mkValidReplicationController(func(rc *core.ReplicationController) { rc.Spec.MinReadySeconds = 100 }),
 	}
 	for _, tc := range successCases {
-		if errs := ValidateReplicationController(&tc, PodValidationOptions{}); len(errs) != 0 {
+		errs := ValidateReplicationController(&tc, PodValidationOptions{})
+		if len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
+		verifyVersionedValidationEquivalence(t, &tc, nil)
 	}
 
 	errorCases := map[string]struct {
@@ -17370,6 +17388,106 @@ func TestValidateReplicationController(t *testing.T) {
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByDetailSubstring()
 			matcher.Test(t, tc.expectedErrs, errs)
 		})
+		verifyVersionedValidationEquivalence(t, &tc.input, nil)
+	}
+}
+
+func verifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Object) {
+	t.Helper()
+
+	// Accumulate errors from all versioned validation, per version.
+	all := map[string]field.ErrorList{}
+	accumulate := func(t *testing.T, gv string, errs field.ErrorList) {
+		all[gv] = errs
+	}
+	if old == nil {
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, accumulate)
+	} else {
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, old, accumulate)
+	}
+
+	// Make a copy so we can modify it.
+	other := map[string]field.ErrorList{}
+	// Index for nicer output.
+	keys := []string{}
+	for k, v := range all {
+		other[k] = v
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Compare each lhs to each rhs.
+	for _, lk := range keys {
+		lv := all[lk]
+		// remove lk since to prevent comparison to itself and because this
+		// iteration will compare it to any version it has not yet been
+		// compared to. e.g. [1, 2, 3] vs. [1, 2, 3] yields:
+		//   1 vs. 2
+		//   1 vs. 3
+		//   2 vs. 3
+		delete(other, lk)
+		// don't compare to ourself
+		for _, rk := range keys {
+			rv, found := other[rk]
+			if !found {
+				continue // done already
+			}
+			if len(lv) != len(rv) {
+				t.Errorf("different error count (%d vs. %d)\n%s: %v\n%s: %v", len(lv), len(rv), lk, fmtErrs(lv), rk, fmtErrs(rv))
+				continue
+			}
+			next := false
+			for i := range lv {
+				if l, r := lv[i], rv[i]; l.Type != r.Type || l.Detail != r.Detail {
+					t.Errorf("different errors\n%s: %v\n%s: %v", lk, fmtErrs(lv), rk, fmtErrs(rv))
+					next = true
+					break
+				}
+			}
+			if next {
+				continue
+			}
+		}
+	}
+}
+
+// helper for nicer output
+func fmtErrs(errs field.ErrorList) string {
+	if len(errs) == 0 {
+		return "<no errors>"
+	}
+	if len(errs) == 1 {
+		return strconv.Quote(errs[0].Error())
+	}
+	buf := bytes.Buffer{}
+	for _, e := range errs {
+		buf.WriteString("\n")
+		buf.WriteString(strconv.Quote(e.Error()))
+	}
+
+	return buf.String()
+}
+
+// FIXME: move somewhere generic - pkg/api/testing?
+func TestVersionedValidationByFuzzing(t *testing.T) {
+	for i := 0; i < *roundtrip.FuzzIters; i++ {
+		gv := schema.GroupVersion{Group: "", Version: "v1"}
+		f := fuzzer.FuzzerFor(apitest.FuzzerFuncs, rand.NewSource(rand.Int63()), legacyscheme.Codecs)
+		for kind := range legacyscheme.Scheme.KnownTypes(gv) {
+			obj, err := legacyscheme.Scheme.New(gv.WithKind(kind))
+			if err != nil {
+				t.Fatalf("could not create a %v: %s", kind, err)
+			}
+			f.Fill(obj)
+			verifyVersionedValidationEquivalence(t, obj, nil)
+
+			old, err := legacyscheme.Scheme.New(gv.WithKind(kind))
+			if err != nil {
+				t.Fatalf("could not create a %v: %s", kind, err)
+			}
+			f.Fill(old)
+			verifyVersionedValidationEquivalence(t, obj, old)
+		}
 	}
 }
 

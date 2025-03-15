@@ -430,13 +430,13 @@ func TestValidateStorageVersionName(t *testing.T) {
 		expectedErr: "",
 	}, {
 		name:        strings.Repeat("x", 254) + ".tokenreviews",
-		expectedErr: `the group segment must be no more than 253 characters`,
+		expectedErr: `the group segment must be no more than 253 bytes`,
 	}, {
 		name:        "authentication.k8s.io." + strings.Repeat("x", 63),
 		expectedErr: "",
 	}, {
 		name:        "authentication.k8s.io." + strings.Repeat("x", 64),
-		expectedErr: `the resource segment must be no more than 63 characters`,
+		expectedErr: `the resource segment must be no more than 63 bytes`,
 	}}
 	for _, tc := range cases {
 		errs := ValidateStorageVersionName(tc.name, false)
