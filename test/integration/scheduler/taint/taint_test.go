@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
@@ -69,6 +70,24 @@ func TestTaintNodeByCondition(t *testing.T) {
 	externalClientset := kubernetes.NewForConfigOrDie(externalClientConfig)
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, 0)
 
+	// Add an index to the pod informer to allow looking up pods by node name
+	nodeNameByIndex := "spec.nodeName"
+	err := externalInformers.Core().V1().Pods().Informer().AddIndexers(cache.Indexers{
+		nodeNameByIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return []string{}, nil
+			}
+			if len(pod.Spec.NodeName) == 0 {
+				return []string{}, nil
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to add pod informer indexer: %v", err)
+	}
+
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
@@ -92,6 +111,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 		100,         // Secondary eviction limiter QPS
 		100,         // Large cluster threshold
 		100,         // Unhealthy zone threshold
+		nodeNameByIndex,
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)

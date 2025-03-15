@@ -31,6 +31,7 @@ import (
 	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
 	coordinationv1 "k8s.io/api/coordination/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	certutil "k8s.io/client-go/util/cert"
@@ -97,6 +99,8 @@ const (
 	ConfigzName = "kubecontrollermanager.config.k8s.io"
 	// kubeControllerManager defines variable used internally when referring to cloud-controller-manager component
 	kubeControllerManager = "kube-controller-manager"
+	// NodeNameByIndex is the name of the index used by PodInformer to index pods by their node name.
+	NodeNameByIndex = "spec.nodeName"
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -410,6 +414,9 @@ type ControllerContext struct {
 
 	// GraphBuilder gives an access to dependencyGraphBuilder which keeps tracks of resources in the cluster
 	GraphBuilder *garbagecollector.GraphBuilder
+
+	// NodeNameByIndex is the name of the index used by PodInformer to index pods by their node name.
+	NodeNameByIndex string
 }
 
 // IsControllerEnabled checks if the context's controllers enabled or not
@@ -621,6 +628,24 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactoryWithOptions(versionedClient, ResyncPeriod(s)(), informers.WithTransform(trim))
 
+	// Add indexer to efficiently list pods by node name.
+	// This allows controllers to easily find all pods running on a specific node,
+	podInformer := sharedInformers.Core().V1().Pods().Informer()
+	if err := podInformer.AddIndexers(cache.Indexers{
+		NodeNameByIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*corev1.Pod)
+			if !ok {
+				return []string{}, nil
+			}
+			if len(pod.Spec.NodeName) == 0 {
+				return []string{}, nil
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	}); err != nil {
+		return ControllerContext{}, fmt.Errorf("failed to add pod node name indexer: %w", err)
+	}
+
 	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
 	metadataInformers := metadatainformer.NewSharedInformerFactoryWithOptions(metadataClient, ResyncPeriod(s)(), metadatainformer.WithTransform(trim))
 
@@ -641,6 +666,7 @@ func CreateControllerContext(ctx context.Context, s *config.CompletedConfig, roo
 	controllerContext := ControllerContext{
 		ClientBuilder:                   clientBuilder,
 		InformerFactory:                 sharedInformers,
+		NodeNameByIndex:                 NodeNameByIndex,
 		ObjectOrMetadataInformerFactory: informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
 		ComponentConfig:                 s.ComponentConfig,
 		RESTMapper:                      restMapper,

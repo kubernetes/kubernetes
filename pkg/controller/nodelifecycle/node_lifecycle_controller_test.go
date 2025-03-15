@@ -164,6 +164,7 @@ func newNodeLifecycleControllerFromClient(
 		secondaryEvictionLimiterQPS,
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
+		"spec.nodeName",
 	)
 	if err != nil {
 		return nil, err
