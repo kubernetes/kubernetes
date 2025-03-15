@@ -169,27 +169,9 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
 
-	if request.DeviceClassName == "" && len(request.FirstAvailable) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `deviceClassName` or `firstAvailable` must be specified"))
-	} else if request.DeviceClassName != "" && len(request.FirstAvailable) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified"))
-	} else if request.DeviceClassName != "" {
-		allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
-		allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
-		allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
-	} else if len(request.FirstAvailable) > 0 {
-		if request.Selectors != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectors"), request.Selectors, "must not be specified when firstAvailable is set"))
-		}
-		if request.AllocationMode != "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("allocationMode"), request.AllocationMode, "must not be specified when firstAvailable is set"))
-		}
-		if request.Count != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("count"), request.Count, "must not be specified when firstAvailable is set"))
-		}
-		if request.AdminAccess != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("adminAccess"), request.AdminAccess, "must not be specified when firstAvailable is set"))
-		}
+	numDeviceRequestType := 0
+	if len(request.FirstAvailable) > 0 {
+		numDeviceRequestType++
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
 				return validateDeviceSubRequest(subRequest, fldPath, stored)
@@ -199,6 +181,18 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 			},
 			fldPath.Child("firstAvailable"))...)
 	}
+	if request.Exactly != nil {
+		numDeviceRequestType++
+		allErrs = append(allErrs, validateSpecificDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
+	}
+
+	switch numDeviceRequestType {
+	case 0:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `exactly` or `firstAvailable` is required"))
+	case 1:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `exactly` or `firstAvailable` is required"))
+	}
 	return allErrs
 }
 
@@ -207,6 +201,14 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	return allErrs
+}
+
+func validateSpecificDeviceRequest(request resource.SpecificDeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
+	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	return allErrs
 }
 

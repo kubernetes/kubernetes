@@ -387,25 +387,63 @@ const (
 
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
-// also ask for several identical devices.
+// also ask for several identical devices. With FirstAvailable it is also
+// possible to provide a prioritized list of requests.
 type DeviceRequest struct {
 	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
 	//
-	// Must be a DNS label and unique among all DeviceRequests in a
-	// ResourceClaim.
+	// References using the name in the DeviceRequest will uniquely
+	// identify a request when the Exactly field is set. When the
+	// FirstAvailable field is set, a reference to the name of the
+	// DeviceRequest will match whatever subrequest is chosen by the
+	// scheduler.
+	//
+	// Must be a DNS label.
 	//
 	// +required
 	Name string
 
+	// Exactly specifies the details for a single request that must
+	// be met exactly for the request to be satisfied.
+	//
+	// One of Exactly or FirstAvailable must be set.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	Exactly *SpecificDeviceRequest
+
+	// FirstAvailable contains subrequests, of which exactly one will be
+	// satisfied by the scheduler to satisfy this request. It tries to
+	// satisfy them in the order in which they are listed here. So if
+	// there are two entries in the list, the schduler will only check
+	// the second one if it determines that the first one can not be used.
+	//
+	// DRA does not yet implement scoring, so the scheduler will
+	// select the first set of devices that satisfies all the
+	// requests in the claim. And if the requirements can
+	// be satisfied on more than one node, other scheduling features
+	// will determine which node is chosen. This means that the set of
+	// devices allocated to a claim might not be the optimal set
+	// available to the cluster. Scoring will be implemented later.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	// +listType=atomic
+	// +featureGate=DRAPrioritizedList
+	FirstAvailable []DeviceSubRequest
+}
+
+// SpecificDeviceRequest is a request for one or more identical devices.
+type SpecificDeviceRequest struct {
 	// DeviceClassName references a specific DeviceClass, which can define
 	// additional configuration and selectors to be inherited by this
 	// request.
 	//
-	// A class is required if no subrequests are specified in the
-	// firstAvailable list and no class can be set if subrequests
-	// are specified in the firstAvailable list.
-	// Which classes are available depends on the cluster.
+	// A DeviceClassName is required. Clients must check that it is
+	// indeed set. It's absence indicates that something changed in a way that
+	// is not supported by the client yet, in which case it must refuse to
+	// handle the request.
 	//
 	// Administrators may use this to restrict which devices may get
 	// requested by only installing classes with selectors for permitted
@@ -413,8 +451,7 @@ type DeviceRequest struct {
 	// then administrators can create an empty DeviceClass for users
 	// to reference.
 	//
-	// +optional
-	// +oneOf=deviceRequestType
+	// +required
 	DeviceClassName string
 
 	// Selectors define criteria which must be satisfied by a specific
@@ -480,28 +517,6 @@ type DeviceRequest struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool
-
-	// FirstAvailable contains subrequests, of which exactly one will be
-	// satisfied by the scheduler to satisfy this request. It tries to
-	// satisfy them in the order in which they are listed here. So if
-	// there are two entries in the list, the scheduler will only check
-	// the second one if it determines that the first one cannot be used.
-	//
-	// This field may only be set in the entries of DeviceClaim.Requests.
-	//
-	// DRA does not yet implement scoring, so the scheduler will
-	// select the first set of devices that satisfies all the
-	// requests in the claim. And if the requirements can
-	// be satisfied on more than one node, other scheduling features
-	// will determine which node is chosen. This means that the set of
-	// devices allocated to a claim might not be the optimal set
-	// available to the cluster. Scoring will be implemented later.
-	//
-	// +optional
-	// +oneOf=deviceRequestType
-	// +listType=atomic
-	// +featureGate=DRAPrioritizedList
-	FirstAvailable []DeviceSubRequest
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -509,10 +524,9 @@ type DeviceRequest struct {
 // is typically a request for a single resource like a device, but can
 // also ask for several identical devices.
 //
-// DeviceSubRequest is similar to Request, but doesn't expose the AdminAccess
-// or FirstAvailable fields, as those can only be set on the top-level request.
-// AdminAccess is not supported for requests with a prioritized list, and
-// recursive FirstAvailable fields are not supported.
+// DeviceSubRequest is similar to SpecificDeviceRequest, but doesn't expose the
+// AdminAccess field as that one is only supported when requesting a
+// specific device.
 type DeviceSubRequest struct {
 	// Name can be used to reference this subrequest in the list of constraints
 	// or the list of configurations for the claim. References must use the
