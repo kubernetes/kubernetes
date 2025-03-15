@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,12 +29,13 @@ import (
 )
 
 // backoffQueuer is a wrapper for backoffQ related operations.
+// Its methods that relies on the queues, take the lock inside.
 type backoffQueuer interface {
 	// isPodBackingoff returns true if a pod is still waiting for its backoff timer.
 	// If this returns true, the pod should not be re-tried.
 	isPodBackingoff(podInfo *framework.QueuedPodInfo) bool
-	// popEachBackoffCompleted run fn for all pods from podBackoffQ and podErrorBackoffQ that completed backoff while popping them.
-	popEachBackoffCompleted(logger klog.Logger, fn func(pInfo *framework.QueuedPodInfo))
+	// popAllBackoffCompleted pops all pods from podBackoffQ and podErrorBackoffQ that completed backoff.
+	popAllBackoffCompleted(logger klog.Logger) []*framework.QueuedPodInfo
 
 	// podInitialBackoffDuration returns initial backoff duration that pod can get.
 	podInitialBackoffDuration() time.Duration
@@ -62,6 +64,14 @@ type backoffQueuer interface {
 // backoffQueue implements backoffQueuer and wraps two queues inside,
 // providing seamless access as if it were one queue.
 type backoffQueue struct {
+	// lock synchronizes all operations related to backoffQ.
+	// It protects both podBackoffQ and podErrorBackoffQ.
+	// Caution: DO NOT take "SchedulingQueue.lock" or "activeQueue.lock" after taking "lock".
+	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" first, otherwise the queue could end up in deadlock.
+	// "lock" should not be taken after taking "nominator.nLock".
+	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock > lock > nominator.nLock.
+	lock sync.RWMutex
+
 	clock clock.Clock
 
 	// podBackoffQ is a heap ordered by backoff expiry. Pods which have completed backoff
@@ -144,7 +154,8 @@ func (bq *backoffQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInf
 	return duration
 }
 
-func (bq *backoffQueue) popEachBackoffCompletedWithQueue(logger klog.Logger, fn func(pInfo *framework.QueuedPodInfo), queue *heap.Heap[*framework.QueuedPodInfo]) {
+func (bq *backoffQueue) popAllBackoffCompletedWithQueue(logger klog.Logger, queue *heap.Heap[*framework.QueuedPodInfo]) []*framework.QueuedPodInfo {
+	var poppedPods []*framework.QueuedPodInfo
 	for {
 		pInfo, ok := queue.Peek()
 		if !ok || pInfo == nil {
@@ -159,23 +170,29 @@ func (bq *backoffQueue) popEachBackoffCompletedWithQueue(logger klog.Logger, fn 
 			logger.Error(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			break
 		}
-		if fn != nil {
-			fn(pInfo)
-		}
+		poppedPods = append(poppedPods, pInfo)
 	}
+	return poppedPods
 }
 
-// popEachBackoffCompleted run fn for all pods from podBackoffQ and podErrorBackoffQ that completed backoff while popping them.
-func (bq *backoffQueue) popEachBackoffCompleted(logger klog.Logger, fn func(pInfo *framework.QueuedPodInfo)) {
+// popAllBackoffCompleted pops all pods from podBackoffQ and podErrorBackoffQ that completed backoff.
+func (bq *backoffQueue) popAllBackoffCompleted(logger klog.Logger) []*framework.QueuedPodInfo {
+	bq.lock.Lock()
+	defer bq.lock.Unlock()
+
 	// Ensure both queues are called
-	bq.popEachBackoffCompletedWithQueue(logger, fn, bq.podBackoffQ)
-	bq.popEachBackoffCompletedWithQueue(logger, fn, bq.podErrorBackoffQ)
+	poppedPods := bq.popAllBackoffCompletedWithQueue(logger, bq.podBackoffQ)
+	poppedPods = append(poppedPods, bq.popAllBackoffCompletedWithQueue(logger, bq.podErrorBackoffQ)...)
+	return poppedPods
 }
 
 // add adds the pInfo to backoffQueue.
 // The event should show which event triggered this addition and is used for the metric recording.
 // It also ensures that pInfo is not in both queues.
 func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
+	bq.lock.Lock()
+	defer bq.lock.Unlock()
+
 	// If pod has empty both unschedulable plugins and pending plugins,
 	// it means that it failed because of error and should be moved to podErrorBackoffQ.
 	if pInfo.UnschedulablePlugins.Len() == 0 && pInfo.PendingPlugins.Len() == 0 {
@@ -202,6 +219,9 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 // update updates the pod in backoffQueue if oldPodInfo is already in the queue.
 // It returns new pod info if updated, nil otherwise.
 func (bq *backoffQueue) update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
+	bq.lock.Lock()
+	defer bq.lock.Unlock()
+
 	// If the pod is in the backoff queue, update it there.
 	if pInfo, exists := bq.podBackoffQ.Get(oldPodInfo); exists {
 		_ = pInfo.Update(newPod)
@@ -219,12 +239,32 @@ func (bq *backoffQueue) update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodIn
 
 // delete deletes the pInfo from backoffQueue.
 func (bq *backoffQueue) delete(pInfo *framework.QueuedPodInfo) {
+	bq.lock.Lock()
+	defer bq.lock.Unlock()
+
 	_ = bq.podBackoffQ.Delete(pInfo)
 	_ = bq.podErrorBackoffQ.Delete(pInfo)
 }
 
+// popBackoff pops the pInfo from the podBackoffQ.
+// It returns nil if the queue is empty.
+// This doesn't pop the pods from the podErrorBackoffQ.
+func (bq *backoffQueue) popBackoff() *framework.QueuedPodInfo {
+	bq.lock.Lock()
+	defer bq.lock.Unlock()
+
+	pInfo, err := bq.podBackoffQ.Pop()
+	if err != nil {
+		return nil
+	}
+	return pInfo
+}
+
 // get returns the pInfo matching given pInfoLookup, if exists.
 func (bq *backoffQueue) get(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool) {
+	bq.lock.RLock()
+	defer bq.lock.RUnlock()
+
 	pInfo, exists := bq.podBackoffQ.Get(pInfoLookup)
 	if exists {
 		return pInfo, true
@@ -234,15 +274,24 @@ func (bq *backoffQueue) get(pInfoLookup *framework.QueuedPodInfo) (*framework.Qu
 
 // has inform if pInfo exists in the queue.
 func (bq *backoffQueue) has(pInfo *framework.QueuedPodInfo) bool {
+	bq.lock.RLock()
+	defer bq.lock.RUnlock()
+
 	return bq.podBackoffQ.Has(pInfo) || bq.podErrorBackoffQ.Has(pInfo)
 }
 
 // list returns all pods that are in the queue.
 func (bq *backoffQueue) list() []*framework.QueuedPodInfo {
+	bq.lock.RLock()
+	defer bq.lock.RUnlock()
+
 	return append(bq.podBackoffQ.List(), bq.podErrorBackoffQ.List()...)
 }
 
 // len returns length of the queue.
 func (bq *backoffQueue) len() int {
+	bq.lock.RLock()
+	defer bq.lock.RUnlock()
+
 	return bq.podBackoffQ.Len() + bq.podErrorBackoffQ.Len()
 }
