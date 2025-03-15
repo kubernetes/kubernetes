@@ -1,0 +1,127 @@
+P0 ("things we need to get done to get it merged upstream"):
+- How to deal with fields which are +k8s:optional and +default - they need a
+  required-check, but only on server-side, never client-side. 
+   - For optional fields w/ defaults how do we want to handle this
+   - Are some items in strategies
+   - things we have declarative defaults, "implicit" defaults (zero value), and side-channel defaults
+   - maybe switch from Replication Controller as other field maybe doesn't need this resolved
+- Validation logic for:
+    - listMap key requiredness (no auto-fail if you have same list map key)
+      - defaulted keys (key in a list map must be required but can have a default.  If default, need to use that in X places. Related to default ordering)
+    - immutable (update)
+- Convert 2-3 fields
+- Clearly documented recipe for doing the recipe
+  - Flow like prove X, make a change, then prove X again
+  - test throught strategy.go, validation.go, or both?
+  - ok to start process of moving up through strategy.go if it is cleaner?  Should be there already? Initial PR maybe don't do the move?
+- Squash and rebase the PR to prepare for upstream PR
+  - drop unrelated changes, e.g. TODOs in pkg/apis/core/validation/validation_test.go
+- Add metrics gated by "DeclarativeValidationMismatchMetrics" to emit validation errors mismatch
+- Validation "origin" for tests
+
+
+P1:
+- Should defaults take +k8s:default?
+  - Adopted convention of prefix "+k8s:", do defaults also get "+k8s:"?
+- Validation logic for:
+  - more format
+  - more schema
+- cross field validations
+  - only validate obj.X if this validation passes
+  - if obj.X is value Y, then validate obj.Z
+  - field found in listfield Y (e.g. volume mount name)
+  - dependencies - field X is allowed IFF field Y
+- lists - whether add/remove are allowed on update
+- listType=set needs to validate all unique values
+- label/annotation validations based on Object type
+- IntOrString
+- Fix subresources
+  - "spec" and "status" are hard coded in generator, drive them off of a `+subresource=status` tag?
+  - Do we need to do anything special for "scale"?
+- Consider adding flag-optional mutation checks along the way through the REST
+  stack (copy object, call strategy, diff).
+- Fix defaulting ordering vs manual
+- Conditional defaulting
+- Add CEL validation rules
+- When calling a validation function in another pkg, we need to make sure it exists
+  - by name convention + fingerprint
+  - by explicit tag (e.g. // +validation-func-for=...
+- Warning support
+  - Decide how to implement
+- Stop using "+k8s:validation-gen=TypeMeta" to find root types?
+  - Do we need something more flexible?
+- Migrate core group to declarative validation
+  - xref: Alex's WIP for jobs: https://github.com/alexzielenski/kubectl-validate/blob/jobset/jobset/patches/apis/jobset.x-k8s.io/v1alpha2.json
+  - Enable declarative validation for strategies and test
+- Error when calling eachVal on non-list types or ignore?
+- failure tests for error messages
+- Test for registration / init func
+- We may need to nest "built-in" tags.
+  - +eachVal=+subField(Foo)=+minimum=6
+  - +subfield(Foo)=+eachField=+minimum=6
+  - +subfield(Foo)=+subfield(Bar)=+eachVal=+subField(Qux)=+minimum=6
+- Correlate listType=set by exact value
+  - maybe allow a sloppy compare for IPs?
+- Allow some form of "key" like listMap, but for atomic lists
+  - uniqueness
+  - correlated updates
+- Investigate "chains" style output so CRDs can use the same primitives
+- Simplify the "always nilable" logic
+  - e.g. always pass non-pointer `value` and pointer `oldValue`; return
+    internal error if a pointer field is nil and not checked for
+    `required`/`optional`.
+- Add generator failure testing. For example, we should ensure that the generator panics if a type
+  is unimported and "+k8s:skipUnimported" is not set.
+
+P2: 
+- Deduplicate `jsontagutil.go`. It was copy-pasted in from applyconfig-gen
+- Deduplicate most of enum.go, it was copy-pasted in from kube-openapi
+- Use Go-standard-style names for generated functions
+  for scalar testing that should be put in declarative validator test code
+- Linear or bin-search ListMap rather thsan build a map?
+- enums: pass the sorted list of value rather than a set, do a linear/binary search
+- Revisit whether eachKey/eachVal can be a single function call
+- Add a way to store a comment with a FunctionGen, so we could emit things like
+  the which tag caused it
+- When we do CRDs:
+  - accept or warn on kubebuilder comments?
+
+
+Later:
+- Try to link typedef-of-typedef to chain validations?
+  ```
+  Get pos in walkType
+  for each file in pkg.Syntax[] (ast.File)
+        for each decl in file.Decls[] (ast.Decl -> ast.GenDecl)
+                for each spec in decl.Specs[] (ast.Spec -> ast.TypeSpec)
+                        if Name.NamePos matches {
+                                Look at spec.Type
+                                if is ast.Ident
+                                        look at ident.Obj
+                                        if nil
+                                                builtin?
+                                        if obj.Kind = Typ
+                                                look at obj.Name and obj.Decl.(TypeSpec).Name.NamePos
+                                                match that to another type?
+  ```
+- Add file+line info to gengo Type and Member (for better errors)
+  - parser.fset.Position(Named.Obj().Pos())
+  - parser.fset.Position(Var.Pos())
+- Can we fix the gengo alias-to-ptr issue?  Causes problems in other generators.
+  ```
+  diff --git a/vendor/k8s.io/gengo/v2/parser/parse.go b/vendor/k8s.io/gengo/v2/parser/parse.go
+  index a5993d16393..9214db19873 100644
+  --- a/vendor/k8s.io/gengo/v2/parser/parse.go
+  +++ b/vendor/k8s.io/gengo/v2/parser/parse.go
+  @@ -726,7 +726,7 @@ func (p *Parser) walkType(u types.Universe, useName *types.Name, in gotypes.Type
+          case *gotypes.Named:
+                  var out *types.Type
+                  switch t.Underlying().(type) {
+  -               case *gotypes.Named, *gotypes.Basic, *gotypes.Map, *gotypes.Slice:
+  +               case *gotypes.Named, *gotypes.Basic, *gotypes.Map, *gotypes.Slice, *gotypes.Pointer:
+                          name := goNameToName(t.String())
+                          out = u.Type(name)
+                          if out.Kind != types.Unknown {
+  ```
+- Exclude all fields that do not have a json struct tag with a name from validation.
+- Move logic from k8s.io/apimachinery/pkg/util/validation/ to k8s.io/apimachinery/pkg/api/
