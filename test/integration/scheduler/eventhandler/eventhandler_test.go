@@ -270,8 +270,8 @@ func TestUpdateNominatedNodeName(t *testing.T) {
 				// Note that the update has to happen since the nominated pod is still in the backoffQ to actually test updates of nominated, but not bound yet pods.
 				tt.updateFunc(testCtx)
 
-				// Advance time by the maxPodBackoffSeconds to move low priority pod out of the backoff queue.
-				fakeClock.Step(testBackoff)
+				// Advance time by the 2 * maxPodBackoffSeconds to move low priority pod out of the backoff queue.
+				fakeClock.Step(2 * testBackoff)
 
 				// Expect the low-priority pod is notified about unnominated mid-pririty pod and gets scheduled, as it should fit this time.
 				if err := testutils.WaitForPodToSchedule(testCtx.Ctx, testCtx.ClientSet, podLow); err != nil {

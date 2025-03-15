@@ -20,12 +20,20 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/utils/clock"
 )
+
+// backoffQOrderingWindowDuration is a duration of an ordering window in the podBackoffQ.
+// In each window, represented as a whole second, pods are ordered by priority.
+// It is the same as interval of flushing the pods from the podBackoffQ to the activeQ, to flush the whole windows there.
+// This works only if PopFromBackoffQ feature is enabled.
+// See the KEP-5142 (http://kep.k8s.io/5142) for rationale.
+const backoffQOrderingWindowDuration = time.Second
 
 // backoffQueuer is a wrapper for backoffQ related operations.
 type backoffQueuer interface {
@@ -39,6 +47,10 @@ type backoffQueuer interface {
 	podInitialBackoffDuration() time.Duration
 	// podMaxBackoffDuration returns maximum backoff duration that pod can get.
 	podMaxBackoffDuration() time.Duration
+	// waitUntilAlignedWithOrderingWindow waits until the time reaches the multiple of backoffQOrderingWindowDuration.
+	// It's important to align the flushing time, because podBackoffQ's ordering is based on the windows
+	// and whole windows have to be flushed at one time without a visible latency.
+	waitUntilAlignedWithOrderingWindow(stopCh <-chan struct{})
 
 	// add adds the pInfo to backoffQueue.
 	// The event should show which event triggered this addition and is used for the metric recording.
@@ -73,15 +85,23 @@ type backoffQueue struct {
 
 	podInitialBackoff time.Duration
 	podMaxBackoff     time.Duration
+
+	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
+	isPopFromBackoffQEnabled bool
 }
 
-func newBackoffQueue(clock clock.Clock, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration) *backoffQueue {
+func newBackoffQueue(clock clock.Clock, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, popFromBackoffQEnabled bool) *backoffQueue {
 	bq := &backoffQueue{
-		clock:             clock,
-		podInitialBackoff: podInitialBackoffDuration,
-		podMaxBackoff:     podMaxBackoffDuration,
+		clock:                    clock,
+		podInitialBackoff:        podInitialBackoffDuration,
+		podMaxBackoff:            podMaxBackoffDuration,
+		isPopFromBackoffQEnabled: popFromBackoffQEnabled,
 	}
-	bq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, bq.lessBackoffCompleted, metrics.NewBackoffPodsRecorder())
+	podBackoffQLessFn := bq.lessBackoffCompleted
+	if popFromBackoffQEnabled {
+		podBackoffQLessFn = bq.lessBackoffCompletedWithPriority
+	}
+	bq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, podBackoffQLessFn, metrics.NewBackoffPodsRecorder())
 	bq.podErrorBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, bq.lessBackoffCompleted, metrics.NewBackoffPodsRecorder())
 
 	return bq
@@ -97,7 +117,50 @@ func (bq *backoffQueue) podMaxBackoffDuration() time.Duration {
 	return bq.podMaxBackoff
 }
 
-// lessBackoffCompleted is a less function of podBackoffQ and podErrorBackoffQ.
+// windowForTime truncates the provided time to the podBackoffQ ordering window.
+// It returns the lowest possible timestamp in the window.
+func (bq *backoffQueue) windowForTime(t time.Time) time.Time {
+	if !bq.isPopFromBackoffQEnabled {
+		return t
+	}
+	return t.Truncate(backoffQOrderingWindowDuration)
+}
+
+// waitUntilAlignedWithOrderingWindow waits until the time reaches the multiple of backoffQOrderingWindowDuration.
+// It's important to align the flushing time, because podBackoffQ's ordering is based on the windows
+// and whole windows have to be flushed at one time without a visible latency.
+func (bq *backoffQueue) waitUntilAlignedWithOrderingWindow(stopCh <-chan struct{}) {
+	now := bq.clock.Now()
+	// Wait until the time reaches the multiple of backoffQOrderingWindowDuration.
+	durationToNextWindow := bq.windowForTime(now.Add(backoffQOrderingWindowDuration)).Sub(now)
+	t := bq.clock.NewTimer(durationToNextWindow)
+	select {
+	case <-stopCh:
+		_ = t.Stop()
+		return
+	case <-t.C():
+	}
+}
+
+// lessBackoffCompletedWithPriority is a less function of podBackoffQ if PopFromBackoffQ feature is enabled.
+// It orders the pods by priority in the same BackoffOrderingWindow to improve popping order from backoffQ when activeQ is empty.
+func (bq *backoffQueue) lessBackoffCompletedWithPriority(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
+	bo1 := bq.getBackoffTime(pInfo1)
+	bo2 := bq.getBackoffTime(pInfo2)
+	if !bo1.Equal(bo2) {
+		return bo1.Before(bo2)
+	}
+
+	pod1Priority := corev1helpers.PodPriority(pInfo1.Pod)
+	pod2Priority := corev1helpers.PodPriority(pInfo2.Pod)
+	if pod1Priority != pod2Priority {
+		return pod1Priority > pod2Priority
+	}
+
+	return pInfo1.Timestamp.Before(pInfo2.Timestamp)
+}
+
+// lessBackoffCompleted is a less function of podErrorBackoffQ.
 func (bq *backoffQueue) lessBackoffCompleted(pInfo1, pInfo2 *framework.QueuedPodInfo) bool {
 	bo1 := bq.getBackoffTime(pInfo1)
 	bo2 := bq.getBackoffTime(pInfo2)
@@ -111,6 +174,14 @@ func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 	return boTime.After(bq.clock.Now())
 }
 
+// podCompletedBackoff returns true if a pod completed its backoff
+// and should be flushed to the activeQ. This method is different than isPodBackingoff,
+// because it has to allow to pop only pods from the previous windows.
+func (bq *backoffQueue) podCompletedBackoff(podInfo *framework.QueuedPodInfo) bool {
+	boTime := bq.getBackoffTime(podInfo)
+	return boTime.Before(bq.windowForTime(bq.clock.Now()))
+}
+
 // getBackoffTime returns the time that podInfo completes backoff.
 // It caches the result in podInfo.BackoffExpiration and returns this value in subsequent calls.
 // The cache will be cleared when this pod is poped from the scheduling queue again (i.e., at activeQ's pop),
@@ -120,6 +191,7 @@ func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Ti
 	if podInfo.BackoffExpiration.IsZero() {
 		duration := bq.calculateBackoffDuration(podInfo)
 		podInfo.BackoffExpiration = podInfo.Timestamp.Add(duration)
+		podInfo.BackoffExpiration = bq.windowForTime(podInfo.BackoffExpiration)
 	}
 	return podInfo.BackoffExpiration
 }
@@ -151,7 +223,7 @@ func (bq *backoffQueue) popEachBackoffCompletedWithQueue(logger klog.Logger, fn 
 			break
 		}
 		pod := pInfo.Pod
-		if bq.isPodBackingoff(pInfo) {
+		if !bq.podCompletedBackoff(pInfo) {
 			break
 		}
 		_, err := queue.Pop()
