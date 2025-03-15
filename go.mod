@@ -257,3 +257,13 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 )
+
+tool (
+	github.com/onsi/ginkgo/v2/ginkgo
+	k8s.io/code-generator/cmd/deepcopy-gen
+	k8s.io/code-generator/cmd/defaulter-gen
+	k8s.io/code-generator/cmd/go-to-protobuf
+	k8s.io/code-generator/cmd/go-to-protobuf/protoc-gen-gogo
+	k8s.io/kube-openapi/cmd/openapi-gen
+	github.com/armon/go-socks5
+)
