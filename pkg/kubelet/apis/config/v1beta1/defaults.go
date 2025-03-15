@@ -313,4 +313,10 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 			obj.CrashLoopBackOff.MaxContainerRestartPeriod = &metav1.Duration{Duration: MaxContainerBackOff}
 		}
 	}
+
+	if localFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		if obj.ImagePullCredentialsVerificationPolicy == "" {
+			obj.ImagePullCredentialsVerificationPolicy = kubeletconfigv1beta1.NeverVerifyPreloadedImages
+		}
+	}
 }
