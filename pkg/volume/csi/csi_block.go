@@ -457,15 +457,14 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 	stagingPath := m.GetStagingPath()
 	if _, err := os.Stat(stagingPath); err != nil {
 		if os.IsNotExist(err) {
-			klog.V(4).Info(log("blockMapper.TearDownDevice stagingPath(%s) has already been deleted, skip calling NodeUnstageVolume", stagingPath))
+			klog.V(4).Info(log("blockMapper.TearDownDevice stagingPath(%s) has already been deleted", stagingPath))
 		} else {
 			return err
 		}
-	} else {
-		err := m.unstageVolumeForBlock(ctx, csiClient, stagingPath)
-		if err != nil {
-			return err
-		}
+	}
+	err = m.unstageVolumeForBlock(ctx, csiClient, stagingPath)
+	if err != nil {
+		return err
 	}
 	if err = m.cleanupOrphanDeviceFiles(); err != nil {
 		// V(4) for not so serious error
