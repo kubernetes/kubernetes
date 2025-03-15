@@ -189,6 +189,10 @@ func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.Po
 				AvailableBytes:  &availableBytes,
 				WorkingSetBytes: &WorkingSetBytes,
 			},
+			Swap: &statsapi.SwapStats{
+				SwapAvailableBytes: ptr.To(uint64(0)),
+				SwapUsageBytes:     ptr.To(uint64(0)),
+			},
 			SystemContainers: []statsapi.ContainerStats{
 				// Used for memory signal observations on linux
 				{
