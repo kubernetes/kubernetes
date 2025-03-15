@@ -245,6 +245,7 @@ var (
 		lifecycle.PodOSNotSupported,
 		lifecycle.InvalidNodeInfo,
 		lifecycle.InitContainerRestartPolicyForbidden,
+		lifecycle.SupplementalGroupsPolicyNotSupported,
 		lifecycle.UnexpectedAdmissionError,
 		lifecycle.UnknownReason,
 		lifecycle.UnexpectedPredicateFailureType,

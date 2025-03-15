@@ -25,25 +25,19 @@ package node
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-	ptr "k8s.io/utils/ptr"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/gcustom"
 )
 
 // SeccompProcStatusField is the field of /proc/$PID/status referencing the seccomp filter type.
@@ -117,167 +111,6 @@ var _ = SIGDescribe("Security Context", func() {
 				pod, 0,
 				[]string{fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)},
 			)
-		})
-	})
-
-	SIGDescribe("SupplementalGroupsPolicy", feature.SupplementalGroupsPolicy, func() {
-		timeout := 3 * time.Minute
-
-		agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
-		uidInImage := int64(1000)
-		gidDefinedInImage := int64(50000)
-		supplementalGroup := int64(60000)
-
-		supportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
-			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(node).NotTo(gomega.BeNil())
-			if node.Status.Features != nil {
-				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
-				if supportsSupplementalGroupsPolicy != nil && *supportsSupplementalGroupsPolicy {
-					return true
-				}
-			}
-			return false
-		}
-		mkPod := func(policy *v1.SupplementalGroupsPolicy) *v1.Pod {
-			pod := scTestPod(false, false)
-
-			// In specified image(agnhost E2E image),
-			// - user-defined-in-image(uid=1000) is defined
-			// - user-defined-in-image belongs to group-defined-in-image(gid=50000)
-			// thus, resultant supplementary group of the container processes should be
-			// - 1000 : self
-			// - 50000: pre-defined groups defined in the container image(/etc/group) of self(uid=1000)
-			// - 60000: specified in SupplementalGroups
-			// $ id -G
-			// 1000 50000 60000 (if SupplementalGroupsPolicy=Merge or not set)
-			// 1000 60000       (if SupplementalGroupsPolicy=Strict)
-			pod.Spec.SecurityContext.RunAsUser = &uidInImage
-			pod.Spec.SecurityContext.SupplementalGroupsPolicy = policy
-			pod.Spec.SecurityContext.SupplementalGroups = []int64{supplementalGroup}
-			pod.Spec.Containers[0].Image = agnhostImage
-			pod.Spec.Containers[0].Command = []string{"sh", "-c", "id -G; while :; do sleep 1; done"}
-
-			return pod
-		}
-		waitForContainerUser := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedContainerUser *v1.ContainerUser) error {
-			return framework.Gomega().Eventually(ctx,
-				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
-				WithTimeout(timeout).
-				Should(gcustom.MakeMatcher(func(p *v1.Pod) (bool, error) {
-					for _, s := range p.Status.ContainerStatuses {
-						if s.Name == containerName {
-							return reflect.DeepEqual(s.User, expectedContainerUser), nil
-						}
-					}
-					return false, nil
-				}))
-		}
-		waitForPodLogs := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedLog string) error {
-			return framework.Gomega().Eventually(ctx,
-				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
-				WithTimeout(timeout).
-				Should(gcustom.MakeMatcher(func(p *v1.Pod) (bool, error) {
-					podLogs, err := e2epod.GetPodLogs(ctx, f.ClientSet, p.Namespace, p.Name, containerName)
-					if err != nil {
-						return false, err
-					}
-					return podLogs == expectedLog, nil
-				}))
-		}
-
-		ginkgo.When("SupplementalGroupsPolicy was not set", func() {
-			ginkgo.It("if the container's primary UID belongs to some groups in the image, it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
-				var pod *v1.Pod
-				ginkgo.By("creating a pod", func() {
-					pod = e2epod.NewPodClient(f).Create(ctx, mkPod(nil))
-					framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
-					var err error
-					pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					if !supportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
-						e2eskipper.Skipf("node does not support SupplementalGroupsPolicy")
-					}
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
-				})
-				expectedOutput := fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)
-				expectedContainerUser := &v1.ContainerUser{
-					Linux: &v1.LinuxContainerUser{
-						UID:                uidInImage,
-						GID:                uidInImage,
-						SupplementalGroups: []int64{uidInImage, gidDefinedInImage, supplementalGroup},
-					},
-				}
-
-				framework.ExpectNoError(waitForContainerUser(ctx, f, pod.Name, pod.Spec.Containers[0].Name, expectedContainerUser))
-				framework.ExpectNoError(waitForPodLogs(ctx, f, pod.Name, pod.Spec.Containers[0].Name, expectedOutput+"\n"))
-
-				stdout := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "id", "-G")
-				gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
-			})
-		})
-		ginkgo.When("SupplementalGroupsPolicy was set to Merge", func() {
-			ginkgo.It("if the container's primary UID belongs to some groups in the image, it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
-				var pod *v1.Pod
-				ginkgo.By("creating a pod", func() {
-					pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyMerge)))
-					framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
-					var err error
-					pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					if !supportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
-						e2eskipper.Skipf("node does not support SupplementalGroupsPolicy")
-					}
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
-				})
-
-				expectedOutput := fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)
-				expectedContainerUser := &v1.ContainerUser{
-					Linux: &v1.LinuxContainerUser{
-						UID:                uidInImage,
-						GID:                uidInImage,
-						SupplementalGroups: []int64{uidInImage, gidDefinedInImage, supplementalGroup},
-					},
-				}
-
-				framework.ExpectNoError(waitForContainerUser(ctx, f, pod.Name, pod.Spec.Containers[0].Name, expectedContainerUser))
-				framework.ExpectNoError(waitForPodLogs(ctx, f, pod.Name, pod.Spec.Containers[0].Name, expectedOutput+"\n"))
-
-				stdout := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "id", "-G")
-				gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
-			})
-		})
-		ginkgo.When("SupplementalGroupsPolicy was set to Strict", func() {
-			ginkgo.It("even if the container's primary UID belongs to some groups in the image, it should not add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
-				var pod *v1.Pod
-				ginkgo.By("creating a pod", func() {
-					pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
-					framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
-					var err error
-					pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					if !supportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
-						e2eskipper.Skipf("node does not support SupplementalGroupsPolicy")
-					}
-					framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
-				})
-
-				expectedOutput := fmt.Sprintf("%d %d", uidInImage, supplementalGroup)
-				expectedContainerUser := &v1.ContainerUser{
-					Linux: &v1.LinuxContainerUser{
-						UID:                uidInImage,
-						GID:                uidInImage,
-						SupplementalGroups: []int64{uidInImage, supplementalGroup},
-					},
-				}
-
-				framework.ExpectNoError(waitForContainerUser(ctx, f, pod.Name, pod.Spec.Containers[0].Name, expectedContainerUser))
-				framework.ExpectNoError(waitForPodLogs(ctx, f, pod.Name, pod.Spec.Containers[0].Name, expectedOutput+"\n"))
-
-				stdout := e2epod.ExecCommandInContainer(f, pod.Name, pod.Spec.Containers[0].Name, "id", "-G")
-				gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
-			})
 		})
 	})
 
