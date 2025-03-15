@@ -348,15 +348,15 @@ func TestSelectCandidate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-
-			state := framework.NewCycleState()
-			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
-				t.Errorf("Unexpected PreFilter Status: %v", status)
-			}
 			nodeInfos, err := snapshot.NodeInfos().List()
 			if err != nil {
 				t.Fatal(err)
+			}
+
+			state := framework.NewCycleState()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod, nodeInfos); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
 			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}

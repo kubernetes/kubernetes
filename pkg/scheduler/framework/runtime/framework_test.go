@@ -206,7 +206,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return pl.inj.PreFilterResult, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
@@ -276,7 +276,7 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
 	return nil, nil
 }
@@ -296,7 +296,7 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
 	return nil, nil
 }
@@ -324,7 +324,7 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
@@ -1558,7 +1558,7 @@ func TestPreFilterPlugins(t *testing.T) {
 			_ = f.Close()
 		}()
 		state := framework.NewCycleState()
-		f.RunPreFilterPlugins(ctx, state, nil)
+		f.RunPreFilterPlugins(ctx, state, nil, nil)
 		f.RunPreFilterExtensionAddPod(ctx, state, nil, nil, nil)
 		f.RunPreFilterExtensionRemovePod(ctx, state, nil, nil, nil)
 
@@ -1751,7 +1751,7 @@ func TestRunPreFilterPlugins(t *testing.T) {
 			}()
 
 			state := framework.NewCycleState()
-			result, status, _ := f.RunPreFilterPlugins(ctx, state, nil)
+			result, status, _ := f.RunPreFilterPlugins(ctx, state, nil, nil)
 			if diff := cmp.Diff(tt.wantPreFilterResult, result); diff != "" {
 				t.Errorf("wrong status (-want,+got):\n%s", diff)
 			}
@@ -2916,8 +2916,10 @@ func TestRecordingMetrics(t *testing.T) {
 		wantStatus         framework.Code
 	}{
 		{
-			name:               "PreFilter - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+			name: "PreFilter - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPreFilterPlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         framework.Success,
 		},
@@ -2973,8 +2975,10 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 
 		{
-			name:               "PreFilter - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, state, pod) },
+			name: "PreFilter - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPreFilterPlugins(ctx, state, pod, BuildNodeInfos(nodes))
+			},
 			inject:             injectedResult{PreFilterStatus: int(framework.Error)},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         framework.Error,
