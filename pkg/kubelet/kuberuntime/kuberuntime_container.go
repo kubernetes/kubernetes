@@ -33,6 +33,7 @@ import (
 	"sync"
 	"time"
 
+	codes "google.golang.org/grpc/codes"
 	crierror "k8s.io/cri-api/pkg/errors"
 
 	"github.com/opencontainers/selinux/go-selinux"
@@ -52,6 +53,7 @@ import (
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -409,6 +411,25 @@ func (m *kubeGenericRuntimeManager) updateContainerResources(pod *v1.Pod, contai
 		err = m.allocationManager.SetActuatedResources(pod, container)
 	}
 	return err
+}
+
+func (m *kubeGenericRuntimeManager) updatePodSandboxResources(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) error {
+	podResourcesRequest := m.generateUpdatePodSandboxResourcesRequest(sandboxID, pod, podResources)
+	if podResourcesRequest == nil {
+		return fmt.Errorf("sandboxID %q updatePodSandboxResources failed: cannot generate resources config", sandboxID)
+	}
+
+	ctx := context.Background()
+	_, err := m.runtimeService.UpdatePodSandboxResources(ctx, podResourcesRequest)
+	if err != nil {
+		stat, _ := grpcstatus.FromError(err)
+		if stat.Code() == codes.Unimplemented {
+			klog.V(3).InfoS("updatePodSandboxResources failed: unimplemented; this call is best-effort: proceeding with resize", "sandboxID", sandboxID)
+			return nil
+		}
+		return fmt.Errorf("updatePodSandboxResources failed for sanboxID %q: %w", sandboxID, err)
+	}
+	return nil
 }
 
 // makeDevices generates container devices for kubelet runtime v1.
