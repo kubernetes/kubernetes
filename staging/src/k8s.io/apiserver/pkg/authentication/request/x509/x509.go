@@ -30,6 +30,7 @@ import (
 	asn1util "k8s.io/apimachinery/pkg/apis/asn1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/features"
@@ -110,6 +111,15 @@ func certificateIdentifier(c *x509.Certificate) string {
 	)
 }
 
+func certificateErrorIdentifier(c *x509.Certificate) string {
+	return fmt.Sprintf(
+		"CN=%s, Issuer=%s, SN=%d",
+		c.Subject.CommonName,
+		c.Issuer.CommonName,
+		c.SerialNumber,
+	)
+}
+
 // VerifyOptionFunc is function which provides a shallow copy of the VerifyOptions to the authenticator.  This allows
 // for cases where the options (particularly the CAs) can change.  If the bool is false, then the returned VerifyOptions
 // are ignored and the authenticator will express "no opinion".  This allows a clear signal for cases where a CertPool
@@ -184,6 +194,14 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	clientCertificateExpirationHistogram.WithContext(req.Context()).Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
+		ctx := req.Context()
+		audit.AddAuditAnnotation(ctx,
+			"authentication.k8s.io/certificate-error",
+			fmt.Sprintf("certificate %s failed: %v", certificateErrorIdentifier(req.TLS.PeerCertificates[0]),
+				err),
+		)
+		req = req.WithContext(ctx)
+
 		return nil, false, fmt.Errorf(
 			"verifying certificate %s failed: %w",
 			certificateIdentifier(req.TLS.PeerCertificates[0]),
