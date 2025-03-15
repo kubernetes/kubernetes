@@ -735,7 +735,7 @@ func (s *sharedIndexInformer) HandleDeltas(obj interface{}, isInInitialList bool
 // Conforms to ResourceEventHandler
 func (s *sharedIndexInformer) OnAdd(obj interface{}, isInInitialList bool) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
-	// save to distribute the notification
+	// safe to distribute the notification
 	s.cacheMutationDetector.AddObject(obj)
 	s.processor.distribute(addNotification{newObj: obj, isInInitialList: isInInitialList}, false)
 }
@@ -757,7 +757,7 @@ func (s *sharedIndexInformer) OnUpdate(old, new interface{}) {
 	}
 
 	// Invocation of this function is locked under s.blockDeltas, so it is
-	// save to distribute the notification
+	// safe to distribute the notification
 	s.cacheMutationDetector.AddObject(new)
 	s.processor.distribute(updateNotification{oldObj: old, newObj: new}, isSync)
 }
@@ -765,7 +765,7 @@ func (s *sharedIndexInformer) OnUpdate(old, new interface{}) {
 // Conforms to ResourceEventHandler
 func (s *sharedIndexInformer) OnDelete(old interface{}) {
 	// Invocation of this function is locked under s.blockDeltas, so it is
-	// save to distribute the notification
+	// safe to distribute the notification
 	s.processor.distribute(deleteNotification{oldObj: old}, false)
 }
 
@@ -1088,7 +1088,7 @@ func (p *processorListener) run() {
 	}
 }
 
-// shouldResync deterimines if the listener needs a resync. If the listener's resyncPeriod is 0,
+// shouldResync determines if the listener needs a resync. If the listener's resyncPeriod is 0,
 // this always returns false.
 func (p *processorListener) shouldResync(now time.Time) bool {
 	p.resyncLock.Lock()
