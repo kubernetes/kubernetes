@@ -25,8 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidVolumeAttachment(name string) *storage.VolumeAttachment {
@@ -176,6 +179,31 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 	StatusStrategy.PrepareForUpdate(ctx, newVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(newVolumeAttachment, volumeAttachment) {
 		t.Errorf("unexpected objects difference after modifying spec: %v", cmp.Diff(newVolumeAttachment, volumeAttachment))
+	}
+
+	// Verify that error codes are dropped when the feature gate is disabled.
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, false)
+
+	statusWithError := volumeAttachment.DeepCopy()
+	statusErrCode := int32(7)
+	statusWithError.Status = storage.VolumeAttachmentStatus{
+		Attached: true,
+		AttachError: &storage.VolumeError{
+			Message:   "attach error",
+			ErrorCode: &statusErrCode,
+		},
+		DetachError: &storage.VolumeError{
+			Message:   "detach error",
+			ErrorCode: &statusErrCode,
+		},
+	}
+
+	StatusStrategy.PrepareForUpdate(ctx, statusWithError, volumeAttachment)
+	if statusWithError.Status.AttachError != nil && statusWithError.Status.AttachError.ErrorCode != nil {
+		t.Errorf("expected AttachError.ErrorCode to be nil, got %v", *statusWithError.Status.AttachError.ErrorCode)
+	}
+	if statusWithError.Status.DetachError != nil && statusWithError.Status.DetachError.ErrorCode != nil {
+		t.Errorf("expected DetachError.ErrorCode to be nil, got %v", *statusWithError.Status.DetachError.ErrorCode)
 	}
 }
 

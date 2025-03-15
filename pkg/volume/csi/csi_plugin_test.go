@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1427,5 +1428,120 @@ func TestValidatePluginExistingDriver(t *testing.T) {
 		if !tc.shouldFail && err != nil {
 			t.Fatalf("unexpected error during ValidatePlugin for testcase: %#v\r\n err:%v", tc, err)
 		}
+	}
+}
+
+func TestGetNodeAllocatableUpdatePeriod(t *testing.T) {
+	tests := []struct {
+		name     string
+		driver   *storage.CSIDriver
+		expected time.Duration
+	}{
+		{
+			name:     "nil driver",
+			driver:   nil,
+			expected: 0,
+		},
+		{
+			name: "nil NodeAllocatableUpdatePeriodSeconds",
+			driver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					NodeAllocatableUpdatePeriodSeconds: nil,
+				},
+			},
+			expected: 0,
+		},
+		{
+			name: "NodeAllocatableUpdatePeriodSeconds set to 60",
+			driver: &storage.CSIDriver{
+				Spec: storage.CSIDriverSpec{
+					NodeAllocatableUpdatePeriodSeconds: &[]int64{60}[0],
+				},
+			},
+			expected: 60 * time.Second,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := getNodeAllocatableUpdatePeriod(tc.driver)
+			if actual != tc.expected {
+				t.Errorf("Expected %v, got %v", tc.expected, actual)
+			}
+		})
+	}
+}
+
+func TestIsResourceExhaustError(t *testing.T) {
+	tests := []struct {
+		name       string
+		attachment *storage.VolumeAttachment
+		expected   bool
+	}{
+		{
+			name:       "nil attachment",
+			attachment: nil,
+			expected:   false,
+		},
+		{
+			name: "nil AttachError",
+			attachment: &storage.VolumeAttachment{
+				Status: storage.VolumeAttachmentStatus{
+					AttachError: nil,
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "nil ErrorCode",
+			attachment: &storage.VolumeAttachment{
+				Status: storage.VolumeAttachmentStatus{
+					AttachError: &storage.VolumeError{
+						Message:   "an error occurred",
+						ErrorCode: nil,
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "non-resource exhausted error code",
+			attachment: &storage.VolumeAttachment{
+				Status: storage.VolumeAttachmentStatus{
+					AttachError: &storage.VolumeError{
+						Message: "volume not found",
+						ErrorCode: func() *int32 {
+							code := int32(codes.NotFound)
+							return &code
+						}(),
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "resource exhausted error code",
+			attachment: &storage.VolumeAttachment{
+				Status: storage.VolumeAttachmentStatus{
+					AttachError: &storage.VolumeError{
+						Message: "resource exhausted",
+						ErrorCode: func() *int32 {
+							code := int32(codes.ResourceExhausted)
+							return &code
+						}(),
+					},
+				},
+			},
+			expected: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := isResourceExhaustError(tc.attachment)
+			if actual != tc.expected {
+				t.Errorf("Expected isResourceExhaustError to return %v, but got %v", tc.expected, actual)
+			}
+		})
 	}
 }
