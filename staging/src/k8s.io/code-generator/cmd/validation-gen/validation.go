@@ -1100,7 +1100,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		later := make([]validators.FunctionGen, 0, len(in))
 
 		for _, fg := range in {
-			isShortCircuit := (fg.Flags().IsSet(validators.ShortCircuit))
+			isShortCircuit := (fg.Flags.IsSet(validators.ShortCircuit))
 
 			if isShortCircuit {
 				sooner = append(sooner, fg)
@@ -1116,19 +1116,17 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 	validations = sort(validations)
 
 	for _, v := range validations {
-		isShortCircuit := v.Flags().IsSet(validators.ShortCircuit)
-		isNonError := v.Flags().IsSet(validators.NonError)
+		isShortCircuit := v.Flags.IsSet(validators.ShortCircuit)
+		isNonError := v.Flags.IsSet(validators.NonError)
 
-		fn, extraArgs := v.SignatureAndArgs()
 		targs := generator.Args{
-			"funcName": c.Universe.Type(fn),
+			"funcName": c.Universe.Type(v.Function),
 			"field":    mkSymbolArgs(c, fieldPkgSymbols),
 		}
 
 		emitCall := func() {
 			sw.Do("$.funcName|raw$", targs)
-			typeArgs := v.TypeArgs()
-			if len(typeArgs) > 0 {
+			if typeArgs := v.TypeArgs; len(typeArgs) > 0 {
 				sw.Do("[", nil)
 				for i, typeArg := range typeArgs {
 					sw.Do("$.|raw$", c.Universe.Type(typeArg))
@@ -1139,7 +1137,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				sw.Do("]", nil)
 			}
 			sw.Do("(ctx, op, fldPath, obj, oldObj", targs)
-			for _, arg := range extraArgs {
+			for _, arg := range v.Args {
 				sw.Do(", ", nil)
 				toGolangSourceDataLiteral(sw, c, arg)
 			}
@@ -1147,21 +1145,21 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		}
 
 		// If validation is conditional, wrap the validation function with a conditions check.
-		if !v.Conditions().Empty() {
+		if !v.Conditions.Empty() {
 			emitBaseFunction := emitCall
 			emitCall = func() {
 				sw.Do("func() $.field.ErrorList|raw$ {\n", targs)
 				sw.Do("  if ", nil)
 				firstCondition := true
-				if len(v.Conditions().OptionEnabled) > 0 {
-					sw.Do("op.Options.Has($.$)", strconv.Quote(v.Conditions().OptionEnabled))
+				if len(v.Conditions.OptionEnabled) > 0 {
+					sw.Do("op.Options.Has($.$)", strconv.Quote(v.Conditions.OptionEnabled))
 					firstCondition = false
 				}
-				if len(v.Conditions().OptionDisabled) > 0 {
+				if len(v.Conditions.OptionDisabled) > 0 {
 					if !firstCondition {
 						sw.Do(" && ", nil)
 					}
-					sw.Do("!op.Options.Has($.$)", strconv.Quote(v.Conditions().OptionDisabled))
+					sw.Do("!op.Options.Has($.$)", strconv.Quote(v.Conditions.OptionDisabled))
 				}
 				sw.Do(" {\n", nil)
 				sw.Do("    return ", nil)
@@ -1174,7 +1172,7 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 			}
 		}
 
-		for _, comment := range v.Comments() {
+		for _, comment := range v.Comments {
 			sw.Do("// $.$\n", comment)
 		}
 		if isShortCircuit {
@@ -1214,21 +1212,19 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 
 	variables := tn.typeValidations.Variables
 	slices.SortFunc(variables, func(a, b validators.VariableGen) int {
-		return cmp.Compare(a.Var().Name, b.Var().Name)
+		return cmp.Compare(a.Variable.Name, b.Variable.Name)
 	})
 	for _, variable := range variables {
-		fn := variable.Init()
-		supportInitFn, supportInitArgs := fn.SignatureAndArgs()
+		fn := variable.InitFunc
 		targs := generator.Args{
-			"varName": c.Universe.Type(types.Name(variable.Var())),
-			"initFn":  c.Universe.Type(supportInitFn),
+			"varName": c.Universe.Type(types.Name(variable.Variable)),
+			"initFn":  c.Universe.Type(fn.Function),
 		}
-		for _, comment := range fn.Comments() {
+		for _, comment := range fn.Comments {
 			sw.Do("// $.$\n", comment)
 		}
 		sw.Do("var $.varName|private$ = $.initFn|raw$", targs)
-		typeArgs := variable.Init().TypeArgs()
-		if len(typeArgs) > 0 {
+		if typeArgs := fn.TypeArgs; len(typeArgs) > 0 {
 			sw.Do("[", nil)
 			for i, typeArg := range typeArgs {
 				sw.Do("$.|raw$", c.Universe.Type(typeArg))
@@ -1239,11 +1235,11 @@ func (g *genValidations) emitValidationVariables(c *generator.Context, t *types.
 			sw.Do("]", nil)
 		}
 		sw.Do("(", targs)
-		for i, arg := range supportInitArgs {
-			toGolangSourceDataLiteral(sw, c, arg)
-			if i < len(supportInitArgs)-1 {
+		for i, arg := range fn.Args {
+			if i != 0 {
 				sw.Do(", ", nil)
 			}
+			toGolangSourceDataLiteral(sw, c, arg)
 		}
 		sw.Do(")\n", nil)
 
@@ -1277,14 +1273,13 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	case *validators.PrivateVar:
 		sw.Do("$.|private$", c.Universe.Type(types.Name(*v)))
 	case validators.WrapperFunction:
-		fn, extraArgs := v.Function.SignatureAndArgs()
-		if len(extraArgs) == 0 {
+		if extraArgs := v.Function.Args; len(extraArgs) == 0 {
 			// If the function to be wrapped has no additional arguments, we can
 			// just use it directly.
 			targs := generator.Args{
-				"funcName": c.Universe.Type(fn),
+				"funcName": c.Universe.Type(v.Function.Function),
 			}
-			for _, comment := range v.Function.Comments() {
+			for _, comment := range v.Function.Comments {
 				sw.Do("// $.$\n", comment)
 			}
 			sw.Do("$.funcName|raw$", targs)
@@ -1292,7 +1287,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			// If the function to be wrapped has additional arguments, we need
 			// a "standard signature" validation function to wrap it.
 			targs := generator.Args{
-				"funcName":   c.Universe.Type(fn),
+				"funcName":   c.Universe.Type(v.Function.Function),
 				"field":      mkSymbolArgs(c, fieldPkgSymbols),
 				"operation":  mkSymbolArgs(c, operationPkgSymbols),
 				"context":    mkSymbolArgs(c, contextPkgSymbols),
@@ -1305,7 +1300,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 
 			emitCall := func() {
 				sw.Do("return $.funcName|raw$", targs)
-				typeArgs := v.Function.TypeArgs()
+				typeArgs := v.Function.TypeArgs
 				if len(typeArgs) > 0 {
 					sw.Do("[", nil)
 					for i, typeArg := range typeArgs {

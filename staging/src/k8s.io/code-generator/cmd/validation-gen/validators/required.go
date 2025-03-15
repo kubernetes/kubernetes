@@ -156,7 +156,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 			return Validations{}, err
 		}
 		for i, fn := range validations.Functions {
-			validations.Functions[i] = WithComment(fn, "optional fields with default values are effectively required")
+			validations.Functions[i] = fn.WithComment("optional fields with default values are effectively required")
 		}
 		return validations, nil
 	}

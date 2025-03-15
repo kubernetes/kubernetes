@@ -73,7 +73,7 @@ func (frtv fixedResultTagValidator) GetValidations(context Context, _ []string, 
 	if err != nil {
 		return result, fmt.Errorf("can't decode tag payload: %w", err)
 	}
-	result.AddFunction(GenericFunction(frtv.TagName(), tag.flags, fixedResultValidator, tag.typeArgs, frtv.result, tag.msg))
+	result.AddFunction(Function(frtv.TagName(), tag.flags, fixedResultValidator, frtv.result, tag.msg).WithTypeArgs(tag.typeArgs...))
 
 	return result, nil
 }
