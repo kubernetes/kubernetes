@@ -52,8 +52,8 @@ var waitingMark = &requestWatermark{
 	phase: epmetrics.WaitingPhase,
 }
 
-var atomicMutatingExecuting, atomicReadOnlyExecuting int32
-var atomicMutatingWaiting, atomicReadOnlyWaiting int32
+var atomicMutatingExecuting, atomicReadOnlyExecuting atomic.Int32
+var atomicMutatingWaiting, atomicReadOnlyWaiting atomic.Int32
 
 // newInitializationSignal is defined for testing purposes.
 var newInitializationSignal = utilflowcontrol.NewInitializationSignal
@@ -143,16 +143,16 @@ func (h *priorityAndFairnessHandler) Handle(w http.ResponseWriter, r *http.Reque
 	isMutatingRequest := !nonMutatingRequestVerbs.Has(requestInfo.Verb)
 	noteExecutingDelta := func(delta int32) {
 		if isMutatingRequest {
-			watermark.recordMutating(int(atomic.AddInt32(&atomicMutatingExecuting, delta)))
+			watermark.recordMutating(int(atomicMutatingExecuting.Add(delta)))
 		} else {
-			watermark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyExecuting, delta)))
+			watermark.recordReadOnly(int(atomicReadOnlyExecuting.Add(delta)))
 		}
 	}
 	noteWaitingDelta := func(delta int32) {
 		if isMutatingRequest {
-			waitingMark.recordMutating(int(atomic.AddInt32(&atomicMutatingWaiting, delta)))
+			waitingMark.recordMutating(int(atomicMutatingWaiting.Add(delta)))
 		} else {
-			waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
+			waitingMark.recordReadOnly(int(atomicReadOnlyWaiting.Add(delta)))
 		}
 	}
 	queueNote := func(inQueue bool) {
