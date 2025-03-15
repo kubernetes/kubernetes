@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/pkg/controlplane/apiserver"
 
 	"k8s.io/klog/v2"
 )
@@ -214,7 +215,7 @@ func (c *Controller) syncStorageVersion(ctx context.Context, name string) error 
 	for _, v := range sv.Status.StorageVersions {
 		lease, err := c.kubeclientset.CoordinationV1().Leases(metav1.NamespaceSystem).Get(ctx, v.APIServerID, metav1.GetOptions{})
 		if err != nil || lease == nil || lease.Labels == nil ||
-			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != controlplane.KubeAPIServer {
+			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != apiserver.KubeAPIServer {
 			// We cannot find a corresponding identity lease from apiserver as well.
 			// We need to clean up this storage version.
 			hasInvalidID = true
@@ -243,7 +244,7 @@ func (c *Controller) enqueueStorageVersion(logger klog.Logger, obj *apiserverint
 	for _, sv := range obj.Status.StorageVersions {
 		lease, err := c.leaseLister.Leases(metav1.NamespaceSystem).Get(sv.APIServerID)
 		if err != nil || lease == nil || lease.Labels == nil ||
-			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != controlplane.KubeAPIServer {
+			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != apiserver.KubeAPIServer {
 			// we cannot find a corresponding identity lease in cache, enqueue the storageversion
 			logger.V(4).Info("Observed storage version with invalid apiserver entry", "objName", obj.Name)
 			c.storageVersionQueue.Add(obj.Name)
@@ -269,7 +270,7 @@ func (c *Controller) onDeleteLease(logger klog.Logger, obj interface{}) {
 
 	if castObj.Namespace == metav1.NamespaceSystem &&
 		castObj.Labels != nil &&
-		castObj.Labels[controlplane.IdentityLeaseComponentLabelKey] == controlplane.KubeAPIServer {
+		castObj.Labels[controlplane.IdentityLeaseComponentLabelKey] == apiserver.KubeAPIServer {
 		logger.V(4).Info("Observed lease deleted", "castObjName", castObj.Name)
 		c.enqueueLease(castObj)
 	}

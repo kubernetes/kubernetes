@@ -117,8 +117,6 @@ const (
 	//   2. which component owns this lease
 	// TODO(sttts): remove this indirection
 	IdentityLeaseComponentLabelKey = controlplaneapiserver.IdentityLeaseComponentLabelKey
-	// KubeAPIServer defines variable used internally when referring to kube-apiserver component
-	KubeAPIServer = "kube-apiserver"
 	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
 	repairLoopInterval = 3 * time.Minute
 )
@@ -314,7 +312,7 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
 
-	cp, err := c.ControlPlane.New(KubeAPIServer, delegationTarget)
+	cp, err := c.ControlPlane.New(controlplaneapiserver.KubeAPIServer, delegationTarget)
 	if err != nil {
 		return nil, err
 	}
