@@ -75,6 +75,11 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
+var (
+	validateUnique              = types.Name{Package: libValidationPkg, Name: "Unique"}
+	validateUniqueNonComparable = types.Name{Package: libValidationPkg, Name: "UniqueNonComparable"}
+)
+
 func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	t := context.Type
 	if t.Kind == types.Alias {
@@ -85,8 +90,20 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 	}
 
 	switch payload {
-	case "atomic", "set":
+	case "atomic":
 		// Allowed but no special handling.
+	case "set":
+		t = t.Elem
+		// NOTE: lists of pointers are not supported, and that is enforced way before this point.
+		for t.Kind == types.Alias {
+			t = t.Underlying
+		}
+		switch {
+		case t.IsComparable():
+			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUnique)}}, nil
+		case !t.IsComparable():
+			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueNonComparable)}}, nil
+		}
 	case "map":
 		if realType(t.Elem).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
@@ -114,7 +131,7 @@ func (lttv listTypeTagValidator) Docs() TagDoc {
 		Description: "Declares a list field's semantic type.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<type>",
-			Docs:        "map | atomic",
+			Docs:        "atomic | map | set",
 		}},
 	}
 	return doc
