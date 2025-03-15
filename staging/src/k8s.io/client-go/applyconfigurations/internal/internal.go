@@ -2934,6 +2934,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: stabilizationWindowSeconds
       type:
         scalar: numeric
+    - name: tolerance
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscaler
   map:
     fields:
