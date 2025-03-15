@@ -164,7 +164,7 @@ func NewHorizontalController(
 		hpaSelectors:        selectors.NewBiMultimap(),
 	}
 
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	hpaHandler, _ := hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    hpaController.enqueueHPA,
 			UpdateFunc: hpaController.updateHPA,
@@ -173,7 +173,7 @@ func NewHorizontalController(
 		resyncPeriod,
 	)
 	hpaController.hpaLister = hpaInformer.Lister()
-	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
+	hpaController.hpaListerSynced = hpaHandler.HasSynced
 
 	hpaController.podLister = podInformer.Lister()
 	hpaController.podListerSynced = podInformer.Informer().HasSynced
