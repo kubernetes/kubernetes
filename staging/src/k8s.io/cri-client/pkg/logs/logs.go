@@ -306,7 +306,10 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		//nolint:errcheck
+		f.Close()
+	}()
 
 	// Search start point based on tail line.
 	start, err := findTailLineStartIndex(f, opts.tail)
@@ -322,7 +325,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	// Start parsing the logs.
 	r := bufio.NewReader(f)
 	// Do not create watcher here because it is not needed if `Follow` is false.
-	var watcher *fsnotify.Watcher
+	var watcher *dedupWriteEventsWatcher
 	var parse parseFunc
 	var stop bool
 	isNewLine := true
@@ -352,14 +355,21 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 					return fmt.Errorf("failed to reset seek in log file %q: %v", path, err)
 				}
 				if watcher == nil {
+					var fsWatcher *fsnotify.Watcher
 					// Initialize the watcher if it has not been initialized yet.
-					if watcher, err = fsnotify.NewWatcher(); err != nil {
+					if fsWatcher, err = fsnotify.NewWatcher(); err != nil {
 						return fmt.Errorf("failed to create fsnotify watcher: %v", err)
 					}
+
+					watcher = newDedupWriteEventsWatcher(baseName, fsWatcher)
+					go watcher.dedupLoop()
+
+					//nolint:errcheck
 					defer watcher.Close()
 					if err := watcher.Add(dir); err != nil {
 						return fmt.Errorf("failed to watch directory %q: %w", dir, err)
 					}
+
 					// If we just created the watcher, try again to read as we might have missed
 					// the event.
 					continue
@@ -378,7 +388,6 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
-					defer newF.Close()
 					f.Close()
 					f = newF
 					r = bufio.NewReader(f)
@@ -455,7 +464,7 @@ func isContainerRunning(ctx context.Context, logger *klog.Logger, id string, r i
 // waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
 // indicates whether a new log is found; the second boolean if the log file was recreated;
 // the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, logger *klog.Logger, id string, logName string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
+func waitLogs(ctx context.Context, logger *klog.Logger, id string, logName string, w *dedupWriteEventsWatcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	// no need to wait if the pod is not running
 	if running, err := isContainerRunning(ctx, logger, id, runtimeService); !running {
 		return false, false, err

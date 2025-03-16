@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -289,7 +290,8 @@ func TestReadRotatedLog(t *testing.T) {
 	err = file.Close()
 	assert.NoErrorf(t, err, "could not close file.")
 
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(1 * time.Second)
+
 	// Make the function ReadLogs end.
 	fakeRuntimeService.Lock()
 	fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
@@ -593,6 +595,79 @@ func TestOnlyStdoutStream(t *testing.T) {
 				require.NoError(t, err)
 			}
 			assert.EqualValues(t, tc.expectedStdout, stdoutBuf.String())
+		})
+	}
+}
+
+func TestDedupEvents(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    []interface{}
+		expected []interface{}
+	}{
+		{
+			name: "events without error 1",
+			input: []interface{}{fsnotify.Write, fsnotify.Write, fsnotify.Write, fsnotify.Create,
+				fsnotify.Write, fsnotify.Write, fsnotify.Write, fsnotify.Write, fsnotify.Write, fsnotify.Write, fsnotify.Create,
+				fsnotify.Write, fsnotify.Write, fsnotify.Create},
+			expected: []interface{}{fsnotify.Write, fsnotify.Write, fsnotify.Create,
+				fsnotify.Write, fsnotify.Create,
+				fsnotify.Write, fsnotify.Create},
+		},
+		{
+			name:     "events without error 2",
+			input:    []interface{}{fsnotify.Write, fsnotify.Create},
+			expected: []interface{}{fsnotify.Write, fsnotify.Write, fsnotify.Create},
+		},
+		{
+			name:     "event with error",
+			input:    []interface{}{fsnotify.Write, fsnotify.Write, fsnotify.Write, fsnotify.Create, fsnotify.ErrEventOverflow, fsnotify.ErrEventOverflow},
+			expected: []interface{}{fsnotify.Write, fsnotify.Write, fsnotify.Create},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			w, err := fsnotify.NewWatcher()
+			if err != nil {
+				t.Fatal(err)
+			}
+			dedup := newDedupWriteEventsWatcher("0.log", w)
+			go func() {
+				go dedup.dedupLoop()
+				for _, val := range tc.input {
+					switch v := val.(type) {
+					case error:
+						w.Errors <- v
+					case fsnotify.Op:
+						ev := fsnotify.Event{
+							Op:   v,
+							Name: "0.log",
+						}
+						w.Events <- ev
+					}
+				}
+				// Wait dedupLoop to start
+				time.Sleep(200 * time.Millisecond)
+				//nolint:errcheck
+				dedup.Close()
+			}()
+
+			received := make([]interface{}, 0, 10)
+		forLoop:
+			for {
+				select {
+				case op, ok := <-dedup.Events:
+					if !ok {
+						break forLoop
+					}
+					// Mimic read logs
+					time.Sleep(1 * time.Millisecond)
+					received = append(received, op.Op)
+				case <-dedup.Errors:
+				}
+			}
+			assert.Equal(t, tc.expected, received)
 		})
 	}
 }
