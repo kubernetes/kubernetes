@@ -112,6 +112,16 @@ var (
 	//   is enabled such that passing CDI device IDs through CRI fields is supported
 	DRAAdminAccess = framework.WithFeature(framework.ValidFeatures.Add("DRAAdminAccess"))
 
+	// owning-sig: sig-scheduling
+	// kep: https://kep.k8s.io/5055
+	// test-infra jobs:
+	// - "ci-kind-dra-all" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
+	//
+	// This label is used for tests which need:
+	// - the DynamicResourceAllocation *and* DRADeviceTaints feature gates
+	// - the resource.k8s.io API group, including version v1alpha3
+	DRADeviceTaints = framework.WithFeature(framework.ValidFeatures.Add("DRADeviceTaints"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	// OWNER: sig-node
 	// Testing downward API huge pages
