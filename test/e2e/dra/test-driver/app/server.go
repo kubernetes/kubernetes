@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/metrics"
 
+	resourceapi "k8s.io/api/resource/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 )
 
@@ -204,7 +206,24 @@ func NewCommand() *cobra.Command {
 			return errors.New("--node-name not set")
 		}
 
-		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{NumDevices: *numDevices},
+		devices := make([]resourceapi.Device, *numDevices)
+		for i := 0; i < *numDevices; i++ {
+			devices[i] = resourceapi.Device{
+				Name:  fmt.Sprintf("device-%02d", i),
+				Basic: &resourceapi.BasicDevice{},
+			}
+		}
+		driverResources := resourceslice.DriverResources{
+			Pools: map[string]resourceslice.Pool{
+				*nodeName: {
+					Slices: []resourceslice.Slice{{
+						Devices: devices,
+					}},
+				},
+			},
+		}
+
+		plugin, err := StartPlugin(cmd.Context(), *cdiDir, *driverName, clientset, *nodeName, FileOperations{DriverResources: &driverResources},
 			kubeletplugin.PluginDataDirectoryPath(datadir),
 			kubeletplugin.RegistrarDirectoryPath(*kubeletRegistryDir),
 		)
