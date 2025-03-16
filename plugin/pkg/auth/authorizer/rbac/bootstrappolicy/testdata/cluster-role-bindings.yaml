@@ -186,6 +186,9 @@ items:
   - apiGroup: rbac.authorization.k8s.io
     kind: Group
     name: system:serviceaccounts
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:unauthenticated
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:

@@ -682,7 +682,7 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 	// Defer to the cluster admin with regard to binding directly to all authenticated and/or
 	// unauthenticated users.
 	rolebindings = append(rolebindings,
-		rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
+		rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup, user.AllUnauthenticated).BindingOrDie(),
 	)
 
 	// Service accounts can read ClusterTrustBundle objects.
