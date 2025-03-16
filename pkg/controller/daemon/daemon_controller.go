@@ -113,7 +113,7 @@ type DaemonSetsController struct {
 	historyStoreSynced cache.InformerSynced
 	// podLister get list/get pods from the shared informers's store
 	podLister corelisters.PodLister
-	// podIndexer allows looking up pods by node name.
+	// podIndexer allows looking up pods by node name or by ControllerRef UID
 	podIndexer cache.Indexer
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
@@ -217,6 +217,7 @@ func NewDaemonSetsController(
 	dsc.podLister = podInformer.Lister()
 	dsc.podStoreSynced = podInformer.Informer().HasSynced
 	controller.AddPodNodeNameIndexer(podInformer.Informer())
+	controller.AddPodControllerUIDIndexer(podInformer.Informer())
 	dsc.podIndexer = podInformer.Informer().GetIndexer()
 
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -688,6 +689,30 @@ func (dsc *DaemonSetsController) updateNode(logger klog.Logger, old, cur interfa
 	dsc.nodeUpdateQueue.Add(curNode.Name)
 }
 
+// getPodsFromCache returns the Pods that a given DS should manage.
+func (dsc *DaemonSetsController) getDaemonPodsFromCache(ds *apps.DaemonSet) ([]*v1.Pod, error) {
+	// Iterate over two keys:
+	//  The UID of the Daemonset, which identifies Pods that are controlled by the Daemonset.
+	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
+	//   but may be adopted later on if they have matching labels with the Daemonset.
+	podsForDS := []*v1.Pod{}
+	for _, key := range []string{string(ds.UID), controller.OrphanPodIndexKey} {
+		podObjs, err := dsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range podObjs {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			podsForDS = append(podsForDS, pod)
+		}
+	}
+	return podsForDS, nil
+}
+
 // getDaemonPods returns daemon pods owned by the given ds.
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned Pods are pointers to objects in the cache.
@@ -697,10 +722,8 @@ func (dsc *DaemonSetsController) getDaemonPods(ctx context.Context, ds *apps.Dae
 	if err != nil {
 		return nil, err
 	}
-
-	// List all pods to include those that don't match the selector anymore but
-	// have a ControllerRef pointing to this controller.
-	pods, err := dsc.podLister.Pods(ds.Namespace).List(labels.Everything())
+	// List all pods indexed to DS UID and Orphan pods
+	pods, err := dsc.getDaemonPodsFromCache(ds)
 	if err != nil {
 		return nil, err
 	}
