@@ -59,6 +59,7 @@ func TestEachSliceVal(t *testing.T) {
 }
 
 func testEachSliceVal[T any](t *testing.T, name string, input []T) {
+	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
@@ -77,6 +78,7 @@ func testEachSliceVal[T any](t *testing.T, name string, input []T) {
 }
 
 func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
+	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
@@ -116,6 +118,7 @@ func TestEachMapVal(t *testing.T) {
 }
 
 func testEachMapVal[T any](t *testing.T, name string, input map[string]T) {
+	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
@@ -141,6 +144,7 @@ func TestEachMapKey(t *testing.T) {
 }
 
 func testEachMapKey[K ~string, V any](t *testing.T, name string, input map[K]V) {
+	t.Helper()
 	var zero K
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
 		calls := 0
