@@ -959,7 +959,11 @@
   versionedSpecs:
   - default: false
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
+    version: "1.30"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
     version: "1.33"
 - name: PodAndContainerStatsFromCRI
   versionedSpecs:
