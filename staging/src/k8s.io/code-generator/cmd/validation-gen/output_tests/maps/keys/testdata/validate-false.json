@@ -1,5 +1,5 @@
 {
-  "*eachkey.Struct": {
+  "*keys.Struct": {
     "": [
       "type Struct"
     ],
