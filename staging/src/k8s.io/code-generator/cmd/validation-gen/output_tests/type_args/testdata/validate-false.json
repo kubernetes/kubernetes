@@ -1,98 +1,98 @@
 {
-    "*typeargs.T1": {
-      "e1": [
-        "T1.E1",
-        "type E1"
-      ],
-      "i1": [
-        "T1.I1"
-      ],
-      "pe1": [
-        "type E1"
-      ],
-      "ps1": [
-        "PT1.PS1"
-      ],
-      "ps1.anothert2.b": [
-        "field T2.B"
-      ],
-      "ps1.anothert2.f": [
-        "field T2.F"
-      ],
-      "ps1.anothert2.i": [
-        "field T2.I"
-      ],
-      "ps1.anothert2.s": [
-        "field T2.S"
-      ],
-      "ps1.b": [
-        "field T1.B"
-      ],
-      "ps1.f": [
-        "field T1.F"
-      ],
-      "ps1.i": [
-        "field T1.I"
-      ],
-      "ps1.s": [
-        "field T1.S"
-      ],
-      "ps1.t2": [
-        "field T1.T2"
-      ],
-      "ps1.t2.b": [
-        "field T2.B"
-      ],
-      "ps1.t2.f": [
-        "field T2.F"
-      ],
-      "ps1.t2.i": [
-        "field T2.I"
-      ],
-      "ps1.t2.s": [
-        "field T2.S"
-      ],
-      "s1": [
-        "T1.S1"
-      ],
-      "s1.anothert2.b": [
-        "field T2.B"
-      ],
-      "s1.anothert2.f": [
-        "field T2.F"
-      ],
-      "s1.anothert2.i": [
-        "field T2.I"
-      ],
-      "s1.anothert2.s": [
-        "field T2.S"
-      ],
-      "s1.b": [
-        "field T1.B"
-      ],
-      "s1.f": [
-        "field T1.F"
-      ],
-      "s1.i": [
-        "field T1.I"
-      ],
-      "s1.s": [
-        "field T1.S"
-      ],
-      "s1.t2": [
-        "field T1.T2"
-      ],
-      "s1.t2.b": [
-        "field T2.B"
-      ],
-      "s1.t2.f": [
-        "field T2.F"
-      ],
-      "s1.t2.i": [
-        "field T2.I"
-      ],
-      "s1.t2.s": [
-        "field T2.S"
-      ]
-    }
+  "*typeargs.T1": {
+    "e1": [
+      "T1.E1",
+      "type E1"
+    ],
+    "i1": [
+      "T1.I1"
+    ],
+    "pe1": [
+      "type E1"
+    ],
+    "ps1": [
+      "PT1.PS1"
+    ],
+    "ps1.anothert2.b": [
+      "field T2.B"
+    ],
+    "ps1.anothert2.f": [
+      "field T2.F"
+    ],
+    "ps1.anothert2.i": [
+      "field T2.I"
+    ],
+    "ps1.anothert2.s": [
+      "field T2.S"
+    ],
+    "ps1.b": [
+      "field T1.B"
+    ],
+    "ps1.f": [
+      "field T1.F"
+    ],
+    "ps1.i": [
+      "field T1.I"
+    ],
+    "ps1.s": [
+      "field T1.S"
+    ],
+    "ps1.t2": [
+      "field T1.T2"
+    ],
+    "ps1.t2.b": [
+      "field T2.B"
+    ],
+    "ps1.t2.f": [
+      "field T2.F"
+    ],
+    "ps1.t2.i": [
+      "field T2.I"
+    ],
+    "ps1.t2.s": [
+      "field T2.S"
+    ],
+    "s1": [
+      "T1.S1"
+    ],
+    "s1.anothert2.b": [
+      "field T2.B"
+    ],
+    "s1.anothert2.f": [
+      "field T2.F"
+    ],
+    "s1.anothert2.i": [
+      "field T2.I"
+    ],
+    "s1.anothert2.s": [
+      "field T2.S"
+    ],
+    "s1.b": [
+      "field T1.B"
+    ],
+    "s1.f": [
+      "field T1.F"
+    ],
+    "s1.i": [
+      "field T1.I"
+    ],
+    "s1.s": [
+      "field T1.S"
+    ],
+    "s1.t2": [
+      "field T1.T2"
+    ],
+    "s1.t2.b": [
+      "field T2.B"
+    ],
+    "s1.t2.f": [
+      "field T2.F"
+    ],
+    "s1.t2.i": [
+      "field T2.I"
+    ],
+    "s1.t2.s": [
+      "field T2.S"
+    ]
   }
+}

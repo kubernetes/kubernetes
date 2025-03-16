@@ -1,48 +1,48 @@
 {
-    "*structs.T00": {
-      "pt.os": [
-        "Tother, no flags"
-      ],
-      "t.os": [
-        "Tother, no flags"
-      ]
-    },
-    "*structs.T01": {
-      "": [
-        "T01, no flags"
-      ],
-      "ps": [
-        "T01.PS, no flags"
-      ],
-      "pt": [
-        "T01.PT, no flags"
-      ],
-      "pt.os": [
-        "Tother, no flags"
-      ],
-      "s": [
-        "T01.S, no flags"
-      ],
-      "t": [
-        "T01.T, no flags"
-      ],
-      "t.os": [
-        "Tother, no flags"
-      ]
-    },
-    "*structs.T02": {
-      "": [
-        "T02, ShortCircuit"
-      ]
-    },
-    "*structs.T03": {
-      "": [
-        "T03, ShortCircuit"
-      ]
-    },
-    "*structs.TMultiple": {
-      "": [
-        "TMultiple, ShortCircuit 1"
-      ]
-    }
+  "*structs.T00": {
+    "pt.os": [
+      "Tother, no flags"
+    ],
+    "t.os": [
+      "Tother, no flags"
+    ]
+  },
+  "*structs.T01": {
+    "": [
+      "T01, no flags"
+    ],
+    "ps": [
+      "T01.PS, no flags"
+    ],
+    "pt": [
+      "T01.PT, no flags"
+    ],
+    "pt.os": [
+      "Tother, no flags"
+    ],
+    "s": [
+      "T01.S, no flags"
+    ],
+    "t": [
+      "T01.T, no flags"
+    ],
+    "t.os": [
+      "Tother, no flags"
+    ]
+  },
+  "*structs.T02": {
+    "": [
+      "T02, ShortCircuit"
+    ]
+  },
+  "*structs.T03": {
+    "": [
+      "T03, ShortCircuit"
+    ]
+  },
+  "*structs.TMultiple": {
+    "": [
+      "TMultiple, ShortCircuit 1"
+    ]
   }
+}
