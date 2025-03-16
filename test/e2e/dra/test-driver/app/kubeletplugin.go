@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
@@ -49,10 +48,9 @@ type ExamplePlugin struct {
 	d          *kubeletplugin.Helper
 	fileOps    FileOperations
 
-	cdiDir      string
-	driverName  string
-	nodeName    string
-	deviceNames sets.Set[string]
+	cdiDir     string
+	driverName string
+	nodeName   string
 
 	// The mutex is needed because there are other goroutines checking the state.
 	// Serializing in the gRPC server alone is not enough because writing would
@@ -118,13 +116,9 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// NumDevices determines whether the plugin reports devices
-	// and how many. It reports nothing if negative.
-	NumDevices int
-
-	// Pre-defined devices, with each device name mapped to
-	// the device attributes. Not used if NumDevices >= 0.
-	Devices map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	// DriverResources provides the information that the driver will use to
+	// construct the ResourceSlices that it will publish.
+	DriverResources *resourceslice.DriverResources
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
@@ -145,23 +139,16 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		}
 	}
 	ex := &ExamplePlugin{
-		stopCh:      ctx.Done(),
-		logger:      logger,
-		kubeClient:  kubeClient,
-		fileOps:     fileOps,
-		cdiDir:      cdiDir,
-		driverName:  driverName,
-		nodeName:    nodeName,
-		prepared:    make(map[ClaimID][]kubeletplugin.Device),
-		deviceNames: sets.New[string](),
+		stopCh:     ctx.Done(),
+		logger:     logger,
+		kubeClient: kubeClient,
+		fileOps:    fileOps,
+		cdiDir:     cdiDir,
+		driverName: driverName,
+		nodeName:   nodeName,
+		prepared:   make(map[ClaimID][]kubeletplugin.Device),
 	}
 
-	for i := 0; i < ex.fileOps.NumDevices; i++ {
-		ex.deviceNames.Insert(fmt.Sprintf("device-%02d", i))
-	}
-	for deviceName := range ex.fileOps.Devices {
-		ex.deviceNames.Insert(deviceName)
-	}
 	opts = append(opts,
 		kubeletplugin.DriverName(driverName),
 		kubeletplugin.NodeName(nodeName),
@@ -175,44 +162,8 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	}
 	ex.d = d
 
-	if fileOps.NumDevices >= 0 {
-		devices := make([]resourceapi.Device, ex.fileOps.NumDevices)
-		for i := 0; i < ex.fileOps.NumDevices; i++ {
-			devices[i] = resourceapi.Device{
-				Name:  fmt.Sprintf("device-%02d", i),
-				Basic: &resourceapi.BasicDevice{},
-			}
-		}
-		driverResources := resourceslice.DriverResources{
-			Pools: map[string]resourceslice.Pool{
-				nodeName: {
-					Slices: []resourceslice.Slice{{
-						Devices: devices,
-					}},
-				},
-			},
-		}
-		if err := ex.d.PublishResources(ctx, driverResources); err != nil {
-			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
-		}
-	} else if len(ex.fileOps.Devices) > 0 {
-		devices := make([]resourceapi.Device, len(ex.fileOps.Devices))
-		for i, deviceName := range sets.List(ex.deviceNames) {
-			devices[i] = resourceapi.Device{
-				Name:  deviceName,
-				Basic: &resourceapi.BasicDevice{Attributes: ex.fileOps.Devices[deviceName]},
-			}
-		}
-		driverResources := resourceslice.DriverResources{
-			Pools: map[string]resourceslice.Pool{
-				nodeName: {
-					Slices: []resourceslice.Slice{{
-						Devices: devices,
-					}},
-				},
-			},
-		}
-		if err := ex.d.PublishResources(ctx, driverResources); err != nil {
+	if fileOps.DriverResources != nil {
+		if err := ex.d.PublishResources(ctx, *fileOps.DriverResources); err != nil {
 			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
 		}
 	}
