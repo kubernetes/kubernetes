@@ -118,6 +118,7 @@ shutdownGracePeriodByPodPriority:
   - priority: 6
     shutdownGracePeriodSeconds: 30
 featureGates:
+  KubeletServiceAccountTokenForCredentialProviders: true
   PodAndContainerStatsFromCRI: false
   DynamicResourceAllocation: true`)
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
@@ -163,7 +164,11 @@ featureGates:
 				},
 			}
 			// This covers the case where the fields within the map are overridden.
-			overrides := map[string]bool{"PodAndContainerStatsFromCRI": false, "DynamicResourceAllocation": true}
+			overrides := map[string]bool{
+				"PodAndContainerStatsFromCRI":                      false,
+				"DynamicResourceAllocation":                        true,
+				"KubeletServiceAccountTokenForCredentialProviders": true,
+			}
 			// In some CI jobs, `NodeSwap` is explicitly disabled as the images are cgroupv1 based,
 			// so such flags should be picked up directly from the initial configuration
 			if _, ok := initialConfig.FeatureGates["NodeSwap"]; ok {
