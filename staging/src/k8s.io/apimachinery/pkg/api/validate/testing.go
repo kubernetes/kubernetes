@@ -30,6 +30,6 @@ func FixedResult[T any](_ context.Context, op operation.Operation, fldPath *fiel
 		return nil
 	}
 	return field.ErrorList{
-		field.Invalid(fldPath, value, "forced failure: "+arg),
+		field.Invalid(fldPath, value, "forced failure: "+arg).WithOrigin("validateFalse"),
 	}
 }
