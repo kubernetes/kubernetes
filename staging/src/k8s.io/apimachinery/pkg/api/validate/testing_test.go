@@ -20,10 +20,9 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/utils/ptr"
-
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func TestFixedResult(t *testing.T) {
