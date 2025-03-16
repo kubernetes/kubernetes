@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (

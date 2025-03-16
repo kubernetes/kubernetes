@@ -150,7 +150,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 		if err := os.MkdirAll(path.Dir(testdataFilename), os.FileMode(0755)); err != nil {
 			s.Fatal("error making directory", err)
 		}
-		data, err := json.MarshalIndent(got, "  ", "  ")
+		data, err := json.MarshalIndent(got, "", "  ")
 		if err != nil {
 			s.Fatal(err)
 		}

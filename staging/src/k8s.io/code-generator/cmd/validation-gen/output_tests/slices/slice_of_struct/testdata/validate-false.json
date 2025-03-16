@@ -1,35 +1,35 @@
 {
-    "*sliceofstruct.Struct": {
-      "": [
-        "type Struct"
-      ],
-      "UnvalidatedListField[0]": [
-        "type OtherStruct"
-      ],
-      "UnvalidatedListField[1]": [
-        "type OtherStruct"
-      ],
-      "listField": [
-        "field Struct.ListField"
-      ],
-      "listField[0]": [
-        "field Struct.ListField[*]",
-        "type OtherStruct"
-      ],
-      "listField[1]": [
-        "field Struct.ListField[*]",
-        "type OtherStruct"
-      ],
-      "listTypedefField": [
-        "field Struct.ListTypedefField"
-      ],
-      "listTypedefField[0]": [
-        "field Struct.ListTypedefField[*]",
-        "type OtherTypedefStruct"
-      ],
-      "listTypedefField[1]": [
-        "field Struct.ListTypedefField[*]",
-        "type OtherTypedefStruct"
-      ]
-    }
+  "*sliceofstruct.Struct": {
+    "": [
+      "type Struct"
+    ],
+    "UnvalidatedListField[0]": [
+      "type OtherStruct"
+    ],
+    "UnvalidatedListField[1]": [
+      "type OtherStruct"
+    ],
+    "listField": [
+      "field Struct.ListField"
+    ],
+    "listField[0]": [
+      "field Struct.ListField[*]",
+      "type OtherStruct"
+    ],
+    "listField[1]": [
+      "field Struct.ListField[*]",
+      "type OtherStruct"
+    ],
+    "listTypedefField": [
+      "field Struct.ListTypedefField"
+    ],
+    "listTypedefField[0]": [
+      "field Struct.ListTypedefField[*]",
+      "type OtherTypedefStruct"
+    ],
+    "listTypedefField[1]": [
+      "field Struct.ListTypedefField[*]",
+      "type OtherTypedefStruct"
+    ]
   }
+}

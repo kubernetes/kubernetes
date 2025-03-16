@@ -1,33 +1,33 @@
 {
-    "*typedeftoslice.Struct": {
-      "": [
-        "type Struct"
-      ],
-      "listField": [
-        "field Struct.ListField",
-        "type ListType"
-      ],
-      "listField[0]": [
-        "field Struct.ListField[*]",
-        "type ListType[*]"
-      ],
-      "listField[1]": [
-        "field Struct.ListField[*]",
-        "type ListType[*]"
-      ],
-      "listTypedefField": [
-        "field Struct.ListTypedefField",
-        "type ListTypedefType"
-      ],
-      "listTypedefField[0]": [
-        "field Struct.ListTypedefField[*]",
-        "type ListTypedefType[*]",
-        "type StringType"
-      ],
-      "listTypedefField[1]": [
-        "field Struct.ListTypedefField[*]",
-        "type ListTypedefType[*]",
-        "type StringType"
-      ]
-    }
+  "*typedeftoslice.Struct": {
+    "": [
+      "type Struct"
+    ],
+    "listField": [
+      "field Struct.ListField",
+      "type ListType"
+    ],
+    "listField[0]": [
+      "field Struct.ListField[*]",
+      "type ListType[*]"
+    ],
+    "listField[1]": [
+      "field Struct.ListField[*]",
+      "type ListType[*]"
+    ],
+    "listTypedefField": [
+      "field Struct.ListTypedefField",
+      "type ListTypedefType"
+    ],
+    "listTypedefField[0]": [
+      "field Struct.ListTypedefField[*]",
+      "type ListTypedefType[*]",
+      "type StringType"
+    ],
+    "listTypedefField[1]": [
+      "field Struct.ListTypedefField[*]",
+      "type ListTypedefType[*]",
+      "type StringType"
+    ]
   }
+}
