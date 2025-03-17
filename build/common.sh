@@ -39,7 +39,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-KUBE_BUILD_IMAGE_CROSS_TAG="$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"
+KUBE_BUILD_IMAGE_CROSS_TAG="${KUBE_CROSS_VERSION:-"$(cat "${KUBE_ROOT}/build/build-image/cross/VERSION")"}"
 readonly KUBE_BUILD_IMAGE_CROSS_TAG
 
 readonly KUBE_DOCKER_REGISTRY="${KUBE_DOCKER_REGISTRY:-registry.k8s.io}"
