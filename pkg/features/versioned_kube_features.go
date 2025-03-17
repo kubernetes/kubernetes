@@ -856,7 +856,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	WindowsHostNetwork: {
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
 	zpagesfeatures.ComponentFlagz: {
