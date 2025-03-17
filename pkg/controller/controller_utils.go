@@ -83,6 +83,9 @@ const (
 	// The number of batches is given by:
 	//      1+floor(log_2(ceil(N/SlowStartInitialBatchSize)))
 	SlowStartInitialBatchSize = 1
+
+	// PodNodeNameKeyIndex is the name of the index used by PodInformer to index pods by their node name.
+	PodNodeNameKeyIndex = "spec.nodeName"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -1049,6 +1052,28 @@ func FilterReplicaSets(RSes []*apps.ReplicaSet, filterFn filterRS) []*apps.Repli
 		}
 	}
 	return filtered
+}
+
+// AddPodNodeNameIndexer adds an indexer for Pod's nodeName to the given PodInformer.
+// This indexer is used to efficiently look up pods by their node name.
+func AddPodNodeNameIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodNodeNameKeyIndex]; exists {
+		// indexer already exists, do nothing
+		return nil
+	}
+
+	return podInformer.AddIndexers(cache.Indexers{
+		PodNodeNameKeyIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return []string{}, nil
+			}
+			if len(pod.Spec.NodeName) == 0 {
+				return []string{}, nil
+			}
+			return []string{pod.Spec.NodeName}, nil
+		},
+	})
 }
 
 // PodKey returns a key unique to the given pod within a cluster.
