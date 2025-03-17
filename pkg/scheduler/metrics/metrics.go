@@ -271,9 +271,9 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "queueing_hint_execution_duration_seconds",
 			Help:      "Duration for running a queueing hint function of a plugin.",
-			// Start with 0.0001ms (0.1 microsecond) with the last bucket being [~97ms, Inf). We use a small factor (1.5)
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~16ms, Inf). We use a small factor (1.5)
 			// so that we have better granularity since plugin latency is very sensitive.
-			Buckets:        metrics.ExponentialBuckets(0.0000001, 1.5, 35),
+			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 25),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "event", "hint"})
