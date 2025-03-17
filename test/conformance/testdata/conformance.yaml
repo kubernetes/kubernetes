@@ -1154,6 +1154,32 @@
     exceeds maxFailedIndexes.
   release: v1.33
   file: test/e2e/apps/job.go
+- testname: Ensure that job with successPolicy succeeded when all indexes succeeded
+  codename: '[sig-apps] Job with successPolicy should succeeded when all indexes succeeded
+    [Conformance]'
+  description: Create an indexed job with successPolicy. Verify that job got SuccessCriteriaMet
+    with SuccessPolicy reason and Complete condition once all indexes succeeded.
+  release: v1.33
+  file: test/e2e/apps/job.go
+- testname: Ensure that job with successPolicy succeededCount rule succeeded even
+    when some indexes remain pending
+  codename: '[sig-apps] Job with successPolicy succeededCount rule should succeeded
+    even when some indexes remain pending [Conformance]'
+  description: Create an indexed job with successPolicy succeededCount rule. Verify
+    that the job got the SuccessCriteriaMet with SuccessPolicy reason condition and
+    Complete condition when the job met successPolicy even if some indexed remain
+    pending.
+  release: v1.33
+  file: test/e2e/apps/job.go
+- testname: Ensure that job with successPolicy succeededIndexes rule succeeded even
+    when some indexes remain pending
+  codename: '[sig-apps] Job with successPolicy succeededIndexes rule should succeeded
+    even when some indexes remain pending [Conformance]'
+  description: Create an indexed job with successPolicy succeededIndexes rule. Verify
+    that the job got SuccessCriteriaMet with SuccessPolicy reason condition and Complete
+    condition when the job met successPolicy even if some indexed remain pending.
+  release: v1.33
+  file: test/e2e/apps/job.go
 - testname: ReplicaSet, is created, Replaced and Patched
   codename: '[sig-apps] ReplicaSet Replace and Patch tests [Conformance]'
   description: Create a ReplicaSet (RS) with a single Pod. The Pod MUST be verified

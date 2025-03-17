@@ -476,12 +476,13 @@ done`}
 	})
 
 	/*
-		Testcase: Ensure that job with successPolicy succeeded when all indexes succeeded
+		Release: v1.33
+		Testname: Ensure that job with successPolicy succeeded when all indexes succeeded
 		Description: Create an indexed job with successPolicy.
 		Verify that job got SuccessCriteriaMet with SuccessPolicy reason and Complete condition
 		once all indexes succeeded.
 	*/
-	ginkgo.It("with successPolicy should succeeded when all indexes succeeded", func(ctx context.Context) {
+	framework.ConformanceIt("with successPolicy should succeeded when all indexes succeeded", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(2)
 		backoffLimit := int32(6) // default value
@@ -510,17 +511,19 @@ done`}
 		framework.ExpectNoError(err, "failed to get latest job object")
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
+		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(0)))
 	})
 
 	/*
-		Testcase: Ensure that job with successPolicy succeededIndexes rule succeeded even when some indexes remain pending
+		Release: v1.33
+		Testname: Ensure that job with successPolicy succeededIndexes rule succeeded even when some indexes remain pending
 		Description: Create an indexed job with successPolicy succeededIndexes rule.
 		Verify that the job got SuccessCriteriaMet with SuccessPolicy reason condition and Complete condition
 		when the job met successPolicy even if some indexed remain pending.
 	*/
-	ginkgo.It("with successPolicy succeededIndexes rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
+	framework.ConformanceIt("with successPolicy succeededIndexes rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(5)
 		backoffLimit := int32(6) // default value
@@ -550,16 +553,18 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
+		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	/*
-		Testcase: Ensure that job with successPolicy succeededCount rule succeeded even when some indexes remain pending
+		Release: v1.33
+		Testname: Ensure that job with successPolicy succeededCount rule succeeded even when some indexes remain pending
 		Description: Create an indexed job with successPolicy succeededCount rule.
 		Verify that the job got the SuccessCriteriaMet with SuccessPolicy reason condition and Complete condition
 		when the job met successPolicy even if some indexed remain pending.
 	*/
-	ginkgo.It("with successPolicy succeededCount rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
+	framework.ConformanceIt("with successPolicy succeededCount rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(5)
 		backoffLimit := int32(math.MaxInt32)
@@ -589,7 +594,8 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
+		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	/*
