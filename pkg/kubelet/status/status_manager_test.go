@@ -28,12 +28,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -2024,7 +2026,107 @@ func TestMergePodStatus(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestPodResizeConditions(t *testing.T) {
+	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
+	podUID := types.UID("12345")
+
+	testCases := []struct {
+		name       string
+		updateFunc func(types.UID)
+		expected   []*v1.PodCondition
+	}{
+		{
+			name:       "initial empty conditions",
+			updateFunc: nil,
+			expected:   nil,
+		},
+		{
+			name: "set pod resize in progress condition with reason and message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message")
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizeInProgress,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
+				},
+			},
+		},
+		{
+			name: "set pod resize in progress condition without reason and message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizeInProgressCondition(podUID, "", "")
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "set pod resize pending condition with reason and message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizePendingCondition(podUID, "some-reason", "some-message")
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
+				},
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "clear pod resize in progress condition",
+			updateFunc: func(podUID types.UID) {
+				m.ClearPodResizeInProgressCondition(podUID)
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
+				},
+			},
+		},
+		{
+			name: "clear pod resize pending condition",
+			updateFunc: func(podUID types.UID) {
+				m.ClearPodResizePendingCondition(podUID)
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.updateFunc != nil {
+				tc.updateFunc(podUID)
+			}
+			resizeConditions := m.GetPodResizeConditions(podUID)
+			if tc.expected == nil {
+				require.Nil(t, resizeConditions)
+			} else {
+				// ignore the last probe and transition times
+				for _, c := range resizeConditions {
+					c.LastProbeTime = metav1.Time{}
+					c.LastTransitionTime = metav1.Time{}
+				}
+				require.Equal(t, tc.expected, resizeConditions)
+			}
+		})
+	}
 }
 
 func statusEqual(left, right v1.PodStatus) bool {

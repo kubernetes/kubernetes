@@ -29141,7 +29141,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 					},
 					"resize": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\"",
+							Description: "Status of resources resize desired for pod's containers. It is empty if no resources resize is pending. Any changes to container resources will automatically set this to \"Proposed\" Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress. PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources. PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

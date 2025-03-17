@@ -68,16 +68,32 @@ type manager struct {
 	kubeClient clientset.Interface
 	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
-	podStatuses       map[types.UID]versionedPodStatus
-	podResizeStatuses map[types.UID]v1.PodResizeStatus
-	podStatusesLock   sync.RWMutex
-	podStatusChannel  chan struct{}
+	podStatuses         map[types.UID]versionedPodStatus
+	podResizeConditions map[types.UID]podResizeConditions
+	podStatusesLock     sync.RWMutex
+	podStatusChannel    chan struct{}
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 	podDeletionSafety PodDeletionSafetyProvider
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
+}
+
+type podResizeConditions struct {
+	PodResizePending    *v1.PodCondition
+	PodResizeInProgress *v1.PodCondition
+}
+
+func (prc podResizeConditions) List() []*v1.PodCondition {
+	var conditions []*v1.PodCondition
+	if prc.PodResizePending != nil {
+		conditions = append(conditions, prc.PodResizePending)
+	}
+	if prc.PodResizeInProgress != nil {
+		conditions = append(conditions, prc.PodResizeInProgress)
+	}
+	return conditions
 }
 
 // PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
@@ -136,11 +152,20 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// GetPodResizeStatus returns cached PodStatus.Resize value
-	GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus
+	// GetPodResizeConditions returns cached PodStatus Resize conditions value
+	GetPodResizeConditions(podUID types.UID) []*v1.PodCondition
 
-	// SetPodResizeStatus caches the last resizing decision for the pod.
-	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus)
+	// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
+	SetPodResizePendingCondition(podUID types.UID, reason, message string)
+
+	// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
+	SetPodResizeInProgressCondition(podUID types.UID, reason, message string)
+
+	// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
+	ClearPodResizePendingCondition(podUID types.UID)
+
+	// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
+	ClearPodResizeInProgressCondition(podUID types.UID)
 }
 
 const syncPeriod = 10 * time.Second
@@ -151,7 +176,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		kubeClient:              kubeClient,
 		podManager:              podManager,
 		podStatuses:             make(map[types.UID]versionedPodStatus),
-		podResizeStatuses:       make(map[types.UID]v1.PodResizeStatus),
+		podResizeConditions:     make(map[types.UID]podResizeConditions),
 		podStatusChannel:        make(chan struct{}, 1),
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
@@ -165,15 +190,30 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 // changes will be ignored.
 func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
+
+	newConditions := make(map[v1.PodConditionType]*v1.PodCondition, len(status.Conditions))
+	oldConditions := make(map[v1.PodConditionType]*v1.PodCondition, len(oldStatus.Conditions))
 	for _, c := range status.Conditions {
-		// both owned and shared conditions are used for kubelet status equality
 		if kubetypes.PodConditionByKubelet(c.Type) || kubetypes.PodConditionSharedByKubelet(c.Type) {
-			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
-			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
-				return false
-			}
+			newConditions[c.Type] = &c
 		}
 	}
+	for _, c := range oldStatus.Conditions {
+		if kubetypes.PodConditionByKubelet(c.Type) || kubetypes.PodConditionSharedByKubelet(c.Type) {
+			oldConditions[c.Type] = &c
+		}
+	}
+
+	if len(newConditions) != len(oldConditions) {
+		return false
+	}
+	for _, newCondition := range newConditions {
+		oldCondition := oldConditions[newCondition.Type]
+		if oldCondition == nil || oldCondition.Status != newCondition.Status || oldCondition.Message != newCondition.Message || oldCondition.Reason != newCondition.Reason {
+			return false
+		}
+	}
+
 	oldCopy.Conditions = status.Conditions
 	return apiequality.Semantic.DeepEqual(oldCopy, status)
 }
@@ -207,18 +247,53 @@ func (m *manager) Start() {
 	}, 0)
 }
 
-// GetPodResizeStatus returns the last cached ResizeStatus value.
-func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
+// GetPodResizeConditions returns the last cached ResizeStatus value.
+func (m *manager) GetPodResizeConditions(podUID types.UID) []*v1.PodCondition {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.podResizeStatuses[podUID]
+	return m.podResizeConditions[podUID].List()
 }
 
-// SetPodResizeStatus checkpoints the last resizing decision for the pod.
-func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
+// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
+func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message string) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
-	m.podResizeStatuses[podUID] = resizeStatus
+
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message),
+		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+	}
+}
+
+// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
+func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message),
+		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
+	}
+}
+
+// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
+func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizePending:    nil,
+		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
+	}
+}
+
+// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
+func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
+		PodResizeInProgress: nil,
+	}
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
@@ -696,7 +771,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		delete(m.podResizeStatuses, uid)
+		delete(m.podResizeConditions, uid)
 	}
 }
 
@@ -709,7 +784,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				delete(m.podResizeStatuses, key)
+				delete(m.podResizeConditions, key)
 			}
 		}
 	}
@@ -1085,4 +1160,23 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *v1.PodCondition, reason, message string) *v1.PodCondition {
+	now := metav1.NewTime(time.Now())
+	var lastTransitionTime metav1.Time
+	if oldCondition == nil || oldCondition.Reason != reason {
+		lastTransitionTime = now
+	} else {
+		lastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	return &v1.PodCondition{
+		Type:               conditionType,
+		Status:             v1.ConditionTrue,
+		LastProbeTime:      now,
+		LastTransitionTime: lastTransitionTime,
+		Reason:             reason,
+		Message:            message,
+	}
 }

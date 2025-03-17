@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	helpers "k8s.io/component-helpers/resource"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -394,7 +395,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 		Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
 		WithTimeout(f.Timeouts.PodStart).
 		Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
-			if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+			if helpers.IsPodResizeInfeasible(pod) {
 				// This is a terminal resize state
 				return func() string {
 					return "resize is infeasible"
@@ -406,6 +407,14 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 				return func() string {
 					return fmt.Sprintf("container status resources don't match expected: %v", formatErrors(resourceErrs))
 				}, nil
+			}
+			// Wait for kubelet to clear the resize status conditions.
+			for _, c := range pod.Status.Conditions {
+				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
+					return func() string {
+						return fmt.Sprintf("resize status %v is still present in the pod status", c)
+					}, nil
+				}
 			}
 			return nil, nil
 		})),
@@ -429,6 +438,13 @@ func ExpectPodResized(ctx context.Context, f *framework.Framework, resizedPod *v
 	}
 	if restartErrs := verifyPodRestarts(resizedPod, expectedContainers); restartErrs != nil {
 		errs = append(errs, fmt.Errorf("container restart counts don't match expected: %w", formatErrors(restartErrs)))
+	}
+
+	// Verify Pod Resize conditions are empty.
+	for _, condition := range resizedPod.Status.Conditions {
+		if condition.Type == v1.PodResizeInProgress || condition.Type == v1.PodResizePending {
+			errs = append(errs, fmt.Errorf("unexpected resize condition type %s found in pod status", condition.Type))
+		}
 	}
 
 	if len(errs) > 0 {

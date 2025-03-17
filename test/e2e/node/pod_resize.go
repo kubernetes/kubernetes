@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	helpers "k8s.io/component-helpers/resource"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -231,7 +232,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			node.Name, nodeAllocatableMilliCPU, nodeAvailableMilliCPU)
 
 		//
-		// Scheduler focussed pod resize E2E test case #1:
+		// Scheduler focused pod resize E2E test case #1:
 		//     1. Create pod1 and pod2 on node such that pod1 has enough CPU to be scheduled, but pod2 does not.
 		//     2. Resize pod2 down so that it fits on the node and can be scheduled.
 		//     3. Verify that pod2 gets scheduled and comes up and running.
@@ -295,7 +296,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST1: Verify that pod '%s' is running after resize", testPod2.Name))
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod2))
 
-		// Scheduler focussed pod resize E2E test case #2
+		// Scheduler focused pod resize E2E test case #2
 		//     1. With pod1 + pod2 running on node above, create pod3 that requests more CPU than available, verify pending.
 		//     2. Resize pod1 down so that pod3 gets room to be scheduled.
 		//     3. Verify that pod3 is scheduled and running.
@@ -348,13 +349,71 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod3.Name, testPod3.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3))
 
-		ginkgo.By("deleting pods")
-		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
-		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
+		// Scheduler focssed pod resize E2E test case #3
+		//     1. With pod1 + pod2 + pod3 running on node above, attempt to scale up pod1 to requests more CPU than available, verify deferred.
+		//     2. Delete pod2 + pod3 to make room for pod3.
+		//     3. Verify that pod1 resize has completed.
+		//     4. Attempt to scale up pod1 to request more cpu than the node has, verify infeasible.
+		patchTestpod1ExceedNodeCapacity := fmt.Sprintf(`{
+			"spec": {
+				"containers": [
+					{
+						"name":      "c1",
+						"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
+					}
+				]
+			}
+		}`, testPod1CPUQuantity.MilliValue(), testPod1CPUQuantity.MilliValue())
+
+		testPod1CPUQuantityResizedAgain := resource.NewMilliQuantity(nodeAvailableMilliCPU*2, resource.DecimalSI)
+		patchTestpod1AgainExceedNodeCapacity := fmt.Sprintf(`{
+			"spec": {
+				"containers": [
+					{
+						"name":      "c1",
+						"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
+					}
+				]
+			}
+		}`, testPod1CPUQuantityResizedAgain.MilliValue(), testPod1CPUQuantityResizedAgain.MilliValue())
+
+		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' exceed node capacity", testPod1.Name))
+		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
+			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ExceedNodeCapacity), metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
+		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(3))
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod1.Namespace, testPod1.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+			return helpers.IsPodResizeDeferred(pod), nil
+		}))
+
+		ginkgo.By("deleting pods 2 and 3")
 		delErr2 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod2)
 		framework.ExpectNoError(delErr2, "failed to delete pod %s", testPod2.Name)
 		delErr3 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod3)
 		framework.ExpectNoError(delErr3, "failed to delete pod %s", testPod3.Name)
+
+		ginkgo.By(fmt.Sprintf("TEST3: Verify pod '%s' is resized successfully after pod deletion '%s' and '%s", testPod1.Name, testPod2.Name, testPod3.Name))
+		expected := []e2epod.ResizableContainerInfo{
+			{
+				Name:      "c1",
+				Resources: &e2epod.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+			},
+		}
+		resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, testPod1, expected)
+		e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
+
+		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' to exceed the node capacity", testPod1.Name))
+		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
+			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1AgainExceedNodeCapacity), metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
+		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(4))
+		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod1.Namespace, testPod1.Name, "display pod resize status as infeasible", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
+			return helpers.IsPodResizeInfeasible(pod), nil
+		}))
+
+		ginkgo.By("deleting pod 1")
+		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
+		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
 	})
 }
 

@@ -289,7 +289,7 @@ func TestPodResourceRequests(t *testing.T) {
 		description           string
 		options               PodResourcesOptions
 		overhead              v1.ResourceList
-		podResizeStatus       v1.PodResizeStatus
+		podResizeStatus       []v1.PodCondition
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
 		containers            []v1.Container
@@ -432,8 +432,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("2"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: true},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -487,8 +491,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: false},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: false},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -515,8 +523,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("2"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: true},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: true},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -572,8 +584,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: false},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: false},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -789,7 +805,7 @@ func TestPodResourceRequests(t *testing.T) {
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatus,
 					InitContainerStatuses: tc.initContainerStatuses,
-					Resize:                tc.podResizeStatus,
+					Conditions:            tc.podResizeStatus,
 				},
 			}
 			request := PodRequests(p, tc.options)

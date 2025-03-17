@@ -2951,6 +2951,17 @@ const (
 	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	DisruptionTarget PodConditionType = "DisruptionTarget"
+	// PodResizePending indicates that the pod has been resized, but kubelet has not
+	// yet allocated the resources. If both PodResizePending and PodResizeInProgress
+	// are set, it means that a new resize was requested in the middle of a previous
+	// pod resize that is still in progress.
+	PodResizePending PodConditionType = "PodResizePending"
+	// PodResizeInProgress indicates that a resize is in progress, and is present whenever
+	// the Kubelet has allocated resources for the resize, but has not yet actuated all of
+	// the required changes.
+	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
+	// requested in the middle of a previous pod resize that is still in progress.
+	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 )
 
 // PodCondition represents pod's condition
@@ -2970,7 +2981,7 @@ type PodCondition struct {
 	Message string
 }
 
-// PodResizeStatus shows status of desired resize of a pod's containers.
+// Deprecated: PodResizeStatus shows status of desired resize of a pod's containers.
 type PodResizeStatus string
 
 const (
@@ -4251,6 +4262,9 @@ type PodStatus struct {
 	// Status of resources resize desired for pod's containers.
 	// It is empty if no resources resize is pending.
 	// Any changes to container resources will automatically set this to "Proposed"
+	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
+	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
+	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus
