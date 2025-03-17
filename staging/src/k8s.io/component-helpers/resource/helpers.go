@@ -223,7 +223,7 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 
 // determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
 func determineContainerReqs(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+	if IsPodResizeInfeasible(pod) {
 		return cs.Resources.Requests.DeepCopy()
 	}
 	return max(container.Resources.Requests, cs.Resources.Requests)
@@ -231,10 +231,30 @@ func determineContainerReqs(pod *v1.Pod, container *v1.Container, cs *v1.Contain
 
 // determineContainerLimits will return a copy of the container limits based on if resizing is feasible or not.
 func determineContainerLimits(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+	if IsPodResizeInfeasible(pod) {
 		return cs.Resources.Limits.DeepCopy()
 	}
 	return max(container.Resources.Limits, cs.Resources.Limits)
+}
+
+// IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.
+func IsPodResizeInfeasible(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			return condition.Reason == v1.PodReasonInfeasible
+		}
+	}
+	return false
+}
+
+// IsPodResizeDeferred returns true if the pod condition PodResizePending is set to deferred.
+func IsPodResizeDeferred(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			return condition.Reason == v1.PodReasonDeferred
+		}
+	}
+	return false
 }
 
 // applyNonMissing will return a copy of the given resource list with any missing values replaced by the nonMissing values

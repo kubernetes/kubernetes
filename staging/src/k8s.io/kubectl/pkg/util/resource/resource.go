@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	helpers "k8s.io/component-helpers/resource"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
@@ -142,7 +143,7 @@ func podLimits(pod *corev1.Pod) corev1.ResourceList {
 
 // determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
 func determineContainerReqs(pod *corev1.Pod, container *corev1.Container, cs *corev1.ContainerStatus) corev1.ResourceList {
-	if pod.Status.Resize == corev1.PodResizeStatusInfeasible {
+	if helpers.IsPodResizeInfeasible(pod) {
 		return cs.Resources.Requests.DeepCopy()
 	}
 	return max(container.Resources.Requests, cs.Resources.Requests)

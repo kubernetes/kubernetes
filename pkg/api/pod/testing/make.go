@@ -336,12 +336,6 @@ func MakeContainerStatus(name string, allocatedResources api.ResourceList) api.C
 	return cs
 }
 
-func SetResizeStatus(resizeStatus api.PodResizeStatus) TweakPodStatus {
-	return func(podstatus *api.PodStatus) {
-		podstatus.Resize = resizeStatus
-	}
-}
-
 // TweakContainers applies the container tweaks to all containers (regular & init) in the pod.
 // Note: this should typically be added to pod tweaks after all containers have been added.
 func TweakContainers(tweaks ...TweakContainer) Tweak {

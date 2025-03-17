@@ -1896,7 +1896,7 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		requests, statusResources,
 		initRequests, initStatusResources,
 		sidecarRequests, sidecarStatusResources *v1.ResourceList,
-		resizeStatus v1.PodResizeStatus) PodInfo {
+		resizeStatus []*v1.PodCondition) PodInfo {
 
 		if requests != nil {
 			pod.Spec.Containers = append(pod.Spec.Containers,
@@ -1952,7 +1952,10 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 				})
 		}
 
-		pod.Status.Resize = resizeStatus
+		for _, c := range resizeStatus {
+			pod.Status.Conditions = append(pod.Status.Conditions, *c)
+		}
+
 		return PodInfo{Pod: &pod}
 	}
 
@@ -1962,16 +1965,15 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 		statusResources        v1.ResourceList
 		initRequests           *v1.ResourceList
 		initStatusResources    *v1.ResourceList
+		resizeStatus           []*v1.PodCondition
 		sidecarRequests        *v1.ResourceList
 		sidecarStatusResources *v1.ResourceList
-		resizeStatus           v1.PodResizeStatus
 		expectedResource       podResource
 	}{
 		{
 			name:            "Pod with no pending resize",
 			requests:        v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			statusResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:    "",
 			expectedResource: podResource{
 				resource: Resource{
 					MilliCPU: cpu500m.MilliValue(),
@@ -1985,7 +1987,12 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			name:            "Pod with resize in progress",
 			requests:        v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			statusResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:    v1.PodResizeStatusInProgress,
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
 			expectedResource: podResource{
 				resource: Resource{
 					MilliCPU: cpu500m.MilliValue(),
@@ -1999,7 +2006,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			name:            "Pod with deferred resize",
 			requests:        v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			statusResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:    v1.PodResizeStatusDeferred,
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
 			expectedResource: podResource{
 				resource: Resource{
 					MilliCPU: cpu700m.MilliValue(),
@@ -2013,7 +2026,13 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			name:            "Pod with infeasible resize",
 			requests:        v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			statusResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			resizeStatus:    v1.PodResizeStatusInfeasible,
+			resizeStatus: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Status: v1.ConditionTrue,
+					Reason: v1.PodReasonInfeasible,
+				},
+			},
 			expectedResource: podResource{
 				resource: Resource{
 					MilliCPU: cpu500m.MilliValue(),
@@ -2029,7 +2048,6 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			statusResources:     v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			initRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			initStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resizeStatus:        "",
 			expectedResource: podResource{
 				resource: Resource{
 					MilliCPU: cpu700m.MilliValue(),
@@ -2047,7 +2065,6 @@ func TestCalculatePodResourcesWithResize(t *testing.T) {
 			initStatusResources:    &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			sidecarRequests:        &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
 			sidecarStatusResources: &v1.ResourceList{v1.ResourceCPU: cpu700m, v1.ResourceMemory: mem800M},
-			resizeStatus:           "",
 			expectedResource: podResource{
 				resource: Resource{
 					MilliCPU: cpu500m.MilliValue() + cpu700m.MilliValue(),
