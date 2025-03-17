@@ -451,8 +451,8 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 						return err
 					}
 					// Allocation successful, update the current state
-					s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset)
-					p.updateCPUsToReuse(pod, container, newallocatedcpuset)
+					s.SetCPUSet(string(pod.UID), container.Name, newallocatedcpuset.CPUs)
+					p.updateCPUsToReuse(pod, container, newallocatedcpuset.CPUs)
 					// Updated state to the checkpoint file will be stored during
 					// the reconcile loop. TODO is this a problem? I don't believe
 					// because if kubelet will be terminated now, anyhow it will be
