@@ -136,16 +136,14 @@ func (bce *bootstrapConfigurationEnsurer) ensureAPFBootstrapConfiguration(hookCo
 	err = func() error {
 		// get a derived context that gets cancelled after 5m or
 		// when the StopCh gets closed, whichever happens first.
-		ctx, cancel := contextFromChannelAndMaxWaitDuration(hookContext.Done(), 5*time.Minute)
+		ctx, cancel := context.WithDeadline(hookContext, time.Now().Add(5*time.Minute))
 		defer cancel()
 
 		if !cache.WaitForCacheSync(ctx.Done(), bce.informersSynced...) {
 			return fmt.Errorf("APF bootstrap ensurer timed out waiting for cache sync")
 		}
 
-		err = wait.PollImmediateUntilWithContext(
-			ctx,
-			time.Second,
+		err = wait.PollUntilContextCancel(ctx, time.Second, true,
 			func(context.Context) (bool, error) {
 				if err := ensure(ctx, bce.v134Config, clientset, bce.fsLister, bce.plcLister); err != nil {
 					klog.ErrorS(err, "APF bootstrap ensurer ran into error, will retry later")
@@ -165,15 +163,14 @@ func (bce *bootstrapConfigurationEnsurer) ensureAPFBootstrapConfiguration(hookCo
 	// we have successfully initialized the bootstrap configuration, now we
 	// spin up a goroutine which reconciles the bootstrap configuration periodically.
 	go func() {
-		wait.PollImmediateUntil(
-			time.Minute,
-			func() (bool, error) {
-				if err := ensure(hookContext, bce.v134Config, clientset, bce.fsLister, bce.plcLister); err != nil {
+		_ = wait.PollUntilContextCancel(hookContext, time.Minute, true,
+			func(ctx context.Context) (bool, error) {
+				if err := ensure(ctx, bce.v134Config, clientset, bce.fsLister, bce.plcLister); err != nil {
 					klog.ErrorS(err, "APF bootstrap ensurer ran into error, will retry later")
 				}
 				// always auto update both suggested and mandatory configuration
 				return false, nil
-			}, hookContext.Done())
+			})
 		klog.Info("APF bootstrap ensurer is exiting")
 	}()
 

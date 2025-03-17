@@ -93,6 +93,10 @@
     version: "1.33"
 - name: APFv134Config
   versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
   - default: true
     lockToDefault: false
     preRelease: Beta

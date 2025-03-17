@@ -124,7 +124,7 @@ type configController struct {
 	queueSetFactory   fq.QueueSetFactory
 	reqsGaugeVec      metrics.RatioedGaugeVec
 	execSeatsGaugeVec metrics.RatioedGaugeVec
-	newConfig         bool
+	v134Config        bool
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -277,7 +277,7 @@ func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
 // NewTestableController is extra flexible to facilitate testing
 func newTestableController(config TestableConfig) *configController {
 	cfgCtlr := &configController{
-		newConfig:              config.V134Config,
+		v134Config:             config.V134Config,
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
@@ -692,10 +692,10 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// Supply missing mandatory PriorityLevelConfiguration objects
 	if !meal.haveExemptPL {
-		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.newConfig).PriorityLevelConfigurationExempt)
+		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.v134Config).PriorityLevelConfigurationExempt)
 	}
 	if !meal.haveCatchAllPL {
-		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.newConfig).PriorityLevelConfigurationCatchAll)
+		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.v134Config).PriorityLevelConfigurationCatchAll)
 	}
 
 	meal.finishQueueSetReconfigsLocked()
@@ -787,10 +787,10 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*flowcontrol.FlowSchema) {
 
 	// Supply missing mandatory FlowSchemas, in correct position
 	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.GetV1ConfigCollection(meal.cfgCtlr.newConfig).FlowSchemaExempt}, fsSeq...)
+		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.GetV1ConfigCollection(meal.cfgCtlr.v134Config).FlowSchemaExempt}, fsSeq...)
 	}
 	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.GetV1ConfigCollection(meal.cfgCtlr.newConfig).FlowSchemaCatchAll)
+		fsSeq = append(fsSeq, fcboot.GetV1ConfigCollection(meal.cfgCtlr.v134Config).FlowSchemaCatchAll)
 	}
 
 	meal.cfgCtlr.flowSchemas = fsSeq

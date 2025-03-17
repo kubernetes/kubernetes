@@ -167,7 +167,7 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 	}
 }
 func TestConfigConsumerFight(t *testing.T) {
-	_, kubeConfig, closeFn := setup(t, 100, 100)
+	_, _, kubeConfig, closeFn := setup(t, 100, 100, true)
 	defer closeFn()
 	const teamSize = 3
 	ft := newFightTest(t, kubeConfig, teamSize)
