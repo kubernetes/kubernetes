@@ -45,8 +45,10 @@ import (
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
+	v1informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/events"
@@ -76,7 +78,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	netutils "k8s.io/utils/net"
 )
@@ -173,9 +174,10 @@ type ProxyServer struct {
 	NodeIPs         map[v1.IPFamily]net.IP
 	flagz           flagz.Reader
 
-	podCIDRs []string // only used for LocalModeNodeCIDR
-
-	Proxier proxy.Provider
+	podCIDRs     []string // only used for LocalModeNodeCIDR
+	nodeInformer v1informers.NodeInformer
+	nodeManager  *proxy.NodeManager
+	Proxier      proxy.Provider
 }
 
 // newProxyServer creates a ProxyServer based on the given config
@@ -207,7 +209,22 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		return nil, err
 	}
 
-	rawNodeIPs := getNodeIPs(ctx, s.Client, s.Hostname)
+	// make an informer that selects for the node where this kube-proxy pod is running
+	thisNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
+			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.Hostname).String()
+		}))
+	s.nodeInformer = thisNodeInformerFactory.Core().V1().Nodes()
+
+	nodeLister := s.nodeInformer.Lister()
+	// initialize the informer and wait for cache sync
+	thisNodeInformerFactory.Start(wait.NeverStop)
+	if !cache.WaitForNamedCacheSync("node informer cache", ctx.Done(), s.nodeInformer.Informer().HasSynced) {
+		return nil, fmt.Errorf("can not sync node informer")
+	}
+
+	s.nodeManager = proxy.NewNodeManager(ctx, nodeLister, s.Hostname)
+	rawNodeIPs := s.nodeManager.NodeIPs()
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 
 	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
@@ -594,12 +611,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	informerFactory.Start(wait.NeverStop)
 	serviceInformerFactory.Start(wait.NeverStop)
 
-	// Make an informer that selects for our nodename.
-	currentNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
-		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", s.NodeRef.Name).String()
-		}))
-	nodeConfig := config.NewNodeConfig(ctx, currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
+	nodeConfig := config.NewNodeConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
 	// https://issues.k8s.io/111321
 	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
 		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
@@ -607,15 +619,11 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
 		HealthServer: s.HealthzServer,
 	})
-
-	nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, currentNodeInformerFactory.Core().V1().Nodes(), s.Config.ConfigSyncPeriod.Duration)
+	nodeConfig.RegisterEventHandler(s.nodeManager)
+	nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
 	nodeTopologyConfig.RegisterEventHandler(s.Proxier)
 
 	go nodeConfig.Run(wait.NeverStop)
-
-	// This has to start after the calls to NewNodeConfig because that must
-	// configure the shared informer event handler first.
-	currentNodeInformerFactory.Start(wait.NeverStop)
 
 	// Birth Cry after the birth is successful
 	s.birthCry()
@@ -686,35 +694,4 @@ func detectNodeIPs(ctx context.Context, rawNodeIPs []net.IP, bindAddress string)
 		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
 	}
 	return primaryFamily, nodeIPs
-}
-
-// getNodeIP returns IPs for the node with the provided name.  If
-// required, it will wait for the node to be created.
-func getNodeIPs(ctx context.Context, client clientset.Interface, name string) []net.IP {
-	logger := klog.FromContext(ctx)
-	var nodeIPs []net.IP
-	backoff := wait.Backoff{
-		Steps:    6,
-		Duration: 1 * time.Second,
-		Factor:   2.0,
-		Jitter:   0.2,
-	}
-
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node info")
-			return false, nil
-		}
-		nodeIPs, err = utilnode.GetNodeHostIPs(node)
-		if err != nil {
-			logger.Error(err, "Failed to retrieve node IPs")
-			return false, nil
-		}
-		return true, nil
-	})
-	if err == nil {
-		logger.Info("Successfully retrieved node IP(s)", "IPs", nodeIPs)
-	}
-	return nodeIPs
 }

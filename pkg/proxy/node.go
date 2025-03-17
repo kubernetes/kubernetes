@@ -18,13 +18,19 @@ package proxy
 
 import (
 	"context"
+	"net"
+	"os"
 	"reflect"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // NodePodCIDRHandler handles the life cycle of kube-proxy based on the node PodCIDR assigned
@@ -109,3 +115,93 @@ func (n *NodeEligibleHandler) OnNodeDelete(node *v1.Node) { n.HealthServer.SyncN
 
 // OnNodeSynced is a handler for Node syncs.
 func (n *NodeEligibleHandler) OnNodeSynced() {}
+
+// NodeManager handles the life cycle of kube-proxy based on the NodeIPs, handles node watch events
+// and crashes kube-proxy if there are any changes in NodeIPs.
+type NodeManager struct {
+	nodeIPs  []net.IP
+	logger   klog.Logger
+	exitFunc func(exitCode int)
+}
+
+// NewNodeManager returns NodeManager after waiting for the node object to exist and have NodeIPs.
+func NewNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string) *NodeManager {
+	return newNodeManager(ctx, nodeLister, nodeName, time.Second, 30*time.Second)
+}
+
+// newNodeManager implements NewNodeManager with configurable poll interval and timeout.
+func newNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string, pollInterval, pollTimeout time.Duration) *NodeManager {
+	logger := klog.FromContext(ctx)
+	var node *v1.Node
+	var err error
+	var nodeIPs []net.IP
+
+	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
+	defer cancel()
+	pollErr := wait.PollUntilContextCancel(ctx, pollInterval, true, func(context.Context) (bool, error) {
+		node, err = nodeLister.Get(nodeName)
+		if err != nil {
+			return false, nil
+		}
+
+		nodeIPs, err = utilnode.GetNodeHostIPs(node)
+		if err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+
+	if pollErr != nil {
+		logger.Error(err, "Failed to retrieve NodeIPs")
+	} else {
+		logger.Info("Successfully retrieved NodeIPs", "NodeIPs", nodeIPs)
+	}
+	return &NodeManager{
+		nodeIPs:  nodeIPs,
+		logger:   klog.FromContext(ctx),
+		exitFunc: os.Exit,
+	}
+}
+
+// NodeIPs returns the NodeIPs polled in NewNodeManager().
+func (n *NodeManager) NodeIPs() []net.IP {
+	return n.nodeIPs
+}
+
+// OnNodeAdd is a handler for Node creates.
+func (n *NodeManager) OnNodeAdd(node *v1.Node) {
+	n.onNodeChange(node)
+}
+
+// OnNodeUpdate is a handler for Node updates.
+func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
+	n.onNodeChange(node)
+}
+
+// onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
+func (n *NodeManager) onNodeChange(node *v1.Node) {
+	nodeIPs, err := utilnode.GetNodeHostIPs(node)
+	if err != nil {
+		n.logger.Error(err, "Failed to retrieve NodeIPs")
+		return
+	}
+
+	// We exit whenever there is a change in NodeIPs detected initially, and NodeIPs received
+	// on node watch event.
+	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
+		n.logger.Error(nil, "NodeIPs changed for the node",
+			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
+		klog.Flush()
+		n.exitFunc(1)
+	}
+}
+
+// OnNodeDelete is a handler for Node deletes.
+func (n *NodeManager) OnNodeDelete(node *v1.Node) {
+	n.logger.Error(nil, "Node is being deleted", "node", klog.KObj(node))
+	klog.Flush()
+	n.exitFunc(1)
+}
+
+// OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
+func (n *NodeManager) OnNodeSynced() {}

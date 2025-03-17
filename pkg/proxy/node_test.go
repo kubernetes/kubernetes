@@ -17,12 +17,25 @@ limitations under the License.
 package proxy
 
 import (
+	"net"
 	"strconv"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
+)
+
+const (
+	testNodeName = "test-node"
 )
 
 func TestNodePodCIDRHandlerAdd(t *testing.T) {
@@ -148,4 +161,114 @@ func TestNodePodCIDRHandlerUpdate(t *testing.T) {
 
 func customExit(exitCode int) {
 	panic(strconv.Itoa(exitCode))
+}
+
+type nodeTweak func(n *v1.Node)
+
+func makeNode(tweaks ...nodeTweak) *v1.Node {
+	n := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+		},
+	}
+	for _, tw := range tweaks {
+		tw(n)
+	}
+	return n
+}
+
+func tweakNodeIPs(nodeIPs ...string) nodeTweak {
+	return func(n *v1.Node) {
+		for _, ip := range nodeIPs {
+			n.Status.Addresses = append(n.Status.Addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip})
+		}
+	}
+}
+
+func TestNewNodeManager(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	client := clientsetfake.NewClientset()
+	informer := informers.NewSharedInformerFactoryWithOptions(client, 0)
+	nodeLister := informer.Core().V1().Nodes().Lister()
+	nodeStore := informer.Core().V1().Nodes().Informer().GetStore()
+	nodeIP := "192.168.0.1"
+
+	go func() {
+		// node object doesn't exist
+		// wait for 1.5µs for 1µs poll interval to finish
+		time.Sleep(1500 * time.Nanosecond)
+
+		// node initially has no IP
+		_ = nodeStore.Add(makeNode())
+		// wait for 1.5µs for 1µs poll interval to finish
+		time.Sleep(1500 * time.Nanosecond)
+
+		// node updated with IP
+		_ = nodeStore.Add(makeNode(tweakNodeIPs(nodeIP)))
+	}()
+
+	nodeManager := newNodeManager(ctx, nodeLister, testNodeName, time.Microsecond, time.Second)
+	require.Equal(t, []net.IP{netutils.ParseIPSloppy(nodeIP)}, nodeManager.NodeIPs())
+}
+
+func TestNodeManagerOnNodeChange(t *testing.T) {
+	tests := []struct {
+		name string
+		// nodeIPs represent the initial NodeIPs fetched in NewNodeManager().
+		nodeIPs          []net.IP
+		makeNode         func() *v1.Node
+		expectedExitCode *int
+	}{
+		{
+			name:             "no initial NodeIPs and node updated without NodeIPs",
+			nodeIPs:          []net.IP{},
+			makeNode:         func() *v1.Node { return makeNode() },
+			expectedExitCode: nil,
+		},
+		{
+			name:             "no initial NodeIPs and node updated with NodeIPs",
+			makeNode:         func() *v1.Node { return makeNode(tweakNodeIPs("192.168.1.1", "fd00:1:2:3::1")) },
+			expectedExitCode: ptr.To(1),
+		},
+		{
+			name:             "node updated with same NodeIPs",
+			nodeIPs:          []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			makeNode:         func() *v1.Node { return makeNode(tweakNodeIPs("192.168.1.1", "fd00:1:2:3::1")) },
+			expectedExitCode: nil,
+		},
+		{
+			name:             "node updated with different NodeIPs",
+			nodeIPs:          []net.IP{netutils.ParseIPSloppy("192.168.1.1"), netutils.ParseIPSloppy("fd00:1:2:3::1")},
+			makeNode:         func() *v1.Node { return makeNode(tweakNodeIPs("10.0.1.1", "fd00:3:2:1::2")) },
+			expectedExitCode: ptr.To(1),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var exitCode *int
+			n := NodeManager{
+				nodeIPs: tc.nodeIPs,
+				logger:  klog.FromContext(ctx),
+				exitFunc: func(code int) {
+					exitCode = &code
+				},
+			}
+			n.onNodeChange(tc.makeNode())
+			require.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestNodeManagerOnNodeDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	var exitCode *int
+	n := NodeManager{
+		logger: klog.FromContext(ctx),
+		exitFunc: func(code int) {
+			exitCode = &code
+		},
+	}
+	n.OnNodeDelete(makeNode())
+	require.Equal(t, ptr.To(1), exitCode)
 }

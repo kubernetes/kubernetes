@@ -288,6 +288,15 @@ func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, r
 		logger: klog.FromContext(ctx),
 	}
 
+	// todo @aroradaman: get rid of the following special case for hollow-proxy
+	// This handles the case (hollow_proxier) where ProxyServer is instantiated without
+	// the "newProxyServer" function, and nodeInformer will be nil as we are creating
+	// the NodeInformers in "newProxyServer" now, the following event handler registration
+	// will panic for hollow proxy.
+	if nodeInformer == nil {
+		return result
+	}
+
 	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddNode,
@@ -309,6 +318,10 @@ func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
 
 // Run starts the goroutine responsible for calling registered handlers.
 func (c *NodeConfig) Run(stopCh <-chan struct{}) {
+	if c.listerSynced == nil {
+		return
+	}
+
 	c.logger.Info("Starting node config controller")
 
 	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
@@ -494,6 +507,15 @@ func newNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInf
 	result := &NodeTopologyConfig{
 		logger:         klog.FromContext(ctx),
 		topologyLabels: make(map[string]string),
+	}
+
+	// todo @aroradaman: get rid of the following special case for hollow-proxy
+	// This handles the case (hollow_proxier) where ProxyServer is instantiated without
+	// the "newProxyServer" function, and nodeInformer will be nil as we are creating
+	// the NodeInformers in "newProxyServer" now, the following event handler registration
+	// will panic for hollow proxy.
+	if nodeInformer == nil {
+		return result
 	}
 
 	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
