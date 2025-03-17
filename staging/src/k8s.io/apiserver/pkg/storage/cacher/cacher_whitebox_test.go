@@ -250,15 +250,23 @@ func TestShouldDelegateList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	continueOnNegativeRV, err := storage.EncodeContinue(keyPrefix+"foo", keyPrefix, -1)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	testCases := map[opts]bool{}
 	testCases[opts{}] = true
 	testCases[opts{Limit: 100}] = true
 	testCases[opts{Continue: continueOnRev1}] = true
 	testCases[opts{Limit: 100, Continue: continueOnRev1}] = true
+	testCases[opts{Continue: continueOnNegativeRV}] = true
+	testCases[opts{Limit: 100, Continue: continueOnNegativeRV}] = true
 	testCases[opts{ResourceVersion: "0"}] = false
 	testCases[opts{ResourceVersion: "0", Limit: 100}] = false
 	testCases[opts{ResourceVersion: "0", Continue: continueOnRev1}] = true
 	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnRev1}] = true
+	testCases[opts{ResourceVersion: "0", Continue: continueOnNegativeRV}] = true
+	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = true
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
 	testCases[opts{ResourceVersion: "1"}] = false
@@ -276,10 +284,12 @@ func TestShouldDelegateList(t *testing.T) {
 	// Continue is ignored on non recursive LIST
 	testCases[opts{ResourceVersion: "1", Continue: continueOnRev1}] = true
 	testCases[opts{ResourceVersion: "1", Continue: continueOnRev1, Limit: 100}] = true
+	testCases[opts{ResourceVersion: "1", Continue: continueOnNegativeRV}] = true
+	testCases[opts{ResourceVersion: "1", Continue: continueOnNegativeRV, Limit: 100}] = true
 
 	for _, rv := range []string{"", "0", "1"} {
 		for _, match := range []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
-			for _, continueKey := range []string{"", continueOnRev1} {
+			for _, continueKey := range []string{"", continueOnRev1, continueOnNegativeRV} {
 				for _, limit := range []int64{0, 100} {
 					for _, recursive := range []bool{true, false} {
 						opt := opts{

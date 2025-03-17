@@ -1493,6 +1493,73 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: utilpointer.Int64(3),
 		},
+		{
+			name:   "test List with continue from second pod, negative resource version gives consistent read",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", -1),
+			},
+			expectedOut: []example.Pod{*createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			expectRV:    currentRV,
+		},
+		{
+			name:   "test List with continue from second pod and limit, negative resource version gives consistent read",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    2,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", -1),
+			},
+			expectedOut:                []example.Pod{*createdPods[1], *createdPods[2]},
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(continueRV+1)),
+			expectRV:                   currentRV,
+			expectedRemainingItemCount: utilpointer.Int64(2),
+		},
+		{
+			name:   "test List with continue from third pod, negative resource version gives consistent read",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", -1),
+			},
+			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
+			expectRV:    currentRV,
+		},
+		{
+			name:   "test List with continue from empty fails",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie("", int64(continueRV)),
+			},
+			expectError: true,
+		},
+		{
+			name:   "test List with continue from first pod, empty resource version fails",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", 0),
+			},
+			expectError: true,
+		},
+		{
+			name:   "test List with negative rv fails",
+			prefix: "/pods/",
+			rv:     "-1",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
