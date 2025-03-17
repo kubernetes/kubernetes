@@ -75,6 +75,10 @@ var (
 		            debugging utilities without restarting the pod.
 		* Node: Create a new pod that runs in the node's host namespaces and can access
 		        the node's filesystem.
+
+		Note: When a non-root user is configured for the entire target Pod, some capabilities granted 
+		by debug profile may not work. Please consider using "--custom" with a custom profile 
+		that specifies "securityContext.runAsUser: 0".
 `))
 
 	debugExample = templates.Examples(i18n.T(`
@@ -475,18 +479,6 @@ func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev
 //
 // visitPod returns a pod and debug container name for subsequent attach, if applicable.
 func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
-	// Display warning message if some capabilities are set by profile and non-root user is specified in .Spec.SecurityContext.RunAsUser.(#1650)
-	if o.Profile == ProfileGeneral || o.Profile == ProfileNetadmin || o.Profile == ProfileSysadmin ||
-		(o.CustomProfile != nil && o.CustomProfile.SecurityContext != nil &&
-			((o.CustomProfile.SecurityContext.Privileged != nil && *o.CustomProfile.SecurityContext.Privileged) ||
-				(o.CustomProfile.SecurityContext.Capabilities != nil && len(o.CustomProfile.SecurityContext.Capabilities.Add) != 0))) {
-		if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser != 0 {
-			if o.CustomProfile == nil ||
-				(o.CustomProfile.SecurityContext.RunAsUser == nil || *o.CustomProfile.SecurityContext.RunAsUser != 0) {
-				fmt.Fprintln(o.ErrOut, `Warning: Non-root user is specified for the entire target Pod and some capabilities granted by debug profile may not work. Please consider using "--custom" with the custom profile specifying "securityContext.runAsUser: 0".`)
-			}
-		}
-	}
 	if len(o.CopyTo) > 0 {
 		return o.debugByCopy(ctx, pod)
 	}
@@ -506,6 +498,8 @@ func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev
 		return nil, "", err
 	}
 	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
+
+	o.displayWarning((*corev1.Container)(&debugContainer.EphemeralContainerCommon), pod)
 
 	debugJS, err := json.Marshal(debugPod)
 	if err != nil {
@@ -623,6 +617,16 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 	if err != nil {
 		return nil, "", err
 	}
+
+	var debugContainer *corev1.Container
+	for i := range copied.Spec.Containers {
+		if copied.Spec.Containers[i].Name == dc {
+			debugContainer = &copied.Spec.Containers[i]
+			break
+		}
+	}
+	o.displayWarning(debugContainer, copied)
+
 	created, err := o.podClient.Pods(copied.Namespace).Create(ctx, copied, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
@@ -634,6 +638,21 @@ func (o *DebugOptions) debugByCopy(ctx context.Context, pod *corev1.Pod) (*corev
 		}
 	}
 	return created, dc, nil
+}
+
+func (o *DebugOptions) displayWarning(container *corev1.Container, pod *corev1.Pod) {
+	if container != nil {
+		// Display warning message if some capabilities are set by profile and non-root user is specified in .Spec.SecurityContext.RunAsUser.(#1650)
+		if container.SecurityContext != nil &&
+			((container.SecurityContext.Privileged != nil && *container.SecurityContext.Privileged) ||
+				(container.SecurityContext.Capabilities != nil && len(container.SecurityContext.Capabilities.Add) != 0)) {
+			if pod.Spec.SecurityContext.RunAsUser != nil && *pod.Spec.SecurityContext.RunAsUser != 0 {
+				if container.SecurityContext.RunAsUser == nil || *container.SecurityContext.RunAsUser != 0 {
+					_, _ = fmt.Fprintln(o.ErrOut, `Warning: Non-root user is configured for the entire target Pod, and some capabilities granted by debug profile may not work. Please consider using "--custom" with a custom profile that specifies "securityContext.runAsUser: 0".`)
+				}
+			}
+		}
+	}
 }
 
 // generateDebugContainer returns a debugging pod and an EphemeralContainer suitable for use as a debug container

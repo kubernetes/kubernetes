@@ -1048,6 +1048,7 @@ runTests() {
     record_command run_kubectl_debug_restricted_tests
     record_command run_kubectl_debug_netadmin_tests
     record_command run_kubectl_debug_custom_profile_tests
+    record_command run_kubectl_debug_warning_tests
   fi
   if kube::test::if_supports_resource "${nodes}" ; then
     record_command run_kubectl_debug_node_tests
