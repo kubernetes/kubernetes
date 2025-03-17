@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	helpers "k8s.io/component-helpers/resource"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -414,6 +415,100 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By("deleting pod 1")
 		delErr1 := e2epod.DeletePodWithWait(ctx, f.ClientSet, testPod1)
 		framework.ExpectNoError(delErr1, "failed to delete pod %s", testPod1.Name)
+	})
+
+	ginkgo.It("pod-resize-taint-tests", func(ctx context.Context) {
+		const (
+			originalCPU = "20m"
+			resizedCPU  = "10m" // Decreased so the resize should always be accepted
+		)
+		originalContainers := []e2epod.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &e2epod.ContainerResources{CPUReq: originalCPU},
+		}}
+		patchString := fmt.Sprintf(`{"spec":{"containers":[{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}]}}`, resizedCPU)
+		resizedContainers := []e2epod.ResizableContainerInfo{{
+			Name:      "c1",
+			Resources: &e2epod.ContainerResources{CPUReq: resizedCPU},
+		}}
+
+		tStamp := strconv.Itoa(time.Now().Nanosecond())
+		testPod := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "taints-resize-test", tStamp, originalContainers)
+		testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
+
+		ginkgo.By("creating pod")
+		podClient := e2epod.NewPodClient(f)
+		pod := podClient.CreateSync(ctx, testPod)
+
+		scheduledNode := pod.Spec.NodeName
+		const taintKey = "no-schedule"
+		taint := v1.Taint{
+			Key:    taintKey,
+			Effect: v1.TaintEffectNoSchedule,
+		}
+
+		ginkgo.By(fmt.Sprintf("Tainting scheduled node %q with %s", scheduledNode, taint.String()))
+		var originalTaints []v1.Taint
+		nodeClient := f.ClientSet.CoreV1().Nodes()
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			tmpNode, err := nodeClient.Get(ctx, scheduledNode, metav1.GetOptions{})
+			framework.ExpectNoError(err, "failed to get node %q", scheduledNode)
+			originalTaints = tmpNode.Spec.Taints
+			tmpNode.Spec.Taints = append(originalTaints, taint)
+			_, err = nodeClient.Update(ctx, tmpNode, metav1.UpdateOptions{})
+			return err
+		})
+		framework.ExpectNoError(err, "failed to taint node %q", scheduledNode)
+		ginkgo.DeferCleanup(func(ctx context.Context) {
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				tmpNode, err := nodeClient.Get(ctx, scheduledNode, metav1.GetOptions{})
+				framework.ExpectNoError(err, "failed to get node %q", scheduledNode)
+				tmpNode.Spec.Taints = originalTaints
+				_, err = nodeClient.Update(ctx, tmpNode, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "failed to untaint node %q", scheduledNode)
+		})
+
+		// Pause to let the taint propogate to the Kubelet's node informer. There aren't any
+		// external signals that the Kubelet has seen the update, so there is no way to make this
+		// deterministic.
+		time.Sleep(10 * time.Second)
+
+		ginkgo.By("patching pod for resize")
+		_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Patch(ctx, pod.Name,
+			types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(err, "failed to patch pod for resize")
+
+		ginkgo.By("verifying resize is deferred")
+		framework.ExpectNoError(framework.Gomega().
+			Eventually(ctx, framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(pod.Namespace).Get, pod.Name, metav1.GetOptions{}))).
+			WithTimeout(f.Timeouts.PodStart).
+			Should(framework.MakeMatcher(func(pod *v1.Pod) (func() string, error) {
+				if pod.Status.Resize == v1.PodResizeStatusDeferred {
+					return nil, nil // Expected state
+				}
+				return func() string {
+					return fmt.Sprintf("got resizeStatus %s, expected %s", pod.Status.Resize, v1.PodResizeStatusDeferred)
+				}, nil
+			})),
+		)
+		deferredPod, err := podClient.Get(ctx, pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err, "failed to get deferred pod")
+		// Ensure resize is not actuated.
+		framework.ExpectNoError(e2epod.VerifyPodStatusResources(deferredPod, originalContainers), "Original resources should not be changed")
+
+		ginkgo.By("adding toleration to pod")
+		podClient.Update(ctx, pod.Name, func(pod *v1.Pod) {
+			pod.Spec.Tolerations = append(pod.Spec.Tolerations, v1.Toleration{
+				Key:    taintKey,
+				Effect: v1.TaintEffectNoSchedule,
+			})
+		})
+
+		ginkgo.By("expecting resize to succeed")
+		resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, pod, resizedContainers)
+		e2epod.ExpectPodResized(ctx, f, resizedPod, resizedContainers)
 	})
 }
 

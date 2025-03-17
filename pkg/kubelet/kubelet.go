@@ -70,6 +70,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-helpers/apimachinery/lease"
+	"k8s.io/component-helpers/scheduling/corev1"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
@@ -2889,6 +2890,15 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 		klog.ErrorS(err, "getNodeAnyway function failed")
 		return false, "", ""
 	}
+
+	taint, isUntolerated := corev1.FindMatchingUntoleratedTaint(node.Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+		// Resizing has scheduling implications, so it should also respect NoSchedule taints.
+		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
+	})
+	if isUntolerated {
+		return false, v1.PodReasonDeferred, fmt.Sprintf("Node has untolerated taint: %s", taint.ToString())
+	}
+
 	cpuAvailable := node.Status.Allocatable.Cpu().MilliValue()
 	memAvailable := node.Status.Allocatable.Memory().Value()
 	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)

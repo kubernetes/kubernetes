@@ -2613,23 +2613,21 @@ func TestHandlePodResourcesResize(t *testing.T) {
 	mem2500M := resource.MustParse("2500Mi")
 	mem4500M := resource.MustParse("4500Mi")
 
-	nodes := []*v1.Node{
-		{
-			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
-			Status: v1.NodeStatus{
-				Capacity: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("8"),
-					v1.ResourceMemory: resource.MustParse("8Gi"),
-				},
-				Allocatable: v1.ResourceList{
-					v1.ResourceCPU:    resource.MustParse("4"),
-					v1.ResourceMemory: resource.MustParse("4Gi"),
-					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
-				},
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+		Status: v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("8"),
+				v1.ResourceMemory: resource.MustParse("8Gi"),
+			},
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("4Gi"),
+				v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
 			},
 		},
 	}
-	kubelet.nodeLister = testNodeLister{nodes: nodes}
+	kubelet.nodeLister = testNodeLister{nodes: []*v1.Node{node}}
 
 	testPod1 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2717,6 +2715,8 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		expectedResize        []*v1.PodCondition
 		expectBackoffReset    bool
 		annotations           map[string]string
+		nodeTaint             *v1.Taint
+		podToleration         *v1.Toleration
 	}{
 		{
 			name:                  "Request CPU and memory decrease - expect InProgress",
@@ -2919,6 +2919,69 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                  "Ignore PreferNoSchedule taints",
+			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectBackoffReset:    true,
+			nodeTaint:             &v1.Taint{Key: "prefer-no-schedule", Effect: v1.TaintEffectPreferNoSchedule},
+
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+		},
+		{
+			name:                  "NoSchedule taint blocks resize",
+			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			nodeTaint:             &v1.Taint{Key: "no-schedule", Effect: v1.TaintEffectNoSchedule},
+
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  v1.PodReasonDeferred,
+					Message: "Node has untolerated taint: no-schedule:NoSchedule",
+				},
+			},
+		},
+		{
+			name:                  "NoExecute taint blocks resize",
+			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			nodeTaint:             &v1.Taint{Key: "no-execute", Effect: v1.TaintEffectNoExecute},
+
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  v1.PodReasonDeferred,
+					Message: "Node has untolerated taint: no-execute:NoExecute",
+				},
+			},
+		},
+		{
+			name:                  "tolerated NoSchedule taint does not block resize",
+			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1000M},
+			expectBackoffReset:    true,
+			nodeTaint:             &v1.Taint{Key: "no-schedule", Effect: v1.TaintEffectNoSchedule},
+			podToleration:         &v1.Toleration{Key: "no-schedule", Effect: v1.TaintEffectNoSchedule},
+
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2947,6 +3010,15 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				} else {
 					newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
 					newPod.Spec.Containers[0].Resources.Limits = tt.newLimits
+				}
+
+				if tt.podToleration != nil {
+					newPod.Spec.Tolerations = append(newPod.Spec.Tolerations, *tt.podToleration)
+				}
+				if tt.nodeTaint != nil {
+					originalTaints := node.Spec.Taints
+					node.Spec.Taints = append(originalTaints, *tt.nodeTaint)
+					t.Cleanup(func() { node.Spec.Taints = originalTaints })
 				}
 
 				if !tt.newResourcesAllocated {

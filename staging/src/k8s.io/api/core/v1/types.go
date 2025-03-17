@@ -3740,6 +3740,7 @@ const (
 	// but allow all pods submitted to Kubelet without going through the scheduler
 	// to start, and allow all already-running pods to continue running.
 	// Enforced by the scheduler.
+	// Do not allow pods to be resized unless they tolerate the taint (enforced by Kubelet).
 	TaintEffectNoSchedule TaintEffect = "NoSchedule"
 	// Like TaintEffectNoSchedule, but the scheduler tries not to schedule
 	// new pods onto the node, rather than prohibiting new pods from scheduling
