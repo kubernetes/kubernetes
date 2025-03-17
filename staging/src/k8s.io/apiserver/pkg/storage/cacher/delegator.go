@@ -36,8 +36,8 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
-	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/tracing"
 	"k8s.io/klog/v2"
@@ -180,8 +180,11 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	if err != nil {
 		return err
 	}
-	shouldDelegate, consistentRead := shouldDelegateList(opts)
-	if shouldDelegate {
+	result, err := shouldDelegateList(opts, delegator.CacheWithoutSnapshots{})
+	if err != nil {
+		return err
+	}
+	if result.ShouldDelegate {
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
@@ -203,7 +206,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 			return c.storage.GetList(ctx, key, opts, listObj)
 		}
 	}
-	if consistentRead {
+	if result.ConsistentRead {
 		listRV, err = c.storage.GetCurrentResourceVersion(ctx)
 		if err != nil {
 			return err
@@ -215,7 +218,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	success := "true"
 	fallback := "false"
 	if err != nil {
-		if consistentRead {
+		if result.ConsistentRead {
 			if storage.IsTooLargeResourceVersion(err) {
 				fallback = "true"
 				// Reset resourceVersion during fallback from consistent read.
@@ -229,7 +232,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 		}
 		return err
 	}
-	if consistentRead {
+	if result.ConsistentRead {
 		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.resourcePrefix, success, fallback).Add(1)
 	}
 	return nil
@@ -243,36 +246,32 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	return noLabelSelector && noFieldSelector && hasLimit
 }
 
-// NOTICE: Keep in sync with shouldListFromStorage function in
+// NOTICE: Keep in sync with shouldDelegateList function in
 //
 //	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions) (shouldDeletage, consistentRead bool) {
+func shouldDelegateList(opts storage.ListOptions, cache delegator.Helper) (delegator.Result, error) {
 	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	consistentRead = false
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return true, consistentRead
+		return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
 	case metav1.ResourceVersionMatchNotOlderThan:
-		return false, consistentRead
+		return delegator.Result{ShouldDelegate: false}, nil
 	case "":
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true, consistentRead
+			return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
 		}
 		// Continue
 		if len(opts.Predicate.Continue) > 0 {
-			return true, consistentRead
+			return cache.ShouldDelegateContinue(opts.Predicate.Continue, opts.Recursive)
 		}
 		// Consistent Read
 		if opts.ResourceVersion == "" {
-			consistentRead = true
-			consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-			requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-			return !consistentListFromCacheEnabled || !requestWatchProgressSupported, consistentRead
+			return cache.ShouldDelegateConsistentRead()
 		}
-		return false, consistentRead
+		return delegator.Result{ShouldDelegate: false}, nil
 	default:
-		return true, consistentRead
+		return delegator.Result{ShouldDelegate: true}, nil
 	}
 }
 

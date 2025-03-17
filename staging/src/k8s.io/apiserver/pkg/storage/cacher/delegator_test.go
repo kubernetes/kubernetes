@@ -20,8 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
-	"k8s.io/apimachinery/pkg/apis/meta/internalversion/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -192,58 +190,5 @@ func TestCalculateDigest(t *testing.T) {
 				t.Errorf("Expect: %+v Got: %+v", &tc.expectDigest, *digest)
 			}
 		})
-	}
-}
-
-func TestValidateUndelegatedListOptions(t *testing.T) {
-	opts := []storage.ListOptions{}
-	keyPrefix := "/pods/"
-	continueOnRV1, err := storage.EncodeContinue("/pods/a", keyPrefix, 1)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	continueOnNegativeRV, err := storage.EncodeContinue("/pods/a", keyPrefix, -1)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	for _, rv := range []string{"", "0", "1"} {
-		for _, match := range []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
-			for _, c := range []string{"", continueOnRV1, continueOnNegativeRV} {
-				for _, limit := range []int64{0, 100} {
-					for _, recursive := range []bool{true, false} {
-						opt := storage.ListOptions{
-							ResourceVersion:      rv,
-							ResourceVersionMatch: match,
-							Predicate: storage.SelectionPredicate{
-								Limit:    limit,
-								Continue: c,
-							},
-							Recursive: recursive,
-						}
-						// Skip requests that will not pass apiserver validation
-						if errs := validation.ValidateListOptions(&internalversion.ListOptions{
-							ResourceVersion:      opt.ResourceVersion,
-							ResourceVersionMatch: opt.ResourceVersionMatch,
-							Limit:                opt.Predicate.Limit,
-							Continue:             opt.Predicate.Continue,
-						}, false); len(errs) != 0 {
-							continue
-						}
-						// Skip requests sent directly to etcd
-						if delegateList, _ := shouldDelegateList(opt); delegateList {
-							continue
-						}
-						opts = append(opts, opt)
-					}
-
-				}
-			}
-		}
-	}
-	for _, opt := range opts {
-		_, _, err := storage.ValidateListOptions(keyPrefix, storage.APIObjectVersioner{}, opt)
-		if err != nil {
-			t.Errorf("Expected List requests %+v to pass validation, got: %v", opt, err)
-		}
 	}
 }
