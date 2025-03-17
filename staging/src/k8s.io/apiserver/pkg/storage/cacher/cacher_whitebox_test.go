@@ -216,7 +216,7 @@ func (d *dummyCacher) Ready() bool {
 	return d.ready
 }
 
-func TestGetListCacheBypass(t *testing.T) {
+func TestShouldDelegateList(t *testing.T) {
 	type opts struct {
 		Recursive            bool
 		ResourceVersion      string
@@ -324,7 +324,10 @@ func TestGetListCacheBypass(t *testing.T) {
 					expectBypass = bypass
 				}
 			}
-			testGetListCacheBypass(t, toStorageOpts(opt), expectBypass)
+			gotBypass, _ := shouldDelegateList(toStorageOpts(opt))
+			if gotBypass != expectBypass {
+				t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", opt, expectBypass, gotBypass)
+			}
 		}
 	}
 	consistentListFromCacheOverrides := map[opts]bool{}
@@ -349,49 +352,6 @@ func TestGetListCacheBypass(t *testing.T) {
 		forceRequestWatchProgressSupport(t)
 		runTestCases(t, testCases, consistentListFromCacheOverrides)
 	})
-}
-
-func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-	delegator := NewCacheDelegator(cacher, backingStorage)
-	defer delegator.Stop()
-	result := &example.PodList{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-		currentResourceVersion := "42"
-		switch {
-		// request made by getCurrentResourceVersionFromStorage by checking Limit
-		case key == cacher.resourcePrefix:
-			podList := listObj.(*example.PodList)
-			podList.ResourceVersion = currentResourceVersion
-			return nil
-		// request made by storage.GetList with revision from original request or
-		// returned by getCurrentResourceVersionFromStorage
-		case opts.ResourceVersion == options.ResourceVersion || opts.ResourceVersion == currentResourceVersion:
-			return errDummy
-		default:
-			t.Fatalf("Unexpected request %+v", opts)
-			return nil
-		}
-	}
-	err = delegator.GetList(context.TODO(), "pods/ns", options, result)
-	gotBypass := errors.Is(err, errDummy)
-	if err != nil && !gotBypass {
-		t.Fatalf("Unexpected error for List request with options: %v, err: %v", options, err)
-	}
-	if gotBypass != expectBypass {
-		t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", options, expectBypass, gotBypass)
-	}
 }
 
 func TestConsistentReadFallback(t *testing.T) {
