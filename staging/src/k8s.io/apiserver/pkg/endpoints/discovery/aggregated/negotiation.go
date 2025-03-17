@@ -18,6 +18,9 @@ package aggregated
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 // Interface is from "k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
@@ -37,6 +40,9 @@ func (discoveryEndpointRestrictions) AllowsStreamSchema(s string) bool { return 
 // IsAggregatedDiscoveryGVK checks if a provided GVK is the GVK for serving aggregated discovery.
 func IsAggregatedDiscoveryGVK(gvk *schema.GroupVersionKind) bool {
 	if gvk != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AggregatedDiscoveryRemoveBetaType) {
+			return gvk.Group == "apidiscovery.k8s.io" && gvk.Version == "v2" && gvk.Kind == "APIGroupDiscoveryList"
+		}
 		return gvk.Group == "apidiscovery.k8s.io" && (gvk.Version == "v2beta1" || gvk.Version == "v2") && gvk.Kind == "APIGroupDiscoveryList"
 	}
 	return false
