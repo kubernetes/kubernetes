@@ -935,10 +935,14 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 
 		reservedSystemCPUs := cpuset.New(0)
-		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			reservedSystemCPUs: reservedSystemCPUs,
-		}, false, false)
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedSystemCPUs,
+			},
+			false,
+			false,
+		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		ginkgo.By("running a Gu pod - it shouldn't use reserved system CPUs")
@@ -961,12 +965,16 @@ func runCPUManagerTests(f *framework.Framework) {
 		cpuPolicyOptions := map[string]string{
 			cpumanager.StrictCPUReservationOption: "true",
 		}
-		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:              string(cpumanager.PolicyStatic),
-			reservedSystemCPUs:      reservedSystemCPUs,
-			enableCPUManagerOptions: true,
-			options:                 cpuPolicyOptions,
-		}, false, false)
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      reservedSystemCPUs,
+				enableCPUManagerOptions: true,
+				options:                 cpuPolicyOptions,
+			},
+			false,
+			false,
+		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		ginkgo.By("running a Gu pod - it shouldn't use reserved system CPUs")
@@ -1042,7 +1050,9 @@ func runCPUManagerTests(f *framework.Framework) {
 				reservedSystemCPUs:      reservedSystemCPUs,
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
-			}, false, false,
+			},
+			false,
+			false,
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -1064,7 +1074,9 @@ func runCPUManagerTests(f *framework.Framework) {
 				policyName:                       string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: true,
-			}, false, false,
+			},
+			false,
+			false,
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -1085,7 +1097,9 @@ func runCPUManagerTests(f *framework.Framework) {
 				policyName:                       string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: false,
-			}, false, false,
+			},
+			false,
+			false,
 		)
 
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -1103,10 +1117,14 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 
 		// Enable CPU Manager in the kubelet.
-		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
-			reservedSystemCPUs: cpuset.CPUSet{},
-		}, false, false)
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: cpuset.CPUSet{},
+			},
+			false,
+			false,
+		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		ginkgo.By("running a Gu pod with a regular init container and a restartable init container")
@@ -1186,7 +1204,9 @@ func runCPUManagerTests(f *framework.Framework) {
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
-			}, false, false,
+			},
+			false,
+			false,
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 
@@ -1252,7 +1272,9 @@ func runCPUManagerTests(f *framework.Framework) {
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
-			}, false, false,
+			},
+			false,
+			false,
 		)
 		updateKubeletConfig(ctx, f, newCfg, true)
 		// 'distribute-cpus-across-numa' policy option ensures that CPU allocations are evenly distributed
