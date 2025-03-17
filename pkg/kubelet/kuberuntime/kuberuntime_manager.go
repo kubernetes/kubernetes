@@ -51,10 +51,12 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider/plugin"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/logs"
@@ -67,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -106,9 +109,6 @@ type kubeGenericRuntimeManager struct {
 
 	// Container GC manager
 	containerGC *containerGC
-
-	// Keyring for pulling images
-	keyring credentialprovider.DockerKeyring
 
 	// Runner of lifecycle events.
 	runner kubecontainer.HandlerRunner
@@ -207,6 +207,8 @@ func NewKubeGenericRuntimeManager(
 	maxParallelImagePulls *int32,
 	imagePullQPS float32,
 	imagePullBurst int,
+	imagePullsCredentialVerificationPolicy string,
+	preloadedImagesCredentialVerificationWhitelist []string,
 	imageCredentialProviderConfigFile string,
 	imageCredentialProviderBinDir string,
 	singleProcessOOMKill *bool,
@@ -226,7 +228,7 @@ func NewKubeGenericRuntimeManager(
 	tracerProvider trace.TracerProvider,
 	tokenManager *token.Manager,
 	getServiceAccount plugin.GetServiceAccountFunc,
-) (KubeGenericRuntime, error) {
+) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
@@ -261,7 +263,7 @@ func NewKubeGenericRuntimeManager(
 	typedVersion, err := kubeRuntimeManager.getTypedVersion(ctx)
 	if err != nil {
 		klog.ErrorS(err, "Get runtime version failed")
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Only matching kubeRuntimeAPIVersion is supported now
@@ -270,7 +272,7 @@ func NewKubeGenericRuntimeManager(
 		klog.ErrorS(err, "This runtime api version is not supported",
 			"apiVersion", typedVersion.Version,
 			"supportedAPIVersion", kubeRuntimeAPIVersion)
-		return nil, ErrVersionNotSupported
+		return nil, nil, ErrVersionNotSupported
 	}
 
 	kubeRuntimeManager.runtimeName = typedVersion.RuntimeName
@@ -285,11 +287,37 @@ func NewKubeGenericRuntimeManager(
 			os.Exit(1)
 		}
 	}
-	kubeRuntimeManager.keyring = credentialprovider.NewDefaultDockerKeyring()
 
+	var imageGCHooks []images.PostImageGCHook
+	var imagePullManager imagepullmanager.ImagePullManager = &imagepullmanager.NoopImagePullManager{}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
+		imagePullCredentialsVerificationPolicy, err := imagepullmanager.NewImagePullCredentialVerificationPolicy(
+			kubeletconfiginternal.ImagePullCredentialsVerificationPolicy(imagePullsCredentialVerificationPolicy),
+			preloadedImagesCredentialVerificationWhitelist)
+
+		if err != nil {
+			return nil, nil, err
+		}
+
+		fsRecordAccessor, err := imagepullmanager.NewFSPullRecordsAccessor(rootDirectory)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to setup the FSPullRecordsAccessor: %w", err)
+		}
+
+		imagePullManager, err = imagepullmanager.NewImagePullManager(ctx, fsRecordAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, ptr.Deref(maxParallelImagePulls, 0))
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create image pull manager: %w", err)
+		}
+
+		imageGCHooks = append(imageGCHooks, imagePullManager.PruneUnknownRecords)
+	}
+
+	nodeKeyring := credentialprovider.NewDefaultDockerKeyring()
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
+		nodeKeyring,
 		kubeRuntimeManager,
+		imagePullManager,
 		imageBackOff,
 		serializeImagePulls,
 		maxParallelImagePulls,
@@ -307,7 +335,7 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	return kubeRuntimeManager, nil
+	return kubeRuntimeManager, imageGCHooks, nil
 }
 
 // Type returns the type of the container runtime.

@@ -87,11 +87,12 @@ func NewExternalCredentialProviderDockerKeyring(podNamespace, podName, podUID, s
 	return keyring
 }
 
-func (k *externalCredentialProviderKeyring) Lookup(image string) ([]credentialprovider.AuthConfig, bool) {
+func (k *externalCredentialProviderKeyring) Lookup(image string) ([]credentialprovider.TrackedAuthConfig, bool) {
 	keyring := &credentialprovider.BasicDockerKeyring{}
 
 	for _, p := range k.providers {
-		keyring.Add(p.Provide(image))
+		// TODO: modify the credentialprovider.CredentialSource to contain the SA/pod information
+		keyring.Add(nil, p.Provide(image))
 	}
 
 	return keyring.Lookup(image)
