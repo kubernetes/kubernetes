@@ -51,8 +51,11 @@ func (s *stateMemory) GetContainerResources(podUID types.UID, containerName stri
 	if !ok {
 		return v1.ResourceRequirements{}, ok
 	}
-	//  klog.V(2).InfoS("GetContainerResourceAllocation: %v", *resources.DeepCopy())
-	resources := resourcesInfoMap.ContainerResources[containerName]
+	klog.V(2).InfoS("GetContainerResourceAllocation: %v", resourcesInfoMap)
+	resources, ok := resourcesInfoMap.ContainerResources[containerName]
+	if !ok {
+		return v1.ResourceRequirements{}, ok
+	}
 	return *resources.DeepCopy(), ok
 }
 
