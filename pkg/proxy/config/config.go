@@ -260,12 +260,9 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 // NodeHandler is an abstract interface of objects which receive
 // notifications about node object changes.
 type NodeHandler interface {
-	// OnNodeAdd is called whenever creation of new node object
-	// is observed.
-	OnNodeAdd(node *v1.Node)
-	// OnNodeUpdate is called whenever modification of an existing
-	// node object is observed.
-	OnNodeUpdate(oldNode, node *v1.Node)
+	// OnNodeChange is called whenever creation or modification
+	// of node object is observed.
+	OnNodeChange(node *v1.Node)
 	// OnNodeDelete is called whenever deletion of an existing node
 	// object is observed.
 	OnNodeDelete(node *v1.Node)
@@ -299,8 +296,8 @@ func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, r
 
 	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    result.handleAddNode,
-			UpdateFunc: result.handleUpdateNode,
+			AddFunc:    result.handleChangeNode,
+			UpdateFunc: func(_, newObj interface{}) { result.handleChangeNode(newObj) },
 			DeleteFunc: result.handleDeleteNode,
 		},
 		resyncPeriod,
@@ -334,32 +331,22 @@ func (c *NodeConfig) Run(stopCh <-chan struct{}) {
 	}
 }
 
-func (c *NodeConfig) handleAddNode(obj interface{}) {
+func (c *NodeConfig) handleChangeNode(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-		return
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
+		if node, ok = tombstone.Obj.(*v1.Node); !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
 	}
 	for i := range c.eventHandlers {
-		c.logger.V(4).Info("Calling handler.OnNodeAdd")
-		c.eventHandlers[i].OnNodeAdd(node)
-	}
-}
-
-func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
-	oldNode, ok := oldObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
-		return
-	}
-	node, ok := newObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
-		return
-	}
-	for i := range c.eventHandlers {
-		c.logger.V(5).Info("Calling handler.OnNodeUpdate")
-		c.eventHandlers[i].OnNodeUpdate(oldNode, node)
+		c.logger.V(4).Info("Calling handler.OnNodeChange")
+		c.eventHandlers[i].OnNodeChange(node)
 	}
 }
 

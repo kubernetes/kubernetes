@@ -479,11 +479,11 @@ func TestHealthzServer(t *testing.T) {
 	var expectedPayload ProxyHealth
 	// testProxyHealthUpdater only asserts on proxy health, without considering node eligibility
 	// defaulting node health to true for testing.
-	nodeManager.OnNodeAdd(makeNode())
+	nodeManager.OnNodeChange(makeNode())
 	testProxyHealthUpdater(hs, hsTest, fakeClock, ptr.To(true), t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -497,7 +497,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a ToBeDeletedTaint node
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakTainted(ToBeDeletedTaint)))
+	nodeManager.OnNodeChange(makeNode(tweakTainted(ToBeDeletedTaint)))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -511,7 +511,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -525,7 +525,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a deleted node
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakDeleted()))
+	nodeManager.OnNodeChange(makeNode(tweakDeleted()))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -561,7 +561,7 @@ func TestLivezServer(t *testing.T) {
 	testProxyHealthUpdater(hs, hsTest, fakeClock, nil, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -574,7 +574,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakTainted(ToBeDeletedTaint)))
+	nodeManager.OnNodeChange(makeNode(tweakTainted(ToBeDeletedTaint)))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -587,7 +587,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -600,7 +600,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakDeleted()))
+	nodeManager.OnNodeChange(makeNode(tweakDeleted()))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),

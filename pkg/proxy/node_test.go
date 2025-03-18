@@ -267,7 +267,7 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 					exitCode = &code
 				},
 			}
-			n.onNodeChange(tc.makeNode())
+			n.OnNodeChange(tc.makeNode())
 			require.Equal(t, tc.expectedExitCode, exitCode)
 		})
 	}
@@ -291,10 +291,10 @@ func TestNodeManagerNode(t *testing.T) {
 	manager := NodeManager{}
 
 	node = makeNode(tweakResourceVersion("1"))
-	manager.OnNodeAdd(node)
+	manager.OnNodeChange(node)
 	require.Equal(t, node, manager.Node())
 
 	node = makeNode(tweakResourceVersion("2"))
-	manager.OnNodeUpdate(nil, node)
+	manager.OnNodeChange(node)
 	require.Equal(t, node, manager.Node())
 }
