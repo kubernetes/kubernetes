@@ -692,6 +692,13 @@ const (
 	// Enables trafficDistribution field on Services.
 	ServiceTrafficDistribution featuregate.Feature = "ServiceTrafficDistribution"
 
+	// owner: @cupnes
+	// kep: https://kep.k8s.io/4049
+	//
+	// Enables scoring nodes by available storage capacity with
+	// StorageCapacityScoring feature gate.
+	StorageCapacityScoring featuregate.Feature = "StorageCapacityScoring"
+
 	// owner: @gjkim42 @SergeyKanzhelev @matthyx @tzneal
 	// kep: http://kep.k8s.io/753
 	//
@@ -797,9 +804,6 @@ const (
 	//
 	// Enables user specified volume attributes for persistent volumes, like iops and throughput.
 	VolumeAttributesClass featuregate.Feature = "VolumeAttributesClass"
-
-	// owner: @cofyc
-	VolumeCapacityPriority featuregate.Feature = "VolumeCapacityPriority"
 
 	// owner: @ksubrmnn
 	//

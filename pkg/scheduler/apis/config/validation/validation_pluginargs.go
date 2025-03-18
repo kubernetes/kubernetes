@@ -261,13 +261,13 @@ func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) e
 
 // VolumeBindingArgsValidationOptions contains the different settings for validation.
 type VolumeBindingArgsValidationOptions struct {
-	AllowVolumeCapacityPriority bool
+	AllowStorageCapacityScoring bool
 }
 
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
 func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
 	return ValidateVolumeBindingArgsWithOptions(path, args, VolumeBindingArgsValidationOptions{
-		AllowVolumeCapacityPriority: utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		AllowStorageCapacityScoring: utilfeature.DefaultFeatureGate.Enabled(features.StorageCapacityScoring),
 	})
 }
 
@@ -279,13 +279,13 @@ func ValidateVolumeBindingArgsWithOptions(path *field.Path, args *config.VolumeB
 		allErrs = append(allErrs, field.Invalid(path.Child("bindTimeoutSeconds"), args.BindTimeoutSeconds, "invalid BindTimeoutSeconds, should not be a negative value"))
 	}
 
-	if opts.AllowVolumeCapacityPriority {
+	if opts.AllowStorageCapacityScoring {
 		allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
 	} else if args.Shape != nil {
 		// When the feature is off, return an error if the config is not nil.
 		// This prevents unexpected configuration from taking effect when the
 		// feature turns on in the future.
-		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate VolumeCapacityPriority"))
+		allErrs = append(allErrs, field.Invalid(path.Child("shape"), args.Shape, "unexpected field `shape`, remove it or turn on the feature gate StorageCapacityScoring"))
 	}
 	return allErrs.ToAggregate()
 }

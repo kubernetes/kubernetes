@@ -16,7 +16,7 @@ limitations under the License.
 
 package volumescheduling
 
-// This file tests the VolumeCapacityPriority feature.
+// This file tests the StorageCapacityScoring feature.
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func mergeNodeLabels(node *v1.Node, labels map[string]string) *v1.Node {
 	return node
 }
 
-func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
+func setupClusterForStorageCapacityScoring(t *testing.T, nsName string, resyncPeriod time.Duration, provisionDelaySeconds int) *testConfig {
 	testCtx := testutil.InitTestSchedulerWithOptions(t, testutil.InitTestAPIServer(t, nsName, nil), resyncPeriod)
 	testutil.SyncSchedulerInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
@@ -75,10 +75,10 @@ func setupClusterForVolumeCapacityPriority(t *testing.T, nsName string, resyncPe
 	}
 }
 
-func TestVolumeCapacityPriority(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeCapacityPriority, true)
+func TestStorageCapacityScoring(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StorageCapacityScoring, true)
 
-	config := setupClusterForVolumeCapacityPriority(t, "volume-capacity-priority", 0, 0)
+	config := setupClusterForStorageCapacityScoring(t, "storage-capacity-scoring", 0, 0)
 	defer config.teardown()
 
 	tests := []struct {
@@ -90,7 +90,7 @@ func TestVolumeCapacityPriority(t *testing.T) {
 		wantNodeName string
 	}{
 		{
-			name: "local volumes with close capacity are preferred",
+			name: "local volumes with max capacity are preferred",
 			pod:  makePod("pod", config.ns, []string{"data"}),
 			nodes: []*v1.Node{
 				makeNode(0),
@@ -108,10 +108,10 @@ func TestVolumeCapacityPriority(t *testing.T) {
 			pvcs: []*v1.PersistentVolumeClaim{
 				setPVCRequestStorage(makePVC("data", config.ns, &waitSSDSC.Name, ""), resource.MustParse("20Gi")),
 			},
-			wantNodeName: "node-2",
+			wantNodeName: "node-0",
 		},
 		{
-			name: "local volumes with close capacity are preferred (multiple pvcs)",
+			name: "local volumes with max capacity are preferred (multiple pvcs)",
 			pod:  makePod("pod", config.ns, []string{"data-0", "data-1"}),
 			nodes: []*v1.Node{
 				makeNode(0),
@@ -130,10 +130,10 @@ func TestVolumeCapacityPriority(t *testing.T) {
 				setPVCRequestStorage(makePVC("data-0", config.ns, &waitSSDSC.Name, ""), resource.MustParse("80Gi")),
 				setPVCRequestStorage(makePVC("data-1", config.ns, &waitSSDSC.Name, ""), resource.MustParse("80Gi")),
 			},
-			wantNodeName: "node-1",
+			wantNodeName: "node-0",
 		},
 		{
-			name: "local volumes with close capacity are preferred (multiple pvcs, multiple classes)",
+			name: "local volumes with max capacity are preferred (multiple pvcs, multiple classes)",
 			pod:  makePod("pod", config.ns, []string{"data-0", "data-1"}),
 			nodes: []*v1.Node{
 				makeNode(0),
@@ -152,10 +152,10 @@ func TestVolumeCapacityPriority(t *testing.T) {
 				setPVCRequestStorage(makePVC("data-0", config.ns, &waitSSDSC.Name, ""), resource.MustParse("80Gi")),
 				setPVCRequestStorage(makePVC("data-1", config.ns, &waitHDDSC.Name, ""), resource.MustParse("80Gi")),
 			},
-			wantNodeName: "node-1",
+			wantNodeName: "node-0",
 		},
 		{
-			name: "zonal volumes with close capacity are preferred (multiple pvcs, multiple classes)",
+			name: "zonal volumes with max capacity are preferred (multiple pvcs, multiple classes)",
 			pod:  makePod("pod", config.ns, []string{"data-0", "data-1"}),
 			nodes: []*v1.Node{
 				mergeNodeLabels(makeNode(0), map[string]string{
@@ -201,7 +201,7 @@ func TestVolumeCapacityPriority(t *testing.T) {
 				setPVCRequestStorage(makePVC("data-0", config.ns, &waitSSDSC.Name, ""), resource.MustParse("80Gi")),
 				setPVCRequestStorage(makePVC("data-1", config.ns, &waitHDDSC.Name, ""), resource.MustParse("80Gi")),
 			},
-			wantNodeName: "node-1",
+			wantNodeName: "node-0",
 		},
 	}
 
