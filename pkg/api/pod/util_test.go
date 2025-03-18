@@ -4026,12 +4026,15 @@ func TestValidateAllowSidecarResizePolicy(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
-			if tc.wantOption != gotOptions.AllowSidecarResizePolicy {
-				t.Errorf("Got AllowSidecarResizePolicy=%t, want %t", gotOptions.AllowSidecarResizePolicy, tc.wantOption)
-			}
-		})
+		for _, ippvsEnabled := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/%t", tc.name, ippvsEnabled), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, ippvsEnabled)
+
+				gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+				expected := tc.wantOption || ippvsEnabled
+				assert.Equal(t, expected, gotOptions.AllowSidecarResizePolicy, "AllowSidecarResizePolicy")
+			})
+		}
 	}
 }
 

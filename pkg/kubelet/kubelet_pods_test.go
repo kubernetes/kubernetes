@@ -3349,6 +3349,10 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 		},
 	}
+	withResources := func(cs v1.ContainerStatus) v1.ContainerStatus {
+		cs.Resources = &v1.ResourceRequirements{}
+		return cs
+	}
 
 	now := metav1.Now()
 	normalized_now := now.Rfc3339Copy()
@@ -3725,7 +3729,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 				},
 				ContainerStatuses: []v1.ContainerStatus{
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
-					ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo")),
+					withResources(ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo"))),
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
@@ -3783,8 +3787,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				},
 				ContainerStatuses: []v1.ContainerStatus{
-					ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1")),
-					ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2")),
+					withResources(ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1"))),
+					withResources(ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2"))),
 				},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
@@ -4606,11 +4610,6 @@ func TestSortPodIPs(t *testing.T) {
 	}
 }
 
-// func init() {
-// 	klog.InitFlags(flag.CommandLine)
-// 	flag.CommandLine.Lookup("v").Value.Set("5")
-// }
-
 func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	pod := podWithUIDNameNs("12345", "test-pod", "test-namespace")
 
@@ -5170,6 +5169,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 				ContainerID: testContainerID.String(),
 				Image:       "img",
 				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
+				Resources:   &v1.ResourceRequirements{},
 				User:        user,
 			},
 		}

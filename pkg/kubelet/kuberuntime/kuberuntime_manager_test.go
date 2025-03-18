@@ -1262,6 +1262,10 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 			actual.ContainersToKill[k] = info
 		}
 	}
+	if expected.ContainersToUpdate == nil && actual.ContainersToUpdate != nil {
+		// No need to distinguish empty and nil maps for the test.
+		expected.ContainersToUpdate = map[v1.ResourceName][]containerToUpdateInfo{}
+	}
 	assert.Equal(t, expected, actual, desc)
 }
 
