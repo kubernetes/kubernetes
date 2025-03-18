@@ -32,8 +32,6 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	gomegatypes "github.com/onsi/gomega/types"
-	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1205,7 +1203,7 @@ device_taint_eviction_controller_pod_deletions_total %[1]d
 		controller.metrics.PodDeletionsTotal.FQName(),
 		controller.metrics.PodDeletionsLatency.FQName(),
 	}
-	gather := func() ([]*dto.MetricFamily, error) {
+	gather := func() ([]*metricstestutil.MetricFamily, error) {
 		got, err := controller.metrics.Gather()
 		for _, mf := range got {
 			for _, m := range mf.Metric {
@@ -1218,7 +1216,7 @@ device_taint_eviction_controller_pod_deletions_total %[1]d
 		return got, err
 	}
 
-	return metricstestutil.GatherAndCompare(prometheus.GathererFunc(gather), strings.NewReader(expectedMetric), names...)
+	return metricstestutil.GatherAndCompare(metricstestutil.GathererFunc(gather), strings.NewReader(expectedMetric), names...)
 }
 
 // TestEviction runs through the full flow of starting the controller and evicting one pod.
