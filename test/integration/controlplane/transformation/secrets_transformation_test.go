@@ -30,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/test/integration/authutil"
+	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
 )
 
@@ -431,19 +433,26 @@ func TestListCorruptObjects(t *testing.T) {
 		// secrets that are created before encryption breaks
 		secrets []string
 		// whether encryption broke after the config change
-		encryptionBrokenFn func(t *testing.T, got apierrors.APIStatus) bool
+		encryptionBrokenFn func(t *testing.T, got apierrors.APIStatus)
 		// what we expect for LIST on the corrupt objects after encryption has broken
 		listAfter verifier
 	}{
 		{
 			secrets:        secrets,
 			featureEnabled: true,
-			encryptionBrokenFn: func(t *testing.T, got apierrors.APIStatus) bool {
-				// the new encryption config does not have the old key, so reading of resources
-				// created before the encryption change will fail with 'no matching prefix found'
-				return got.Status().Reason == metav1.StatusReasonInternalError &&
-					strings.Contains(got.Status().Message, "Internal error occurred: StorageError: corrupt object") &&
-					strings.Contains(got.Status().Message, "data from the storage is not transformable revision=0: no matching prefix found")
+			encryptionBrokenFn: func(t *testing.T, got apierrors.APIStatus) {
+				status := got.Status()
+				if status.Reason != metav1.StatusReasonInternalError {
+					t.Errorf("Invalid reason, got: %q, want: %q", status.Reason, metav1.StatusReasonInternalError)
+				}
+				corruptObjectMsg := "Internal error occurred: StorageError: corrupt object"
+				if !strings.Contains(status.Message, corruptObjectMsg) {
+					t.Errorf("Message should include %q, but got: %q", corruptObjectMsg, status.Message)
+				}
+				messageAuthenticationFailedMsg := "data from the storage is not transformable revision=0: cipher: message authentication failed"
+				if !strings.Contains(status.Message, messageAuthenticationFailedMsg) {
+					t.Errorf("Message should include %q, but got: %q", messageAuthenticationFailedMsg, status.Message)
+				}
 			},
 			listAfter: wantAPIStatusError{
 				reason:          metav1.StatusReasonStoreReadError,
@@ -482,11 +491,15 @@ func TestListCorruptObjects(t *testing.T) {
 		{
 			secrets:        secrets,
 			featureEnabled: false,
-			encryptionBrokenFn: func(t *testing.T, got apierrors.APIStatus) bool {
-				// the new encryption config does not have the old key, so reading of resources
-				// created before the encryption change will fail with 'no matching prefix found'
-				return got.Status().Reason == metav1.StatusReasonInternalError &&
-					strings.Contains(got.Status().Message, "Internal error occurred: no matching prefix found")
+			encryptionBrokenFn: func(t *testing.T, got apierrors.APIStatus) {
+				status := got.Status()
+				if status.Reason != metav1.StatusReasonInternalError {
+					t.Errorf("Invalid reason, got: %q, want: %q", status.Reason, metav1.StatusReasonInternalError)
+				}
+				noMatchingPrefixFoundMsg := "Internal error occurred: cipher: message authentication failed"
+				if !strings.Contains(status.Message, noMatchingPrefixFoundMsg) {
+					t.Errorf("Message should include %q, but got: %q", noMatchingPrefixFoundMsg, status.Message)
+				}
 			},
 			listAfter: wantAPIStatusError{
 				reason:          metav1.StatusReasonInternalError,
@@ -497,12 +510,13 @@ func TestListCorruptObjects(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(fmt.Sprintf("%s/%t", string(genericfeatures.AllowUnsafeMalformedObjectDeletion), tc.featureEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, tc.featureEnabled)
-
-			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: aesGCMConfigYAML, reload: true})
+			storageConfig := framework.SharedEtcd()
+			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: aesGCMConfigYAML, reload: true, storageConfig: storageConfig})
 			if err != nil {
 				t.Fatalf("failed to setup test for envelop %s, error was %v", aesGCMPrefix, err)
 			}
 			defer test.cleanUp()
+			ctx := context.Background()
 
 			// a) create a number of secrets in the test namespace
 			for _, name := range tc.secrets {
@@ -523,64 +537,45 @@ func TestListCorruptObjects(t *testing.T) {
 
 			// c) override the config and break decryption of the old resources,
 			// the secret created in step a will be undecryptable
-			encryptionConf := filepath.Join(test.configDir, encryptionConfigFileName)
-			body, _ := ioutil.ReadFile(encryptionConf)
-			t.Logf("file before write: %s", body)
-			// we replace the existing key with a new key from a different provider
-			if err := os.WriteFile(encryptionConf, []byte(aesCBCConfigYAML), 0o644); err != nil {
-				t.Fatalf("failed to write encryption config that's going to make decryption fail")
-			}
-			body, _ = ioutil.ReadFile(encryptionConf)
-			t.Logf("file after write: %s", body)
-
-			// d) wait for the breaking changes to take effect
-			testCtx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			// TODO: dynamic encryption config reload takes about 1m, so can't use
-			// wait.ForeverTestTimeout just yet, investigate and reduce the reload time.
-			err = wait.PollUntilContextTimeout(testCtx, 1*time.Second, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
-				_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(ctx, tc.secrets[0], metav1.GetOptions{})
-
-				if err != nil {
-					t.Logf("get returned error: %#v message: %s", err, err.Error())
-				}
-
-				var got apierrors.APIStatus
-				if !errors.As(err, &got) {
-					return false, nil
-				}
-				if done := tc.encryptionBrokenFn(t, got); done {
-					return true, nil
-				}
-				return false, nil
-			})
+			client, err := clientv3.New(clientv3.Config{Endpoints: storageConfig.Transport.ServerList})
 			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				err := client.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
+			resp, err := client.Get(ctx, "/"+storageConfig.Prefix+"/secrets/", clientv3.WithPrefix())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(resp.Kvs) != len(tc.secrets) {
+				t.Fatalf("Expected %d number of keys, got: %d", len(tc.secrets), len(resp.Kvs))
+			}
+			for _, kv := range resp.Kvs {
+				// Remove last byte
+				_, err = client.Put(ctx, string(kv.Key), string(kv.Value)[:len(kv.Value)-1])
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(ctx, tc.secrets[0], metav1.GetOptions{})
+			if err != nil {
+				t.Logf("get returned error: %#v message: %s", err, err.Error())
+			}
+
+			var got apierrors.APIStatus
+			if !errors.As(err, &got) {
 				t.Fatalf("encryption never broke: %v", err)
 			}
-
-			// TODO: ConsistentListFromCache feature returns the list of objects
-			// from cache even though these objects are not readable from the
-			// store after encryption has broken; to work around this issue, let's
-			// create a new secret and retrieve it from the store to get a more
-			// recent ResourceVersion and invoke the list with:
-			//   ResourceVersionMatch: Exact
-			newSecretName := "new-a"
-			_, err = test.createSecret(newSecretName, testNamespace)
-			if err != nil {
-				t.Fatalf("expected no error while creating the new secret, but got: %d", err)
-			}
-			newSecret, err := test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), newSecretName, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("expected no error getting the new secret, but got: %d", err)
-			}
+			tc.encryptionBrokenFn(t, got)
 
 			// e) list should return expected error
-			_, err = test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{
-				ResourceVersion:      newSecret.ResourceVersion,
-				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
-			})
+			_, err = test.restClient.CoreV1().Secrets(testNamespace).List(ctx, metav1.ListOptions{})
 			tc.listAfter.verify(t, err)
-
 		})
 	}
 }
