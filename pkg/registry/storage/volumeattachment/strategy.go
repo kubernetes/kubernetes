@@ -143,11 +143,16 @@ func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj,
 	metav1.ResetObjectMetaForStatus(&newVolumeAttachment.ObjectMeta, &oldVolumeAttachment.ObjectMeta)
 
 	if !feature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
+		// Only clear ErrorCode field if it isn't set in the old object
 		if newVolumeAttachment.Status.AttachError != nil {
-			newVolumeAttachment.Status.AttachError.ErrorCode = nil
+			if oldVolumeAttachment.Status.AttachError == nil || oldVolumeAttachment.Status.AttachError.ErrorCode == nil {
+				newVolumeAttachment.Status.AttachError.ErrorCode = nil
+			}
 		}
 		if newVolumeAttachment.Status.DetachError != nil {
-			newVolumeAttachment.Status.DetachError.ErrorCode = nil
+			if oldVolumeAttachment.Status.DetachError == nil || oldVolumeAttachment.Status.DetachError.ErrorCode == nil {
+				newVolumeAttachment.Status.DetachError.ErrorCode = nil
+			}
 		}
 	}
 }

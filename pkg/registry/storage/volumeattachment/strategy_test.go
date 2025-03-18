@@ -205,6 +205,47 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 	if statusWithError.Status.DetachError != nil && statusWithError.Status.DetachError.ErrorCode != nil {
 		t.Errorf("expected DetachError.ErrorCode to be nil, got %v", *statusWithError.Status.DetachError.ErrorCode)
 	}
+
+	// Verify that error codes are not dropped when set in the old object.
+	oldStatusWithError := volumeAttachment.DeepCopy()
+	oldStatusErrCode := int32(8)
+	oldStatusWithError.Status = storage.VolumeAttachmentStatus{
+		Attached: true,
+		AttachError: &storage.VolumeError{
+			Message:   "old attach error",
+			ErrorCode: &oldStatusErrCode,
+		},
+		DetachError: &storage.VolumeError{
+			Message:   "old detach error",
+			ErrorCode: &oldStatusErrCode,
+		},
+	}
+
+	newStatusWithError := oldStatusWithError.DeepCopy()
+	newStatusErrCode := int32(9)
+	newStatusWithError.Status = storage.VolumeAttachmentStatus{
+		Attached: true,
+		AttachError: &storage.VolumeError{
+			Message:   "new attach error",
+			ErrorCode: &newStatusErrCode,
+		},
+		DetachError: &storage.VolumeError{
+			Message:   "new detach error",
+			ErrorCode: &newStatusErrCode,
+		},
+	}
+
+	StatusStrategy.PrepareForUpdate(ctx, newStatusWithError, oldStatusWithError)
+	if newStatusWithError.Status.AttachError == nil || newStatusWithError.Status.AttachError.ErrorCode == nil {
+		t.Errorf("expected AttachError.ErrorCode to be preserved, got nil")
+	} else if *newStatusWithError.Status.AttachError.ErrorCode != newStatusErrCode {
+		t.Errorf("expected AttachError.ErrorCode to be %v, got %v", newStatusErrCode, *newStatusWithError.Status.AttachError.ErrorCode)
+	}
+	if newStatusWithError.Status.DetachError == nil || newStatusWithError.Status.DetachError.ErrorCode == nil {
+		t.Errorf("expected DetachError.ErrorCode to be preserved, got nil")
+	} else if *newStatusWithError.Status.DetachError.ErrorCode != newStatusErrCode {
+		t.Errorf("expected DetachError.ErrorCode to be %v, got %v", newStatusErrCode, *newStatusWithError.Status.DetachError.ErrorCode)
+	}
 }
 
 func TestUpdatePreventsStatusWrite(t *testing.T) {
