@@ -1276,7 +1276,23 @@ func TestReplicaCalcConfigurableTolerance(t *testing.T) {
 		replicaCalcTestCase
 	}{
 		{
-			name: "Within a 20% scale-up tolerance",
+			name: "Outside of a 0% tolerance",
+			replicaCalcTestCase: replicaCalcTestCase{
+				tolerances:       &Tolerances{0., 0.},
+				currentReplicas:  3,
+				expectedReplicas: 4,
+				resource: &resourceInfo{
+					name:                v1.ResourceCPU,
+					requests:            []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+					levels:              makePodMetricLevels(909, 1010, 1111),
+					targetUtilization:   100,
+					expectedUtilization: 101,
+					expectedValue:       numContainersPerPod * 1010,
+				},
+			},
+		},
+		{
+			name: "Within a 200% scale-up tolerance",
 			replicaCalcTestCase: replicaCalcTestCase{
 				tolerances:       &Tolerances{defaultTestingTolerance, 2.},
 				currentReplicas:  3,

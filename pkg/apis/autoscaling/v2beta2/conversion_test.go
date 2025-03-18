@@ -112,12 +112,12 @@ func TestConvertRoundTrip(t *testing.T) {
 			if err := Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(tt.internalHPA, v2beta2HPA, nil); err != nil {
 				t.Errorf("Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler() error = %v", err)
 			}
-			roundtripHpa := &autoscaling.HorizontalPodAutoscaler{}
-			if err := Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(v2beta2HPA, roundtripHpa, nil); err != nil {
+			roundtripHPA := &autoscaling.HorizontalPodAutoscaler{}
+			if err := Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(v2beta2HPA, roundtripHPA, nil); err != nil {
 				t.Errorf("Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler() error = %v", err)
 			}
-			if !apiequality.Semantic.DeepEqual(tt.internalHPA, roundtripHpa) {
-				t.Errorf("HPA is not equivalent after round-trip:  mismatch (-want +got):\n%s", cmp.Diff(tt.internalHPA, roundtripHpa))
+			if !apiequality.Semantic.DeepEqual(tt.internalHPA, roundtripHPA) {
+				t.Errorf("HPA is not equivalent after round-trip:  mismatch (-want +got):\n%s", cmp.Diff(tt.internalHPA, roundtripHPA))
 			}
 		})
 	}

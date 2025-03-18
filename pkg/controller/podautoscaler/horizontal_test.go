@@ -2230,6 +2230,7 @@ func TestConfigurableTolerance(t *testing.T) {
 		scaleUpRules              *autoscalingv2.HPAScalingRules
 		scaleDownRules            *autoscalingv2.HPAScalingRules
 		reportedLevels            []uint64
+		reportedCPURequests       []resource.Quantity
 		expectedDesiredReplicas   int32
 		expectedConditionReason   string
 		expectedActionLabel       monitor.ActionLabel
@@ -2242,18 +2243,20 @@ func TestConfigurableTolerance(t *testing.T) {
 				Tolerance: &onePercentQuantity,
 			},
 			reportedLevels:          []uint64{1010, 1030, 1020},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 			expectedDesiredReplicas: 4,
 			expectedConditionReason: "SucceededRescale",
 			expectedActionLabel:     monitor.ActionLabelScaleUp,
 		},
 		{
-			name:                      "No down because of a 90% configurable tolerance",
+			name:                      "No scale-down because of a 90% configurable tolerance",
 			configurableToleranceGate: true,
 			replicas:                  3,
 			scaleDownRules: &autoscalingv2.HPAScalingRules{
 				Tolerance: &ninetyPercentQuantity,
 			},
 			reportedLevels:          []uint64{300, 300, 300},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 			expectedDesiredReplicas: 3,
 			expectedConditionReason: "ReadyForNewScale",
 			expectedActionLabel:     monitor.ActionLabelNone,
@@ -2263,6 +2266,7 @@ func TestConfigurableTolerance(t *testing.T) {
 			configurableToleranceGate: true,
 			replicas:                  3,
 			reportedLevels:            []uint64{1010, 1030, 1020},
+			reportedCPURequests:       []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 			expectedDesiredReplicas:   3,
 			expectedConditionReason:   "ReadyForNewScale",
 			expectedActionLabel:       monitor.ActionLabelNone,
@@ -2275,6 +2279,7 @@ func TestConfigurableTolerance(t *testing.T) {
 				Tolerance: &onePercentQuantity,
 			},
 			reportedLevels:          []uint64{1010, 1030, 1020},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
 			expectedDesiredReplicas: 3,
 			expectedConditionReason: "ReadyForNewScale",
 			expectedActionLabel:     monitor.ActionLabelNone,
@@ -2294,7 +2299,7 @@ func TestConfigurableTolerance(t *testing.T) {
 				expectedDesiredReplicas: tc.expectedDesiredReplicas,
 				CPUTarget:               100,
 				reportedLevels:          tc.reportedLevels,
-				reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+				reportedCPURequests:     tc.reportedCPURequests,
 				useMetricsAPI:           true,
 				expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
 					Type:   autoscalingv2.AbleToScale,

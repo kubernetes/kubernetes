@@ -199,8 +199,8 @@ type HPAScalingRules struct {
 
 	// policies is a list of potential scaling polices which can be used during scaling.
 	// If not set, use the default values:
-	// - For scale up: allow doubling the number of pods, and an absolute change of 4 pods in a 15s window.
-	// - For scale down: allow halving the number of pods in a 15s window.
+	// - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+	// - For scale down: allow all pods to be removed in a 15s window.
 	// +listType=atomic
 	// +optional
 	Policies []HPAScalingPolicy `json:"policies,omitempty" listType:"atomic" protobuf:"bytes,2,rep,name=policies"`
