@@ -107,7 +107,8 @@ type TestServerInstanceOptions struct {
 	// If empty, effective version will default to DefaultKubeEffectiveVersion.
 	BinaryVersion string
 	// Set non-default request timeout in the server.
-	RequestTimeout time.Duration
+	RequestTimeout    time.Duration
+	WatchCacheEnabled bool
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -141,7 +142,8 @@ type ProxyCA struct {
 // NewDefaultTestServerOptions Default options for TestServer instances
 func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 	return &TestServerInstanceOptions{
-		EnableCertAuth: true,
+		EnableCertAuth:    true,
+		WatchCacheEnabled: true,
 	}
 }
 
@@ -339,6 +341,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	s.ServiceClusterIPRanges = "10.0.0.0/16"
 	s.Etcd.StorageConfig = *storageConfig
+	s.Etcd.EnableWatchCache = instanceOptions.WatchCacheEnabled
 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err

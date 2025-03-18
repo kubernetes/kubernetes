@@ -415,13 +415,21 @@ func (wantError wantAPIStatusError) verify(t *testing.T, err error) {
 	}
 }
 
+func TestListCorruptObjectsWithoutWatchCache(t *testing.T) {
+	testListCorruptObjects(t, false)
+}
+
+func TestListCorruptObjectsWithWatchCache(t *testing.T) {
+	testListCorruptObjects(t, true)
+}
+
 // TestListCorruptObjects is an integration test that verifies:
 // 1) if the feature AllowUnsafeMalformedObjectDeletion is enabled, LIST operation,
 // in its error response, should include information that identifies the objects
 // that it failed to read from the storage
 // 2) if the feature AllowUnsafeMalformedObjectDeletion is disabled, LIST should
 // abort as soon as it encounters the first error, to be backward compatible
-func TestListCorruptObjects(t *testing.T) {
+func testListCorruptObjects(t *testing.T, watchCacheEnabled bool) {
 	// these are the secrets that the test will initially create, and
 	// are expected to become unreadable/corrupt after encryption breaks
 	secrets := []string{"corrupt-a", "corrupt-b", "corrupt-c"}
@@ -498,7 +506,7 @@ func TestListCorruptObjects(t *testing.T) {
 		t.Run(fmt.Sprintf("%s/%t", string(genericfeatures.AllowUnsafeMalformedObjectDeletion), tc.featureEnabled), func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AllowUnsafeMalformedObjectDeletion, tc.featureEnabled)
 
-			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: aesGCMConfigYAML, reload: true})
+			test, err := newTransformTest(t, transformTestConfig{transformerConfigYAML: aesGCMConfigYAML, reload: true, watchCacheDisabled: !watchCacheEnabled})
 			if err != nil {
 				t.Fatalf("failed to setup test for envelop %s, error was %v", aesGCMPrefix, err)
 			}
@@ -558,29 +566,25 @@ func TestListCorruptObjects(t *testing.T) {
 				t.Fatalf("encryption never broke: %v", err)
 			}
 
-			// TODO: ConsistentListFromCache feature returns the list of objects
+			// TODO: ListFromCacheSnapshot feature returns the list of objects
 			// from cache even though these objects are not readable from the
-			// store after encryption has broken; to work around this issue, let's
-			// create a new secret and retrieve it from the store to get a more
-			// recent ResourceVersion and invoke the list with:
-			//   ResourceVersionMatch: Exact
-			newSecretName := "new-a"
-			_, err = test.createSecret(newSecretName, testNamespace)
-			if err != nil {
-				t.Fatalf("expected no error while creating the new secret, but got: %d", err)
-			}
-			newSecret, err := test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), newSecretName, metav1.GetOptions{})
-			if err != nil {
-				t.Fatalf("expected no error getting the new secret, but got: %d", err)
-			}
+			// store after encryption has broken;
+			if !watchCacheEnabled {
+				newSecretName := "new-a"
+				_, err = test.createSecret(newSecretName, testNamespace)
+				if err != nil {
+					t.Fatalf("expected no error while creating the new secret, but got: %d", err)
+				}
+				_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(context.Background(), newSecretName, metav1.GetOptions{})
+				if err != nil {
+					t.Fatalf("expected no error getting the new secret, but got: %d", err)
+				}
 
-			// e) list should return expected error
-			_, err = test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{
-				ResourceVersion:      newSecret.ResourceVersion,
-				ResourceVersionMatch: metav1.ResourceVersionMatchExact,
-			})
-			tc.listAfter.verify(t, err)
+				// e) list should return expected error
+				_, err = test.restClient.CoreV1().Secrets(testNamespace).List(context.Background(), metav1.ListOptions{})
+				tc.listAfter.verify(t, err)
 
+			}
 		})
 	}
 }

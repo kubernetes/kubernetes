@@ -122,37 +122,37 @@ func testWebhookConverter(t *testing.T, watchCache bool) {
 			group:          "empty-response-v1",
 			handler:        NewReviewWebhookHandler(t, nil, emptyV1ResponseConverter),
 			reviewVersions: []string{"v1", "v1beta1"},
-			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1", !watchCache)),
 		},
 		{
 			group:          "empty-response-v1beta1",
 			handler:        NewReviewWebhookHandler(t, emptyV1Beta1ResponseConverter, nil),
 			reviewVersions: []string{"v1beta1", "v1"},
-			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1", !watchCache)),
 		},
 		{
 			group:          "failure-message-v1",
 			handler:        NewReviewWebhookHandler(t, nil, failureV1ResponseConverter("custom webhook conversion error")),
 			reviewVersions: []string{"v1", "v1beta1"},
-			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error", !watchCache)),
 		},
 		{
 			group:          "failure-message-v1beta1",
 			handler:        NewReviewWebhookHandler(t, failureV1Beta1ResponseConverter("custom webhook conversion error"), nil),
 			reviewVersions: []string{"v1beta1", "v1"},
-			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error", !watchCache)),
 		},
 		{
 			group:          "unhandled-v1",
 			handler:        NewReviewWebhookHandler(t, nil, nil),
 			reviewVersions: []string{"v1", "v1beta1"},
-			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request")),
+			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request", !watchCache)),
 		},
 		{
 			group:          "unhandled-v1beta1",
 			handler:        NewReviewWebhookHandler(t, nil, nil),
 			reviewVersions: []string{"v1beta1", "v1"},
-			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request")),
+			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request", !watchCache)),
 		},
 	}
 
@@ -671,7 +671,7 @@ func validateDefaulting(t *testing.T, ctc *conversionTestContext) {
 	}
 }
 
-func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *conversionTestContext) {
+func expectConversionFailureMessage(id string, message string, validateList bool) func(t *testing.T, ctc *conversionTestContext) {
 	return func(t *testing.T, ctc *conversionTestContext) {
 		ns := ctc.namespace
 		clients := ctc.versionedClients(ns)
@@ -686,18 +686,22 @@ func expectConversionFailureMessage(id, message string) func(t *testing.T, ctc *
 		objv1beta2 := newConversionMultiVersionFixture(ns, id, "v1beta2")
 		meta, _, _ := unstructured.NestedFieldCopy(obj.Object, "metadata")
 		unstructured.SetNestedField(objv1beta2.Object, meta, "metadata")
-		lastRV := objv1beta2.GetResourceVersion()
 
-		for _, verb := range []string{"get", "list", "create", "update", "patch", "delete", "deletecollection"} {
+		verbs := []string{"get", "create", "update", "patch", "delete", "deletecollection"}
+		// With ResilientWatchcCacheInitialization feature, List requests are rejected with 429 if watchcache is not initialized.
+		// However, in some of these tests that install faulty converter webhook, watchcache will never initialize by definition (as list will never succeed due to faulty converter webook).
+		// In such case, the returned error will differ from the one returned from the etcd, so we need to force the request to go to etcd.
+		if validateList {
+			verbs = append(verbs, "list")
+		}
+
+		for _, verb := range verbs {
 			t.Run(verb, func(t *testing.T) {
 				switch verb {
 				case "get":
 					_, err = clients["v1beta2"].Get(context.TODO(), obj.GetName(), metav1.GetOptions{})
 				case "list":
-					// With ResilientWatchcCacheInitialization feature, List requests are rejected with 429 if watchcache is not initialized.
-					// However, in some of these tests that install faulty converter webhook, watchcache will never initialize by definition (as list will never succeed due to faulty converter webook).
-					// In such case, the returned error will differ from the one returned from the etcd, so we need to force the request to go to etcd.
-					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{ResourceVersion: lastRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact})
+					_, err = clients["v1beta2"].List(context.TODO(), metav1.ListOptions{})
 				case "create":
 					_, err = clients["v1beta2"].Create(context.TODO(), newConversionMultiVersionFixture(ns, id, "v1beta2"), metav1.CreateOptions{})
 				case "update":

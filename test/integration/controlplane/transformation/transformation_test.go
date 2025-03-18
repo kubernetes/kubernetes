@@ -93,6 +93,7 @@ type transformTestConfig struct {
 	configDir             string
 	storageConfig         *storagebackend.Config
 	runtimeConfig         []string
+	watchCacheDisabled    bool
 }
 
 func newTransformTest(tb testing.TB, config transformTestConfig) (*transformTest, error) {
@@ -128,8 +129,10 @@ func newTransformTest(tb testing.TB, config transformTestConfig) (*transformTest
 	if len(config.runtimeConfig) > 0 {
 		flags = append(flags, "--runtime-config="+strings.Join(config.runtimeConfig, ","))
 	}
+	opts := kubeapiservertesting.NewDefaultTestServerOptions()
+	opts.WatchCacheEnabled = !config.watchCacheDisabled
 	if e.kubeAPIServer, err = kubeapiservertesting.StartTestServer(
-		tb, nil,
+		tb, opts,
 		flags, e.storageConfig); err != nil {
 		e.cleanUp()
 		return nil, fmt.Errorf("failed to start KubeAPI server: %w", err)
