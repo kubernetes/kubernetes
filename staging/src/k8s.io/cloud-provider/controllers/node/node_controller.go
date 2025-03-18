@@ -287,6 +287,7 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		}
 
 		cnc.updateNodeAddress(ctx, node, instanceMetadata)
+		cnc.updateNodeLabels(ctx, node, instanceMetadata)
 	}
 
 	workqueue.ParallelizeUntil(ctx, int(cnc.workerCount), len(nodes), updateNodeFunc)
@@ -404,6 +405,49 @@ func (cnc *CloudNodeController) updateNodeAddress(ctx context.Context, node *v1.
 	}
 }
 
+// updateNodeLabels updates only the additional labels from cloud provider
+func (cnc *CloudNodeController) updateNodeLabels(ctx context.Context, node *v1.Node, instanceMetadata *cloudprovider.InstanceMetadata) {
+	if instanceMetadata == nil || len(instanceMetadata.AdditionalLabels) == 0 {
+		klog.V(5).Infof("Skipping node label update for node %q since no additional labels provided", node.Name)
+		return
+	}
+
+	// Check if we need to update any labels
+	needsUpdate := false
+	for key, newValue := range instanceMetadata.AdditionalLabels {
+		if currentValue, exists := node.Labels[key]; !exists || currentValue != newValue {
+			needsUpdate = true
+			klog.V(5).Infof("Label update needed for %s: current=%s, new=%s", key, currentValue, newValue)
+			break
+		}
+	}
+
+	if !needsUpdate {
+		klog.V(5).Infof("No label updates needed for node %s", node.Name)
+		return
+	}
+
+	// Create new node with updated labels
+	newNode := node.DeepCopy()
+	if newNode.Labels == nil {
+		newNode.Labels = make(map[string]string)
+	}
+
+	for k, v := range instanceMetadata.AdditionalLabels {
+		klog.V(5).Infof("Setting label %s=%s", k, v)
+		newNode.Labels[k] = v
+	}
+
+	// Update the node
+	updatedNode, err := cnc.kubeClient.CoreV1().Nodes().Update(ctx, newNode, metav1.UpdateOptions{})
+	if err != nil {
+		klog.Errorf("Error updating node %s labels: %v", node.Name, err)
+		return
+	}
+
+	klog.V(5).Infof("Successfully updated labels for node %s", updatedNode.Name)
+}
+
 // nodeModifier is used to carry changes to node objects across multiple attempts to update them
 // in a retry-if-conflict loop.
 type nodeModifier func(*v1.Node)
@@ -470,6 +514,7 @@ func (cnc *CloudNodeController) syncNode(ctx context.Context, nodeName string) e
 		// After adding, call UpdateNodeAddress to set the CloudProvider provided IPAddresses
 		// So that users do not see any significant delay in IP addresses being filled into the node
 		cnc.updateNodeAddress(ctx, newNode, instanceMetadata)
+		cnc.updateNodeLabels(ctx, newNode, instanceMetadata)
 
 		klog.Infof("Successfully initialized node %s with cloud provider", nodeName)
 		return nil
