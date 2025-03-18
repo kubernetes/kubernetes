@@ -245,6 +245,11 @@ var (
 			`\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] .* UDP`,
 			`\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] .* session affinity`,
 		},
+		"[Skipped:external]": {
+			// LoadBalancer tests in 1.31 require explicit platform-specific skips
+			// https://issues.redhat.com/browse/OCPBUGS-53249
+			`\[sig-network\] LoadBalancers \[Feature:LoadBalancer\] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on`,
+		},
 		"[Skipped:azure]": {
 			"Networking should provide Internet connection for containers", // Azure does not allow ICMP traffic to internet.
 			// Azure CSI migration changed how we treat regions without zones.
