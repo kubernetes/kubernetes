@@ -1663,24 +1663,26 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
 	require.NoError(t, err)
-	writeRV, err := strconv.Atoi(outPod.ResourceVersion)
+	lastResourceWriteRV, err := strconv.Atoi(outPod.ResourceVersion)
 	require.NoError(t, err)
 
 	increaseRV(ctx, t)
-	consistentRV := writeRV + 1
+	consistentRV := lastResourceWriteRV + 1
+	cacheSyncRV := 0
 
 	tcs := []struct {
 		name               string
 		requestRV          string
+		continueToken      string
 		validateResponseRV func(*testing.T, int)
 	}{
 		{
-			name:      "Non-consistent list before sync",
+			name:      "Non-consistent list before consistent read",
 			requestRV: "0",
 			validateResponseRV: func(t *testing.T, rv int) {
 				if cacheEnabled {
 					// Cache might not yet observed write
-					assert.LessOrEqual(t, rv, writeRV)
+					assert.LessOrEqual(t, rv, lastResourceWriteRV)
 				} else {
 					// Etcd should always be up to date with consistent RV
 					assert.Equal(t, consistentRV, rv)
@@ -1688,20 +1690,35 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 			},
 		},
 		{
-			name:      "Consistent request returns currentRV",
+			name:      "LIST without RV returns consistent RV",
 			requestRV: "",
 			validateResponseRV: func(t *testing.T, rv int) {
+				assert.Equal(t, consistentRV, rv)
+				cacheSyncRV = rv
+			},
+		},
+		{
+			name:          "List with negative continue RV returns consistent RV",
+			continueToken: encodeContinueOrDie("/pods/a", -1),
+			validateResponseRV: func(t *testing.T, rv int) {
+				// TODO: Update cacheSyncRV after continue is served from cache.
 				assert.Equal(t, consistentRV, rv)
 			},
 		},
 		{
-			name:      "Non-consistent request after sync",
+			name:      "Non-consistent request after consistent read",
 			requestRV: "0",
 			validateResponseRV: func(t *testing.T, rv int) {
-				// Consistent read is required to sync cache
-				if cacheEnabled && !consistentReadsSupported {
-					assert.LessOrEqual(t, rv, writeRV)
+				if cacheEnabled {
+					if consistentReadsSupported {
+						// Consistent read will sync cache
+						assert.Equal(t, cacheSyncRV, rv)
+					} else {
+						// Without consisten reads cache is not synced
+						assert.LessOrEqual(t, rv, lastResourceWriteRV)
+					}
 				} else {
+					// Etcd always points to newest RV
 					assert.Equal(t, consistentRV, rv)
 				}
 			},
@@ -1712,7 +1729,11 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 			out := &example.PodList{}
 			opts := storage.ListOptions{
 				ResourceVersion: tc.requestRV,
-				Predicate:       storage.Everything,
+				Predicate: storage.SelectionPredicate{
+					Label:    labels.Everything(),
+					Field:    fields.Everything(),
+					Continue: tc.continueToken,
+				},
 			}
 			err = store.GetList(ctx, "/pods/empty", opts, out)
 			require.NoError(t, err)
@@ -1721,6 +1742,9 @@ func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Inte
 			require.NoError(t, err)
 			tc.validateResponseRV(t, parsedOutRV)
 		})
+		// Update RV on each read to test multiple reads for consistent RV.
+		increaseRV(ctx, t)
+		consistentRV++
 	}
 }
 
