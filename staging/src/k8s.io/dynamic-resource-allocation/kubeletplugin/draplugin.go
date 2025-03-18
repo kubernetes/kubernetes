@@ -21,12 +21,14 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path"
 	"sync"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 
+	"go.etcd.io/etcd/client/pkg/v3/fileutil"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -195,8 +197,10 @@ func RegistrarDirectoryPath(path string) Option {
 // support updates from an installation which used an older release of
 // of the helper code.
 //
-// The default is <driver name>-reg.sock. When rolling updates are enabled (not supported yet),
+// The default is <driver name>-reg.sock. When rolling updates are enabled,
 // it is <driver name>-<uid>-reg.sock.
+//
+// This option and [RollingUpdate] are mutually exclusive.
 func RegistrarSocketFilename(name string) Option {
 	return func(o *options) error {
 		o.pluginRegistrationEndpoint.file = name
@@ -244,6 +248,44 @@ func PluginDataDirectoryPath(path string) Option {
 func PluginListener(listen func(ctx context.Context, path string) (net.Listener, error)) Option {
 	return func(o *options) error {
 		o.draEndpointListen = listen
+		return nil
+	}
+}
+
+// RollingUpdate can be used to enable support for running two plugin instances
+// in parallel while a newer instance replaces the older. When enabled, both
+// instances must share the same plugin data directory and driver name.
+// They create different sockets to allow the kubelet to connect to both at
+// the same time.
+//
+// There is no guarantee which of the two instances are used by kubelet.
+// For example, it can happen that a claim gets prepared by one instance
+// and then needs to be unprepared by the other. Kubelet then may fall back
+// to the first one again for some other operation. In practice this means
+// that each instance must be entirely stateless across method calls.
+// Serialization (on by default, see [Serialize]) ensures that methods
+// are serialized across all instances through file locking. The plugin
+// implementation can load shared state from a file at the start
+// of a call, execute and then store the updated shared state again.
+//
+// Passing a non-empty uid enables rolling updates, an empty uid disables it.
+// The uid must be the pod UID. A DaemonSet can pass that into the driver container
+// via the downward API (https://kubernetes.io/docs/concepts/workloads/pods/downward-api/#downwardapi-fieldRef).
+//
+// Because new instances cannot remove stale sockets of older instances,
+// it is important that each pod shuts down cleanly: it must catch SIGINT/TERM
+// and stop the helper instead of quitting immediately.
+//
+// This depends on support in the kubelet which was added in Kubernetes 1.33.
+// Don't use this if it is not certain that the kubelet has that support!
+//
+// This option and [RegistrarSocketFilename] are mutually exclusive.
+func RollingUpdate(uid types.UID) Option {
+	return func(o *options) error {
+		o.rollingUpdateUID = uid
+
+		// TODO: ask the kubelet whether that pod is still running and
+		// clean up leftover sockets?
 		return nil
 	}
 }
@@ -322,6 +364,17 @@ func Serialize(enabled bool) Option {
 	}
 }
 
+// FlockDir changes where lock files are created and locked. A lock file
+// is needed when serializing gRPC calls and rolling updates are enabled.
+// The directory must exist and be reserved for exclusive use by the
+// driver. The default is the plugin data directory.
+func FlockDirectoryPath(path string) Option {
+	return func(o *options) error {
+		o.flockDirectoryPath = path
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -330,11 +383,13 @@ type options struct {
 	nodeUID                    types.UID
 	pluginRegistrationEndpoint endpoint
 	pluginDataDirectoryPath    string
+	rollingUpdateUID           types.UID
 	draEndpointListen          func(ctx context.Context, path string) (net.Listener, error)
 	unaryInterceptors          []grpc.UnaryServerInterceptor
 	streamInterceptors         []grpc.StreamServerInterceptor
 	kubeClient                 kubernetes.Interface
 	serialize                  bool
+	flockDirectoryPath         string
 	nodeV1beta1                bool
 }
 
@@ -344,17 +399,18 @@ type Helper struct {
 	// backgroundCtx is for activities that are started later.
 	backgroundCtx context.Context
 	// cancel cancels the backgroundCtx.
-	cancel       func(cause error)
-	wg           sync.WaitGroup
-	registrar    *nodeRegistrar
-	pluginServer *grpcServer
-	plugin       DRAPlugin
-	driverName   string
-	nodeName     string
-	nodeUID      types.UID
-	kubeClient   kubernetes.Interface
-	serialize    bool
-	grpcMutex    sync.Mutex
+	cancel           func(cause error)
+	wg               sync.WaitGroup
+	registrar        *nodeRegistrar
+	pluginServer     *grpcServer
+	plugin           DRAPlugin
+	driverName       string
+	nodeName         string
+	nodeUID          types.UID
+	kubeClient       kubernetes.Interface
+	serialize        bool
+	grpcMutex        sync.Mutex
+	grpcLockFilePath string
 
 	// Information about resource publishing changes concurrently and thus
 	// must be protected by the mutex. The controller gets started only
@@ -392,12 +448,20 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.driverName == "" {
 		return nil, errors.New("driver name must be set")
 	}
+	if o.rollingUpdateUID != "" && o.pluginRegistrationEndpoint.file != "" {
+		return nil, errors.New("rolling updates and explicit registration socket filename are mutually exclusive")
+	}
+	uidPart := ""
+	if o.rollingUpdateUID != "" {
+		uidPart = "-" + string(o.rollingUpdateUID)
+	}
 	if o.pluginRegistrationEndpoint.file == "" {
-		o.pluginRegistrationEndpoint.file = o.driverName + "-reg.sock"
+		o.pluginRegistrationEndpoint.file = o.driverName + uidPart + "-reg.sock"
 	}
 	if o.pluginDataDirectoryPath == "" {
 		o.pluginDataDirectoryPath = path.Join(KubeletPluginsDir, o.driverName)
 	}
+
 	d := &Helper{
 		driverName: o.driverName,
 		nodeName:   o.nodeName,
@@ -405,6 +469,14 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		kubeClient: o.kubeClient,
 		serialize:  o.serialize,
 		plugin:     plugin,
+	}
+	if o.rollingUpdateUID != "" {
+		dir := o.pluginDataDirectoryPath
+		if o.flockDirectoryPath != "" {
+			dir = o.flockDirectoryPath
+		}
+		// Enable file locking, required for concurrently running pods.
+		d.grpcLockFilePath = path.Join(dir, "serialize.lock")
 	}
 
 	// Stop calls cancel and therefore both cancellation
@@ -434,7 +506,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	var supportedServices []string
 	draEndpoint := endpoint{
 		dir:        o.pluginDataDirectoryPath,
-		file:       "dra.sock", // "dra" is hard-coded.
+		file:       "dra" + uidPart + ".sock", // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
 		listenFunc: o.draEndpointListen,
 	}
 	pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
@@ -575,12 +647,25 @@ func (d *Helper) RegistrationStatus() *registerapi.RegistrationStatus {
 // serializeGRPCIfEnabled locks a mutex if serialization is enabled.
 // Either way it returns a method that the caller must invoke
 // via defer.
-func (d *Helper) serializeGRPCIfEnabled() func() {
+func (d *Helper) serializeGRPCIfEnabled() (func(), error) {
 	if !d.serialize {
-		return func() {}
+		return func() {}, nil
 	}
+
+	// If rolling updates are enabled, we cannot do only in-memory locking.
+	// We must use file locking.
+	if d.grpcLockFilePath != "" {
+		file, err := fileutil.LockFile(d.grpcLockFilePath, os.O_RDWR|os.O_CREATE, 0666)
+		if err != nil {
+			return nil, fmt.Errorf("lock file: %w", err)
+		}
+		return func() {
+			_ = file.Close()
+		}, nil
+	}
+
 	d.grpcMutex.Lock()
-	return d.grpcMutex.Unlock
+	return d.grpcMutex.Unlock, nil
 }
 
 // nodePluginImplementation is a thin wrapper around the helper instance.
@@ -597,7 +682,11 @@ func (d *nodePluginImplementation) NodePrepareResources(ctx context.Context, req
 		return nil, fmt.Errorf("get resource claims: %w", err)
 	}
 
-	defer d.serializeGRPCIfEnabled()()
+	unlock, err := d.serializeGRPCIfEnabled()
+	if err != nil {
+		return nil, fmt.Errorf("serialize gRPC: %w", err)
+	}
+	defer unlock()
 
 	result, err := d.plugin.PrepareResourceClaims(ctx, claims)
 	if err != nil {
@@ -659,7 +748,11 @@ func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims
 
 // NodeUnprepareResources implements [draapi.NodeUnprepareResources].
 func (d *nodePluginImplementation) NodeUnprepareResources(ctx context.Context, req *drapb.NodeUnprepareResourcesRequest) (*drapb.NodeUnprepareResourcesResponse, error) {
-	defer d.serializeGRPCIfEnabled()
+	unlock, err := d.serializeGRPCIfEnabled()
+	if err != nil {
+		return nil, fmt.Errorf("serialize gRPC: %w", err)
+	}
+	defer unlock()
 
 	claims := make([]NamespacedObject, 0, len(req.Claims))
 	for _, claim := range req.Claims {

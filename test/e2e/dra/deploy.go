@@ -66,6 +66,7 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
 
@@ -76,6 +77,7 @@ const (
 
 type Nodes struct {
 	NodeNames []string
+	tempDir   string
 }
 
 type Resources struct {
@@ -111,6 +113,8 @@ func NewNodesNow(ctx context.Context, f *framework.Framework, minNodes, maxNodes
 }
 
 func (nodes *Nodes) init(ctx context.Context, f *framework.Framework, minNodes, maxNodes int) {
+	nodes.tempDir = ginkgo.GinkgoT().TempDir()
+
 	ginkgo.By("selecting nodes")
 	// The kubelet plugin is harder. We deploy the builtin manifest
 	// after patching in the driver name and all nodes on which we
@@ -214,9 +218,14 @@ func (d *Driver) Run(nodes *Nodes, configureResources func() Resources, devicesP
 		// not run on all nodes.
 		resources.Nodes = nodes.NodeNames
 	}
-	ginkgo.DeferCleanup(d.IsGone) // Register first so it gets called last.
 	d.SetUp(nodes, resources, devicesPerNode...)
 	ginkgo.DeferCleanup(d.TearDown)
+}
+
+// NewGetSlices generates a function for gomega.Eventually/Consistently which
+// returns the ResourceSliceList.
+func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList] {
+	return framework.ListObjects(d.f.ClientSet.ResourceV1beta1().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 }
 
 type MethodInstance struct {
@@ -227,12 +236,26 @@ type MethodInstance struct {
 type Driver struct {
 	f                  *framework.Framework
 	ctx                context.Context
-	cleanup            []func() // executed first-in-first-out
+	cleanup            []func(context.Context) // executed first-in-first-out
 	wg                 sync.WaitGroup
 	serviceAccountName string
 
+	// NameSuffix can be set while registering a test to deploy different
+	// drivers in the same test namespace.
 	NameSuffix string
-	Name       string
+
+	// InstanceSuffix can be set while registering a test to deploy two different
+	// instances of the same driver. Used to generate unique objects in the API server.
+	// The socket path is still the same.
+	InstanceSuffix string
+
+	// RollingUpdate can be set to true to enable using different socket names
+	// for different pods and thus seamless upgrades. Must be supported by the kubelet!
+	RollingUpdate bool
+
+	// Name gets derived automatically from the current test namespace and
+	// (if set) the NameSuffix while setting up the driver for a test.
+	Name string
 
 	// Nodes contains entries for each node selected for a test when the test runs.
 	// In addition, there is one entry for a fictional node.
@@ -263,9 +286,13 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 	ctx, cancel := context.WithCancel(context.Background())
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "driverName", d.Name)
+	if d.InstanceSuffix != "" {
+		instance, _ := strings.CutPrefix(d.InstanceSuffix, "-")
+		logger = klog.LoggerWithValues(logger, "instance", instance)
+	}
 	ctx = klog.NewContext(ctx, logger)
 	d.ctx = ctx
-	d.cleanup = append(d.cleanup, cancel)
+	d.cleanup = append(d.cleanup, func(context.Context) { cancel() })
 
 	if !resources.NodeLocal {
 		// Publish one resource pool with "network-attached" devices.
@@ -323,28 +350,31 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 	}
 
 	// Create service account and corresponding RBAC rules.
-	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + "-service-account"
+	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
 	content := pluginPermissions
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", d.f.Namespace.Name)
-	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name)
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(ctx, []byte(content), d.f.Namespace.Name)
 
+	// Using a ReplicaSet instead of a DaemonSet has the advantage that we can control
+	// the lifecycle explicitly, in particular run two pods per node long enough to
+	// run checks.
 	instanceKey := "app.kubernetes.io/instance"
 	rsName := ""
 	numNodes := int32(len(nodes.NodeNames))
 	pluginDataDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins", d.Name)
 	registrarDirectoryPath := path.Join(framework.TestContext.KubeletRootDir, "plugins_registry")
-	registrarSocketFilename := d.Name + "-reg.sock"
+	instanceName := d.Name + d.InstanceSuffix
 	err := utils.CreateFromManifests(ctx, d.f, d.f.Namespace, func(item interface{}) error {
 		switch item := item.(type) {
 		case *appsv1.ReplicaSet:
-			item.Name += d.NameSuffix
+			item.Name += d.NameSuffix + d.InstanceSuffix
 			rsName = item.Name
 			item.Spec.Replicas = &numNodes
-			item.Spec.Selector.MatchLabels[instanceKey] = d.Name
-			item.Spec.Template.Labels[instanceKey] = d.Name
+			item.Spec.Selector.MatchLabels[instanceKey] = instanceName
+			item.Spec.Template.Labels[instanceKey] = instanceName
 			item.Spec.Template.Spec.ServiceAccountName = d.serviceAccountName
-			item.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = d.Name
+			item.Spec.Template.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector.MatchLabels[instanceKey] = instanceName
 			item.Spec.Template.Spec.Affinity.NodeAffinity = &v1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
 					NodeSelectorTerms: []v1.NodeSelectorTerm{
@@ -376,7 +406,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 	if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, d.f.ClientSet, rs, numNodes); err != nil {
 		framework.ExpectNoError(err, "all kubelet plugin proxies running")
 	}
-	requirement, err := labels.NewRequirement(instanceKey, selection.Equals, []string{d.Name})
+	requirement, err := labels.NewRequirement(instanceKey, selection.Equals, []string{instanceName})
 	framework.ExpectNoError(err, "create label selector requirement")
 	selector := labels.NewSelector().Add(*requirement)
 	pods, err := d.f.ClientSet.CoreV1().Pods(d.f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
@@ -429,6 +459,14 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 		// All listeners running in this pod use a new unique local port number
 		// by atomically incrementing this variable.
 		listenerPort := int32(9000)
+		rollingUpdateUID := pod.UID
+		serialize := true
+		if !d.RollingUpdate {
+			rollingUpdateUID = ""
+			// A test might have to execute two gRPC calls in parallel, so only
+			// serialize when we explicitly want to test a rolling update.
+			serialize = false
+		}
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
@@ -438,17 +476,31 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 				return d.streamInterceptor(nodename, srv, ss, info, handler)
 			}),
 
+			kubeletplugin.RollingUpdate(rollingUpdateUID),
+			kubeletplugin.Serialize(serialize),
+			kubeletplugin.FlockDirectoryPath(nodes.tempDir),
+
 			kubeletplugin.PluginDataDirectoryPath(pluginDataDirectoryPath),
 			kubeletplugin.PluginListener(listen(d.f, &pod, &listenerPort)),
 
 			kubeletplugin.RegistrarDirectoryPath(registrarDirectoryPath),
-			kubeletplugin.RegistrarSocketFilename(registrarSocketFilename),
 			kubeletplugin.RegistrarListener(listen(d.f, &pod, &listenerPort)),
 		)
 		framework.ExpectNoError(err, "start kubelet plugin for node %s", pod.Spec.NodeName)
-		d.cleanup = append(d.cleanup, func() {
+		d.cleanup = append(d.cleanup, func(ctx context.Context) {
 			// Depends on cancel being called first.
 			plugin.Stop()
+
+			// Also explicitly stop all pods.
+			ginkgo.By("scaling down driver proxy pods for " + d.Name)
+			rs, err := d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Get(ctx, rsName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get ReplicaSet for driver "+d.Name)
+			rs.Spec.Replicas = ptr.To(int32(0))
+			rs, err = d.f.ClientSet.AppsV1().ReplicaSets(d.f.Namespace.Name).Update(ctx, rs, metav1.UpdateOptions{})
+			framework.ExpectNoError(err, "scale down ReplicaSet for driver "+d.Name)
+			if err := e2ereplicaset.WaitForReplicaSetTargetAvailableReplicas(ctx, d.f.ClientSet, rs, 0); err != nil {
+				framework.ExpectNoError(err, "all kubelet plugin proxies stopped")
+			}
 		})
 		d.Nodes[nodename] = KubeletPlugin{ExamplePlugin: plugin, ClientSet: driverClient}
 	}
@@ -717,14 +769,19 @@ func pipe(ctx context.Context, msg string, verbosity int) *io.PipeWriter {
 	return writer
 }
 
-func (d *Driver) TearDown() {
+func (d *Driver) TearDown(ctx context.Context) {
 	for _, c := range d.cleanup {
-		c()
+		c(ctx)
 	}
 	d.cleanup = nil
 	d.wg.Wait()
 }
 
+// IsGone checks that the kubelet is done with the driver.
+// This is done by waiting for the kubelet to remove the
+// driver's ResourceSlices, which takes at least 5 minutes
+// because of the delay in the kubelet. Only use this in slow
+// tests...
 func (d *Driver) IsGone(ctx context.Context) {
 	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
 		slices, err := d.f.ClientSet.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
@@ -732,7 +789,7 @@ func (d *Driver) IsGone(ctx context.Context) {
 			return nil, err
 		}
 		return slices.Items, err
-	}).Should(gomega.BeEmpty())
+	}).WithTimeout(7 * time.Minute).Should(gomega.BeEmpty())
 }
 
 func (d *Driver) interceptor(nodename string, ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
