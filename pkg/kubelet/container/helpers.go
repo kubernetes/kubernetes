@@ -67,8 +67,8 @@ type RuntimeHelper interface {
 	// UnprepareDynamicResources unprepares resources for a a pod.
 	UnprepareDynamicResources(ctx context.Context, pod *v1.Pod) error
 
-	// SetPodWatchCondition flags a pod to be inspected until the condition is met.
-	SetPodWatchCondition(types.UID, string, func(*PodStatus) bool)
+	// RequestPodReSync flags a pod to be inspected.
+	RequestPodReSync(types.UID)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
