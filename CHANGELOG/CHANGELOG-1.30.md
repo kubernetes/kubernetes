@@ -1584,7 +1584,7 @@ name | architectures
    ([#123344](https://github.com/kubernetes/kubernetes/pull/123344), [@nilekhc](https://github.com/nilekhc))
 - When configuring a JWT authenticator:
   
-  If `username.expression` used 'claims.email', then 'claims.email_verified' must have been used in `username.expression` or `extra[*].valueExpression` or `claimValidationRules[*].expression`. An example claim validation rule expression that matches the validation automatically applied when `username.claim` is set to 'email' is 'claims.?email_verified.orValue(true)'.
+  If `username.expression` used 'claims.email', then 'claims.email_verified' must have been used in `username.expression` or `extra[*].valueExpression` or `claimValidationRules[*].expression`. An example claim validation rule expression that matches the validation automatically applied when `username.claim` is set to 'email' is 'claims.?email_verified.orValue(true) == true'.
    ([#123737](https://github.com/kubernetes/kubernetes/pull/123737), [@enj](https://github.com/enj))
 - `readOnly` volumes now support recursive read-only mounts for kernel versions >= 5.12."
    ([#123180](https://github.com/kubernetes/kubernetes/pull/123180), [@AkihiroSuda](https://github.com/AkihiroSuda))
@@ -2416,7 +2416,7 @@ name | architectures
   If username.expression uses 'claims.email', then 'claims.email_verified' must be used in
   username.expression or extra[*].valueExpression or claimValidationRules[*].expression.
   An example claim validation rule expression that matches the validation automatically
-  applied when username.claim is set to 'email' is 'claims.?email_verified.orValue(true)'. ([#123737](https://github.com/kubernetes/kubernetes/pull/123737), [@enj](https://github.com/enj)) [SIG API Machinery and Auth]
+  applied when username.claim is set to 'email' is 'claims.?email_verified.orValue(true) == true'. ([#123737](https://github.com/kubernetes/kubernetes/pull/123737), [@enj](https://github.com/enj)) [SIG API Machinery and Auth]
 
 ### Feature
 
