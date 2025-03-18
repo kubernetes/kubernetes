@@ -182,7 +182,7 @@ func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Objec
 
 	// TODO: move me to a binding strategy
 	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
-		return nil, errs.ToAggregate()
+		return nil, errors.NewInvalid(api.Kind("Binding"), "", errs)
 	}
 
 	if createValidation != nil {

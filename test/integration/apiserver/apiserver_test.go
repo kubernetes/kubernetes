@@ -169,6 +169,25 @@ var cascDel = `
 }
 `
 
+func Test422StatusCodeInvalidBindings(t *testing.T) {
+	ctx, client, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	body := []byte(`{"target":{}}`)
+	var statusCode int
+	result := client.CoreV1().RESTClient().
+		Post().
+		Namespace("default").
+		Resource("bindings").
+		Body(body).
+		Do(ctx)
+	result.StatusCode(&statusCode)
+
+	if statusCode != 422 {
+		t.Fatalf("Expected status code to be 422, got %v (%#v)", statusCode, result)
+	}
+}
+
 func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 	ctx, client, _, tearDownFn := setup(t)
 	defer tearDownFn()
