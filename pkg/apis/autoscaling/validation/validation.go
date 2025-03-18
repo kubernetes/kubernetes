@@ -106,7 +106,7 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName, field.NewPath("metadata"))
 
-	// allowTolerance is true iif spec.behavior.scale(Up,Down).tolerance can be set
+	// allowTolerance is true if spec.behavior.scale(Up,Down).tolerance can be set
 	allowTolerance := utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance)
 
 	// MinReplicasLowerBound represents a minimum value for minReplicas
@@ -127,7 +127,7 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
 
-	// allowTolerance is true iif spec.behavior.scale(Up,Down).tolerance can be set.
+	// allowTolerance is true if spec.behavior.scale(Up,Down).tolerance can be set.
 	allowTolerance := utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance)
 
 	// minReplicasLowerBound represents a minimum value for minReplicas
