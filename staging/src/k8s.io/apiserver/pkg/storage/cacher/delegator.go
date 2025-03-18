@@ -351,16 +351,18 @@ func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
 func (c *consistencyChecker) check(ctx context.Context) {
 	digests, err := c.calculateDigests(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Cache consistentency check error", "resource", c.resourcePrefix)
+		klog.ErrorS(err, "Cache consistency check error", "resource", c.resourcePrefix)
 		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "error").Inc()
 		return
 	}
 	if digests.CacheDigest == digests.EtcdDigest {
-		klog.V(3).InfoS("Cache consistentency check passed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
+		klog.V(3).InfoS("Cache consistency check passed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
 		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "success").Inc()
 	} else {
-		klog.ErrorS(nil, "Cache consistentency check failed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+		klog.ErrorS(nil, "Cache consistency check failed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
 		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "failure").Inc()
+		// Panic on internal consistency checking enabled only by environment variable. R
+		panic(fmt.Sprintf("Cache consistency check failed, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q", c.resourcePrefix, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest))
 	}
 }
 
@@ -369,6 +371,7 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 		return nil, fmt.Errorf("cache is not ready")
 	}
 	cacheDigest, resourceVersion, err := c.calculateStoreDigest(ctx, c.cacher, storage.ListOptions{
+		Recursive:            true,
 		ResourceVersion:      "0",
 		Predicate:            storage.Everything,
 		ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
@@ -377,6 +380,7 @@ func (c *consistencyChecker) calculateDigests(ctx context.Context) (*storageDige
 		return nil, fmt.Errorf("failed calculating cache digest: %w", err)
 	}
 	etcdDigest, _, err := c.calculateStoreDigest(ctx, c.etcd, storage.ListOptions{
+		Recursive:            true,
 		ResourceVersion:      resourceVersion,
 		Predicate:            storage.Everything,
 		ResourceVersionMatch: metav1.ResourceVersionMatchExact,
