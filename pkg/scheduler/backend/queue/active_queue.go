@@ -402,6 +402,12 @@ func (aq *activeQueue) done(pod types.UID) {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
+	aq.unlockedDone(pod)
+}
+
+// unlockedDone is used by the activeQueue internally and doesn't take the lock itself.
+// It assumes the lock is already taken outside before the method is called.
+func (aq *activeQueue) unlockedDone(pod types.UID) {
 	inFlightPod, ok := aq.inFlightPods[pod]
 	if !ok {
 		// This Pod is already done()ed.
@@ -446,15 +452,15 @@ func (aq *activeQueue) done(pod types.UID) {
 
 // close closes the activeQueue.
 func (aq *activeQueue) close() {
+	aq.lock.Lock()
+	defer aq.lock.Unlock()
 	// We should call done() for all in-flight pods to clean up the inFlightEvents metrics.
 	// It's safe even if the binding cycle running asynchronously calls done() afterwards
 	// done() will just be a no-op.
 	for pod := range aq.inFlightPods {
-		aq.done(pod)
+		aq.unlockedDone(pod)
 	}
-	aq.lock.Lock()
 	aq.closed = true
-	aq.lock.Unlock()
 }
 
 // broadcast notifies the pop() operation that new pod(s) was added to the activeQueue.
