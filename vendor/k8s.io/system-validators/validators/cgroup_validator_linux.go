@@ -23,7 +23,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -196,7 +195,7 @@ func (c *CgroupsValidator) getCgroupV2Subsystems(unifiedMountpoint string) ([]st
 	if freezeSupported {
 		subsystems = append(subsystems, "freezer")
 	}
-	data, err := ioutil.ReadFile(filepath.Join(unifiedMountpoint, "cgroup.controllers"))
+	data, err := os.ReadFile(filepath.Join(unifiedMountpoint, "cgroup.controllers"))
 	if err != nil {
 		return nil, err, warn
 	}
