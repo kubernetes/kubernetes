@@ -26758,3 +26758,57 @@ func TestValidatePodResize(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateResourceQuotaRequestLessThanLimits(t *testing.T) {
+	tests := []struct {
+		name    string
+		hard    core.ResourceList
+		wantErr bool
+	}{
+		{
+			name:    "Empty Hard Spec",
+			hard:    core.ResourceList{},
+			wantErr: false,
+		},
+		{
+			name: "Request less than limit",
+			hard: core.ResourceList{
+				core.ResourceName("requests.cpu"):    resource.MustParse("500m"),
+				core.ResourceName("limits.cpu"):      resource.MustParse("1"),
+				core.ResourceName("requests.memory"): resource.MustParse("1Gi"),
+				core.ResourceName("limits.memory"):   resource.MustParse("2Gi"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "Request greater than limit",
+			hard: core.ResourceList{
+				core.ResourceName("requests.cpu"):    resource.MustParse("2"),
+				core.ResourceName("limits.cpu"):      resource.MustParse("1"),
+				core.ResourceName("requests.memory"): resource.MustParse("3Gi"),
+				core.ResourceName("limits.memory"):   resource.MustParse("2Gi"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "Request greater than limit, and not requests",
+			hard: core.ResourceList{
+				core.ResourceName("cpu"):           resource.MustParse("2"),
+				core.ResourceName("limits.cpu"):    resource.MustParse("1"),
+				core.ResourceName("memory"):        resource.MustParse("3Gi"),
+				core.ResourceName("limits.memory"): resource.MustParse("2Gi"),
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fld := field.NewPath("spec")
+			errs := validateResourceQuotaRequestLessThanLimits(tt.hard, fld)
+			if (len(errs) > 0) != tt.wantErr {
+				t.Errorf("validateResourceQuotaRequestLessThanLimits() error = %v, wantErr %v", errs, tt.wantErr)
+			}
+		})
+	}
+}
