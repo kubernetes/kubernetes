@@ -53,7 +53,7 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: registry.k8s.io/sig-storage/hostpathplugin:v1.15.0
+          image: registry.k8s.io/sig-storage/hostpathplugin:v1.16.1
           args:
             - -v=5
             - -nodeid=$(KUBE_NODE_NAME)
