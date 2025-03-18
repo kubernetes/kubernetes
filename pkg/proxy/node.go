@@ -18,10 +18,10 @@ package proxy
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"reflect"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,69 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
-
-// NodePodCIDRHandler handles the life cycle of kube-proxy based on the node PodCIDR assigned
-// Implements the config.NodeHandler interface
-// https://issues.k8s.io/111321
-type NodePodCIDRHandler struct {
-	mu       sync.Mutex
-	podCIDRs []string
-	logger   klog.Logger
-}
-
-func NewNodePodCIDRHandler(ctx context.Context, podCIDRs []string) *NodePodCIDRHandler {
-	return &NodePodCIDRHandler{
-		podCIDRs: podCIDRs,
-		logger:   klog.FromContext(ctx),
-	}
-}
-
-var _ config.NodeHandler = &NodePodCIDRHandler{}
-
-// OnNodeAdd is a handler for Node creates.
-func (n *NodePodCIDRHandler) OnNodeAdd(node *v1.Node) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	podCIDRs := node.Spec.PodCIDRs
-	// initialize podCIDRs
-	if len(n.podCIDRs) == 0 && len(podCIDRs) > 0 {
-		n.logger.Info("Setting current PodCIDRs", "podCIDRs", podCIDRs)
-		n.podCIDRs = podCIDRs
-		return
-	}
-	if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
-		n.logger.Error(nil, "Using NodeCIDR LocalDetector mode, current PodCIDRs are different than previous PodCIDRs, restarting",
-			"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-}
-
-// OnNodeUpdate is a handler for Node updates.
-func (n *NodePodCIDRHandler) OnNodeUpdate(_, node *v1.Node) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	podCIDRs := node.Spec.PodCIDRs
-	// initialize podCIDRs
-	if len(n.podCIDRs) == 0 && len(podCIDRs) > 0 {
-		n.logger.Info("Setting current PodCIDRs", "podCIDRs", podCIDRs)
-		n.podCIDRs = podCIDRs
-		return
-	}
-	if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
-		n.logger.Error(nil, "Using NodeCIDR LocalDetector mode, current PodCIDRs are different than previous PodCIDRs, restarting",
-			"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPODCIDRs", n.podCIDRs)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-}
-
-// OnNodeDelete is a handler for Node deletes.
-func (n *NodePodCIDRHandler) OnNodeDelete(node *v1.Node) {
-	n.logger.Error(nil, "Current Node is being deleted", "node", klog.KObj(node))
-}
-
-// OnNodeSynced is a handler for Node syncs.
-func (n *NodePodCIDRHandler) OnNodeSynced() {}
 
 // NodeEligibleHandler handles the life cycle of the Node's eligibility, as
 // determined by the health server for directing load balancer traffic.
@@ -119,22 +56,27 @@ func (n *NodeEligibleHandler) OnNodeSynced() {}
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs, handles node watch events
 // and crashes kube-proxy if there are any changes in NodeIPs.
 type NodeManager struct {
-	nodeIPs  []net.IP
-	logger   klog.Logger
-	exitFunc func(exitCode int)
+	nodeIPs       []net.IP
+	podCIDRs      []string
+	watchPodCIDRs bool
+	logger        klog.Logger
+	exitFunc      func(exitCode int)
 }
 
-// NewNodeManager returns NodeManager after waiting for the node object to exist and have NodeIPs.
-func NewNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string) *NodeManager {
-	return newNodeManager(ctx, nodeLister, nodeName, time.Second, 30*time.Second)
+// NewNodeManager returns NodeManager after waiting for the node object to exist and have NodeIPs
+// and PodCIDRS (if watchPodCIDRs is true)
+func NewNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string, watchPodCIDRs bool) (*NodeManager, error) {
+	// we wait for at most 5 minutes for allocators to assign a PodCIDR to the node after it is registered.
+	return newNodeManager(ctx, nodeLister, nodeName, watchPodCIDRs, time.Second, 5*time.Minute)
 }
 
 // newNodeManager implements NewNodeManager with configurable poll interval and timeout.
-func newNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string, pollInterval, pollTimeout time.Duration) *NodeManager {
+func newNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, nodeName string, watchPodCIDRs bool, pollInterval, pollTimeout time.Duration) (*NodeManager, error) {
 	logger := klog.FromContext(ctx)
 	var node *v1.Node
 	var err error
 	var nodeIPs []net.IP
+	var podCIDRs []string
 
 	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
 	defer cancel()
@@ -146,26 +88,50 @@ func newNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, node
 
 		nodeIPs, err = utilnode.GetNodeHostIPs(node)
 		if err != nil {
+			err = fmt.Errorf("failed to retrieve NodeIPs : %w", err)
 			return false, nil
+		}
+
+		// we only wait for PodCIDRs if NodeManager is configured with watchPodCIDRs
+		if watchPodCIDRs {
+			if len(node.Spec.PodCIDRs) > 0 {
+				podCIDRs = node.Spec.PodCIDRs
+			} else {
+				err = fmt.Errorf("failed to retrieve PodCIDRs")
+				return false, nil
+			}
 		}
 		return true, nil
 	})
 
 	if pollErr != nil {
-		logger.Error(err, "Failed to retrieve NodeIPs")
+		logger.Error(err, pollErr.Error())
 	} else {
 		logger.Info("Successfully retrieved NodeIPs", "NodeIPs", nodeIPs)
 	}
-	return &NodeManager{
-		nodeIPs:  nodeIPs,
-		logger:   klog.FromContext(ctx),
-		exitFunc: os.Exit,
+
+	// we return error is watchPodCIDRs was configured and PodCIDRs were not retrieved.
+	if watchPodCIDRs && len(podCIDRs) == 0 {
+		return nil, err
 	}
+
+	return &NodeManager{
+		nodeIPs:       nodeIPs,
+		podCIDRs:      podCIDRs,
+		watchPodCIDRs: watchPodCIDRs,
+		logger:        klog.FromContext(ctx),
+		exitFunc:      os.Exit,
+	}, nil
 }
 
 // NodeIPs returns the NodeIPs polled in NewNodeManager().
 func (n *NodeManager) NodeIPs() []net.IP {
 	return n.nodeIPs
+}
+
+// PodCIDRs returns the PodCIDRs polled in NewNodeManager().
+func (n *NodeManager) PodCIDRs() []string {
+	return n.podCIDRs
 }
 
 // OnNodeAdd is a handler for Node creates.
@@ -180,6 +146,18 @@ func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
 
 // onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
 func (n *NodeManager) onNodeChange(node *v1.Node) {
+	// We exit whenever there is a change in PodCIDRs detected initially, and PodCIDRs received
+	// on node watch event if the node manager is configured with watchPodCIDRs.
+	if n.watchPodCIDRs {
+		podCIDRs := node.Spec.PodCIDRs
+		if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
+			n.logger.Error(nil, "PodCIDRs changed for the node",
+				"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
+			klog.Flush()
+			n.exitFunc(1)
+		}
+	}
+
 	nodeIPs, err := utilnode.GetNodeHostIPs(node)
 	if err != nil {
 		n.logger.Error(err, "Failed to retrieve NodeIPs")

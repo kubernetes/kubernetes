@@ -223,8 +223,12 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		return nil, fmt.Errorf("can not sync node informer")
 	}
 
-	s.nodeManager = proxy.NewNodeManager(ctx, nodeLister, s.Hostname)
+	s.nodeManager, err = proxy.NewNodeManager(ctx, nodeLister, s.Hostname, s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR)
+	if err != nil {
+		return nil, err
+	}
 	rawNodeIPs := s.nodeManager.NodeIPs()
+	s.podCIDRs = s.nodeManager.PodCIDRs()
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 
 	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
@@ -612,10 +616,6 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	serviceInformerFactory.Start(wait.NeverStop)
 
 	nodeConfig := config.NewNodeConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
-	// https://issues.k8s.io/111321
-	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
-	}
 	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
 		HealthServer: s.HealthzServer,
 	})
