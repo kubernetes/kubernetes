@@ -5104,20 +5104,8 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			}
 			podStatus := testPodStatus(state, resources)
 
-			for _, enableAllocatedStatus := range []bool{true, false} {
-				t.Run(fmt.Sprintf("AllocatedStatus=%t", enableAllocatedStatus), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingAllocatedStatus, enableAllocatedStatus)
-
-					expected := tc.Expected
-					if !enableAllocatedStatus {
-						expected = *expected.DeepCopy()
-						expected.AllocatedResources = nil
-					}
-
-					cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, false, false)
-					assert.Equal(t, expected, cStatuses[0])
-				})
-			}
+			cStatuses := kubelet.convertToAPIContainerStatuses(tPod, podStatus, []v1.ContainerStatus{tc.OldStatus}, tPod.Spec.Containers, false, false)
+			assert.Equal(t, tc.Expected, cStatuses[0])
 		})
 	}
 }
