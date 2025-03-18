@@ -434,6 +434,6 @@ func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventRespon
 	metrics.EventedPLEGConnLatency.Observe(duration.Seconds())
 }
 
-func (e *EventedPLEG) SetPodWatchCondition(podUID types.UID, conditionKey string, condition WatchCondition) {
-	e.genericPleg.SetPodWatchCondition(podUID, conditionKey, condition)
+func (e *EventedPLEG) RequestPodReSync(podUID types.UID) {
+	e.genericPleg.RequestPodReSync(podUID)
 }
