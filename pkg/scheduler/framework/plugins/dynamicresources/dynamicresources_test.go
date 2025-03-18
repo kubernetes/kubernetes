@@ -1047,7 +1047,9 @@ type testContext struct {
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
-	if actualErr := status.AsError(); actualErr != nil {
+	if expected.status == nil {
+		assert.Nil(t, status)
+	} else if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
 		assert.ErrorContains(t, actualErr, expected.status.AsError().Error())
 	} else {
