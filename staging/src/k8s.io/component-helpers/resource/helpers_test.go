@@ -460,6 +460,41 @@ func TestPodResourceRequests(t *testing.T) {
 			},
 		},
 		{
+			description: "resized, infeasible & in-progress",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("6"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "resized, no resize status",
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
@@ -481,6 +516,45 @@ func TestPodResourceRequests(t *testing.T) {
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "resized: per-resource 3-way maximum",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("30m"),
+				v1.ResourceMemory: resource.MustParse("30M"),
+				// Note: EphemeralStorage is not resizable, but that doesn't matter for the purposes of this test.
+				v1.ResourceEphemeralStorage: resource.MustParse("30G"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("30m"),
+							v1.ResourceMemory:           resource.MustParse("20M"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("20m"),
+						v1.ResourceMemory:           resource.MustParse("10M"),
+						v1.ResourceEphemeralStorage: resource.MustParse("30G"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("10m"),
+							v1.ResourceMemory:           resource.MustParse("30M"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20G"),
 						},
 					},
 				},

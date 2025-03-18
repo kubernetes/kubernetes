@@ -224,9 +224,9 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 // determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
 func determineContainerReqs(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
 	if IsPodResizeInfeasible(pod) {
-		return cs.Resources.Requests.DeepCopy()
+		return max(cs.Resources.Requests, cs.AllocatedResources)
 	}
-	return max(container.Resources.Requests, cs.Resources.Requests)
+	return max(container.Resources.Requests, cs.Resources.Requests, cs.AllocatedResources)
 }
 
 // determineContainerLimits will return a copy of the container limits based on if resizing is feasible or not.
@@ -399,23 +399,12 @@ func maxResourceList(list, newList v1.ResourceList) {
 	}
 }
 
-// max returns the result of max(a, b) for each named resource and is only used if we can't
+// max returns the result of max(a, b...) for each named resource and is only used if we can't
 // accumulate into an existing resource list
-func max(a v1.ResourceList, b v1.ResourceList) v1.ResourceList {
-	result := v1.ResourceList{}
-	for key, value := range a {
-		if other, found := b[key]; found {
-			if value.Cmp(other) <= 0 {
-				result[key] = other.DeepCopy()
-				continue
-			}
-		}
-		result[key] = value.DeepCopy()
-	}
-	for key, value := range b {
-		if _, found := result[key]; !found {
-			result[key] = value.DeepCopy()
-		}
+func max(a v1.ResourceList, b ...v1.ResourceList) v1.ResourceList {
+	result := a.DeepCopy()
+	for _, other := range b {
+		maxResourceList(result, other)
 	}
 	return result
 }
