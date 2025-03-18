@@ -113,6 +113,49 @@ message BasicDevice {
   //
   // +optional
   map<string, DeviceCapacity> capacity = 2;
+
+  // ConsumesCounter defines a list of references to sharedCounters
+  // and the set of counters that the device will
+  // consume from those counter sets.
+  //
+  // There can only be a single entry per counterSet.
+  //
+  // The maximum number of device counter consumption entries
+  // is 32. This is the same as the maximum number of shared counters
+  // allowed in a ResourceSlice.
+  //
+  // +optional
+  // +listType=atomic
+  repeated DeviceCounterConsumption consumesCounter = 3;
+
+  // NodeName identifies the node where the device is available.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional string nodeName = 4;
+
+  // NodeSelector defines the nodes where the device is available.
+  //
+  // Must use exactly one term.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 5;
+
+  // AllNodes indicates that all nodes have access to the device.
+  //
+  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // At most one of NodeName, NodeSelector and AllNodes can be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  optional bool allNodes = 6;
 }
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
@@ -170,6 +213,38 @@ message CELDeviceSelector {
   //
   // +required
   optional string expression = 1;
+}
+
+// Counter describes a quantity associated with a device.
+message Counter {
+  // Value defines how much of a certain device counter is available.
+  //
+  // +required
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity value = 1;
+}
+
+// CounterSet defines a named set of counters
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The counters are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the portion of counters it uses will no longer be available for use
+// by other devices.
+message CounterSet {
+  // Name defines the name of the counter set.
+  // It must be a DNS label.
+  //
+  // +required
+  optional string name = 1;
+
+  // Counters defines the set of counters for this CounterSet
+  // The name of each counter must be unique in that set and must be a DNS label.
+  //
+  // The maximum number of counters is 32.
+  //
+  // +required
+  map<string, Counter> counters = 2;
 }
 
 // Device represents one individual hardware instance that can be selected based
@@ -410,6 +485,24 @@ message DeviceConstraint {
   // +optional
   // +oneOf=ConstraintType
   optional string matchAttribute = 2;
+}
+
+// DeviceCounterConsumption defines a set of counters that
+// a device will consume from a CounterSet.
+message DeviceCounterConsumption {
+  // SharedCounter defines the shared counter from which the
+  // counters defined will be consumed.
+  //
+  // +required
+  optional string sharedCounter = 1;
+
+  // Counters defines the Counter that will be consumed by
+  // the device.
+  //
+  // The maximum number of Counters is 32.
+  //
+  // +required
+  map<string, Counter> counters = 2;
 }
 
 // DeviceRequest is a request for devices required for a claim.
@@ -1015,5 +1108,28 @@ message ResourceSliceSpec {
   // +optional
   // +listType=atomic
   repeated Device devices = 6;
+
+  // PerDeviceNodeSelection defines whether the access from nodes to
+  // resources in the pool is set on the ResourceSlice level or on each
+  // device. If it is set to true, every device defined the ResourceSlice
+  // must specify this individually.
+  //
+  // Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
+  // must be set.
+  //
+  // +optional
+  // +oneOf=NodeSelection
+  optional bool perDeviceNodeSelection = 7;
+
+  // SharedCounters defines a list of counter sets, each of which
+  // has a name and a list of counters available.
+  //
+  // The names of the SharedCounters must be unique in the ResourceSlice.
+  //
+  // The maximum number of SharedCounters is 32.
+  //
+  // +optional
+  // +listType=atomic
+  repeated CounterSet sharedCounters = 8;
 }
 
