@@ -32,9 +32,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -61,6 +62,9 @@ func setup(t testing.TB, maxReadonlyRequestsInFlight, maxMutatingRequestsInFligh
 }
 
 func setupAnother(t testing.TB, ctx context.Context, maxReadonlyRequestsInFlight, maxMutatingRequestsInFlight int, v134Config bool) (clientset.Interface, *rest.Config, framework.TearDownFunc) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.APFv134Config) != v134Config {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.APFv134Config, v134Config)
+	}
 	client, kubeConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Ensure all clients are allowed to send requests.
@@ -70,18 +74,8 @@ func setupAnother(t testing.TB, ctx context.Context, maxReadonlyRequestsInFlight
 		},
 		ModifyServerConfig: func(c *controlplane.Config) {
 			fg := c.ControlPlane.Generic.FeatureGate
-			if fg.Enabled(features.APFv134Config) == v134Config {
-				return
-			}
-			desired := fmt.Sprintf("APFv134Config=%v", v134Config)
-			switch typed := fg.(type) {
-			case featuregate.MutableFeatureGate:
-				err := typed.Set(desired)
-				if err != nil {
-					t.Errorf("Failed to set %s: %s", desired, err.Error())
-				}
-			default:
-				t.Error("Unable to turn on APFv134Config Feature due to immutable FeatureGate")
+			if enabled := fg.Enabled(features.APFv134Config); enabled != v134Config {
+				t.Fatalf("Wrong value for APFv134Config: %v", enabled)
 			}
 		},
 	})
