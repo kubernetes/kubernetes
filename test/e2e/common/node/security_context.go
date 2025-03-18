@@ -200,8 +200,6 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 
 		f.It("should mount all volumes with proper permissions with hostUsers=false [LinuxOnly]", feature.UserNamespacesSupport, func(ctx context.Context) {
-			// Create all volume types supported: configmap, secret, downwardAPI, projected.
-
 			// Create configmap.
 			name := "userns-volumes-test-" + string(uuid.NewUUID())
 			configMap := newConfigMap(f, name)
