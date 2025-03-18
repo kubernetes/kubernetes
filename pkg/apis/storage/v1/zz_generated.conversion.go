@@ -312,6 +312,7 @@ func autoConvert_v1_CSIDriverSpec_To_storage_CSIDriverSpec(in *storagev1.CSIDriv
 	out.TokenRequests = *(*[]storage.TokenRequest)(unsafe.Pointer(&in.TokenRequests))
 	out.RequiresRepublish = (*bool)(unsafe.Pointer(in.RequiresRepublish))
 	out.SELinuxMount = (*bool)(unsafe.Pointer(in.SELinuxMount))
+	out.NodeAllocatableUpdatePeriodSeconds = (*int64)(unsafe.Pointer(in.NodeAllocatableUpdatePeriodSeconds))
 	return nil
 }
 
@@ -329,6 +330,7 @@ func autoConvert_storage_CSIDriverSpec_To_v1_CSIDriverSpec(in *storage.CSIDriver
 	out.TokenRequests = *(*[]storagev1.TokenRequest)(unsafe.Pointer(&in.TokenRequests))
 	out.RequiresRepublish = (*bool)(unsafe.Pointer(in.RequiresRepublish))
 	out.SELinuxMount = (*bool)(unsafe.Pointer(in.SELinuxMount))
+	out.NodeAllocatableUpdatePeriodSeconds = (*int64)(unsafe.Pointer(in.NodeAllocatableUpdatePeriodSeconds))
 	return nil
 }
 
@@ -728,6 +730,7 @@ func Convert_storage_VolumeAttachmentStatus_To_v1_VolumeAttachmentStatus(in *sto
 func autoConvert_v1_VolumeError_To_storage_VolumeError(in *storagev1.VolumeError, out *storage.VolumeError, s conversion.Scope) error {
 	out.Time = in.Time
 	out.Message = in.Message
+	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
 	return nil
 }
 
@@ -739,6 +742,7 @@ func Convert_v1_VolumeError_To_storage_VolumeError(in *storagev1.VolumeError, ou
 func autoConvert_storage_VolumeError_To_v1_VolumeError(in *storage.VolumeError, out *storagev1.VolumeError, s conversion.Scope) error {
 	out.Time = in.Time
 	out.Message = in.Message
+	out.ErrorCode = (*int32)(unsafe.Pointer(in.ErrorCode))
 	return nil
 }
 

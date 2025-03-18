@@ -857,6 +857,12 @@
     lockToDefault: false
     preRelease: GA
     version: "1.33"
+- name: MutableCSINodeAllocatableCount
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: MutatingAdmissionPolicy
   versionedSpecs:
   - default: false

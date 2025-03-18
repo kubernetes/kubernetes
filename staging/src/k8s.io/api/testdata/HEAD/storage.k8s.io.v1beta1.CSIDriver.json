@@ -58,6 +58,7 @@
       }
     ],
     "requiresRepublish": true,
-    "seLinuxMount": true
+    "seLinuxMount": true,
+    "nodeAllocatableUpdatePeriodSeconds": 9
   }
 }

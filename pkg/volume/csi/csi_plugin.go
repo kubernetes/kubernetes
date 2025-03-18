@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/grpc/codes"
 	"k8s.io/klog/v2"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -39,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/client-go/tools/cache"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -64,6 +66,7 @@ const (
 type csiPlugin struct {
 	host                      volume.VolumeHost
 	csiDriverLister           storagelisters.CSIDriverLister
+	csiDriverInformer         cache.SharedIndexInformer
 	serviceAccountTokenGetter func(namespace, name string, tr *authenticationv1.TokenRequest) (*authenticationv1.TokenRequest, error)
 	volumeAttachmentLister    storagelisters.VolumeAttachmentLister
 }
@@ -81,6 +84,7 @@ var _ volume.VolumePlugin = &csiPlugin{}
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
 type RegistrationHandler struct {
+	csiPlugin *csiPlugin
 }
 
 // TODO (verult) consider using a struct instead of global variables
@@ -89,6 +93,8 @@ type RegistrationHandler struct {
 var csiDrivers = &DriversStore{}
 
 var nim nodeinfomanager.Interface
+
+var csiNodeUpdaterVar *csiNodeUpdater
 
 // PluginHandler is the plugin registration handler interface passed to the
 // pluginwatcher module in kubelet
@@ -156,7 +162,79 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
+	if csiNodeUpdaterVar != nil {
+		csiNodeUpdaterVar.syncDriverUpdater(pluginName)
+	}
+
 	return nil
+}
+
+func updateCSIDriver(pluginName string) error {
+	csi, err := newCsiDriverClient(csiDriverName(pluginName))
+	if err != nil {
+		return fmt.Errorf("failed to create CSI client for driver %q: %w", pluginName, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+
+	driverNodeID, maxVolumePerNode, accessibleTopology, err := csi.NodeGetInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get NodeGetInfo from driver %q: %w", pluginName, err)
+	}
+
+	if err := nim.UpdateCSIDriver(pluginName, driverNodeID, maxVolumePerNode, accessibleTopology); err != nil {
+		return fmt.Errorf("failed to update driver %q: %w", pluginName, err)
+	}
+	return nil
+}
+
+func (p *csiPlugin) VerifyExhaustedResource(spec *volume.Spec, nodeName types.NodeName) {
+	if spec == nil || spec.PersistentVolume == nil || spec.PersistentVolume.Spec.CSI == nil {
+		klog.ErrorS(nil, "Invalid volume spec for CSI", "nodeName", nodeName)
+		return
+	}
+
+	pluginName := spec.PersistentVolume.Spec.CSI.Driver
+
+	driver, err := p.getCSIDriver(pluginName)
+	if err != nil {
+		klog.ErrorS(err, "Failed to retrieve CSIDriver", "pluginName", pluginName)
+		return
+	}
+
+	period := getNodeAllocatableUpdatePeriod(driver)
+	if period == 0 {
+		return
+	}
+
+	volumeHandle := spec.PersistentVolume.Spec.CSI.VolumeHandle
+	attachmentName := getAttachmentName(volumeHandle, pluginName, string(nodeName))
+	kubeClient := p.host.GetKubeClient()
+
+	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+	defer cancel()
+
+	attachment, err := kubeClient.StorageV1().VolumeAttachments().Get(ctx, attachmentName, meta.GetOptions{})
+	if err != nil {
+		klog.ErrorS(err, "Failed to get volume attachment", "attachmentName", attachmentName)
+		return
+	}
+
+	if isResourceExhaustError(attachment) {
+		klog.V(4).InfoS("Detected ResourceExhausted error for volume", "pluginName", pluginName, "volumeHandle", volumeHandle)
+		if err := updateCSIDriver(pluginName); err != nil {
+			klog.ErrorS(err, "Failed to update CSIDriver", "pluginName", pluginName)
+		}
+	}
+}
+
+func isResourceExhaustError(attachment *storage.VolumeAttachment) bool {
+	if attachment == nil || attachment.Status.AttachError == nil {
+		return false
+	}
+	return attachment.Status.AttachError.ErrorCode != nil &&
+		*attachment.Status.AttachError.ErrorCode == int32(codes.ResourceExhausted)
 }
 
 func (h *RegistrationHandler) validateVersions(callerName, pluginName string, endpoint string, versions []string) (*utilversion.Version, error) {
@@ -191,6 +269,10 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	klog.Info(log("registrationHandler.DeRegisterPlugin request for plugin %s", pluginName))
 	if err := unregisterDriver(pluginName); err != nil {
 		klog.Error(log("registrationHandler.DeRegisterPlugin failed: %v", err))
+	}
+
+	if csiNodeUpdaterVar != nil {
+		csiNodeUpdaterVar.syncDriverUpdater(pluginName)
 	}
 }
 
@@ -228,6 +310,13 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			}
 			// We don't run the volumeAttachmentLister in the kubelet context
 			p.volumeAttachmentLister = nil
+
+			informerFactory := kletHost.GetInformerFactory()
+			if informerFactory == nil {
+				klog.Error(log("InformerFactory not found on KubeletVolumeHost"))
+			} else {
+				p.csiDriverInformer = informerFactory.Storage().V1().CSIDrivers().Informer()
+			}
 		}
 	}
 
@@ -257,17 +346,17 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 
 	// Initializing the label management channels
 	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
+	PluginHandler.csiPlugin = p
 
 	// This function prevents Kubelet from posting Ready status until CSINode
 	// is both installed and initialized
-	if err := initializeCSINode(host); err != nil {
+	if err := initializeCSINode(host, p.csiDriverInformer); err != nil {
 		return errors.New(log("failed to initialize CSINode: %v", err))
 	}
-
 	return nil
 }
 
-func initializeCSINode(host volume.VolumeHost) error {
+func initializeCSINode(host volume.VolumeHost, csiDriverInformer cache.SharedIndexInformer) error {
 	kvh, ok := host.(volume.KubeletVolumeHost)
 	if !ok {
 		klog.V(4).Info("Cast from VolumeHost to KubeletVolumeHost failed. Skipping CSINode initialization, not running on kubelet")
@@ -322,6 +411,18 @@ func initializeCSINode(host volume.VolumeHost) error {
 			klog.Fatalf("Failed to initialize CSINode after retrying: %v", err)
 		}
 	}()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) && csiNodeUpdaterVar == nil {
+		if csiDriverInformer != nil {
+			var err error
+			csiNodeUpdaterVar, err = NewCSINodeUpdater(csiDriverInformer)
+			if err != nil {
+				klog.ErrorS(err, "Failed to create CSINodeUpdater")
+			} else {
+				go csiNodeUpdaterVar.Run()
+			}
+		}
+	}
 	return nil
 }
 

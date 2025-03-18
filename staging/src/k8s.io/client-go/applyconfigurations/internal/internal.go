@@ -13572,6 +13572,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsGroupPolicy
       type:
         scalar: string
+    - name: nodeAllocatableUpdatePeriodSeconds
+      type:
+        scalar: numeric
     - name: podInfoOnMount
       type:
         scalar: boolean
@@ -13789,6 +13792,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.storage.v1.VolumeError
   map:
     fields:
+    - name: errorCode
+      type:
+        scalar: numeric
     - name: message
       type:
         scalar: string
@@ -13915,6 +13921,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.storage.v1alpha1.VolumeError
   map:
     fields:
+    - name: errorCode
+      type:
+        scalar: numeric
     - name: message
       type:
         scalar: string
@@ -13947,6 +13956,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: fsGroupPolicy
       type:
         scalar: string
+    - name: nodeAllocatableUpdatePeriodSeconds
+      type:
+        scalar: numeric
     - name: podInfoOnMount
       type:
         scalar: boolean
@@ -14186,6 +14198,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.storage.v1beta1.VolumeError
   map:
     fields:
+    - name: errorCode
+      type:
+        scalar: numeric
     - name: message
       type:
         scalar: string
