@@ -134,6 +134,10 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion 
 	}
 	featureList = append(featureList, features...)
 
+	if err := verifyAlphaFeatures(featureList); err != nil {
+		return err
+	}
+
 	sort.Slice(featureList, func(i, j int) bool {
 		return strings.ToLower(featureList[i].Name) < strings.ToLower(featureList[j].Name)
 	})
@@ -175,7 +179,7 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion 
 }
 
 func dedupeFeatureList(featureList []featureInfo) ([]featureInfo, error) {
-	if featureList == nil || len(featureList) < 1 {
+	if len(featureList) < 1 {
 		return featureList, nil
 	}
 	last := featureList[0]
@@ -257,6 +261,17 @@ func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureIn
 					name, minRemovalVer)
 			}
 
+		}
+	}
+	return nil
+}
+
+func verifyAlphaFeatures(featureList []featureInfo) error {
+	for _, f := range featureList {
+		for _, spec := range f.VersionedSpecs {
+			if spec.PreRelease == "Alpha" && spec.Default {
+				return fmt.Errorf("alpha feature %s cannot be enabled by default", f.Name)
+			}
 		}
 	}
 	return nil
