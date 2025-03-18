@@ -253,7 +253,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
+		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration, s.nodeManager)
 	}
 
 	err = s.platformSetup(ctx)
@@ -616,9 +616,6 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	serviceInformerFactory.Start(wait.NeverStop)
 
 	nodeConfig := config.NewNodeConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
-	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
-		HealthServer: s.HealthzServer,
-	})
 	nodeConfig.RegisterEventHandler(s.nodeManager)
 	nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.nodeInformer, s.Config.ConfigSyncPeriod.Duration)
 	nodeTopologyConfig.RegisterEventHandler(s.Proxier)

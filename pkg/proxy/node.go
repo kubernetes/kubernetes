@@ -22,40 +22,21 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
-
-// NodeEligibleHandler handles the life cycle of the Node's eligibility, as
-// determined by the health server for directing load balancer traffic.
-type NodeEligibleHandler struct {
-	HealthServer *healthcheck.ProxyHealthServer
-}
-
-var _ config.NodeHandler = &NodeEligibleHandler{}
-
-// OnNodeAdd is a handler for Node creates.
-func (n *NodeEligibleHandler) OnNodeAdd(node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeUpdate is a handler for Node updates.
-func (n *NodeEligibleHandler) OnNodeUpdate(_, node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeDelete is a handler for Node deletes.
-func (n *NodeEligibleHandler) OnNodeDelete(node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeSynced is a handler for Node syncs.
-func (n *NodeEligibleHandler) OnNodeSynced() {}
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs, handles node watch events
 // and crashes kube-proxy if there are any changes in NodeIPs.
 type NodeManager struct {
+	mu            sync.Mutex
+	node          *v1.Node
 	nodeIPs       []net.IP
 	podCIDRs      []string
 	watchPodCIDRs bool
@@ -116,6 +97,7 @@ func newNodeManager(ctx context.Context, nodeLister corelisters.NodeLister, node
 	}
 
 	return &NodeManager{
+		node:          node,
 		nodeIPs:       nodeIPs,
 		podCIDRs:      podCIDRs,
 		watchPodCIDRs: watchPodCIDRs,
@@ -146,6 +128,11 @@ func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
 
 // onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
 func (n *NodeManager) onNodeChange(node *v1.Node) {
+	// update the node object
+	n.mu.Lock()
+	n.node = node
+	n.mu.Unlock()
+
 	// We exit whenever there is a change in PodCIDRs detected initially, and PodCIDRs received
 	// on node watch event if the node manager is configured with watchPodCIDRs.
 	if n.watchPodCIDRs {
@@ -183,3 +170,10 @@ func (n *NodeManager) OnNodeDelete(node *v1.Node) {
 
 // OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
 func (n *NodeManager) OnNodeSynced() {}
+
+// Node returns the latest copy of node object.
+func (n *NodeManager) Node() *v1.Node {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.node
+}
