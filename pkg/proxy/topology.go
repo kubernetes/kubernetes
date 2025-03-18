@@ -191,15 +191,3 @@ func filterEndpoints(endpoints []Endpoint, predicate func(Endpoint) bool) []Endp
 
 	return filteredEndpoints
 }
-
-// ExtractTopologyLabels consumes node labels and extract topology related labels if present.
-func ExtractTopologyLabels(nodeLabels map[string]string) map[string]string {
-	topologyLabels := make(map[string]string)
-	if zone, ok := nodeLabels[v1.LabelTopologyZone]; ok {
-		topologyLabels[v1.LabelTopologyZone] = zone
-	}
-	if region, ok := nodeLabels[v1.LabelTopologyRegion]; ok {
-		topologyLabels[v1.LabelTopologyRegion] = region
-	}
-	return topologyLabels
-}

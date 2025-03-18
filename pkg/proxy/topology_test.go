@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -376,52 +374,6 @@ func TestCategorizeEndpoints(t *testing.T) {
 			if expectedHasAnyEndpoints != hasAnyEndpoints {
 				t.Errorf("expected hasAnyEndpoints=%v, got %v", expectedHasAnyEndpoints, hasAnyEndpoints)
 			}
-		})
-	}
-}
-
-func TestExtractTopologyLabels(t *testing.T) {
-	testCases := []struct {
-		name     string
-		labels   map[string]string
-		expected map[string]string
-	}{
-		{
-			name: "no topology labels",
-			labels: map[string]string{
-				v1.LabelInstanceType: "m4.large",
-				v1.LabelOSStable:     "linux",
-			},
-			expected: map[string]string{},
-		},
-		{
-			name: "zone topology label",
-			labels: map[string]string{
-				v1.LabelInstanceType: "c6.large",
-				v1.LabelOSStable:     "windows",
-				v1.LabelTopologyZone: "us-west-2a",
-			},
-			expected: map[string]string{
-				v1.LabelTopologyZone: "us-west-2a",
-			},
-		},
-		{
-			name: "zone and region topology labels",
-			labels: map[string]string{
-				v1.LabelInstanceType:   "m3.medium",
-				v1.LabelOSStable:       "windows",
-				v1.LabelTopologyRegion: "us-east-1",
-				v1.LabelTopologyZone:   "us-east-1b",
-			},
-			expected: map[string]string{
-				v1.LabelTopologyRegion: "us-east-1",
-				v1.LabelTopologyZone:   "us-east-1b",
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			require.Equal(t, tc.expected, ExtractTopologyLabels(tc.labels))
 		})
 	}
 }
