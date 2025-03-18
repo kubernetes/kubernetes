@@ -894,3 +894,53 @@ func TestVerifyFeatureRemoval(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyAlphaFeatures(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureList    []featureInfo
+		expectErr      bool
+		expectedErrMsg string
+	}{
+		{
+			name: "no alpha features",
+			featureList: []featureInfo{
+				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Beta"}}},
+				{Name: "FeatureC", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "GA", LockToDefault: true}}},
+			},
+		},
+		{
+			name: "alpha feature disabled",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha", Default: false}}},
+				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Beta"}}},
+			},
+		},
+		{
+			name: "alpha feature enabled",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha", Default: true}}},
+				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Beta"}}},
+			},
+			expectErr:      true,
+			expectedErrMsg: "alpha feature FeatureA cannot be enabled by default",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := verifyAlphaFeatures(tc.featureList)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				if !strings.Contains(err.Error(), tc.expectedErrMsg) {
+					t.Fatalf("expected error message to contain %q, got %q", tc.expectedErrMsg, err.Error())
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
