@@ -19,6 +19,7 @@ package eviction
 import (
 	"context"
 	"fmt"
+	goruntime "runtime"
 	"testing"
 	"time"
 
@@ -189,11 +190,20 @@ func makeMemoryStats(nodeAvailableBytes string, podStats map[*v1.Pod]statsapi.Po
 				WorkingSetBytes: &WorkingSetBytes,
 			},
 			SystemContainers: []statsapi.ContainerStats{
+				// Used for memory signal observations on linux
 				{
 					Name: statsapi.SystemContainerPods,
 					Memory: &statsapi.MemoryStats{
 						AvailableBytes:  &availableBytes,
 						WorkingSetBytes: &WorkingSetBytes,
+					},
+				},
+				// Used for memory signal observations on windows
+				{
+					Name: statsapi.SystemContainerWindowsGlobalCommitMemory,
+					Memory: &statsapi.MemoryStats{
+						AvailableBytes: &availableBytes,
+						UsageBytes:     &WorkingSetBytes,
 					},
 				},
 			},
@@ -354,6 +364,9 @@ func TestMemoryPressure_VerifyPodStatus(t *testing.T) {
 }
 
 func TestPIDPressure_VerifyPodStatus(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("PID pressure is not supported on Windows")
+	}
 	testCases := map[string]struct {
 		wantPodStatus v1.PodStatus
 	}{

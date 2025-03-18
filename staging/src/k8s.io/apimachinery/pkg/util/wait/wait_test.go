@@ -682,7 +682,7 @@ func TestBackoff_Step(t *testing.T) {
 				initial = nil
 			}
 			t.Run(fmt.Sprintf("%#v seed=%d", initial, seed), func(t *testing.T) {
-				rand.Seed(seed)
+				jitterRand = rand.New(rand.NewSource(seed)).Float64
 				for i := 0; i < len(tt.want); i++ {
 					got := initial.Step()
 					t.Logf("[%d]=%s", i, got)

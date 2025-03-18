@@ -24,17 +24,26 @@ import (
 type APIResourceConfigSource interface {
 	ResourceEnabled(resource schema.GroupVersionResource) bool
 	AnyResourceForGroupEnabled(group string) bool
+	ResourceExplicitlyEnabled(resource schema.GroupVersionResource) bool
+	VersionExplicitlyEnabled(version schema.GroupVersion) bool
 }
 
 var _ APIResourceConfigSource = &ResourceConfig{}
 
 type ResourceConfig struct {
-	GroupVersionConfigs map[schema.GroupVersion]bool
-	ResourceConfigs     map[schema.GroupVersionResource]bool
+	GroupVersionConfigs         map[schema.GroupVersion]bool
+	ResourceConfigs             map[schema.GroupVersionResource]bool
+	ExplicitGroupVersionConfigs map[schema.GroupVersion]bool
+	ExplicitResourceConfigs     map[schema.GroupVersionResource]bool
 }
 
 func NewResourceConfig() *ResourceConfig {
-	return &ResourceConfig{GroupVersionConfigs: map[schema.GroupVersion]bool{}, ResourceConfigs: map[schema.GroupVersionResource]bool{}}
+	return &ResourceConfig{
+		GroupVersionConfigs:         map[schema.GroupVersion]bool{},
+		ResourceConfigs:             map[schema.GroupVersionResource]bool{},
+		ExplicitGroupVersionConfigs: map[schema.GroupVersion]bool{},
+		ExplicitResourceConfigs:     map[schema.GroupVersionResource]bool{},
+	}
 }
 
 // DisableMatchingVersions disables all group/versions for which the matcher function returns true.
@@ -77,6 +86,7 @@ func (o *ResourceConfig) removeMatchingResourcePreferences(matcher func(gvr sche
 	}
 	for _, k := range keysToRemove {
 		delete(o.ResourceConfigs, k)
+		delete(o.ExplicitResourceConfigs, k)
 	}
 }
 
@@ -91,6 +101,13 @@ func (o *ResourceConfig) DisableVersions(versions ...schema.GroupVersion) {
 	}
 }
 
+func (o *ResourceConfig) ExplicitlyDisableVersions(versions ...schema.GroupVersion) {
+	for _, version := range versions {
+		o.ExplicitGroupVersionConfigs[version] = false
+	}
+	o.DisableVersions(versions...)
+}
+
 // EnableVersions enables all resources in a given groupVersion.
 // This will remove any preferences previously set on individual resources.
 func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
@@ -103,10 +120,16 @@ func (o *ResourceConfig) EnableVersions(versions ...schema.GroupVersion) {
 
 }
 
+func (o *ResourceConfig) ExplicitlyEnableVersions(versions ...schema.GroupVersion) {
+	for _, version := range versions {
+		o.ExplicitGroupVersionConfigs[version] = true
+	}
+	o.EnableVersions(versions...)
+}
+
 // TODO this must be removed and we enable/disable individual resources.
 func (o *ResourceConfig) versionEnabled(version schema.GroupVersion) bool {
-	enabled, _ := o.GroupVersionConfigs[version]
-	return enabled
+	return o.GroupVersionConfigs[version]
 }
 
 func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResource) {
@@ -115,10 +138,24 @@ func (o *ResourceConfig) DisableResources(resources ...schema.GroupVersionResour
 	}
 }
 
+func (o *ResourceConfig) ExplicitlyDisableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		o.ExplicitResourceConfigs[resource] = false
+	}
+	o.DisableResources(resources...)
+}
+
 func (o *ResourceConfig) EnableResources(resources ...schema.GroupVersionResource) {
 	for _, resource := range resources {
 		o.ResourceConfigs[resource] = true
 	}
+}
+
+func (o *ResourceConfig) ExplicitlyEnableResources(resources ...schema.GroupVersionResource) {
+	for _, resource := range resources {
+		o.ExplicitResourceConfigs[resource] = true
+	}
+	o.EnableResources(resources...)
 }
 
 func (o *ResourceConfig) ResourceEnabled(resource schema.GroupVersionResource) bool {
@@ -149,5 +186,21 @@ func (o *ResourceConfig) AnyResourceForGroupEnabled(group string) bool {
 		}
 	}
 
+	return false
+}
+
+func (o *ResourceConfig) ResourceExplicitlyEnabled(resource schema.GroupVersionResource) bool {
+	resourceEnabled, explicitlySet := o.ExplicitResourceConfigs[resource]
+	if explicitlySet {
+		return resourceEnabled
+	}
+	return false
+}
+
+func (o *ResourceConfig) VersionExplicitlyEnabled(version schema.GroupVersion) bool {
+	versionEnabled, explicitlySet := o.ExplicitGroupVersionConfigs[version]
+	if explicitlySet {
+		return versionEnabled
+	}
 	return false
 }

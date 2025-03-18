@@ -471,7 +471,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
-			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoT(), func(req *http.Request) bool {
+			testSrv := httptest.NewServer(utilnettesting.NewHTTPProxyHandler(ginkgo.GinkgoTB(), func(req *http.Request) bool {
 				fmt.Fprintf(&proxyLogs, "Accepting %s to %s\n", req.Method, req.Host)
 				return true
 			}))
@@ -498,6 +498,16 @@ var _ = SIGDescribe("Kubectl client", func() {
 				if !strings.Contains(proxyLog, expectedProxyLog) {
 					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
 				}
+			}
+		})
+
+		// https://issues.k8s.io/128314
+		f.It(f.WithSlow(), "should support exec idle connections", func(ctx context.Context) {
+			ginkgo.By("executing a command in the container")
+
+			execOutput := e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "/bin/sh", "-c", "sleep 320 && echo running in container")
+			if expected, got := "running in container", strings.TrimSpace(execOutput); expected != got {
+				framework.Failf("Unexpected kubectl exec output. Wanted %q, got %q", expected, got)
 			}
 		})
 

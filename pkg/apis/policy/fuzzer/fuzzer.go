@@ -17,7 +17,7 @@ limitations under the License.
 package fuzzer
 
 import (
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -26,8 +26,8 @@ import (
 // Funcs returns the fuzzer functions for the policy api group.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(s *policy.PodDisruptionBudgetStatus, c fuzz.Continue) {
-			c.FuzzNoCustom(s) // fuzz self without calling this function again
+		func(s *policy.PodDisruptionBudgetStatus, c randfill.Continue) {
+			c.FillNoCustom(s) // fuzz self without calling this function again
 			s.DisruptionsAllowed = int32(c.Rand.Intn(2))
 		},
 	}

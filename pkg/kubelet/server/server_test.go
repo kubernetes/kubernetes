@@ -44,6 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -58,6 +59,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/kubelet/pkg/cri/streaming"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
@@ -372,6 +374,7 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 		fw.fakeKubelet,
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		[]healthz.HealthChecker{},
+		flagz.NamedFlagSetsReader{},
 		fw.fakeAuth,
 		kubeCfg,
 	)
@@ -575,10 +578,77 @@ func TestAuthzCoverage(t *testing.T) {
 	}
 }
 
+func TestInstallAuthNotRequiredHandlers(t *testing.T) {
+	fw := newServerTestWithDebug(false, nil)
+	defer fw.testHTTPServer.Close()
+
+	// No new handlers should be added to this list.
+	allowedAuthNotRequiredHandlers := sets.NewString(
+		"/healthz",
+		"/healthz/log",
+		"/healthz/ping",
+		"/healthz/syncloop",
+		"/metrics",
+		"/metrics/slis",
+		"/metrics/cadvisor",
+		"/metrics/probes",
+		"/metrics/resource",
+		"/pods/",
+		"/stats/",
+		"/stats/summary",
+	)
+
+	// These handlers are explicitly disabled.
+	debuggingDisabledHandlers := sets.NewString(
+		"/run/",
+		"/exec/",
+		"/attach/",
+		"/portForward/",
+		"/containerLogs/",
+		"/runningpods/",
+		"/debug/pprof/",
+		"/logs/",
+	)
+	allowedAuthNotRequiredHandlers.Insert(debuggingDisabledHandlers.UnsortedList()...)
+
+	// Test all the non-web-service handlers
+	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
+		if !allowedAuthNotRequiredHandlers.Has(path) {
+			t.Errorf("New handler %q must require auth", path)
+		}
+	}
+
+	// Test all the generated web-service paths
+	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
+		for _, r := range ws.Routes() {
+			if !allowedAuthNotRequiredHandlers.Has(r.Path) {
+				t.Errorf("New handler %q must require auth", r.Path)
+			}
+		}
+	}
+
+	// Ensure the disabled handlers are in fact disabled.
+	for path := range debuggingDisabledHandlers {
+		for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE"} {
+			t.Run(method+":"+path, func(t *testing.T) {
+				req, err := http.NewRequest(method, fw.testHTTPServer.URL+path, nil)
+				require.NoError(t, err)
+
+				resp, err := http.DefaultClient.Do(req)
+				require.NoError(t, err)
+				defer resp.Body.Close() //nolint:errcheck
+
+				assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+			})
+		}
+	}
+}
+
 func TestAuthFilters(t *testing.T) {
 	// Enable features.ContainerCheckpoint during test
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerCheckpoint, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
 
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
@@ -1662,9 +1732,11 @@ func TestMetricBuckets(t *testing.T) {
 		"stats":                           {url: "/stats/", bucket: "stats"},
 		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
 		"statusz":                         {url: "/statusz", bucket: "statusz"},
+		"/flagz":                          {url: "/flagz", bucket: "flagz"},
 		"invalid path":                    {url: "/junk", bucket: "other"},
 		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
 	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
@@ -1893,8 +1965,8 @@ func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
 	}
 	resourceAnalyzer := stats.NewResourceAnalyzer(nil, time.Minute, &record.FakeRecorder{})
 
-	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
-	server2 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, nil, nil)
+	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
+	server2 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)
 
 	// Check if both servers registered the /metrics/slis endpoint
 	assert.Contains(t, server1.restfulCont.RegisteredHandlePaths(), "/metrics/slis", "First server should register /metrics/slis")

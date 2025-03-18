@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Microsoft/hnslib/hcn"
+
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1201,6 +1202,7 @@ func TestEndpointSlice(t *testing.T) {
 
 func TestNoopEndpointSlice(t *testing.T) {
 	p := Proxier{}
+	p.endpointsChanges = proxy.NewEndpointsChangeTracker(v1.IPv4Protocol, "", nil, nil)
 	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
 	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
 	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})

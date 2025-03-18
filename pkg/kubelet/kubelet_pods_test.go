@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -55,7 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
-	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -2619,7 +2619,6 @@ func TestPodPhaseWithRestartAlwaysRestartableInitContainers(t *testing.T) {
 			"all regular containers succeeded and restartable init container succeeded with restart always, but the pod is terminal",
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
@@ -2711,7 +2710,6 @@ func TestPodPhaseWithRestartAlwaysAndPodHasRun(t *testing.T) {
 			"regular init container is succeeded, restartable init container and regular containers are both running",
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
@@ -3115,7 +3113,6 @@ func TestPodPhaseWithRestartNeverRestartableInitContainers(t *testing.T) {
 			"backoff crashloop with non-zero restartable init container, main containers succeeded",
 		},
 	}
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	for _, test := range tests {
 		statusInfo := test.pod.Status.InitContainerStatuses
 		statusInfo = append(statusInfo, test.pod.Status.ContainerStatuses...)
@@ -3824,6 +3821,9 @@ func Test_generateAPIPodStatus(t *testing.T) {
 }
 
 func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testContainerName := "ctr0"
 	testContainerID := kubecontainer.ContainerID{Type: "test", ID: testContainerName}
@@ -3881,7 +3881,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 							AllocatedResources: CPU1AndMem1GAndStorage2GAndCustomResource,
 						},
 					},
-					Resize: "InProgress",
 				},
 			},
 		},
@@ -3912,7 +3911,6 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 							AllocatedResources: CPU1AndMem1GAndStorage2G,
 						},
 					},
-					Resize: "InProgress",
 				},
 			},
 		},
@@ -3924,12 +3922,12 @@ func Test_generateAPIPodStatusForInPlaceVPAEnabled(t *testing.T) {
 			kl := testKubelet.kubelet
 
 			oldStatus := test.pod.Status
-			kl.statusManager = status.NewFakeManager()
 			kl.statusManager.SetPodStatus(test.pod, oldStatus)
 			actual := kl.generateAPIPodStatus(test.pod, &testKubecontainerPodStatus /* criStatus */, false /* test.isPodTerminal */)
-
-			if actual.Resize != "" {
-				t.Fatalf("Unexpected Resize status: %s", actual.Resize)
+			for _, c := range actual.Conditions {
+				if c.Type == v1.PodResizePending || c.Type == v1.PodResizeInProgress {
+					t.Fatalf("unexpected resize status: %v", c)
+				}
 			}
 		})
 	}
@@ -4583,6 +4581,12 @@ func TestSortPodIPs(t *testing.T) {
 			podIPs:      []string{"10.0.0.1", "10.0.0.2", "fd01::1234", "10.0.0.3", "fd01::5678"},
 			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
 		},
+		{
+			name:        "Badly-formatted IPs from CRI",
+			nodeIP:      "",
+			podIPs:      []string{"010.000.000.001", "fd01:0:0:0:0:0:0:1234"},
+			expectedIPs: []string{"10.0.0.1", "fd01::1234"},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -4638,6 +4642,9 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 }
 
 func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 
 	nowTime := time.Now()
@@ -4717,7 +4724,6 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	idx := 0
 	for tdesc, tc := range map[string]struct {
@@ -5083,7 +5089,8 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 			} else {
 				tPod.Spec.Containers[0].Resources = tc.Resources
 			}
-			kubelet.statusManager.SetPodAllocation(tPod)
+			err := kubelet.allocationManager.SetAllocatedResources(tPod)
+			require.NoError(t, err)
 			resources := tc.ActualResources
 			if resources == nil {
 				resources = &kubecontainer.ContainerResources{
@@ -5170,7 +5177,6 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.statusManager = status.NewFakeManager()
 
 	for tdesc, tc := range map[string]struct {
 		testPodStatus           *kubecontainer.PodStatus
@@ -6670,243 +6676,5 @@ func TestResolveRecursiveReadOnly(t *testing.T) {
 		} else {
 			assert.ErrorContains(t, err, tc.expectedErr)
 		}
-	}
-}
-
-func TestAllocatedResourcesMatchStatus(t *testing.T) {
-	tests := []struct {
-		name               string
-		allocatedResources v1.ResourceRequirements
-		statusResources    *kubecontainer.ContainerResources
-		statusTerminated   bool
-		expectMatch        bool
-	}{{
-		name: "guaranteed pod: match",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
-			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
-			MemoryLimit: resource.NewScaledQuantity(100, 6),
-		},
-		expectMatch: true,
-	}, {
-		name: "guaranteed pod: cpu request mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest:  resource.NewMilliQuantity(50, resource.DecimalSI),
-			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
-			MemoryLimit: resource.NewScaledQuantity(100, 6),
-		},
-		expectMatch: false,
-	}, {
-		name: "guaranteed pod: cpu limit mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
-			CPULimit:    resource.NewMilliQuantity(50, resource.DecimalSI),
-			MemoryLimit: resource.NewScaledQuantity(100, 6),
-		},
-		expectMatch: false,
-	}, {
-		name: "guaranteed pod: memory limit mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
-			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
-			MemoryLimit: resource.NewScaledQuantity(50, 6),
-		},
-		expectMatch: false,
-	}, {
-		name: "guaranteed pod: terminated mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU:    resource.MustParse("100m"),
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest:  resource.NewMilliQuantity(100, resource.DecimalSI),
-			CPULimit:    resource.NewMilliQuantity(100, resource.DecimalSI),
-			MemoryLimit: resource.NewScaledQuantity(50, 6),
-		},
-		statusTerminated: true,
-		expectMatch:      true,
-	}, {
-		name: "burstable: no cpu request",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
-		},
-		expectMatch: true,
-	}, {
-		name: "burstable: min cpu request",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100M"),
-				v1.ResourceCPU:    resource.MustParse("2m"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
-		},
-		expectMatch: true,
-	}, {
-		name: "burstable: below min cpu request",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100M"),
-				v1.ResourceCPU:    resource.MustParse("1m"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
-		},
-		expectMatch: true,
-	}, {
-		name: "burstable: min cpu limit",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("10m"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("10m"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(10, resource.DecimalSI),
-			CPULimit:   resource.NewMilliQuantity(10, resource.DecimalSI),
-		},
-		expectMatch: true,
-	}, {
-		name: "burstable: below min cpu limit",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("5m"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("5m"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(5, resource.DecimalSI),
-			CPULimit:   resource.NewMilliQuantity(10, resource.DecimalSI),
-		},
-		expectMatch: true,
-	}, {
-		name:               "best effort",
-		allocatedResources: v1.ResourceRequirements{},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
-		},
-		expectMatch: true,
-	}, {
-		name: "nil status resources: cpu request mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("100m"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{},
-		expectMatch:     false,
-	}, {
-		name: "nil status resources: cpu limit mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Requests: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("100m"),
-			},
-			Limits: v1.ResourceList{
-				v1.ResourceCPU: resource.MustParse("100m"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{
-			CPURequest: resource.NewMilliQuantity(2, resource.DecimalSI),
-		},
-		expectMatch: false,
-	}, {
-		name: "nil status resources: memory limit mismatch",
-		allocatedResources: v1.ResourceRequirements{
-			Limits: v1.ResourceList{
-				v1.ResourceMemory: resource.MustParse("100M"),
-			},
-		},
-		statusResources: &kubecontainer.ContainerResources{},
-		expectMatch:     false,
-	}}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			allocatedPod := v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test",
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{{
-						Name:      "c",
-						Resources: test.allocatedResources,
-					}},
-				},
-			}
-			state := kubecontainer.ContainerStateRunning
-			if test.statusTerminated {
-				state = kubecontainer.ContainerStateExited
-			}
-			podStatus := &kubecontainer.PodStatus{
-				Name: "test",
-				ContainerStatuses: []*kubecontainer.Status{
-					{
-						Name:      "c",
-						State:     state,
-						Resources: test.statusResources,
-					},
-				},
-			}
-
-			match := allocatedResourcesMatchStatus(&allocatedPod, podStatus)
-			assert.Equal(t, test.expectMatch, match)
-		})
 	}
 }

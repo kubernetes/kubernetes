@@ -199,7 +199,7 @@ func TestSplitYAMLDocuments(t *testing.T) {
 	for _, rt := range tests {
 		t.Run(rt.name, func(t2 *testing.T) {
 
-			gvkmap, err := SplitYAMLDocuments(rt.fileContents)
+			gvkmap, err := SplitConfigDocuments(rt.fileContents)
 			if (err != nil) != rt.expectedErr {
 				t2.Errorf("expected error: %t, actual: %t", rt.expectedErr, err != nil)
 			}

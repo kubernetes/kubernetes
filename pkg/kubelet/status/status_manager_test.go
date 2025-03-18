@@ -19,7 +19,6 @@ package status
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -29,13 +28,14 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -43,7 +43,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
-	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -92,13 +91,7 @@ func newTestManager(kubeClient clientset.Interface) *manager {
 	podManager := kubepod.NewBasicPodManager()
 	podManager.(mutablePodManager).AddPod(getTestPod())
 	podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
-	testRootDir := ""
-	if tempDir, err := os.MkdirTemp("", "kubelet_test."); err != nil {
-		return nil
-	} else {
-		testRootDir = tempDir
-	}
-	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, testRootDir).(*manager)
+	return NewManager(kubeClient, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 }
 
 func generateRandomMessage() string {
@@ -1088,7 +1081,7 @@ func TestTerminatePod_DefaultUnknownStatus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
-			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, "").(*manager)
+			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 
 			original := tc.pod.DeepCopy()
 			syncer.SetPodStatus(original, original.Status)
@@ -1174,7 +1167,7 @@ func TestTerminatePod_EnsurePodPhaseIsTerminal(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := util.NewPodStartupLatencyTracker()
-			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker, "").(*manager)
+			syncer := NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker).(*manager)
 
 			pod := getTestPod()
 			pod.Status = tc.status
@@ -2033,103 +2026,104 @@ func TestMergePodStatus(t *testing.T) {
 			}
 		})
 	}
-
 }
 
-func TestUpdatePodFromAllocation(t *testing.T) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			UID:       "12345",
-			Name:      "test",
-			Namespace: "default",
+func TestPodResizeConditions(t *testing.T) {
+	m := NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, util.NewPodStartupLatencyTracker())
+	podUID := types.UID("12345")
+
+	testCases := []struct {
+		name       string
+		updateFunc func(types.UID)
+		expected   []*v1.PodCondition
+	}{
+		{
+			name:       "initial empty conditions",
+			updateFunc: nil,
+			expected:   nil,
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{{
-				Name: "c1",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
-					},
+		{
+			name: "set pod resize in progress condition with reason and message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message")
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizeInProgress,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
 				},
-			}, {
-				Name: "c2",
-				Resources: v1.ResourceRequirements{
-					Requests: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
-					},
-					Limits: v1.ResourceList{
-						v1.ResourceCPU:    *resource.NewMilliQuantity(700, resource.DecimalSI),
-						v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
-					},
+			},
+		},
+		{
+			name: "set pod resize in progress condition without reason and message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizeInProgressCondition(podUID, "", "")
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
 				},
-			}},
+			},
+		},
+		{
+			name: "set pod resize pending condition with reason and message",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizePendingCondition(podUID, "some-reason", "some-message")
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
+				},
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: v1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "clear pod resize in progress condition",
+			updateFunc: func(podUID types.UID) {
+				m.ClearPodResizeInProgressCondition(podUID)
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
+				},
+			},
+		},
+		{
+			name: "clear pod resize pending condition",
+			updateFunc: func(podUID types.UID) {
+				m.ClearPodResizePendingCondition(podUID)
+			},
+			expected: nil,
 		},
 	}
 
-	resizedPod := pod.DeepCopy()
-	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(200, resource.DecimalSI)
-
-	tests := []struct {
-		name         string
-		pod          *v1.Pod
-		allocs       state.PodResourceAllocation
-		expectPod    *v1.Pod
-		expectUpdate bool
-	}{{
-		name: "steady state",
-		pod:  pod,
-		allocs: state.PodResourceAllocation{
-			string(pod.UID): map[string]v1.ResourceRequirements{
-				"c1": *pod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
-			},
-		},
-		expectUpdate: false,
-	}, {
-		name:         "no allocations",
-		pod:          pod,
-		allocs:       state.PodResourceAllocation{},
-		expectUpdate: false,
-	}, {
-		name: "missing container allocation",
-		pod:  pod,
-		allocs: state.PodResourceAllocation{
-			string(pod.UID): map[string]v1.ResourceRequirements{
-				"c2": *pod.Spec.Containers[1].Resources.DeepCopy(),
-			},
-		},
-		expectUpdate: false,
-	}, {
-		name: "resized container",
-		pod:  pod,
-		allocs: state.PodResourceAllocation{
-			string(pod.UID): map[string]v1.ResourceRequirements{
-				"c1": *resizedPod.Spec.Containers[0].Resources.DeepCopy(),
-				"c2": *resizedPod.Spec.Containers[1].Resources.DeepCopy(),
-			},
-		},
-		expectUpdate: true,
-		expectPod:    resizedPod,
-	}}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			pod := test.pod.DeepCopy()
-			allocatedPod, updated := updatePodFromAllocation(pod, test.allocs)
-
-			if test.expectUpdate {
-				assert.True(t, updated, "updated")
-				assert.Equal(t, test.expectPod, allocatedPod)
-				assert.NotEqual(t, pod, allocatedPod)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.updateFunc != nil {
+				tc.updateFunc(podUID)
+			}
+			resizeConditions := m.GetPodResizeConditions(podUID)
+			if tc.expected == nil {
+				require.Nil(t, resizeConditions)
 			} else {
-				assert.False(t, updated, "updated")
-				assert.Same(t, pod, allocatedPod)
+				// ignore the last probe and transition times
+				for _, c := range resizeConditions {
+					c.LastProbeTime = metav1.Time{}
+					c.LastTransitionTime = metav1.Time{}
+				}
+				require.Equal(t, tc.expected, resizeConditions)
 			}
 		})
 	}

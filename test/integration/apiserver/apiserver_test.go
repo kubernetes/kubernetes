@@ -33,7 +33,9 @@ import (
 	"testing"
 	"time"
 
+	guuid "github.com/google/uuid"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -56,10 +58,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -70,7 +74,6 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/pager"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	utilversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -258,7 +261,7 @@ func TestCacheControl(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -304,7 +307,7 @@ func TestHSTS(t *testing.T) {
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -386,125 +389,136 @@ func TestListOptions(t *testing.T) {
 
 	for _, watchCacheEnabled := range []bool{true, false} {
 		t.Run(fmt.Sprintf("watchCacheEnabled=%t", watchCacheEnabled), func(t *testing.T) {
-			tCtx := ktesting.Init(t)
-
-			var storageTransport *storagebackend.TransportConfig
-			clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
-				ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-					opts.Etcd.EnableWatchCache = watchCacheEnabled
-					storageTransport = &opts.Etcd.StorageConfig.Transport
-				},
-			})
-			defer tearDownFn()
-
-			ns := framework.CreateNamespaceOrDie(clientSet, "list-options", t)
-			defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
-
-			rsClient := clientSet.AppsV1().ReplicaSets(ns.Name)
-
-			var compactedRv, oldestUncompactedRv string
-			for i := 0; i < 15; i++ {
-				rs := newRS(ns.Name)
-				rs.Name = fmt.Sprintf("test-%d", i)
-				created, err := rsClient.Create(tCtx, rs, metav1.CreateOptions{})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if i == 0 {
-					compactedRv = created.ResourceVersion // We compact this first resource version below
-				}
-				// delete the first 5, and then compact them
-				if i < 5 {
-					var zero int64
-					if err := rsClient.Delete(tCtx, rs.Name, metav1.DeleteOptions{GracePeriodSeconds: &zero}); err != nil {
-						t.Fatal(err)
-					}
-					oldestUncompactedRv = created.ResourceVersion
-				}
-			}
-
-			// compact some of the revision history in etcd so we can test "too old" resource versions
-			rawClient, kvClient, err := integration.GetEtcdClients(*storageTransport)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
-			// close the client (which we can do by closing rawClient).
-			defer rawClient.Close()
-
-			revision, err := strconv.Atoi(oldestUncompactedRv)
-			if err != nil {
-				t.Fatal(err)
-			}
-			_, err = kvClient.Compact(tCtx, int64(revision))
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			listObj, err := rsClient.List(tCtx, metav1.ListOptions{
-				Limit: 6,
-			})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			validContinueToken := listObj.Continue
-
-			// test all combinations of these, for both watch cache enabled and disabled:
-			limits := []int64{0, 6}
-			continueTokens := []string{"", validContinueToken, invalidContinueToken}
-			rvs := []string{"", "0", compactedRv, invalidResourceVersion}
-			rvMatches := []metav1.ResourceVersionMatch{
-				"",
-				metav1.ResourceVersionMatchNotOlderThan,
-				metav1.ResourceVersionMatchExact,
-				invalidResourceVersionMatch,
-			}
-
-			for _, limit := range limits {
-				for _, continueToken := range continueTokens {
-					for _, rv := range rvs {
-						for _, rvMatch := range rvMatches {
-							rvName := ""
-							switch rv {
-							case "":
-								rvName = "empty"
-							case "0":
-								rvName = "0"
-							case compactedRv:
-								rvName = "compacted"
-							case invalidResourceVersion:
-								rvName = "invalid"
-							default:
-								rvName = "unknown"
-							}
-
-							continueName := ""
-							switch continueToken {
-							case "":
-								continueName = "empty"
-							case validContinueToken:
-								continueName = "valid"
-							case invalidContinueToken:
-								continueName = "invalid"
-							default:
-								continueName = "unknown"
-							}
-
-							name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueName, rvName, rvMatch)
-							t.Run(name, func(t *testing.T) {
-								opts := metav1.ListOptions{
-									ResourceVersion:      rv,
-									ResourceVersionMatch: rvMatch,
-									Continue:             continueToken,
-									Limit:                limit,
-								}
-								testListOptionsCase(t, rsClient, watchCacheEnabled, opts, compactedRv)
-							})
-						}
-					}
-				}
-			}
+			testListOptions(t, watchCacheEnabled)
 		})
+	}
+}
+
+func testListOptions(t *testing.T, watchCacheEnabled bool) {
+	tCtx := ktesting.Init(t)
+	prefix := path.Join("/", guuid.New().String(), "registry")
+	etcdConfig := storagebackend.Config{
+		Prefix:    prefix,
+		Transport: storagebackend.TransportConfig{ServerList: []string{framework.GetEtcdURL()}},
+	}
+	rawClient, kvClient, err := integration.GetEtcdClients(etcdConfig.Transport)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// kvClient is a wrapper around rawClient and to avoid leaking goroutines we need to
+	// close the client (which we can do by closing rawClient).
+	defer func() {
+		err := rawClient.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	var compactedRv string
+	var oldestUncompactedRv int64
+	for i := 0; i < 15; i++ {
+		rs := newRS("default")
+		rs.Name = fmt.Sprintf("test-%d", i)
+		serializer := protobuf.NewSerializer(nil, nil)
+		buf := bytes.Buffer{}
+		err := serializer.Encode(rs, &buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := prefix + "/replicasets/default/" + rs.Name
+
+		resp, err := kvClient.Put(tCtx, key, buf.String())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			compactedRv = strconv.FormatInt(resp.Header.Revision, 10) // We compact this first resource version below
+		}
+		// delete the first 5, and then compact them
+		if i < 5 {
+			if _, err := kvClient.Delete(tCtx, key); err != nil {
+				t.Fatal(err)
+			}
+			oldestUncompactedRv = resp.Header.Revision
+		}
+	}
+	_, err = kvClient.Compact(tCtx, int64(oldestUncompactedRv))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientSet, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
+		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
+			opts.Etcd.EnableWatchCache = watchCacheEnabled
+			opts.Etcd.StorageConfig = etcdConfig
+		},
+	})
+	defer tearDownFn()
+
+	rsClient := clientSet.AppsV1().ReplicaSets("default")
+
+	listObj, err := rsClient.List(tCtx, metav1.ListOptions{
+		Limit: 6,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	validContinueToken := listObj.Continue
+
+	// test all combinations of these, for both watch cache enabled and disabled:
+	limits := []int64{0, 6}
+	continueTokens := []string{"", validContinueToken, invalidContinueToken}
+	rvs := []string{"", "0", compactedRv, invalidResourceVersion}
+	rvMatches := []metav1.ResourceVersionMatch{
+		"",
+		metav1.ResourceVersionMatchNotOlderThan,
+		metav1.ResourceVersionMatchExact,
+		invalidResourceVersionMatch,
+	}
+
+	for _, limit := range limits {
+		for _, continueToken := range continueTokens {
+			for _, rv := range rvs {
+				for _, rvMatch := range rvMatches {
+					rvName := ""
+					switch rv {
+					case "":
+						rvName = "empty"
+					case "0":
+						rvName = "0"
+					case compactedRv:
+						rvName = "compacted"
+					case invalidResourceVersion:
+						rvName = "invalid"
+					default:
+						rvName = "unknown"
+					}
+
+					continueName := ""
+					switch continueToken {
+					case "":
+						continueName = "empty"
+					case validContinueToken:
+						continueName = "valid"
+					case invalidContinueToken:
+						continueName = "invalid"
+					default:
+						continueName = "unknown"
+					}
+
+					name := fmt.Sprintf("limit=%d continue=%s rv=%s rvMatch=%s", limit, continueName, rvName, rvMatch)
+					t.Run(name, func(t *testing.T) {
+						opts := metav1.ListOptions{
+							ResourceVersion:      rv,
+							ResourceVersionMatch: rvMatch,
+							Continue:             continueToken,
+							Limit:                limit,
+						}
+						testListOptionsCase(t, rsClient, watchCacheEnabled, opts, compactedRv)
+					})
+				}
+			}
+		}
 	}
 }
 
@@ -1682,12 +1696,14 @@ func TestGetScaleSubresourceAsTableForAllBuiltins(t *testing.T) {
 	// KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE allows for APIs pending removal to not block tests
 	t.Setenv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE", "true")
 
-	// Enable all features for testing
+	// Enable all features and apis for testing
+	flags := framework.DefaultTestServerFlags()
+	flags = append(flags, "--runtime-config=api/all=true")
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, "AllBeta", true)
 
 	testNamespace := "test-scale"
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	clientset := clientset.NewForConfigOrDie(server.ClientConfig)
@@ -3198,8 +3214,7 @@ func TestEmulatedStorageVersion(t *testing.T) {
 	for emulatedVersion, cases := range groupedCases {
 		t.Run(emulatedVersion, func(t *testing.T) {
 			server := kubeapiservertesting.StartTestServerOrDie(
-				t, &kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: emulatedVersion},
-				[]string{"--emulated-version=kube=" + emulatedVersion, `--storage-media-type=application/json`}, framework.SharedEtcd())
+				t, nil, []string{"--emulated-version=kube=" + emulatedVersion, `--storage-media-type=application/json`, fmt.Sprintf("--runtime-config=%s=true", admissionregistrationv1beta1.SchemeGroupVersion)}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client := clientset.NewForConfigOrDie(server.ClientConfig)
@@ -3302,7 +3317,7 @@ func TestAllowedEmulationVersions(t *testing.T) {
 	}{
 		{
 			name:             "default",
-			emulationVersion: utilversion.DefaultKubeEffectiveVersion().EmulationVersion().String(),
+			emulationVersion: compatibility.DefaultKubeEffectiveVersionForTest().EmulationVersion().String(),
 		},
 	}
 
@@ -3317,7 +3332,7 @@ func TestAllowedEmulationVersions(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+"/", nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+"/", nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3337,9 +3352,10 @@ func TestAllowedEmulationVersions(t *testing.T) {
 }
 
 func TestEnableEmulationVersion(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
-		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
-		[]string{"--emulated-version=kube=1.31"}, framework.SharedEtcd())
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
+		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	rt, err := restclient.TransportFor(server.ClientConfig)
@@ -3364,22 +3380,146 @@ func TestEnableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas", // introduced at 1.20, removed at 1.26
-			expectedStatusCode: 404,
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta2/flowschemas", // introduced at 1.23, removed at 1.29
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
 			expectedStatusCode: 404,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.path, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tc.expectedStatusCode {
+				t.Errorf("expect status code: %d, got : %d\n", tc.expectedStatusCode, resp.StatusCode)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+		})
+	}
+}
+
+func TestEnableEmulationVersionForwardCompatible(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	server := kubeapiservertesting.StartTestServerOrDie(t,
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
+		[]string{"--emulated-version=kube=1.31", "--runtime-config=api/beta=true", "--emulation-forward-compatible=true"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	rt, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcs := []struct {
+		path               string
+		expectedStatusCode int
+	}{
+		{
+			path:               "/",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/apps/v1/deployments",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
+			expectedStatusCode: 200,
 		},
 		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
 			expectedStatusCode: 200,
 		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp, err := rt.RoundTrip(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tc.expectedStatusCode {
+				t.Errorf("expect status code: %d, got : %d\n", tc.expectedStatusCode, resp.StatusCode)
+			}
+			defer func() {
+				_ = resp.Body.Close()
+			}()
+		})
+	}
+}
+
+func TestEnableRuntimeConfigEmulationVersionForwardCompatible(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	server := kubeapiservertesting.StartTestServerOrDie(t,
+		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.33"},
+		[]string{"--emulated-version=kube=1.31", "--runtime-config-emulation-forward-compatible=true", "--runtime-config=api/beta=true,networking.k8s.io/v1=true"}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	rt, err := restclient.TransportFor(server.ClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcs := []struct {
+		path               string
+		expectedStatusCode int
+	}{
+		{
+			path:               "/",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/apps/v1/deployments",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1/flowschemas",
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1beta1/servicecidrs", // introduced at 1.31, removed at 1.34
+			expectedStatusCode: 200,
+		},
+		{
+			path:               "/apis/networking.k8s.io/v1/servicecidrs", // introduced at 1.33
+			expectedStatusCode: 200,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.path, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -3398,6 +3538,7 @@ func TestEnableEmulationVersion(t *testing.T) {
 }
 
 func TestDisableEmulationVersion(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	server := kubeapiservertesting.StartTestServerOrDie(t,
 		&kubeapiservertesting.TestServerInstanceOptions{BinaryVersion: "1.32"},
 		[]string{}, framework.SharedEtcd())
@@ -3425,14 +3566,6 @@ func TestDisableEmulationVersion(t *testing.T) {
 			expectedStatusCode: 200,
 		},
 		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta1/flowschemas", // introduced at 1.20, removed at 1.26
-			expectedStatusCode: 404,
-		},
-		{
-			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta2/flowschemas", // introduced at 1.23, removed at 1.29
-			expectedStatusCode: 404,
-		},
-		{
 			path:               "/apis/flowcontrol.apiserver.k8s.io/v1beta3/flowschemas", // introduced at 1.26, removed at 1.32
 			expectedStatusCode: 404,
 		},
@@ -3440,7 +3573,7 @@ func TestDisableEmulationVersion(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.path, func(t *testing.T) {
-			req, err := http.NewRequest("GET", server.ClientConfig.Host+tc.path, nil)
+			req, err := http.NewRequest(http.MethodGet, server.ClientConfig.Host+tc.path, nil)
 			if err != nil {
 				t.Fatal(err)
 			}

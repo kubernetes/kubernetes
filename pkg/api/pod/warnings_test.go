@@ -26,7 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -148,10 +151,11 @@ func TestWarnings(t *testing.T) {
 	}
 	testName := "Test"
 	testcases := []struct {
-		name        string
-		template    *api.PodTemplateSpec
-		oldTemplate *api.PodTemplateSpec
-		expected    []string
+		name                  string
+		template              *api.PodTemplateSpec
+		oldTemplate           *api.PodTemplateSpec
+		gitRepoPluginDisabled bool
+		expected              []string
 	}{
 		{
 			name:     "null",
@@ -175,6 +179,16 @@ func TestWarnings(t *testing.T) {
 				}},
 			},
 			expected: []string{`spec.volumes[0].gitRepo: deprecated in v1.11`},
+		},
+		{
+			name: "gitRepo plugin disabled",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
+				}},
+			},
+			gitRepoPluginDisabled: true,
+			expected:              []string{`spec.volumes[0].gitRepo: deprecated in v1.11, and disabled by default in v1.33+`},
 		},
 		{
 			name: "scaleIO",
@@ -1767,10 +1781,26 @@ func TestWarnings(t *testing.T) {
 				`spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[0].preference.matchExpressions[0].values[0]: -1 is invalid, a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')`,
 			},
 		},
+		{
+			name: "dubious IP address formats",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Nameservers: []string{"1.2.3.4", "05.06.07.08"},
+				},
+				HostAliases: []api.HostAlias{
+					{IP: "::ffff:1.2.3.4"},
+				},
+			}},
+			expected: []string{
+				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" will be considered invalid in a future Kubernetes release: use "5.6.7.8"`,
+				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" will be considered invalid in a future Kubernetes release: use "1.2.3.4"`,
+			},
+		},
 	}
 
 	for _, tc := range testcases {
 		t.Run("podspec_"+tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GitRepoVolumeDriver, !tc.gitRepoPluginDisabled)
 			var oldTemplate *api.PodTemplateSpec
 			if tc.oldTemplate != nil {
 				oldTemplate = tc.oldTemplate
@@ -1790,6 +1820,7 @@ func TestWarnings(t *testing.T) {
 		})
 
 		t.Run("pod_"+tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GitRepoVolumeDriver, !tc.gitRepoPluginDisabled)
 			var pod *api.Pod
 			if tc.template != nil {
 				pod = &api.Pod{

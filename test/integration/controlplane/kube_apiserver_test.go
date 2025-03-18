@@ -132,7 +132,8 @@ func TestLivezAndReadyz(t *testing.T) {
 
 func TestFlagz(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	testServerFlags := append(framework.DefaultTestServerFlags(), "--emulated-version=1.32")
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -149,6 +150,46 @@ func TestFlagz(t *testing.T) {
 
 	expectedHeader := `
 kube-apiserver flags
+Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
+
+	raw, err := res.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(raw, []byte(expectedHeader)) {
+		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
+	}
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "emulated-version") && strings.Contains(line, "1.32") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Expected flag --emulated-version=[1.32] to be reflected in /flagz output, got:\n%s", string(raw))
+	}
+}
+
+func TestStatusz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentStatusz, true)
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	res := client.CoreV1().RESTClient().Get().RequestURI("/statusz").Do(context.TODO())
+	var status int
+	res.StatusCode(&status)
+	if status != http.StatusOK {
+		t.Fatalf("statusz/ should be healthy, got %v", status)
+	}
+
+	expectedHeader := `
+kube-apiserver statusz
 Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
 
 	raw, err := res.Raw()

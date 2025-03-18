@@ -87,12 +87,7 @@ func waitForJobPodsInPhase(ctx context.Context, c clientset.Interface, ns, jobNa
 // WaitForJobComplete uses c to wait for completions to complete for the Job jobName in namespace ns.
 // This function checks if the number of succeeded Job Pods reached expected completions and
 // the Job has a "Complete" condition with the expected reason.
-// The pointer "reason" argument allows us to skip "Complete" condition reason verifications.
-// The conformance test cases have the different expected "Complete" condition reason ("CompletionsReached" vs "")
-// between conformance CI jobs and e2e CI jobs since the e2e conformance test cases are performed in
-// both conformance CI jobs with GA-only features and e2e CI jobs with all default-enabled features.
-// So, we need to skip "Complete" condition reason verifications in the e2e conformance test cases.
-func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName string, reason *string, completions int32) error {
+func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName string, reason string, completions int32) error {
 	// This function is called by HandleRetry, which will retry
 	// on transient API errors or stop polling in the case of other errors.
 	get := func(ctx context.Context) (*batchv1.Job, error) {
@@ -121,7 +116,7 @@ func WaitForJobComplete(ctx context.Context, c clientset.Interface, ns, jobName 
 	if err != nil {
 		return err
 	}
-	return WaitForJobCondition(ctx, c, ns, jobName, batchv1.JobComplete, reason)
+	return WaitForJobCondition(ctx, c, ns, jobName, batchv1.JobComplete, &reason)
 }
 
 // WaitForJobReady waits for particular value of the Job .status.ready field

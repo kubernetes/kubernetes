@@ -612,7 +612,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(tt.want, got, cmpOpts...); diff != "" {
+			if diff := cmp.Diff(tt.want, got, stateCmpOpts...); diff != "" {
 				t.Errorf("PodTopologySpread#PreScore() returned (-want, +got):\n%s", diff)
 			}
 		})
@@ -1396,7 +1396,11 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			var gotList framework.NodeScoreList
 			for _, n := range tt.nodes {
 				nodeName := n.Name
-				score, status := p.Score(ctx, state, tt.pod, nodeName)
+				nodeInfo, err := p.sharedLister.NodeInfos().Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.Score(ctx, state, tt.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
@@ -1407,7 +1411,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}
-			if diff := cmp.Diff(tt.want, gotList, cmpOpts...); diff != "" {
+			if diff := cmp.Diff(tt.want, gotList); diff != "" {
 				t.Errorf("unexpected scores (-want,+got):\n%s", diff)
 			}
 		})
@@ -1463,13 +1467,21 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 			if !status.IsSuccess() {
 				b.Fatalf("unexpected error: %v", status)
 			}
+			nodeInfos := make([]*framework.NodeInfo, len(filteredNodes))
+			for i, n := range filteredNodes {
+				nodeInfo, err := p.sharedLister.NodeInfos().Get(n.Name)
+				if err != nil {
+					b.Fatalf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				nodeInfos[i] = nodeInfo
+			}
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
 				var gotList framework.NodeScoreList
-				for _, n := range filteredNodes {
-					nodeName := n.Name
-					score, status := p.Score(ctx, state, tt.pod, nodeName)
+				for _, nodeInfo := range nodeInfos {
+					nodeName := nodeInfo.Node().Name
+					score, status := p.Score(ctx, state, tt.pod, nodeInfo)
 					if !status.IsSuccess() {
 						b.Fatalf("unexpected error: %v", status)
 					}

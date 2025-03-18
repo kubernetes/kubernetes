@@ -195,6 +195,12 @@ func tweakPVCScalePolicy(t apps.PersistentVolumeClaimRetentionPolicyType) pvcPol
 	}
 }
 
+func tweakServiceName(name string) statefulSetTweak {
+	return func(ss *apps.StatefulSet) {
+		ss.Spec.ServiceName = name
+	}
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -520,10 +526,18 @@ func TestValidateStatefulSet(t *testing.T) {
 		errs: field.ErrorList{
 			field.Invalid(field.NewPath("spec", "ordinals.start"), nil, ""),
 		},
+	}, {
+		name: "invalid service name",
+		set: mkStatefulSet(&validPodTemplate,
+			tweakServiceName("Invalid.Name"),
+		),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "serviceName"), "Invalid.Name", ""),
+		},
 	},
 	}
 
-	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
+	cmpOpts := []cmp.Option{cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin"), cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() })}
 	for _, testCase := range append(successCases, errorCases...) {
 		name := testCase.name
 		var testTitle string
@@ -595,7 +609,7 @@ func TestValidateStatefulSetMinReadySeconds(t *testing.T) {
 	for tcName, tc := range testCases {
 		t.Run(tcName, func(t *testing.T) {
 			errs := ValidateStatefulSetSpec(tc.ss, field.NewPath("spec", "minReadySeconds"),
-				corevalidation.PodValidationOptions{})
+				corevalidation.PodValidationOptions{}, StatefulSetValidationOptions{})
 			if tc.expectErr && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
@@ -864,6 +878,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		name:   "update existing instance with .spec.ordinals.start",
 		old:    mkStatefulSet(&validPodTemplate),
 		update: mkStatefulSet(&validPodTemplate, tweakOrdinalsStart(3)),
+	}, {
+		name:   "update with invalid .spec.serviceName",
+		old:    mkStatefulSet(&validPodTemplate, tweakServiceName("Invalid.Name")),
+		update: mkStatefulSet(&validPodTemplate, tweakServiceName("Invalid.Name"), tweakReplicas(3)),
 	},
 	}
 
@@ -936,7 +954,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 	}
 
 	cmpOpts := []cmp.Option{
-		cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail"),
+		cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail", "Origin"),
 		cmpopts.SortSlices(func(a, b *field.Error) bool { return a.Error() < b.Error() }),
 		cmpopts.EquateEmpty(),
 	}

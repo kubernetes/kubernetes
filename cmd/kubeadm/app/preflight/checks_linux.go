@@ -88,5 +88,8 @@ func addExecChecks(checks []Checker, execer utilsexec.Interface, k8sVersion stri
 
 	// kubelet requires mount to be present in PATH for in-tree volume plugins.
 	checks = append(checks, InPathCheck{executable: "mount", mandatory: true, exec: execer})
+
+	// kubeadm requires cp to be present in PATH for copying etcd directories.
+	checks = append(checks, InPathCheck{executable: "cp", mandatory: true, exec: execer})
 	return checks
 }

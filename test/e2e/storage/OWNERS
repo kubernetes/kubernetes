@@ -4,6 +4,7 @@ approvers:
   - sig-storage-approvers
   - jingxu97
   - pohly
+  - carlory
 reviewers:
   - sig-storage-reviewers
   - pohly

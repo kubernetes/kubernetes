@@ -19,14 +19,16 @@ package stats
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -387,9 +389,9 @@ func getPodVolumeStats(seed int, volumeName string) statsapi.VolumeStats {
 }
 
 func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
-	f := fuzz.New().NilChance(0).Funcs(
-		func(e *cadvisorapiv1.MetricSpec, c fuzz.Continue) {
-			c.Fuzz(&e.Name)
+	f := randfill.New().NilChance(0).Funcs(
+		func(e *cadvisorapiv1.MetricSpec, c randfill.Continue) {
+			c.Fill(&e.Name)
 			switch c.Intn(3) {
 			case 0:
 				e.Type = cadvisorapiv1.MetricGauge
@@ -404,28 +406,28 @@ func generateCustomMetricSpec() []cadvisorapiv1.MetricSpec {
 			case 1:
 				e.Format = cadvisorapiv1.FloatType
 			}
-			c.Fuzz(&e.Units)
+			c.Fill(&e.Units)
 		})
 	var ret []cadvisorapiv1.MetricSpec
-	f.Fuzz(&ret)
+	f.Fill(&ret)
 	return ret
 }
 
 func generateCustomMetrics(spec []cadvisorapiv1.MetricSpec) map[string][]cadvisorapiv1.MetricVal {
 	ret := map[string][]cadvisorapiv1.MetricVal{}
 	for _, metricSpec := range spec {
-		f := fuzz.New().NilChance(0).Funcs(
-			func(e *cadvisorapiv1.MetricVal, c fuzz.Continue) {
+		f := randfill.New().NilChance(0).Funcs(
+			func(e *cadvisorapiv1.MetricVal, c randfill.Continue) {
 				switch metricSpec.Format {
 				case cadvisorapiv1.IntType:
-					c.Fuzz(&e.IntValue)
+					c.Fill(&e.IntValue)
 				case cadvisorapiv1.FloatType:
-					c.Fuzz(&e.FloatValue)
+					c.Fill(&e.FloatValue)
 				}
 			})
 
 		var metrics []cadvisorapiv1.MetricVal
-		f.Fuzz(&metrics)
+		f.Fill(&metrics)
 		ret[metricSpec.Name] = metrics
 	}
 	return ret
@@ -503,6 +505,39 @@ func checkFsStats(t *testing.T, label string, seed int, stats *statsapi.FsStats)
 	assert.EqualValues(t, seed+offsetFsAvailable, *stats.AvailableBytes, label+".AvailableBytes")
 	assert.EqualValues(t, seed+offsetFsInodes, *stats.Inodes, label+".Inodes")
 	assert.EqualValues(t, seed+offsetFsInodesFree, *stats.InodesFree, label+".InodesFree")
+}
+
+func checkContainersSwapStats(t *testing.T, podStats statsapi.PodStats, containerStats ...cadvisorapiv2.ContainerInfo) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+
+	podContainers := make(map[string]struct{}, len(podStats.Containers))
+	for _, container := range podStats.Containers {
+		podContainers[container.Name] = struct{}{}
+	}
+
+	for _, container := range containerStats {
+		found := false
+		containerName := container.Spec.Labels["io.kubernetes.container.name"]
+		for _, containerPodStats := range podStats.Containers {
+			if containerPodStats.Name == containerName {
+				assert.Equal(t, container.Stats[0].Memory.Swap, *containerPodStats.Swap.SwapUsageBytes)
+				found = true
+			}
+		}
+		assert.True(t, found, "container %s not found in pod stats", container.Spec.Labels["io.kubernetes.container.name"])
+		delete(podContainers, containerName)
+	}
+
+	var missingContainerNames []string
+	for containerName := range podContainers {
+		missingContainerNames = append(missingContainerNames, containerName)
+	}
+	assert.Emptyf(t, podContainers, "containers not found in pod stats: %v", strings.Join(missingContainerNames, " "))
+	if len(missingContainerNames) > 0 {
+		assert.FailNow(t, "containers not found in pod stats")
+	}
 }
 
 func checkEphemeralStats(t *testing.T, label string, containerSeeds []int, volumeSeeds []int, containerLogStats []*volume.Metrics, stats *statsapi.FsStats) {

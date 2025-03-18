@@ -92,13 +92,13 @@ func RoundtripToUnstructured(t *testing.T, scheme *runtime.Scheme, funcs fuzzer.
 				}
 
 				if nointernal.Has(gvk) {
-					fuzzer.Fuzz(item)
+					fuzzer.Fill(item)
 				} else {
 					internalObj, err := scheme.New(gvk.GroupKind().WithVersion(runtime.APIVersionInternal))
 					if err != nil {
 						t.Fatalf("couldn't create internal object %v: %v", gvk.Kind, err)
 					}
-					fuzzer.Fuzz(internalObj)
+					fuzzer.Fill(internalObj)
 
 					if err := scheme.Convert(internalObj, item, nil); err != nil {
 						t.Fatalf("conversion for %v failed: %v", gvk.Kind, err)

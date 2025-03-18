@@ -206,6 +206,7 @@ items:
     verbs:
     - delete
     - list
+    - watch
   - apiGroups:
     - ""
     - events.k8s.io
@@ -466,6 +467,7 @@ items:
     - get
     - list
     - update
+    - watch
   - apiGroups:
     - ""
     resources:
@@ -517,6 +519,7 @@ items:
     - get
     - list
     - update
+    - watch
   - apiGroups:
     - ""
     - events.k8s.io
@@ -567,6 +570,7 @@ items:
     - get
     - list
     - update
+    - watch
   - apiGroups:
     - ""
     - events.k8s.io
@@ -735,12 +739,14 @@ items:
     - pods
     verbs:
     - list
+    - watch
   - apiGroups:
     - metrics.k8s.io
     resources:
     - pods
     verbs:
     - list
+    - watch
   - apiGroups:
     - custom.metrics.k8s.io
     resources:
@@ -748,6 +754,7 @@ items:
     verbs:
     - get
     - list
+    - watch
   - apiGroups:
     - external.metrics.k8s.io
     resources:
@@ -755,6 +762,7 @@ items:
     verbs:
     - get
     - list
+    - watch
   - apiGroups:
     - ""
     - events.k8s.io
@@ -896,6 +904,7 @@ items:
     - list
     - patch
     - update
+    - watch
   - apiGroups:
     - ""
     resources:
@@ -918,6 +927,7 @@ items:
     - delete
     - get
     - list
+    - watch
   - apiGroups:
     - ""
     - events.k8s.io
@@ -1040,6 +1050,7 @@ items:
     verbs:
     - get
     - list
+    - watch
   - apiGroups:
     - ""
     resources:
@@ -1303,6 +1314,57 @@ items:
     - create
     - patch
     - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    creationTimestamp: null
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:selinux-warning-controller
+  rules:
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - csidrivers
+    verbs:
+    - get
+    - list
+    - watch
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:

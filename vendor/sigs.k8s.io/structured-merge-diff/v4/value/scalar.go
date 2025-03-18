@@ -43,7 +43,7 @@ func IntCompare(lhs, rhs int64) int {
 func BoolCompare(lhs, rhs bool) int {
 	if lhs == rhs {
 		return 0
-	} else if lhs == false {
+	} else if !lhs {
 		return -1
 	}
 	return 1

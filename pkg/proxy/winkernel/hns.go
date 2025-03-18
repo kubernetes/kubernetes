@@ -23,11 +23,11 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Microsoft/hnslib/hcn"
-	"k8s.io/klog/v2"
 
-	"strings"
+	"k8s.io/klog/v2"
 )
 
 type HostNetworkService interface {
@@ -168,7 +168,7 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 		}
 		endpointInfos[ep.IpConfigurations[1].IpAddress] = endpointDualstack
 	}
-	klog.V(3).InfoS("Queried endpoints from network", "network", networkName)
+	klog.V(3).InfoS("Queried endpoints from network", "network", networkName, "count", len(endpointInfos))
 	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
 	return endpointInfos, nil
 }

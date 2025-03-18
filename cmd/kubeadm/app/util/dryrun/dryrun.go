@@ -23,10 +23,10 @@ import (
 	"path/filepath"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
@@ -74,6 +74,7 @@ func PrintDryRunFiles(files []FileToPrint, w io.Writer) error {
 		if len(outputFilePath) == 0 {
 			outputFilePath = file.RealPath
 		}
+		outputFilePath = filepath.ToSlash(outputFilePath)
 
 		fmt.Fprintf(w, "[dryrun] Would write file %q with content:\n", outputFilePath)
 		fmt.Fprintf(w, "%s", fileBytes)
@@ -90,7 +91,7 @@ func NewWaiter() apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForControlPlaneComponents(cfg *kubeadmapi.ClusterConfiguration, apiServerAddress string) error {
+func (w *Waiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiServerAddress string) error {
 	return nil
 }
 

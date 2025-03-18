@@ -229,6 +229,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PreloadedImagesVerificationAllowlist != nil {
+		in, out := &in.PreloadedImagesVerificationAllowlist, &out.PreloadedImagesVerificationAllowlist
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.EventRecordQPS != nil {
 		in, out := &in.EventRecordQPS, &out.EventRecordQPS
 		*out = new(int32)
@@ -371,6 +376,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
+	}
+	if in.MergeDefaultEvictionSettings != nil {
+		in, out := &in.MergeDefaultEvictionSettings, &out.MergeDefaultEvictionSettings
+		*out = new(bool)
+		**out = **in
 	}
 	if in.EnableControllerAttachDetach != nil {
 		in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach

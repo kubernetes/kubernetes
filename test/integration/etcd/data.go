@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apiserver/pkg/util/compatibility"
 	utilversion "k8s.io/component-base/version"
 
 	"k8s.io/kubernetes/test/utils/image"
@@ -34,9 +35,9 @@ import (
 // Tests aiming for full coverage of versions should test fixtures of all supported versions.
 func GetSupportedEmulatedVersions() []string {
 	return []string{
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(2).String(),
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().SubtractMinor(1).String(),
-		utilversion.DefaultKubeEffectiveVersion().BinaryVersion().String(),
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(2).String(),
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(1).String(),
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().String(),
 	}
 }
 
@@ -215,10 +216,20 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 
 		// k8s.io/kubernetes/pkg/apis/certificates/v1alpha1
 		gvr("certificates.k8s.io", "v1alpha1", "clustertrustbundles"): {
-			Stub:              `{"metadata": {"name": "example.com:signer:abc"}, "spec": {"signerName":"example.com/signer", "trustBundle": "-----BEGIN CERTIFICATE-----\nMIIBBDCBt6ADAgECAgEAMAUGAytlcDAQMQ4wDAYDVQQDEwVyb290MTAiGA8wMDAx\nMDEwMTAwMDAwMFoYDzAwMDEwMTAxMDAwMDAwWjAQMQ4wDAYDVQQDEwVyb290MTAq\nMAUGAytlcAMhAF2MoFeGa97gK2NGT1h6p1/a1GlMXAXbcjI/OShyIobPozIwMDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTWDdK2CNQiHqRjPaAWYPPtIykQgjAF\nBgMrZXADQQCtom9WGl7m2SAa4tXM9Soo/mbInBsRhn187BMoqTAHInHchKup5/3y\nl1tYJSZZsEXnXrCvw2qLCBNif6+2YYgE\n-----END CERTIFICATE-----\n"}}`,
-			ExpectedEtcdPath:  "/registry/clustertrustbundles/example.com:signer:abc",
+			Stub:              `{"metadata": {"name": "example.com:signer:abcd"}, "spec": {"signerName":"example.com/signer", "trustBundle": "-----BEGIN CERTIFICATE-----\nMIIBBDCBt6ADAgECAgEAMAUGAytlcDAQMQ4wDAYDVQQDEwVyb290MTAiGA8wMDAx\nMDEwMTAwMDAwMFoYDzAwMDEwMTAxMDAwMDAwWjAQMQ4wDAYDVQQDEwVyb290MTAq\nMAUGAytlcAMhAF2MoFeGa97gK2NGT1h6p1/a1GlMXAXbcjI/OShyIobPozIwMDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTWDdK2CNQiHqRjPaAWYPPtIykQgjAF\nBgMrZXADQQCtom9WGl7m2SAa4tXM9Soo/mbInBsRhn187BMoqTAHInHchKup5/3y\nl1tYJSZZsEXnXrCvw2qLCBNif6+2YYgE\n-----END CERTIFICATE-----\n"}}`,
+			ExpectedEtcdPath:  "/registry/clustertrustbundles/example.com:signer:abcd",
+			ExpectedGVK:       gvkP("certificates.k8s.io", "v1beta1", "ClusterTrustBundle"),
 			IntroducedVersion: "1.26",
 			RemovedVersion:    "1.37",
+		},
+		// --
+
+		// k8s.io/kubernetes/pkg/apis/certificates/v1beta1
+		gvr("certificates.k8s.io", "v1beta1", "clustertrustbundles"): {
+			Stub:              `{"metadata": {"name": "example.com:signer:abc"}, "spec": {"signerName":"example.com/signer", "trustBundle": "-----BEGIN CERTIFICATE-----\nMIIBBDCBt6ADAgECAgEAMAUGAytlcDAQMQ4wDAYDVQQDEwVyb290MTAiGA8wMDAx\nMDEwMTAwMDAwMFoYDzAwMDEwMTAxMDAwMDAwWjAQMQ4wDAYDVQQDEwVyb290MTAq\nMAUGAytlcAMhAF2MoFeGa97gK2NGT1h6p1/a1GlMXAXbcjI/OShyIobPozIwMDAP\nBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBTWDdK2CNQiHqRjPaAWYPPtIykQgjAF\nBgMrZXADQQCtom9WGl7m2SAa4tXM9Soo/mbInBsRhn187BMoqTAHInHchKup5/3y\nl1tYJSZZsEXnXrCvw2qLCBNif6+2YYgE\n-----END CERTIFICATE-----\n"}}`,
+			ExpectedEtcdPath:  "/registry/clustertrustbundles/example.com:signer:abc",
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
 		},
 		// --
 
@@ -230,10 +241,20 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/coordination/v1beta1
+		gvr("coordination.k8s.io", "v1beta1", "leasecandidates"): {
+			Stub:              `{"metadata": {"name": "leasecandidatev1beta1"}, "spec": {"leaseName": "lease", "binaryVersion": "0.1.0", "emulationVersion": "0.1.0", "strategy": "OldestEmulationVersion"}}`,
+			ExpectedEtcdPath:  "/registry/leasecandidates/" + namespace + "/leasecandidatev1beta1",
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		// --
+
 		// k8s.io/kubernetes/pkg/apis/coordination/v1alpha2
 		gvr("coordination.k8s.io", "v1alpha2", "leasecandidates"): {
 			Stub:              `{"metadata": {"name": "leasecandidatev1alpha2"}, "spec": {"leaseName": "lease", "binaryVersion": "0.1.0", "emulationVersion": "0.1.0", "strategy": "OldestEmulationVersion"}}`,
 			ExpectedEtcdPath:  "/registry/leasecandidates/" + namespace + "/leasecandidatev1alpha2",
+			ExpectedGVK:       gvkP("coordination.k8s.io", "v1beta1", "LeaseCandidate"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
@@ -273,16 +294,18 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			IntroducedVersion: "1.7",
 		},
 		gvr("networking.k8s.io", "v1", "ipaddresses"): {
-			Stub:              `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
-			ExpectedEtcdPath:  "/registry/ipaddresses/192.168.2.3",
-			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
-			IntroducedVersion: "1.33",
+			Stub:                                   `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath:                       "/registry/ipaddresses/192.168.2.3",
+			ExpectedGVK:                            gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
+			IntroducedVersion:                      "1.33",
+			EmulationForwardCompatibleSinceVersion: "1.31",
 		},
 		gvr("networking.k8s.io", "v1", "servicecidrs"): {
-			Stub:              `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
-			ExpectedEtcdPath:  "/registry/servicecidrs/range-b2",
-			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
-			IntroducedVersion: "1.33",
+			Stub:                                   `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath:                       "/registry/servicecidrs/range-b2",
+			ExpectedGVK:                            gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
+			IntroducedVersion:                      "1.33",
+			EmulationForwardCompatibleSinceVersion: "1.31",
 		},
 		// --
 
@@ -622,13 +645,16 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 
 	// Delete types no longer served or not yet added at a particular emulated version.
 	for key, data := range etcdStorageData {
-		if data.IntroducedVersion != "" && version.MustParse(data.IntroducedVersion).GreaterThan(version.MustParse(v)) {
-			delete(etcdStorageData, key)
-		}
-
 		if data.RemovedVersion != "" && version.MustParse(v).AtLeast(version.MustParse(data.RemovedVersion)) {
 			delete(etcdStorageData, key)
 		}
+		if data.IntroducedVersion == "" || version.MustParse(v).AtLeast(version.MustParse(data.IntroducedVersion)) {
+			continue
+		}
+		if data.EmulationForwardCompatibleSinceVersion != "" && version.MustParse(v).AtLeast(version.MustParse(data.EmulationForwardCompatibleSinceVersion)) {
+			continue
+		}
+		delete(etcdStorageData, key)
 	}
 
 	if removeAlphas {
@@ -672,6 +698,10 @@ type StorageData struct {
 	ExpectedGVK       *schema.GroupVersionKind // The GVK that we expect this object to be stored as - leave this nil to use the default
 	IntroducedVersion string                   // The version that this type is introduced
 	RemovedVersion    string                   // The version that this type is removed. May be empty for stable resources
+	// EmulationForwardCompatibleSinceVersion indicates the api should be kept if the emulation version is >= this version, even when the api is introduced after the emulation version.
+	// Only needed for some Beta (Beta2+) and GA APIs, and is the version when the lowest Beta api is introduced.
+	// This is needed to enable some Beta features where the api used in the corresponding controller has GAed.
+	EmulationForwardCompatibleSinceVersion string
 }
 
 // Prerequisite contains information required to create a resource (but not verify it)

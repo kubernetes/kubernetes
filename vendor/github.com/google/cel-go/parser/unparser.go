@@ -17,12 +17,14 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/google/cel-go/common/ast"
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types"
+	"github.com/google/cel-go/common/types/ref"
 )
 
 // Unparse takes an input expression and source position information and generates a human-readable
@@ -63,6 +65,15 @@ func Unparse(expr ast.Expr, info *ast.SourceInfo, opts ...UnparserOption) (strin
 		return "", err
 	}
 	return un.str.String(), nil
+}
+
+var identifierPartPattern *regexp.Regexp = regexp.MustCompile(`^[A-Za-z_][0-9A-Za-z_]*$`)
+
+func maybeQuoteField(field string) string {
+	if !identifierPartPattern.MatchString(field) || field == "in" {
+		return "`" + field + "`"
+	}
+	return field
 }
 
 // unparser visits an expression to reconstruct a human-readable string from an AST.
@@ -263,8 +274,17 @@ func (un *unparser) visitCallUnary(expr ast.Expr) error {
 	return un.visitMaybeNested(args[0], nested)
 }
 
-func (un *unparser) visitConst(expr ast.Expr) error {
-	val := expr.AsLiteral()
+func (un *unparser) visitConstVal(val ref.Val) error {
+	optional := false
+	if optVal, ok := val.(*types.Optional); ok {
+		if !optVal.HasValue() {
+			un.str.WriteString("optional.none()")
+			return nil
+		}
+		optional = true
+		un.str.WriteString("optional.of(")
+		val = optVal.GetValue()
+	}
 	switch val := val.(type) {
 	case types.Bool:
 		un.str.WriteString(strconv.FormatBool(bool(val)))
@@ -293,7 +313,21 @@ func (un *unparser) visitConst(expr ast.Expr) error {
 		ui := strconv.FormatUint(uint64(val), 10)
 		un.str.WriteString(ui)
 		un.str.WriteString("u")
+	case *types.Optional:
+		if err := un.visitConstVal(val); err != nil {
+			return err
+		}
 	default:
+		return errors.New("unsupported constant")
+	}
+	if optional {
+		un.str.WriteString(")")
+	}
+	return nil
+}
+func (un *unparser) visitConst(expr ast.Expr) error {
+	val := expr.AsLiteral()
+	if err := un.visitConstVal(val); err != nil {
 		return fmt.Errorf("unsupported constant: %v", expr)
 	}
 	return nil
@@ -352,7 +386,7 @@ func (un *unparser) visitSelectInternal(operand ast.Expr, testOnly bool, op stri
 		return err
 	}
 	un.str.WriteString(op)
-	un.str.WriteString(field)
+	un.str.WriteString(maybeQuoteField(field))
 	if testOnly {
 		un.str.WriteString(")")
 	}
@@ -370,7 +404,7 @@ func (un *unparser) visitStructMsg(expr ast.Expr) error {
 		if field.IsOptional() {
 			un.str.WriteString("?")
 		}
-		un.str.WriteString(f)
+		un.str.WriteString(maybeQuoteField(f))
 		un.str.WriteString(": ")
 		v := field.Value()
 		err := un.visit(v)

@@ -328,6 +328,20 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 						},
 						LoadAverage:  2,
 						LoadDAverage: 2,
+						PSI: info.PSIStats{
+							Full: info.PSIData{
+								Avg10:  0.3,
+								Avg60:  0.2,
+								Avg300: 0.1,
+								Total:  100,
+							},
+							Some: info.PSIData{
+								Avg10:  0.6,
+								Avg60:  0.4,
+								Avg300: 0.2,
+								Total:  200,
+							},
+						},
 					},
 					Memory: info.MemoryStats{
 						Usage:             8,
@@ -358,6 +372,20 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 						MappedFile:  16,
 						KernelUsage: 17,
 						Swap:        8192,
+						PSI: info.PSIStats{
+							Full: info.PSIData{
+								Avg10:  0.3,
+								Avg60:  0.2,
+								Avg300: 0.1,
+								Total:  1000,
+							},
+							Some: info.PSIData{
+								Avg10:  0.6,
+								Avg60:  0.4,
+								Avg300: 0.2,
+								Total:  2000,
+							},
+						},
 					},
 					Hugetlb: map[string]info.HugetlbStats{
 						"2Mi": {
@@ -550,6 +578,20 @@ func (p testSubcontainersInfoProvider) GetRequestedContainersInfo(string, v2.Req
 								"Write":   6,
 							},
 						}},
+						PSI: info.PSIStats{
+							Full: info.PSIData{
+								Avg10:  0.3,
+								Avg60:  0.2,
+								Avg300: 0.1,
+								Total:  1100,
+							},
+							Some: info.PSIData{
+								Avg10:  0.6,
+								Avg60:  0.4,
+								Avg300: 0.2,
+								Total:  2200,
+							},
+						},
 					},
 					Filesystem: []info.FsStats{
 						{

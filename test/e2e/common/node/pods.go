@@ -64,7 +64,7 @@ import (
 const (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
-	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxContainerBackOff))
+	maxBackOffTolerance  = time.Duration(1.3 * float64(kubelet.MaxCrashLoopBackOff))
 	podRetryPeriod       = 1 * time.Second
 )
 
@@ -638,7 +638,11 @@ var _ = SIGDescribe("Pods", func() {
 		})
 
 		ginkgo.By("submitting the pod to kubernetes")
-		podClient.CreateSync(ctx, pod)
+		pod = podClient.CreateSync(ctx, pod)
+
+		ginkgo.By("waiting for the container to be running")
+		err = e2epod.WaitForContainerRunning(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, framework.PodStartShortTimeout)
+		framework.ExpectNoError(err, "failed to wait for container to be running")
 
 		req := f.ClientSet.CoreV1().RESTClient().Get().
 			Namespace(f.Namespace.Name).
@@ -735,7 +739,7 @@ var _ = SIGDescribe("Pods", func() {
 		})
 
 		podClient.CreateSync(ctx, pod)
-		time.Sleep(2 * kubelet.MaxContainerBackOff) // it takes slightly more than 2*x to get to a back-off of x
+		time.Sleep(2 * kubelet.MaxCrashLoopBackOff) // it takes slightly more than 2*x to get to a back-off of x
 
 		// wait for a delay == capped delay of MaxContainerBackOff
 		ginkgo.By("getting restart delay when capped")
@@ -749,13 +753,13 @@ var _ = SIGDescribe("Pods", func() {
 				framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 			}
 
-			if delay1 < kubelet.MaxContainerBackOff {
+			if delay1 < kubelet.MaxCrashLoopBackOff {
 				continue
 			}
 		}
 
-		if (delay1 < kubelet.MaxContainerBackOff) || (delay1 > maxBackOffTolerance) {
-			framework.Failf("expected %s back-off got=%s in delay1", kubelet.MaxContainerBackOff, delay1)
+		if (delay1 < kubelet.MaxCrashLoopBackOff) || (delay1 > maxBackOffTolerance) {
+			framework.Failf("expected %s back-off got=%s in delay1", kubelet.MaxCrashLoopBackOff, delay1)
 		}
 
 		ginkgo.By("getting restart delay after a capped delay")
@@ -764,8 +768,8 @@ var _ = SIGDescribe("Pods", func() {
 			framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)
 		}
 
-		if delay2 < kubelet.MaxContainerBackOff || delay2 > maxBackOffTolerance { // syncloop cumulative drift
-			framework.Failf("expected %s back-off got=%s on delay2", kubelet.MaxContainerBackOff, delay2)
+		if delay2 < kubelet.MaxCrashLoopBackOff || delay2 > maxBackOffTolerance { // syncloop cumulative drift
+			framework.Failf("expected %s back-off got=%s on delay2", kubelet.MaxCrashLoopBackOff, delay2)
 		}
 	})
 

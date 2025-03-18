@@ -25,6 +25,7 @@ import (
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/ptr"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -53,6 +54,7 @@ func TestControllerStrategy(t *testing.T) {
 		Spec: api.ReplicationControllerSpec{
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
+			Replicas: ptr.To[int32](1),
 		},
 		Status: api.ReplicationControllerStatus{
 			Replicas:           1,
@@ -67,6 +69,7 @@ func TestControllerStrategy(t *testing.T) {
 	if rc.Status.ObservedGeneration != int64(0) {
 		t.Error("ReplicationController should not allow setting status.observedGeneration on create")
 	}
+
 	errs := Strategy.Validate(ctx, rc)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
@@ -109,7 +112,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	oldController := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "10"},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 3,
+			Replicas: ptr.To[int32](3),
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
 		},
@@ -121,7 +124,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	newController := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault, ResourceVersion: "9"},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: ptr.To[int32](1),
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
 		},
@@ -134,7 +137,7 @@ func TestControllerStatusStrategy(t *testing.T) {
 	if newController.Status.Replicas != 3 {
 		t.Errorf("Replication controller status updates should allow change of replicas: %v", newController.Status.Replicas)
 	}
-	if newController.Spec.Replicas != 3 {
+	if *newController.Spec.Replicas != 3 {
 		t.Errorf("PrepareForUpdate should have preferred spec")
 	}
 	errs := StatusStrategy.ValidateUpdate(ctx, newController, oldController)
@@ -166,7 +169,7 @@ func TestValidateUpdate(t *testing.T) {
 	oldController := &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault, ResourceVersion: "10", Annotations: make(map[string]string)},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 3,
+			Replicas: ptr.To[int32](3),
 			Selector: validSelector,
 			Template: &validPodTemplate.Template,
 		},
@@ -182,7 +185,7 @@ func TestValidateUpdate(t *testing.T) {
 	newController := oldController.DeepCopy()
 
 	// Irrelevant (to the selector) update for the replication controller.
-	newController.Spec.Replicas = 5
+	newController.Spec.Replicas = ptr.To[int32](5)
 
 	// If they didn't try to update the selector then we should not return any error.
 	errs := Strategy.ValidateUpdate(ctx, newController, oldController)

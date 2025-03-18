@@ -48,6 +48,10 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 	bestHint, admit := s.calculateAffinity(pod)
 	klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	if !admit {
+		if IsAlignmentGuaranteed(s.policy) {
+			// increment only if we know we allocate aligned resources.
+			metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
+		}
 		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 		return admission.GetPodAdmitResult(&TopologyAffinityError{})
 	}
@@ -64,6 +68,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 	}
 	if IsAlignmentGuaranteed(s.policy) {
 		// increment only if we know we allocate aligned resources.
+		klog.V(4).InfoS("Resource alignment at pod scope guaranteed", "pod", klog.KObj(pod))
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
 	}
 	return admission.GetPodAdmitResult(nil)
@@ -84,6 +89,6 @@ func (s *podScope) accumulateProvidersHints(pod *v1.Pod) []map[string][]Topology
 func (s *podScope) calculateAffinity(pod *v1.Pod) (TopologyHint, bool) {
 	providersHints := s.accumulateProvidersHints(pod)
 	bestHint, admit := s.policy.Merge(providersHints)
-	klog.InfoS("PodTopologyHint", "bestHint", bestHint)
+	klog.InfoS("PodTopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	return bestHint, admit
 }

@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
@@ -48,21 +47,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-)
-
-var (
-	kubeadmJoinFailMsg = dedent.Dedent(`
-		Unfortunately, an error has occurred:
-			%v
-
-		This error is likely caused by:
-			- The kubelet is not running
-			- The kubelet is unhealthy due to a misconfiguration of the node in some way (required cgroups disabled)
-
-		If you are on a systemd-powered system, you can try to troubleshoot the error with the following commands:
-			- 'systemctl status kubelet'
-			- 'journalctl -xeu kubelet'
-		`)
 )
 
 // NewKubeletStartPhase creates a kubeadm workflow phase that start kubelet on a node.
@@ -293,44 +277,55 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		return err
 	}
 
-	bootstrapKubeConfigFile := filepath.Join(data.KubeConfigDir(), kubeadmconstants.KubeletBootstrapKubeConfigFileName)
-	// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap is removed from disk
-	defer func() {
-		_ = os.Remove(bootstrapKubeConfigFile)
-	}()
+	var client clientset.Interface
 
-	// Apply patches to the in-memory kubelet configuration so that any configuration changes like kubelet healthz
-	// address and port options are respected during the wait below. WriteConfigToDisk already applied patches to
-	// the kubelet.yaml written to disk. This should be done after WriteConfigToDisk because both use the same config
-	// in memory and we don't want patches to be applied two times to the config that is written to disk.
-	if err := kubeletphase.ApplyPatchesToConfig(&initCfg.ClusterConfiguration, data.PatchesDir()); err != nil {
-		return errors.Wrap(err, "could not apply patches to the in-memory kubelet configuration")
-	}
+	if data.DryRun() {
+		fmt.Println("[kubelet-wait] Would wait for the kubelet to be bootstrapped")
 
-	// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
-	// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
-	// times out, display a somewhat user-friendly message.
-	waiter := apiclient.NewKubeWaiter(nil, 0, os.Stdout)
-	waiter.SetTimeout(cfg.Timeouts.KubeletHealthCheck.Duration)
-	kubeletConfig := initCfg.ClusterConfiguration.ComponentConfigs[componentconfigs.KubeletGroup].Get()
-	kubeletConfigTyped, ok := kubeletConfig.(*kubeletconfig.KubeletConfiguration)
-	if !ok {
-		return errors.New("could not convert the KubeletConfiguration to a typed object")
-	}
-	if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
-		fmt.Printf(kubeadmJoinFailMsg, err)
-		return err
-	}
+		// Use the dry-run client.
+		if client, err = data.Client(); err != nil {
+			return errors.Wrap(err, "could not get client for dry-run")
+		}
+	} else {
+		bootstrapKubeConfigFile := filepath.Join(data.KubeConfigDir(), kubeadmconstants.KubeletBootstrapKubeConfigFileName)
+		// Deletes the bootstrapKubeConfigFile, so the credential used for TLS bootstrap is removed from disk
+		defer func() {
+			_ = os.Remove(bootstrapKubeConfigFile)
+		}()
 
-	if err := waitForTLSBootstrappedClient(cfg.Timeouts.TLSBootstrap.Duration); err != nil {
-		fmt.Printf(kubeadmJoinFailMsg, err)
-		return err
-	}
+		// Apply patches to the in-memory kubelet configuration so that any configuration changes like kubelet healthz
+		// address and port options are respected during the wait below. WriteConfigToDisk already applied patches to
+		// the kubelet.yaml written to disk. This should be done after WriteConfigToDisk because both use the same config
+		// in memory and we don't want patches to be applied two times to the config that is written to disk.
+		if err := kubeletphase.ApplyPatchesToConfig(&initCfg.ClusterConfiguration, data.PatchesDir()); err != nil {
+			return errors.Wrap(err, "could not apply patches to the in-memory kubelet configuration")
+		}
 
-	// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
-	client, err := kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
-	if err != nil {
-		return err
+		// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
+		// Wait for the kubelet to create the /etc/kubernetes/kubelet.conf kubeconfig file. If this process
+		// times out, display a somewhat user-friendly message.
+		waiter := apiclient.NewKubeWaiter(nil, 0, os.Stdout)
+		waiter.SetTimeout(cfg.Timeouts.KubeletHealthCheck.Duration)
+		kubeletConfig := initCfg.ClusterConfiguration.ComponentConfigs[componentconfigs.KubeletGroup].Get()
+		kubeletConfigTyped, ok := kubeletConfig.(*kubeletconfig.KubeletConfiguration)
+		if !ok {
+			return errors.New("could not convert the KubeletConfiguration to a typed object")
+		}
+		if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
+			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
+			return errors.Wrap(err, "failed while waiting for the kubelet to start")
+		}
+
+		if err := waitForTLSBootstrappedClient(cfg.Timeouts.TLSBootstrap.Duration); err != nil {
+			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
+			return errors.Wrap(err, "failed while waiting for TLS bootstrap")
+		}
+
+		// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
+		client, err = kubeconfigutil.ClientSetFromFile(kubeadmconstants.GetKubeletKubeConfigPath())
+		if err != nil {
+			return err
+		}
 	}
 
 	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {

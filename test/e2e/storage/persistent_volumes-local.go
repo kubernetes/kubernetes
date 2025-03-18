@@ -1157,7 +1157,8 @@ func createStatefulSet(ctx context.Context, config *localTestConfig, ssReplicas 
 }
 
 func validateStatefulSet(ctx context.Context, config *localTestConfig, ss *appsv1.StatefulSet, anti bool) {
-	pods := e2estatefulset.GetPodList(ctx, config.client, ss)
+	pods, err := e2estatefulset.GetPodList(ctx, config.client, ss)
+	framework.ExpectNoError(err)
 
 	nodes := sets.NewString()
 	for _, pod := range pods.Items {

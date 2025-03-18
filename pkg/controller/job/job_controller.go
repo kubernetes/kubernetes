@@ -595,7 +595,7 @@ func (jm *Controller) enqueueSyncJobInternal(logger klog.Logger, obj interface{}
 	// all controllers there will still be some replica instability. One way to handle this is
 	// by querying the store for all controllers that this rc overlaps, as well as all
 	// controllers that overlap this rc, and sorting them.
-	logger.Info("enqueueing job", "key", key, "delay", delay)
+	logger.V(2).Info("enqueueing job", "key", key, "delay", delay)
 	jm.queue.AddAfter(key, delay)
 }
 
@@ -1007,7 +1007,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
 			// updates.
-			if job.Spec.Suspend != nil && *job.Spec.Suspend {
+			if jobSuspended(&job) {
 				// Job can be in the suspended state only if it is NOT completed.
 				var isUpdated bool
 				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended", jm.clock.Now())

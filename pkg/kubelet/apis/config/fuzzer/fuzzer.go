@@ -20,7 +20,7 @@ import (
 	"math/rand"
 	"time"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
@@ -38,8 +38,8 @@ import (
 func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
 		// provide non-empty values for fields with defaults, so the defaulter doesn't change values during round-trip
-		func(obj *kubeletconfig.KubeletConfiguration, c fuzz.Continue) {
-			c.FuzzNoCustom(obj)
+		func(obj *kubeletconfig.KubeletConfiguration, c randfill.Continue) {
+			c.FillNoCustom(obj)
 			obj.EnableServer = true
 			obj.Authentication.Anonymous.Enabled = true
 			obj.Authentication.Webhook.Enabled = false
@@ -98,6 +98,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.HairpinMode = v1beta1.PromiscuousBridge
 			obj.EvictionHard = eviction.DefaultEvictionHard
 			obj.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 5 * time.Minute}
+			obj.MergeDefaultEvictionSettings = false
 			obj.MakeIPTablesUtilChains = true
 			obj.IPTablesMasqueradeBit = kubeletconfigv1beta1.DefaultIPTablesMasqueradeBit
 			obj.IPTablesDropBit = kubeletconfigv1beta1.DefaultIPTablesDropBit
@@ -125,6 +126,12 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 				"AllAlpha": false,
 				"AllBeta":  true,
 			}
+		},
+
+		// tokenAttributes field is only supported in v1 CredentialProvider
+		func(obj *kubeletconfig.CredentialProvider, c randfill.Continue) {
+			c.FillNoCustom(obj)
+			obj.TokenAttributes = nil
 		},
 	}
 }

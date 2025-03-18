@@ -18,12 +18,14 @@ package endpointslice
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -66,6 +68,9 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if !testcase.hintsGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
 
 			dropDisabledFieldsOnCreate(testcase.eps)
@@ -282,6 +287,9 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if !testcase.hintsGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
 
 			dropDisabledFieldsOnUpdate(testcase.oldEPS, testcase.newEPS)
@@ -1010,6 +1018,89 @@ func TestWarningsOnEndpointSliceAddressType(t *testing.T) {
 				t.Fatal("Failed warning was not returned")
 			} else if !tc.wantWarning && len(got) != 0 {
 				t.Fatalf("Failed warning  was returned (%v)", got)
+			}
+		})
+	}
+}
+
+func Test_warnOnBadIPs(t *testing.T) {
+	tests := []struct {
+		name     string
+		slice    *discovery.EndpointSlice
+		warnings []string
+	}{
+		{
+			name:     "empty EndpointSlice",
+			slice:    &discovery.EndpointSlice{},
+			warnings: nil,
+		},
+		{
+			name: "valid EndpointSlice",
+			slice: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"1.2.3.4",
+							"fd00::1234",
+						},
+					},
+				},
+			},
+			warnings: nil,
+		},
+		{
+			name: "bad EndpointSlice",
+			slice: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"fd00::1234",
+							"01.02.03.04",
+						},
+					},
+					{
+						Addresses: []string{
+							"::ffff:1.2.3.4",
+						},
+					},
+				},
+			},
+			warnings: []string{
+				"endpoints[0].addresses[1]",
+				"endpoints[1].addresses[0]",
+			},
+		},
+		{
+			name: "bad EndpointSlice ignored because of label",
+			slice: &discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"endpointslice.kubernetes.io/managed-by": "endpointslice-controller.k8s.io",
+					},
+				},
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"fd00::1234",
+							"01.02.03.04",
+						},
+					},
+				},
+			},
+			warnings: nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			warnings := warnOnBadIPs(test.slice)
+			if len(warnings) != len(test.warnings) {
+				t.Fatalf("Expected warnings %v, got %v", test.warnings, warnings)
+			}
+			for i := range warnings {
+				if !strings.HasPrefix(warnings[i], test.warnings[i]) {
+					t.Fatalf("Expected warnings %v, got %v", test.warnings, warnings)
+				}
 			}
 		})
 	}

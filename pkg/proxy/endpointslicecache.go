@@ -25,9 +25,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -213,12 +211,10 @@ func (cache *EndpointSliceCache) addEndpoints(svcPortName *ServicePortName, port
 		terminating := endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating
 
 		var zoneHints sets.Set[string]
-		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
-			if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
-				zoneHints = sets.New[string]()
-				for _, zone := range endpoint.Hints.ForZones {
-					zoneHints.Insert(zone.Name)
-				}
+		if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+			zoneHints = sets.New[string]()
+			for _, zone := range endpoint.Hints.ForZones {
+				zoneHints.Insert(zone.Name)
 			}
 		}
 

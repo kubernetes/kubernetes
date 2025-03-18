@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	helpers "k8s.io/component-helpers/resource"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
@@ -45,16 +46,15 @@ func podRequests(pod *corev1.Pod) corev1.ResourceList {
 	for i := range pod.Status.ContainerStatuses {
 		containerStatuses[pod.Status.ContainerStatuses[i].Name] = &pod.Status.ContainerStatuses[i]
 	}
+	for i := range pod.Status.InitContainerStatuses {
+		containerStatuses[pod.Status.InitContainerStatuses[i].Name] = &pod.Status.InitContainerStatuses[i]
+	}
 
 	for _, container := range pod.Spec.Containers {
 		containerReqs := container.Resources.Requests
 		cs, found := containerStatuses[container.Name]
 		if found && cs.Resources != nil {
-			if pod.Status.Resize == corev1.PodResizeStatusInfeasible {
-				containerReqs = cs.Resources.Requests.DeepCopy()
-			} else {
-				containerReqs = max(container.Resources.Requests, cs.Resources.Requests)
-			}
+			containerReqs = determineContainerReqs(pod, &container, cs)
 		}
 		addResourceList(reqs, containerReqs)
 	}
@@ -66,6 +66,10 @@ func podRequests(pod *corev1.Pod) corev1.ResourceList {
 		containerReqs := container.Resources.Requests
 
 		if container.RestartPolicy != nil && *container.RestartPolicy == corev1.ContainerRestartPolicyAlways {
+			cs, found := containerStatuses[container.Name]
+			if found && cs.Resources != nil {
+				containerReqs = determineContainerReqs(pod, &container, cs)
+			}
 			// and add them to the resulting cumulative container requests
 			addResourceList(reqs, containerReqs)
 
@@ -135,6 +139,14 @@ func podLimits(pod *corev1.Pod) corev1.ResourceList {
 	}
 
 	return limits
+}
+
+// determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
+func determineContainerReqs(pod *corev1.Pod, container *corev1.Container, cs *corev1.ContainerStatus) corev1.ResourceList {
+	if helpers.IsPodResizeInfeasible(pod) {
+		return cs.Resources.Requests.DeepCopy()
+	}
+	return max(container.Resources.Requests, cs.Resources.Requests)
 }
 
 // max returns the result of max(a, b) for each named resource and is only used if we can't

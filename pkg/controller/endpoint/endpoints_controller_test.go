@@ -23,6 +23,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,9 +93,12 @@ func testPod(namespace string, id int, nPorts int, isReady bool, ipFamilies []v1
 	for _, family := range ipFamilies {
 		var ip string
 		if family == v1.IPv4Protocol {
-			ip = fmt.Sprintf("1.2.3.%d", 4+id)
+			// if id=1, ip=1.2.3.4
+			// if id=2, ip=1.2.3.5
+			// if id=999, ip=1.2.6.235
+			ip = fmt.Sprintf("1.2.%d.%d", 3+((4+id)/256), (4+id)%256)
 		} else {
-			ip = fmt.Sprintf("2000::%d", 4+id)
+			ip = fmt.Sprintf("2000::%x", 4+id)
 		}
 		p.Status.PodIPs = append(p.Status.PodIPs, v1.PodIP{IP: ip})
 	}
@@ -109,6 +113,13 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotRea
 		pod := testPod(namespace, i, nPorts, isReady, ipFamilies)
 		store.Add(pod)
 	}
+}
+
+func addBadIPPod(store cache.Store, namespace string, ipFamilies []v1.IPFamily) {
+	pod := testPod(namespace, 0, 1, true, ipFamilies)
+	pod.Status.PodIPs[0].IP = "0" + pod.Status.PodIPs[0].IP
+	pod.Status.PodIP = pod.Status.PodIPs[0].IP
+	store.Add(pod)
 }
 
 func addNotReadyPodsWithSpecifiedRestartPolicyAndPhase(store cache.Store, namespace string, nPods int, nPorts int, restartPolicy v1.RestartPolicy, podPhase v1.PodPhase) {
@@ -306,6 +317,9 @@ func TestSyncEndpointsExistingNilSubsets(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+			},
 		},
 		Subsets: nil,
 	})
@@ -335,6 +349,9 @@ func TestSyncEndpointsExistingEmptySubsets(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
@@ -365,6 +382,9 @@ func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{
@@ -387,8 +407,9 @@ func TestSyncEndpointsWithPodResourceVersionUpdateOnly(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	pod0.ResourceVersion = "3"
@@ -472,8 +493,9 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -488,6 +510,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -511,6 +534,7 @@ func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -622,8 +646,9 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "UDP"}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "UDP"}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -638,6 +663,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -670,8 +696,9 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "SCTP"}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "SCTP"}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -686,6 +713,7 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -715,8 +743,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -730,6 +759,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -760,8 +790,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -775,6 +806,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -805,8 +837,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -820,6 +853,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -843,6 +877,9 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
@@ -853,8 +890,9 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -868,6 +906,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -890,6 +929,9 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			ResourceVersion: "1",
 			Name:            "foo",
 			Namespace:       ns,
+			Labels: map[string]string{
+				LabelManagedBy: ControllerName,
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -900,8 +942,9 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: metav1.NamespaceDefault},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -928,6 +971,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt32(8088)},
 			},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, "other/foo")
@@ -951,6 +995,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			ResourceVersion: "",
 			Name:            "foo",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -980,6 +1025,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)},
 				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt32(8088)},
 			},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1000,6 +1046,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	}}
 
 	serviceLabels[v1.IsHeadlessService] = ""
+	serviceLabels[LabelManagedBy] = ControllerName
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
@@ -1041,8 +1088,9 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Labels:    serviceLabels,
 		},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1051,6 +1099,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	}
 
 	serviceLabels[v1.IsHeadlessService] = ""
+	serviceLabels[LabelManagedBy] = ControllerName
 	data := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -1091,8 +1140,9 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			service := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{},
-					Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+					Selector:   map[string]string{},
+					Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			}
 			endpoints.serviceStore.Add(service)
@@ -1141,9 +1191,10 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, Labels: map[string]string{"a": "b"}},
 		Spec: v1.ServiceSpec{
-			Selector:  map[string]string{},
-			ClusterIP: api.ClusterIPNone,
-			Ports:     []v1.ServicePort{},
+			Selector:   map[string]string{},
+			ClusterIP:  api.ClusterIPNone,
+			Ports:      []v1.ServicePort{},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	}
 	originalService := service.DeepCopy()
@@ -1158,6 +1209,7 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				"a":                  "b",
 				v1.IsHeadlessService: "",
 			},
@@ -1187,7 +1239,8 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
-				"foo": "bar",
+				LabelManagedBy: ControllerName,
+				"foo":          "bar",
 			},
 		},
 		Subsets: []v1.EndpointSubset{},
@@ -1196,8 +1249,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1210,6 +1264,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1240,8 +1295,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1254,6 +1310,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1284,8 +1341,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{"foo": "bar"},
-			Ports:    []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1299,6 +1357,7 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1316,9 +1375,10 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector:  map[string]string{"foo": "bar"},
-			ClusterIP: "None",
-			Ports:     nil,
+			Selector:   map[string]string{"foo": "bar"},
+			ClusterIP:  "None",
+			Ports:      nil,
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	addPods(endpoints.podStore, ns, 1, 1, 0, ipv4only)
@@ -1332,6 +1392,7 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1359,7 +1420,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
+					ClusterIP:  "10.0.0.1",
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 			expectedEndpointFamily: ipv4,
@@ -1369,7 +1431,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
+					ClusterIP:  "10.0.0.1",
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 			expectedEndpointFamily: ipv4,
@@ -1379,7 +1442,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			ipFamilies: ipv6ipv4,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: "10.0.0.1",
+					ClusterIP:  "10.0.0.1",
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 			expectedEndpointFamily: ipv4,
@@ -1389,7 +1453,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 			expectedEndpointFamily: ipv4,
@@ -1406,31 +1471,12 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name:       "v4 legacy headless service, in a dual stack cluster",
-			ipFamilies: ipv4ipv6,
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-				},
-			},
-			expectedEndpointFamily: ipv4,
-		},
-		{
-			name:       "v4 legacy headless service, in a dual stack ipv6-primary cluster",
-			ipFamilies: ipv6ipv4,
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-				},
-			},
-			expectedEndpointFamily: ipv6,
-		},
-		{
 			name:       "v6 service, in a dual stack cluster",
 			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: "3000::1",
+					ClusterIP:  "3000::1",
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
 				},
 			},
 			expectedEndpointFamily: ipv6,
@@ -1440,13 +1486,14 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			ipFamilies: ipv6only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
 				},
 			},
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name:       "v6 headless service, in a dual stack cluster (connected to a new api-server)",
+			name:       "v6 headless service, in a dual stack cluster",
 			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
@@ -1457,38 +1504,12 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name:       "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
-			ipFamilies: ipv4ipv6,
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
-				},
-			},
-			expectedEndpointFamily: ipv4,
-		},
-		// in reality this is a misconfigured cluster
-		// i.e user is not using dual stack and have PodIP == v4 and ServiceIP==v6
-		// previously controller could assign wrong ip to endpoint address
-		// with gate removed. this is no longer the case. this is *not* behavior change
-		// because previously things would have failed in kube-proxy anyway (due to editing wrong iptables).
-		{
-			name:       "v6 service, in a v4 only cluster.",
-			ipFamilies: ipv4only,
-			service: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIP: "3000::1",
-				},
-			},
-			expectError:            true,
-			expectedEndpointFamily: ipv4,
-		},
-		// but this will actually give an error
-		{
 			name:       "v6 service, in a v4 only cluster",
 			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: "3000::1",
+					ClusterIP:  "3000::1",
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
 				},
 			},
 			expectError: true,
@@ -1498,7 +1519,9 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 			ns := "test"
-			addPods(podStore, ns, 1, 1, 0, tc.ipFamilies)
+			// We use addBadIPPod to test that podToEndpointAddressForService
+			// fixes up the bad IP.
+			addBadIPPod(podStore, ns, tc.ipFamilies)
 			pods := podStore.List()
 			if len(pods) != 1 {
 				t.Fatalf("podStore size: expected: %d, got: %d", 1, len(pods))
@@ -1520,6 +1543,9 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			if utilnet.IsIPv6String(epa.IP) != (tc.expectedEndpointFamily == ipv6) {
 				t.Fatalf("IP: expected %s, got: %s", tc.expectedEndpointFamily, epa.IP)
+			}
+			if strings.HasPrefix(epa.IP, "0") {
+				t.Fatalf("IP: expected valid, got: %s", epa.IP)
 			}
 			if *(epa.NodeName) != pod.Spec.NodeName {
 				t.Fatalf("NodeName: expected: %s, got: %s", pod.Spec.NodeName, *(epa.NodeName))
@@ -1566,8 +1592,9 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, CreationTimestamp: metav1.NewTime(triggerTime)},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1585,6 +1612,7 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
 			},
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1621,8 +1649,9 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns, CreationTimestamp: metav1.NewTime(triggerTime)},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1640,6 +1669,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
 			},
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			},
 		},
@@ -1677,8 +1707,9 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 	endpoints.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector: map[string]string{},
-			Ports:    []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			Selector:   map[string]string{},
+			Ports:      []v1.ServicePort{{Port: 80, TargetPort: intstr.FromInt32(8080), Protocol: "TCP"}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 	err := endpoints.syncService(tCtx, ns+"/foo")
@@ -1693,6 +1724,7 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 			Namespace:       ns,
 			ResourceVersion: "1",
 			Labels: map[string]string{
+				LabelManagedBy:       ControllerName,
 				v1.IsHeadlessService: "",
 			}, // Annotation not set anymore.
 		},
@@ -1820,8 +1852,9 @@ func TestPodUpdatesBatching(t *testing.T) {
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					Ports:      []v1.ServicePort{{Port: 80}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			})
 
@@ -1941,8 +1974,9 @@ func TestPodAddsBatching(t *testing.T) {
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					Ports:      []v1.ServicePort{{Port: 80}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			})
 
@@ -2065,8 +2099,9 @@ func TestPodDeleteBatching(t *testing.T) {
 			endpoints.serviceStore.Add(&v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					Ports:      []v1.ServicePort{{Port: 80}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			})
 
@@ -2207,8 +2242,9 @@ func TestSyncServiceOverCapacity(t *testing.T) {
 			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 				Spec: v1.ServiceSpec{
-					Selector: map[string]string{"foo": "bar"},
-					Ports:    []v1.ServicePort{{Port: 80}},
+					Selector:   map[string]string{"foo": "bar"},
+					Ports:      []v1.ServicePort{{Port: 80}},
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			}
 			c.serviceStore.Add(svc)
@@ -2405,9 +2441,10 @@ func TestMultipleServiceChanges(t *testing.T) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector:  map[string]string{"foo": "bar"},
-			ClusterIP: "None",
-			Ports:     nil,
+			Selector:   map[string]string{"foo": "bar"},
+			ClusterIP:  "None",
+			Ports:      nil,
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	}
 
@@ -2477,9 +2514,10 @@ func TestMultiplePodChanges(t *testing.T) {
 	_ = controller.serviceStore.Add(&v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: v1.ServiceSpec{
-			Selector:  map[string]string{"foo": "bar"},
-			ClusterIP: "10.0.0.1",
-			Ports:     []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			Selector:   map[string]string{"foo": "bar"},
+			ClusterIP:  "10.0.0.1",
+			Ports:      []v1.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt32(8080)}},
+			IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 		},
 	})
 
@@ -2525,6 +2563,7 @@ func TestSyncServiceAddresses(t *testing.T) {
 				Type:                     v1.ServiceTypeClusterIP,
 				ClusterIP:                "1.1.1.1",
 				Ports:                    []v1.ServicePort{{Port: 80}},
+				IPFamilies:               []v1.IPFamily{v1.IPv4Protocol},
 			},
 		}
 	}

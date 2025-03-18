@@ -59,12 +59,6 @@ func expectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
-// PodsCreated returns a pod list matched by the given name.
-func PodsCreated(ctx context.Context, c clientset.Interface, ns, name string, replicas int32) (*v1.PodList, error) {
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	return PodsCreatedByLabel(ctx, c, ns, name, replicas, label)
-}
-
 // PodsCreatedByLabel returns a created pod list matched by the given label.
 func PodsCreatedByLabel(ctx context.Context, c clientset.Interface, ns, name string, replicas int32, label labels.Selector) (*v1.PodList, error) {
 	timeout := 2 * time.Minute
@@ -95,26 +89,32 @@ func PodsCreatedByLabel(ctx context.Context, c clientset.Interface, ns, name str
 }
 
 // VerifyPods checks if the specified pod is responding.
-func VerifyPods(ctx context.Context, c clientset.Interface, ns, name string, wantName bool, replicas int32) error {
-	return podRunningMaybeResponding(ctx, c, ns, name, wantName, replicas, true)
-}
-
-// VerifyPodsRunning checks if the specified pod is running.
-func VerifyPodsRunning(ctx context.Context, c clientset.Interface, ns, name string, wantName bool, replicas int32) error {
-	return podRunningMaybeResponding(ctx, c, ns, name, wantName, replicas, false)
-}
-
-func podRunningMaybeResponding(ctx context.Context, c clientset.Interface, ns, name string, wantName bool, replicas int32, checkResponding bool) error {
-	pods, err := PodsCreated(ctx, c, ns, name, replicas)
+func VerifyPods(ctx context.Context, c clientset.Interface, ns, name string, selector labels.Selector, wantName bool, replicas int32) error {
+	pods, err := PodsCreatedByLabel(ctx, c, ns, name, replicas, selector)
 	if err != nil {
 		return err
 	}
+
+	return podsRunningMaybeResponding(ctx, c, ns, name, selector, pods, wantName, true)
+}
+
+// VerifyPodsRunning checks if the specified pod is running.
+func VerifyPodsRunning(ctx context.Context, c clientset.Interface, ns, name string, selector labels.Selector, wantName bool, replicas int32) error {
+	pods, err := PodsCreatedByLabel(ctx, c, ns, name, replicas, selector)
+	if err != nil {
+		return err
+	}
+
+	return podsRunningMaybeResponding(ctx, c, ns, name, selector, pods, wantName, false)
+}
+
+func podsRunningMaybeResponding(ctx context.Context, c clientset.Interface, ns string, name string, selector labels.Selector, pods *v1.PodList, wantName bool, checkResponding bool) error {
 	e := podsRunning(ctx, c, pods)
 	if len(e) > 0 {
 		return fmt.Errorf("failed to wait for pods running: %v", e)
 	}
 	if checkResponding {
-		return WaitForPodsResponding(ctx, c, ns, name, wantName, podRespondingTimeout, pods)
+		return WaitForPodsResponding(ctx, c, ns, name, selector, wantName, podRespondingTimeout, pods)
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func LogPodStates(pods []v1.Pod) {
 		if pod.DeletionGracePeriodSeconds != nil {
 			grace = fmt.Sprintf("%ds", *pod.DeletionGracePeriodSeconds)
 		}
-		framework.Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s",
+		framework.Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]v",
 			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, maxGraceW, grace, pod.Status.Conditions)
 	}
 	framework.Logf("") // Final empty line helps for readability.

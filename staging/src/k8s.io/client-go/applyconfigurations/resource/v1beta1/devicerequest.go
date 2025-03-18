@@ -31,6 +31,7 @@ type DeviceRequestApplyConfiguration struct {
 	AllocationMode  *resourcev1beta1.DeviceAllocationMode `json:"allocationMode,omitempty"`
 	Count           *int64                                `json:"count,omitempty"`
 	AdminAccess     *bool                                 `json:"adminAccess,omitempty"`
+	FirstAvailable  []DeviceSubRequestApplyConfiguration  `json:"firstAvailable,omitempty"`
 }
 
 // DeviceRequestApplyConfiguration constructs a declarative configuration of the DeviceRequest type for use with
@@ -89,5 +90,18 @@ func (b *DeviceRequestApplyConfiguration) WithCount(value int64) *DeviceRequestA
 // If called multiple times, the AdminAccess field is set to the value of the last call.
 func (b *DeviceRequestApplyConfiguration) WithAdminAccess(value bool) *DeviceRequestApplyConfiguration {
 	b.AdminAccess = &value
+	return b
+}
+
+// WithFirstAvailable adds the given value to the FirstAvailable field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the FirstAvailable field.
+func (b *DeviceRequestApplyConfiguration) WithFirstAvailable(values ...*DeviceSubRequestApplyConfiguration) *DeviceRequestApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithFirstAvailable")
+		}
+		b.FirstAvailable = append(b.FirstAvailable, *values[i])
+	}
 	return b
 }

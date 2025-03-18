@@ -21,7 +21,6 @@ package preflight
 
 import (
 	system "k8s.io/system-validators/validators"
-	utilsexec "k8s.io/utils/exec"
 )
 
 // addOSValidator adds a new OSValidator
@@ -45,11 +44,5 @@ func addIPv4Checks(checks []Checker) []Checker {
 // addSwapCheck adds a swap check
 // No-op for Darwin (MacOS), Windows.
 func addSwapCheck(checks []Checker) []Checker {
-	return checks
-}
-
-// addExecChecks adds checks that verify if certain binaries are in PATH
-// No-op for Darwin (MacOS), Windows.
-func addExecChecks(checks []Checker, _ utilsexec.Interface, _ string) []Checker {
 	return checks
 }

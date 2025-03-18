@@ -40,14 +40,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/status/state"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
 )
-
-// podStatusManagerStateFile is the file name where status manager stores its state
-const podStatusManagerStateFile = "pod_status_manager_state"
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
 // not sent to the API server.
@@ -72,19 +68,32 @@ type manager struct {
 	kubeClient clientset.Interface
 	podManager PodManager
 	// Map from pod UID to sync status of the corresponding pod.
-	podStatuses      map[types.UID]versionedPodStatus
-	podStatusesLock  sync.RWMutex
-	podStatusChannel chan struct{}
+	podStatuses         map[types.UID]versionedPodStatus
+	podResizeConditions map[types.UID]podResizeConditions
+	podStatusesLock     sync.RWMutex
+	podStatusChannel    chan struct{}
 	// Map from (mirror) pod UID to latest status version successfully sent to the API server.
 	// apiStatusVersions must only be accessed from the sync thread.
 	apiStatusVersions map[kubetypes.MirrorPodUID]uint64
 	podDeletionSafety PodDeletionSafetyProvider
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
-	// state allows to save/restore pod resource allocation and tolerate kubelet restarts.
-	state state.State
-	// stateFileDirectory holds the directory where the state file for checkpoints is held.
-	stateFileDirectory string
+}
+
+type podResizeConditions struct {
+	PodResizePending    *v1.PodCondition
+	PodResizeInProgress *v1.PodCondition
+}
+
+func (prc podResizeConditions) List() []*v1.PodCondition {
+	var conditions []*v1.PodCondition
+	if prc.PodResizePending != nil {
+		conditions = append(conditions, prc.PodResizePending)
+	}
+	if prc.PodResizeInProgress != nil {
+		conditions = append(conditions, prc.PodResizeInProgress)
+	}
+	return conditions
 }
 
 // PodManager is the subset of methods the manager needs to observe the actual state of the kubelet.
@@ -143,42 +152,35 @@ type Manager interface {
 	// the provided podUIDs.
 	RemoveOrphanedStatuses(podUIDs map[types.UID]bool)
 
-	// GetPodResizeStatus returns cached PodStatus.Resize value
-	GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus
+	// GetPodResizeConditions returns cached PodStatus Resize conditions value
+	GetPodResizeConditions(podUID types.UID) []*v1.PodCondition
 
-	// SetPodResizeStatus caches the last resizing decision for the pod.
-	SetPodResizeStatus(podUID types.UID, resize v1.PodResizeStatus)
+	// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
+	SetPodResizePendingCondition(podUID types.UID, reason, message string)
 
-	allocationManager
-}
+	// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
+	SetPodResizeInProgressCondition(podUID types.UID, reason, message string)
 
-// TODO(tallclair): Refactor allocation state handling out of the status manager.
-type allocationManager interface {
-	// GetContainerResourceAllocation returns the checkpointed AllocatedResources value for the container
-	GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool)
+	// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
+	ClearPodResizePendingCondition(podUID types.UID)
 
-	// UpdatePodFromAllocation overwrites the pod spec with the allocation.
-	// This function does a deep copy only if updates are needed.
-	// Returns the updated (or original) pod, and whether there was an allocation stored.
-	UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool)
-
-	// SetPodAllocation checkpoints the resources allocated to a pod's containers.
-	SetPodAllocation(pod *v1.Pod) error
+	// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
+	ClearPodResizeInProgressCondition(podUID types.UID)
 }
 
 const syncPeriod = 10 * time.Second
 
 // NewManager returns a functional Manager.
-func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper, stateFileDirectory string) Manager {
+func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
 	return &manager{
 		kubeClient:              kubeClient,
 		podManager:              podManager,
 		podStatuses:             make(map[types.UID]versionedPodStatus),
+		podResizeConditions:     make(map[types.UID]podResizeConditions),
 		podStatusChannel:        make(chan struct{}, 1),
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
-		stateFileDirectory:      stateFileDirectory,
 	}
 }
 
@@ -188,34 +190,35 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 // changes will be ignored.
 func isPodStatusByKubeletEqual(oldStatus, status *v1.PodStatus) bool {
 	oldCopy := oldStatus.DeepCopy()
+
+	newConditions := make(map[v1.PodConditionType]*v1.PodCondition, len(status.Conditions))
+	oldConditions := make(map[v1.PodConditionType]*v1.PodCondition, len(oldStatus.Conditions))
 	for _, c := range status.Conditions {
-		// both owned and shared conditions are used for kubelet status equality
 		if kubetypes.PodConditionByKubelet(c.Type) || kubetypes.PodConditionSharedByKubelet(c.Type) {
-			_, oc := podutil.GetPodCondition(oldCopy, c.Type)
-			if oc == nil || oc.Status != c.Status || oc.Message != c.Message || oc.Reason != c.Reason {
-				return false
-			}
+			newConditions[c.Type] = &c
 		}
 	}
+	for _, c := range oldStatus.Conditions {
+		if kubetypes.PodConditionByKubelet(c.Type) || kubetypes.PodConditionSharedByKubelet(c.Type) {
+			oldConditions[c.Type] = &c
+		}
+	}
+
+	if len(newConditions) != len(oldConditions) {
+		return false
+	}
+	for _, newCondition := range newConditions {
+		oldCondition := oldConditions[newCondition.Type]
+		if oldCondition == nil || oldCondition.Status != newCondition.Status || oldCondition.Message != newCondition.Message || oldCondition.Reason != newCondition.Reason {
+			return false
+		}
+	}
+
 	oldCopy.Conditions = status.Conditions
 	return apiequality.Semantic.DeepEqual(oldCopy, status)
 }
 
 func (m *manager) Start() {
-	// Initialize m.state to no-op state checkpoint manager
-	m.state = state.NewNoopStateCheckpoint()
-
-	// Create pod allocation checkpoint manager even if client is nil so as to allow local get/set of AllocatedResources & Resize
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		stateImpl, err := state.NewStateCheckpoint(m.stateFileDirectory, podStatusManagerStateFile)
-		if err != nil {
-			// This is a crictical, non-recoverable failure.
-			klog.ErrorS(err, "Could not initialize pod allocation checkpoint manager, please drain node and remove policy state file")
-			panic(err)
-		}
-		m.state = stateImpl
-	}
-
 	// Don't start the status manager if we don't have a client. This will happen
 	// on the master, where the kubelet is responsible for bootstrapping the pods
 	// of the master components.
@@ -244,72 +247,53 @@ func (m *manager) Start() {
 	}, 0)
 }
 
-// GetContainerResourceAllocation returns the last checkpointed AllocatedResources values
-// If checkpoint manager has not been initialized, it returns nil, false
-func (m *manager) GetContainerResourceAllocation(podUID string, containerName string) (v1.ResourceRequirements, bool) {
+// GetPodResizeConditions returns the last cached ResizeStatus value.
+func (m *manager) GetPodResizeConditions(podUID types.UID) []*v1.PodCondition {
 	m.podStatusesLock.RLock()
 	defer m.podStatusesLock.RUnlock()
-	return m.state.GetContainerResourceAllocation(podUID, containerName)
+	return m.podResizeConditions[podUID].List()
 }
 
-// UpdatePodFromAllocation overwrites the pod spec with the allocation.
-// This function does a deep copy only if updates are needed.
-func (m *manager) UpdatePodFromAllocation(pod *v1.Pod) (*v1.Pod, bool) {
-	m.podStatusesLock.RLock()
-	defer m.podStatusesLock.RUnlock()
-	// TODO(tallclair): This clones the whole cache, but we only need 1 pod.
-	allocs := m.state.GetPodResourceAllocation()
-	return updatePodFromAllocation(pod, allocs)
-}
+// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
+func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message string) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
 
-func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceAllocation) (*v1.Pod, bool) {
-	allocated, found := allocs[string(pod.UID)]
-	if !found {
-		return pod, false
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message),
+		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
 	}
+}
 
-	updated := false
-	for i, c := range pod.Spec.Containers {
-		if cAlloc, ok := allocated[c.Name]; ok {
-			if !apiequality.Semantic.DeepEqual(c.Resources, cAlloc) {
-				// Allocation differs from pod spec, update
-				if !updated {
-					// If this is the first update, copy the pod
-					pod = pod.DeepCopy()
-					updated = true
-				}
-				pod.Spec.Containers[i].Resources = cAlloc
-			}
-		}
+// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
+func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message),
+		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 	}
-	return pod, updated
 }
 
-// GetPodResizeStatus returns the last cached ResizeStatus value.
-func (m *manager) GetPodResizeStatus(podUID types.UID) v1.PodResizeStatus {
-	m.podStatusesLock.RLock()
-	defer m.podStatusesLock.RUnlock()
-	return m.state.GetPodResizeStatus(string(podUID))
-}
-
-// SetPodAllocation checkpoints the resources allocated to a pod's containers
-func (m *manager) SetPodAllocation(pod *v1.Pod) error {
-	m.podStatusesLock.RLock()
-	defer m.podStatusesLock.RUnlock()
-	for _, container := range pod.Spec.Containers {
-		alloc := *container.Resources.DeepCopy()
-		if err := m.state.SetContainerResourceAllocation(string(pod.UID), container.Name, alloc); err != nil {
-			return err
-		}
+// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
+func (m *manager) ClearPodResizePendingCondition(podUID types.UID) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizePending:    nil,
+		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
 	}
-	return nil
 }
 
-// SetPodResizeStatus checkpoints the last resizing decision for the pod.
-func (m *manager) SetPodResizeStatus(podUID types.UID, resizeStatus v1.PodResizeStatus) {
-	m.podStatusesLock.RLock()
-	defer m.podStatusesLock.RUnlock()
-	m.state.SetPodResizeStatus(string(podUID), resizeStatus)
+// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
+func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	m.podResizeConditions[podUID] = podResizeConditions{
+		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
+		PodResizeInProgress: nil,
+	}
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
@@ -325,6 +309,9 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 
 	// Make sure we're caching a deep copy.
 	status = *status.DeepCopy()
+
+	// Set the observedGeneration for this pod status.
+	status.ObservedGeneration = podutil.GetPodObservedGenerationIfEnabled(pod)
 
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
@@ -690,6 +677,11 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		status.StartTime = &now
 	}
 
+	// prevent sending unnecessary patches
+	if oldStatus.ObservedGeneration > status.ObservedGeneration {
+		status.ObservedGeneration = oldStatus.ObservedGeneration
+	}
+
 	normalizeStatus(pod, &status)
 
 	// Perform some more extensive logging of container termination state to assist in
@@ -779,7 +771,7 @@ func (m *manager) deletePodStatus(uid types.UID) {
 	delete(m.podStatuses, uid)
 	m.podStartupLatencyHelper.DeletePodStartupState(uid)
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		m.state.Delete(string(uid), "")
+		delete(m.podResizeConditions, uid)
 	}
 }
 
@@ -792,7 +784,7 @@ func (m *manager) RemoveOrphanedStatuses(podUIDs map[types.UID]bool) {
 			klog.V(5).InfoS("Removing pod from status map.", "podUID", key)
 			delete(m.podStatuses, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-				m.state.Delete(string(key), "")
+				delete(m.podResizeConditions, key)
 			}
 		}
 	}
@@ -1168,4 +1160,23 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 		return true
 	}
 	return false
+}
+
+func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *v1.PodCondition, reason, message string) *v1.PodCondition {
+	now := metav1.NewTime(time.Now())
+	var lastTransitionTime metav1.Time
+	if oldCondition == nil || oldCondition.Reason != reason {
+		lastTransitionTime = now
+	} else {
+		lastTransitionTime = oldCondition.LastTransitionTime
+	}
+
+	return &v1.PodCondition{
+		Type:               conditionType,
+		Status:             v1.ConditionTrue,
+		LastProbeTime:      now,
+		LastTransitionTime: lastTransitionTime,
+		Reason:             reason,
+		Message:            message,
+	}
 }

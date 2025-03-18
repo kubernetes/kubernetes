@@ -19,8 +19,9 @@ package library
 import (
 	"context"
 	"fmt"
-	"github.com/google/cel-go/common/types/ref"
 	"testing"
+
+	"github.com/google/cel-go/common/types/ref"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker"
@@ -1110,6 +1111,86 @@ func TestSetsCost(t *testing.T) {
 	}
 }
 
+func TestSemverCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "semver",
+			expr:                `semver("1.0.0")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "semver long input",
+			expr:                `semver("1234.56789012345.67890123456789")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 4, Max: 4},
+			expectRuntimeCost:   4,
+		},
+		{
+			name:                "isSemver",
+			expr:                `isSemver("1.0.0")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 1, Max: 1},
+			expectRuntimeCost:   1,
+		},
+		{
+			name:                "isSemver long input",
+			expr:                `isSemver("1234.56789012345.67890123456789")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 4, Max: 4},
+			expectRuntimeCost:   4,
+		},
+		// major(), minor(), patch()
+		{
+			name:                "major",
+			expr:                `semver("1.2.3").major()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "minor",
+			expr:                `semver("1.2.3").minor()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "patch",
+			expr:                `semver("1.2.3").patch()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		// isLessThan
+		{
+			name:                "isLessThan",
+			expr:                `semver("1.0.0").isLessThan(semver("1.1.0"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		// isGreaterThan
+		{
+			name:                "isGreaterThan",
+			expr:                `semver("1.1.0").isGreaterThan(semver("1.0.0"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		// compareTo
+		{
+			name:                "compareTo",
+			expr:                `semver("1.0.0").compareTo(semver("1.2.3"))`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
 func TestTwoVariableComprehensionCost(t *testing.T) {
 	cases := []struct {
 		name                string
@@ -1223,6 +1304,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		// Previous the presence has a cost of 0 but cel fixed it to 1. We still set to 0 here to avoid breaking changes.
 		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
 		ext.TwoVarComprehensions(),
+		SemverLib(SemverVersion(1)),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)

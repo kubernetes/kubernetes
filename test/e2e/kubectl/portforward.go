@@ -617,7 +617,8 @@ var _ = SIGDescribe("Kubectl Port forwarding", func() {
 				// this error indicates timeout when POST-ing data
 				gomega.ContainSubstring("context deadline exceeded"),
 				// this will happen when trying to write to a closed connection
-				gomega.ContainSubstring("write: broken pipe"), gomega.ContainSubstring("closed network connection")))
+				gomega.ContainSubstring("write: broken pipe"), gomega.ContainSubstring("closed network connection"),
+				gomega.ContainSubstring("connect: connection refused")))
 
 			ginkgo.By("Check kubectl port-forward exit code")
 			gomega.Expect(cmd.cmd.ProcessState.ExitCode()).To(gomega.BeNumerically("<", 0), "kubectl port-forward should finish with non-zero exit code")

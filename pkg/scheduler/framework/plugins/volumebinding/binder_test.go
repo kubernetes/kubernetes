@@ -45,6 +45,7 @@ import (
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
 )
 
@@ -167,6 +168,7 @@ func newTestBinder(t *testing.T, ctx context.Context) *testEnv {
 	binder := NewVolumeBinder(
 		logger,
 		client,
+		feature.Features{},
 		podInformer,
 		nodeInformer,
 		csiNodeInformer,

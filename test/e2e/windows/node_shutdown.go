@@ -221,7 +221,7 @@ var _ = sigDescribe(feature.Windows, "GracefulNodeShutdown", framework.WithSeria
 				if !isPodReadyToStartConditionSetToFalse(&pod) {
 					framework.Logf("Expecting pod (%v/%v) 's ready to start condition set to false, "+
 						"but it's not currently: Pod Condition %+v", pod.Namespace, pod.Name, pod.Status.Conditions)
-					return fmt.Errorf("pod (%v/%v) 's ready to start condition should be false, condition: %s, phase: %s",
+					return fmt.Errorf("pod (%v/%v) 's ready to start condition should be false, condition: %v, phase: %s",
 						pod.Namespace, pod.Name, pod.Status.Conditions, pod.Status.Phase)
 				}
 			}

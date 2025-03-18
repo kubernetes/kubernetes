@@ -224,14 +224,6 @@ func TestLexer(t *testing.T) {
 	}
 }
 
-func min(l, r int) (m int) {
-	m = r
-	if l < r {
-		m = l
-	}
-	return m
-}
-
 func TestLexerSequence(t *testing.T) {
 	testcases := []struct {
 		s string

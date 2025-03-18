@@ -409,6 +409,12 @@ func (p *PodWrapper) Node(s string) *PodWrapper {
 	return p
 }
 
+// Tolerations sets `tolerations` as the tolerations of the inner pod.
+func (p *PodWrapper) Tolerations(tolerations []v1.Toleration) *PodWrapper {
+	p.Spec.Tolerations = tolerations
+	return p
+}
+
 // NodeSelector sets `m` as the nodeSelector of the inner pod.
 func (p *PodWrapper) NodeSelector(m map[string]string) *PodWrapper {
 	p.Spec.NodeSelector = m
@@ -1104,6 +1110,28 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 	return wrapper
 }
 
+// RequestWithPrioritizedList adds one device request with one subrequest
+// per provided deviceClassName.
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames ...string) *ResourceClaimWrapper {
+	var prioritizedList []resourceapi.DeviceSubRequest
+	for i, deviceClassName := range deviceClassNames {
+		prioritizedList = append(prioritizedList, resourceapi.DeviceSubRequest{
+			Name:            fmt.Sprintf("subreq-%d", i+1),
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+			DeviceClassName: deviceClassName,
+		})
+	}
+
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name:           fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
+			FirstAvailable: prioritizedList,
+		},
+	)
+	return wrapper
+}
+
 // Allocation sets the allocation of the inner object.
 func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
 	if !slices.Contains(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer) {
@@ -1296,5 +1324,44 @@ func (c *CSIStorageCapacityWrapper) StorageClassName(name string) *CSIStorageCap
 // Capacity sets the `Capacity` of the inner CSIStorageCapacity.
 func (c *CSIStorageCapacityWrapper) Capacity(capacity *resource.Quantity) *CSIStorageCapacityWrapper {
 	c.CSIStorageCapacity.Capacity = capacity
+	return c
+}
+
+// VolumeAttachmentWrapper wraps a VolumeAttachment inside.
+type VolumeAttachmentWrapper struct{ storagev1.VolumeAttachment }
+
+// MakeVolumeAttachment creates a VolumeAttachment wrapper.
+func MakeVolumeAttachment() *VolumeAttachmentWrapper {
+	return &VolumeAttachmentWrapper{}
+}
+
+// Obj returns the inner VolumeAttachment.
+func (c *VolumeAttachmentWrapper) Obj() *storagev1.VolumeAttachment {
+	return &c.VolumeAttachment
+}
+
+// Name sets `n` as the name of the inner VolumeAttachment.
+func (c *VolumeAttachmentWrapper) Name(n string) *VolumeAttachmentWrapper {
+	c.SetName(n)
+	return c
+}
+
+func (c *VolumeAttachmentWrapper) Attacher(attacher string) *VolumeAttachmentWrapper {
+	c.Spec.Attacher = attacher
+	return c
+}
+
+func (c *VolumeAttachmentWrapper) NodeName(nodeName string) *VolumeAttachmentWrapper {
+	c.Spec.NodeName = nodeName
+	return c
+}
+
+func (c *VolumeAttachmentWrapper) Source(source storagev1.VolumeAttachmentSource) *VolumeAttachmentWrapper {
+	c.Spec.Source = source
+	return c
+}
+
+func (c *VolumeAttachmentWrapper) Attached(attached bool) *VolumeAttachmentWrapper {
+	c.Status.Attached = attached
 	return c
 }

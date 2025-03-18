@@ -113,12 +113,21 @@ func TestWebSocketRoundTripper_RoundTripperFails(t *testing.T) {
 				}
 				if testCase.status != nil {
 					statusBytes, err := runtime.Encode(encoder, testCase.status)
-					require.NoError(t, err)
+					if err != nil {
+						t.Errorf("unexpected error %v", err)
+						return
+					}
 					_, err = w.Write(statusBytes)
-					require.NoError(t, err)
+					if err != nil {
+						t.Errorf("unexpected error %v", err)
+						return
+					}
 				} else if len(testCase.body) > 0 {
 					_, err := w.Write([]byte(testCase.body))
-					require.NoError(t, err)
+					if err != nil {
+						t.Errorf("unexpected error %v", err)
+						return
+					}
 				}
 			}))
 			defer websocketServer.Close()

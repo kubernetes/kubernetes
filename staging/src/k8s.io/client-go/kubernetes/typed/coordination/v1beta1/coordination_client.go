@@ -29,6 +29,7 @@ import (
 type CoordinationV1beta1Interface interface {
 	RESTClient() rest.Interface
 	LeasesGetter
+	LeaseCandidatesGetter
 }
 
 // CoordinationV1beta1Client is used to interact with features provided by the coordination.k8s.io group.
@@ -38,6 +39,10 @@ type CoordinationV1beta1Client struct {
 
 func (c *CoordinationV1beta1Client) Leases(namespace string) LeaseInterface {
 	return newLeases(c, namespace)
+}
+
+func (c *CoordinationV1beta1Client) LeaseCandidates(namespace string) LeaseCandidateInterface {
+	return newLeaseCandidates(c, namespace)
 }
 
 // NewForConfig creates a new CoordinationV1beta1Client for the given config.

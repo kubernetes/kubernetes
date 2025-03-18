@@ -85,7 +85,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods for job exist")
@@ -182,7 +182,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -260,7 +260,7 @@ var _ = SIGDescribe("Job", func() {
 		})
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -292,7 +292,7 @@ var _ = SIGDescribe("Job", func() {
 		framework.ExpectNoError(err, "failed to update job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Waiting for job to complete")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -417,7 +417,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods with index for job exist")
@@ -458,7 +458,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring all pods have the required index labels")
@@ -476,12 +476,13 @@ done`}
 	})
 
 	/*
-		Testcase: Ensure that job with successPolicy succeeded when all indexes succeeded
+		Release: v1.33
+		Testname: Ensure that job with successPolicy succeeded when all indexes succeeded
 		Description: Create an indexed job with successPolicy.
 		Verify that job got SuccessCriteriaMet with SuccessPolicy reason and Complete condition
 		once all indexes succeeded.
 	*/
-	ginkgo.It("with successPolicy should succeeded when all indexes succeeded", func(ctx context.Context) {
+	framework.ConformanceIt("with successPolicy should succeeded when all indexes succeeded", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(2)
 		backoffLimit := int32(6) // default value
@@ -502,7 +503,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that job has SuccessCriteriaMet with SuccessPolicy reason condition")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonSuccessPolicy, completions)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the job status to ensure correct final state")
@@ -510,17 +511,19 @@ done`}
 		framework.ExpectNoError(err, "failed to get latest job object")
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
+		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(0)))
 	})
 
 	/*
-		Testcase: Ensure that job with successPolicy succeededIndexes rule succeeded even when some indexes remain pending
+		Release: v1.33
+		Testname: Ensure that job with successPolicy succeededIndexes rule succeeded even when some indexes remain pending
 		Description: Create an indexed job with successPolicy succeededIndexes rule.
 		Verify that the job got SuccessCriteriaMet with SuccessPolicy reason condition and Complete condition
 		when the job met successPolicy even if some indexed remain pending.
 	*/
-	ginkgo.It("with successPolicy succeededIndexes rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
+	framework.ConformanceIt("with successPolicy succeededIndexes rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(5)
 		backoffLimit := int32(6) // default value
@@ -541,7 +544,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that job has SuccessCriteriaMet with SuccessPolicy reason condition")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), 1)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonSuccessPolicy, 1)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the only appropriately index succeeded")
@@ -550,16 +553,18 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
+		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	/*
-		Testcase: Ensure that job with successPolicy succeededCount rule succeeded even when some indexes remain pending
+		Release: v1.33
+		Testname: Ensure that job with successPolicy succeededCount rule succeeded even when some indexes remain pending
 		Description: Create an indexed job with successPolicy succeededCount rule.
 		Verify that the job got the SuccessCriteriaMet with SuccessPolicy reason condition and Complete condition
 		when the job met successPolicy even if some indexed remain pending.
 	*/
-	ginkgo.It("with successPolicy succeededCount rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
+	framework.ConformanceIt("with successPolicy succeededCount rule should succeeded even when some indexes remain pending", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(5)
 		backoffLimit := int32(math.MaxInt32)
@@ -580,7 +585,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure that the job has SuccessCriteriaMet condition with SuccessPolicy rule")
 
 		ginkgo.By("Ensure that the job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonSuccessPolicy), 1)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonSuccessPolicy, 1)
 		framework.ExpectNoError(err, "failed to ensure that job completed")
 
 		ginkgo.By("Verifying that the job status to ensure correct final state")
@@ -589,17 +594,19 @@ done`}
 		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal("0"))
 		gomega.Expect(job.Status.Active).Should(gomega.Equal(int32(0)))
 		gomega.Expect(job.Status.Ready).Should(gomega.Equal(ptr.To[int32](0)))
-		gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
+		// TODO (https://github.com/kubernetes/enhancements/issues/3939): Restore the assert on .status.terminating when PodReplacementPolicy goes GA.
+		// gomega.Expect(job.Status.Terminating).Should(gomega.Equal(ptr.To[int32](0)))
 	})
 
 	/*
-		Testcase: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
+		Release: v1.33
+		Testname: Ensure that all indexes are executed for an indexed job with backoffLimitPerIndex despite some failing
 		Description: Create an indexed job and ensure that all indexes are either failed or succeeded, depending
 		on the end state of the corresponding pods. Pods with odd indexes fail, while the pods with even indexes
 		succeeded. Also, verify that the number of failed pods doubles the number of failing indexes, as the
 		backoffLimitPerIndex=1, allowing for one pod recreation before marking that indexed failed.
 	*/
-	ginkgo.It("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
+	framework.ConformanceIt("should execute all indexes despite some failing when using backoffLimitPerIndex", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(4)
 		backoffLimit := int32(6) // default value
@@ -627,12 +634,13 @@ done`}
 	})
 
 	/*
-		Testcase: Terminate job execution when the maxFailedIndexes is exceeded
+		Release: v1.33
+		Testname: Terminate job execution when the maxFailedIndexes is exceeded
 		Description: Create an indexed job with backoffLimitPerIndex and maxFailedIndexes.
 		Verify the job execution is terminated as soon as the number of failed
 		indexes exceeds maxFailedIndexes.
 	*/
-	ginkgo.It("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
+	framework.ConformanceIt("should terminate job execution when the number of failed indexes exceeds maxFailedIndexes", func(ctx context.Context) {
 		// we use parallelism=1 to make sure in the asserts only one pod was created
 		parallelism := int32(1)
 		completions := int32(4)
@@ -661,13 +669,65 @@ done`}
 	})
 
 	/*
-		Testcase: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
+		Testname: Track the failure count per index in Pod annotation when backoffLimitPerIndex is used
+		Description: Create an indexed job and ensure that the Pods are
+		re-created with the failure-count Pod annotation set properly to
+		indicate the number of so-far failures per index.
+	*/
+	ginkgo.It("should record the failure-count in the Pod annotation when using backoffLimitPerIndex", func(ctx context.Context) {
+		jobName := "e2e-backofflimitperindex-" + utilrand.String(5)
+		label := map[string]string{batchv1.JobNameLabel: jobName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		parallelism := int32(2)
+		completions := int32(2)
+		backoffLimit := int32(6) // default value
+
+		job := e2ejob.NewTestJob("fail", jobName, v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		job.Spec.BackoffLimit = nil
+		job.Spec.BackoffLimitPerIndex = ptr.To[int32](1)
+		job.Spec.CompletionMode = ptr.To(batchv1.IndexedCompletion)
+
+		tracker := NewIndexedPodAnnotationTracker(jobName, f.Namespace.Name, labelSelector, batchv1.JobCompletionIndexAnnotation, batchv1.JobIndexFailureCountAnnotation)
+		trackerCancel := tracker.Start(ctx, f.ClientSet)
+		ginkgo.DeferCleanup(trackerCancel)
+
+		ginkgo.By("Creating an indexed job with backoffLimit per index and failing pods")
+		job, err := e2ejob.CreateJob(ctx, f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Awaiting for the job to fail as there are failed indexes")
+		err = e2ejob.WaitForJobFailed(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Verify the failure-count annotation on Pods")
+		// Since the Job is already failed all the relevant Pod events are
+		// already being distributed. Still, there might be a little bit of lag
+		// between the events being receiced by the Job controller and the test
+		// code so we need to wait a little bit.
+		gomega.Eventually(ctx, tracker.cloneTrackedAnnotations).
+			WithTimeout(15 * time.Second).
+			WithPolling(500 * time.Millisecond).
+			Should(gomega.Equal(map[int][]string{0: {"0", "1"}, 1: {"0", "1"}}))
+
+		ginkgo.By("Verifying the Job status fields")
+		job, err = e2ejob.GetJob(ctx, f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to retrieve latest job object")
+		gomega.Expect(job.Status.FailedIndexes).Should(gomega.HaveValue(gomega.Equal("0,1")))
+		gomega.Expect(job.Status.CompletedIndexes).Should(gomega.Equal(""))
+		gomega.Expect(job.Status.Failed).Should(gomega.Equal(int32(4)))
+		gomega.Expect(job.Status.Succeeded).Should(gomega.Equal(int32(0)))
+	})
+
+	/*
+		Release: v1.33
+		Testname: Mark indexes as failed when the FailIndex action is matched in podFailurePolicy
 		Description: Create an indexed job with backoffLimitPerIndex, and podFailurePolicy
 		with the FailIndex action. Verify the failed pods matching the pod failure policy
 		result in marking the corresponding indexes as failed without restarts, despite
 		backoffLimitPerIndex > 0.
 	*/
-	ginkgo.It("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
+	framework.ConformanceIt("should mark indexes as failed when the FailIndex action is matched in podFailurePolicy", func(ctx context.Context) {
 		parallelism := int32(2)
 		completions := int32(2)
 		backoffLimit := int32(6) // default value
@@ -755,7 +815,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 	})
 
@@ -786,7 +846,7 @@ done`}
 		framework.ExpectNoError(err, "failed to ensure job has the interim success condition: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), *job.Spec.Completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, *job.Spec.Completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Verifying the Job status fields to ensure correct final state")
@@ -981,7 +1041,7 @@ done`}
 		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring job reaches completions")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, ptr.To(batchv1.JobReasonCompletionsReached), completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, f.Namespace.Name, job.Name, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
 
 		ginkgo.By("Ensuring pods for job exist")
@@ -1187,7 +1247,7 @@ done`}
 		framework.Logf("Job: %v as labels: %v", testJob.Name, testJob.Labels)
 
 		ginkgo.By("Waiting for job to complete")
-		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, ns, jobName, nil, completions)
+		err = e2ejob.WaitForJobComplete(ctx, f.ClientSet, ns, jobName, batchv1.JobReasonCompletionsReached, completions)
 		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", ns)
 
 		ginkgo.By("Delete a job collection with a labelselector")

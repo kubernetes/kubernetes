@@ -57,10 +57,16 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 	defer close(stopServerChan)
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+			return
+		}
 		upgrader := spdy.NewResponseUpgrader()
 		conn := upgrader.UpgradeResponse(w, req, justQueueStream(streamChan))
-		require.NotNil(t, conn)
+		if conn == nil {
+			t.Error("connect is unexpected nil")
+			return
+		}
 		defer conn.Close() //nolint:errcheck
 		<-stopServerChan
 	}))
@@ -97,9 +103,15 @@ func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {
 	var actual []byte
 	go func() {
 		clientStream, err := spdyClient.CreateStream(http.Header{})
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+			return
+		}
 		_, err = io.Copy(clientStream, bytes.NewReader(randomData))
-		require.NoError(t, err)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+			return
+		}
 		clientStream.Close() //nolint:errcheck
 	}()
 	select {
@@ -169,7 +181,10 @@ func TestTunnelingHandler_BadHandshakeError(t *testing.T) {
 	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		// Handshake fails.
 		_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
-		require.Error(t, err, "handshake should have returned an error")
+		if err == nil {
+			t.Errorf("handshake should have returned an error %v", err)
+			return
+		}
 		assert.ErrorContains(t, err, "unable to negotiate protocol")
 		w.WriteHeader(http.StatusForbidden)
 	}))
@@ -223,7 +238,10 @@ func TestTunnelingHandler_UpstreamSPDYServerErrorPropagated(t *testing.T) {
 		// Create fake upstream SPDY server, which returns a 500-level error.
 		spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			_, err := httpstream.Handshake(req, w, []string{constants.PortForwardV1Name})
-			require.NoError(t, err, "handshake should have succeeded")
+			if err != nil {
+				t.Errorf("handshake should have succeeded %v", err)
+				return
+			}
 			// Returned status code should be incremented in metrics.
 			w.WriteHeader(statusCode)
 		}))

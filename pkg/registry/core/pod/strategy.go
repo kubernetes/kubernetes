@@ -40,6 +40,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -85,6 +86,7 @@ func (podStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
+	pod.Generation = 1
 	pod.Status = api.PodStatus{
 		Phase:    api.PodPending,
 		QOSClass: qos.GetPodQOS(pod),
@@ -103,6 +105,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
 }
 
 // Validate validates a new pod.
@@ -223,6 +226,37 @@ func (podStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if newPod.Status.QOSClass == "" {
 		newPod.Status.QOSClass = oldPod.Status.QOSClass
 	}
+
+	preserveOldObservedGeneration(newPod, oldPod)
+	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
+// If a client request tries to clear `observedGeneration`, in the pod status or
+// conditions, we preserve the original value.
+func preserveOldObservedGeneration(newPod, oldPod *api.Pod) {
+	if newPod.Status.ObservedGeneration == 0 {
+		newPod.Status.ObservedGeneration = oldPod.Status.ObservedGeneration
+	}
+
+	// Remember observedGeneration values from old status conditions.
+	// This is a list per type because validation permits multiple conditions with the same type.
+	oldConditionGenerations := map[api.PodConditionType][]int64{}
+	for _, oldCondition := range oldPod.Status.Conditions {
+		oldConditionGenerations[oldCondition.Type] = append(oldConditionGenerations[oldCondition.Type], oldCondition.ObservedGeneration)
+	}
+
+	// For any conditions in the new status without observedGeneration set, preserve the old value.
+	for i, newCondition := range newPod.Status.Conditions {
+		oldGeneration := int64(0)
+		if oldGenerations, ok := oldConditionGenerations[newCondition.Type]; ok && len(oldGenerations) > 0 {
+			oldGeneration = oldGenerations[0]
+			oldConditionGenerations[newCondition.Type] = oldGenerations[1:]
+		}
+
+		if newCondition.ObservedGeneration == 0 {
+			newPod.Status.Conditions[i].ObservedGeneration = oldGeneration
+		}
+	}
 }
 
 func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -236,21 +270,41 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 
 // WarningsOnUpdate returns warnings for the given update.
 func (podStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	pod := obj.(*api.Pod)
+	var warnings []string
+
+	for i, podIP := range pod.Status.PodIPs {
+		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("status", "podIPs").Index(i).Child("ip"), podIP.IP)...)
+	}
+	for i, hostIP := range pod.Status.HostIPs {
+		warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("status", "hostIPs").Index(i).Child("ip"), hostIP.IP)...)
+	}
+
+	return warnings
 }
 
 type podEphemeralContainersStrategy struct {
 	podStrategy
+
+	resetFieldsFilter fieldpath.Filter
 }
 
 // EphemeralContainersStrategy wraps and exports the used podStrategy for the storage package.
-var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
+var EphemeralContainersStrategy = podEphemeralContainersStrategy{
+	podStrategy: Strategy,
+	resetFieldsFilter: fieldpath.NewIncludeMatcherFilter(
+		fieldpath.MakePrefixMatcherOrDie("spec", "ephemeralContainers"),
+	),
+}
 
 // dropNonEphemeralContainerUpdates discards all changes except for pod.Spec.EphemeralContainers and certain metadata
 func dropNonEphemeralContainerUpdates(newPod, oldPod *api.Pod) *api.Pod {
-	pod := dropPodUpdates(newPod, oldPod)
-	pod.Spec.EphemeralContainers = newPod.Spec.EphemeralContainers
-	return pod
+	newEphemeralContainerSpec := newPod.Spec.EphemeralContainers
+	newPod.Spec = oldPod.Spec
+	newPod.Status = oldPod.Status
+	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
+	newPod.Spec.EphemeralContainers = newEphemeralContainerSpec
+	return newPod
 }
 
 func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -259,6 +313,7 @@ func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj,
 
 	*newPod = *dropNonEphemeralContainerUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
 }
 
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -274,6 +329,14 @@ func (podEphemeralContainersStrategy) WarningsOnUpdate(ctx context.Context, obj,
 	return nil
 }
 
+// GetResetFieldsFilter returns a set of fields filter reset by the strategy
+// and should not be modified by the user.
+func (p podEphemeralContainersStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]fieldpath.Filter {
+	return map[fieldpath.APIVersion]fieldpath.Filter{
+		"v1": p.resetFieldsFilter,
+	}
+}
+
 type podResizeStrategy struct {
 	podStrategy
 
@@ -286,30 +349,54 @@ var ResizeStrategy = podResizeStrategy{
 	resetFieldsFilter: fieldpath.NewIncludeMatcherFilter(
 		fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resources"),
 		fieldpath.MakePrefixMatcherOrDie("spec", "containers", fieldpath.MatchAnyPathElement(), "resizePolicy"),
+		fieldpath.MakePrefixMatcherOrDie("spec", "initContainers", fieldpath.MatchAnyPathElement(), "resources"),
+		fieldpath.MakePrefixMatcherOrDie("spec", "initContainers", fieldpath.MatchAnyPathElement(), "resizePolicy"),
 	),
 }
 
-// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources,ResizePolicy and certain metadata
+// dropNonResizeUpdates discards all changes except for pod.Spec.Containers[*].Resources, pod.Spec.InitContainers[*].Resources, ResizePolicy and certain metadata
 func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
-	pod := dropPodUpdates(newPod, oldPod)
+	// Containers are not allowed to be added, removed, re-ordered, or renamed.
+	// If we detect any of these changes, we will return new podspec as-is and
+	// allow the validation to catch the error and drop the update.
+	if len(newPod.Spec.Containers) != len(oldPod.Spec.Containers) || len(newPod.Spec.InitContainers) != len(oldPod.Spec.InitContainers) {
+		return newPod
+	}
 
-	// Containers are not allowed to be re-ordered, but in case they were,
-	// we don't want to corrupt them here. It will get caught in validation.
-	oldCtrToIndex := make(map[string]int)
-	for idx, ctr := range pod.Spec.Containers {
-		oldCtrToIndex[ctr.Name] = idx
+	containers := dropNonResizeUpdatesForContainers(newPod.Spec.Containers, oldPod.Spec.Containers)
+	initContainers := dropNonResizeUpdatesForContainers(newPod.Spec.InitContainers, oldPod.Spec.InitContainers)
+
+	newPod.Spec = oldPod.Spec
+	newPod.Status = oldPod.Status
+	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
+
+	newPod.Spec.Containers = containers
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		newPod.Spec.InitContainers = initContainers
 	}
-	// TODO: Once we add in-place pod resize support for sidecars, we need to allow
-	// modifying sidecar resources via resize subresource too.
-	for _, ctr := range newPod.Spec.Containers {
-		idx, ok := oldCtrToIndex[ctr.Name]
-		if !ok {
-			continue
+
+	return newPod
+}
+
+func dropNonResizeUpdatesForContainers(new, old []api.Container) []api.Container {
+	if len(new) == 0 {
+		return new
+	}
+
+	oldCopyWithMergedResources := make([]api.Container, len(old))
+	copy(oldCopyWithMergedResources, old)
+
+	for i, ctr := range new {
+		if oldCopyWithMergedResources[i].Name != new[i].Name {
+			// This is an attempt to reorder or rename a container, which is not allowed.
+			// Allow validation to catch this error.
+			return new
 		}
-		pod.Spec.Containers[idx].Resources = ctr.Resources
-		pod.Spec.Containers[idx].ResizePolicy = ctr.ResizePolicy
+		oldCopyWithMergedResources[i].Resources = ctr.Resources
+		oldCopyWithMergedResources[i].ResizePolicy = ctr.ResizePolicy
 	}
-	return pod
+
+	return oldCopyWithMergedResources
 }
 
 func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -317,8 +404,8 @@ func (podResizeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	oldPod := old.(*api.Pod)
 
 	*newPod = *dropNonResizeUpdates(newPod, oldPod)
-	podutil.MarkPodProposedForResize(oldPod, newPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
+	updatePodGeneration(newPod, oldPod)
 }
 
 func (podResizeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -342,17 +429,6 @@ func (p podResizeStrategy) GetResetFieldsFilter() map[fieldpath.APIVersion]field
 	}
 }
 
-// dropPodUpdates drops any changes in the pod.
-func dropPodUpdates(newPod, oldPod *api.Pod) *api.Pod {
-	pod := oldPod.DeepCopy()
-	pod.Name = newPod.Name
-	pod.Namespace = newPod.Namespace
-	pod.ResourceVersion = newPod.ResourceVersion
-	pod.UID = newPod.UID
-
-	return pod
-}
-
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)
@@ -365,7 +441,7 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	var indexFields = []string{"spec.nodeName"}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
 		indexFields = append(indexFields, "metadata.namespace")
 	}
 	return storage.SelectionPredicate{
@@ -404,7 +480,7 @@ func Indexers() *cache.Indexers {
 	var indexers = cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
 		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
 	}
 	return &indexers
@@ -959,4 +1035,12 @@ func apparmorFieldForAnnotation(annotation string) *api.AppArmorProfile {
 	// we can only reach this code path if the localhostProfile name has a zero
 	// length or if the annotation has an unrecognized value
 	return nil
+}
+
+// updatePodGeneration bumps metadata.generation if needed for any updates
+// to the podspec.
+func updatePodGeneration(newPod, oldPod *api.Pod) {
+	if !apiequality.Semantic.DeepEqual(newPod.Spec, oldPod.Spec) {
+		newPod.Generation++
+	}
 }

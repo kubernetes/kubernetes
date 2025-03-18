@@ -244,7 +244,7 @@ func scaleFromRC(rc *api.ReplicationController) *autoscaling.Scale {
 			CreationTimestamp: rc.CreationTimestamp,
 		},
 		Spec: autoscaling.ScaleSpec{
-			Replicas: rc.Spec.Replicas,
+			Replicas: *rc.Spec.Replicas,
 		},
 		Status: autoscaling.ScaleStatus{
 			Replicas: rc.Status.Replicas,
@@ -325,7 +325,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	// move replicas/resourceVersion fields to object and return
-	replicationcontroller.Spec.Replicas = scale.Spec.Replicas
+	replicationcontroller.Spec.Replicas = &scale.Spec.Replicas
 	replicationcontroller.ResourceVersion = scale.ResourceVersion
 
 	updatedEntries, err := managedFieldsHandler.ToParent(scale.ManagedFields)

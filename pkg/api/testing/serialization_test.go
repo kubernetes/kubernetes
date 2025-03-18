@@ -51,7 +51,7 @@ import (
 // fuzzInternalObject fuzzes an arbitrary runtime object using the appropriate
 // fuzzer registered with the apitesting package.
 func fuzzInternalObject(t *testing.T, forVersion schema.GroupVersion, item runtime.Object, seed int64) runtime.Object {
-	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).Fuzz(item)
+	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).Fill(item)
 
 	j, err := meta.TypeAccessor(item)
 	if err != nil {
@@ -331,7 +331,7 @@ func TestUnversionedTypes(t *testing.T) {
 func TestObjectWatchFraming(t *testing.T) {
 	f := fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(benchmarkSeed), legacyscheme.Codecs)
 	secret := &api.Secret{}
-	f.Fuzz(secret)
+	f.Fill(secret)
 	if secret.Data == nil {
 		secret.Data = map[string][]byte{}
 	}
@@ -418,7 +418,7 @@ func benchmarkItems(b *testing.B) []v1.Pod {
 	items := make([]v1.Pod, 10)
 	for i := range items {
 		var pod api.Pod
-		apiObjectFuzzer.Fuzz(&pod)
+		apiObjectFuzzer.Fill(&pod)
 		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
 		out, err := legacyscheme.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {
@@ -434,7 +434,7 @@ func benchmarkItemsList(b *testing.B, numItems int) v1.PodList {
 	items := make([]v1.Pod, numItems)
 	for i := range items {
 		var pod api.Pod
-		apiObjectFuzzer.Fuzz(&pod)
+		apiObjectFuzzer.Fill(&pod)
 		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
 		out, err := legacyscheme.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {

@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -40,10 +41,10 @@ import (
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	cliflag "k8s.io/component-base/cli/flag"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	utilversion "k8s.io/component-base/version"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
@@ -51,13 +52,11 @@ import (
 )
 
 func TestAddFlags(t *testing.T) {
-	componentGlobalsRegistry := featuregate.DefaultComponentGlobalsRegistry
-	t.Cleanup(func() {
-		componentGlobalsRegistry.Reset()
-	})
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
 	fs := pflag.NewFlagSet("addflagstest", pflag.PanicOnError)
-	utilruntime.Must(componentGlobalsRegistry.Register("test", utilversion.NewEffectiveVersion("1.32"), featuregate.NewFeatureGate()))
+	utilruntime.Must(componentGlobalsRegistry.Register("test", basecompatibility.NewEffectiveVersionFromString("1.32", "1.31", "1.31"), featuregate.NewFeatureGate()))
 	s := NewOptions()
+	s.GenericServerRunOptions.ComponentGlobalsRegistry = componentGlobalsRegistry
 	var fss cliflag.NamedFlagSets
 	s.AddFlags(&fss)
 	for _, f := range fss.FlagSets {
@@ -141,7 +140,7 @@ func TestAddFlags(t *testing.T) {
 			JSONPatchMaxCopyBytes:        int64(3 * 1024 * 1024),
 			MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 			ComponentGlobalsRegistry:     componentGlobalsRegistry,
-			ComponentName:                featuregate.DefaultKubeComponent,
+			ComponentName:                basecompatibility.DefaultKubeComponent,
 		},
 		Admission: &kubeoptions.AdmissionOptions{
 			GenericAdmission: &apiserveroptions.AdmissionOptions{
@@ -485,7 +484,7 @@ func TestCompleteForServiceAccount(t *testing.T) {
 			options := NewOptions()
 			if tc.externalSigner {
 				// create and start mock signer.
-				socketPath := fmt.Sprintf("@mock-external-jwt-signer-%d.sock", time.Now().Nanosecond())
+				socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
 				mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
 				defer mockSigner.CleanUp()
 

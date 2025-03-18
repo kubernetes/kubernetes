@@ -66,6 +66,7 @@ const (
 	ResctrlMetrics                 MetricKind = "resctrl"
 	CPUSetMetrics                  MetricKind = "cpuset"
 	OOMMetrics                     MetricKind = "oom_event"
+	PressureMetrics                MetricKind = "pressure"
 )
 
 // AllMetrics represents all kinds of metrics that cAdvisor supported.
@@ -91,6 +92,7 @@ var AllMetrics = MetricSet{
 	ResctrlMetrics:                 struct{}{},
 	CPUSetMetrics:                  struct{}{},
 	OOMMetrics:                     struct{}{},
+	PressureMetrics:                struct{}{},
 }
 
 // AllNetworkMetrics represents all network metrics that cAdvisor supports.

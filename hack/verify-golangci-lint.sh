@@ -25,7 +25,6 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -r <revision>: only report issues in code added since that revision
    -a: automatically select the common base of origin/master and HEAD
        as revision
-   -s: select a strict configuration for new code
    -n: in addition to strict checking, also enable hints (aka nits) that may or may not
        be useful
    -g <github action file>: also write results with --out-format=github-actions
@@ -53,7 +52,6 @@ invocation=(./hack/verify-golangci-lint.sh "$@")
 golangci=("${GOBIN}/golangci-lint" run)
 golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
-strict=
 hints=
 githubactions=
 while getopts "ar:sng:c:" o; do
@@ -68,10 +66,6 @@ while getopts "ar:sng:c:" o; do
         echo >&2
         usage
       fi
-      ;;
-    s)
-      golangci_config="${KUBE_ROOT}/hack/golangci-strict.yaml"
-      strict=1
       ;;
     n)
       golangci_config="${KUBE_ROOT}/hack/golangci-hints.yaml"
@@ -127,12 +121,28 @@ done
 
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
-go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/cmd/golangci-lint
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/cmd/golangci-lint
 if [ "${golangci_config}" ]; then
   # This cannot be used without a config.
   # This uses `go build` because `go install -buildmode=plugin` doesn't work
   # (on purpose: https://github.com/golang/go/issues/64964).
-  go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+fi
+
+# Verify that the given config is valid. "golangci-lint run" does not
+# do that, which makes it easy to miss mistakes while editing the configuration.
+if ! failures=$( "${GOBIN}/golangci-lint" config verify --config="${golangci_config:-}" 2>&1 ); then
+  cat >&2 <<EOF
+
+Verification of the golangci-lint configuration failed. Command:
+
+   ${GOBIN}/golangci-lint config verify --config="${golangci_config:-}")
+
+Result:
+
+$failures
+EOF
+    exit 1
 fi
 
 if [ "${golangci_config}" ]; then
@@ -185,18 +195,12 @@ else
     echo "Please review the above warnings. You can test via \"${invocation[*]}\""
     echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
     echo ' (if your reviewer is okay with it).'
-    if [ "$strict" ]; then
-        echo
-        echo 'golangci-strict.yaml was used as configuration. Warnings must be fixed in'
-        echo 'new or modified code.'
-    elif [ "$hints" ]; then
+    if [ "$hints" ]; then
         echo
         echo 'golangci-hints.yaml was used as configuration. Some of the reported issues may'
         echo 'have to be fixed while others can be ignored, depending on the circumstances'
         echo 'and/or personal preferences. To determine which issues have to be fixed, check'
-        echo 'the report that uses golangci-strict.yaml (= pull-kubernetes-verify-lint).'
-    fi
-    if [ "$strict" ] || [ "$hints" ]; then
+        echo 'the report that uses golangci.yaml (= pull-kubernetes-verify).'
         echo
         echo 'If you feel that this warns about issues that should be ignored by default,'
         echo 'then please discuss with your reviewer and propose'
@@ -208,11 +212,12 @@ else
         echo 'Instead, propose to fix certain linter issues in an issue first and'
         echo 'discuss there with maintainers. PRs are welcome if they address a real'
         echo 'problem, which then needs to be explained in the PR.'
+    else
+        echo
+        echo 'In general please prefer to fix the error, we have already disabled specific lints'
+        echo ' that the project chooses to ignore.'
+        echo 'See: https://golangci-lint.run/usage/false-positives/'
     fi
-    echo
-    echo 'In general please prefer to fix the error, we have already disabled specific lints'
-    echo ' that the project chooses to ignore.'
-    echo 'See: https://golangci-lint.run/usage/false-positives/'
     echo
   } >&2
   exit 1

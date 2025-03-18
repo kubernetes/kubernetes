@@ -46,6 +46,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Lease{},
 		&LeaseList{},
+		&LeaseCandidate{},
+		&LeaseCandidateList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

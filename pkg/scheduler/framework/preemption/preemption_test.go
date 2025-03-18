@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -63,6 +62,10 @@ var (
 		v1.ResourceMemory: "500",
 	}
 )
+
+func init() {
+	metrics.Register()
+}
 
 type FakePostFilterPlugin struct {
 	numViolatingVictim int
@@ -141,7 +144,6 @@ func (pl *FakePreemptionScorePostFilterPlugin) OrderedScoreFuncs(ctx context.Con
 }
 
 func TestDryRunPreemption(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name               string
 		nodes              []*v1.Node
@@ -754,8 +756,8 @@ func TestPrepareCandidate(t *testing.T) {
 					}
 
 					if asyncPreemptionEnabled {
-						if tt.expectedActivatedPods != nil && !reflect.DeepEqual(tt.expectedActivatedPods, fakeActivator.activatedPods) {
-							lastErrMsg = fmt.Sprintf("expected activated pods %v, got %v", tt.expectedActivatedPods, fakeActivator.activatedPods)
+						if diff := cmp.Diff(tt.expectedActivatedPods, fakeActivator.activatedPods); tt.expectedActivatedPods != nil && diff != "" {
+							lastErrMsg = fmt.Sprintf("Unexpected activated pods (-want,+got):\n%s", diff)
 							return false, nil
 						}
 						if tt.expectedActivatedPods == nil && len(fakeActivator.activatedPods) != 0 {

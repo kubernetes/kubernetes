@@ -152,8 +152,18 @@ func TestCIDR(t *testing.T) {
 			expectResult: trueVal,
 		},
 		{
+			name:         "contains CIDR ipv4 (CIDR) (/32)",
+			expr:         `cidr("192.168.0.0/24").containsCIDR(cidr("192.168.0.1/32"))`,
+			expectResult: trueVal,
+		},
+		{
 			name:         "does not contain IP ipv4 (CIDR)",
 			expr:         `cidr("192.168.0.0/24").containsCIDR(cidr("192.168.0.0/23"))`,
+			expectResult: falseVal,
+		},
+		{
+			name:         "does not contain IP ipv4 (CIDR) (/32)",
+			expr:         `cidr("192.168.0.0/24").containsCIDR(cidr("192.169.0.1/32"))`,
 			expectResult: falseVal,
 		},
 		{

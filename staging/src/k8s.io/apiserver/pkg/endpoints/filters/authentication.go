@@ -68,6 +68,7 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 		authenticationFinish := time.Now()
 		defer func() {
 			metrics(req.Context(), resp, ok, err, apiAuds, authenticationStart, authenticationFinish)
+			genericapirequest.TrackAuthenticationLatency(req.Context(), authenticationFinish.Sub(authenticationStart))
 		}()
 		if err != nil || !ok {
 			if err != nil {
@@ -118,7 +119,6 @@ func withAuthentication(handler http.Handler, auth authenticator.Request, failed
 			// https://github.com/golang/net/commit/97aa3a539ec716117a9d15a4659a911f50d13c3c
 			w.Header().Set("Connection", "close")
 		}
-
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 		handler.ServeHTTP(w, req)
 	})
