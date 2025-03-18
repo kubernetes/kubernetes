@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -39,6 +40,7 @@ import (
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
@@ -315,6 +317,9 @@ type KubeletVolumeHost interface {
 	// Returns trust anchors from the ClusterTrustBundles selected by signer
 	// name and label selector.
 	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+
+	// Returns the credential bundle for the specified podCertificate projected volume source.
+	GetPodCertificateCredentialBundle(ctx context.Context, pod podcertificate.PodIdentity, volumeName, path, signerName, keyType string) ([]byte, []byte, error)
 }
 
 // CSIDriverVolumeHost is a volume host that has access to CSIDriverLister

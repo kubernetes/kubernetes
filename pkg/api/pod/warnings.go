@@ -435,7 +435,6 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 		}
 
 		if v.Projected != nil {
-			var sourcePaths []pathAndSource
 			var allPaths []pathAndSource
 
 			for _, source := range v.Projected.Sources {
@@ -444,6 +443,7 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 					continue
 				}
 
+				var sourcePaths []pathAndSource
 				switch {
 				case source.ConfigMap != nil && source.ConfigMap.Items != nil:
 					sourcePaths = extractPaths(source.ConfigMap.Items, fmt.Sprintf("ConfigMap %q", source.ConfigMap.Name))
@@ -461,6 +461,17 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 						name = *source.ClusterTrustBundle.SignerName
 					}
 					sourcePaths = []pathAndSource{{source.ClusterTrustBundle.Path, fmt.Sprintf("ClusterTrustBundle %q", name)}}
+				case source.PodCertificate != nil:
+					sourcePaths = []pathAndSource{}
+					if source.PodCertificate.CertificateChainPath != "" {
+						sourcePaths = append(sourcePaths, pathAndSource{source.PodCertificate.CertificateChainPath, "PodCertificate chain"})
+					}
+					if source.PodCertificate.KeyPath != "" {
+						sourcePaths = append(sourcePaths, pathAndSource{source.PodCertificate.KeyPath, "PodCertificate key"})
+					}
+					if source.PodCertificate.CredentialBundlePath != "" {
+						sourcePaths = append(sourcePaths, pathAndSource{source.PodCertificate.CredentialBundlePath, "PodCertificate credential bundle"})
+					}
 				}
 
 				if len(sourcePaths) == 0 {
