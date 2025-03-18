@@ -53,7 +53,7 @@ const (
 
 // In injects a matchExpression (with an operator IN) as a selectorTerm
 // to the inner nodeSelector.
-// NOTE: appended selecterTerms are ORed.
+// NOTE: appended selectorTerms are ORed.
 func (s *NodeSelectorWrapper) In(key string, vals []string, t NodeSelectorType) *NodeSelectorWrapper {
 	expression := v1.NodeSelectorRequirement{
 		Key:      key,
