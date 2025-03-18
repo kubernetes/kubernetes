@@ -48,6 +48,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
@@ -334,9 +335,12 @@ func TestShouldDelegateList(t *testing.T) {
 					expectBypass = bypass
 				}
 			}
-			gotBypass, _ := shouldDelegateList(toStorageOpts(opt))
-			if gotBypass != expectBypass {
-				t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", opt, expectBypass, gotBypass)
+			result, err := shouldDelegateList(toStorageOpts(opt), delegator.CacheWithoutSnapshots{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.ShouldDelegate != expectBypass {
+				t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", opt, expectBypass, result.ShouldDelegate)
 			}
 		}
 	}
