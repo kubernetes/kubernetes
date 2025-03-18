@@ -5190,6 +5190,15 @@ type NodeSystemInfo struct {
 	OperatingSystem string
 	// The Architecture reported by the node
 	Architecture string
+	// Swap Info reported by the node.
+	Swap *NodeSwapStatus
+}
+
+// NodeSwapStatus represents swap memory information.
+type NodeSwapStatus struct {
+	// Total amount of swap memory in bytes.
+	// +optional
+	Capacity *int64
 }
 
 // NodeConfigStatus describes the status of the config assigned by Node.Spec.ConfigSource.

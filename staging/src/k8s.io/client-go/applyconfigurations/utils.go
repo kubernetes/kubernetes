@@ -856,6 +856,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeSpecApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeStatus"):
 		return &applyconfigurationscorev1.NodeStatusApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeSwapStatus"):
+		return &applyconfigurationscorev1.NodeSwapStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeSystemInfo"):
 		return &applyconfigurationscorev1.NodeSystemInfoApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("ObjectFieldSelector"):
