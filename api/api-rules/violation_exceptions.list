@@ -263,3 +263,5 @@ API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfigurati
 API rule violation: names_match,k8s.io/kubelet/config/v1beta1,KubeletConfiguration,ResolverConfig
 API rule violation: names_match,k8s.io/metrics/pkg/apis/custom_metrics/v1beta1,MetricValue,WindowSeconds
 API rule violation: names_match,k8s.io/metrics/pkg/apis/external_metrics/v1beta1,ExternalMetricValue,WindowSeconds
+API rule violation: streaming_list_type_proto_tags,k8s.io/apimachinery/pkg/apis/meta/v1beta1,PartialObjectMetadataList,Items
+API rule violation: streaming_list_type_proto_tags,k8s.io/apimachinery/pkg/apis/meta/v1beta1,PartialObjectMetadataList,ListMeta
