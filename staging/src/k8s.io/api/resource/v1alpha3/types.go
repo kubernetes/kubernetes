@@ -329,7 +329,6 @@ type BasicDevice struct {
 	// +featureGate=DRAPartitionableDevices
 	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,6,opt,name=allNodes"`
 
-
 	// If specified, these are the driver-defined taints.
 	//
 	// The maximum number of taints is 8.

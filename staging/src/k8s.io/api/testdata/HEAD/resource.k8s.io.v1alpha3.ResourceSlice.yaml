@@ -36,6 +36,7 @@ spec:
   allNodes: true
   devices:
   - basic:
+      allNodes: true
       attributes:
         attributesKey:
           bool: true
@@ -44,6 +45,24 @@ spec:
           version: versionValue
       capacity:
         capacityKey: "0"
+      consumesCounter:
+      - counters:
+          countersKey:
+            value: "0"
+        sharedCounter: sharedCounterValue
+      nodeName: nodeNameValue
+      nodeSelector:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
+          matchFields:
+          - key: keyValue
+            operator: operatorValue
+            values:
+            - valuesValue
       taints:
       - effect: effectValue
         key: keyValue
@@ -64,7 +83,13 @@ spec:
         operator: operatorValue
         values:
         - valuesValue
+  perDeviceNodeSelection: true
   pool:
     generation: 2
     name: nameValue
     resourceSliceCount: 3
+  sharedCounters:
+  - counters:
+      countersKey:
+        value: "0"
+    name: nameValue
