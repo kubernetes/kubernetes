@@ -766,6 +766,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.33
 	},
 
+	StorageCapacityScoring: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	StorageVersionMigrator: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -834,10 +838,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	VolumeAttributesClass: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-	},
-
-	VolumeCapacityPriority: {
-		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	WinDSR: {
