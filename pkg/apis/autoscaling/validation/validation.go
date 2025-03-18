@@ -210,8 +210,7 @@ func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Pat
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("selectPolicy"), rules.SelectPolicy, validSelectPolicyTypesList))
 		}
 		policiesPath := fldPath.Child("policies")
-		hasPolicyFields := rules.StabilizationWindowSeconds != nil || rules.SelectPolicy != nil
-		if len(rules.Policies) == 0 && (rules.Tolerance == nil || hasPolicyFields) {
+		if len(rules.Policies) == 0 {
 			allErrs = append(allErrs, field.Required(policiesPath, "must specify at least one Policy"))
 		}
 		for i, policy := range rules.Policies {

@@ -162,12 +162,12 @@ type HPAScalingRules struct {
 	// If not set, the default value MaxPolicySelect is used.
 	// +optional
 	SelectPolicy *ScalingPolicySelect
-	// policies is a list of potential scaling polices which can used during scaling.
-	// If tolerance is not set, at least one policy must be specified, otherwise
-	// the HPAScalingRules will be discarded as invalid.
+	// policies is a list of potential scaling polices which can be used during scaling.
+	// If not set, use the default values:
+	// - For scale up: allow doubling the number of pods, and an absolute change of 4 pods in a 15s window.
+	// - For scale down: allow halving the number of pods in a 15s window.
 	// +optional
 	Policies []HPAScalingPolicy
-
 	// tolerance is the tolerance on the ratio between the current and desired
 	// metric value under which no updates are made to the desired number of
 	// replicas. If not set, the default cluster-wide tolerance is applied (by

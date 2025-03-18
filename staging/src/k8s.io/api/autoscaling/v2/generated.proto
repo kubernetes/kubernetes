@@ -139,8 +139,9 @@ message HPAScalingRules {
   optional string selectPolicy = 1;
 
   // policies is a list of potential scaling polices which can be used during scaling.
-  // If tolerance is not set, at least one policy must be specified, otherwise
-  // the HPAScalingRules will be discarded as invalid.
+  // If not set, use the default values:
+  // - For scale up: allow doubling the number of pods, and an absolute change of 4 pods in a 15s window.
+  // - For scale down: allow halving the number of pods in a 15s window.
   // +listType=atomic
   // +optional
   repeated HPAScalingPolicy policies = 2;

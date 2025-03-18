@@ -14717,7 +14717,7 @@ func schema_k8sio_api_autoscaling_v2_HPAScalingRules(ref common.ReferenceCallbac
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "policies is a list of potential scaling polices which can be used during scaling. If tolerance is not set, at least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid.",
+							Description: "policies is a list of potential scaling polices which can be used during scaling. If not set, use the default values: - For scale up: allow doubling the number of pods, and an absolute change of 4 pods in a 15s window. - For scale down: allow halving the number of pods in a 15s window.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{

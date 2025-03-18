@@ -95,8 +95,9 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutosca
 // at least one scaling rule policy (for scale-up or scale-down)
 func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPodAutoscaler) {
 	// If behavior contains a scaling rule policy (either for scale-up, scale-down, or both), we
-	// should fill all the 'nil' scaling parameters (e.g. stabilization window) with default values
-	if BehaviorHasPolicySet(obj.Spec.Behavior) {
+	// should fill all the unset scaling policy fields (i.e. StabilizationWindowSeconds,
+	// SelectPolicy, Policies) with default values
+	if obj.Spec.Behavior != nil {
 		obj.Spec.Behavior.ScaleUp = GenerateHPAScaleUpRules(obj.Spec.Behavior.ScaleUp)
 		obj.Spec.Behavior.ScaleDown = GenerateHPAScaleDownRules(obj.Spec.Behavior.ScaleDown)
 	}
@@ -115,16 +116,6 @@ func GenerateHPAScaleUpRules(scalingRules *autoscalingv2.HPAScalingRules) *autos
 func GenerateHPAScaleDownRules(scalingRules *autoscalingv2.HPAScalingRules) *autoscalingv2.HPAScalingRules {
 	defaultScalingRules := defaultHPAScaleDownRules.DeepCopy()
 	return copyHPAScalingRules(scalingRules, defaultScalingRules)
-}
-
-// BehaviorHasPolicySet checks if a given behavior contains at least one scaling
-// rule policy (for scale-up or scale-down)
-func BehaviorHasPolicySet(behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) bool {
-	return behavior != nil && (ruleHasPolicySet(behavior.ScaleDown) || ruleHasPolicySet(behavior.ScaleUp))
-}
-
-func ruleHasPolicySet(rule *autoscalingv2.HPAScalingRules) bool {
-	return rule != nil && len(rule.Policies) > 0
 }
 
 // copyHPAScalingRules copies all non-`nil` fields in HPA constraint structure

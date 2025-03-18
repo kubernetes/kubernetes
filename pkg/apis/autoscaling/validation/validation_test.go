@@ -1666,10 +1666,8 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.
 
 	successCases := []autoscaling.HPAScalingRules{
 		{
+			Policies:  policiesList,
 			Tolerance: resource.NewMilliQuantity(1, resource.DecimalSI),
-		},
-		{
-			Tolerance: resource.NewMilliQuantity(0, resource.DecimalSI),
 		},
 		{
 			Policies:  policiesList,
@@ -1699,6 +1697,7 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.
 		},
 		{
 			rule: autoscaling.HPAScalingRules{
+				Policies:  policiesList,
 				Tolerance: resource.NewMilliQuantity(-10, resource.DecimalSI),
 			},
 			msg: "greater or equal to zero",
@@ -1772,6 +1771,7 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceDisabled(t *testing
 	}{
 		{
 			rule: autoscaling.HPAScalingRules{
+				Policies:  policiesList,
 				Tolerance: resource.NewMilliQuantity(1, resource.DecimalSI),
 			},
 			msg: "not supported",
@@ -1814,6 +1814,7 @@ func TestValidateHorizontalPodAutoscalerUpdateConfigurableToleranceEnabled(t *te
 
 	withToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
 		ScaleUp: &autoscaling.HPAScalingRules{
+			Policies:  policiesList,
 			Tolerance: resource.NewMilliQuantity(10, resource.DecimalSI),
 		}})
 	withoutToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
@@ -1842,6 +1843,7 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceUpdateDisabled(t *t
 
 	withToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
 		ScaleUp: &autoscaling.HPAScalingRules{
+			Policies:  policiesList,
 			Tolerance: resource.NewMilliQuantity(10, resource.DecimalSI),
 		}})
 	withoutToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{

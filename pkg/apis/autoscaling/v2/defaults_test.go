@@ -275,14 +275,27 @@ func TestSetBehaviorDefaults(t *testing.T) {
 			expectedBehavior: nil,
 		},
 		{
-			annotation: "Behavior with tolerance only",
+			annotation: "Behavior with stabilizationWindowSeconds and tolerance",
 			behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
 				ScaleUp: &autoscalingv2.HPAScalingRules{
-					Tolerance: &sampleTolerance,
+					StabilizationWindowSeconds: utilpointer.Int32(100),
+					Tolerance:                  &sampleTolerance,
 				},
 			},
 			expectedBehavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscalingv2.HPAScalingRules{
+					SelectPolicy: &maxPolicy,
+					Policies: []autoscalingv2.HPAScalingPolicy{
+						{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
+					},
+				},
 				ScaleUp: &autoscalingv2.HPAScalingRules{
+					StabilizationWindowSeconds: utilpointer.Int32(100),
+					SelectPolicy:               &maxPolicy,
+					Policies: []autoscalingv2.HPAScalingPolicy{
+						{Type: autoscalingv2.PodsScalingPolicy, Value: 4, PeriodSeconds: 15},
+						{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
+					},
 					Tolerance: &sampleTolerance,
 				},
 			},

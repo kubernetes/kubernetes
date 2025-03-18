@@ -50,7 +50,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	autoscalingconverters "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
@@ -859,10 +858,10 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		if desiredReplicas < currentReplicas {
 			rescaleReason = "All metrics below target"
 		}
-		if autoscalingconverters.BehaviorHasPolicySet(hpa.Spec.Behavior) {
-			desiredReplicas = a.normalizeDesiredReplicasWithBehaviors(hpa, key, currentReplicas, desiredReplicas, minReplicas)
-		} else {
+		if hpa.Spec.Behavior == nil {
 			desiredReplicas = a.normalizeDesiredReplicas(hpa, key, currentReplicas, desiredReplicas, minReplicas)
+		} else {
+			desiredReplicas = a.normalizeDesiredReplicasWithBehaviors(hpa, key, currentReplicas, desiredReplicas, minReplicas)
 		}
 		rescale = desiredReplicas != currentReplicas
 	}
