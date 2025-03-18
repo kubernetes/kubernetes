@@ -3088,7 +3088,7 @@ func (kl *Kubelet) updateRuntimeUp() {
 		kl.runtimeState.setRuntimeState(fmt.Errorf("container runtime not ready: %v", runtimeReady))
 		return
 	}
-
+	//Testing the change
 	kl.runtimeState.setRuntimeState(nil)
 	kl.runtimeState.setRuntimeHandlers(s.Handlers)
 	kl.runtimeState.setRuntimeFeatures(s.Features)

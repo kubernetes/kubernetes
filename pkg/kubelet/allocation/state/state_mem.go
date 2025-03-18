@@ -48,6 +48,8 @@ func (s *stateMemory) GetContainerResourceAllocation(podUID types.UID, container
 	defer s.RUnlock()
 
 	alloc, ok := s.podAllocation[podUID][containerName]
+	klog.V(2).InfoS("GetContainerResourceAllocation: %v", *alloc.DeepCopy())
+
 	return *alloc.DeepCopy(), ok
 }
 
@@ -66,7 +68,8 @@ func (s *stateMemory) SetContainerResourceAllocation(podUID types.UID, container
 	}
 
 	s.podAllocation[podUID][containerName] = alloc
-	klog.V(3).InfoS("Updated container resource allocation", "podUID", podUID, "containerName", containerName, "alloc", alloc)
+	klog.V(2).InfoS("Updated container resource allocation", "podUID", podUID, "containerName", containerName, "alloc", alloc)
+
 	return nil
 }
 
@@ -75,7 +78,7 @@ func (s *stateMemory) SetPodResourceAllocation(podUID types.UID, alloc map[strin
 	defer s.Unlock()
 
 	s.podAllocation[podUID] = alloc
-	klog.V(3).InfoS("Updated pod resource allocation", "podUID", podUID, "allocation", alloc)
+	klog.V(2).InfoS("Updated pod resource allocation", "podUID", podUID, "allocation", alloc)
 	return nil
 }
 

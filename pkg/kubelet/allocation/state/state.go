@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
 // PodResourceAllocation type is used in tracking resources allocated to pod's containers
@@ -34,6 +35,8 @@ func (pr PodResourceAllocation) Clone() PodResourceAllocation {
 			prCopy[pod][container] = *alloc.DeepCopy()
 		}
 	}
+	klog.V(2).InfoS("GetContainerResourceAllocation: %v", prCopy)
+
 	return prCopy
 }
 
