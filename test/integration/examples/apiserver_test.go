@@ -48,6 +48,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
+	utilcompatibility "k8s.io/apiserver/pkg/util/compatibility"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	client "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -263,6 +264,7 @@ func TestFrontProxyConfig(t *testing.T) {
 		testFrontProxyConfig(t, false)
 	})
 	t.Run("WithUID", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MajorMinor(1, 33))
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemoteRequestHeaderUID, true)
 		testFrontProxyConfig(t, true)
 	})
@@ -277,7 +279,13 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
-	var extraKASFlags []string
+	// Set the emulation version for the kube-apiserver testserver by mapping
+	// the wardle version to the kube version.
+	wardleEmulationVersion := version.MustParse(wardleBinaryVersion)
+	kubeEmulationVersion := sampleserver.WardleVersionToKubeVersion(wardleEmulationVersion)
+	extraKASFlags := []string{
+		fmt.Sprintf("--emulated-version=kube=%s", kubeEmulationVersion.String()),
+	}
 	if withUID {
 		extraKASFlags = []string{"--requestheader-uid-headers=x-remote-uid"}
 	}
@@ -393,19 +401,27 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool, wardleBinaryVersion, wardleEmulationVersion string) {
+func testAggregatedAPIServer(t *testing.T, setWardleFeatureGate, banFlunder bool, wardleBinaryVersionRaw, wardleEmulationVersionRaw string) {
 	const testNamespace = "kube-wardle"
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 
-	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, wardleBinaryVersion, nil, false)
+	// set the emulation version for the kube-apiserver testserver by mapping
+	// the wardle version to the kube version.
+	wardleEmulationVersion := version.MustParse(wardleEmulationVersionRaw)
+	kubeEmulationVersion := sampleserver.WardleVersionToKubeVersion(wardleEmulationVersion)
+	extraKASFlags := []string{
+		fmt.Sprintf("--emulated-version=kube=%s", kubeEmulationVersion.String()),
+	}
+
+	testKAS, wardleOptions, wardlePort := prepareAggregatedWardleAPIServer(ctx, t, testNamespace, wardleBinaryVersionRaw, extraKASFlags, false)
 	kubeClientConfig := getKubeConfig(testKAS)
 
 	wardleCertDir, _ := os.MkdirTemp("", "test-integration-wardle-server")
 	defer os.RemoveAll(wardleCertDir)
 
-	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, wardleEmulationVersion, kubeClientConfig, false)
+	directWardleClientConfig := runPreparedWardleServer(ctx, t, wardleOptions, wardleCertDir, wardlePort, setWardleFeatureGate, banFlunder, wardleEmulationVersionRaw, kubeClientConfig, false)
 
 	// now we're finally ready to test. These are what's run by default now
 	wardleDirectClient := client.NewForConfigOrDie(directWardleClientConfig)
@@ -699,7 +715,14 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 		framework.SharedEtcd())
 	t.Cleanup(func() { testServer.TearDownFn() })
 
-	componentGlobalsRegistry := testServer.ServerOpts.Options.GenericServerRunOptions.ComponentGlobalsRegistry
+	// Create a new registry since the testServer's ComponentGlobalsRegistry is already Set(),
+	// and wardle server would try to Set() again in the test.
+	componentGlobalsRegistry := basecompatibility.NewComponentGlobalsRegistry()
+	_, _ = componentGlobalsRegistry.ComponentGlobalsOrRegister(
+		basecompatibility.DefaultKubeComponent,
+		utilcompatibility.DefaultKubeEffectiveVersionForTest(),
+		utilfeature.DefaultFeatureGate.DeepCopy(),
+	)
 	_, _ = componentGlobalsRegistry.ComponentGlobalsOrRegister(
 		apiserver.WardleComponentName, basecompatibility.NewEffectiveVersionFromString(wardleBinaryVersion, "", ""),
 		featuregate.NewVersionedFeatureGate(version.MustParse(wardleBinaryVersion)))
