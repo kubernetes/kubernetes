@@ -154,7 +154,7 @@ type watchCache struct {
 	waitingUntilFresh *progress.ConditionalProgressRequester
 
 	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
-	snapshots *storeSnapshotter
+	snapshots Snapshotter
 }
 
 func newWatchCache(
