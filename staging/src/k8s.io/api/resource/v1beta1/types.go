@@ -109,7 +109,7 @@ type ResourceSliceSpec struct {
 	// new nodes of the same type as some old node might also make new
 	// resources available.
 	//
-	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
 	// This field is immutable.
 	//
 	// +optional
@@ -121,7 +121,7 @@ type ResourceSliceSpec struct {
 	//
 	// Must use exactly one term.
 	//
-	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
 	//
 	// +optional
 	// +oneOf=NodeSelection
@@ -129,7 +129,7 @@ type ResourceSliceSpec struct {
 
 	// AllNodes indicates that all nodes have access to the resources in the pool.
 	//
-	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
 	//
 	// +optional
 	// +oneOf=NodeSelection
@@ -297,7 +297,7 @@ type BasicDevice struct {
 
 	// NodeName identifies the node where the device is available.
 	//
-	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	//
 	// +optional
@@ -307,9 +307,7 @@ type BasicDevice struct {
 
 	// NodeSelector defines the nodes where the device is available.
 	//
-	// Must use exactly one term.
-	//
-	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	//
 	// +optional
@@ -318,7 +316,7 @@ type BasicDevice struct {
 
 	// AllNodes indicates that all nodes have access to the device.
 	//
-	// Must only be set if Spec.PerDeviceNodeSelection is set.
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
 	//
 	// +optional
