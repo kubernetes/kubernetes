@@ -31,7 +31,6 @@ import (
 	flowcontrolbootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestConfigFlap tests the ability of the APF config-producer to correctly switch
@@ -49,30 +48,22 @@ import (
 // Remember that the etcd server is bound in test_main, so all
 // three phases share the same etcd server.
 func TestConfigFlap(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	if !flapTo(t, tCtx, "first", true) {
-		return
-	}
-	if !flapTo(t, tCtx, "first", false) {
-		return
-	}
-	if !flapTo(t, tCtx, "second", true) {
-		return
-	}
-	tCtx.Cancel("test function done")
+	t.Run("Phase1", func(t *testing.T) {
+		flapTo(t, "first", true)
+	})
+	t.Run("Phase2", func(t *testing.T) {
+		flapTo(t, "first", false)
+	})
+	t.Run("Phase3", func(t *testing.T) {
+		flapTo(t, "second", true)
+	})
 }
 
-var errTestPhaseDone = errors.New("test phase done")
-
-func flapTo(t *testing.T, ctx context.Context, trial string, v134 bool) bool {
+func flapTo(t *testing.T, trial string, v134 bool) bool {
 	flapName := fmt.Sprintf("%s v134=%v", trial, v134)
 	t.Log("Preparing for " + flapName)
-	ctx, cancel := context.WithCancelCause(ctx)
-	client, _, tearDown := setupAnother(t, ctx, 100, 100, v134)
-	defer func() {
-		cancel(errTestPhaseDone)
-		tearDown()
-	}()
+	ctx, client, _, tearDown := setup(t, 100, 100, v134)
+	defer tearDown()
 	t.Log("Waiting for " + flapName)
 	if !waitForConfig(t, ctx, client, flapName, v134) {
 		t.Fatal("Failed to establish " + flapName)
