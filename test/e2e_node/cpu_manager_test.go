@@ -49,6 +49,11 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 )
 
+const (
+	minSMTLevel    = 2
+	minCPUCapacity = 2
+)
+
 // Helper for makeCPUManagerPod().
 type ctnAttribute struct {
 	ctnName       string
@@ -880,9 +885,9 @@ func runCPUManagerTests(f *framework.Framework) {
 	ginkgo.It("should assign CPUs as expected based on the Pod spec", func(ctx context.Context) {
 		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
 
-		// Skip CPU Manager tests altogether if the CPU capacity < 2.
-		if cpuCap < 2 {
-			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
+		// Skip CPU Manager tests altogether if the CPU capacity < minCPUCapacity.
+		if cpuCap < minCPUCapacity {
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < %d", minCPUCapacity)
 		}
 
 		// Enable CPU Manager in the kubelet.
@@ -925,13 +930,14 @@ func runCPUManagerTests(f *framework.Framework) {
 		smtLevel := getSMTLevel()
 
 		// strict SMT alignment is trivially verified and granted on non-SMT systems
-		if smtLevel < 2 {
+		if smtLevel < minSMTLevel {
 			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
 		}
 
-		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
-		if cpuAlloc < int64(smtLevel*2) {
-			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+		// our tests want to allocate a full core, so we need at least 2*2=4 virtual cpus
+		minCPUCount := int64(smtLevel * minCPUCapacity)
+		if cpuAlloc < minCPUCount {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < %d", fullCPUsOnlyOpt, minCPUCount)
 		}
 
 		framework.Logf("SMT level %d", smtLevel)
@@ -1075,13 +1081,14 @@ func runCPUManagerTests(f *framework.Framework) {
 		smtLevel := getSMTLevel()
 
 		// strict SMT alignment is trivially verified and granted on non-SMT systems
-		if smtLevel < 2 {
+		if smtLevel < minSMTLevel {
 			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
 		}
 
-		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
-		if cpuAlloc < int64(smtLevel*2) {
-			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+		// our tests want to allocate a full core, so we need at least 2*2=4 virtual cpus
+		minCPUCount := int64(smtLevel * minCPUCapacity)
+		if cpuAlloc < minCPUCount {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < %d", fullCPUsOnlyOpt, minCPUCount)
 		}
 
 		framework.Logf("SMT level %d", smtLevel)
@@ -1139,13 +1146,14 @@ func runCPUManagerTests(f *framework.Framework) {
 		framework.Logf("SMT level %d", smtLevel)
 
 		// strict SMT alignment is trivially verified and granted on non-SMT systems
-		if smtLevel < 2 {
+		if smtLevel < minSMTLevel {
 			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
 		}
 
-		// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
-		if cpuAlloc < int64(smtLevel*2) {
-			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < 4", fullCPUsOnlyOpt)
+		// our tests want to allocate a full core, so we need at least 2*2=4 virtual cpus
+		minCPUCount := int64(smtLevel * minCPUCapacity)
+		if cpuAlloc < minCPUCount {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < %d", fullCPUsOnlyOpt, minCPUCount)
 		}
 
 		// this test is intended to be run on a multi-node NUMA system and
