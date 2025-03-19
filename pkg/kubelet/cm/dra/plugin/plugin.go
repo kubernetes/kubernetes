@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -62,6 +63,7 @@ type Plugin struct {
 	endpoint          string
 	chosenService     string // e.g. drapbv1beta1.DRAPluginService
 	clientCallTimeout time.Duration
+	healthClient      drahealthv1alpha1.NodeHealthClient
 }
 
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
@@ -178,4 +180,11 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 		metrics.DRAGRPCOperationsDuration.WithLabelValues(pluginName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
 		return err
 	}
+}
+
+// WatchResources establishes a stream to receive health updates from the DRA plugin.
+func (p *Plugin) WatchResources(ctx context.Context) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Initiating WatchResources stream with DRA plugin")
+	return p.healthClient.WatchResources(ctx, &drahealthv1alpha1.WatchResourcesRequest{})
 }
