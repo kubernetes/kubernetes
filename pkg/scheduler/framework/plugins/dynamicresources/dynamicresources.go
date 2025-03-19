@@ -547,6 +547,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 		}
 
 		bound, err := pl.isClaimBound(claim)
+		// If the claim is not bound, assumed timeout and it need to clean up.
 		if err != nil || !bound {
 			unavailableClaims = append(unavailableClaims, index)
 		}
@@ -818,13 +819,13 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to decide how long we should wait for the device to be attached to the node.
-	timeoutDefault := int64(600)
-	timeoutMax := int64(1200)
-	timeout := int64(0)
+	timeoutDefault := 600 * time.Second
+	timeoutMax := 1200 * time.Second
+	timeout := 0 * time.Second
 	for _, claim := range state.claims {
 		for _, device := range claim.Status.Allocation.Devices.Results {
-			if device.BindingTimeoutSeconds != nil && timeout < *device.BindingTimeoutSeconds {
-				timeout = *device.BindingTimeoutSeconds
+			if device.BindingTimeoutSeconds != nil && timeout < time.Duration(*device.BindingTimeoutSeconds)*time.Second {
+				timeout = time.Duration(*device.BindingTimeoutSeconds) * time.Second
 			}
 		}
 	}
@@ -836,7 +837,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to wait for the device to be attached to the node.
-	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Duration(timeout)*time.Second, true,
+	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true,
 		func(ctx context.Context) (bool, error) {
 			return pl.hasDeviceBindingStatus(ctx, state, pod, nodeName)
 		})
@@ -914,7 +915,6 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 				claim = updatedClaim
 			}
 			claim.Status.Allocation = allocation
-
 		}
 
 		// We can simply try to add the pod here without checking
