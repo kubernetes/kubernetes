@@ -34,6 +34,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1276,6 +1277,88 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		prioritizedListTests()
 	})
 
+	framework.Context("with device taints", feature.DRADeviceTaints, framework.WithFeatureGate(features.DRADeviceTaints), func() {
+		nodes := NewNodes(f, 1, 1)
+		driver := NewDriver(f, nodes, func() Resources {
+			return Resources{
+				Tainted: true,
+			}
+		})
+		b := newBuilder(f, driver)
+
+		f.It("DeviceTaint keeps pod pending", func(ctx context.Context) {
+			pod, template := b.podInline()
+			b.create(ctx, pod, template)
+			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name))
+		})
+
+		f.It("DeviceToleration enables pod scheduling", func(ctx context.Context) {
+			pod, template := b.podInline()
+			template.Spec.Spec.Devices.Requests[0].Tolerations = []resourceapi.DeviceToleration{{
+				Effect:   resourceapi.DeviceTaintEffectNoSchedule,
+				Operator: resourceapi.DeviceTolerationOpExists,
+				// No key: tolerate *all* taints with this effect.
+			}}
+			b.create(ctx, pod, template)
+			b.testPod(ctx, f, pod)
+		})
+
+		f.It("DeviceTaintRule evicts pod", func(ctx context.Context) {
+			pod, template := b.podInline()
+			template.Spec.Spec.Devices.Requests[0].Tolerations = []resourceapi.DeviceToleration{{
+				Effect:   resourceapi.DeviceTaintEffectNoSchedule,
+				Operator: resourceapi.DeviceTolerationOpExists,
+				// No key: tolerate *all* taints with this effect.
+			}}
+			// Add a finalizer to ensure that we get a chance to test the pod status after eviction (= deletion).
+			pod.Finalizers = []string{"e2e-test/dont-delete-me"}
+			b.create(ctx, pod, template)
+			b.testPod(ctx, f, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				// Unblock shutdown by removing the finalizer.
+				pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err, "get pod")
+				pod.Finalizers = nil
+				_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Update(ctx, pod, metav1.UpdateOptions{})
+				framework.ExpectNoError(err, "remove finalizers from pod")
+			})
+
+			// Now evict it.
+			ginkgo.By("Evicting pod...")
+			taint := &resourcealphaapi.DeviceTaintRule{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "device-taint-rule-" + f.UniqueName + "-",
+				},
+				Spec: resourcealphaapi.DeviceTaintRuleSpec{
+					// All devices of the current driver instance.
+					DeviceSelector: &resourcealphaapi.DeviceTaintSelector{
+						Driver: &driver.Name,
+					},
+					Taint: resourcealphaapi.DeviceTaint{
+						Effect: resourcealphaapi.DeviceTaintEffectNoExecute,
+						Key:    "test.example.com/evict",
+						Value:  "now",
+						// No TimeAdded, gets defaulted.
+					},
+				},
+			}
+			createdTaint := b.create(ctx, taint)
+			taint = createdTaint[0].(*resourcealphaapi.DeviceTaintRule)
+			gomega.Expect(*taint).Should(gomega.HaveField("Spec.Taint.TimeAdded.Time", gomega.BeTemporally("~", time.Now(), time.Minute /* allow for some clock drift and delays */)))
+
+			framework.ExpectNoError(e2epod.WaitForPodTerminatingInNamespaceTimeout(ctx, f.ClientSet, pod.Name, f.Namespace.Name, f.Timeouts.PodStart))
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "get pod")
+			gomega.Expect(pod).Should(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+				// LastTransitionTime is unknown.
+				"Type":    gomega.Equal(v1.DisruptionTarget),
+				"Status":  gomega.Equal(v1.ConditionTrue),
+				"Reason":  gomega.Equal("DeletionByDeviceTaintManager"),
+				"Message": gomega.Equal("Device Taint manager: deleting due to NoExecute taint"),
+			}))))
+		})
+	})
+
 	// TODO (https://github.com/kubernetes/kubernetes/issues/123699): move most of the test below into `testDriver` so that they get
 	// executed with different parameters.
 
@@ -2135,6 +2218,12 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			ginkgo.DeferCleanup(func(ctx context.Context) {
 				err := b.f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
 				framework.ExpectNoError(err, "delete node resource slice")
+			})
+		case *resourcealphaapi.DeviceTaintRule:
+			createdObj, err = b.f.ClientSet.ResourceV1alpha3().DeviceTaintRules().Create(ctx, obj, metav1.CreateOptions{})
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				err := b.f.ClientSet.ResourceV1alpha3().DeviceTaintRules().Delete(ctx, createdObj.GetName(), metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "delete DeviceTaintRule")
 			})
 		case *appsv1.DaemonSet:
 			createdObj, err = b.f.ClientSet.AppsV1().DaemonSets(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})

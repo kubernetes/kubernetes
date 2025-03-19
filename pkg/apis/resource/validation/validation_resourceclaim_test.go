@@ -735,6 +735,70 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"tolerations": {
+			wantFailures: func() field.ErrorList {
+				var allErrs field.ErrorList
+				fldPath := field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("tolerations")
+				allErrs = append(allErrs,
+					field.Required(fldPath.Index(0).Child("operator"), ""),
+				)
+				fldPath = field.NewPath("spec", "devices", "requests").Index(1).Child("tolerations")
+				allErrs = append(allErrs,
+					field.Required(fldPath.Index(3).Child("operator"), ""),
+
+					field.NotSupported(fldPath.Index(4).Child("operator"), resource.DeviceTolerationOperator("some-other-op"), []resource.DeviceTolerationOperator{resource.DeviceTolerationOpEqual, resource.DeviceTolerationOpExists}),
+
+					field.Invalid(fldPath.Index(5).Child("key"), badName, "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
+					field.Invalid(fldPath.Index(5).Child("value"), badName, "a valid label must be an empty string or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345', regex used for validation is '(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?')"),
+					field.NotSupported(fldPath.Index(5).Child("effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule}),
+				)
+				return allErrs
+			}(),
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				claim.Spec.Devices.Requests[0].FirstAvailable[0].Tolerations = []resource.DeviceToleration{
+					{
+						// One invalid case to verify the field path.
+						// Full test for validateDeviceToleration is below.
+						Operator: "",
+					},
+				}
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *validClaimSpec.Devices.Requests[0].DeepCopy())
+				claim.Spec.Devices.Requests[1].Name += "-other"
+				claim.Spec.Devices.Requests[1].Tolerations = []resource.DeviceToleration{
+					{
+						// Minimal valid toleration: match all taints.
+						Operator: resource.DeviceTolerationOpExists,
+					},
+					{
+						Key:      "example.com/taint",
+						Operator: resource.DeviceTolerationOpExists,
+						Effect:   resource.DeviceTaintEffectNoExecute,
+					},
+					{
+						Key:      "example.com/taint",
+						Operator: resource.DeviceTolerationOpEqual,
+						Value:    "tainted",
+						Effect:   resource.DeviceTaintEffectNoSchedule,
+					},
+					{
+						// Invalid, operator is required.
+						Operator: "",
+					},
+					{
+						Key:      goodName,
+						Operator: "some-other-op",
+					},
+					{
+						Key:      badName,
+						Operator: resource.DeviceTolerationOpEqual,
+						Value:    badName,
+						Effect:   "some-other-effect",
+					},
+				}
+				return claim
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -1645,11 +1709,6 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 
 			scenario.oldClaim.ResourceVersion = "1"
 			errs := ValidateResourceClaimStatusUpdate(scenario.update(scenario.oldClaim.DeepCopy()), scenario.oldClaim)
-
-			if name == "invalid-data-device-status-limits-feature-gate" {
-				fmt.Println(errs)
-				fmt.Println(scenario.wantFailures)
-			}
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}

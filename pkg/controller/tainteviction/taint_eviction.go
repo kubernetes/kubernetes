@@ -106,11 +106,11 @@ type Controller struct {
 
 func deletePodHandler(c clientset.Interface, emitEventFunc func(types.NamespacedName), controllerName string) func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
 	return func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-		ns := args.NamespacedName.Namespace
-		name := args.NamespacedName.Name
-		klog.FromContext(ctx).Info("Deleting pod", "controller", controllerName, "pod", args.NamespacedName)
+		ns := args.Object.Namespace
+		name := args.Object.Name
+		klog.FromContext(ctx).Info("Deleting pod", "controller", controllerName, "pod", args.Object)
 		if emitEventFunc != nil {
-			emitEventFunc(args.NamespacedName)
+			emitEventFunc(args.Object.NamespacedName)
 		}
 		var err error
 		for i := 0; i < retries; i++ {

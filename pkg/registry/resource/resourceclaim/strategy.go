@@ -335,3 +335,5 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 		newClaim.Status.Devices = nil
 	}
 }
+
+// TODO: add tests after partitionable devices is merged (code conflict!)

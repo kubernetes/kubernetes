@@ -114,7 +114,25 @@
                   }
                 ],
                 "allocationMode": "allocationModeValue",
-                "count": 5
+                "count": 5,
+                "tolerations": [
+                  {
+                    "key": "keyValue",
+                    "operator": "operatorValue",
+                    "value": "valueValue",
+                    "effect": "effectValue",
+                    "tolerationSeconds": 5
+                  }
+                ]
+              }
+            ],
+            "tolerations": [
+              {
+                "key": "keyValue",
+                "operator": "operatorValue",
+                "value": "valueValue",
+                "effect": "effectValue",
+                "tolerationSeconds": 5
               }
             ]
           }

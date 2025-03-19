@@ -28,10 +28,12 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
@@ -49,6 +51,8 @@ func (resourceSliceStrategy) NamespaceScoped() bool {
 func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	slice := obj.(*resource.ResourceSlice)
 	slice.Generation = 1
+
+	dropDisabledFields(slice, nil)
 }
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -75,6 +79,8 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 	if !apiequality.Semantic.DeepEqual(oldSlice.Spec, slice.Spec) {
 		slice.Generation = oldSlice.Generation + 1
 	}
+
+	dropDisabledFields(slice, oldSlice)
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
@@ -146,4 +152,34 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 
 	// Adds one field.
 	return generic.AddObjectMetaFieldsSet(fields, &slice.ObjectMeta, false)
+}
+
+// dropDisabledFields removes fields which are covered by a feature gate.
+func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
+	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
+}
+
+func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) || draDeviceTaintsFeatureInUse(oldSlice) {
+		return
+	}
+
+	for _, device := range newSlice.Spec.Devices {
+		if device.Basic != nil {
+			device.Basic.Taints = nil
+		}
+	}
+}
+
+func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if device.Basic != nil && len(device.Basic.Taints) > 0 {
+			return true
+		}
+	}
+	return false
 }

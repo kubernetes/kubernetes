@@ -687,6 +687,22 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSlice)
 	_ = h.TableHandler(nodeResourceSliceColumnDefinitions, printResourceSliceList)
 
+	deviceTaintColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		// The filter criteria are not printed. They could be lengthy (CEL!) and in practice many of them
+		// will be empty. Instead, the admin could pick a descriptive name.
+		//
+		// The taint is more useful.
+		{Name: "Key", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["key"]},
+		{Name: "Value", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["value"]},
+		{Name: "Effect", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["effect"]},
+		// TimeAdded and Age are often the same, but not necessarily.
+		{Name: "TimeAdded", Type: "string", Description: resourceapi.DeviceTaint{}.SwaggerDoc()["timeAdded"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(deviceTaintColumnDefinitions, printDeviceTaint)
+	_ = h.TableHandler(deviceTaintColumnDefinitions, printDeviceTaintRuleList)
+
 	serviceCIDRColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "CIDRs", Type: "string", Description: networkingv1beta1.ServiceCIDRSpec{}.SwaggerDoc()["cidrs"]},
@@ -3164,6 +3180,32 @@ func printResourceSliceList(list *resource.ResourceSliceList, options printers.G
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printResourceSlice(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printDeviceTaint(obj *resource.DeviceTaintRule, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+
+	timeAdded := ""
+	if added := obj.Spec.Taint.TimeAdded; added != nil {
+		timeAdded = translateTimestampSince(*added)
+	}
+	row.Cells = append(row.Cells, obj.Name, string(obj.Spec.Taint.Key), obj.Spec.Taint.Value, string(obj.Spec.Taint.Effect), timeAdded, translateTimestampSince(obj.CreationTimestamp))
+
+	return []metav1.TableRow{row}, nil
+}
+
+func printDeviceTaintRuleList(list *resource.DeviceTaintRuleList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printDeviceTaint(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

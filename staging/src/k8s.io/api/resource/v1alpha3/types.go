@@ -223,6 +223,18 @@ type BasicDevice struct {
 	//
 	// +optional
 	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
+
+	// If specified, these are the driver-defined taints.
+	//
+	// The maximum number of taints is 8.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,3,rep,name=taints"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -289,6 +301,64 @@ type DeviceAttribute struct {
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
 const DeviceAttributeMaxValueLength = 64
+
+// DeviceTaintsMaxLength is the maximum number of taints per device.
+const DeviceTaintsMaxLength = 8
+
+// The device this taint is attached to has the "effect" on
+// any claim which does not tolerate the taint and, through the claim,
+// to pods using the claim.
+type DeviceTaint struct {
+	// The taint key to be applied to a device.
+	// Must be a label name.
+	//
+	// +required
+	Key string `json:"key" protobuf:"bytes,1,name=key"`
+
+	// The taint value corresponding to the taint key.
+	// Must be a label value.
+	//
+	// +optional
+	Value string `json:"value,omitempty" protobuf:"bytes,2,opt,name=value"`
+
+	// The effect of the taint on claims that do not tolerate the taint
+	// and through such claims on the pods using them.
+	// Valid effects are NoSchedule and NoExecute. PreferNoSchedule as used for
+	// nodes is not valid here.
+	//
+	// +required
+	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
+
+	// ^^^^
+	//
+	// Implementing PreferNoSchedule would depend on a scoring solution for DRA.
+	// It might get added as part of that.
+
+	// TimeAdded represents the time at which the taint was added.
+	// Added automatically during create or update if not set.
+	//
+	// +optional
+	TimeAdded *metav1.Time `json:"timeAdded,omitempty" protobuf:"bytes,4,opt,name=timeAdded"`
+
+	// ^^^
+	//
+	// This field was defined as "It is only written for NoExecute taints." for node taints.
+	// But in practice, Kubernetes never did anything with it (no validation, no defaulting,
+	// ignored during pod eviction in pkg/controller/tainteviction).
+}
+
+// +enum
+type DeviceTaintEffect string
+
+const (
+	// Do not allow new pods to schedule which use a tainted device unless they tolerate the taint,
+	// but allow all pods submitted to Kubelet without going through the scheduler
+	// to start, and allow all already-running pods to continue running.
+	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
+
+	// Evict any already-running pods that do not tolerate the device taint.
+	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.31
@@ -508,6 +578,32 @@ type DeviceRequest struct {
 	// +listType=atomic
 	// +featureGate=DRAPrioritizedList
 	FirstAvailable []DeviceSubRequest `json:"firstAvailable,omitempty" protobuf:"bytes,7,name=firstAvailable"`
+
+	// If specified, the request's tolerations.
+	//
+	// Tolerations for NoSchedule are required to allocate a
+	// device which has a taint with that effect. The same applies
+	// to NoExecute.
+	//
+	// In addition, should any of the allocated devices get tainted
+	// with NoExecute after allocation and that effect is not tolerated,
+	// then all pods consuming the ResourceClaim get deleted to evict
+	// them. The scheduler will not let new pods reserve the claim while
+	// it has these tainted devices. Once all pods are evicted, the
+	// claim will get deallocated.
+	//
+	// The maximum number of tolerations is 16.
+	//
+	// This field can only be set when deviceClassName is set and no subrequests
+	// are specified in the firstAvailable list.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,8,opt,name=tolerations"`
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -580,11 +676,35 @@ type DeviceSubRequest struct {
 	// +optional
 	// +oneOf=AllocationMode
 	Count int64 `json:"count,omitempty" protobuf:"bytes,5,opt,name=count"`
+
+	// If specified, the request's tolerations.
+	//
+	// Tolerations for NoSchedule are required to allocate a
+	// device which has a taint with that effect. The same applies
+	// to NoExecute.
+	//
+	// In addition, should any of the allocated devices get tainted
+	// with NoExecute after allocation and that effect is not tolerated,
+	// then all pods consuming the ResourceClaim get deleted to evict
+	// them. The scheduler will not let new pods reserve the claim while
+	// it has these tainted devices. Once all pods are evicted, the
+	// claim will get deallocated.
+	//
+	// The maximum number of tolerations is 16.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,7,opt,name=tolerations"`
 }
 
 const (
 	DeviceSelectorsMaxSize             = 32
 	FirstAvailableDeviceRequestMaxSize = 8
+	DeviceTolerationsMaxLength         = 16
 )
 
 type DeviceAllocationMode string
@@ -790,6 +910,59 @@ type OpaqueDeviceConfiguration struct {
 // [OpaqueDeviceConfiguration.Parameters] field.
 const OpaqueParametersMaxLength = 10 * 1024
 
+// The ResourceClaim this DeviceToleration is attached to tolerates any taint that matches
+// the triple <key,value,effect> using the matching operator <operator>.
+type DeviceToleration struct {
+	// Key is the taint key that the toleration applies to. Empty means match all taint keys.
+	// If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+	// Must be a label name.
+	//
+	// +optional
+	Key string `json:"key,omitempty" protobuf:"bytes,1,opt,name=key"`
+
+	// Operator represents a key's relationship to the value.
+	// Valid operators are Exists and Equal. Defaults to Equal.
+	// Exists is equivalent to wildcard for value, so that a ResourceClaim can
+	// tolerate all taints of a particular category.
+	//
+	// +optional
+	// +default="Equal"
+	Operator DeviceTolerationOperator `json:"operator,omitempty" protobuf:"bytes,2,opt,name=operator,casttype=DeviceTolerationOperator"`
+
+	// Value is the taint value the toleration matches to.
+	// If the operator is Exists, the value must be empty, otherwise just a regular string.
+	// Must be a label value.
+	//
+	// +optional
+	Value string `json:"value,omitempty" protobuf:"bytes,3,opt,name=value"`
+
+	// Effect indicates the taint effect to match. Empty means match all taint effects.
+	// When specified, allowed values are NoSchedule and NoExecute.
+	//
+	// +optional
+	Effect DeviceTaintEffect `json:"effect,omitempty" protobuf:"bytes,4,opt,name=effect,casttype=DeviceTaintEffect"`
+
+	// TolerationSeconds represents the period of time the toleration (which must be
+	// of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+	// it is not set, which means tolerate the taint forever (do not evict). Zero and
+	// negative values will be treated as 0 (evict immediately) by the system.
+	// If larger than zero, the time when the pod needs to be evicted is calculated as <time when
+	// taint was adedd> + <toleration seconds>.
+	//
+	// +optional
+	TolerationSeconds *int64 `json:"tolerationSeconds,omitempty" protobuf:"varint,5,opt,name=tolerationSeconds"`
+}
+
+// A toleration operator is the set of operators that can be used in a toleration.
+//
+// +enum
+type DeviceTolerationOperator string
+
+const (
+	DeviceTolerationOpExists DeviceTolerationOperator = "Exists"
+	DeviceTolerationOpEqual  DeviceTolerationOperator = "Equal"
+)
+
 // ResourceClaimStatus tracks whether the resource has been allocated and what
 // the result of that was.
 type ResourceClaimStatus struct {
@@ -960,6 +1133,19 @@ type DeviceRequestAllocationResult struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool `json:"adminAccess" protobuf:"bytes,5,name=adminAccess"`
+
+	// A copy of all tolerations specified in the request at the time
+	// when the device got allocated.
+	//
+	// The maximum number of tolerations is 16.
+	//
+	// This is an alpha field and requires enabling the DRADeviceTaints
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceTaints
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.
@@ -1236,4 +1422,108 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// DeviceTaintRule adds one taint to all devices which match the selector.
+// This has the same effect as if the taint was specified directly
+// in the ResourceSlice by the DRA driver.
+type DeviceTaintRule struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec specifies the selector and one taint.
+	//
+	// Changing the spec automatically increments the metadata.generation number.
+	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
+
+	// ^^^
+	// A spec gets added because adding a status seems likely.
+	// Such a status could provide feedback on applying the
+	// eviction and/or statistics (number of matching devices,
+	// affected allocated claims, pods remaining to be evicted,
+	// etc.).
+}
+
+// DeviceTaintRuleSpec specifies the selector and one taint.
+type DeviceTaintRuleSpec struct {
+	// DeviceSelector defines which device(s) the taint is applied to.
+	// All selector criteria must be satified for a device to
+	// match. The empty selector matches all devices. Without
+	// a selector, no devices are matches.
+	//
+	// +optional
+	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
+
+	// The taint that gets applied to matching devices.
+	//
+	// +required
+	Taint DeviceTaint `json:"taint,omitempty" protobuf:"bytes,2,rep,name=taint"`
+}
+
+// DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.
+// The empty selector matches all devices. Without a selector, no devices
+// are matched.
+type DeviceTaintSelector struct {
+	// If DeviceClassName is set, the selectors defined there must be
+	// satisfied by a device to be selected. This field corresponds
+	// to class.metadata.name.
+	//
+	// +optional
+	DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
+
+	// If driver is set, only devices from that driver are selected.
+	// This fields corresponds to slice.spec.driver.
+	//
+	// +optional
+	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
+
+	// If pool is set, only devices in that pool are selected.
+	//
+	// Also setting the driver name may be useful to avoid
+	// ambiguity when different drivers use the same pool name,
+	// but this is not required because selecting pools from
+	// different drivers may also be useful, for example when
+	// drivers with node-local devices use the node name as
+	// their pool name.
+	//
+	// +optional
+	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
+
+	// If device is set, only devices with that name are selected.
+	// This field corresponds to slice.spec.devices[].name.
+	//
+	// Setting also driver and pool may be required to avoid ambiguity,
+	// but is not required.
+	//
+	// +optional
+	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
+
+	// Selectors contains the same selection criteria as a ResourceClaim.
+	// Currently, CEL expressions are supported. All of these selectors
+	// must be satisfied.
+	//
+	// +optional
+	// +listType=atomic
+	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
+
+// DeviceTaintRuleList is a collection of DeviceTaintRules.
+type DeviceTaintRuleList struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of DeviceTaintRules.
+	Items []DeviceTaintRule `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

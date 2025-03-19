@@ -48,6 +48,7 @@ func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
 		EnableDRAPrioritizedList:                     feature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
 		EnableDRAAdminAccess:                         feature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+		EnableDRADeviceTaints:                        feature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                  feature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 		EnableCSIMigrationPortworx:                   feature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx),

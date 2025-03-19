@@ -178,18 +178,22 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	DRAPrioritizedList: {
+	DRADeviceTaints: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	DynamicResourceAllocation: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
+	DRAPrioritizedList: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRAResourceClaimDeviceStatus: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	DynamicResourceAllocation: {
+		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	KubeletCrashLoopBackOffMax: {

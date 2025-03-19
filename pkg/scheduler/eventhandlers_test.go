@@ -28,12 +28,14 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 
@@ -395,6 +397,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 		name                   string
 		gvkMap                 map[framework.EventResource]framework.ActionType
 		enableDRA              bool
+		enableDRADeviceTaints  bool
 		expectStaticInformers  map[reflect.Type]bool
 		expectDynamicInformers map[schema.GroupVersionResource]bool
 	}{
@@ -423,7 +426,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "all DRA events enabled",
+			name: "core DRA events enabled",
 			gvkMap: map[framework.EventResource]framework.ActionType{
 				framework.ResourceClaim: framework.Add,
 				framework.ResourceSlice: framework.Add,
@@ -437,6 +440,26 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
 				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
 				reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
+			},
+			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
+		},
+		{
+			name: "all DRA events enabled",
+			gvkMap: map[framework.EventResource]framework.ActionType{
+				framework.ResourceClaim: framework.Add,
+				framework.ResourceSlice: framework.Add,
+				framework.DeviceClass:   framework.Add,
+			},
+			enableDRA:             true,
+			enableDRADeviceTaints: true,
+			expectStaticInformers: map[reflect.Type]bool{
+				reflect.TypeOf(&v1.Pod{}):                           true,
+				reflect.TypeOf(&v1.Node{}):                          true,
+				reflect.TypeOf(&v1.Namespace{}):                     true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
+				reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -499,6 +522,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicResourceAllocation, tt.enableDRA)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tt.enableDRADeviceTaints)
 
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -515,12 +539,27 @@ func TestAddAllEventHandlers(t *testing.T) {
 			dynclient := dyfake.NewSimpleDynamicClient(scheme)
 			dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
 			var resourceClaimCache *assumecache.AssumeCache
+			var resourceSliceTracker *resourceslicetracker.Tracker
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
 				resourceClaimInformer := informerFactory.Resource().V1beta1().ResourceClaims().Informer()
 				resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
+				var err error
+				opts := resourceslicetracker.Options{
+					EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+					SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+				}
+				if opts.EnableDeviceTaints {
+					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+					opts.ClassInformer = informerFactory.Resource().V1beta1().DeviceClasses()
+
+				}
+				resourceSliceTracker, err = resourceslicetracker.StartTracker(ctx, opts)
+				if err != nil {
+					t.Fatalf("couldn't start resource slice tracker: %v", err)
+				}
 			}
 
-			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, tt.gvkMap); err != nil {
+			if err := addAllEventHandlers(&testSched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, tt.gvkMap); err != nil {
 				t.Fatalf("Add event handlers failed, error = %v", err)
 			}
 

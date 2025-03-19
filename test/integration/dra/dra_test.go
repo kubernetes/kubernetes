@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -130,6 +131,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
 			},
 		},
 		"all": {
@@ -149,6 +151,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
 			},
 		},
 	} {
@@ -325,4 +328,72 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 			return pod
 		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
 	})
+}
+
+func testPublishResourceSlices(tCtx ktesting.TContext) {
+	tCtx.Parallel()
+
+	driverName := "dra.example.com"
+	poolName := "global"
+	resources := &resourceslice.DriverResources{
+		Pools: map[string]resourceslice.Pool{
+			poolName: {
+				Slices: []resourceslice.Slice{
+					{
+						Devices: []resourceapi.Device{
+							{
+								Name:  "device-simple",
+								Basic: &resourceapi.BasicDevice{},
+							},
+							// TODO: once https://github.com/kubernetes/kubernetes/pull/130764 is merged,
+							// add tests which detect dropped fields related to it.
+						},
+					},
+					{
+						Devices: []resourceapi.Device{
+							{
+								Name: "device-tainted-default",
+								Basic: &resourceapi.BasicDevice{
+									Taints: []resourceapi.DeviceTaint{{
+										Effect: resourceapi.DeviceTaintEffectNoExecute,
+										// TimeAdded is added by apiserver.
+									}},
+								},
+							},
+							{
+								Name: "device-tainted-time-added",
+								Basic: &resourceapi.BasicDevice{
+									Taints: []resourceapi.DeviceTaint{{
+										Effect:    resourceapi.DeviceTaintEffectNoExecute,
+										TimeAdded: ptr.To(metav1.Now()),
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	opts := resourceslice.Options{
+		DriverName: driverName,
+		KubeClient: tCtx.Client(),
+		SyncDelay:  ptr.To(0 * time.Second),
+		Resources:  resources,
+	}
+	controller, err := resourceslice.StartController(tCtx, opts)
+	tCtx.ExpectNoError(err, "start controller")
+	defer controller.Stop()
+
+	// Two create calls should be all that are needed.
+	expectedStats := resourceslice.Stats{
+		NumCreates: 2,
+	}
+	getStats := func(tCtx ktesting.TContext) resourceslice.Stats {
+		return controller.GetStats()
+	}
+	ktesting.Eventually(tCtx, getStats).WithTimeout(10 * time.Second).Should(gomega.Equal(expectedStats))
+
+	// No further changes necessary.
+	ktesting.Consistently(tCtx, getStats).WithTimeout(10 * time.Second).Should(gomega.Equal(expectedStats))
 }

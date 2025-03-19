@@ -353,7 +353,68 @@
       initClaims: 0
       maxClaimsPerNode: 10
       duration: 2s
- 
+
+# SchedulingWithResourceClaimTemplateToleration is a variant of SchedulingWithResourceClaimTemplate
+# with a claim template that tolerates the taint defined in a DeviceTaintRule.
+- name: SchedulingWithResourceClaimTemplateToleration
+  featureGates:
+    DynamicResourceAllocation: true
+    DRADeviceTaints: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createAny
+    templatePath: templates/devicetaintrule.yaml
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createResourceDriver
+    driverName: test-driver.cdi.k8s.io
+    nodes: scheduler-perf-dra-*
+    maxClaimsPerNodeParam: $maxClaimsPerNode
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-toleration.yaml
+    namespace: init
+  - opcode: createPods
+    namespace: init
+    countParam: $initPods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-toleration.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      initPods: 0
+      measurePods: 10
+      maxClaimsPerNode: 10
+
 # SchedulingWithResourceClaimTemplate uses ResourceClaims
 # with deterministic names that are shared between pods.
 # There is a fixed ratio of 1:5 between claims and pods.

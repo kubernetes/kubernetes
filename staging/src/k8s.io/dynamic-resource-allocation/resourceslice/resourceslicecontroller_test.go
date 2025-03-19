@@ -85,6 +85,8 @@ func TestControllerSyncPool(t *testing.T) {
 				}},
 			}},
 		}
+		timeAdded      = metav1.Now()
+		timeAddedLater = metav1.Time{Time: timeAdded.Add(time.Minute)}
 	)
 
 	testCases := map[string]struct {
@@ -141,6 +143,118 @@ func TestControllerSyncPool(t *testing.T) {
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName}}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"keep-taint-unchanged": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name: deviceName,
+					Basic: &resourceapi.BasicDevice{
+						Taints: []resourceapi.DeviceTaint{{
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
+							TimeAdded: &timeAdded,
+						}},
+					}}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{Devices: []resourceapi.Device{{
+							Name: deviceName,
+							Basic: &resourceapi.BasicDevice{
+								Taints: []resourceapi.DeviceTaint{{
+									Effect: resourceapi.DeviceTaintEffectNoExecute,
+									// No time added here! No need to update the slice.
+								}},
+							}}},
+						}},
+					},
+				},
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name: deviceName,
+					Basic: &resourceapi.BasicDevice{
+						Taints: []resourceapi.DeviceTaint{{
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
+							TimeAdded: &timeAdded,
+						}},
+					}}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+		},
+		"add-taint": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name: deviceName,
+					Basic: &resourceapi.BasicDevice{
+						Taints: []resourceapi.DeviceTaint{{
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
+							TimeAdded: &timeAdded,
+						}},
+					}}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{Devices: []resourceapi.Device{{
+							Name: deviceName,
+							Basic: &resourceapi.BasicDevice{
+								Taints: []resourceapi.DeviceTaint{
+									{
+										Effect: resourceapi.DeviceTaintEffectNoExecute,
+										// No time added here! Time from existing slice must get copied during update.
+									},
+									{
+										Key:       "example.com/tainted",
+										Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+										TimeAdded: &timeAddedLater,
+									},
+								},
+							}}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name: deviceName,
+					Basic: &resourceapi.BasicDevice{
+						Taints: []resourceapi.DeviceTaint{
+							{
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAdded,
+							},
+							{
+								Key:       "example.com/tainted",
+								Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+								TimeAdded: &timeAddedLater,
+							},
+						},
+					}}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
 			},
 		},
 		"remove-pool": {

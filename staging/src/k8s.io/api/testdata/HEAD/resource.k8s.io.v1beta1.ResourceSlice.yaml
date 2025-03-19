@@ -45,6 +45,11 @@ spec:
       capacity:
         capacityKey:
           value: "0"
+      taints:
+      - effect: effectValue
+        key: keyValue
+        timeAdded: "2004-01-01T01:01:01Z"
+        value: valueValue
     name: nameValue
   driver: driverValue
   nodeName: nodeNameValue

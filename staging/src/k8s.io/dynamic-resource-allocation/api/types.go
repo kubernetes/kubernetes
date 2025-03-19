@@ -18,6 +18,7 @@ package api
 
 import (
 	v1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -50,6 +51,7 @@ type Device struct {
 type BasicDevice struct {
 	Attributes map[QualifiedName]DeviceAttribute
 	Capacity   map[QualifiedName]DeviceCapacity
+	Taints     []resourceapi.DeviceTaint
 }
 
 type QualifiedName string
@@ -66,3 +68,18 @@ type DeviceAttribute struct {
 type DeviceCapacity struct {
 	Value resource.Quantity
 }
+
+type DeviceTaint struct {
+	Key       string
+	Value     string
+	Effect    DeviceTaintEffect
+	TimeAdded *metav1.Time
+}
+
+type DeviceTaintEffect string
+
+const (
+	DeviceTaintEffectNoSchedule DeviceTaintEffect = "NoSchedule"
+
+	DeviceTaintEffectNoExecute DeviceTaintEffect = "NoExecute"
+)

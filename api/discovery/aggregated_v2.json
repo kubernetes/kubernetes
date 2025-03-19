@@ -1916,6 +1916,26 @@
               ]
             },
             {
+              "resource": "devicetaintrules",
+              "responseKind": {
+                "group": "",
+                "kind": "DeviceTaintRule",
+                "version": ""
+              },
+              "scope": "Cluster",
+              "singularResource": "devicetaintrule",
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "resourceclaims",
               "responseKind": {
                 "group": "",

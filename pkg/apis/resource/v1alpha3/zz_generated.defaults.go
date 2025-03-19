@@ -30,6 +30,10 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.DeviceTaintRule{}, func(obj interface{}) { SetObjectDefaults_DeviceTaintRule(obj.(*resourcev1alpha3.DeviceTaintRule)) })
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.DeviceTaintRuleList{}, func(obj interface{}) {
+		SetObjectDefaults_DeviceTaintRuleList(obj.(*resourcev1alpha3.DeviceTaintRuleList))
+	})
 	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaim{}, func(obj interface{}) { SetObjectDefaults_ResourceClaim(obj.(*resourcev1alpha3.ResourceClaim)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimList{}, func(obj interface{}) { SetObjectDefaults_ResourceClaimList(obj.(*resourcev1alpha3.ResourceClaimList)) })
 	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimTemplate{}, func(obj interface{}) {
@@ -38,7 +42,20 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceClaimTemplateList{}, func(obj interface{}) {
 		SetObjectDefaults_ResourceClaimTemplateList(obj.(*resourcev1alpha3.ResourceClaimTemplateList))
 	})
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceSlice{}, func(obj interface{}) { SetObjectDefaults_ResourceSlice(obj.(*resourcev1alpha3.ResourceSlice)) })
+	scheme.AddTypeDefaultingFunc(&resourcev1alpha3.ResourceSliceList{}, func(obj interface{}) { SetObjectDefaults_ResourceSliceList(obj.(*resourcev1alpha3.ResourceSliceList)) })
 	return nil
+}
+
+func SetObjectDefaults_DeviceTaintRule(in *resourcev1alpha3.DeviceTaintRule) {
+	SetDefaults_DeviceTaint(&in.Spec.Taint)
+}
+
+func SetObjectDefaults_DeviceTaintRuleList(in *resourcev1alpha3.DeviceTaintRuleList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_DeviceTaintRule(a)
+	}
 }
 
 func SetObjectDefaults_ResourceClaim(in *resourcev1alpha3.ResourceClaim) {
@@ -48,6 +65,29 @@ func SetObjectDefaults_ResourceClaim(in *resourcev1alpha3.ResourceClaim) {
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
 			SetDefaults_DeviceSubRequest(b)
+			for k := range b.Tolerations {
+				c := &b.Tolerations[k]
+				if c.Operator == "" {
+					c.Operator = "Equal"
+				}
+			}
+		}
+		for j := range a.Tolerations {
+			b := &a.Tolerations[j]
+			if b.Operator == "" {
+				b.Operator = "Equal"
+			}
+		}
+	}
+	if in.Status.Allocation != nil {
+		for i := range in.Status.Allocation.Devices.Results {
+			a := &in.Status.Allocation.Devices.Results[i]
+			for j := range a.Tolerations {
+				b := &a.Tolerations[j]
+				if b.Operator == "" {
+					b.Operator = "Equal"
+				}
+			}
 		}
 	}
 }
@@ -66,6 +106,18 @@ func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1alpha3.ResourceClaimT
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
 			SetDefaults_DeviceSubRequest(b)
+			for k := range b.Tolerations {
+				c := &b.Tolerations[k]
+				if c.Operator == "" {
+					c.Operator = "Equal"
+				}
+			}
+		}
+		for j := range a.Tolerations {
+			b := &a.Tolerations[j]
+			if b.Operator == "" {
+				b.Operator = "Equal"
+			}
 		}
 	}
 }
@@ -74,5 +126,24 @@ func SetObjectDefaults_ResourceClaimTemplateList(in *resourcev1alpha3.ResourceCl
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ResourceClaimTemplate(a)
+	}
+}
+
+func SetObjectDefaults_ResourceSlice(in *resourcev1alpha3.ResourceSlice) {
+	for i := range in.Spec.Devices {
+		a := &in.Spec.Devices[i]
+		if a.Basic != nil {
+			for j := range a.Basic.Taints {
+				b := &a.Basic.Taints[j]
+				SetDefaults_DeviceTaint(b)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_ResourceSliceList(in *resourcev1alpha3.ResourceSliceList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ResourceSlice(a)
 	}
 }

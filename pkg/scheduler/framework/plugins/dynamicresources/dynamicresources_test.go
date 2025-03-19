@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -95,7 +96,7 @@ var (
 
 	// Node with "instance-1" device and no device attributes.
 	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
+	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
@@ -183,7 +184,21 @@ var (
 	otherAllocatedClaim = st.FromResourceClaim(otherClaim).
 				Allocation(allocationResult).
 				Obj()
+
+	deviceTaint = resourceapi.DeviceTaint{
+		Key:    "taint-key",
+		Value:  "taint-value",
+		Effect: resourceapi.DeviceTaintEffectNoSchedule,
+	}
 )
+
+func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
+	slice = slice.DeepCopy()
+	for i := range slice.Spec.Devices {
+		slice.Spec.Devices[i].Basic.Taints = append(slice.Spec.Devices[i].Basic.Taints, deviceTaint)
+	}
+	return slice
+}
 
 func reserve(claim *resourceapi.ResourceClaim, pod *v1.Pod) *resourceapi.ResourceClaim {
 	return st.FromResourceClaim(claim).
@@ -343,6 +358,7 @@ func TestPlugin(t *testing.T) {
 		disableDRA bool
 
 		enableDRAPrioritizedList bool
+		enableDRADeviceTaints    bool
 	}{
 		"empty": {
 			pod: st.MakePod().Name("foo").Namespace("default").Obj(),
@@ -592,6 +608,56 @@ func TestPlugin(t *testing.T) {
 			claims:  []*resourceapi.ResourceClaim{pendingClaim, otherAllocatedClaim},
 			classes: []*resourceapi.DeviceClass{deviceClass},
 			objs:    []apiruntime.Object{workerNodeSlice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `cannot allocate all claims`),
+					},
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
+
+		// The two test cases for device tainting only need to cover
+		// whether the feature gate is passed through to the allocator
+		// correctly. The actual logic around device taints and allocation
+		// is in the allocator.
+		"tainted-device-disabled": {
+			enableDRADeviceTaints: false,
+			pod:                   podWithClaimName,
+			claims:                []*resourceapi.ResourceClaim{pendingClaim},
+			classes:               []*resourceapi.DeviceClass{deviceClass},
+			objs:                  []apiruntime.Object{taintDevices(workerNodeSlice)},
+			want: want{
+				reserve: result{
+					inFlightClaim: allocatedClaim,
+				},
+				prebind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+					changes: change{
+						claim: func(claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status = inUseClaim.Status
+							}
+							return claim
+						},
+					},
+				},
+				postbind: result{
+					assumedClaim: reserve(allocatedClaim, podWithClaimName),
+				},
+			},
+		},
+		"tainted-device-enabled": {
+			enableDRADeviceTaints: true,
+			pod:                   podWithClaimName,
+			claims:                []*resourceapi.ResourceClaim{pendingClaim},
+			classes:               []*resourceapi.DeviceClass{deviceClass},
+			objs:                  []apiruntime.Object{taintDevices(workerNodeSlice)},
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -920,6 +986,7 @@ func TestPlugin(t *testing.T) {
 			}
 			features := feature.Features{
 				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
+				EnableDRADeviceTaints:           tc.enableDRADeviceTaints,
 				EnableDynamicResourceAllocation: !tc.disableDRA,
 				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
 			}
@@ -1191,7 +1258,16 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	tc.client.PrependReactor("*", "*", reactor)
 
 	tc.informerFactory = informers.NewSharedInformerFactory(tc.client, 0)
-	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil), tc.informerFactory)
+	resourceSliceTrackerOpts := resourceslicetracker.Options{
+		EnableDeviceTaints: true,
+		SliceInformer:      tc.informerFactory.Resource().V1beta1().ResourceSlices(),
+		TaintInformer:      tc.informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+		ClassInformer:      tc.informerFactory.Resource().V1beta1().DeviceClasses(),
+		KubeClient:         tc.client,
+	}
+	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
+	require.NoError(t, err, "couldn't start resource slice tracker")
+	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil), resourceSliceTracker, tc.informerFactory)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),

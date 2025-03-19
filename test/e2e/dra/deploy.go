@@ -89,6 +89,9 @@ type Resources struct {
 
 	// Number of devices called "device-000", "device-001", ... on each node or in the cluster.
 	MaxAllocations int
+
+	// Tainted causes all devices to be published with a NoExecute taint.
+	Tainted bool
 }
 
 //go:embed test-driver/deploy/example/plugin-permissions.yaml
@@ -326,10 +329,18 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			maxAllocations = 10
 		}
 		for i := 0; i < maxAllocations; i++ {
-			slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device{
+			device := resourceapi.Device{
 				Name:  fmt.Sprintf("device-%d", i),
 				Basic: &resourceapi.BasicDevice{},
-			})
+			}
+			if resources.Tainted {
+				device.Basic.Taints = []resourceapi.DeviceTaint{{
+					Key:    "example.com/taint",
+					Value:  "tainted",
+					Effect: resourceapi.DeviceTaintEffectNoSchedule,
+				}}
+			}
+			slice.Spec.Devices = append(slice.Spec.Devices, device)
 		}
 
 		_, err := d.f.ClientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})

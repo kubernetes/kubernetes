@@ -1642,6 +1642,16 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceSelectorApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceSubRequest"):
 		return &resourcev1alpha3.DeviceSubRequestApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaint"):
+		return &resourcev1alpha3.DeviceTaintApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRule"):
+		return &resourcev1alpha3.DeviceTaintRuleApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintRuleSpec"):
+		return &resourcev1alpha3.DeviceTaintRuleSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
+		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceToleration"):
+		return &resourcev1alpha3.DeviceTolerationApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &resourcev1alpha3.NetworkDeviceDataApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
@@ -1706,6 +1716,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceSelectorApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceSubRequest"):
 		return &applyconfigurationsresourcev1beta1.DeviceSubRequestApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceTaint"):
+		return &applyconfigurationsresourcev1beta1.DeviceTaintApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceToleration"):
+		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):

@@ -147,8 +147,8 @@ func classWithConfig(name, driver, attribute string) *resourceapi.DeviceClass {
 }
 
 // generate a ResourceClaim object with the given name and device requests.
-func claimWithRequests(name string, constraints []resourceapi.DeviceConstraint, requests ...resourceapi.DeviceRequest) *resourceapi.ResourceClaim {
-	return &resourceapi.ResourceClaim{
+func claimWithRequests(name string, constraints []resourceapi.DeviceConstraint, requests ...resourceapi.DeviceRequest) wrapResourceClaim {
+	return wrapResourceClaim{&resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -158,7 +158,7 @@ func claimWithRequests(name string, constraints []resourceapi.DeviceConstraint, 
 				Constraints: constraints,
 			},
 		},
-	}
+	}}
 }
 
 // generate a DeviceRequest object with the given name, class and selectors.
@@ -191,14 +191,28 @@ func requestWithPrioritizedList(name string, prioritizedRequests ...resourceapi.
 }
 
 // generate a ResourceClaim object with the given name, request and class.
-func claim(name, req, class string, constraints ...resourceapi.DeviceConstraint) *resourceapi.ResourceClaim {
+func claim(name, req, class string, constraints ...resourceapi.DeviceConstraint) wrapResourceClaim {
 	claim := claimWithRequests(name, constraints, request(req, class, 1))
 	return claim
 }
 
+type wrapResourceClaim struct{ *resourceapi.ResourceClaim }
+
+func (in wrapResourceClaim) obj() *resourceapi.ResourceClaim {
+	return in.ResourceClaim
+}
+
+func (in wrapResourceClaim) withTolerations(tolerations ...resourceapi.DeviceToleration) wrapResourceClaim {
+	out := in.DeepCopy()
+	for i := range out.Spec.Devices.Requests {
+		out.Spec.Devices.Requests[i].Tolerations = append(out.Spec.Devices.Requests[i].Tolerations, tolerations...)
+	}
+	return wrapResourceClaim{out}
+}
+
 // generate a ResourceClaim object with the given name, request, class, and attribute.
 // attribute is used to generate parameters in a form of JSON {attribute: attributeValue}.
-func claimWithDeviceConfig(name, request, class, driver, attribute string) *resourceapi.ResourceClaim {
+func claimWithDeviceConfig(name, request, class, driver, attribute string) wrapResourceClaim {
 	claim := claim(name, request, class)
 	claim.Spec.Devices.Config = []resourceapi.DeviceClaimConfiguration{
 		{
@@ -208,7 +222,7 @@ func claimWithDeviceConfig(name, request, class, driver, attribute string) *reso
 	return claim
 }
 
-func claimWithAll(name string, requests []resourceapi.DeviceRequest, constraints []resourceapi.DeviceConstraint, configs []resourceapi.DeviceClaimConfiguration) *resourceapi.ResourceClaim {
+func claimWithAll(name string, requests []resourceapi.DeviceRequest, constraints []resourceapi.DeviceConstraint, configs []resourceapi.DeviceClaimConfiguration) wrapResourceClaim {
 	claim := claimWithRequests(name, constraints, requests...)
 	claim.Spec.Devices.Config = configs
 	return claim
@@ -222,7 +236,7 @@ func deviceClaimConfig(requests []string, deviceConfig resourceapi.DeviceConfigu
 }
 
 // generate a Device object with the given name, capacity and attributes.
-func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) resourceapi.Device {
+func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) wrapDevice {
 	device := resourceapi.Device{
 		Name: name,
 		Basic: &resourceapi.BasicDevice{
@@ -233,14 +247,27 @@ func device(name string, capacity map[resourceapi.QualifiedName]resource.Quantit
 	for name, quantity := range capacity {
 		device.Basic.Capacity[name] = resourceapi.DeviceCapacity{Value: quantity}
 	}
-	return device
+	return wrapDevice(device)
+}
+
+type wrapDevice resourceapi.Device
+
+func (in wrapDevice) obj() resourceapi.Device {
+	return resourceapi.Device(in)
+}
+
+func (in wrapDevice) withTaints(taints ...resourceapi.DeviceTaint) wrapDevice {
+	inDevice := resourceapi.Device(in)
+	device := inDevice.DeepCopy()
+	device.Basic.Taints = append(device.Basic.Taints, taints...)
+	return wrapDevice(*device)
 }
 
 // generate a ResourceSlice object with the given name, node,
 // driver and pool names, generation and a list of devices.
 // The nodeSelection parameter may be a string (= node name),
 // true (= all nodes), or a node selector (= specific nodes).
-func slice(name string, nodeSelection any, pool, driver string, devices ...resourceapi.Device) *resourceapi.ResourceSlice {
+func slice(name string, nodeSelection any, pool, driver string, devices ...wrapDevice) *resourceapi.ResourceSlice {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -252,10 +279,11 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...resou
 				ResourceSliceCount: 1,
 				Generation:         1,
 			},
-			Devices: devices,
 		},
 	}
-
+	for _, device := range devices {
+		slice.Spec.Devices = append(slice.Spec.Devices, resourceapi.Device(device))
+	}
 	switch nodeSelection := nodeSelection.(type) {
 	case *v1.NodeSelector:
 		slice.Spec.NodeSelector = nodeSelection
@@ -389,6 +417,19 @@ func objects[T any](objs ...T) []T {
 	return objs
 }
 
+// convert a list of wrapper objects to a slice
+func unwrap[T any, O wrapper[T]](objs ...O) []T {
+	out := make([]T, len(objs))
+	for i, obj := range objs {
+		out[i] = obj.obj()
+	}
+	return out
+}
+
+type wrapper[T any] interface {
+	obj() T
+}
+
 // generate a ResourceSlice object with the given parameters and no devices
 func sliceWithNoDevices(name string, nodeSelection any, pool, driver string) *resourceapi.ResourceSlice {
 	return slice(name, nodeSelection, pool, driver)
@@ -401,7 +442,7 @@ func sliceWithOneDevice(name string, nodeSelection any, pool, driver string) *re
 
 // generate a ResourceSclie object with the given parameters and the specified number of devices.
 func sliceWithMultipleDevices(name string, nodeSelection any, pool, driver string, count int) *resourceapi.ResourceSlice {
-	var devices []resourceapi.Device
+	var devices []wrapDevice
 	for i := 0; i < count; i++ {
 		devices = append(devices, device(fmt.Sprintf("device-%d", i), nil, nil))
 	}
@@ -414,11 +455,36 @@ func TestAllocator(t *testing.T) {
 	stringAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "stringAttribute")
 	versionAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "driverVersion")
 	intAttribute := resourceapi.FullyQualifiedName(driverA + "/" + "numa")
+	taintKey := "taint-key"
+	taintValue := "taint-value"
+	taintValue2 := "taint-value-2"
+	taintNoSchedule := resourceapi.DeviceTaint{
+		Key:    taintKey,
+		Value:  taintValue,
+		Effect: resourceapi.DeviceTaintEffectNoSchedule,
+	}
+	taintNoExecute := resourceapi.DeviceTaint{
+		Key:    taintKey,
+		Value:  taintValue2,
+		Effect: resourceapi.DeviceTaintEffectNoExecute,
+	}
+	tolerationNoSchedule := resourceapi.DeviceToleration{
+		Operator: resourceapi.DeviceTolerationOpExists,
+		Key:      taintKey,
+		Effect:   resourceapi.DeviceTaintEffectNoSchedule,
+	}
+	tolerationNoExecute := resourceapi.DeviceToleration{
+		Operator: resourceapi.DeviceTolerationOpEqual,
+		Key:      taintKey,
+		Value:    taintValue2,
+		Effect:   resourceapi.DeviceTaintEffectNoExecute,
+	}
 
 	testcases := map[string]struct {
 		adminAccess      bool
 		prioritizedList  bool
-		claimsToAllocate []*resourceapi.ResourceClaim
+		deviceTaints     bool
+		claimsToAllocate []wrapResourceClaim
 		allocatedDevices []DeviceID
 		classes          []*resourceapi.DeviceClass
 		slices           []*resourceapi.ResourceSlice
@@ -955,11 +1021,11 @@ func TestAllocator(t *testing.T) {
 		},
 		"all-devices-some-allocated-admin-access": {
 			adminAccess: true,
-			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
 				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 				c.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationModeAll
-				return []*resourceapi.ResourceClaim{c}
+				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
 				MakeDeviceID(driverA, pool1, device1),
@@ -978,7 +1044,7 @@ func TestAllocator(t *testing.T) {
 		"all-devices-slice-without-devices-prioritized-list": {
 			prioritizedList: true,
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claimWithRequests(claim0, nil,
 						requestWithPrioritizedList(req0,
 							subRequest(subReq0, classA, 1),
@@ -1004,7 +1070,7 @@ func TestAllocator(t *testing.T) {
 		"all-devices-no-slices-prioritized-list": {
 			prioritizedList: true,
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claimWithRequests(claim0, nil,
 						requestWithPrioritizedList(req0,
 							subRequest(subReq0, classA, 1),
@@ -1029,7 +1095,7 @@ func TestAllocator(t *testing.T) {
 		"all-devices-some-allocated-prioritized-list": {
 			prioritizedList: true,
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claimWithRequests(claim0, nil,
 						requestWithPrioritizedList(req0,
 							subRequest(subReq0, classA, 1),
@@ -1152,10 +1218,10 @@ func TestAllocator(t *testing.T) {
 		},
 		"admin-access-disabled": {
 			adminAccess: false,
-			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
 				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-				return []*resourceapi.ResourceClaim{c}
+				return []wrapResourceClaim{c}
 			}(),
 			classes: objects(class(classA, driverA)),
 			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
@@ -1166,10 +1232,10 @@ func TestAllocator(t *testing.T) {
 		},
 		"admin-access-enabled": {
 			adminAccess: true,
-			claimsToAllocate: func() []*resourceapi.ResourceClaim {
+			claimsToAllocate: func() []wrapResourceClaim {
 				c := claim(claim0, req0, classA)
 				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-				return []*resourceapi.ResourceClaim{c}
+				return []wrapResourceClaim{c}
 			}(),
 			allocatedDevices: []DeviceID{
 				MakeDeviceID(driverA, pool1, device1),
@@ -1250,7 +1316,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"with-constraint-not-matching-int-attribute-all-devices": {
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claimWithRequests(
 						claim0,
 						[]resourceapi.DeviceConstraint{{MatchAttribute: &intAttribute}},
@@ -1434,7 +1500,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"unknown-selector": {
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
 					claim.Spec.Devices.Requests[0].Selectors = []resourceapi.DeviceSelector{
 						{ /* empty = unknown future selector */ },
@@ -1450,7 +1516,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"unknown-allocation-mode": {
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
 					claim.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationMode("future-mode")
 					return claim
@@ -1464,7 +1530,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"unknown-constraint": {
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
 					claim.Spec.Devices.Constraints = []resourceapi.DeviceConstraint{
 						{ /* empty = unknown */ },
@@ -1492,7 +1558,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"invalid-CEL-one-device": {
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
 					claim.Spec.Devices.Requests[0].Selectors = []resourceapi.DeviceSelector{
 						{CEL: &resourceapi.CELDeviceSelector{Expression: "noSuchVar"}},
@@ -1522,7 +1588,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"invalid-CEL-all-devices": {
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claim(claim0, req0, classA)
 					claim.Spec.Devices.Requests[0].Selectors = []resourceapi.DeviceSelector{
 						{CEL: &resourceapi.CELDeviceSelector{Expression: "noSuchVar"}},
@@ -1846,7 +1912,7 @@ func TestAllocator(t *testing.T) {
 		"prioritized-list-subrequests-with-allocation-mode-all": {
 			prioritizedList: true,
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claimWithRequests(claim0, nil,
 						requestWithPrioritizedList(req0,
 							subRequest(subReq0, classA, 1),
@@ -1909,7 +1975,7 @@ func TestAllocator(t *testing.T) {
 		"prioritized-list-disabled": {
 			prioritizedList: false,
 			claimsToAllocate: objects(
-				func() *resourceapi.ResourceClaim {
+				func() wrapResourceClaim {
 					claim := claimWithRequests(claim0, nil,
 						requestWithPrioritizedList(req0,
 							subRequest(subReq0, classA, 1),
@@ -2038,6 +2104,168 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
 			)},
 		},
+		"tainted-two-devices": {
+			deviceTaints:     true,
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+				device(device2, nil, nil).withTaints(taintNoExecute),
+			)),
+			node: node(node1, region1),
+		},
+		"tainted-one-device-two-taints": {
+			deviceTaints:     true,
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule, taintNoExecute),
+			)),
+			node: node(node1, region1),
+		},
+		"tainted-two-devices-tolerated": {
+			deviceTaints:     true,
+			claimsToAllocate: objects(claim(claim0, req0, classA).withTolerations(tolerationNoExecute)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+				device(device2, nil, nil).withTaints(taintNoExecute),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false), // Only second device's taints are tolerated.
+			)},
+		},
+		"tainted-one-device-two-taints-both-tolerated": {
+			deviceTaints:     true,
+			claimsToAllocate: objects(claim(claim0, req0, classA).withTolerations(tolerationNoSchedule, tolerationNoExecute)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule, taintNoExecute),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"tainted-disabled": {
+			deviceTaints:     false,
+			claimsToAllocate: objects(claim(claim0, req0, classA)),
+			classes:          objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule, taintNoExecute),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"tainted-prioritized-list": {
+			deviceTaints:    true,
+			prioritizedList: true,
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
+				subRequest(subReq0, classB, 1),
+				subRequest(subReq1, classA, 1),
+			))),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+			)),
+			node: node(node1, region1),
+		},
+		"tainted-prioritized-list-disabled": {
+			deviceTaints:    false,
+			prioritizedList: true,
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
+				subRequest(subReq0, classB, 1),
+				subRequest(subReq1, classA, 1),
+			))),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+			)},
+		},
+		"tainted-admin-access": {
+			deviceTaints: true,
+			adminAccess:  true,
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				return []wrapResourceClaim{c}
+			}(),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+			)),
+			node: node(node1, region1),
+		},
+		"tainted-admin-access-disabled": {
+			deviceTaints: false,
+			adminAccess:  true,
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				return []wrapResourceClaim{c}
+			}(),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+				MakeDeviceID(driverA, pool1, device2),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+			)},
+		},
+		"tainted-all-devices-single": {
+			deviceTaints: true,
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name:            req0,
+				AllocationMode:  resourceapi.DeviceAllocationModeAll,
+				DeviceClassName: classA,
+			})),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+			)),
+			node: node(node1, region1),
+		},
+		"tainted-all-devices-single-disabled": {
+			deviceTaints: false,
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, resourceapi.DeviceRequest{
+				Name:            req0,
+				AllocationMode:  resourceapi.DeviceAllocationModeAll,
+				DeviceClassName: classA,
+			})),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil).withTaints(taintNoSchedule),
+			)),
+			node: node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -2056,7 +2284,7 @@ func TestAllocator(t *testing.T) {
 			allocatedDevices := slices.Clone(tc.allocatedDevices)
 			slices := slices.Clone(tc.slices)
 
-			allocator, err := NewAllocator(ctx, tc.adminAccess, tc.prioritizedList, claimsToAllocate, sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
+			allocator, err := NewAllocator(ctx, tc.adminAccess, tc.prioritizedList, tc.deviceTaints, unwrap(claimsToAllocate...), sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
 			results, err := allocator.Allocate(ctx, tc.node)

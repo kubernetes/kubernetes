@@ -153,6 +153,7 @@ var resetFieldsSpecData = map[schema.GroupVersionResource]string{
 	gvr("resource.k8s.io", "v1alpha3", "deviceclasses"):                            `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1alpha3", "resourceclaims"):                           `{"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "other-class"}]}}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"):                   `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,
+	gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"):                         `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1beta1", "deviceclasses"):                             `{"metadata": {"labels":{"a":"c"}}}`,
 	gvr("resource.k8s.io", "v1beta1", "resourceclaims"):                            `{"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "other-class"}]}}}`, // spec is immutable, but that doesn't matter for the test.
 	gvr("resource.k8s.io", "v1beta1", "resourceclaimtemplates"):                    `{"spec": {"spec": {"resourceClassName": "class2name"}}}`,

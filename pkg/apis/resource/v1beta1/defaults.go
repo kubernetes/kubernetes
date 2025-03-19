@@ -17,7 +17,10 @@ limitations under the License.
 package v1beta1
 
 import (
+	"time"
+
 	resourceapi "k8s.io/api/resource/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -48,5 +51,11 @@ func SetDefaults_DeviceSubRequest(obj *resourceapi.DeviceSubRequest) {
 
 	if obj.AllocationMode == resourceapi.DeviceAllocationModeExactCount && obj.Count == 0 {
 		obj.Count = 1
+	}
+}
+
+func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
+	if obj.TimeAdded == nil {
+		obj.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
 	}
 }

@@ -590,6 +590,12 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			IntroducedVersion: "1.31",
 			RemovedVersion:    "1.37",
 		},
+		gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"): {
+			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
+			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/resource/v1beta1

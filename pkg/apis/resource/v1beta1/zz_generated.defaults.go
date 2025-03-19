@@ -38,6 +38,8 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 	scheme.AddTypeDefaultingFunc(&resourcev1beta1.ResourceClaimTemplateList{}, func(obj interface{}) {
 		SetObjectDefaults_ResourceClaimTemplateList(obj.(*resourcev1beta1.ResourceClaimTemplateList))
 	})
+	scheme.AddTypeDefaultingFunc(&resourcev1beta1.ResourceSlice{}, func(obj interface{}) { SetObjectDefaults_ResourceSlice(obj.(*resourcev1beta1.ResourceSlice)) })
+	scheme.AddTypeDefaultingFunc(&resourcev1beta1.ResourceSliceList{}, func(obj interface{}) { SetObjectDefaults_ResourceSliceList(obj.(*resourcev1beta1.ResourceSliceList)) })
 	return nil
 }
 
@@ -48,6 +50,29 @@ func SetObjectDefaults_ResourceClaim(in *resourcev1beta1.ResourceClaim) {
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
 			SetDefaults_DeviceSubRequest(b)
+			for k := range b.Tolerations {
+				c := &b.Tolerations[k]
+				if c.Operator == "" {
+					c.Operator = "Equal"
+				}
+			}
+		}
+		for j := range a.Tolerations {
+			b := &a.Tolerations[j]
+			if b.Operator == "" {
+				b.Operator = "Equal"
+			}
+		}
+	}
+	if in.Status.Allocation != nil {
+		for i := range in.Status.Allocation.Devices.Results {
+			a := &in.Status.Allocation.Devices.Results[i]
+			for j := range a.Tolerations {
+				b := &a.Tolerations[j]
+				if b.Operator == "" {
+					b.Operator = "Equal"
+				}
+			}
 		}
 	}
 }
@@ -66,6 +91,18 @@ func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1beta1.ResourceClaimTe
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
 			SetDefaults_DeviceSubRequest(b)
+			for k := range b.Tolerations {
+				c := &b.Tolerations[k]
+				if c.Operator == "" {
+					c.Operator = "Equal"
+				}
+			}
+		}
+		for j := range a.Tolerations {
+			b := &a.Tolerations[j]
+			if b.Operator == "" {
+				b.Operator = "Equal"
+			}
 		}
 	}
 }
@@ -74,5 +111,24 @@ func SetObjectDefaults_ResourceClaimTemplateList(in *resourcev1beta1.ResourceCla
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_ResourceClaimTemplate(a)
+	}
+}
+
+func SetObjectDefaults_ResourceSlice(in *resourcev1beta1.ResourceSlice) {
+	for i := range in.Spec.Devices {
+		a := &in.Spec.Devices[i]
+		if a.Basic != nil {
+			for j := range a.Basic.Taints {
+				b := &a.Basic.Taints[j]
+				SetDefaults_DeviceTaint(b)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_ResourceSliceList(in *resourcev1beta1.ResourceSliceList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_ResourceSlice(a)
 	}
 }
