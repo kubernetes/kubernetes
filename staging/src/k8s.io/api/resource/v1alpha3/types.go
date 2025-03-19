@@ -154,7 +154,8 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	PerDeviceNodeSelection bool `json:"perDeviceNodeSelection,omitempty" protobuf:"bytes,7,name=perDeviceNodeSelection"`
+	// +featureGate=DRAPartitionableDevices
+	PerDeviceNodeSelection *bool `json:"perDeviceNodeSelection,omitempty" protobuf:"bytes,7,name=perDeviceNodeSelection"`
 
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
@@ -165,6 +166,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRAPartitionableDevices
 	SharedCounters []CounterSet `json:"sharedCounters,omitempty" protobuf:"bytes,8,name=sharedCounters"`
 }
 
@@ -295,6 +297,7 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRAPartitionableDevices
 	ConsumesCounter []DeviceCounterConsumption `json:"consumesCounter,omitempty" protobuf:"bytes,3,rep,name=consumesCounter"`
 
 	// NodeName identifies the node where the device is available.
@@ -304,7 +307,8 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +oneOf=DeviceNodeSelection
-	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,4,opt,name=nodeName"`
+	// +featureGate=DRAPartitionableDevices
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,4,opt,name=nodeName"`
 
 	// NodeSelector defines the nodes where the device is available.
 	//
@@ -315,6 +319,7 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +oneOf=DeviceNodeSelection
+	// +featureGate=DRAPartitionableDevices
 	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,5,opt,name=nodeSelector"`
 
 	// AllNodes indicates that all nodes have access to the device.
@@ -324,7 +329,8 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +oneOf=DeviceNodeSelection
-	AllNodes bool `json:"allNodes,omitempty" protobuf:"bytes,6,opt,name=allNodes"`
+	// +featureGate=DRAPartitionableDevices
+	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,6,opt,name=allNodes"`
 }
 
 // DeviceCounterConsumption defines a set of counters that

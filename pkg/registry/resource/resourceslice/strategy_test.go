@@ -49,8 +49,11 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 		Name: "valid-resource-slice",
 	},
 	Spec: resource.ResourceSliceSpec{
-		PerDeviceNodeSelection: true,
-		Driver:                 "testdriver.example.com",
+		PerDeviceNodeSelection: func() *bool {
+			r := true
+			return &r
+		}(),
+		Driver: "testdriver.example.com",
 		Pool: resource.ResourcePool{
 			Name:               "valid-pool-name",
 			ResourceSliceCount: 1,
@@ -80,7 +83,10 @@ var sliceWithPartitionableDevices = &resource.ResourceSlice{
 							},
 						},
 					},
-					NodeName: "valid-node-name",
+					NodeName: func() *string {
+						r := "valid-node-name"
+						return &r
+					}(),
 					Attributes: map[resource.QualifiedName]resource.DeviceAttribute{
 						resource.QualifiedName("version"): {
 							StringValue: func() *string {
@@ -136,7 +142,10 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 		"drop-fields-partitionable-devices": {
 			obj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.Spec.PerDeviceNodeSelection = false
+				obj.Spec.PerDeviceNodeSelection = func() *bool {
+					r := false
+					return &r
+				}()
 				obj.Spec.NodeName = "valid-node-name"
 				return obj
 			}(),
@@ -145,11 +154,11 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 				obj := sliceWithPartitionableDevices.DeepCopy()
 				obj.ObjectMeta.Generation = 1
 				obj.Spec.SharedCounters = nil
-				obj.Spec.PerDeviceNodeSelection = false
+				obj.Spec.PerDeviceNodeSelection = nil
 				obj.Spec.NodeName = "valid-node-name"
-				obj.Spec.Devices[0].Basic.NodeName = ""
+				obj.Spec.Devices[0].Basic.NodeName = nil
 				obj.Spec.Devices[0].Basic.NodeSelector = nil
-				obj.Spec.Devices[0].Basic.AllNodes = false
+				obj.Spec.Devices[0].Basic.AllNodes = nil
 				obj.Spec.Devices[0].Basic.ConsumesCounter = nil
 				return obj
 			}(),
@@ -233,7 +242,10 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			newObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevices.DeepCopy()
 				obj.ResourceVersion = "4"
-				obj.Spec.PerDeviceNodeSelection = false
+				obj.Spec.PerDeviceNodeSelection = func() *bool {
+					r := false
+					return &r
+				}()
 				obj.Spec.NodeName = "valid-node-name"
 				return obj
 			}(),
@@ -243,10 +255,10 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj.ResourceVersion = "4"
 				obj.Generation = 1
 				obj.Spec.SharedCounters = nil
-				obj.Spec.PerDeviceNodeSelection = false
+				obj.Spec.PerDeviceNodeSelection = nil
 				obj.Spec.NodeName = "valid-node-name"
 				obj.Spec.Devices[0].Basic.ConsumesCounter = nil
-				obj.Spec.Devices[0].Basic.NodeName = ""
+				obj.Spec.Devices[0].Basic.NodeName = nil
 				return obj
 			}(),
 		},
@@ -265,9 +277,9 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			newObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevices.DeepCopy()
 				obj.ResourceVersion = "4"
-				obj.Spec.PerDeviceNodeSelection = false
 				obj.Spec.NodeName = "valid-node-name"
-				obj.Spec.Devices[0].Basic.NodeName = ""
+				obj.Spec.PerDeviceNodeSelection = nil
+				obj.Spec.Devices[0].Basic.NodeName = nil
 				return obj
 			}(),
 			partitionableDevices: true,
@@ -275,9 +287,9 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 				obj := sliceWithPartitionableDevices.DeepCopy()
 				obj.ResourceVersion = "4"
 				obj.Generation = 1
-				obj.Spec.PerDeviceNodeSelection = false
-				obj.Spec.Devices[0].Basic.NodeName = ""
 				obj.Spec.NodeName = "valid-node-name"
+				obj.Spec.PerDeviceNodeSelection = nil
+				obj.Spec.Devices[0].Basic.NodeName = nil
 				return obj
 			}(),
 		},

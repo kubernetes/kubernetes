@@ -35,7 +35,7 @@ type ResourceSliceSpec struct {
 	NodeSelector           *v1.NodeSelector
 	AllNodes               bool
 	Devices                []Device
-	PerDeviceNodeSelection bool
+	PerDeviceNodeSelection *bool
 	SharedCounters         []CounterSet
 }
 
@@ -58,9 +58,9 @@ type BasicDevice struct {
 	Attributes      map[QualifiedName]DeviceAttribute
 	Capacity        map[QualifiedName]DeviceCapacity
 	ConsumesCounter []DeviceCounterConsumption
-	NodeName        UniqueString
+	NodeName        *string
 	NodeSelector    *v1.NodeSelector
-	AllNodes        bool
+	AllNodes        *bool
 }
 
 type DeviceCounterConsumption struct {

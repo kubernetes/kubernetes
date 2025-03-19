@@ -150,7 +150,8 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	PerDeviceNodeSelection bool
+	// +featureGate=DRAPartitionableDevices
+	PerDeviceNodeSelection *bool
 
 	// SharedCounters defines a list of counter sets, each of which
 	// has a name and a list of counters available.
@@ -161,6 +162,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRAPartitionableDevices
 	SharedCounters []CounterSet
 }
 
@@ -301,6 +303,7 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRAPartitionableDevices
 	ConsumesCounter []DeviceCounterConsumption
 
 	// NodeName identifies the node where the device is available.
@@ -310,7 +313,8 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +oneOf=DeviceNodeSelection
-	NodeName string
+	// +featureGate=DRAPartitionableDevices
+	NodeName *string
 
 	// NodeSelector defines the nodes where the device is available.
 	//
@@ -321,6 +325,7 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +oneOf=DeviceNodeSelection
+	// +featureGate=DRAPartitionableDevices
 	NodeSelector *core.NodeSelector
 
 	// AllNodes indicates that all nodes have access to the device.
@@ -330,7 +335,8 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +oneOf=DeviceNodeSelection
-	AllNodes bool
+	// +featureGate=DRAPartitionableDevices
+	AllNodes *bool
 }
 
 // DeviceCounterConsumption defines a set of counters that

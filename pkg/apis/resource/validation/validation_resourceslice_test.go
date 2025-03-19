@@ -456,25 +456,75 @@ func TestValidateResourceSlice(t *testing.T) {
 		"bad-PerDeviceNodeSelection": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec"), "{`nodeName`, `perDeviceNodeSelection`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"),
-				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = "worker"
-				slice.Spec.PerDeviceNodeSelection = true
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := true
+					return &r
+				}()
+				return slice
+			}(),
+		},
+		"invalid-false-PerDeviceNodeSelection": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "perDeviceNodeSelection"), false, "must be either unset or set to true"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.NodeName = "worker"
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := false
+					return &r
+				}()
+				return slice
+			}(),
+		},
+		"invalid-node-selector-in-basicdevice": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "nodeName"), "", "must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "allNodes"), false, "must be either unset or set to true"),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := true
+					return &r
+				}()
+				slice.Spec.NodeName = ""
+				slice.Spec.Devices[0].Basic.NodeName = func() *string {
+					r := ""
+					return &r
+				}()
+				slice.Spec.Devices[0].Basic.AllNodes = func() *bool {
+					r := false
+					return &r
+				}()
 				return slice
 			}(),
 		},
 		"bad-node-selector-in-basicdevice": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
-				slice.Spec.PerDeviceNodeSelection = true
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := true
+					return &r
+				}()
 				slice.Spec.NodeName = ""
-				slice.Spec.Devices[0].Basic.NodeName = "worker"
-				slice.Spec.Devices[0].Basic.AllNodes = true
+				slice.Spec.Devices[0].Basic.NodeName = func() *string {
+					r := "worker"
+					return &r
+				}()
+				slice.Spec.Devices[0].Basic.AllNodes = func() *bool {
+					r := true
+					return &r
+				}()
 				return slice
 			}(),
 		},

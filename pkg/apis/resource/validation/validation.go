@@ -596,8 +596,14 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	if spec.AllNodes {
 		setFields = append(setFields, "`allNodes`")
 	}
-	if spec.PerDeviceNodeSelection {
-		setFields = append(setFields, "`perDeviceNodeSelection`")
+	if spec.PerDeviceNodeSelection != nil {
+		if *spec.PerDeviceNodeSelection {
+			setFields = append(setFields, "`perDeviceNodeSelection`")
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("perDeviceNodeSelection"), *spec.PerDeviceNodeSelection,
+				"must be either unset or set to true"))
+		}
+
 	}
 	switch len(setFields) {
 	case 0:
@@ -667,7 +673,7 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 	return allErrs
 }
 
-func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection bool) field.ErrorList {
+func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
 	if device.Basic == nil {
@@ -678,7 +684,7 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	return allErrs
 }
 
-func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection bool) field.ErrorList {
+func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
@@ -708,28 +714,37 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, share
 		}
 	}
 
-	if perDeviceNodeSelection {
+	if perDeviceNodeSelection != nil && *perDeviceNodeSelection {
 		setFields := make([]string, 0, 3)
-		if device.NodeName != "" {
-			setFields = append(setFields, "`nodeName`")
-			allErrs = append(allErrs, validateNodeName(device.NodeName, fldPath.Child("nodeName"))...)
+		if device.NodeName != nil {
+			if len(*device.NodeName) != 0 {
+				setFields = append(setFields, "`nodeName`")
+				allErrs = append(allErrs, validateNodeName(*device.NodeName, fldPath.Child("nodeName"))...)
+			} else {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *device.NodeName, "must not be empty"))
+			}
+
 		}
 		if device.NodeSelector != nil {
 			setFields = append(setFields, "`nodeSelector`")
 			allErrs = append(allErrs, corevalidation.ValidateNodeSelector(device.NodeSelector, false, fldPath.Child("nodeSelector"))...)
 		}
-		if device.AllNodes {
-			setFields = append(setFields, "`allNodes`")
+		if device.AllNodes != nil {
+			if *device.AllNodes {
+				setFields = append(setFields, "`allNodes`")
+			} else {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("allNodes"), *device.AllNodes, "must be either unset or set to true"))
+			}
 		}
 		switch len(setFields) {
 		case 0:
-			allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"))
+			allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 		case 1:
 		default:
-			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set in the ResourceSlice spec"))
+			allErrs = append(allErrs, field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(setFields, ", ")), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 		}
-	} else if device.NodeName != "" || device.NodeSelector != nil || device.AllNodes {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set in the ResourceSlice spec"))
+	} else if (perDeviceNodeSelection == nil || !*perDeviceNodeSelection) && (device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil) {
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 	}
 
 	return allErrs
