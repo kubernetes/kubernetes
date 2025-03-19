@@ -1097,10 +1097,11 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	msg := truncateMessage(errMsg)
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
-		Type:    v1.PodScheduled,
-		Status:  v1.ConditionFalse,
-		Reason:  reason,
-		Message: errMsg,
+		Type:               v1.PodScheduled,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(&pod.Status, pod.Generation, v1.PodScheduled),
+		Status:             v1.ConditionFalse,
+		Reason:             reason,
+		Message:            errMsg,
 	}, nominatingInfo); err != nil {
 		logger.Error(err, "Error updating pod", "pod", klog.KObj(pod))
 	}
