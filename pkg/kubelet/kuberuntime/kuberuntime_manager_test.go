@@ -3389,7 +3389,7 @@ func TestDoPodResizeAction(t *testing.T) {
 			if tc.expectedError != "" {
 				require.Error(t, resizeResult.Error)
 				require.EqualError(t, resizeResult.Error, tc.expectedError)
-				require.Equal(t, resizeResult.Message, tc.expectedErrorMessage)
+				require.Equal(t, tc.expectedErrorMessage, resizeResult.Message)
 			} else {
 				require.NoError(t, resizeResult.Error)
 			}
