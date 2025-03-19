@@ -32,7 +32,6 @@ import (
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -58,9 +57,6 @@ const (
 	// podStartTimeout is how long to wait for the pod to be started.
 	podStartTimeout = 5 * time.Minute
 )
-
-//go:embed test-driver/deploy/example/admin-access-policy.yaml
-var adminAccessPolicyYAML string
 
 // networkResources can be passed to NewDriver directly.
 func networkResources() Resources {
@@ -1379,30 +1375,13 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
 
-		f.It("support validating admission policy for admin access", feature.DRAAdminAccess, framework.WithFeatureGate(features.DRAAdminAccess), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
-			// Create VAP, after making it unique to the current test.
-			adminAccessPolicyYAML := strings.ReplaceAll(adminAccessPolicyYAML, "dra.example.com", b.f.UniqueName)
-			driver.createFromYAML(ctx, []byte(adminAccessPolicyYAML), "")
-
-			// Wait for both VAPs to be processed. This ensures that there are no check errors in the status.
-			matchStatus := gomega.Equal(admissionregistrationv1.ValidatingAdmissionPolicyStatus{ObservedGeneration: 1, TypeChecking: &admissionregistrationv1.TypeChecking{}})
-			gomega.Eventually(ctx, framework.ListObjects(b.f.ClientSet.AdmissionregistrationV1().ValidatingAdmissionPolicies().List, metav1.ListOptions{})).Should(gomega.HaveField("Items", gomega.ContainElements(
-				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-					"ObjectMeta": gomega.HaveField("Name", "resourceclaim-policy."+b.f.UniqueName),
-					"Status":     matchStatus,
-				}),
-				gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-					"ObjectMeta": gomega.HaveField("Name", "resourceclaimtemplate-policy."+b.f.UniqueName),
-					"Status":     matchStatus,
-				}),
-			)))
-
+		f.It("validate ResourceClaimTemplate and ResourceClaim for admin access", feature.DRAAdminAccess, framework.WithFeatureGate(features.DRAAdminAccess), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
 			// Attempt to create claim and claim template with admin access. Must fail eventually.
 			claim := b.externalClaim()
 			claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			_, claimTemplate := b.podInline()
 			claimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
-			matchVAPError := gomega.MatchError(gomega.ContainSubstring("admin access to devices not enabled in namespace " + b.f.Namespace.Name))
+			matchValidationError := gomega.MatchError(gomega.ContainSubstring("admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace"))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
 				if err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -1410,7 +1389,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				}
 				_, err := b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, claim, metav1.CreateOptions{})
 				return err
-			}).Should(matchVAPError)
+			}).Should(matchValidationError)
 
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
@@ -1419,11 +1398,11 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 				}
 				_, err := b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, claimTemplate, metav1.CreateOptions{})
 				return err
-			}).Should(matchVAPError)
+			}).Should(matchValidationError)
 
 			// After labeling the namespace, creation must (eventually...) succeed.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
-				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"admin-access." + b.f.UniqueName: "on"}),
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
 			framework.ExpectNoError(err)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -1499,6 +1478,12 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 
 		f.It("DaemonSet with admin access", feature.DRAAdminAccess, framework.WithFeatureGate(features.DRAAdminAccess), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
+			// Ensure namespace has the dra admin label.
+			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
+				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
+			framework.ExpectNoError(err)
+
 			pod, template := b.podInline()
 			template.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
 			// Limit the daemon set to the one node where we have the driver.
@@ -1507,7 +1492,8 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			pod.Spec.RestartPolicy = v1.RestartPolicyAlways
 			daemonSet := &appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "monitoring-ds",
+					Name:      "monitoring-ds",
+					Namespace: b.f.Namespace.Name,
 				},
 				Spec: appsv1.DaemonSetSpec{
 					Selector: &metav1.LabelSelector{

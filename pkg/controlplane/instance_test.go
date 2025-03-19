@@ -490,7 +490,7 @@ func TestGenericStorageProviders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	kube, err := completed.StorageProviders(client.Discovery())
+	kube, err := completed.StorageProviders(client)
 	if err != nil {
 		t.Fatal(err)
 	}
