@@ -1,6 +1,6 @@
 module k8s.io/kubernetes/hack/tools
 
-go 1.24.0
+go 1.24.1
 
 godebug default=go1.24
 
@@ -197,7 +197,7 @@ require (
 	go-simpler.org/sloglint v0.9.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
+	go.uber.org/zap v1.24.1 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/sync v0.11.0 // indirect
