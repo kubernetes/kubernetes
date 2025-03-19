@@ -856,6 +856,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.24"
+- name: OrderedNamespaceDeletion
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.30"
 - name: PDBUnhealthyPodEvictionPolicy
   versionedSpecs:
   - default: false

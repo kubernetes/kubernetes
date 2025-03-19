@@ -30,6 +30,10 @@ kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     "${SCRIPT_ROOT}"
 
+kube::codegen::gen_register \
+    --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
+    "${SCRIPT_ROOT}"
+
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
     report_filename="${API_KNOWN_VIOLATIONS_DIR}/codegen_violation_exceptions.list"
     if [[ "${UPDATE_API_KNOWN_VIOLATIONS:-}" == "true" ]]; then

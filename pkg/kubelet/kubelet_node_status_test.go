@@ -849,10 +849,7 @@ func TestUpdateNodeStatusWithLease(t *testing.T) {
 	// Since this test retroactively overrides the stub container manager,
 	// we have to regenerate default status setters.
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
-	// You will add up to 50% of nodeStatusReportFrequency of additional random latency for
-	// kubelet to determine if update node status is needed due to time passage. We need to
-	// take that into consideration to ensure this test pass all time.
-	kubelet.nodeStatusReportFrequency = 30 * time.Second
+	kubelet.nodeStatusReportFrequency = time.Minute
 
 	kubeClient := testKubelet.fakeKubeClient
 	existingNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname}}
@@ -3089,69 +3086,5 @@ func TestUpdateNodeAddresses(t *testing.T) {
 
 			assert.True(t, apiequality.Semantic.DeepEqual(updatedNode, expectedNode), "%s", cmp.Diff(expectedNode, updatedNode))
 		})
-	}
-}
-
-func TestIsUpdateStatusPeriodExperid(t *testing.T) {
-	testcases := []struct {
-		name                       string
-		lastStatusReportTime       time.Time
-		delayAfterNodeStatusChange time.Duration
-		expectExpired              bool
-	}{
-		{
-			name:                       "no status update before and no delay",
-			lastStatusReportTime:       time.Time{},
-			delayAfterNodeStatusChange: 0,
-			expectExpired:              false,
-		},
-		{
-			name:                       "no status update before and existing delay",
-			lastStatusReportTime:       time.Time{},
-			delayAfterNodeStatusChange: 30 * time.Second,
-			expectExpired:              false,
-		},
-		{
-			name:                       "not expired and no delay",
-			lastStatusReportTime:       time.Now().Add(-4 * time.Minute),
-			delayAfterNodeStatusChange: 0,
-			expectExpired:              false,
-		},
-		{
-			name:                       "not expired",
-			lastStatusReportTime:       time.Now().Add(-5 * time.Minute),
-			delayAfterNodeStatusChange: time.Minute,
-			expectExpired:              false,
-		},
-		{
-			name:                       "expired",
-			lastStatusReportTime:       time.Now().Add(-4 * time.Minute),
-			delayAfterNodeStatusChange: -2 * time.Minute,
-			expectExpired:              true,
-		},
-	}
-
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubelet.nodeStatusReportFrequency = 5 * time.Minute
-
-	for _, tc := range testcases {
-		kubelet.lastStatusReportTime = tc.lastStatusReportTime
-		kubelet.delayAfterNodeStatusChange = tc.delayAfterNodeStatusChange
-		expired := kubelet.isUpdateStatusPeriodExperid()
-		assert.Equal(t, tc.expectExpired, expired, tc.name)
-	}
-}
-
-func TestCalculateDelay(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	defer testKubelet.Cleanup()
-	kubelet := testKubelet.kubelet
-	kubelet.nodeStatusReportFrequency = 5 * time.Minute
-
-	for i := 0; i < 100; i++ {
-		randomDelay := kubelet.calculateDelay()
-		assert.LessOrEqual(t, randomDelay.Abs(), kubelet.nodeStatusReportFrequency/2)
 	}
 }
