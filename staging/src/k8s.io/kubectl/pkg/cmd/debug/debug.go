@@ -645,20 +645,20 @@ func (o *DebugOptions) displayWarning(container *corev1.Container, pod *corev1.P
 		return
 	}
 
+	if pod.Spec.SecurityContext.RunAsUser == nil || *pod.Spec.SecurityContext.RunAsUser == 0 {
+		return
+	}
+
 	if container.SecurityContext == nil {
+		return
+	}
+
+	if container.SecurityContext.RunAsUser != nil && *container.SecurityContext.RunAsUser == 0 {
 		return
 	}
 
 	if (container.SecurityContext.Privileged == nil || !*container.SecurityContext.Privileged) &&
 		(container.SecurityContext.Capabilities == nil || len(container.SecurityContext.Capabilities.Add) == 0) {
-		return
-	}
-
-	if pod.Spec.SecurityContext.RunAsUser == nil || *pod.Spec.SecurityContext.RunAsUser == 0 {
-		return
-	}
-
-	if container.SecurityContext.RunAsUser != nil && *container.SecurityContext.RunAsUser == 0 {
 		return
 	}
 
