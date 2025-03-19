@@ -35,26 +35,25 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/metric/noop"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
-	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/metric/noop"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/cpuset"
+	"k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -113,7 +112,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
-	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -122,9 +120,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	"k8s.io/utils/cpuset"
-	"k8s.io/utils/exec"
-	netutils "k8s.io/utils/net"
+	"k8s.io/mount-utils"
 )
 
 func init() {
@@ -804,11 +800,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			klog.InfoS("After cpu setting is overwritten", "kubeReserved", s.KubeReserved, "systemReserved", s.SystemReserved)
 		}
 
-		kubeReserved, err := parseResourceList(s.KubeReserved)
+		kubeReserved, err := kubeletconfigvalidation.ParseResourceList(s.KubeReserved)
 		if err != nil {
 			return fmt.Errorf("--kube-reserved value failed to parse: %w", err)
 		}
-		systemReserved, err := parseResourceList(s.SystemReserved)
+		systemReserved, err := kubeletconfigvalidation.ParseResourceList(s.SystemReserved)
 		if err != nil {
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
@@ -1358,32 +1354,6 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 	k.StartGarbageCollection()
 
 	return k, nil
-}
-
-// parseResourceList parses the given configuration map into an API
-// ResourceList or returns an error.
-func parseResourceList(m map[string]string) (v1.ResourceList, error) {
-	if len(m) == 0 {
-		return nil, nil
-	}
-	rl := make(v1.ResourceList)
-	for k, v := range m {
-		switch v1.ResourceName(k) {
-		// CPU, memory, local storage, and PID resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
-			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[v1.ResourceName(k)] = q
-		default:
-			return nil, fmt.Errorf("cannot reserve %q resource", k)
-		}
-	}
-	return rl, nil
 }
 
 func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, error) {
