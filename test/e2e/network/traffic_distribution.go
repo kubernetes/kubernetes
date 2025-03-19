@@ -41,6 +41,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
 var _ = common.SIGDescribe("Traffic Distribution", func() {
@@ -78,30 +79,49 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		}
 	}
 
-	// endpointSlicesHaveSameZoneHints returns a matcher function to be used with
+	// endpointSlicesHaveExpectedHints returns a matcher function to be used with
 	// gomega.Eventually().Should(...). It checks that the passed EndpointSlices
-	// have zone-hints which match the endpoint's zone.
-	endpointSlicesHaveSameZoneHints := framework.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (func() string, error) {
-		if len(slices) == 0 {
-			return nil, fmt.Errorf("no endpointslices found")
-		}
-		for _, slice := range slices {
-			for _, endpoint := range slice.Endpoints {
-				var ip string
-				if len(endpoint.Addresses) > 0 {
-					ip = endpoint.Addresses[0]
-				}
-				var zone string
-				if endpoint.Zone != nil {
-					zone = *endpoint.Zone
-				}
-				if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
-					return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for zone %q\nEndpointSlices=\n%v", ip, zone, format.Object(slices, 1 /* indent one level */)), nil
+	// have hints appropriate for trafficDist and nodesHaveZones
+	endpointSlicesHaveExpectedHints := func(trafficDist string, nodesHaveZones bool) gomegatypes.GomegaMatcher {
+		return framework.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (func() string, error) {
+			if len(slices) == 0 {
+				return nil, fmt.Errorf("no endpointslices found")
+			}
+
+			expectNodeHints := trafficDist == v1.ServiceTrafficDistributionPreferSameNode
+			expectZoneHints := nodesHaveZones
+			for _, slice := range slices {
+				for _, endpoint := range slice.Endpoints {
+					var ip string
+					if len(endpoint.Addresses) > 0 {
+						ip = endpoint.Addresses[0]
+					}
+					var zone, nodeName string
+					if endpoint.Zone != nil {
+						zone = *endpoint.Zone
+					}
+					if endpoint.NodeName != nil {
+						nodeName = *endpoint.NodeName
+					}
+					if expectZoneHints {
+						if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
+							return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for zone %q\nEndpointSlices=\n%v", ip, zone, format.Object(slices, 1 /* indent one level */)), nil
+						}
+					} else if endpoint.Hints != nil && len(endpoint.Hints.ForZones) != 0 {
+						return gomegaCustomError("endpoint with ip %v has zone hint which it should not have\nEndpointSlices=\n%v", ip, format.Object(slices, 1 /* indent one level */)), nil
+					}
+					if expectNodeHints {
+						if endpoint.Hints == nil || len(endpoint.Hints.ForNodes) != 1 || endpoint.Hints.ForNodes[0].Name != nodeName {
+							return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for node %q\nEndpointSlices=\n%v", ip, nodeName, format.Object(slices, 1 /* indent one level */)), nil
+						}
+					} else if endpoint.Hints != nil && len(endpoint.Hints.ForNodes) != 0 {
+						return gomegaCustomError("endpoint with ip %v has node hint which it should not have\nEndpointSlices=\n%v", ip, format.Object(slices, 1 /* indent one level */)), nil
+					}
 				}
 			}
-		}
-		return nil, nil
-	})
+			return nil, nil
+		})
+	}
 
 	// requestsFromClient returns a helper function to be used with
 	// gomega.Eventually(...). It fetches the logs from the clientPod and returns
@@ -137,11 +157,15 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	// doTrafficDistributionTest runs a test of a service with the given trafficDist,
 	// clients, and endpoints, ensuring that connections go to the expected endpoints.
 	doTrafficDistributionTest := func(ctx context.Context, trafficDist string, clients []*client, endpoints []*endpoint) {
+		nodesHaveZones := false
 		var servingPods []*v1.Pod
 		servingPodLabels := map[string]string{"app": f.UniqueName}
 		for i, ep := range endpoints {
 			node := ep.node.Name
 			zone := ep.node.Labels[v1.LabelTopologyZone]
+			if zone != "" {
+				nodesHaveZones = true
+			}
 			pod := e2epod.NewAgnhostPod(f.Namespace.Name, fmt.Sprintf("endpoint-%d-%s", i, node), nil, nil, nil, "serve-hostname")
 			ginkgo.By(fmt.Sprintf("creating a server pod %q on node %q in zone %q", pod.Name, node, zone))
 			nodeSelection := e2epod.NodeSelection{Name: node}
@@ -170,7 +194,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
 
 		ginkgo.By("ensuring EndpointSlice for service have correct same-zone hints")
-		gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveSameZoneHints)
+		gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveExpectedHints(trafficDist, nodesHaveZones))
 
 		for i, cp := range clients {
 			node := cp.node.Name
@@ -376,5 +400,61 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 	framework.It("should route traffic currently between pods on multiple nodes when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
 		doMultiNodeSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+	})
+
+	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		var clients []*client
+		var endpoints []*endpoint
+
+		ginkgo.By("finding a set of nodes for the test")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodes := make([]*v1.Node, 0, 3)
+		for _, node := range nodeList.Items {
+			nodes = append(nodes, &node)
+			if len(nodes) == 3 {
+				break
+			}
+		}
+		if len(nodes) < 3 {
+			e2eskipper.Skipf("have %d schedulable nodes, need at least 3", len(nodes))
+		}
+
+		// The first node should have a client and two endpoints. The client should
+		// connect to both endpoints.
+		endpointsForNode := []*endpoint{
+			{node: nodes[0]},
+			{node: nodes[0]},
+		}
+		clients = append(clients,
+			&client{
+				node:      nodes[0],
+				endpoints: endpointsForNode,
+			},
+		)
+		endpoints = append(endpoints, endpointsForNode...)
+
+		// The second node should have a client and a single endpoint.
+		endpointsForNode = []*endpoint{
+			{node: nodes[1]},
+		}
+		clients = append(clients,
+			&client{
+				node:      nodes[1],
+				endpoints: endpointsForNode,
+			},
+		)
+		endpoints = append(endpoints, endpointsForNode...)
+
+		// The third node should have just a client, and connect to all of the
+		// other endpoints since it has no local endpoint.
+		clients = append(clients,
+			&client{
+				node:      nodes[2],
+				endpoints: endpoints,
+			},
+		)
+
+		doTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameNode, clients, endpoints)
 	})
 })
