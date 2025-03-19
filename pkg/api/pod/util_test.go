@@ -2271,7 +2271,10 @@ func Test_dropDisabledMatchLabelKeysFieldInPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enabled)
+			if !test.enabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+			}
 
 			dropDisabledFields(test.podSpec, nil, test.oldPodSpec, nil)
 			if diff := cmp.Diff(test.wantPodSpec, test.podSpec); diff != "" {

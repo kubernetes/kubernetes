@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
@@ -1075,7 +1076,10 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, test.enableMatchLabelKeysInAffinity)
+			if !test.enableMatchLabelKeysInAffinity {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+			}
 			_, ctx := ktesting.NewTestContext(t)
 
 			testCtx := initTest(t, "")
@@ -2484,8 +2488,8 @@ func TestUnschedulablePodBecomesSchedulable(t *testing.T) {
 // TestPodAffinityMatchLabelKeyEnablement tests the Pod is correctly mutated by MatchLabelKeysInPodAffinity feature,
 // even if turing the feature gate enabled or disabled.
 func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
-	// enable the feature gate
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, true)
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+
 	testCtx := initTest(t, "matchlabelkey")
 
 	pod := &v1.Pod{
