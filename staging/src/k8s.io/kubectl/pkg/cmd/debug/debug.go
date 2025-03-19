@@ -153,6 +153,8 @@ type DebugOptions struct {
 	WarningPrinter *printers.WarningPrinter
 
 	resource.FilenameOptions
+
+	NodeDebugPodName string
 }
 
 // NewDebugOptions returns a DebugOptions initialized with default values.
@@ -213,6 +215,7 @@ func (o *DebugOptions) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, i18n.T("Allocate a TTY for the debugging container."))
 	cmd.Flags().StringVar(&o.Profile, "profile", ProfileLegacy, i18n.T(`Options are "legacy", "general", "baseline", "netadmin", "restricted" or "sysadmin".`))
 	cmd.Flags().StringVar(&o.CustomProfileFile, "custom", o.CustomProfileFile, i18n.T("Path to a JSON or YAML file containing a partial container spec to customize built-in debug profiles."))
+	cmd.Flags().StringVar(&o.NodeDebugPodName, "node-debug-pod-name", "", i18n.T("When node debugging, the name of the debug pod to create."))
 }
 
 // Complete finishes run-time initialization of debug.DebugOptions.
@@ -461,6 +464,19 @@ func (o *DebugOptions) visitNode(ctx context.Context, node *corev1.Node) (*corev
 	if err != nil {
 		return nil, "", err
 	}
+
+	same_name_pods ,err:= pods.List(ctx, metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", debugPod.ObjectMeta.Name).String(),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+
+	if len(same_name_pods.Items) > 0 {
+		same_name_pod :=same_name_pods.Items[0]
+		return &same_name_pod, same_name_pod.Spec.Containers[0].Name, nil
+	}
+
 	newPod, err := pods.Create(ctx, debugPod, metav1.CreateOptions{})
 	if err != nil {
 		return nil, "", err
@@ -678,7 +694,11 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 	// The name of the debugging pod is based on the target node, and it's not configurable to
 	// limit the number of command line flags. There may be a collision on the name, but this
 	// should be rare enough that it's not worth the API round trip to check.
-	pn := fmt.Sprintf("node-debugger-%s-%s", node.Name, nameSuffixFunc(5))
+	pn := o.NodeDebugPodName
+	
+	if pn == "" {
+		pn = fmt.Sprintf("node-debugger-%s-%s", node.Name, nameSuffixFunc(5))
+	}
 	if !o.Quiet {
 		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node.Name)
 	}
