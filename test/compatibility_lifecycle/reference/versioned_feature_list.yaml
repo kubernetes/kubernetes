@@ -1671,6 +1671,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.14"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: WinOverlay
   versionedSpecs:
   - default: false
