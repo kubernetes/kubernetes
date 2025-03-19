@@ -113,6 +113,7 @@ const (
 	CPUManagerPinningErrorsTotalKey           = "cpu_manager_pinning_errors_total"
 	CPUManagerSharedPoolSizeMilliCoresKey     = "cpu_manager_shared_pool_size_millicores"
 	CPUManagerExclusiveCPUsAllocationCountKey = "cpu_manager_exclusive_cpu_allocation_count"
+	CPUManagerAllocationPerNUMAKey            = "cpu_manager_allocation_per_numa"
 
 	// Metrics to track the Memory manager behavior
 	MemoryManagerPinningRequestsTotalKey = "memory_manager_pinning_requests_total"
@@ -815,6 +816,17 @@ var (
 		},
 	)
 
+	// CPUManagerAllocationPerNUMA tracks the count of CPUs allocated per NUMA node
+	CPUManagerAllocationPerNUMA = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CPUManagerAllocationPerNUMAKey,
+			Help:           "Number of CPUs allocated per NUMA node",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{AlignedNUMANode},
+	)
+
 	// ContainerAlignedComputeResources reports the count of resources allocation which granted aligned resources, per alignment boundary
 	ContainerAlignedComputeResources = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1126,6 +1138,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CPUManagerPinningErrorsTotal)
 		legacyregistry.MustRegister(CPUManagerSharedPoolSizeMilliCores)
 		legacyregistry.MustRegister(CPUManagerExclusiveCPUsAllocationCount)
+		legacyregistry.MustRegister(CPUManagerAllocationPerNUMA)
 		legacyregistry.MustRegister(ContainerAlignedComputeResources)
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
