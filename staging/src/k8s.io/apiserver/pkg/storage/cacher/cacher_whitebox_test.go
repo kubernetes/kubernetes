@@ -3213,7 +3213,7 @@ func TestRetryAfterForUnreadyCache(t *testing.T) {
 		t.Fatalf("Unexpected error waiting for the cache to be ready")
 	}
 
-	cacher.ready.set(false)
+	cacher.ready.setError(nil)
 	clock.Step(14 * time.Second)
 
 	opts := storage.ListOptions{
