@@ -57,7 +57,7 @@ func TestEffectiveVersionRegistry(t *testing.T) {
 
 func testRegistry(t *testing.T) *componentGlobalsRegistry {
 	r := NewComponentGlobalsRegistry()
-	verKube := NewEffectiveVersionFromString("1.31", "1.31", "1.30")
+	verKube := NewEffectiveVersionFromString("1.31.1-beta.0.353", "1.31", "1.30")
 	fgKube := featuregate.NewVersionedFeatureGate(version.MustParse("0.0"))
 	err := fgKube.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 		"kubeA": {
@@ -103,13 +103,13 @@ func testRegistry(t *testing.T) *componentGlobalsRegistry {
 
 func TestVersionFlagOptions(t *testing.T) {
 	r := testRegistry(t)
-	emuVers := strings.Join(r.unsafeVersionFlagOptions(true), "\n")
-	expectedEmuVers := "kube=1.31..1.31 (default=1.31)\ntest=2.8..2.8 (default=2.8)"
+	emuVers := strings.Join(r.unsafeVersionFlagOptions(true), ",")
+	expectedEmuVers := "kube=1.31..1.31(default:1.31),test=2.8..2.8(default:2.8)"
 	if emuVers != expectedEmuVers {
 		t.Errorf("wanted emulation version flag options to be: %s, got %s", expectedEmuVers, emuVers)
 	}
-	minCompVers := strings.Join(r.unsafeVersionFlagOptions(false), "\n")
-	expectedMinCompVers := "kube=1.30..1.31 (default=1.30)\ntest=2.7..2.8 (default=2.7)"
+	minCompVers := strings.Join(r.unsafeVersionFlagOptions(false), ",")
+	expectedMinCompVers := "kube=1.30..1.31(default:1.30),test=2.7..2.8(default:2.7)"
 	if minCompVers != expectedMinCompVers {
 		t.Errorf("wanted min compatibility version flag options to be: %s, got %s", expectedMinCompVers, minCompVers)
 	}
@@ -119,13 +119,13 @@ func TestVersionFlagOptionsWithMapping(t *testing.T) {
 	r := testRegistry(t)
 	utilruntime.Must(r.SetEmulationVersionMapping(testComponent, DefaultKubeComponent,
 		func(from *version.Version) *version.Version { return version.MajorMinor(1, from.Minor()+23) }))
-	emuVers := strings.Join(r.unsafeVersionFlagOptions(true), "\n")
-	expectedEmuVers := "test=2.8..2.8 (default=2.8)"
+	emuVers := strings.Join(r.unsafeVersionFlagOptions(true), ",")
+	expectedEmuVers := "test=2.8..2.8(default:2.8)"
 	if emuVers != expectedEmuVers {
 		t.Errorf("wanted emulation version flag options to be: %s, got %s", expectedEmuVers, emuVers)
 	}
-	minCompVers := strings.Join(r.unsafeVersionFlagOptions(false), "\n")
-	expectedMinCompVers := "kube=1.30..1.31 (default=1.30)\ntest=2.7..2.8 (default=2.7)"
+	minCompVers := strings.Join(r.unsafeVersionFlagOptions(false), ",")
+	expectedMinCompVers := "kube=1.30..1.31(default:1.30),test=2.7..2.8(default:2.7)"
 	if minCompVers != expectedMinCompVers {
 		t.Errorf("wanted min compatibility version flag options to be: %s, got %s", expectedMinCompVers, minCompVers)
 	}

@@ -235,8 +235,8 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&r.emulationVersionConfig, "emulated-version", r.emulationVersionConfig, ""+
 		"The versions different components emulate their capabilities (APIs, features, ...) of.\n"+
 		"If set, the component will emulate the behavior of this version instead of the underlying binary version.\n"+
-		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'. Options are:\n"+strings.Join(r.unsafeVersionFlagOptions(true), "\n")+
-		"If the component is not specified, defaults to \"kube\"")
+		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'.\nOptions are: "+strings.Join(r.unsafeVersionFlagOptions(true), ",")+
+		"\nIf the component is not specified, defaults to \"kube\"")
 
 	fs.Var(cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig), "feature-gates", "Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.\n"+
 		"If the component is not specified, defaults to \"kube\". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true'"+
