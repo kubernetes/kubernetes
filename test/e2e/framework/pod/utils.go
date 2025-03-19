@@ -294,6 +294,25 @@ func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath, expec
 	return nil
 }
 
+// VerifyOomScoreAdjValue verifies that oom_score_adj for pid 1 (pidof init/systemd -> app)
+// has the expected value in specified container of the pod. It execs into the container,
+// reads the oom_score_adj value from procfs, and compares it against the expected value.
+func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
+	cmd := fmt.Sprintf("cat /proc/1/oom_score_adj")
+	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value %s",
+		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
+	oomScoreAdj, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
+	if err != nil {
+		return fmt.Errorf("failed to find expected value %s for container app process", expectedOomScoreAdj)
+	}
+	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
+	if oomScoreAdj != expectedOomScoreAdj {
+		return fmt.Errorf("oom_score_adj value %s not equal to expected %s", oomScoreAdj, expectedOomScoreAdj)
+	}
+	fmt.Printf("VDBG: POD: %s EXPECTED_OOM_ADJ %s ACTUAL_OOM_ADJ %s\n", pod.Name, expectedOomScoreAdj, oomScoreAdj)
+	return nil
+}
+
 // IsPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
 // TODO: Deduplicate this function with NPD cluster e2e test:
 // https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369

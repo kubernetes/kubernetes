@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -48,6 +49,7 @@ const (
 	Cgroupv2CPURequest         string = "/sys/fs/cgroup/cpu.weight"
 	CPUPeriod                  string = "100000"
 	MinContainerRuntimeVersion string = "1.6.9"
+	MinimumGracePeriodSeconds  int64  = 2
 )
 
 var (
@@ -167,6 +169,7 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo) *v1.Pod {
 	testInitContainers, testContainers := separateContainers(tcInfo)
 
+	var minGracePeriodSeconds int64 = MinimumGracePeriodSeconds
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -176,10 +179,11 @@ func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []Resizab
 			},
 		},
 		Spec: v1.PodSpec{
-			OS:             &v1.PodOS{Name: v1.Linux},
-			InitContainers: testInitContainers,
-			Containers:     testContainers,
-			RestartPolicy:  v1.RestartPolicyOnFailure,
+			OS:                            &v1.PodOS{Name: v1.Linux},
+			InitContainers:                testInitContainers,
+			Containers:                    testContainers,
+			RestartPolicy:                 v1.RestartPolicyOnFailure,
+			TerminationGracePeriodSeconds: &minGracePeriodSeconds,
 		},
 	}
 	return pod
@@ -350,6 +354,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 			}
 			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimitString))
 			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
+			//TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
 		}
 	}
 	return utilerrors.NewAggregate(errs)
@@ -420,6 +425,8 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 		})),
 	)
 
+	// Wait 2x termination grace period to catch any restarts - expected or not
+	time.Sleep(time.Duration(*pod.Spec.TerminationGracePeriodSeconds*2) * time.Second)
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
 	framework.ExpectNoError(err, "failed to get resized pod")
 	return resizedPod

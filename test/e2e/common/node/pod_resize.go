@@ -93,8 +93,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-			]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
+					{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+				]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -105,8 +105,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name:         "Guaranteed QoS pod, one container - decrease CPU only",
-			testRollback: true,
+			name: "Guaranteed QoS pod, one container - decrease CPU only",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -116,8 +115,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, reducedCPU, reducedCPU),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, reducedCPU, reducedCPU),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -126,6 +125,7 @@ func doPodResizeTests() {
 					MemPolicy: &noRestart,
 				},
 			},
+			testRollback: true,
 		},
 		{
 			name: "Guaranteed QoS pod, three containers (c1, c2, c3) - increase: CPU (c1,c3), memory (c2, c3) ; decrease: CPU (c2)",
@@ -150,10 +150,10 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}},
-						{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
-						{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`,
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}},
+							{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
+							{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`,
 				increasedCPU, increasedCPU,
 				offsetCPU(1, reducedCPU), offsetMemory(1, increasedMem), offsetCPU(1, reducedCPU), offsetMemory(1, increasedMem),
 				offsetCPU(2, increasedCPU), offsetMemory(2, increasedMem), offsetCPU(2, increasedCPU), offsetMemory(2, increasedMem)),
@@ -179,8 +179,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only",
-			testRollback: true,
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease memory requests only",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -188,14 +187,15 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"}}}
-					]}}`, reducedMem),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"}}}
+						]}}`, reducedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
 				},
 			},
+			testRollback: true,
 		},
 		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase memory requests only",
@@ -206,8 +206,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"}}}
-					]}}`, increasedMem),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"}}}
+						]}}`, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -224,8 +224,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"limits":{"memory":"%s"}}}
-					]}}`, increasedMemLimit),
+							{"name":"c1", "resources":{"limits":{"memory":"%s"}}}
+						]}}`, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -234,8 +234,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only",
-			testRollback: true,
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU requests only",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -243,18 +242,18 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}
-					]}}`, reducedCPU),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}
+						]}}`, reducedCPU),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
+			testRollback: true,
 		},
 		{
-			name:         "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only",
-			testRollback: true,
+			name: "Burstable QoS pod, one container with cpu & memory requests + limits - decrease CPU limits only",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -262,14 +261,15 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"limits":{"cpu":"%s"}}}
-					]}}`, reducedCPULimit),
+							{"name":"c1", "resources":{"limits":{"cpu":"%s"}}}
+						]}}`, reducedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
 					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: reducedCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
+			testRollback: true,
 		},
 		{
 			name: "Burstable QoS pod, one container with cpu & memory requests + limits - increase CPU requests only",
@@ -280,8 +280,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}
-					]}}`, increasedCPU),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}
+						]}}`, increasedCPU),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -298,8 +298,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"limits":{"cpu":"%s"}}}
-					]}}`, increasedCPULimit),
+							{"name":"c1", "resources":{"limits":{"cpu":"%s"}}}
+						]}}`, increasedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -316,8 +316,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, reducedCPU, reducedCPULimit),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, reducedCPU, reducedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -334,8 +334,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, increasedCPU, increasedCPULimit),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, increasedCPU, increasedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -352,8 +352,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, reducedCPU, increasedCPULimit),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, reducedCPU, increasedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -370,8 +370,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, increasedCPU, reducedCPULimit),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, increasedCPU, reducedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -388,8 +388,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, increasedMem, increasedMemLimit),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
+						]}}`, increasedMem, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -406,8 +406,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, reducedMem, increasedMemLimit),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
+						]}}`, reducedMem, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -424,8 +424,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, reducedCPU, increasedMemLimit),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"memory":"%s"}}}
+						]}}`, reducedCPU, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -442,8 +442,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, reducedMem, increasedCPULimit),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, reducedMem, increasedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -460,8 +460,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, increasedMem, reducedCPULimit),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, increasedMem, reducedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -478,8 +478,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"memory":"%s"}}}
-					]}}`, reducedMem),
+							{"name":"c1", "resources":{"requests":{"memory":"%s"}}}
+						]}}`, reducedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -496,8 +496,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}
-					]}}`, increasedCPU),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"}}}
+						]}}`, increasedCPU),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -514,8 +514,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: `{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"1m"},"limits":{"cpu":"5m"}}}
-					]}}`,
+							{"name":"c1", "resources":{"requests":{"cpu":"1m"},"limits":{"cpu":"5m"}}}
+						]}}`,
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -524,8 +524,7 @@ func doPodResizeTests() {
 			},
 		},
 		{
-			name:         "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
-			testRollback: true,
+			name: "Guaranteed QoS pod, one container - increase CPU (NotRequired) & memory (RestartContainer)",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -535,8 +534,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:         "c1",
@@ -546,10 +545,34 @@ func doPodResizeTests() {
 					RestartCount: 1,
 				},
 			},
+			testRollback: true,
 		},
 		{
-			name:         "Burstable QoS pod, one container - decrease CPU (NotRequired) & memory (RestartContainer)",
+			name: "Burstable QoS pod, one container - decrease CPU (NotRequired) & memory (RestartContainer)",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					CPUPolicy: &noRestart,
+					MemPolicy: &doRestart,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+							{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, reducedCPU, reducedMem, reducedCPULimit, reducedMemLimit),
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &doRestart,
+					RestartCount: 1,
+				},
+			},
 			testRollback: true,
+		},
+		{
+			name: "Burstable QoS pod, one container - decrease memory request (RestartContainer memory resize policy)",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -560,14 +583,37 @@ func doPodResizeTests() {
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
 						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, reducedCPU, reducedMem, reducedCPULimit, reducedMemLimit),
+					]}}`, originalCPU, reducedMem, originalCPULimit, originalMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:         "c1",
-					Resources:    &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit, MemReq: reducedMem, MemLim: reducedMemLimit},
+					Resources:    &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: reducedMem, MemLim: originalMemLimit},
 					CPUPolicy:    &noRestart,
 					MemPolicy:    &doRestart,
 					RestartCount: 1,
+				},
+			},
+		},
+		{
+			name: "Burstable QoS pod, one container - increase memory request (NoRestart memory resize policy)",
+			containers: []e2epod.ResizableContainerInfo{
+				{
+					Name:      "c1",
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					CPUPolicy: &noRestart,
+					MemPolicy: &noRestart,
+				},
+			},
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+							{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, originalCPU, increasedMem, originalCPULimit, originalMemLimit),
+			expected: []e2epod.ResizableContainerInfo{
+				{
+					Name:         "c1",
+					Resources:    &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: increasedMem, MemLim: originalMemLimit},
+					CPUPolicy:    &noRestart,
+					MemPolicy:    &noRestart,
+					RestartCount: 0,
 				},
 			},
 		},
@@ -594,9 +640,9 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
-						{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`,
+							{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
+							{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`,
 				increasedCPU, increasedMem, increasedCPULimit, increasedMemLimit,
 				offsetCPU(2, reducedCPU), offsetMemory(2, reducedMem), offsetCPU(2, reducedCPULimit)),
 			expected: []e2epod.ResizableContainerInfo{
@@ -643,9 +689,9 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s"}}},
-						{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`,
+							{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s"}}},
+							{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`,
 				reducedCPU, reducedMem, reducedCPULimit,
 				offsetCPU(2, increasedCPU), offsetMemory(2, increasedMem), offsetCPU(2, increasedCPULimit), offsetMemory(2, increasedMemLimit)),
 			expected: []e2epod.ResizableContainerInfo{
@@ -693,9 +739,9 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
-						{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`,
+							{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}},
+							{"name":"c3", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`,
 				offsetCPU(1, increasedCPU), offsetMemory(1, increasedMem), offsetCPU(1, increasedCPULimit), offsetMemory(1, increasedMemLimit),
 				reducedCPU, reducedMem, reducedCPULimit, reducedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
@@ -736,8 +782,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
+							{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -766,8 +812,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"}}}
-					]}}`, originalCPU, originalMem),
+							{"name":"c2", "resources":{"requests":{"cpu":"%s","memory":"%s"}}}
+						]}}`, originalCPU, originalMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -800,8 +846,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-						{"name":"c2", "resources":{"limits":{"cpu":"%s"}}}
-					]}}`, originalCPULimit),
+							{"name":"c2", "resources":{"limits":{"cpu":"%s"}}}
+						]}}`, originalCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -829,8 +875,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
-					{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
+						{"name":"c1", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name: "c1",
@@ -877,8 +923,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
+							{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, increasedCPU, increasedMem, increasedCPU, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -911,8 +957,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, reducedCPU, increasedMem, reducedCPU, increasedMem),
+							{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, reducedCPU, increasedMem, reducedCPU, increasedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -941,8 +987,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, reducedCPU, reducedCPU),
+							{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, reducedCPU, reducedCPU),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -971,8 +1017,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
-					]}}`, increasedCPU, increasedMem, increasedCPULimit, increasedMemLimit),
+							{"name":"c1-init", "resources":{"requests":{"cpu":"%s","memory":"%s"},"limits":{"cpu":"%s","memory":"%s"}}}
+						]}}`, increasedCPU, increasedMem, increasedCPULimit, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1001,8 +1047,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, reducedCPU, reducedCPULimit),
+							{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, reducedCPU, reducedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1031,8 +1077,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-					]}}`, increasedCPU, increasedCPULimit),
+							{"name":"c1-init", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, increasedCPU, increasedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1061,8 +1107,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"memory":"%s"}}}
-					]}}`, reducedMem),
+							{"name":"c1-init", "resources":{"requests":{"memory":"%s"}}}
+						]}}`, reducedMem),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1091,8 +1137,8 @@ func doPodResizeTests() {
 				},
 			},
 			patchString: fmt.Sprintf(`{"spec":{"initContainers":[
-						{"name":"c1-init", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
-					]}}`, increasedMem, increasedMemLimit),
+							{"name":"c1-init", "resources":{"requests":{"memory":"%s"},"limits":{"memory":"%s"}}}
+						]}}`, increasedMem, increasedMemLimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
@@ -1394,13 +1440,13 @@ func doPodResizeErrorTests() {
 //       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
 //       in test/e2e/node/pod_resize.go
 
-var _ = SIGDescribe("Pod InPlace Resize Container", feature.InPlacePodVerticalScaling, func() {
+var _ = SIGDescribe("[InPlacePodResize] Pod InPlace Resize Container", feature.InPlacePodVerticalScaling, func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
-		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
+		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
-		if framework.NodeOSDistroIs("windows") || e2enode.IsARM64(node) {
+		if framework.NodeOSDistroIs("windows") {
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
 	})
