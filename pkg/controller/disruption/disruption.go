@@ -790,7 +790,7 @@ func (dc *DisruptionController) syncStalePodDisruption(ctx context.Context, key 
 	newPod := pod.DeepCopy()
 	updated := apipod.UpdatePodCondition(&newPod.Status, &v1.PodCondition{
 		Type:               v1.DisruptionTarget,
-		ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(newPod, v1.DisruptionTarget),
+		ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&newPod.Status, newPod.Generation, v1.DisruptionTarget),
 		Status:             v1.ConditionFalse,
 	})
 	if !updated {

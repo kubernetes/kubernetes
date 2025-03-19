@@ -43,19 +43,20 @@ const (
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.
 // The status of "ContainersReady" condition is true when all containers are ready.
-func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+func GenerateContainersReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
 	// Find if all containers are ready or not.
 	if containerStatuses == nil {
 		return v1.PodCondition{
-			Type:   v1.ContainersReady,
-			Status: v1.ConditionFalse,
-			Reason: UnknownContainerStatuses,
+			Type:               v1.ContainersReady,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+			Status:             v1.ConditionFalse,
+			Reason:             UnknownContainerStatuses,
 		}
 	}
 	unknownContainers := []string{}
 	unreadyContainers := []string{}
 
-	for _, container := range spec.InitContainers {
+	for _, container := range pod.Spec.InitContainers {
 		if !podutil.IsRestartableInitContainer(&container) {
 			continue
 		}
@@ -69,7 +70,7 @@ func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.C
 		}
 	}
 
-	for _, container := range spec.Containers {
+	for _, container := range pod.Spec.Containers {
 		if containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
 			if !containerStatus.Ready {
 				unreadyContainers = append(unreadyContainers, container.Name)
@@ -81,12 +82,12 @@ func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.C
 
 	// If all containers are known and succeeded, just return PodCompleted.
 	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
-		return generateContainersReadyConditionForTerminalPhase(podPhase)
+		return generateContainersReadyConditionForTerminalPhase(pod, oldPodStatus, podPhase)
 	}
 
 	// If the pod phase is failed, explicitly set the ready condition to false for containers since they may be in progress of terminating.
 	if podPhase == v1.PodFailed {
-		return generateContainersReadyConditionForTerminalPhase(podPhase)
+		return generateContainersReadyConditionForTerminalPhase(pod, oldPodStatus, podPhase)
 	}
 
 	// Generate message for containers in unknown condition.
@@ -100,38 +101,41 @@ func GenerateContainersReadyCondition(spec *v1.PodSpec, containerStatuses []v1.C
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
 		return v1.PodCondition{
-			Type:    v1.ContainersReady,
-			Status:  v1.ConditionFalse,
-			Reason:  ContainersNotReady,
-			Message: unreadyMessage,
+			Type:               v1.ContainersReady,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+			Status:             v1.ConditionFalse,
+			Reason:             ContainersNotReady,
+			Message:            unreadyMessage,
 		}
 	}
 
 	return v1.PodCondition{
-		Type:   v1.ContainersReady,
-		Status: v1.ConditionTrue,
+		Type:               v1.ContainersReady,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+		Status:             v1.ConditionTrue,
 	}
 }
 
 // GeneratePodReadyCondition returns "Ready" condition of a pod.
 // The status of "Ready" condition is "True", if all containers in a pod are ready
 // AND all matching conditions specified in the ReadinessGates have status equal to "True".
-func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
-	containersReady := GenerateContainersReadyCondition(spec, containerStatuses, podPhase)
+func GeneratePodReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, conditions []v1.PodCondition, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+	containersReady := GenerateContainersReadyCondition(pod, oldPodStatus, containerStatuses, podPhase)
 	// If the status of ContainersReady is not True, return the same status, reason and message as ContainersReady.
 	if containersReady.Status != v1.ConditionTrue {
 		return v1.PodCondition{
-			Type:    v1.PodReady,
-			Status:  containersReady.Status,
-			Reason:  containersReady.Reason,
-			Message: containersReady.Message,
+			Type:               v1.PodReady,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+			Status:             containersReady.Status,
+			Reason:             containersReady.Reason,
+			Message:            containersReady.Message,
 		}
 	}
 
 	// Evaluate corresponding conditions specified in readiness gate
 	// Generate message if any readiness gate is not satisfied.
 	unreadyMessages := []string{}
-	for _, rg := range spec.ReadinessGates {
+	for _, rg := range pod.Spec.ReadinessGates {
 		_, c := podutil.GetPodConditionFromList(conditions, rg.ConditionType)
 		if c == nil {
 			unreadyMessages = append(unreadyMessages, fmt.Sprintf("corresponding condition of pod readiness gate %q does not exist.", string(rg.ConditionType)))
@@ -144,16 +148,18 @@ func GeneratePodReadyCondition(spec *v1.PodSpec, conditions []v1.PodCondition, c
 	if len(unreadyMessages) != 0 {
 		unreadyMessage := strings.Join(unreadyMessages, ", ")
 		return v1.PodCondition{
-			Type:    v1.PodReady,
-			Status:  v1.ConditionFalse,
-			Reason:  ReadinessGatesNotReady,
-			Message: unreadyMessage,
+			Type:               v1.PodReady,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+			Status:             v1.ConditionFalse,
+			Reason:             ReadinessGatesNotReady,
+			Message:            unreadyMessage,
 		}
 	}
 
 	return v1.PodCondition{
-		Type:   v1.PodReady,
-		Status: v1.ConditionTrue,
+		Type:               v1.PodReady,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+		Status:             v1.ConditionTrue,
 	}
 }
 
@@ -172,19 +178,20 @@ func isInitContainerInitialized(initContainer *v1.Container, containerStatus *v1
 
 // GeneratePodInitializedCondition returns initialized condition if all init containers in a pod are ready, else it
 // returns an uninitialized condition.
-func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
+func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, containerStatuses []v1.ContainerStatus, podPhase v1.PodPhase) v1.PodCondition {
 	// Find if all containers are ready or not.
-	if containerStatuses == nil && len(spec.InitContainers) > 0 {
+	if containerStatuses == nil && len(pod.Spec.InitContainers) > 0 {
 		return v1.PodCondition{
-			Type:   v1.PodInitialized,
-			Status: v1.ConditionFalse,
-			Reason: UnknownContainerStatuses,
+			Type:               v1.PodInitialized,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			Status:             v1.ConditionFalse,
+			Reason:             UnknownContainerStatuses,
 		}
 	}
 
 	unknownContainers := []string{}
 	incompleteContainers := []string{}
-	for _, container := range spec.InitContainers {
+	for _, container := range pod.Spec.InitContainers {
 		containerStatus, ok := podutil.GetContainerStatus(containerStatuses, container.Name)
 		if !ok {
 			unknownContainers = append(unknownContainers, container.Name)
@@ -198,9 +205,10 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	// If all init containers are known and succeeded, just return PodCompleted.
 	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
 		return v1.PodCondition{
-			Type:   v1.PodInitialized,
-			Status: v1.ConditionTrue,
-			Reason: PodCompleted,
+			Type:               v1.PodInitialized,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			Status:             v1.ConditionTrue,
+			Reason:             PodCompleted,
 		}
 	}
 
@@ -208,10 +216,11 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	// been initialized before.
 	// This is needed to handle the case where the pod has been initialized but
 	// the restartable init containers are restarting.
-	if kubecontainer.HasAnyRegularContainerStarted(spec, containerStatuses) {
+	if kubecontainer.HasAnyRegularContainerStarted(&pod.Spec, containerStatuses) {
 		return v1.PodCondition{
-			Type:   v1.PodInitialized,
-			Status: v1.ConditionTrue,
+			Type:               v1.PodInitialized,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			Status:             v1.ConditionTrue,
 		}
 	}
 
@@ -225,20 +234,22 @@ func GeneratePodInitializedCondition(spec *v1.PodSpec, containerStatuses []v1.Co
 	unreadyMessage := strings.Join(unreadyMessages, ", ")
 	if unreadyMessage != "" {
 		return v1.PodCondition{
-			Type:    v1.PodInitialized,
-			Status:  v1.ConditionFalse,
-			Reason:  ContainersNotInitialized,
-			Message: unreadyMessage,
+			Type:               v1.PodInitialized,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			Status:             v1.ConditionFalse,
+			Reason:             ContainersNotInitialized,
+			Message:            unreadyMessage,
 		}
 	}
 
 	return v1.PodCondition{
-		Type:   v1.PodInitialized,
-		Status: v1.ConditionTrue,
+		Type:               v1.PodInitialized,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+		Status:             v1.ConditionTrue,
 	}
 }
 
-func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, podStatus *kubecontainer.PodStatus) v1.PodCondition {
+func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus) v1.PodCondition {
 	newSandboxNeeded, _, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
 	// if a new sandbox does not need to be created for a pod, it indicates that
 	// a sandbox for the pod with networking configured already exists.
@@ -246,20 +257,23 @@ func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, podStatus *kubecont
 	// fresh sandbox and configure networking for the sandbox.
 	if !newSandboxNeeded {
 		return v1.PodCondition{
-			Type:   v1.PodReadyToStartContainers,
-			Status: v1.ConditionTrue,
+			Type:               v1.PodReadyToStartContainers,
+			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReadyToStartContainers),
+			Status:             v1.ConditionTrue,
 		}
 	}
 	return v1.PodCondition{
-		Type:   v1.PodReadyToStartContainers,
-		Status: v1.ConditionFalse,
+		Type:               v1.PodReadyToStartContainers,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReadyToStartContainers),
+		Status:             v1.ConditionFalse,
 	}
 }
 
-func generateContainersReadyConditionForTerminalPhase(podPhase v1.PodPhase) v1.PodCondition {
+func generateContainersReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
 	condition := v1.PodCondition{
-		Type:   v1.ContainersReady,
-		Status: v1.ConditionFalse,
+		Type:               v1.ContainersReady,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+		Status:             v1.ConditionFalse,
 	}
 
 	if podPhase == v1.PodFailed {
@@ -271,10 +285,11 @@ func generateContainersReadyConditionForTerminalPhase(podPhase v1.PodPhase) v1.P
 	return condition
 }
 
-func generatePodReadyConditionForTerminalPhase(podPhase v1.PodPhase) v1.PodCondition {
+func generatePodReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
 	condition := v1.PodCondition{
-		Type:   v1.PodReady,
-		Status: v1.ConditionFalse,
+		Type:               v1.PodReady,
+		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+		Status:             v1.ConditionFalse,
 	}
 
 	if podPhase == v1.PodFailed {
