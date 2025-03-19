@@ -85,7 +85,6 @@ const (
 	identicalErrorDelay = 1 * time.Minute
 	// OpenTelemetry instrumentation scope name
 	instrumentationScope = "k8s.io/kubernetes/pkg/kubelet/kuberuntime"
-
 )
 
 var (

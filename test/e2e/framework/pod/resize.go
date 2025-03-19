@@ -50,7 +50,7 @@ const (
 	Cgroupv2CPURequest         string = "/sys/fs/cgroup/cpu.weight"
 	CPUPeriod                  string = "100000"
 	MinContainerRuntimeVersion string = "1.6.9"
-	MinRestartWaitPeriod          int = 10
+	MinRestartWaitPeriod       int    = 10
 )
 
 var (
