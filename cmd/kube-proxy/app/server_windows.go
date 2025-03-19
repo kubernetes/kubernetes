@@ -93,7 +93,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		proxier, err = winkernel.NewDualStackProxier(
 			config.SyncPeriod.Duration,
 			config.MinSyncPeriod.Duration,
-			s.Hostname,
+			s.NodeName,
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
@@ -105,7 +105,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			s.PrimaryIPFamily,
 			config.SyncPeriod.Duration,
 			config.MinSyncPeriod.Duration,
-			s.Hostname,
+			s.NodeName,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,

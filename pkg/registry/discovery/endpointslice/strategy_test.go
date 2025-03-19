@@ -36,30 +36,77 @@ import (
 
 func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 	testcases := []struct {
-		name             string
-		hintsGateEnabled bool
-		eps              *discovery.EndpointSlice
-		expectedEPS      *discovery.EndpointSlice
+		name              string
+		preferSameEnabled bool
+		eps               *discovery.EndpointSlice
+		expectedEPS       *discovery.EndpointSlice
 	}{
 		{
-			name: "node name gate enabled, field should be allowed",
+			name:              "PreferSameTrafficDistribution gate enabled, ForNodes should be allowed",
+			preferSameEnabled: true,
 			eps: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: ptr.To("node-1"),
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
 					},
 					{
-						NodeName: ptr.To("node-2"),
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
 					},
 				},
 			},
 			expectedEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
-						NodeName: ptr.To("node-1"),
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
 					},
 					{
-						NodeName: ptr.To("node-2"),
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:              "PreferSameTrafficDistribution gate disabled, ForNodes should not be allowed",
+			preferSameEnabled: false,
+			eps: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
 					},
 				},
 			},
@@ -68,10 +115,7 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			if !testcase.hintsGateEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, testcase.preferSameEnabled)
 
 			dropDisabledFieldsOnCreate(testcase.eps)
 			if !apiequality.Semantic.DeepEqual(testcase.eps, testcase.expectedEPS) {
@@ -85,78 +129,13 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 
 func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 	testcases := []struct {
-		name             string
-		hintsGateEnabled bool
-		oldEPS           *discovery.EndpointSlice
-		newEPS           *discovery.EndpointSlice
-		expectedEPS      *discovery.EndpointSlice
+		name              string
+		hintsGateEnabled  bool
+		preferSameEnabled bool
+		oldEPS            *discovery.EndpointSlice
+		newEPS            *discovery.EndpointSlice
+		expectedEPS       *discovery.EndpointSlice
 	}{
-		{
-			name: "node name gate enabled, set on new EPS",
-			oldEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: nil,
-					},
-					{
-						NodeName: nil,
-					},
-				},
-			},
-			newEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: ptr.To("node-1"),
-					},
-					{
-						NodeName: ptr.To("node-2"),
-					},
-				},
-			},
-			expectedEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: ptr.To("node-1"),
-					},
-					{
-						NodeName: ptr.To("node-2"),
-					},
-				},
-			},
-		},
-		{
-			name: "node name gate disabled, set on old and updated EPS",
-			oldEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: ptr.To("node-1-old"),
-					},
-					{
-						NodeName: ptr.To("node-2-old"),
-					},
-				},
-			},
-			newEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: ptr.To("node-1"),
-					},
-					{
-						NodeName: ptr.To("node-2"),
-					},
-				},
-			},
-			expectedEPS: &discovery.EndpointSlice{
-				Endpoints: []discovery.Endpoint{
-					{
-						NodeName: ptr.To("node-1"),
-					},
-					{
-						NodeName: ptr.To("node-2"),
-					},
-				},
-			},
-		},
 		{
 			name:             "hints gate enabled, set on new EPS",
 			hintsGateEnabled: true,
@@ -283,6 +262,151 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:              "PreferSameTrafficDistribution gate enabled, set on new EPS",
+			hintsGateEnabled:  true,
+			preferSameEnabled: true,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:              "PreferSameTrafficDistribution gate disabled, set on new EPS",
+			hintsGateEnabled:  true,
+			preferSameEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:              "PreferSameTrafficDiscovery gate disabled, set on new and old EPS",
+			hintsGateEnabled:  true,
+			preferSameEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a-old"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1-old"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a-old"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2-old"}},
+						},
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-1"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+							ForNodes: []discovery.ForNode{{Name: "node-2"}},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, testcase := range testcases {
@@ -291,6 +415,9 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
+			if testcase.hintsGateEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, testcase.preferSameEnabled)
+			}
 
 			dropDisabledFieldsOnUpdate(testcase.oldEPS, testcase.newEPS)
 			if !apiequality.Semantic.DeepEqual(testcase.newEPS, testcase.expectedEPS) {

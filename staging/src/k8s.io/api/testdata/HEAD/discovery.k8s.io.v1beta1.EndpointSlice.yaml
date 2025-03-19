@@ -8,6 +8,8 @@ endpoints:
     serving: true
     terminating: true
   hints:
+    forNodes:
+    - name: nameValue
     forZones:
     - name: nameValue
   hostname: hostnameValue

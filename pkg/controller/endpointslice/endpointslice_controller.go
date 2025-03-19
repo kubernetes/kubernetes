@@ -186,7 +186,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.topologyCache,
 		c.eventRecorder,
 		ControllerName,
-		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution)),
+		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution), utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)),
 	)
 
 	return c

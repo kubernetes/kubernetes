@@ -626,6 +626,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PreferSameTrafficDistribution: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ProcMountType: {
 		{Version: version.MustParse("1.12"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},

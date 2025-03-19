@@ -564,6 +564,12 @@ const (
 	// Enables PortForward to be proxied with a websocket client
 	PortForwardWebsockets featuregate.Feature = "PortForwardWebsockets"
 
+	// owner: @danwinship
+	// kep: https://kep.k8s.io/3015
+	//
+	// Enables PreferSameZone and PreferSameNode values for trafficDistribution
+	PreferSameTrafficDistribution featuregate.Feature = "PreferSameTrafficDistribution"
+
 	// owner: @jessfraz
 	//
 	// Enables control over ProcMountType for containers.

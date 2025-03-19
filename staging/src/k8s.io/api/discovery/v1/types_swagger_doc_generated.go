@@ -56,7 +56,8 @@ func (EndpointConditions) SwaggerDoc() map[string]string {
 
 var map_EndpointHints = map[string]string{
 	"":         "EndpointHints provides hints describing how an endpoint should be consumed.",
-	"forZones": "forZones indicates the zone(s) this endpoint should be consumed by to enable topology aware routing.",
+	"forZones": "forZones indicates the zone(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries.",
+	"forNodes": "forNodes indicates the node(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries. This is an Alpha feature and is only used when the PreferSameTrafficDistribution feature gate is enabled.",
 }
 
 func (EndpointHints) SwaggerDoc() map[string]string {
@@ -95,6 +96,15 @@ var map_EndpointSliceList = map[string]string{
 
 func (EndpointSliceList) SwaggerDoc() map[string]string {
 	return map_EndpointSliceList
+}
+
+var map_ForNode = map[string]string{
+	"":     "ForNode provides information about which nodes should consume this endpoint.",
+	"name": "name represents the name of the node.",
+}
+
+func (ForNode) SwaggerDoc() map[string]string {
+	return map_ForNode
 }
 
 var map_ForZone = map[string]string{

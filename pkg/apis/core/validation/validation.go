@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"unicode"
@@ -6194,8 +6195,21 @@ func validateServiceTrafficDistribution(service *core.Service) field.ErrorList {
 		return allErrs
 	}
 
-	if *service.Spec.TrafficDistribution != v1.ServiceTrafficDistributionPreferClose {
-		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("trafficDistribution"), *service.Spec.TrafficDistribution, []string{v1.ServiceTrafficDistributionPreferClose}))
+	var supportedTrafficDistribution []string
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution) {
+		supportedTrafficDistribution = []string{
+			v1.ServiceTrafficDistributionPreferClose,
+		}
+	} else {
+		supportedTrafficDistribution = []string{
+			v1.ServiceTrafficDistributionPreferClose,
+			v1.ServiceTrafficDistributionPreferSameZone,
+			v1.ServiceTrafficDistributionPreferSameNode,
+		}
+	}
+
+	if !slices.Contains(supportedTrafficDistribution, *service.Spec.TrafficDistribution) {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("spec").Child("trafficDistribution"), *service.Spec.TrafficDistribution, supportedTrafficDistribution))
 	}
 
 	return allErrs

@@ -4560,12 +4560,27 @@ const (
 
 // These are valid values for the TrafficDistribution field of a Service.
 const (
-	// Indicates a preference for routing traffic to endpoints that are in the
-	// same zone as the client. Setting this value gives implementations
-	// permission to make different tradeoffs, e.g. optimizing for proximity
-	// rather than equal distribution of load. Users should not set this value
-	// if such tradeoffs are not acceptable.
+	// Indicates a preference for routing traffic to endpoints that are in the same
+	// zone as the client. Users should not set this value unless they have ensured
+	// that clients and endpoints are distributed in such a way that the "same zone"
+	// preference will not result in endpoints getting overloaded.
 	ServiceTrafficDistributionPreferClose = "PreferClose"
+
+	// Indicates a preference for routing traffic to endpoints that are in the same
+	// zone as the client. Users should not set this value unless they have ensured
+	// that clients and endpoints are distributed in such a way that the "same zone"
+	// preference will not result in endpoints getting overloaded.
+	// This is an alias for "PreferClose", but it is an Alpha feature and is only
+	// recognized if the PreferSameTrafficDistribution feature gate is enabled.
+	ServiceTrafficDistributionPreferSameZone = "PreferSameZone"
+
+	// Indicates a preference for routing traffic to endpoints that are on the same
+	// node as the client. Users should not set this value unless they have ensured
+	// that clients and endpoints are distributed in such a way that the "same node"
+	// preference will not result in endpoints getting overloaded.
+	// This is an Alpha feature and is only recognized if the
+	// PreferSameTrafficDistribution feature gate is enabled.
+	ServiceTrafficDistributionPreferSameNode = "PreferSameNode"
 )
 
 // These are the valid conditions of a service.

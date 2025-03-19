@@ -51,9 +51,13 @@ type Reconciler struct {
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
 	topologyCache *topologycache.TopologyCache
-	// trafficDistributionEnabled determines if endpointDistribution field is to
+	// trafficDistributionEnabled determines if trafficDistribution field is to
 	// be considered when reconciling EndpointSlice hints.
 	trafficDistributionEnabled bool
+	// preferSameTrafficDistribution determines if the new (PreferSameZone /
+	// PreferSameNode) trafficDistribution values should be considered when
+	// reconciling EndpointSlice hints.
+	preferSameTrafficDistribution bool
 	// eventRecorder allows Reconciler to record and publish events.
 	eventRecorder  record.EventRecorder
 	controllerName string
@@ -63,10 +67,30 @@ type ReconcilerOption func(*Reconciler)
 
 // WithTrafficDistributionEnabled controls whether the Reconciler considers the
 // `trafficDistribution` field while reconciling EndpointSlices.
-func WithTrafficDistributionEnabled(enabled bool) ReconcilerOption {
+func WithTrafficDistributionEnabled(enabled, preferSame bool) ReconcilerOption {
 	return func(r *Reconciler) {
 		r.trafficDistributionEnabled = enabled
+		r.preferSameTrafficDistribution = preferSame
 	}
+}
+
+// validTrafficDistribution determines whether TrafficDistribution is set and valid for
+// this cluster.
+func (r *Reconciler) validTrafficDistribution(trafficDistribution *string) bool {
+	if trafficDistribution == nil || !r.trafficDistributionEnabled {
+		return false
+	}
+	if *trafficDistribution == corev1.ServiceTrafficDistributionPreferClose {
+		return true
+	}
+	if !r.preferSameTrafficDistribution {
+		return false
+	}
+	if *trafficDistribution == corev1.ServiceTrafficDistributionPreferSameZone ||
+		*trafficDistribution == corev1.ServiceTrafficDistributionPreferSameNode {
+		return true
+	}
+	return false
 }
 
 // endpointMeta includes the attributes we group slices on, this type helps with
@@ -275,7 +299,7 @@ func (r *Reconciler) reconcileByAddressType(logger klog.Logger, service *corev1.
 		Unchanged:   unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete),
 	}
 
-	canUseTrafficDistribution := r.trafficDistributionEnabled && !hintsEnabled(service.Annotations)
+	canUseTrafficDistribution := r.validTrafficDistribution(service.Spec.TrafficDistribution) && !hintsEnabled(service.Annotations)
 
 	// Check if we need to add/remove hints based on the topology annotation.
 	//
@@ -455,10 +479,8 @@ func (r *Reconciler) finalize(
 		topologyLabel = "Auto"
 	}
 	var trafficDistribution string
-	if r.trafficDistributionEnabled && !hintsEnabled(service.Annotations) {
-		if service.Spec.TrafficDistribution != nil && *service.Spec.TrafficDistribution == corev1.ServiceTrafficDistributionPreferClose {
-			trafficDistribution = *service.Spec.TrafficDistribution
-		}
+	if r.validTrafficDistribution(service.Spec.TrafficDistribution) && !hintsEnabled(service.Annotations) {
+		trafficDistribution = *service.Spec.TrafficDistribution
 	}
 
 	numSlicesChanged := len(slicesToCreate) + len(slicesToUpdate) + len(slicesToDelete)

@@ -57,7 +57,7 @@ type proxyHealthChecker interface {
 	Health() ProxyHealth
 }
 
-func newServiceHealthServer(hostname string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
+func newServiceHealthServer(nodeName string, recorder events.EventRecorder, listener listener, factory httpServerFactory, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
 	// It doesn't matter whether we listen on "0.0.0.0", "::", or ""; go
 	// treats them all the same.
 	nodeIPs := []net.IP{net.IPv4zero}
@@ -72,7 +72,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 	}
 
 	return &server{
-		hostname:      hostname,
+		nodeName:      nodeName,
 		recorder:      recorder,
 		listener:      listener,
 		httpFactory:   factory,
@@ -83,12 +83,12 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 }
 
 // NewServiceHealthServer allocates a new service healthcheck server manager
-func NewServiceHealthServer(hostname string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
-	return newServiceHealthServer(hostname, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
+func NewServiceHealthServer(nodeName string, recorder events.EventRecorder, nodePortAddresses *proxyutil.NodePortAddresses, healthzServer proxyHealthChecker) ServiceHealthServer {
+	return newServiceHealthServer(nodeName, recorder, stdNetListener{}, stdHTTPServerFactory{}, nodePortAddresses, healthzServer)
 }
 
 type server struct {
-	hostname string
+	nodeName string
 	// node addresses where health check port will listen on
 	nodeIPs     []net.IP
 	recorder    events.EventRecorder // can be nil
@@ -131,7 +131,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 		err := svc.listenAndServeAll(hcs)
 
 		if err != nil {
-			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.hostname, nsn.String(), port, err)
+			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.nodeName, nsn.String(), port, err)
 
 			if hcs.recorder != nil {
 				hcs.recorder.Eventf(
@@ -142,7 +142,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						UID:       types.UID(nsn.String()),
 					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
-			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.hostname, "service", nsn, "port", port)
+			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.nodeName, "service", nsn, "port", port)
 			continue
 		}
 		hcs.services[nsn] = svc

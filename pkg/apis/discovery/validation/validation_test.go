@@ -235,6 +235,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Addresses: generateIPAddresses(1),
 					Hints: &discovery.EndpointHints{
 						ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						ForNodes: []discovery.ForNode{{Name: "node-1"}},
 					},
 				}},
 			},
@@ -518,7 +519,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
-		"invalid-hints": {
+		"invalid-zone-hint": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -535,7 +536,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
-		"overlapping-hints": {
+		"overlapping-zone-hints": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -556,7 +557,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
-		"too-many-hints": {
+		"too-many-zone-hints": {
 			expectedErrors: 1,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
@@ -578,6 +579,74 @@ func TestValidateEndpointSlice(t *testing.T) {
 							{Name: "zone-g"},
 							{Name: "zone-h"},
 							{Name: "zone-i"},
+						},
+					},
+				}},
+			},
+		},
+		"invalid-node-hints": {
+			expectedErrors: 2,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForNodes: []discovery.ForNode{
+							{Name: "!@#$!@"},
+							{Name: ""},
+						},
+					},
+				}},
+			},
+		},
+		"overlapping-node-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForNodes: []discovery.ForNode{
+							{Name: "node-1"},
+							{Name: "node-2"},
+							{Name: "node-1"},
+						},
+					},
+				}},
+			},
+		},
+		"too-many-node-hints": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     ptr.To("http"),
+					Protocol: ptr.To(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+					Hints: &discovery.EndpointHints{
+						ForNodes: []discovery.ForNode{
+							{Name: "node-1"},
+							{Name: "node-2"},
+							{Name: "node-3"},
+							{Name: "node-4"},
+							{Name: "node-5"},
+							{Name: "node-6"},
+							{Name: "node-7"},
+							{Name: "node-8"},
+							{Name: "node-9"},
 						},
 					},
 				}},

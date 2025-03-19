@@ -81,8 +81,8 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 func (s *ProxyServer) platformSetup(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
-		logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
-		node, err := waitForPodCIDR(ctx, s.Client, s.Hostname)
+		logger.Info("Watching for node, awaiting podCIDR allocation", "node", s.NodeName)
+		node, err := waitForPodCIDR(ctx, s.Client, s.NodeName)
 		if err != nil {
 			return err
 		}
@@ -157,7 +157,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
@@ -179,7 +179,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
@@ -217,7 +217,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
@@ -243,7 +243,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
@@ -267,7 +267,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors,
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
@@ -285,7 +285,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,

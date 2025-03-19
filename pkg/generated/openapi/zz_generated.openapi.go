@@ -633,6 +633,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/discovery/v1.EndpointPort":                                                                  schema_k8sio_api_discovery_v1_EndpointPort(ref),
 		"k8s.io/api/discovery/v1.EndpointSlice":                                                                 schema_k8sio_api_discovery_v1_EndpointSlice(ref),
 		"k8s.io/api/discovery/v1.EndpointSliceList":                                                             schema_k8sio_api_discovery_v1_EndpointSliceList(ref),
+		"k8s.io/api/discovery/v1.ForNode":                                                                       schema_k8sio_api_discovery_v1_ForNode(ref),
 		"k8s.io/api/discovery/v1.ForZone":                                                                       schema_k8sio_api_discovery_v1_ForZone(ref),
 		"k8s.io/api/discovery/v1beta1.Endpoint":                                                                 schema_k8sio_api_discovery_v1beta1_Endpoint(ref),
 		"k8s.io/api/discovery/v1beta1.EndpointConditions":                                                       schema_k8sio_api_discovery_v1beta1_EndpointConditions(ref),
@@ -640,6 +641,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/discovery/v1beta1.EndpointPort":                                                             schema_k8sio_api_discovery_v1beta1_EndpointPort(ref),
 		"k8s.io/api/discovery/v1beta1.EndpointSlice":                                                            schema_k8sio_api_discovery_v1beta1_EndpointSlice(ref),
 		"k8s.io/api/discovery/v1beta1.EndpointSliceList":                                                        schema_k8sio_api_discovery_v1beta1_EndpointSliceList(ref),
+		"k8s.io/api/discovery/v1beta1.ForNode":                                                                  schema_k8sio_api_discovery_v1beta1_ForNode(ref),
 		"k8s.io/api/discovery/v1beta1.ForZone":                                                                  schema_k8sio_api_discovery_v1beta1_ForZone(ref),
 		"k8s.io/api/events/v1.Event":                                                                            schema_k8sio_api_events_v1_Event(ref),
 		"k8s.io/api/events/v1.EventList":                                                                        schema_k8sio_api_events_v1_EventList(ref),
@@ -33610,7 +33612,7 @@ func schema_k8sio_api_discovery_v1_EndpointHints(ref common.ReferenceCallback) c
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "forZones indicates the zone(s) this endpoint should be consumed by to enable topology aware routing.",
+							Description: "forZones indicates the zone(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -33622,11 +33624,30 @@ func schema_k8sio_api_discovery_v1_EndpointHints(ref common.ReferenceCallback) c
 							},
 						},
 					},
+					"forNodes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "forNodes indicates the node(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries. This is an Alpha feature and is only used when the PreferSameTrafficDistribution feature gate is enabled.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/discovery/v1.ForNode"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/discovery/v1.ForZone"},
+			"k8s.io/api/discovery/v1.ForNode", "k8s.io/api/discovery/v1.ForZone"},
 	}
 }
 
@@ -33812,6 +33833,28 @@ func schema_k8sio_api_discovery_v1_EndpointSliceList(ref common.ReferenceCallbac
 	}
 }
 
+func schema_k8sio_api_discovery_v1_ForNode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ForNode provides information about which nodes should consume this endpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name represents the name of the node.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_discovery_v1_ForZone(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -33979,11 +34022,30 @@ func schema_k8sio_api_discovery_v1beta1_EndpointHints(ref common.ReferenceCallba
 							},
 						},
 					},
+					"forNodes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "forNodes indicates the node(s) this endpoint should be consumed by when using topology aware routing. May contain a maximum of 8 entries. This is an Alpha feature and is only used when the PreferSameTrafficDistribution feature gate is enabled.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/discovery/v1beta1.ForNode"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/discovery/v1beta1.ForZone"},
+			"k8s.io/api/discovery/v1beta1.ForNode", "k8s.io/api/discovery/v1beta1.ForZone"},
 	}
 }
 
@@ -34160,6 +34222,28 @@ func schema_k8sio_api_discovery_v1beta1_EndpointSliceList(ref common.ReferenceCa
 		},
 		Dependencies: []string{
 			"k8s.io/api/discovery/v1beta1.EndpointSlice", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_k8sio_api_discovery_v1beta1_ForNode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ForNode provides information about which nodes should consume this endpoint.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "name represents the name of the node.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 

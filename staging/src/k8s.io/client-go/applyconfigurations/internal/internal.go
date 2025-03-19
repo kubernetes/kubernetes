@@ -8741,6 +8741,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.discovery.v1.EndpointHints
   map:
     fields:
+    - name: forNodes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.discovery.v1.ForNode
+          elementRelationship: atomic
     - name: forZones
       type:
         list:
@@ -8792,6 +8798,13 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.discovery.v1.EndpointPort
           elementRelationship: atomic
+- name: io.k8s.api.discovery.v1.ForNode
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.discovery.v1.ForZone
   map:
     fields:
@@ -8844,6 +8857,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.discovery.v1beta1.EndpointHints
   map:
     fields:
+    - name: forNodes
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.discovery.v1beta1.ForNode
+          elementRelationship: atomic
     - name: forZones
       type:
         list:
@@ -8894,6 +8913,13 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.discovery.v1beta1.EndpointPort
           elementRelationship: atomic
+- name: io.k8s.api.discovery.v1beta1.ForNode
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.discovery.v1beta1.ForZone
   map:
     fields:
