@@ -327,7 +327,7 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	return newCfg
 }
 
-func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int) {
+func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int, strictReservedCPUs cpuset.CPUSet) {
 	var pod *v1.Pod
 
 	ctnAttrs := []ctnAttribute{
@@ -353,6 +353,7 @@ func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int) {
 		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
 
 		gomega.Expect(cpus.Size()).To(gomega.Equal(cpuCount), "expected cpu set size == %d, got %q", cpuCount, cpus.String())
+		gomega.Expect(cpus.Intersection(strictReservedCPUs).IsEmpty()).To(gomega.BeTrueBecause("cpuset %q should not contain strict reserved cpus %q", cpus.String(), strictReservedCPUs.String()))
 	}
 
 	ginkgo.By("by deleting the pods and waiting for container removal")
@@ -360,7 +361,7 @@ func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int) {
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 
-func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64) {
+func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64, strictReservedCPUs cpuset.CPUSet) {
 	var ctnAttrs []ctnAttribute
 	var err error
 	var pod *v1.Pod
@@ -377,11 +378,10 @@ func runNonGuPodTest(ctx context.Context, f *framework.Framework, cpuCap int64) 
 	pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 
 	ginkgo.By("checking if the expected cpuset was assigned")
-	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
-	// on the single CPU node the only possible value is 0
-	if cpuCap == 1 {
-		expAllowedCPUsListRegex = "^0\n$"
-	}
+	expAllowedCPUs, err := cpuset.Parse(fmt.Sprintf("0-%d", cpuCap-1))
+	framework.ExpectNoError(err)
+	expAllowedCPUs = expAllowedCPUs.Difference(strictReservedCPUs)
+	expAllowedCPUsListRegex = fmt.Sprintf("^%s\n$", expAllowedCPUs.String())
 	err = e2epod.NewPodClient(f).MatchContainerOutput(ctx, pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
@@ -890,10 +890,10 @@ func runCPUManagerTests(f *framework.Framework) {
 		updateKubeletConfig(ctx, f, newCfg, true)
 
 		ginkgo.By("running a non-Gu pod")
-		runNonGuPodTest(ctx, f, cpuCap)
+		runNonGuPodTest(ctx, f, cpuCap, cpuset.New())
 
 		ginkgo.By("running a Gu pod")
-		runGuPodTest(ctx, f, 1)
+		runGuPodTest(ctx, f, 1, cpuset.New())
 
 		ginkgo.By("running multiple Gu and non-Gu pods")
 		runMultipleGuNonGuPods(ctx, f, cpuCap, cpuAlloc)
@@ -914,6 +914,56 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		ginkgo.By("test for automatically remove inactive pods from cpumanager state file.")
 		runAutomaticallyRemoveInactivePodsFromCPUManagerStateFile(ctx, f)
+	})
+
+	ginkgo.It("reservedSystemCPUs are excluded only for Gu pods (strict-cpu-reservation option not enabled by default)", func(ctx context.Context) {
+		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+
+		// Skip CPU Manager tests altogether if the CPU capacity < 2.
+		if cpuCap < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
+		}
+
+		reservedSystemCPUs := cpuset.New(0)
+		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:         string(cpumanager.PolicyStatic),
+			reservedSystemCPUs: reservedSystemCPUs,
+		})
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ginkgo.By("running a Gu pod - it shouldn't use reserved system CPUs")
+		runGuPodTest(ctx, f, 1, reservedSystemCPUs)
+
+		ginkgo.By("running a non-Gu pod - it can use reserved system CPUs")
+		runNonGuPodTest(ctx, f, cpuCap, cpuset.New())
+
+	})
+
+	ginkgo.It("reservedSystemCPUs are excluded for both Gu and non-Gu pods (strict-cpu-reservation option enabled)", func(ctx context.Context) {
+		cpuCap, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+
+		// Skip CPU Manager tests altogether if the CPU capacity < 2.
+		if cpuCap < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < 2")
+		}
+
+		reservedSystemCPUs := cpuset.New(0)
+		cpuPolicyOptions := map[string]string{
+			cpumanager.StrictCPUReservationOption: "true",
+		}
+		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			policyName:              string(cpumanager.PolicyStatic),
+			reservedSystemCPUs:      reservedSystemCPUs,
+			enableCPUManagerOptions: true,
+			options:                 cpuPolicyOptions,
+		})
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		ginkgo.By("running a Gu pod - it shouldn't use reserved system CPUs")
+		runGuPodTest(ctx, f, 1, reservedSystemCPUs)
+
+		ginkgo.By("running a non-Gu pod - it shouldn't use reserved system CPUs with strict-cpu-reservation option enabled")
+		runNonGuPodTest(ctx, f, cpuCap, reservedSystemCPUs)
 	})
 
 	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func(ctx context.Context) {
@@ -950,7 +1000,44 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// the order between negative and positive doesn't really matter
 		runSMTAlignmentNegativeTests(ctx, f)
-		runSMTAlignmentPositiveTests(ctx, f, smtLevel)
+		runSMTAlignmentPositiveTests(ctx, f, smtLevel, cpuset.New())
+	})
+
+	ginkgo.It("should assign CPUs as expected based on strict SMT alignment, reservedSystemCPUs should be excluded (both strict-cpu-reservation and full-pcpus-only options enabled)", func(ctx context.Context) {
+		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
+		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+		smtLevel := getSMTLevel()
+
+		// strict SMT alignment is trivially verified and granted on non-SMT systems
+		if smtLevel < 2 {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since SMT disabled", fullCPUsOnlyOpt)
+		}
+
+		// our tests want to allocate a full core, so we need at last smtLevel*2 virtual cpus
+		if cpuAlloc < int64(smtLevel*2) {
+			e2eskipper.Skipf("Skipping CPU Manager %s tests since the CPU capacity < %d", fullCPUsOnlyOpt, smtLevel*2)
+		}
+
+		framework.Logf("SMT level %d", smtLevel)
+
+		reservedSystemCPUs := cpuset.New(0)
+		cpuPolicyOptions := map[string]string{
+			cpumanager.FullPCPUsOnlyOption:        "true",
+			cpumanager.StrictCPUReservationOption: "true",
+		}
+		newCfg := configureCPUManagerInKubelet(oldCfg,
+			&cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      reservedSystemCPUs,
+				enableCPUManagerOptions: true,
+				options:                 cpuPolicyOptions,
+			},
+		)
+		updateKubeletConfig(ctx, f, newCfg, true)
+
+		// the order between negative and positive doesn't really matter
+		runSMTAlignmentNegativeTests(ctx, f)
+		runSMTAlignmentPositiveTests(ctx, f, smtLevel, reservedSystemCPUs)
 	})
 
 	ginkgo.It("should not enforce CFS quota for containers with static CPUs assigned", func(ctx context.Context) {
@@ -1108,7 +1195,7 @@ func runSMTAlignmentNegativeTests(ctx context.Context, f *framework.Framework) {
 	waitForAllContainerRemoval(ctx, pod.Name, pod.Namespace)
 }
 
-func runSMTAlignmentPositiveTests(ctx context.Context, f *framework.Framework, smtLevel int) {
+func runSMTAlignmentPositiveTests(ctx context.Context, f *framework.Framework, smtLevel int, strictReservedCPUs cpuset.CPUSet) {
 	// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
 	// 1. are core siblings
 	// 2. take a full core
@@ -1134,6 +1221,7 @@ func runSMTAlignmentPositiveTests(ctx context.Context, f *framework.Framework, s
 		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
 		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
 
+		gomega.Expect(cpus.Intersection(strictReservedCPUs).IsEmpty()).To(gomega.BeTrueBecause("cpuset %q should not contain strict reserved cpus %q", cpus.String(), strictReservedCPUs.String()))
 		validateSMTAlignment(cpus, smtLevel, pod, &cnt)
 	}
 
