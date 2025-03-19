@@ -180,7 +180,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	if err != nil {
 		return err
 	}
-	result, err := shouldDelegateList(opts, delegator.CacheWithoutSnapshots{})
+	result, err := shouldDelegateList(opts, c.cacher)
 	if err != nil {
 		return err
 	}
