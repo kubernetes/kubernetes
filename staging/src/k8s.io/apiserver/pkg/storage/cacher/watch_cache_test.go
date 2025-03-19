@@ -1363,7 +1363,7 @@ func TestCacheSnapshots(t *testing.T) {
 	clock.Step(DefaultEventFreshDuration + 1)
 	require.NoError(t, store.Update(makeTestPod("foo", 500)))
 	assert.Equal(t, 1, store.capacity)
-	assert.Equal(t, 1, store.snapshots.snapshots.Len())
+	assert.Equal(t, 1, store.snapshots.Len())
 	_, found = store.snapshots.GetLessOrEqual(499)
 	assert.False(t, found, "Expected overfilled cache to delete events below 500")
 
@@ -1377,7 +1377,7 @@ func TestCacheSnapshots(t *testing.T) {
 	t.Log("Add event to force capacity upsize")
 	require.NoError(t, store.Update(makeTestPod("foo", 600)))
 	assert.Equal(t, 2, store.capacity)
-	assert.Equal(t, 2, store.snapshots.snapshots.Len())
+	assert.Equal(t, 2, store.snapshots.Len())
 
 	t.Log("Test cache on rev 600")
 	lister, found = store.snapshots.GetLessOrEqual(600)
