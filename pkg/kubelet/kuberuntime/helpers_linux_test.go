@@ -215,7 +215,7 @@ func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
 }
 
 func TestGetSeccompProfile(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 
 	unconfinedProfile := &runtimeapi.SecurityProfile{
@@ -315,7 +315,7 @@ func TestGetSeccompProfile(t *testing.T) {
 }
 
 func TestGetSeccompProfileDefaultSeccomp(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 
 	unconfinedProfile := &runtimeapi.SecurityProfile{

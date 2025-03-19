@@ -32,7 +32,7 @@ import (
 )
 
 func TestApplySandboxResources(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	m.cpuCFSQuota = true
 	m.singleProcessOOMKill = ptr.To(false)
 
@@ -175,7 +175,7 @@ func TestApplySandboxResources(t *testing.T) {
 }
 
 func TestGeneratePodSandboxConfigWithLinuxSecurityContext(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 	pod := newTestPodWithLinuxSecurityContext()
 
@@ -222,7 +222,7 @@ func newSupplementalGroupsPolicyPod(supplementalGroupsPolicy *v1.SupplementalGro
 }
 
 func TestGeneratePodSandboxLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 
 	tests := []struct {

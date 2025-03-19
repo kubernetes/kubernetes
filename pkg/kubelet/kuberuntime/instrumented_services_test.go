@@ -72,7 +72,7 @@ func TestRecordOperation(t *testing.T) {
 
 func TestInstrumentedVersion(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, _, _ := createTestRuntimeManager()
+	fakeRuntime, _, _, _ := createTestRuntimeManager(nil)
 	irs := newInstrumentedRuntimeService(fakeRuntime)
 	vr, err := irs.Version(ctx, "1")
 	assert.NoError(t, err)
@@ -81,7 +81,7 @@ func TestInstrumentedVersion(t *testing.T) {
 
 func TestStatus(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, _, _ := createTestRuntimeManager()
+	fakeRuntime, _, _, _ := createTestRuntimeManager(nil)
 	fakeRuntime.FakeStatus = &runtimeapi.RuntimeStatus{
 		Conditions: []*runtimeapi.RuntimeCondition{
 			{Type: runtimeapi.RuntimeReady, Status: false},

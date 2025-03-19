@@ -40,7 +40,7 @@ import (
 const testPodLogsDirectory = "/var/log/pods"
 
 func TestGeneratePodSandboxConfig(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 	pod := newTestPod()
 
@@ -73,7 +73,7 @@ func TestGeneratePodSandboxConfig(t *testing.T) {
 // TestCreatePodSandbox tests creating sandbox and its corresponding pod log directory.
 func TestCreatePodSandbox(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 	pod := newTestPod()
 
@@ -95,7 +95,7 @@ func TestCreatePodSandbox(t *testing.T) {
 }
 
 func TestGeneratePodSandboxLinuxConfigSeccomp(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -143,7 +143,7 @@ func TestCreatePodSandbox_RuntimeClass(t *testing.T) {
 	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
 	defer rctest.StartManagerSync(rcm)()
 
-	fakeRuntime, _, m, err := createTestRuntimeManager()
+	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 	m.runtimeClassManager = rcm
 
@@ -214,7 +214,7 @@ func newSeccompPod(podFieldProfile, containerFieldProfile *v1.SeccompProfile, po
 }
 
 func TestGeneratePodSandboxWindowsConfig_HostProcess(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	require.NoError(t, err)
 
 	const containerName = "container"

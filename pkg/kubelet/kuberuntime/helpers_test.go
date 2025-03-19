@@ -159,7 +159,7 @@ func TestToKubeContainer(t *testing.T) {
 		State:               kubecontainer.ContainerStateRunning,
 	}
 
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	assert.NoError(t, err)
 	got, err := m.toKubeContainer(c)
 	assert.NoError(t, err)
@@ -202,7 +202,7 @@ func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 		State:               kubecontainer.ContainerStateRunning,
 	}
 
-	_, _, m, err := createTestRuntimeManager()
+	_, _, m, err := createTestRuntimeManager(nil)
 	assert.NoError(t, err)
 	got, err := m.toKubeContainer(c)
 	assert.NoError(t, err)
@@ -216,7 +216,7 @@ func TestToKubeContainerWithRuntimeHandlerInImageSpecCri(t *testing.T) {
 }
 
 func TestGetImageUser(t *testing.T) {
-	_, i, m, err := createTestRuntimeManager()
+	_, i, m, err := createTestRuntimeManager(nil)
 	assert.NoError(t, err)
 
 	type image struct {
