@@ -32,7 +32,7 @@ import (
 )
 
 func TestSandboxGC(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -203,7 +203,7 @@ func makeGCContainer(podName, containerName string, attempt int, createdAt int64
 }
 
 func TestContainerGC(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -422,7 +422,7 @@ func TestContainerGC(t *testing.T) {
 // Notice that legacy container symlink is not tested since it may be deprecated soon.
 func TestPodLogDirectoryGC(t *testing.T) {
 	ctx := context.Background()
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	fakeOS := m.osInterface.(*containertest.FakeOS)
 	podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)
@@ -463,7 +463,7 @@ func TestPodLogDirectoryGC(t *testing.T) {
 
 func TestUnknownStateContainerGC(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	// podStateProvider := m.containerGC.podStateProvider.(*fakePodStateProvider)

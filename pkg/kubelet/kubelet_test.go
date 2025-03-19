@@ -4151,60 +4151,80 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 		},
 	})
 
-	// Pod resize error returned from the runtime should be surfaced in the conditions.
-	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
-		SyncResults: []*kubecontainer.SyncResult{{
-			Action:  kubecontainer.ResizePodInPlace,
-			Target:  pod.UID,
-			Error:   kubecontainer.ErrResizePodInPlace,
-			Message: "could not resize pod",
-		}},
+	testCases := []struct {
+		name                     string
+		syncResults              *kubecontainer.PodSyncResult
+		expectedErr              string
+		expectedResizeConditions []*v1.PodCondition
+	}{
+		{
+			name: "pod resize error returned from the runtime",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action:  kubecontainer.ResizePodInPlace,
+					Target:  pod.UID,
+					Error:   kubecontainer.ErrResizePodInPlace,
+					Message: "could not resize pod",
+				}},
+			},
+			expectedErr: "failed to \"ResizePodInPlace\" for \"12345678\" with ResizePodInPlaceError: \"could not resize pod\"",
+			expectedResizeConditions: []*v1.PodCondition{{
+				Type:    v1.PodResizeInProgress,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonError,
+				Message: "could not resize pod",
+			}},
+		},
+		{
+			name: "pod resize error cleared upon successful run",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action: kubecontainer.ResizePodInPlace,
+					Target: pod.UID,
+				}},
+			},
+			expectedResizeConditions: []*v1.PodCondition{{
+				Type:   v1.PodResizeInProgress,
+				Status: v1.ConditionTrue,
+			}},
+		},
+		{
+			name: "sync results have a non-resize error",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action:  kubecontainer.CreatePodSandbox,
+					Target:  pod.UID,
+					Error:   kubecontainer.ErrCreatePodSandbox,
+					Message: "could not create pod sandbox",
+				}},
+			},
+			expectedErr: "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
+			expectedResizeConditions: []*v1.PodCondition{{
+				Type:   v1.PodResizeInProgress,
+				Status: v1.ConditionTrue,
+			}},
+		},
 	}
 
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
-	require.Error(t, err)
-
-	expectedErr := "failed to \"ResizePodInPlace\" for \"12345678\" with ResizePodInPlaceError: \"could not resize pod\""
-	require.Equal(t, expectedErr, err.Error())
-	require.False(t, isTerminal)
-
-	gotResizeConditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
-	for _, c := range gotResizeConditions {
-		// ignore last probe and transition times for comparison
-		c.LastProbeTime = metav1.Time{}
-		c.LastTransitionTime = metav1.Time{}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet.fakeRuntime.SyncResults = tc.syncResults
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+			require.False(t, isTerminal)
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Equal(t, tc.expectedErr, err.Error())
+			}
+			gotResizeConditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+			for _, c := range gotResizeConditions {
+				// ignore last probe and transition times for comparison
+				c.LastProbeTime = metav1.Time{}
+				c.LastTransitionTime = metav1.Time{}
+			}
+			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
+		})
 	}
-	expectedResizeConditions := []*v1.PodCondition{{
-		Type:    v1.PodResizeInProgress,
-		Status:  v1.ConditionTrue,
-		Reason:  v1.PodReasonError,
-		Message: "could not resize pod",
-	}}
-	require.Equal(t, expectedResizeConditions, gotResizeConditions)
-
-	// Verify the pod resize conditions are cleared upon a successful resize.
-	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
-		SyncResults: []*kubecontainer.SyncResult{{
-			Action: kubecontainer.ResizePodInPlace,
-			Target: pod.UID,
-		}},
-	}
-
-	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	isTerminal, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
-	require.NoError(t, err)
-	require.False(t, isTerminal)
-
-	gotResizeConditions = kubelet.statusManager.GetPodResizeConditions(pod.UID)
-	for _, c := range gotResizeConditions {
-		// ignore last probe and transition times for comparison
-		c.LastProbeTime = metav1.Time{}
-		c.LastTransitionTime = metav1.Time{}
-	}
-	expectedResizeConditions = []*v1.PodCondition{{
-		Type:   v1.PodResizeInProgress,
-		Status: v1.ConditionTrue,
-	}}
-	require.Equal(t, expectedResizeConditions, gotResizeConditions)
 }

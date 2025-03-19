@@ -66,7 +66,11 @@ var (
 	containerRestartPolicyAlways       = v1.ContainerRestartPolicyAlways
 )
 
-func createTestRuntimeManager(errors map[string][]error) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	return createTestRuntimeManagerWithErrors(nil)
+}
+
+func createTestRuntimeManagerWithErrors(errors map[string][]error) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
 	if errors != nil {
 		fakeRuntimeService.Errors = errors
@@ -292,13 +296,13 @@ func verifyContainerStatuses(t *testing.T, runtime *apitest.FakeRuntimeService, 
 }
 
 func TestNewKubeRuntimeManager(t *testing.T) {
-	_, _, _, err := createTestRuntimeManager(nil)
+	_, _, _, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 }
 
 func TestVersion(t *testing.T) {
 	ctx := context.Background()
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	version, err := m.Version(ctx)
@@ -307,7 +311,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestContainerRuntimeType(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	runtimeType := m.Type()
@@ -316,7 +320,7 @@ func TestContainerRuntimeType(t *testing.T) {
 
 func TestGetPodStatus(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -355,7 +359,7 @@ func TestGetPodStatus(t *testing.T) {
 
 func TestStopContainerWithNotFoundError(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -394,7 +398,7 @@ func TestStopContainerWithNotFoundError(t *testing.T) {
 
 func TestGetPodStatusWithNotFoundError(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -433,7 +437,7 @@ func TestGetPodStatusWithNotFoundError(t *testing.T) {
 
 func TestGetPods(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
@@ -511,7 +515,7 @@ func TestGetPods(t *testing.T) {
 
 func TestGetPodsSorted(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"}}
@@ -541,7 +545,7 @@ func TestGetPodsSorted(t *testing.T) {
 
 func TestKillPod(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	pod := &v1.Pod{
@@ -620,7 +624,7 @@ func TestKillPod(t *testing.T) {
 }
 
 func TestSyncPod(t *testing.T) {
-	fakeRuntime, fakeImage, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, fakeImage, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -661,7 +665,7 @@ func TestSyncPod(t *testing.T) {
 }
 
 func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	containers := []v1.Container{
@@ -720,7 +724,7 @@ func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
 
 func TestPruneInitContainers(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	init1 := makeTestContainer("init1", "busybox")
@@ -758,7 +762,7 @@ func TestPruneInitContainers(t *testing.T) {
 
 func TestSyncPodWithInitContainers(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	initContainers := []v1.Container{
@@ -932,7 +936,7 @@ func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
 }
 
 func TestComputePodActions(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -1273,7 +1277,7 @@ func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 }
 
 func TestComputePodActionsWithInitContainers(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -1491,7 +1495,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 }
 
 func TestComputePodActionsWithInitContainersWithLegacySidecarContainers(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -1769,7 +1773,7 @@ func makeBasePodAndStatusWithInitContainers() (*v1.Pod, *kubecontainer.PodStatus
 }
 
 func TestComputePodActionsWithRestartableInitContainers(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	// Creating a pair reference pod and status for the test cases to refer
@@ -2188,7 +2192,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 	TestComputePodActions(t)
 	TestComputePodActionsWithInitContainers(t)
 
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	basePod, baseStatus := makeBasePodAndStatusWithInitAndEphemeralContainers()
@@ -2335,7 +2339,7 @@ func TestComputePodActionsWithInitAndEphemeralContainersWithLegacySidecarContain
 	TestComputePodActions(t)
 	TestComputePodActionsWithInitContainersWithLegacySidecarContainers(t)
 
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	basePod, baseStatus := makeBasePodAndStatusWithInitAndEphemeralContainers()
@@ -2494,7 +2498,7 @@ func TestComputePodActionsWithInitAndEphemeralContainersWithLegacySidecarContain
 
 func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	fakeRuntime.ErrorOnSandboxCreate = true
 
@@ -2559,7 +2563,7 @@ func makeBasePodAndStatusWithInitAndEphemeralContainers() (*v1.Pod, *kubecontain
 
 func TestComputePodActionsForPodResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
@@ -2923,7 +2927,7 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 func TestUpdatePodContainerResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
 
@@ -3056,7 +3060,7 @@ func TestUpdatePodContainerResources(t *testing.T) {
 }
 
 func TestToKubeContainerImageVolumes(t *testing.T) {
-	_, _, manager, err := createTestRuntimeManager(nil)
+	_, _, manager, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	const (
@@ -3125,7 +3129,7 @@ func TestToKubeContainerImageVolumes(t *testing.T) {
 func TestGetImageVolumes(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, true)
 
-	_, _, manager, err := createTestRuntimeManager(nil)
+	_, _, manager, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	const (
@@ -3315,7 +3319,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, _, m, err := createTestRuntimeManager(tc.runtimeErrors)
+			_, _, m, err := createTestRuntimeManagerWithErrors(tc.runtimeErrors)
 			require.NoError(t, err)
 			m.cpuCFSQuota = true // Enforce CPU Limits
 

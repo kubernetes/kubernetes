@@ -33,7 +33,7 @@ import (
 )
 
 func TestApplyPlatformSpecificContainerConfig(t *testing.T) {
-	_, _, fakeRuntimeSvc, err := createTestRuntimeManager(nil)
+	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	containerConfig := &runtimeapi.ContainerConfig{}
@@ -154,7 +154,7 @@ func TestCalculateWindowsResources(t *testing.T) {
 	// TODO: remove skip once the failing test has been fixed.
 	t.Skip("Skip failing test on Windows.")
 
-	_, _, fakeRuntimeSvc, err := createTestRuntimeManager(nil)
+	_, _, fakeRuntimeSvc, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	tests := []struct {

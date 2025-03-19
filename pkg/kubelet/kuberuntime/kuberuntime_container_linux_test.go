@@ -86,7 +86,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 
 func TestGenerateContainerConfig(t *testing.T) {
 	ctx := context.Background()
-	_, imageService, m, err := createTestRuntimeManager(nil)
+	_, imageService, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	runAsUser := int64(1000)
@@ -163,7 +163,7 @@ func TestGenerateContainerConfig(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigResources(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
 
 	assert.NoError(t, err)
@@ -267,7 +267,7 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 }
 
 func TestCalculateLinuxResources(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	m.cpuCFSQuota = true
 
 	assert.NoError(t, err)
@@ -416,7 +416,7 @@ func TestCalculateLinuxResources(t *testing.T) {
 }
 
 func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	podRequestMemory := resource.MustParse("128Mi")
@@ -679,7 +679,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)
 	}
@@ -752,7 +752,7 @@ var (
 )
 
 func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	if err != nil {
 		t.Fatalf("error creating test RuntimeManager: %v", err)
 	}
@@ -832,7 +832,7 @@ func TestGenerateLinuxConfigSupplementalGroupsPolicy(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerResources(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 
@@ -925,7 +925,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 }
 
 func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 	m.machineInfo.MemoryCapacity = 42949672960 // 40Gb == 40 * 1024^3
 	m.machineInfo.SwapCapacity = 5368709120    // 5Gb == 5 * 1024^3
@@ -1262,7 +1262,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 }
 
 func TestGenerateUpdatePodSandboxResourcesRequest(t *testing.T) {
-	_, _, m, err := createTestRuntimeManager(nil)
+	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
 	podRequestCPU := resource.MustParse("400m")
@@ -1667,7 +1667,7 @@ func TestGenerateUpdatePodSandboxResourcesRequest(t *testing.T) {
 }
 
 func TestUpdatePodSandboxResources(t *testing.T) {
-	fakeRuntime, _, m, errCreate := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
 	require.NoError(t, errCreate)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -48,7 +48,7 @@ import (
 // TestRemoveContainer tests removing the container and its corresponding container logs.
 func TestRemoveContainer(t *testing.T) {
 	ctx := context.Background()
-	fakeRuntime, _, m, err := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -103,7 +103,7 @@ func TestRemoveContainer(t *testing.T) {
 
 // TestKillContainer tests killing the container in a Pod.
 func TestKillContainer(t *testing.T) {
-	_, _, m, _ := createTestRuntimeManager(nil)
+	_, _, m, _ := createTestRuntimeManager()
 
 	tests := []struct {
 		caseName            string
@@ -456,7 +456,7 @@ func TestToKubeContainerStatusWithUser(t *testing.T) {
 func testLifeCycleHook(t *testing.T, testPod *v1.Pod, testContainer *v1.Container) {
 
 	// Setup
-	fakeRuntime, _, m, _ := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, _ := createTestRuntimeManager()
 
 	gracePeriod := int64(30)
 	cID := kubecontainer.ContainerID{
@@ -935,7 +935,7 @@ func TestKillContainerGracePeriod(t *testing.T) {
 
 // TestUpdateContainerResources tests updating a container in a Pod.
 func TestUpdateContainerResources(t *testing.T) {
-	fakeRuntime, _, m, errCreate := createTestRuntimeManager(nil)
+	fakeRuntime, _, m, errCreate := createTestRuntimeManager()
 	require.NoError(t, errCreate)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

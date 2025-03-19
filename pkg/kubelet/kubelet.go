@@ -2069,7 +2069,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	for _, r := range result.SyncResults {
 		if r.Action == kubecontainer.ResizePodInPlace {
-			if r.Message == "" {
+			if r.Error == nil {
 				// The pod was resized successfully, clear any pod resize errors in the PodResizeInProgress condition.
 				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", true)
 			} else {
