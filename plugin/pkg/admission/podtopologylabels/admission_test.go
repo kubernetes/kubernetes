@@ -26,7 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
@@ -50,7 +49,7 @@ func TestPodTopology(t *testing.T) {
 		featureDisabled       bool                 // configure whether the SetPodTopologyLabels feature gate should be disabled.
 	}{
 		{
-			name: "copies topology.k8s.io/zone and region labels to binding annotations",
+			name: "copies topology.k8s.io/zone and region labels to binding labels",
 			targetNodeLabels: map[string]string{
 				"topology.k8s.io/zone":      "zone1",
 				"topology.k8s.io/region":    "region1",
@@ -123,46 +122,102 @@ func TestPodTopology(t *testing.T) {
 					Labels: test.targetNodeLabels,
 				},
 			}
-			// Pod we bind during test cases.
-			pod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: namespace.Name},
-				Spec:       corev1.PodSpec{},
-			}
-			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, version.MustParse("1.33"))
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, kubefeatures.PodTopologyLabelsAdmission,
-				!test.featureDisabled)
-			mockClient := fake.NewSimpleClientset(namespace, node, pod)
-			handler, informerFactory, err := newHandlerForTest(mockClient)
-			if err != nil {
-				t.Fatalf("unexpected error initializing handler: %v", err)
-			}
-			stopCh := make(chan struct{})
-			defer close(stopCh)
-			informerFactory.Start(stopCh)
 
-			target := test.bindingTarget
-			if target == nil {
-				target = &api.ObjectReference{
-					Kind: "Node",
-					Name: node.Name,
+			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, kubefeatures.PodTopologyLabelsAdmission, !test.featureDisabled)
+
+			t.Run("using Pod directly (update)", func(t *testing.T) {
+				// set up the client and informers
+				mockClient := fake.NewSimpleClientset(namespace, node)
+				handler, informerFactory, err := newHandlerForTest(mockClient)
+				if err != nil {
+					t.Fatalf("unexpected error initializing handler: %v", err)
 				}
-			}
-			binding := &api.Binding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      pod.Name,
-					Namespace: pod.Namespace,
-					Labels:    test.existingBindingLabels,
-				},
-				Target: *target,
-			}
-			if err := admissiontesting.WithReinvocationTesting(t, handler).
-				Admit(context.TODO(), admission.NewAttributesRecord(binding, nil, api.Kind("Binding").WithVersion("version"), pod.Namespace, pod.Name, api.Resource("pods").WithVersion("version"), "binding", admission.Create, &metav1.CreateOptions{}, false, nil), nil); err != nil {
-				t.Errorf("failed running admission plugin: %v", err)
-			}
-			updatedBindingLabels := binding.Labels
-			if !apiequality.Semantic.DeepEqual(updatedBindingLabels, test.expectedBindingLabels) {
-				t.Errorf("Unexpected label values: %v", cmp.Diff(updatedBindingLabels, test.expectedBindingLabels))
-			}
+				stopCh := make(chan struct{})
+				defer close(stopCh)
+				informerFactory.Start(stopCh)
+
+				oldPod := &api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: namespace.Name, Labels: test.existingBindingLabels},
+					Spec:       api.PodSpec{},
+				}
+				pod := oldPod.DeepCopy()
+				pod.Spec.NodeName = node.Name
+
+				if err := admissiontesting.WithReinvocationTesting(t, handler).
+					Admit(context.TODO(), admission.NewAttributesRecord(pod, oldPod,
+						api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name,
+						api.Resource("pods").WithVersion("version"), "", admission.Update, &metav1.UpdateOptions{},
+						false, nil), nil); err != nil {
+					t.Errorf("failed running admission plugin: %v", err)
+				}
+			})
+
+			t.Run("using Pod directly (create)", func(t *testing.T) {
+				// set up the client and informers
+				mockClient := fake.NewSimpleClientset(namespace, node)
+				handler, informerFactory, err := newHandlerForTest(mockClient)
+				if err != nil {
+					t.Fatalf("unexpected error initializing handler: %v", err)
+				}
+				stopCh := make(chan struct{})
+				defer close(stopCh)
+				informerFactory.Start(stopCh)
+
+				pod := &api.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: namespace.Name, Labels: test.existingBindingLabels},
+					Spec: api.PodSpec{
+						NodeName: node.Name,
+					},
+				}
+				if err := admissiontesting.WithReinvocationTesting(t, handler).
+					Admit(context.TODO(), admission.NewAttributesRecord(pod, nil,
+						api.Kind("Pod").WithVersion("version"), pod.Namespace, pod.Name,
+						api.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.UpdateOptions{},
+						false, nil), nil); err != nil {
+					t.Errorf("failed running admission plugin: %v", err)
+				}
+			})
+
+			t.Run("using Binding subresource", func(t *testing.T) {
+				// Pod we bind during test cases.
+				existingPod := &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "testPod", Namespace: namespace.Name},
+					Spec:       corev1.PodSpec{},
+				}
+				mockClient := fake.NewSimpleClientset(namespace, node, existingPod)
+				handler, informerFactory, err := newHandlerForTest(mockClient)
+				if err != nil {
+					t.Fatalf("unexpected error initializing handler: %v", err)
+				}
+				stopCh := make(chan struct{})
+				defer close(stopCh)
+				informerFactory.Start(stopCh)
+
+				// create and submit a Binding object
+				target := test.bindingTarget
+				if target == nil {
+					target = &api.ObjectReference{
+						Kind: "Node",
+						Name: node.Name,
+					}
+				}
+				binding := &api.Binding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      existingPod.Name,
+						Namespace: existingPod.Namespace,
+						Labels:    test.existingBindingLabels,
+					},
+					Target: *target,
+				}
+				if err := admissiontesting.WithReinvocationTesting(t, handler).
+					Admit(context.TODO(), admission.NewAttributesRecord(binding, nil, api.Kind("Binding").WithVersion("version"), existingPod.Namespace, existingPod.Name, api.Resource("pods").WithVersion("version"), "binding", admission.Create, &metav1.CreateOptions{}, false, nil), nil); err != nil {
+					t.Errorf("failed running admission plugin: %v", err)
+				}
+				updatedBindingLabels := binding.Labels
+				if !apiequality.Semantic.DeepEqual(updatedBindingLabels, test.expectedBindingLabels) {
+					t.Errorf("Unexpected label values: %v", cmp.Diff(updatedBindingLabels, test.expectedBindingLabels))
+				}
+			})
 		})
 	}
 }

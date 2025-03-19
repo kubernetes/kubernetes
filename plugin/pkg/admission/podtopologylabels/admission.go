@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 
 	"k8s.io/klog/v2"
 
@@ -39,7 +38,7 @@ import (
 const PluginName = "PodTopologyLabels"
 
 // defaultConfig is the configuration used for the default instantiation of the plugin.
-// This is the configured used by kube-apiserver.
+// This configuration is used by kube-apiserver.
 // It is not exported to avoid any chance of accidentally mutating the variable.
 var defaultConfig = Config{
 	Labels: []string{"topology.k8s.io/zone", "topology.k8s.io/region", "kubernetes.io/hostname"},
@@ -60,27 +59,13 @@ type Config struct {
 	// Labels is set of explicit label keys to be copied from the Node object onto
 	// pod Binding objects during admission.
 	Labels []string
-	// Domains is a set of label key prefixes used to copy across label values
-	// for all labels with a given domain prefix.
-	// For example, `example.com` would match all labels matching `example.com/*`.
-	// Keys without a domain portion (i.e. those not containing a /) will never match.
-	Domains []string
-	// Suffixes is a set of label key domain suffixes used to copy label values for
-	// all labels of a given subdomain.
-	// This acts as a suffix match on the domain portion of label keys.
-	// If a suffix does not have a leading '.', one will be prepended to avoid
-	// programmer errors with values like `example.com` matching `notexample.com`.
-	// Keys without a domain portion (i.e. those not containing a /) will never match.
-	Suffixes []string
 }
 
 // NewPodTopologyPlugin initializes a Plugin
 func NewPodTopologyPlugin(c Config) *Plugin {
 	return &Plugin{
-		Handler:  admission.NewHandler(admission.Create),
-		labels:   sets.New(c.Labels...),
-		domains:  sets.New(c.Domains...),
-		suffixes: sets.New(c.Suffixes...),
+		Handler: admission.NewHandler(admission.Create),
+		labels:  sets.New(c.Labels...),
 	}
 }
 
@@ -89,9 +74,8 @@ type Plugin struct {
 
 	nodeLister corev1listers.NodeLister
 
-	// explicit labels, list of domains or a list of domain
-	// suffixes to be copies to Pod objects being bound.
-	labels, domains, suffixes sets.Set[string]
+	// explicit labels to be copied to Pod objects being bound.
+	labels sets.Set[string]
 
 	enabled, inspectedFeatureGates bool
 }
@@ -126,14 +110,21 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if !p.enabled {
 		return nil
 	}
-	if shouldIgnore(a) {
-		return nil
+	// check whether the request is for a Binding or a Pod spec update.
+	shouldAdmit, doAdmit, err := p.shouldAdmit(a)
+	if !shouldAdmit || err != nil {
+		// error is either nil and admit == false, or err is non-nil and should be returned.
+		return err
 	}
 	// we need to wait for our caches to warm
 	if !p.WaitForReady() {
 		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
 	}
+	// run type specific admission
+	return doAdmit(ctx, a, o)
+}
 
+func (p *Plugin) admitBinding(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	binding := a.GetObject().(*api.Binding)
 	// other fields are not set by the default scheduler for the binding target, so only check the Kind.
 	if binding.Target.Kind != "Node" {
@@ -141,28 +132,10 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return nil
 	}
 
-	node, err := p.nodeLister.Get(binding.Target.Name)
+	labelsToCopy, err := p.topologyLabelsForNodeName(binding.Target.Name)
 	if err != nil {
-		// Ignore NotFound errors to avoid risking breaking compatibility/behaviour.
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
 		return err
 	}
-
-	// fast-path/short circuit if the node has no labels
-	if node.Labels == nil {
-		return nil
-	}
-
-	labelsToCopy := make(map[string]string)
-	for k, v := range node.Labels {
-		if !p.isTopologyLabel(k) {
-			continue
-		}
-		labelsToCopy[k] = v
-	}
-
 	if len(labelsToCopy) == 0 {
 		// fast-path/short circuit if the node has no topology labels
 		return nil
@@ -173,16 +146,67 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if binding.Labels == nil {
 		binding.Labels = make(map[string]string)
 	}
-	for k, v := range labelsToCopy {
-		if _, exists := binding.Labels[k]; exists {
-			// Don't overwrite labels on Binding resources as this could lead to unexpected
-			// behaviour if any schedulers rely on being able to explicitly set values themselves.
-			continue
-		}
-		binding.Labels[k] = v
-	}
+	mergeLabels(binding.Labels, labelsToCopy)
 
 	return nil
+}
+
+func (p *Plugin) admitPod(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
+	pod := a.GetObject().(*api.Pod)
+	if pod.Spec.NodeName == "" {
+		// pod has not been scheduled yet
+		return nil
+	}
+
+	// Determine the topology labels from the assigned node to be copied.
+	labelsToCopy, err := p.topologyLabelsForNodeName(pod.Spec.NodeName)
+	if err != nil {
+		return err
+	}
+	if len(labelsToCopy) == 0 {
+		// fast-path/short circuit if the node has no topology labels
+		return nil
+	}
+
+	// copy the topology labels into the Pod's labels.
+	if pod.Labels == nil {
+		pod.Labels = make(map[string]string)
+	}
+	// avoid overwriting any existing labels on the Pod.
+	mergeLabels(pod.Labels, labelsToCopy)
+
+	return nil
+}
+
+func (p *Plugin) topologyLabelsForNodeName(nodeName string) (map[string]string, error) {
+	labels := make(map[string]string)
+	node, err := p.nodeLister.Get(nodeName)
+	if err != nil {
+		// Ignore NotFound errors to avoid risking breaking compatibility/behaviour.
+		if apierrors.IsNotFound(err) {
+			return labels, nil
+		}
+		return nil, err
+	}
+
+	for k, v := range node.Labels {
+		if !p.isTopologyLabel(k) {
+			continue
+		}
+		labels[k] = v
+	}
+
+	return labels, nil
+}
+
+// mergeLabels merges new into existing, without overwriting existing keys.
+func mergeLabels(existing, new map[string]string) {
+	for k, v := range new {
+		if _, exists := existing[k]; exists {
+			continue
+		}
+		existing[k] = v
+	}
 }
 
 func (p *Plugin) isTopologyLabel(key string) bool {
@@ -190,41 +214,33 @@ func (p *Plugin) isTopologyLabel(key string) bool {
 	if p.labels.Has(key) {
 		return true
 	}
-	// Check the domain portion of the label key, if present
-	domain, _, hasDomain := strings.Cut(key, "/")
-	if !hasDomain {
-		// fast-path if there is no / separator
-		return false
-	}
-	if p.domains.Has(domain) {
-		// check for explicit domains to copy
-		return true
-	}
-	for _, suffix := range p.suffixes.UnsortedList() {
-		// check if the domain has one of the suffixes that are to be copied
-		if strings.HasSuffix(domain, suffix) {
-			return true
-		}
-	}
 	return false
 }
 
-func shouldIgnore(a admission.Attributes) bool {
-	resource := a.GetResource().GroupResource()
-	if resource != api.Resource("pods") {
-		return true
-	}
-	if a.GetSubresource() != "binding" {
-		// only run the checks below on the binding subresource
-		return true
+type admitFunc func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error)
+
+// shouldAdmit inspects the provided adminssion attributes to determine whether the request
+// requires admittance through this plugin.
+func (p *Plugin) shouldAdmit(a admission.Attributes) (bool, admitFunc, error) {
+	if a.GetResource().GroupResource() != api.Resource("pods") {
+		return false, nil, nil
 	}
 
-	obj := a.GetObject()
-	_, ok := obj.(*api.Binding)
-	if !ok {
-		klog.Errorf("expected Binding but got %s", a.GetKind().Kind)
-		return true
+	switch a.GetSubresource() {
+	case "": // regular Pod endpoint
+		_, ok := a.GetObject().(*api.Pod)
+		if !ok {
+			return false, nil, fmt.Errorf("expected Pod but got %T", a.GetObject())
+		}
+		return true, p.admitPod, nil
+	case "binding":
+		_, ok := a.GetObject().(*api.Binding)
+		if !ok {
+			return false, nil, fmt.Errorf("expected Binding but got %s", a.GetKind().Kind)
+		}
+		return true, p.admitBinding, nil
+	default:
+		// Ignore all other sub-resources.
+		return false, nil, nil
 	}
-
-	return false
 }

@@ -205,10 +205,10 @@ func (r *BindingREST) PreserveRequestObjectMetaSystemFieldsOnSubresourceCreate()
 	return true
 }
 
-// setPodHostAndAnnotations sets the given pod's host to 'machine' if and only if
-// the pod is unassigned and merges the provided annotations with those of the pod.
+// setPodNodeAndMetadata sets the given pod's nodeName to 'machine' if and only if
+// the pod is unassigned, and merges the provided annotations and labels with those of the pod.
 // Returns the current state of the pod, or an error.
-func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podUID types.UID, podResourceVersion, podID, machine string, annotations, labels map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
+func (r *BindingREST) setPodNodeAndMetadata(ctx context.Context, podUID types.UID, podResourceVersion, podID, machine string, annotations, labels map[string]string, dryRun bool) (finalPod *api.Pod, err error) {
 	podKey, err := r.store.KeyFunc(ctx, podID)
 	if err != nil {
 		return nil, err
@@ -284,7 +284,7 @@ func copyLabelsWithoutOverwriting(pod *api.Pod, labels map[string]string) {
 
 // assignPod assigns the given pod to the given machine.
 func (r *BindingREST) assignPod(ctx context.Context, podUID types.UID, podResourceVersion, podID string, machine string, annotations, labels map[string]string, dryRun bool) (err error) {
-	if _, err = r.setPodHostAndAnnotations(ctx, podUID, podResourceVersion, podID, machine, annotations, labels, dryRun); err != nil {
+	if _, err = r.setPodNodeAndMetadata(ctx, podUID, podResourceVersion, podID, machine, annotations, labels, dryRun); err != nil {
 		err = storeerr.InterpretGetError(err, api.Resource("pods"), podID)
 		err = storeerr.InterpretUpdateError(err, api.Resource("pods"), podID)
 		if _, ok := err.(*errors.StatusError); !ok {

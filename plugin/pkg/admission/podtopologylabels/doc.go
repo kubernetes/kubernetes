@@ -15,10 +15,11 @@ limitations under the License.
 */
 
 // Package podtopologylabels is a plugin that mutates `pod/binding` requests
-// by copying the `topology.k8s.io/{zone,region}` and `kubernetes.io/hostname`
-// labels from the assigned Node object (in the Binding being admitted) onto
-// the Binding so that it can be persisted onto the Pod object when the Pod
-// is being scheduled.
+// by copying the `topology.k8s.io/{zone,region}` labels from the assigned Node
+// object (in the Binding being admitted) onto the Binding so that it can be
+// persisted onto the Pod object when the Pod is being scheduled.
+// Requests for the regular `pods` resource that set the `spec.nodeName` will
+// also trigger the plugin to copy the labels as described.
 // If the binding target is NOT a Node object, no action is taken.
 // If the referenced Node object does not exist, no action is taken.
 package podtopologylabels // import "k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
