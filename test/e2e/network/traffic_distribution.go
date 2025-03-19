@@ -161,7 +161,6 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 				servingPods = append(servingPods, pod)
 				zoneForServingPod[pod.Name] = zone
-				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), pod.GetName(), metav1.DeleteOptions{})
 			}
 			e2epod.NewPodClient(f).CreateBatch(ctx, servingPods)
 
@@ -181,7 +180,6 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 				},
 			})
 			ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
-			ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Services(f.Namespace.Name).Delete), svc.GetName(), metav1.DeleteOptions{})
 
 			ginkgo.By("ensuring EndpointSlice for service have correct same-zone hints")
 			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveSameZoneHints)
@@ -190,14 +188,12 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 			createClientPod := func(ctx context.Context, zone string) *v1.Pod {
 				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "client-pod-in-"+zone, nil, nil, nil)
-				pod.Spec.NodeName = nodeForZone[zone]
 				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
 				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 				cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
 				pod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 				pod.Spec.Containers[0].Name = pod.Name
 
-				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), pod.GetName(), metav1.DeleteOptions{})
 				return e2epod.NewPodClient(f).CreateSync(ctx, pod)
 			}
 
