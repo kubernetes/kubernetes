@@ -518,7 +518,7 @@ func TestStorageFactoryCompatibilityVersion(t *testing.T) {
 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
 		},
 		{
-			effectiveVersion: "1.24.1",
+			effectiveVersion: "1.24.0",
 			example:          &fakeLifecycler[FlowSchema, Internal]{},
 			expectedVersion:  schema.GroupVersion{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
 		},

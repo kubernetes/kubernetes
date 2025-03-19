@@ -254,7 +254,7 @@ func TestGetSkewedKubernetesVersionImpl(t *testing.T) {
 			name:           "valid skew of +1",
 			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
 			n:              1,
-			expectedResult: version.MustParseSemantic("v1.24.1"),
+			expectedResult: version.MustParseSemantic("v1.24.0"),
 		},
 	}
 
