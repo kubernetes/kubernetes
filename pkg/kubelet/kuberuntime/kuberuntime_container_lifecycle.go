@@ -333,7 +333,7 @@ func (c *containerWorker) prepareForTermination(ctx context.Context, pod *v1.Pod
 	if len(message) == 0 {
 		message = fmt.Sprintf("Stopping container %s", containerSpec.Name)
 	}
-	c.m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, message)
+	c.m.recordContainerEvent(pod, containerSpec, containerID.ID, v1.EventTypeNormal, events.KillingContainer, "%v", message)
 
 	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
