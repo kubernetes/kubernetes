@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
@@ -1324,6 +1325,18 @@ func newErrWatcher(err error) *errWatcher {
 	close(watcher.result)
 
 	return watcher
+}
+
+func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (delegator.Result, error) {
+	return delegator.CacheWithoutSnapshots{}.ShouldDelegateExactRV(resourceVersion, recursive)
+}
+
+func (c *Cacher) ShouldDelegateContinue(continueToken string, recursive bool) (delegator.Result, error) {
+	return delegator.CacheWithoutSnapshots{}.ShouldDelegateContinue(continueToken, recursive)
+}
+
+func (c *Cacher) ShouldDelegateConsistentRead() (delegator.Result, error) {
+	return delegator.CacheWithoutSnapshots{}.ShouldDelegateConsistentRead()
 }
 
 // Implements watch.Interface.
