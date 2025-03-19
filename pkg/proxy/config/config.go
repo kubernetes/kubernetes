@@ -19,6 +19,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 
@@ -259,12 +260,9 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 // NodeHandler is an abstract interface of objects which receive
 // notifications about node object changes.
 type NodeHandler interface {
-	// OnNodeAdd is called whenever creation of new node object
-	// is observed.
-	OnNodeAdd(node *v1.Node)
-	// OnNodeUpdate is called whenever modification of an existing
-	// node object is observed.
-	OnNodeUpdate(oldNode, node *v1.Node)
+	// OnNodeChange is called whenever creation or modification
+	// of node object is observed.
+	OnNodeChange(node *v1.Node)
 	// OnNodeDelete is called whenever deletion of an existing node
 	// object is observed.
 	OnNodeDelete(node *v1.Node)
@@ -272,24 +270,6 @@ type NodeHandler interface {
 	// called and the state is fully propagated to local cache.
 	OnNodeSynced()
 }
-
-// NoopNodeHandler is a noop handler for proxiers that have not yet
-// implemented a full NodeHandler.
-type NoopNodeHandler struct{}
-
-// OnNodeAdd is a noop handler for Node creates.
-func (*NoopNodeHandler) OnNodeAdd(node *v1.Node) {}
-
-// OnNodeUpdate is a noop handler for Node updates.
-func (*NoopNodeHandler) OnNodeUpdate(oldNode, node *v1.Node) {}
-
-// OnNodeDelete is a noop handler for Node deletes.
-func (*NoopNodeHandler) OnNodeDelete(node *v1.Node) {}
-
-// OnNodeSynced is a noop handler for Node syncs.
-func (*NoopNodeHandler) OnNodeSynced() {}
-
-var _ NodeHandler = &NoopNodeHandler{}
 
 // NodeConfig tracks a set of node configurations.
 // It accepts "set", "add" and "remove" operations of node via channels, and invokes registered handlers on change.
@@ -305,10 +285,19 @@ func NewNodeConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, r
 		logger: klog.FromContext(ctx),
 	}
 
+	// todo @aroradaman: get rid of the following special case for hollow-proxy
+	// This handles the case (hollow_proxier) where ProxyServer is instantiated without
+	// the "newProxyServer" function, and nodeInformer will be nil as we are creating
+	// the NodeInformers in "newProxyServer" now, the following event handler registration
+	// will panic for hollow proxy.
+	if nodeInformer == nil {
+		return result
+	}
+
 	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    result.handleAddNode,
-			UpdateFunc: result.handleUpdateNode,
+			AddFunc:    result.handleChangeNode,
+			UpdateFunc: func(_, newObj interface{}) { result.handleChangeNode(newObj) },
 			DeleteFunc: result.handleDeleteNode,
 		},
 		resyncPeriod,
@@ -326,6 +315,10 @@ func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
 
 // Run starts the goroutine responsible for calling registered handlers.
 func (c *NodeConfig) Run(stopCh <-chan struct{}) {
+	if c.listerSynced == nil {
+		return
+	}
+
 	c.logger.Info("Starting node config controller")
 
 	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
@@ -338,32 +331,22 @@ func (c *NodeConfig) Run(stopCh <-chan struct{}) {
 	}
 }
 
-func (c *NodeConfig) handleAddNode(obj interface{}) {
+func (c *NodeConfig) handleChangeNode(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
-		return
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
+		if node, ok = tombstone.Obj.(*v1.Node); !ok {
+			utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+			return
+		}
 	}
 	for i := range c.eventHandlers {
-		c.logger.V(4).Info("Calling handler.OnNodeAdd")
-		c.eventHandlers[i].OnNodeAdd(node)
-	}
-}
-
-func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
-	oldNode, ok := oldObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", oldObj))
-		return
-	}
-	node, ok := newObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
-		return
-	}
-	for i := range c.eventHandlers {
-		c.logger.V(5).Info("Calling handler.OnNodeUpdate")
-		c.eventHandlers[i].OnNodeUpdate(oldNode, node)
+		c.logger.V(4).Info("Calling handler.OnNodeChange")
+		c.eventHandlers[i].OnNodeChange(node)
 	}
 }
 
@@ -481,5 +464,100 @@ func (c *ServiceCIDRConfig) handleServiceCIDREvent(oldObj, newObj interface{}) {
 	for i := range c.eventHandlers {
 		c.logger.V(4).Info("Calling handler.OnServiceCIDRsChanged")
 		c.eventHandlers[i].OnServiceCIDRsChanged(c.cidrs.UnsortedList())
+	}
+}
+
+// NodeTopologyHandler is an abstract interface for objects which receive
+// notifications about changes in node topology labels.
+type NodeTopologyHandler interface {
+	// OnTopologyChange is called whenever a change is observed in
+	// node topology labels, and provides the new topology labels.
+	OnTopologyChange(topologyLabels map[string]string)
+}
+
+// NodeTopologyConfig tracks node topology labels.
+type NodeTopologyConfig struct {
+	listerSynced   cache.InformerSynced
+	eventHandlers  []NodeTopologyHandler
+	topologyLabels map[string]string
+	logger         klog.Logger
+}
+
+// NewNodeTopologyConfig creates a new NodeTopologyConfig.
+func NewNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration) *NodeTopologyConfig {
+	return newNodeTopologyConfig(ctx, nodeInformer, resyncPeriod, nil)
+}
+
+// newNodeTopologyConfig implements NewNodeTopologyConfig by additionally consuming a helper function which is invoked when
+// event handler completes processing and is only used for testing.
+func newNodeTopologyConfig(ctx context.Context, nodeInformer v1informers.NodeInformer, resyncPeriod time.Duration, f func()) *NodeTopologyConfig {
+	result := &NodeTopologyConfig{
+		logger:         klog.FromContext(ctx),
+		topologyLabels: make(map[string]string),
+	}
+
+	// todo @aroradaman: get rid of the following special case for hollow-proxy
+	// This handles the case (hollow_proxier) where ProxyServer is instantiated without
+	// the "newProxyServer" function, and nodeInformer will be nil as we are creating
+	// the NodeInformers in "newProxyServer" now, the following event handler registration
+	// will panic for hollow proxy.
+	if nodeInformer == nil {
+		return result
+	}
+
+	handlerRegistration, _ := nodeInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				result.handleNodeEvent(obj)
+				if f != nil {
+					f()
+				}
+			},
+			UpdateFunc: func(_, newObj interface{}) {
+				result.handleNodeEvent(newObj)
+				if f != nil {
+					f()
+				}
+			},
+			DeleteFunc: func(_ interface{}) {},
+		},
+		resyncPeriod,
+	)
+	result.listerSynced = handlerRegistration.HasSynced
+
+	return result
+}
+
+// RegisterEventHandler registers a handler which is called on Node object change.
+func (n *NodeTopologyConfig) RegisterEventHandler(handler NodeTopologyHandler) {
+	n.eventHandlers = append(n.eventHandlers, handler)
+}
+
+// handleNodeEvent is a helper function to handle Add, Update and Delete
+// events on Node objects and call downstream event handlers.
+func (n *NodeTopologyConfig) handleNodeEvent(obj interface{}) {
+	node, ok := obj.(*v1.Node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		return
+	}
+
+	topologyLabels := make(map[string]string)
+	if _, ok = node.Labels[v1.LabelTopologyZone]; ok {
+		topologyLabels[v1.LabelTopologyZone] = node.Labels[v1.LabelTopologyZone]
+	}
+	if _, ok = node.Labels[v1.LabelTopologyRegion]; ok {
+		topologyLabels[v1.LabelTopologyRegion] = node.Labels[v1.LabelTopologyRegion]
+	}
+
+	// skip calling event handlers when no change in topology labels
+	if reflect.DeepEqual(n.topologyLabels, topologyLabels) {
+		return
+	}
+
+	n.topologyLabels = topologyLabels
+	for i := range n.eventHandlers {
+		n.logger.V(4).Info("Calling handler.OnTopologyChange")
+		n.eventHandlers[i].OnTopologyChange(n.topologyLabels)
 	}
 }

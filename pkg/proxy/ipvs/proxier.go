@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -170,10 +169,10 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
-	nodeLabels   map[string]string
+	mu             sync.Mutex // protects the following fields
+	svcPortMap     proxy.ServicePortMap
+	endpointsMap   proxy.EndpointsMap
+	topologyLabels map[string]string
 	// initialSync is a bool indicating if the proxier is syncing for the first time.
 	// It is set to true when a new proxier is initialized and then set to false on all
 	// future syncs.
@@ -823,49 +822,15 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.syncProxyRules()
 }
 
-// OnNodeAdd is called whenever creation of new node object
-// is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
-	if node.Name != proxier.hostname {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
-		return
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
-	}
-
+// OnTopologyChange is called whenever node topology labels are changed.
+// The informer is tweaked to listen for updates of the node where this
+// instance of kube-proxy is running, this guarantees the changed labels
+// are for this node.
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {
 	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
+	proxier.topologyLabels = topologyLabels
 	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
-	proxier.Sync()
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	if node.Name != proxier.hostname {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node", "eventNode", node.Name, "currentNode", proxier.hostname)
-		return
-	}
-
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
-	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
+	proxier.logger.V(4).Info("Updated proxier node topology labels", "labels", topologyLabels)
 	proxier.Sync()
 }
 
@@ -878,7 +843,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = nil
+	proxier.topologyLabels = nil
 	proxier.mu.Unlock()
 
 	proxier.Sync()
@@ -1843,7 +1808,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	if !ok {
 		proxier.logger.Info("Unable to filter endpoints due to missing service info", "servicePortName", svcPortName)
 	} else {
-		clusterEndpoints, localEndpoints, _, hasAnyEndpoints := proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, _, hasAnyEndpoints := proxy.CategorizeEndpoints(endpoints, svcInfo, proxier.topologyLabels)
 		if onlyNodeLocalEndpoints {
 			if len(localEndpoints) > 0 {
 				endpoints = localEndpoints

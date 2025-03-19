@@ -35,16 +35,16 @@ import (
 //
 //   - An indication of whether the service has any endpoints reachable from anywhere in the
 //     cluster. (This may be true even if allReachableEndpoints is empty.)
-func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
+func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, topologyLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
 	var useTopology, useServingTerminatingEndpoints bool
 
 	if svcInfo.UsesClusterEndpoints() {
-		useTopology = canUseTopology(endpoints, nodeLabels)
+		useTopology = canUseTopology(endpoints, topologyLabels)
 		clusterEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
 			if !ep.IsReady() {
 				return false
 			}
-			if useTopology && !availableForTopology(ep, nodeLabels) {
+			if useTopology && !availableForTopology(ep, topologyLabels) {
 				return false
 			}
 			return true
@@ -136,11 +136,11 @@ func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels m
 }
 
 // canUseTopology returns true if all of the following are true:
-//   - The node's labels include "topology.kubernetes.io/zone".
+//   - The node's topology labels include "topology.kubernetes.io/zone".
 //   - All of the endpoints for this Service have a topology hint.
 //   - At least one endpoint for this Service is hinted for this node's zone.
-func canUseTopology(endpoints []Endpoint, nodeLabels map[string]string) bool {
-	zone, foundZone := nodeLabels[v1.LabelTopologyZone]
+func canUseTopology(endpoints []Endpoint, topologyLabels map[string]string) bool {
+	zone, foundZone := topologyLabels[v1.LabelTopologyZone]
 	hasEndpointForZone := false
 	for _, endpoint := range endpoints {
 		if !endpoint.IsReady() {
@@ -174,8 +174,8 @@ func canUseTopology(endpoints []Endpoint, nodeLabels map[string]string) bool {
 
 // availableForTopology checks if this endpoint is available for use on this node, given
 // topology constraints. (It assumes that canUseTopology() returned true.)
-func availableForTopology(endpoint Endpoint, nodeLabels map[string]string) bool {
-	zone := nodeLabels[v1.LabelTopologyZone]
+func availableForTopology(endpoint Endpoint, topologyLabels map[string]string) bool {
+	zone := topologyLabels[v1.LabelTopologyZone]
 	return endpoint.ZoneHints().Has(zone)
 }
 
