@@ -298,7 +298,7 @@ func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath, expec
 // has the expected value in specified container of the pod. It execs into the container,
 // reads the oom_score_adj value from procfs, and compares it against the expected value.
 func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
-	cmd := fmt.Sprintf("cat /proc/1/oom_score_adj")
+	cmd := "cat /proc/1/oom_score_adj"
 	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value %s",
 		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
 	oomScoreAdj, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
