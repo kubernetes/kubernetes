@@ -172,13 +172,13 @@ func shouldDelegateList(opts *metav1.ListOptions, cache delegator.Helper) (deleg
 	case metav1.ResourceVersionMatchNotOlderThan:
 		return delegator.Result{ShouldDelegate: false}, nil
 	case "":
-		// Legacy exact match
-		if opts.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return cache.ShouldDelegateExactRV(opts.ResourceVersion, defaultRecursive)
-		}
 		// Continue
 		if len(opts.Continue) > 0 {
 			return cache.ShouldDelegateContinue(opts.Continue, defaultRecursive)
+		}
+		// Legacy exact match
+		if opts.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return cache.ShouldDelegateExactRV(opts.ResourceVersion, defaultRecursive)
 		}
 		// Consistent Read
 		if opts.ResourceVersion == "" {
