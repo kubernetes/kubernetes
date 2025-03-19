@@ -110,30 +110,22 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	////////////////////////////////////////////////////////////////////////////
 
 	ginkgo.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
-
 		ginkgo.By("finding 3 zones with schedulable nodes")
-		allZonesSet, err := e2enode.GetSchedulableClusterZones(ctx, c)
-		framework.ExpectNoError(err)
-		if len(allZonesSet) < 3 {
-			framework.Failf("got %d zones with schedulable nodes, want atleast 3 zones with schedulable nodes", len(allZonesSet))
-		}
-		zones := allZonesSet.UnsortedList()[:3]
-
-		ginkgo.By(fmt.Sprintf("finding a node in each of the chosen 3 zones %v", zones))
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
 		nodeForZone := make(map[string]*v1.Node)
-		for _, zone := range zones {
-			found := false
-			for _, node := range nodeList.Items {
-				if zone == node.Labels[v1.LabelTopologyZone] {
-					found = true
-					nodeForZone[zone] = &node
-				}
+		for _, node := range nodeList.Items {
+			zone := node.Labels[v1.LabelTopologyZone]
+			if nodeForZone[zone] != nil {
+				continue
 			}
-			if !found {
-				framework.Failf("could not find a node in zone %q; nodes=\n%v", zone, format.Object(nodeList, 1 /* indent one level */))
+			nodeForZone[zone] = &node
+			if len(nodeForZone) == 3 {
+				break
 			}
+		}
+		if len(nodeForZone) < 3 {
+			e2eskipper.Skipf("got %d zones with schedulable nodes, need at least 3", len(nodeForZone))
 		}
 
 		var clientPods []*clientPod
