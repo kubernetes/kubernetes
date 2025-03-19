@@ -80,6 +80,7 @@ func Describe() {
 		framework.WithFeatureGate("no-such-feature-gate"),
 		framework.WithFeatureGate(features.Alpha),
 		framework.WithFeatureGate(features.Beta),
+		framework.WithFeatureGate(features.BetaDefaultOff),
 		framework.WithFeatureGate(features.GA),
 		framework.WithConformance(),
 		framework.WithNodeConformance(),
@@ -116,14 +117,14 @@ ERROR: bugs.go:71: trailing or leading spaces are unnecessary and need to be rem
 ERROR: bugs.go:76: WithFeature: unknown feature "no-such-feature"
 ERROR: bugs.go:78: WithEnvironment: unknown environment "no-such-env"
 ERROR: bugs.go:80: WithFeatureGate: the feature gate "no-such-feature-gate" is unknown
-ERROR: bugs.go:106: SIG label must be lowercase, no spaces and no sig- prefix, got instead: "123"
+ERROR: bugs.go:107: SIG label must be lowercase, no spaces and no sig- prefix, got instead: "123"
 ERROR: buggy/buggy.go:100: hello world
 ERROR: some/relative/path/buggy.go:200: with spaces
 `
 	// Used by unittests/list-tests. It's sorted by test name, not source code location.
 	ListTestsOutput = `The following spec names can be used with 'ginkgo run --focus/skip':
-    ../bugs/bugs.go:100: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
-    ../bugs/bugs.go:95: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
+    ../bugs/bugs.go:101: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestBetaDefaultOffFeature] [Beta] [Feature:OffByDefault] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz x [foo] should [bar]
+    ../bugs/bugs.go:96: [sig-testing] abc   space1 space2  [Feature:no-such-feature] [Feature:feature-foo] [Environment:no-such-env] [Environment:Linux] [FeatureGate:no-such-feature-gate] [Feature:OffByDefault] [FeatureGate:TestAlphaFeature] [Alpha] [Feature:OffByDefault] [FeatureGate:TestBetaFeature] [Beta] [FeatureGate:TestBetaDefaultOffFeature] [Beta] [Feature:OffByDefault] [FeatureGate:TestGAFeature] [Conformance] [NodeConformance] [Slow] [Serial] [Disruptive] [custom-label] xyz y [foo] should [bar]
 
 `
 
@@ -140,6 +141,7 @@ ERROR: some/relative/path/buggy.go:200: with spaces
     Feature:feature-foo
     Feature:no-such-feature
     FeatureGate:TestAlphaFeature
+    FeatureGate:TestBetaDefaultOffFeature
     FeatureGate:TestBetaFeature
     FeatureGate:TestGAFeature
     FeatureGate:no-such-feature-gate

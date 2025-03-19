@@ -24,9 +24,10 @@ import (
 )
 
 const (
-	Alpha featuregate.Feature = "TestAlphaFeature"
-	Beta  featuregate.Feature = "TestBetaFeature"
-	GA    featuregate.Feature = "TestGAFeature"
+	Alpha          featuregate.Feature = "TestAlphaFeature"
+	Beta           featuregate.Feature = "TestBetaFeature"
+	BetaDefaultOff featuregate.Feature = "TestBetaDefaultOffFeature"
+	GA             featuregate.Feature = "TestGAFeature"
 )
 
 func init() {
@@ -40,6 +41,9 @@ var testFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	Beta: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+	},
+	BetaDefaultOff: {
+		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Beta},
 	},
 	GA: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
