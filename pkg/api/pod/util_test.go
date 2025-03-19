@@ -4110,11 +4110,13 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 	testCases := []struct {
 		name                                        string
 		podSpec                                     *api.PodSpec
+		featureEnabled                              bool
 		expectAllowPodLifecycleSleepActionZeroValue bool
 	}{
 		{
-			name:    "no lifecycle hooks",
-			podSpec: &api.PodSpec{},
+			name:           "no lifecycle hooks",
+			podSpec:        &api.PodSpec{},
+			featureEnabled: true,
 			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
@@ -4132,6 +4134,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 					},
 				},
 			},
+			featureEnabled: true,
 			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
@@ -4149,6 +4152,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 					},
 				},
 			},
+			featureEnabled: true,
 			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
@@ -4166,6 +4170,7 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 					},
 				},
 			},
+			featureEnabled: true,
 			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 		{
@@ -4183,12 +4188,93 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 					},
 				},
 			},
+			featureEnabled: true,
+			expectAllowPodLifecycleSleepActionZeroValue: true,
+		},
+		{
+			name:           "no lifecycle hooks with feature gate disabled",
+			podSpec:        &api.PodSpec{},
+			featureEnabled: false,
+			expectAllowPodLifecycleSleepActionZeroValue: false,
+		},
+		{
+			name: "Prestop with non-zero second duration with feature gate disabled",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PreStop: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			featureEnabled: false,
+			expectAllowPodLifecycleSleepActionZeroValue: false,
+		},
+		{
+			name: "PostStart with non-zero second duration with feature gate disabled",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PostStart: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			featureEnabled: false,
+			expectAllowPodLifecycleSleepActionZeroValue: false,
+		},
+		{
+			name: "PreStop with zero seconds with feature gate disabled",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PreStop: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			featureEnabled: false,
+			expectAllowPodLifecycleSleepActionZeroValue: true,
+		},
+		{
+			name: "PostStart with zero seconds with feature gate disabled",
+			podSpec: &api.PodSpec{
+				Containers: []api.Container{
+					{
+						Lifecycle: &api.Lifecycle{
+							PostStart: &api.LifecycleHandler{
+								Sleep: &api.SleepAction{
+									Seconds: 0,
+								},
+							},
+						},
+					},
+				},
+			},
+			featureEnabled: false,
 			expectAllowPodLifecycleSleepActionZeroValue: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLifecycleSleepActionAllowZero, tc.featureEnabled)
+
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.podSpec, nil, nil)
 			assert.Equal(t, tc.expectAllowPodLifecycleSleepActionZeroValue, gotOptions.AllowPodLifecycleSleepActionZeroValue, "AllowPodLifecycleSleepActionZeroValue")
 		})
