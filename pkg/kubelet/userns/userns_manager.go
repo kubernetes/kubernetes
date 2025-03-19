@@ -39,12 +39,14 @@ import (
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
-// length for the user namespace to create (65536).
-const userNsLength = (1 << 16)
+const (
+	// Create a new map when we removed enough pods to avoid memory leaks
+	// since Go maps never free memory.
+	mapReInitializeThreshold = 1000
 
-// Create a new map when we removed enough pods to avoid memory leaks
-// since Go maps never free memory.
-const mapReInitializeThreshold = 1000
+	// userNsUnitLength is the unit length of UserNS
+	userNsUnitLength = 65536
+)
 
 type UsernsManager struct {
 	used    *allocator.AllocationBitmap
@@ -53,6 +55,8 @@ type UsernsManager struct {
 
 	off int
 	len int
+
+	userNsLength uint32
 
 	kl userNsPodsManager
 	// This protects all members except for kl.anager
@@ -130,6 +134,11 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
 
+	userNsLength := kl.GetUserNamespacesIDsPerPod()
+
+	if userNsLength%userNsUnitLength != 0 {
+		return nil, fmt.Errorf("kubelet user namespace length %v is not a multiple of %d", userNsLength, userNsUnitLength)
+	}
 	if kubeletMappingID%userNsLength != 0 {
 		return nil, fmt.Errorf("kubelet user assigned ID %v is not a multiple of %v", kubeletMappingID, userNsLength)
 	}
@@ -147,11 +156,12 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	len := int(kubeletMappingLen / userNsLength)
 
 	m := UsernsManager{
-		used:   allocator.NewAllocationMap(len, "user namespaces"),
-		usedBy: make(map[types.UID]uint32),
-		kl:     kl,
-		off:    off,
-		len:    len,
+		used:         allocator.NewAllocationMap(len, "user namespaces"),
+		usedBy:       make(map[types.UID]uint32),
+		kl:           kl,
+		off:          off,
+		len:          len,
+		userNsLength: userNsLength,
 	}
 
 	// do not bother reading the list of pods if user namespaces are not enabled.
@@ -196,7 +206,7 @@ func (m *UsernsManager) recordPodMappings(pod types.UID) error {
 
 // isSet checks if the specified index is already set.
 func (m *UsernsManager) isSet(v uint32) bool {
-	index := int(v/userNsLength) - m.off
+	index := int(v/m.userNsLength) - m.off
 	if index < 0 || index >= m.len {
 		return true
 	}
@@ -217,24 +227,24 @@ func (m *UsernsManager) allocateOne(pod types.UID) (firstID uint32, length uint3
 
 	klog.V(5).InfoS("new pod user namespace allocation", "podUID", pod)
 
-	firstID = uint32((firstZero + m.off) * userNsLength)
+	firstID = uint32((firstZero + m.off)) * m.userNsLength
 	m.usedBy[pod] = firstID
-	return firstID, userNsLength, nil
+	return firstID, m.userNsLength, nil
 }
 
 // record stores the user namespace [from; from+length] to the specified pod.
 func (m *UsernsManager) record(pod types.UID, from, length uint32) (err error) {
-	if length != userNsLength {
+	if length != m.userNsLength {
 		return fmt.Errorf("wrong user namespace length %v", length)
 	}
-	if from%userNsLength != 0 {
+	if from%m.userNsLength != 0 {
 		return fmt.Errorf("wrong user namespace offset specified %v", from)
 	}
 	prevFrom, found := m.usedBy[pod]
 	if found && prevFrom != from {
 		return fmt.Errorf("different user namespace range already used by pod %q", pod)
 	}
-	index := int(from/userNsLength) - m.off
+	index := int(from/m.userNsLength) - m.off
 	if index < 0 || index >= m.len {
 		return fmt.Errorf("id %v is out of range", from)
 	}
@@ -302,7 +312,7 @@ func (m *UsernsManager) releaseWithLock(pod types.UID) {
 		m.usedBy = n
 		m.removed = 0
 	}
-	_ = m.used.Release(int(v/userNsLength) - m.off)
+	_ = m.used.Release(int(v/m.userNsLength) - m.off)
 }
 
 func (m *UsernsManager) parseUserNsFileAndRecord(pod types.UID, content []byte) (userNs userNamespace, err error) {

@@ -924,6 +924,11 @@ type KubeletConfiguration struct {
 	// Default: false
 	// +optional
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
+
+	// UserNamespaces contains User Namespace configurations.
+	// +featureGate=UserNamespaceSupport
+	// +optional
+	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
 }
 
 type KubeletAuthorizationMode string
@@ -1118,4 +1123,18 @@ type CredentialProvider struct {
 type ExecEnvVar struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+// UserNamespaces contains User Namespace configurations.
+type UserNamespaces struct {
+	// IDsPerPod is the mapping length of UIDs and GIDs.
+	// The length must be a multiple of 65536, and must be less than 1<<32.
+	// On non-linux such as windows, only null / absent is allowed.
+	//
+	// Changing the value may require recreating all containers on the node.
+	//
+	// Default: 65536
+	// +featureGate=UserNamespaceSupport
+	// +optional
+	IDsPerPod *int64 `json:"idsPerPod,omitempty"`
 }

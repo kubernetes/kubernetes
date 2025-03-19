@@ -541,6 +541,11 @@ type KubeletConfiguration struct {
 	// +featureGate=KubeletCrashLoopBackoffMax
 	// +optional
 	CrashLoopBackOff CrashLoopBackOffConfig
+
+	// UserNamespaces contains User Namespace configurations.
+	// +featureGate=UserNamespaceSupport
+	// +optional
+	UserNamespaces *UserNamespaces
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet
@@ -877,4 +882,18 @@ type ImagePullSecret struct {
 	// CredentialHash is a SHA-256 retrieved by hashing the image pull credentials
 	// content of the secret specified by the UID/Namespace/Name coordinates.
 	CredentialHash string
+}
+
+// UserNamespaces contains User Namespace configurations.
+type UserNamespaces struct {
+	// IDsPerPod is the mapping length of UIDs and GIDs.
+	// The length must be a multiple of 65536, and must be less than 1<<32.
+	// On non-linux such as windows, only null / absent is allowed.
+	//
+	// Changing the value may require recreating all containers on the node.
+	//
+	// Default: 65536
+	// +featureGate=UserNamespaceSupport
+	// +optional
+	IDsPerPod *int64
 }

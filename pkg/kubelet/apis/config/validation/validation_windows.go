@@ -46,5 +46,9 @@ func validateKubeletOSConfiguration(kc *kubeletconfig.KubeletConfiguration) erro
 		klog.Warningf(message, "EnforceNodeAllocatable", "--enforce-node-allocatable", kc.EnforceNodeAllocatable)
 	}
 
+	if kc.UserNamespaces != nil {
+		return fmt.Errorf("invalid configuration: userNamespaces is not supported on Windows")
+	}
+
 	return nil
 }

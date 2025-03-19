@@ -1280,6 +1280,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kubelet/config/v1beta1.MemorySwapConfiguration":                                                 schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref),
 		"k8s.io/kubelet/config/v1beta1.SerializedNodeConfigSource":                                              schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref),
 		"k8s.io/kubelet/config/v1beta1.ShutdownGracePeriodByPodPriority":                                        schema_k8sio_kubelet_config_v1beta1_ShutdownGracePeriodByPodPriority(ref),
+		"k8s.io/kubelet/config/v1beta1.UserNamespaces":                                                          schema_k8sio_kubelet_config_v1beta1_UserNamespaces(ref),
 		"k8s.io/kubernetes/pkg/apis/abac/v1beta1.Policy":                                                        schema_pkg_apis_abac_v1beta1_Policy(ref),
 		"k8s.io/kubernetes/pkg/apis/abac/v1beta1.PolicySpec":                                                    schema_pkg_apis_abac_v1beta1_PolicySpec(ref),
 		"k8s.io/metrics/pkg/apis/custom_metrics/v1beta1.MetricListOptions":                                      schema_pkg_apis_custom_metrics_v1beta1_MetricListOptions(ref),
@@ -66201,12 +66202,18 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Format:      "",
 						},
 					},
+					"userNamespaces": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UserNamespaces contains User Namespace configurations.",
+							Ref:         ref("k8s.io/kubelet/config/v1beta1.UserNamespaces"),
+						},
+					},
 				},
 				Required: []string{"containerRuntimeEndpoint"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.Taint", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/component-base/tracing/api/v1.TracingConfiguration", "k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig", "k8s.io/kubelet/config/v1beta1.KubeletAuthentication", "k8s.io/kubelet/config/v1beta1.KubeletAuthorization", "k8s.io/kubelet/config/v1beta1.MemoryReservation", "k8s.io/kubelet/config/v1beta1.MemorySwapConfiguration", "k8s.io/kubelet/config/v1beta1.ShutdownGracePeriodByPodPriority"},
+			"k8s.io/api/core/v1.Taint", "k8s.io/apimachinery/pkg/apis/meta/v1.Duration", "k8s.io/component-base/logs/api/v1.LoggingConfiguration", "k8s.io/component-base/tracing/api/v1.TracingConfiguration", "k8s.io/kubelet/config/v1beta1.CrashLoopBackOffConfig", "k8s.io/kubelet/config/v1beta1.KubeletAuthentication", "k8s.io/kubelet/config/v1beta1.KubeletAuthorization", "k8s.io/kubelet/config/v1beta1.MemoryReservation", "k8s.io/kubelet/config/v1beta1.MemorySwapConfiguration", "k8s.io/kubelet/config/v1beta1.ShutdownGracePeriodByPodPriority", "k8s.io/kubelet/config/v1beta1.UserNamespaces"},
 	}
 }
 
@@ -66398,6 +66405,26 @@ func schema_k8sio_kubelet_config_v1beta1_ShutdownGracePeriodByPodPriority(ref co
 					},
 				},
 				Required: []string{"priority", "shutdownGracePeriodSeconds"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_UserNamespaces(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserNamespaces contains User Namespace configurations.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"idsPerPod": {
+						SchemaProps: spec.SchemaProps{
+							Description: "IDsPerPod is the mapping length of UIDs and GIDs. The length must be a multiple of 65536, and must be less than 1<<32. On non-linux such as windows, only null / absent is allowed.\n\nChanging the value may require recreating all containers on the node.\n\nDefault: 65536",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+				},
 			},
 		},
 	}
