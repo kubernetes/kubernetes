@@ -22,7 +22,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/features"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -339,6 +342,48 @@ func TestSetBehaviorDefaults(t *testing.T) {
 			assert.Equal(t, expectedHPA, hpa)
 		})
 	}
+}
+
+func TestSetBehaviorDefaultsConfigurableToleranceEnabled(t *testing.T) {
+	// Enable HPAConfigurableTolerance feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
+
+	// Verify that the tolerance field is left unset.
+	maxPolicy := autoscalingv2.MaxChangePolicySelect
+
+	hpa := autoscalingv2.HorizontalPodAutoscaler{
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleUp: &autoscalingv2.HPAScalingRules{
+					StabilizationWindowSeconds: utilpointer.Int32(100),
+				},
+			},
+		},
+	}
+
+	expectedHPA := autoscalingv2.HorizontalPodAutoscaler{
+		Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
+			Behavior: &autoscalingv2.HorizontalPodAutoscalerBehavior{
+				ScaleDown: &autoscalingv2.HPAScalingRules{
+					SelectPolicy: &maxPolicy,
+					Policies: []autoscalingv2.HPAScalingPolicy{
+						{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
+					},
+				},
+				ScaleUp: &autoscalingv2.HPAScalingRules{
+					StabilizationWindowSeconds: utilpointer.Int32(100),
+					SelectPolicy:               &maxPolicy,
+					Policies: []autoscalingv2.HPAScalingPolicy{
+						{Type: autoscalingv2.PodsScalingPolicy, Value: 4, PeriodSeconds: 15},
+						{Type: autoscalingv2.PercentScalingPolicy, Value: 100, PeriodSeconds: 15},
+					},
+				},
+			},
+		},
+	}
+
+	SetDefaults_HorizontalPodAutoscalerBehavior(&hpa)
+	assert.Equal(t, expectedHPA, hpa)
 }
 
 func TestHorizontalPodAutoscalerAnnotations(t *testing.T) {

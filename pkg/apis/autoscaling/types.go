@@ -148,7 +148,8 @@ const (
 // window is chosen.
 //
 // The tolerance is applied to the metric values and prevents scaling too
-// eagerly for small metric variations.
+// eagerly for small metric variations. (Note that setting a tolerance requires
+// enabling the alpha HPAConfigurableTolerance feature gate.)
 type HPAScalingRules struct {
 	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
@@ -171,8 +172,12 @@ type HPAScalingRules struct {
 	// tolerance is the tolerance on the ratio between the current and desired
 	// metric value under which no updates are made to the desired number of
 	// replicas. If not set, the default cluster-wide tolerance is applied (by
-	// default 10%). Only supported if the feature gate HPAConfigurableTolerance
-	// is enabled.
+	// default 10%).
+	//
+	// This is an alpha field and requires enabling the HPAConfigurableTolerance
+	// feature gate.
+	//
+	// +featureGate=HPAConfigurableTolerance
 	// +optional
 	Tolerance *resource.Quantity
 }
