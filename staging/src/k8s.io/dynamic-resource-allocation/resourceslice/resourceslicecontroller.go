@@ -141,7 +141,7 @@ type Slice struct {
 	// Devices lists all devices which are part of the slice.
 	Devices                []resourceapi.Device
 	SharedCounters         []resourceapi.CounterSet
-	PerDeviceNodeSelection bool
+	PerDeviceNodeSelection *bool
 }
 
 // +k8s:deepcopy-gen=true

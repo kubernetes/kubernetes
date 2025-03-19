@@ -54,7 +54,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	pools := make(map[PoolID]*Pool)
 
 	for _, slice := range slices {
-		if !features.PartitionableDevices && (len(slice.Spec.SharedCounters) > 0 || slice.Spec.PerDeviceNodeSelection) {
+		if !features.PartitionableDevices && (len(slice.Spec.SharedCounters) > 0 || slice.Spec.PerDeviceNodeSelection != nil) {
 			return nil, fmt.Errorf("DRAPartitionableDevices disabled with SharedCounters or PerDeviceNodeSelection set in ResourceSlice")
 		}
 
@@ -69,10 +69,21 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 					return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 				}
 			}
-		case slice.Spec.PerDeviceNodeSelection:
+		case slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection:
 			matchFound := false
 			for _, device := range slice.Spec.Devices {
-				match, err := NodeMatches(node, device.Basic.NodeName, device.Basic.AllNodes, device.Basic.NodeSelector)
+				if device.Basic == nil {
+					continue
+				}
+				var nodeName string
+				var allNodes bool
+				if device.Basic.NodeName != nil {
+					nodeName = *device.Basic.NodeName
+				}
+				if device.Basic.AllNodes != nil {
+					allNodes = *device.Basic.AllNodes
+				}
+				match, err := NodeMatches(node, nodeName, allNodes, device.Basic.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
 						device.String(), slice.Name, err)

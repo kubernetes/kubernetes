@@ -283,11 +283,14 @@ func partitionableDeviceWithNodeSelector(name string, nodeSelection any, capacit
 		device.Basic.NodeSelector = nodeSelection
 	case string:
 		if nodeSelection == nodeSelectionAll {
-			device.Basic.AllNodes = true
+			device.Basic.AllNodes = func() *bool {
+				r := true
+				return &r
+			}()
 		} else if nodeSelection == nodeSelectionPerDevice {
 			panic("nodeSelectionPerDevice is not supported for devices")
 		} else {
-			device.Basic.NodeName = nodeSelection
+			device.Basic.NodeName = &nodeSelection
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
@@ -336,7 +339,10 @@ func slice(name string, nodeSelection any, pool, driver string, devices ...resou
 		if nodeSelection == nodeSelectionAll {
 			slice.Spec.AllNodes = true
 		} else if nodeSelection == nodeSelectionPerDevice {
-			slice.Spec.PerDeviceNodeSelection = true
+			slice.Spec.PerDeviceNodeSelection = func() *bool {
+				r := true
+				return &r
+			}()
 		} else {
 			slice.Spec.NodeName = nodeSelection
 		}
