@@ -2612,6 +2612,185 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	}
 }
 
+func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, true)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	noSwapContainerName, swapContainerName := "test-container-noswap", "test-container-limitedswap"
+	runtime := testKubelet.fakeRuntime
+	runtime.SwapBehavior = map[string]kubetypes.SwapBehavior{
+		noSwapContainerName: kubetypes.NoSwap,
+		swapContainerName:   kubetypes.LimitedSwap,
+	}
+	kubelet := testKubelet.kubelet
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("8"),
+					v1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("4Gi"),
+					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "1111",
+			Name:      "pod1",
+			Namespace: "ns1",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	testKubelet.fakeKubeClient = fake.NewSimpleClientset(testPod)
+	kubelet.kubeClient = testKubelet.fakeKubeClient
+	defer testKubelet.fakeKubeClient.ClearActions()
+	kubelet.podManager.AddPod(testPod)
+	kubelet.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
+		testPod.UID: true,
+	}
+	defer kubelet.podManager.RemovePod(testPod)
+	tests := []struct {
+		name                  string
+		newRequests           v1.ResourceList
+		expectedAllocatedReqs v1.ResourceList
+		resizePolicy          v1.ContainerResizePolicy
+		swapBehavior          kubetypes.SwapBehavior
+		expectedResize        []*v1.PodCondition
+	}{
+		{
+			name:                  "NoSwap Request Memory decrease ResizePolicy RestartContainer - expect InProgress",
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			swapBehavior:          kubetypes.NoSwap,
+			resizePolicy:          v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+		},
+		{
+			name:                  "LimitedSwap Request Memory increase with ResizePolicy RestartContainer - expect InProgress",
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			swapBehavior:          kubetypes.LimitedSwap,
+			resizePolicy:          v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.RestartContainer},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:   v1.PodResizeInProgress,
+					Status: "True",
+				},
+			},
+		},
+		{
+			name:                  "LimitedSwap Request Memory increase with ResizePolicy NotRequired - expect Infeasible",
+			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
+			swapBehavior:          kubetypes.LimitedSwap,
+			resizePolicy:          v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+			expectedResize: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizePending,
+					Status:  "True",
+					Reason:  "Infeasible",
+					Message: "In-place resize of containers with swap is not supported",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			originalPod := testPod.DeepCopy()
+			originalPod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{tt.resizePolicy}
+			if tt.swapBehavior == kubetypes.NoSwap {
+				originalPod.Spec.Containers[0].Name = noSwapContainerName
+			} else {
+				originalPod.Spec.Containers[0].Name = swapContainerName
+			}
+			kubelet.podManager.UpdatePod(originalPod)
+			newPod := originalPod.DeepCopy()
+			newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(originalPod))
+			require.NoError(t, kubelet.allocationManager.SetActuatedResources(originalPod, nil))
+			t.Cleanup(func() { kubelet.allocationManager.RemovePod(originalPod.UID) })
+			podStatus := &kubecontainer.PodStatus{
+				ID:        originalPod.UID,
+				Name:      originalPod.Name,
+				Namespace: originalPod.Namespace,
+			}
+			setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
+				podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
+					Name:  c.Name,
+					State: kubecontainer.ContainerStateRunning,
+					Resources: &kubecontainer.ContainerResources{
+						CPURequest:  c.Resources.Requests.Cpu(),
+						CPULimit:    c.Resources.Limits.Cpu(),
+						MemoryLimit: c.Resources.Limits.Memory(),
+					},
+				}
+			}
+			podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers))
+			for i, c := range originalPod.Spec.Containers {
+				setContainerStatus(podStatus, &c, i)
+			}
+			updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
+			require.NoError(t, err)
+			updatedPodCtr := updatedPod.Spec.Containers[0]
+			assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
+
+			alloc, found := kubelet.allocationManager.GetContainerResourceAllocation(newPod.UID, updatedPodCtr.Name)
+			require.True(t, found, "container allocation")
+			assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
+			resizeStatus := kubelet.statusManager.GetPodResizeConditions(newPod.UID)
+			for i := range resizeStatus {
+				// Ignore probe time and last transition time during comparison.
+				resizeStatus[i].LastProbeTime = metav1.Time{}
+				resizeStatus[i].LastTransitionTime = metav1.Time{}
+				assert.Contains(t, resizeStatus[i].Message, tt.expectedResize[i].Message)
+				resizeStatus[i].Message = tt.expectedResize[i].Message
+			}
+			assert.Equal(t, tt.expectedResize, resizeStatus)
+		})
+	}
+}
+
 func TestHandlePodResourcesResize(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")

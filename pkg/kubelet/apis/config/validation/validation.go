@@ -203,8 +203,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 	if localFeatureGate.Enabled(features.NodeSwap) {
 		switch kc.MemorySwap.SwapBehavior {
 		case "":
-		case kubetypes.NoSwap:
-		case kubetypes.LimitedSwap:
+		case string(kubetypes.NoSwap):
+		case string(kubetypes.LimitedSwap):
 		default:
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: memorySwap.swapBehavior %q must be one of: \"\", %q or %q", kc.MemorySwap.SwapBehavior, kubetypes.LimitedSwap, kubetypes.NoSwap))
 		}

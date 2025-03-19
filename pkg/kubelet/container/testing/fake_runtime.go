@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -70,6 +71,7 @@ type FakeRuntime struct {
 	// from container runtime.
 	BlockImagePulls      bool
 	imagePullTokenBucket chan bool
+	SwapBehavior         map[string]kubetypes.SwapBehavior
 	T                    TB
 }
 
@@ -535,4 +537,11 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.Cont
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetContainerStatus")
 	return nil, f.Err
+}
+
+func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
+	if f.SwapBehavior != nil && f.SwapBehavior[container.Name] != "" {
+		return f.SwapBehavior[container.Name]
+	}
+	return kubetypes.NoSwap
 }

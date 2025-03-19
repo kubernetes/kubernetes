@@ -924,6 +924,145 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 	}
 }
 
+func TestGetContainerSwapBehavior(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "bar",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("1Gi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("2Gi")},
+					},
+				},
+			},
+		},
+		Status: v1.PodStatus{},
+	}
+	tests := []struct {
+		name                       string
+		configuredMemorySwap       types.SwapBehavior
+		nodeSwapFeatureGateEnabled bool
+		isSwapControllerAvailable  bool
+		cgroupVersion              CgroupVersion
+		isCriticalPod              bool
+		qosClass                   v1.PodQOSClass
+		containerResourceOverride  func(container *v1.Container)
+		expected                   types.SwapBehavior
+	}{
+		{
+			name:                       "NoSwap, user set NoSwap behavior",
+			configuredMemorySwap:       types.NoSwap,
+			nodeSwapFeatureGateEnabled: false,
+			expected:                   types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, feature gate turned off",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: false,
+			expected:                   types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, swap controller unavailable",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  false,
+			expected:                   types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, cgroup v1",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  true,
+			cgroupVersion:              cgroupV1,
+			expected:                   types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, qos is Best-Effort",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  true,
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSBestEffort,
+			expected:                   types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, qos is Guaranteed",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  true,
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSGuaranteed,
+			expected:                   types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, zero memory",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  true,
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSBurstable,
+			containerResourceOverride: func(c *v1.Container) {
+				c.Resources.Requests = v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("0"),
+				}
+				c.Resources.Limits = v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("0"),
+				}
+			},
+			expected: types.NoSwap,
+		},
+		{
+			name:                       "NoSwap, memory request equal to limit",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  true,
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSBurstable,
+			containerResourceOverride: func(c *v1.Container) {
+				c.Resources.Requests = v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				}
+				c.Resources.Limits = v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("100Mi"),
+				}
+			},
+			expected: types.NoSwap,
+		},
+		{
+			name:                       "LimitedSwap, cgroup v2",
+			configuredMemorySwap:       types.LimitedSwap,
+			nodeSwapFeatureGateEnabled: true,
+			isSwapControllerAvailable:  true,
+			cgroupVersion:              cgroupV2,
+			qosClass:                   v1.PodQOSBurstable,
+			expected:                   types.LimitedSwap,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m.memorySwapBehavior = string(tt.configuredMemorySwap)
+			setCgroupVersionDuringTest(tt.cgroupVersion)
+			defer setSwapControllerAvailableDuringTest(tt.isSwapControllerAvailable)()
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tt.nodeSwapFeatureGateEnabled)
+			testpod := pod.DeepCopy()
+			testpod.Status.QOSClass = tt.qosClass
+			if tt.containerResourceOverride != nil {
+				tt.containerResourceOverride(&testpod.Spec.Containers[0])
+			}
+			assert.Equal(t, tt.expected, m.GetContainerSwapBehavior(testpod, &testpod.Spec.Containers[0]))
+		})
+	}
+}
+
 func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
@@ -999,7 +1138,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 		qosClass                    v1.PodQOSClass
 		swapDisabledOnNode          bool
 		nodeSwapFeatureGateEnabled  bool
-		swapBehavior                string
+		swapBehavior                types.SwapBehavior
 		addContainerWithoutRequests bool
 		addGuaranteedContainer      bool
 		isCriticalPod               bool
@@ -1195,7 +1334,7 @@ func TestGenerateLinuxContainerResourcesWithSwap(t *testing.T) {
 			setCgroupVersionDuringTest(tc.cgroupVersion)
 			defer setSwapControllerAvailableDuringTest(!tc.swapDisabledOnNode)()
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeSwap, tc.nodeSwapFeatureGateEnabled)
-			m.memorySwapBehavior = tc.swapBehavior
+			m.memorySwapBehavior = string(tc.swapBehavior)
 
 			var resourceReqsC1, resourceReqsC2 v1.ResourceRequirements
 			switch tc.qosClass {
