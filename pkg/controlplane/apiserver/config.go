@@ -311,10 +311,17 @@ func CreateConfig(
 		if err != nil {
 			return nil, nil, err
 		}
-		// build peer proxy config only if peer ca file exists
 		if opts.PeerCAFile != "" {
-			config.PeerProxy, err = BuildPeerProxy(versionedInformers, genericConfig.StorageVersionManager, opts.ProxyClientCertFile,
-				opts.ProxyClientKeyFile, opts.PeerCAFile, opts.PeerAdvertiseAddress, genericConfig.APIServerID, config.Extra.PeerEndpointLeaseReconciler, config.Generic.Serializer)
+			leaseInformer := versionedInformers.Coordination().V1().Leases()
+			config.PeerProxy, err = BuildPeerProxy(
+				leaseInformer,
+				genericConfig.LoopbackClientConfig,
+				opts.ProxyClientCertFile,
+				opts.ProxyClientKeyFile, opts.PeerCAFile,
+				opts.PeerAdvertiseAddress,
+				genericConfig.APIServerID,
+				config.Extra.PeerEndpointLeaseReconciler,
+				config.Generic.Serializer)
 			if err != nil {
 				return nil, nil, err
 			}
