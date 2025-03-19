@@ -372,4 +372,114 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
+	framework.It("should route traffic to an endpoint on the same node or fall back to same zone when using PreferSameNode", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		ginkgo.By("finding a set of nodes for the test")
+		zone1Nodes, zone2Nodes, zone3Nodes := getNodesForMultiNode(ctx)
+
+		var clientPods []*clientPod
+		var serverPods []*serverPod
+
+		// The first zone: a client and a server on each node. Each client only
+		// talks to the server on the same node.
+		endpointsForZone := []*serverPod{
+			{node: zone1Nodes[0]},
+			{node: zone1Nodes[1]},
+		}
+		clientPods = append(clientPods,
+			&clientPod{
+				node:      zone1Nodes[0],
+				endpoints: []*serverPod{endpointsForZone[0]},
+			},
+			&clientPod{
+				node:      zone1Nodes[1],
+				endpoints: []*serverPod{endpointsForZone[1]},
+			},
+		)
+		serverPods = append(serverPods, endpointsForZone...)
+
+		// The second zone: a client on one node and a server on the other. The
+		// client should fall back to connecting (only) to its same-zone endpoint.
+		endpointsForZone = []*serverPod{
+			{node: zone2Nodes[1]},
+		}
+		clientPods = append(clientPods,
+			&clientPod{
+				node:      zone2Nodes[0],
+				endpoints: endpointsForZone,
+			},
+		)
+		serverPods = append(serverPods, endpointsForZone...)
+
+		// The third zone: just a client. Since it has neither a same-node nor a
+		// same-zone endpoint, it should connect to all endpoints.
+		clientPods = append(clientPods,
+			&clientPod{
+				node:      zone3Nodes[0],
+				endpoints: serverPods,
+			},
+		)
+
+		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameNode)
+		createPods(ctx, svc, clientPods, serverPods)
+		checkTrafficDistribution(ctx, clientPods)
+	})
+
+	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode and fall back when the endpoint becomes unavailable", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		ginkgo.By("finding a set of nodes for the test")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		if len(nodeList.Items) < 2 {
+			e2eskipper.Skipf("have %d schedulable nodes, need at least 2", len(nodeList.Items))
+		}
+		nodes := nodeList.Items[:2]
+
+		// One client and one server on each node
+		serverPods := []*serverPod{
+			{node: &nodes[0]},
+			{node: &nodes[1]},
+		}
+		clientPods := []*clientPod{
+			{
+				node:      &nodes[0],
+				endpoints: []*serverPod{serverPods[0]},
+			},
+			{
+				node:      &nodes[1],
+				endpoints: []*serverPod{serverPods[1]},
+			},
+		}
+
+		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameNode)
+		createPods(ctx, svc, clientPods, serverPods)
+
+		ginkgo.By("ensuring that each client talks to its same-node endpoint when both endpoints exist")
+		checkTrafficDistribution(ctx, clientPods)
+
+		ginkgo.By("killing the server pod on the first node and waiting for the EndpointSlices to be updated")
+		err = c.CoreV1().Pods(f.Namespace.Name).Delete(ctx, serverPods[0].pod.Name, metav1.DeleteOptions{})
+		framework.ExpectNoError(err)
+		err = framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, 1, 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("ensuring that both clients talk to the remaining endpoint when only one endpoint exists")
+		serverPods[0].pod = nil
+		clientPods[0].endpoints = []*serverPod{serverPods[1]}
+		checkTrafficDistribution(ctx, clientPods)
+
+		ginkgo.By("recreating the missing server pod and waiting for the EndpointSlices to be updated")
+		// We can't use createPods() here because if we only tell it about
+		// serverPods[0] and not serverPods[1] it will expect there to be only one
+		// endpoint.
+		pod := e2epod.NewAgnhostPod(f.Namespace.Name, "server-0-new", nil, nil, nil, "serve-hostname")
+		nodeSelection := e2epod.NodeSelection{Name: serverPods[0].node.Name}
+		e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
+		pod.Labels = svc.Spec.Selector
+		serverPods[0].pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+		err = framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, 2, 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("ensuring that each client talks only to its same-node endpoint again")
+		clientPods[0].endpoints = []*serverPod{serverPods[0]}
+		checkTrafficDistribution(ctx, clientPods)
+	})
 })
