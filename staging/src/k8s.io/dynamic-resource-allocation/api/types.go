@@ -62,7 +62,7 @@ type BasicDevice struct {
 	NodeName        *string
 	NodeSelector    *v1.NodeSelector
 	AllNodes        *bool
-	Taints     []resourceapi.DeviceTaint
+	Taints          []resourceapi.DeviceTaint
 }
 
 type DeviceCounterConsumption struct {

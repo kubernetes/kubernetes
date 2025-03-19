@@ -107,7 +107,7 @@ type DynamicResources struct {
 	enablePrioritizedList      bool
 	enableSchedulingQueueHint  bool
 	enablePartitionableDevices bool
-	enableDeviceTaints        bool
+	enableDeviceTaints         bool
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -460,7 +460,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.Cycl
 			AdminAccess:          pl.enableAdminAccess,
 			PrioritizedList:      pl.enablePrioritizedList,
 			PartitionableDevices: pl.enablePartitionableDevices,
-			DeviceTaints:    pl.enableDeviceTaints,
+			DeviceTaints:         pl.enableDeviceTaints,
 		}
 		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
