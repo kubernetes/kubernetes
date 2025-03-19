@@ -2131,7 +2131,7 @@ func (kl *Kubelet) SyncTerminatingPod(_ context.Context, pod *v1.Pod, podStatus 
 			return err
 		}
 	} else {
-		podStopped, err := kl.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, kl.getPullSecretsForPod(pod), kl.backOff)
+		podStopped, err := kl.syncTerminatingPod(ctx, pod, podStatus, gracePeriod, kl.getPullSecretsForPod(pod), kl.crashLoopBackOff)
 		if err != nil {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 			// there was an error killing the pod, so we return that error directly
