@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ptr "k8s.io/utils/ptr"
 
@@ -3330,6 +3331,7 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 		oldPod      *api.Pod
 		newPod      *api.Pod
 		expected    *api.Pod
+		features    map[featuregate.Feature]bool
 	}{
 		{
 			description: "preserve old owner references",
@@ -3371,7 +3373,10 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 			},
 		},
 		{
-			description: "drop disabled status fields",
+			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
+			features: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScaling: false,
+			},
 			oldPod: &api.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status:     api.PodStatus{},
@@ -3391,6 +3396,35 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{{}},
+				},
+			},
+		},
+		{
+			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
+			features: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScaling: true,
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status:     api.PodStatus{},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{
+						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{Resources: &api.ResourceRequirements{}},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{Resources: &api.ResourceRequirements{}},
+					},
 				},
 			},
 		},
@@ -3553,6 +3587,9 @@ func TestStatusPrepareForUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			for f, v := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
+			}
 			StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
 			if !cmp.Equal(tc.expected, tc.newPod) {
 				t.Errorf("StatusStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
