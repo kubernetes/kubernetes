@@ -2047,7 +2047,7 @@ func TestPodResizeConditions(t *testing.T) {
 		{
 			name: "set pod resize in progress condition with reason and message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message")
+				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", false)
 			},
 			expected: []*v1.PodCondition{
 				{
@@ -2059,9 +2059,23 @@ func TestPodResizeConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "set pod resize in progress condition without reason and message",
+			name: "set pod resize in progress condition without reason and message/allowReasonToBeCleared=false",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "", "")
+				m.SetPodResizeInProgressCondition(podUID, "", "", false)
+			},
+			expected: []*v1.PodCondition{
+				{
+					Type:    v1.PodResizeInProgress,
+					Status:  v1.ConditionTrue,
+					Reason:  "some-reason",
+					Message: "some-message",
+				},
+			},
+		},
+		{
+			name: "set pod resize in progress condition without reason and message/allowReasonToBeCleared=true",
+			updateFunc: func(podUID types.UID) {
+				m.SetPodResizeInProgressCondition(podUID, "", "", true)
 			},
 			expected: []*v1.PodCondition{
 				{

@@ -4138,5 +4138,73 @@ func TestCrashLoopBackOffConfiguration(t *testing.T) {
 			assert.Equalf(t, tc.expectedInitial, resultInitial, "wrong base calculated, want: %v, got %v", tc.expectedInitial, resultInitial)
 		})
 	}
+}
 
+func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "bar"},
+		},
+	})
+
+	// Pod resize error returned from the runtime should be surfaced in the conditions.
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action:  kubecontainer.ResizePodInPlace,
+			Target:  pod.UID,
+			Error:   kubecontainer.ErrResizePodInPlace,
+			Message: "could not resize pod",
+		}},
+	}
+
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.Error(t, err)
+
+	expectedErr := "failed to \"ResizePodInPlace\" for \"12345678\" with ResizePodInPlaceError: \"could not resize pod\""
+	require.Equal(t, expectedErr, err.Error())
+	require.False(t, isTerminal)
+
+	gotResizeConditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+	for _, c := range gotResizeConditions {
+		// ignore last probe and transition times for comparison
+		c.LastProbeTime = metav1.Time{}
+		c.LastTransitionTime = metav1.Time{}
+	}
+	expectedResizeConditions := []*v1.PodCondition{{
+		Type:    v1.PodResizeInProgress,
+		Status:  v1.ConditionTrue,
+		Reason:  v1.PodReasonError,
+		Message: "could not resize pod",
+	}}
+	require.Equal(t, expectedResizeConditions, gotResizeConditions)
+
+	// Verify the pod resize conditions are cleared upon a successful resize.
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action: kubecontainer.ResizePodInPlace,
+			Target: pod.UID,
+		}},
+	}
+
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	isTerminal, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	require.False(t, isTerminal)
+
+	gotResizeConditions = kubelet.statusManager.GetPodResizeConditions(pod.UID)
+	for _, c := range gotResizeConditions {
+		// ignore last probe and transition times for comparison
+		c.LastProbeTime = metav1.Time{}
+		c.LastTransitionTime = metav1.Time{}
+	}
+	expectedResizeConditions = []*v1.PodCondition{{
+		Type:   v1.PodResizeInProgress,
+		Status: v1.ConditionTrue,
+	}}
+	require.Equal(t, expectedResizeConditions, gotResizeConditions)
 }
