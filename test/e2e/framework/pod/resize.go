@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -49,7 +48,6 @@ const (
 	Cgroupv2CPURequest         string = "/sys/fs/cgroup/cpu.weight"
 	CPUPeriod                  string = "100000"
 	MinContainerRuntimeVersion string = "1.6.9"
-	MinRestartWaitPeriod       int    = 10
 )
 
 var (
@@ -425,13 +423,6 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 			return nil, nil
 		})),
 	)
-
-	// Wait min(3 x termination grace period, MinRestartWaitPeriod) to catch any restarts - expected or not
-	containerRestartWaitPeriod := int(*pod.Spec.TerminationGracePeriodSeconds) * 3
-	if containerRestartWaitPeriod < MinRestartWaitPeriod {
-		containerRestartWaitPeriod = MinRestartWaitPeriod
-	}
-	time.Sleep(time.Duration(containerRestartWaitPeriod) * time.Second)
 
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
 	framework.ExpectNoError(err, "failed to get resized pod")
