@@ -595,17 +595,7 @@ kube::golang::setup_gomaxprocs() {
   # when running in a container, please see https://github.com/golang/go/issues/33803
   if [[ -z "${GOMAXPROCS:-}" ]]; then
     if ! command -v ncpu >/dev/null 2>&1; then
-<<<<<<< HEAD
-      # shellcheck disable=SC2164
-      pushd "${KUBE_ROOT}/hack/tools" >/dev/null
-      go install -mod=readonly ./ncpu || echo "Will not automatically set GOMAXPROCS"
-      # shellcheck disable=SC2164
-      popd >/dev/null
-||||||| 67a30c0adcf
-      go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
-=======
-      GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install ./ncpu || echo "Will not automatically set GOMAXPROCS"
->>>>>>> v1.32.3
+      GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install -mod=readonly ./ncpu || echo "Will not automatically set GOMAXPROCS"
     fi
     if command -v ncpu >/dev/null 2>&1; then
       GOMAXPROCS=$(ncpu)
