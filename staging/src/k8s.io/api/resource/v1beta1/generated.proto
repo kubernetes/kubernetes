@@ -131,7 +131,7 @@ message BasicDevice {
 
   // NodeName identifies the node where the device is available.
   //
-  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // Must only be set if Spec.PerDeviceNodeSelection is set to true.
   // At most one of NodeName, NodeSelector and AllNodes can be set.
   //
   // +optional
@@ -141,9 +141,7 @@ message BasicDevice {
 
   // NodeSelector defines the nodes where the device is available.
   //
-  // Must use exactly one term.
-  //
-  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // Must only be set if Spec.PerDeviceNodeSelection is set to true.
   // At most one of NodeName, NodeSelector and AllNodes can be set.
   //
   // +optional
@@ -152,7 +150,7 @@ message BasicDevice {
 
   // AllNodes indicates that all nodes have access to the device.
   //
-  // Must only be set if Spec.PerDeviceNodeSelection is set.
+  // Must only be set if Spec.PerDeviceNodeSelection is set to true.
   // At most one of NodeName, NodeSelector and AllNodes can be set.
   //
   // +optional
@@ -1078,7 +1076,7 @@ message ResourceSliceSpec {
   // new nodes of the same type as some old node might also make new
   // resources available.
   //
-  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
+  // Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
   // This field is immutable.
   //
   // +optional
@@ -1090,7 +1088,7 @@ message ResourceSliceSpec {
   //
   // Must use exactly one term.
   //
-  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
+  // Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
   //
   // +optional
   // +oneOf=NodeSelection
@@ -1098,7 +1096,7 @@ message ResourceSliceSpec {
 
   // AllNodes indicates that all nodes have access to the resources in the pool.
   //
-  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
+  // Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection
   //
   // +optional
   // +oneOf=NodeSelection

@@ -171,7 +171,7 @@
         "description": "BasicDevice defines one device instance.",
         "properties": {
           "allNodes": {
-            "description": "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+            "description": "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
             "type": "boolean"
           },
           "attributes": {
@@ -212,7 +212,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "nodeName": {
-            "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set.",
+            "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
             "type": "string"
           },
           "nodeSelector": {
@@ -221,7 +221,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector"
               }
             ],
-            "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set. At most one of NodeName, NodeSelector and AllNodes can be set."
+            "description": "NodeSelector defines the nodes where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
           }
         },
         "type": "object"
@@ -1276,7 +1276,7 @@
         "description": "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
         "properties": {
           "allNodes": {
-            "description": "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+            "description": "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection",
             "type": "boolean"
           },
           "devices": {
@@ -1298,7 +1298,7 @@
             "type": "string"
           },
           "nodeName": {
-            "description": "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
+            "description": "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection This field is immutable.",
             "type": "string"
           },
           "nodeSelector": {
@@ -1307,7 +1307,7 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelector"
               }
             ],
-            "description": "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set."
+            "description": "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection"
           },
           "perDeviceNodeSelection": {
             "description": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
