@@ -27,7 +27,7 @@ import (
 	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
-func NodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
+func nodeMatches(node *v1.Node, nodeNameToMatch string, allNodesMatch bool, nodeSelector *v1.NodeSelector) (bool, error) {
 	switch {
 	case nodeNameToMatch != "":
 		return node != nil && node.Name == nodeNameToMatch, nil
@@ -55,12 +55,12 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 
 	for _, slice := range slices {
 		if !features.PartitionableDevices && (len(slice.Spec.SharedCounters) > 0 || slice.Spec.PerDeviceNodeSelection != nil) {
-			return nil, fmt.Errorf("DRAPartitionableDevices disabled with SharedCounters or PerDeviceNodeSelection set in ResourceSlice")
+			continue
 		}
 
 		switch {
 		case slice.Spec.NodeName != "" || slice.Spec.AllNodes || slice.Spec.NodeSelector != nil:
-			match, err := NodeMatches(node, slice.Spec.NodeName, slice.Spec.AllNodes, slice.Spec.NodeSelector)
+			match, err := nodeMatches(node, slice.Spec.NodeName, slice.Spec.AllNodes, slice.Spec.NodeSelector)
 			if err != nil {
 				return nil, fmt.Errorf("failed to perform node selection for slice %s: %w", slice.Name, err)
 			}
@@ -70,7 +70,6 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				}
 			}
 		case slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection:
-			matchFound := false
 			for _, device := range slice.Spec.Devices {
 				if device.Basic == nil {
 					continue
@@ -83,7 +82,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 				if device.Basic.AllNodes != nil {
 					allNodes = *device.Basic.AllNodes
 				}
-				match, err := NodeMatches(node, nodeName, allNodes, device.Basic.NodeSelector)
+				match, err := nodeMatches(node, nodeName, allNodes, device.Basic.NodeSelector)
 				if err != nil {
 					return nil, fmt.Errorf("failed to perform node selection for device %s in slice %s: %w",
 						device.String(), slice.Name, err)
@@ -92,12 +91,8 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 					if err := addSlice(pools, slice); err != nil {
 						return nil, fmt.Errorf("failed to add node slice %s: %w", slice.Name, err)
 					}
-					matchFound = true
 					break
 				}
-			}
-			if matchFound {
-				continue
 			}
 		default:
 			// Nothing known was set. This must be some future, unknown extension,

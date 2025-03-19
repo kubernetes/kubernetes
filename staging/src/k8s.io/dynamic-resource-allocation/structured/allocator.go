@@ -886,7 +886,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 		return false, nil
 	}
 
-	if slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection {
+	if slice.Spec.PerDeviceNodeSelection != nil && ptr.Deref(slice.Spec.PerDeviceNodeSelection, true) {
 		var nodeName string
 		var allNodes bool
 		if device.NodeName != nil {
@@ -895,7 +895,7 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 		if device.AllNodes != nil {
 			allNodes = *device.AllNodes
 		}
-		matches, err := NodeMatches(alloc.node, nodeName, allNodes, device.NodeSelector)
+		matches, err := nodeMatches(alloc.node, nodeName, allNodes, device.NodeSelector)
 		if err != nil {
 			return false, err
 		}
@@ -967,7 +967,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// the API validation logic has in place to check the ConsumesCounter referred should exist inside SharedCounters
+	// The API validation logic has checked the ConsumesCounter referred should exist inside SharedCounters.
 	if alloc.features.PartitionableDevices && len(device.slice.Spec.SharedCounters) > 0 && len(device.basic.ConsumesCounter) > 0 {
 		// If a device consumes capacity from a capacity pool, verify that
 		// there is sufficient capacity available.
@@ -1058,7 +1058,7 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 			// the API validation logic has been added to make sure the counterSet referred should exist in capacityPools
 			continue
 		}
-		counterShared := make(map[string]draapi.Counter)
+		counterShared := make(map[string]draapi.Counter, len(counterSet.Counters))
 		for name, cap := range counterSet.Counters {
 			counterShared[name] = cap
 		}
@@ -1072,7 +1072,7 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 			Pool:   slice.Spec.Pool.Name,
 			Device: device.Name,
 		}
-		if !(alloc.allocatedDevices.Has(deviceID) || alloc.allocatingDevices[deviceID]) {
+		if !alloc.allocatedDevices.Has(deviceID) && !alloc.allocatingDevices[deviceID] {
 			continue
 		}
 		for _, consumedCounter := range device.Basic.ConsumesCounter {
@@ -1125,8 +1125,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 		slice := result[i].slice
 		var nodeName draapi.UniqueString
 		var nodeSelector *v1.NodeSelector
-		if slice.Spec.PerDeviceNodeSelection != nil && *slice.Spec.PerDeviceNodeSelection {
-			nodeName = draapi.NullUniqueString
+		if slice.Spec.PerDeviceNodeSelection != nil && ptr.Deref(slice.Spec.PerDeviceNodeSelection, true) {
 			if result[i].basic.NodeName != nil {
 				nodeName = draapi.MakeUniqueString(*result[i].basic.NodeName)
 			}

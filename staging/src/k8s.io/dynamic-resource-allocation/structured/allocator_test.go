@@ -2597,7 +2597,6 @@ func TestAllocator(t *testing.T) {
 			)),
 			node:          node(node1, region1),
 			expectResults: nil,
-			expectError:   gomega.MatchError(gomega.ContainSubstring("DRAPartitionableDevices disabled with SharedCounters or PerDeviceNodeSelection set in ResourceSlice")),
 		},
 		"partitionable-devices-per-device-node-selection-nodename": {
 			features: Features{
