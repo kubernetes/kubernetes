@@ -77,31 +77,6 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		}
 	}
 
-	// endpointSlicesHaveSameZoneHints returns a matcher function to be used with
-	// gomega.Eventually().Should(...). It checks that the passed EndpointSlices
-	// have zone-hints which match the endpoint's zone.
-	endpointSlicesHaveSameZoneHints := framework.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (func() string, error) {
-		if len(slices) == 0 {
-			return nil, fmt.Errorf("no endpointslices found")
-		}
-		for _, slice := range slices {
-			for _, endpoint := range slice.Endpoints {
-				var ip string
-				if len(endpoint.Addresses) > 0 {
-					ip = endpoint.Addresses[0]
-				}
-				var zone string
-				if endpoint.Zone != nil {
-					zone = *endpoint.Zone
-				}
-				if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
-					return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for zone %q\nEndpointSlices=\n%v", ip, zone, format.Object(slices, 1 /* indent one level */)), nil
-				}
-			}
-		}
-		return nil, nil
-	})
-
 	// requestsFromClient returns a helper function to be used with
 	// gomega.Eventually(...). It fetches the logs from the clientPod and returns
 	// them in reverse-chronological order.
@@ -161,7 +136,6 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 				servingPods = append(servingPods, pod)
 				zoneForServingPod[pod.Name] = zone
-				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), pod.GetName(), metav1.DeleteOptions{})
 			}
 			e2epod.NewPodClient(f).CreateBatch(ctx, servingPods)
 
@@ -181,23 +155,23 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 				},
 			})
 			ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
-			ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Services(f.Namespace.Name).Delete), svc.GetName(), metav1.DeleteOptions{})
 
-			ginkgo.By("ensuring EndpointSlice for service have correct same-zone hints")
-			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveSameZoneHints)
+			ginkgo.By("waiting for EndpointSlices to be created")
+			err = framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, len(servingPods), 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+			framework.ExpectNoError(err)
+			slices := endpointSlicesForService(svc.Name)
+			framework.Logf("got slices:\n%v", format.Object(slices, 1))
 
 			ginkgo.By("keeping traffic within the same zone as the client, when serving pods exist in the same zone")
 
 			createClientPod := func(ctx context.Context, zone string) *v1.Pod {
 				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "client-pod-in-"+zone, nil, nil, nil)
-				pod.Spec.NodeName = nodeForZone[zone]
 				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
 				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 				cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
 				pod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
 				pod.Spec.Containers[0].Name = pod.Name
 
-				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), pod.GetName(), metav1.DeleteOptions{})
 				return e2epod.NewPodClient(f).CreateSync(ctx, pod)
 			}
 
