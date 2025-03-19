@@ -71,7 +71,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 	if status, ok := err.(errors.APIStatus); !ok {
 		t.Fatalf("expected APIStatus error, but got: %#v", err)
 	} else if !errors.IsBadRequest(err) {
-		t.Fatalf("expected BadRequst error, but got: %v", errors.ReasonForError(err))
+		t.Fatalf("expected BadRequest error, but got: %v", errors.ReasonForError(err))
 	} else if !strings.Contains(status.Status().Message, "cannot be handled") {
 		t.Fatalf("expected 'cannot be handled' error message, got: %v", status.Status().Message)
 	}
