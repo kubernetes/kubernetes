@@ -31,7 +31,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	helpers "k8s.io/component-helpers/resource"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -170,7 +169,7 @@ func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 func MakePodWithResizableContainers(ns, name, timeStamp string, tcInfo []ResizableContainerInfo) *v1.Pod {
 	testInitContainers, testContainers := separateContainers(tcInfo)
 
-	minGracePeriodSeconds := kuberuntime.MinimumGracePeriodInSeconds
+	minGracePeriodSeconds := int64(0)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -433,6 +432,7 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 		containerRestartWaitPeriod = MinRestartWaitPeriod
 	}
 	time.Sleep(time.Duration(containerRestartWaitPeriod) * time.Second)
+
 	resizedPod, err := framework.GetObject(podClient.Get, pod.Name, metav1.GetOptions{})(ctx)
 	framework.ExpectNoError(err, "failed to get resized pod")
 	return resizedPod

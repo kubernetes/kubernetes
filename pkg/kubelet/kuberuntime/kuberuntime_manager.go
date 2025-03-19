@@ -77,7 +77,6 @@ const (
 	kubeRuntimeAPIVersion = "0.1.0"
 	// A minimal shutdown window for avoiding unnecessary SIGKILLs
 	minimumGracePeriodInSeconds = 2
-	MinimumGracePeriodInSeconds = int64(minimumGracePeriodInSeconds)
 
 	// The expiration time of version cache.
 	versionCacheTTL = 60 * time.Second

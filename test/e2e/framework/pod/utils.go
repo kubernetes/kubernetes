@@ -309,7 +309,6 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 	if oomScoreAdj != expectedOomScoreAdj {
 		return fmt.Errorf("oom_score_adj value %s not equal to expected %s", oomScoreAdj, expectedOomScoreAdj)
 	}
-	fmt.Printf("VDBG: POD: %s EXPECTED_OOM_ADJ %s ACTUAL_OOM_ADJ %s\n", pod.Name, expectedOomScoreAdj, oomScoreAdj)
 	return nil
 }
 
