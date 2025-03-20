@@ -94,6 +94,36 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		}
 	}
 
+	// getNodesForMultiNode returns a set of nodes for a test case with 3 zones with 2
+	// nodes each. If there are not suitable nodes/zones, the test is skipped.
+	getNodesForMultiNode := func(ctx context.Context) ([]*v1.Node, []*v1.Node, []*v1.Node) {
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodesForZone := make(map[string][]*v1.Node)
+		for _, node := range nodeList.Items {
+			zone := node.Labels[v1.LabelTopologyZone]
+			nodesForZone[zone] = append(nodesForZone[zone], &node)
+		}
+		if len(nodesForZone) < 3 {
+			e2eskipper.Skipf("need at least 3 zones, with at least 2 schedulable nodes each")
+		}
+
+		var multiNodeZones [][]*v1.Node
+		for _, nodes := range nodesForZone {
+			if len(nodes) > 1 {
+				multiNodeZones = append(multiNodeZones, nodes)
+			}
+			if len(multiNodeZones) == 3 {
+				break
+			}
+		}
+		if len(multiNodeZones) < 3 {
+			e2eskipper.Skipf("need at least 3 zones, with at least 2 schedulable nodes each")
+		}
+
+		return multiNodeZones[0], multiNodeZones[1], multiNodeZones[2]
+	}
+
 	// Data structures for tracking server and client pods
 	type serverPod struct {
 		node *v1.Node
@@ -147,6 +177,59 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		clientPods[0].endpoints = []*serverPod{serverPods[0]}
 		clientPods[1].endpoints = []*serverPod{serverPods[1]}
 		clientPods[2].endpoints = serverPods
+
+		return clientPods, serverPods
+	}
+
+	// allocateMultiNodeClientsAndServers figures out where to put clients and servers
+	// for a "same-zone" traffic distribution test with multiple nodes in each zone.
+	allocateMultiNodeClientsAndServers := func(ctx context.Context) ([]*clientPod, []*serverPod) {
+		ginkgo.By("finding a set of zones and nodes for the test")
+		zone1Nodes, zone2Nodes, zone3Nodes := getNodesForMultiNode(ctx)
+
+		var clientPods []*clientPod
+		var serverPods []*serverPod
+
+		// First zone: a client and an endpoint on each node, and both clients
+		// should talk to both endpoints.
+		endpointsForZone := []*serverPod{
+			{node: zone1Nodes[0]},
+			{node: zone1Nodes[1]},
+		}
+
+		clientPods = append(clientPods,
+			&clientPod{
+				node:      zone1Nodes[0],
+				endpoints: endpointsForZone,
+			},
+			&clientPod{
+				node:      zone1Nodes[1],
+				endpoints: endpointsForZone,
+			},
+		)
+		serverPods = append(serverPods, endpointsForZone...)
+
+		// Second zone: a client on one node and a server on the other.
+		endpointsForZone = []*serverPod{
+			{node: zone2Nodes[1]},
+		}
+
+		clientPods = append(clientPods,
+			&clientPod{
+				node:      zone2Nodes[0],
+				endpoints: endpointsForZone,
+			},
+		)
+		serverPods = append(serverPods, endpointsForZone...)
+
+		// Third zone: just a client, which should connect to the servers in the
+		// other two zones.
+		clientPods = append(clientPods,
+			&clientPod{
+				node:      zone3Nodes[0],
+				endpoints: serverPods,
+			},
+		)
 
 		return clientPods, serverPods
 	}
@@ -268,10 +351,25 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		checkTrafficDistribution(ctx, clientPods)
 	})
 
+	framework.It("should route traffic correctly between pods on multiple nodes when using PreferClose", func(ctx context.Context) {
+		clientPods, serverPods := allocateMultiNodeClientsAndServers(ctx)
+		svc := createService(ctx, v1.ServiceTrafficDistributionPreferClose)
+		createPods(ctx, svc, clientPods, serverPods)
+		checkTrafficDistribution(ctx, clientPods)
+	})
+
 	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
 		clientPods, serverPods := allocateClientsAndServers(ctx)
 		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 		createPods(ctx, svc, clientPods, serverPods)
 		checkTrafficDistribution(ctx, clientPods)
 	})
+
+	framework.It("should route traffic correctly between pods on multiple nodes when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		clientPods, serverPods := allocateMultiNodeClientsAndServers(ctx)
+		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+		createPods(ctx, svc, clientPods, serverPods)
+		checkTrafficDistribution(ctx, clientPods)
+	})
+
 })
