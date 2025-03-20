@@ -551,6 +551,209 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, false)
 }
 
+// Test transitions involving the `trafficDistribution` field with
+// PreferSameTrafficDistribution enabled.
+func Test_TransitionsForPreferSameTrafficDistribution(t *testing.T) {
+
+	////////////////////////////////////////////////////////////////////////////
+	// Setup components, like kube-apiserver and EndpointSlice controller.
+	////////////////////////////////////////////////////////////////////////////
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTrafficDistribution, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, true)
+
+	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := clientset.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	resyncPeriod := 12 * time.Hour
+	informers := informers.NewSharedInformerFactory(client, resyncPeriod)
+
+	ctx := ktesting.Init(t)
+	defer ctx.Cancel("test has completed")
+	epsController := endpointslice.NewController(
+		ctx,
+		informers.Core().V1().Pods(),
+		informers.Core().V1().Services(),
+		informers.Core().V1().Nodes(),
+		informers.Discovery().V1().EndpointSlices(),
+		int32(100),
+		client,
+		1*time.Second,
+	)
+
+	informers.Start(ctx.Done())
+	go epsController.Run(ctx, 1)
+
+	////////////////////////////////////////////////////////////////////////////
+	// Create a namespace, node, pod in the node, and a service exposing the pod.
+	////////////////////////////////////////////////////////////////////////////
+
+	ns := framework.CreateNamespaceOrDie(client, "test-service-traffic-distribution", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	node := &corev1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "fake-node",
+			Labels: map[string]string{
+				corev1.LabelTopologyZone: "fake-zone-1",
+			},
+		},
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pod",
+			Namespace: ns.GetName(),
+			Labels: map[string]string{
+				"foo": "bar",
+			},
+		},
+		Spec: corev1.PodSpec{
+			NodeName: node.GetName(),
+			Containers: []corev1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fake-image",
+					Ports: []corev1.ContainerPort{
+						{
+							Name:          "port-443",
+							ContainerPort: 443,
+						},
+					},
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			Conditions: []corev1.PodCondition{
+				{
+					Type:   corev1.PodReady,
+					Status: corev1.ConditionTrue,
+				},
+			},
+			PodIP: "10.0.0.1",
+			PodIPs: []corev1.PodIP{
+				{
+					IP: "10.0.0.1",
+				},
+			},
+		},
+	}
+
+	svc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-service",
+			Namespace: ns.GetName(),
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			Ports: []corev1.ServicePort{
+				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
+			},
+		},
+	}
+
+	_, err = client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test node: %v", err)
+	}
+	_, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test ready pod: %v", err)
+	}
+	_, err = client.CoreV1().Pods(ns.Name).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update status for test pod to Ready: %v", err)
+	}
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, svc, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test service: %v", err)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Assert that without the presence of `trafficDistribution` field there are
+	// no zone hints in EndpointSlice.
+	////////////////////////////////////////////////////////////////////////////
+
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, false)
+
+	////////////////////////////////////////////////////////////////////////////
+	// Update the service by setting `trafficDistribution: PreferSameZone`
+	//
+	// Assert that the respective EndpointSlices get the same-zone hints.
+	////////////////////////////////////////////////////////////////////////////
+
+	trafficDist := corev1.ServiceTrafficDistributionPreferSameZone
+	svc.Spec.TrafficDistribution = &trafficDist
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update test service with 'trafficDistribution: PreferSameZone': %v", err)
+	}
+
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), true, false)
+
+	////////////////////////////////////////////////////////////////////////////
+	// Change `trafficDistribution` to `PreferSameNode`.
+	//
+	// Assert that the respective EndpointSlices have both same-zone and
+	// same-node hints.
+	////////////////////////////////////////////////////////////////////////////
+
+	trafficDist = corev1.ServiceTrafficDistributionPreferSameNode
+	svc.Spec.TrafficDistribution = &trafficDist
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update test service with 'trafficDistribution: PreferSameNode': %v", err)
+	}
+
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), true, true)
+
+	////////////////////////////////////////////////////////////////////////////
+	// Remove the field `trafficDistribution` from the service.
+	//
+	// Assert that EndpointSlice for service again has no zone hints.
+	////////////////////////////////////////////////////////////////////////////
+
+	svc.Spec.TrafficDistribution = nil
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to remove annotation 'service.kubernetes.io/topology-mode=Auto' from service: %v", err)
+	}
+
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, false)
+
+	////////////////////////////////////////////////////////////////////////////
+	// Update the Node to no longer have a zone label, and re-enable
+	// `PreferSameNode`.
+	//
+	// Assert that the respective EndpointSlices have same-node hints but not
+	// same-zone.
+	////////////////////////////////////////////////////////////////////////////
+
+	delete(node.Labels, corev1.LabelTopologyZone)
+	_, err = client.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update test node with no zone label: %v", err)
+	}
+
+	trafficDist = corev1.ServiceTrafficDistributionPreferSameNode
+	svc.Spec.TrafficDistribution = &trafficDist
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to update test service with 'trafficDistribution: PreferSameNode': %v", err)
+	}
+
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, true)
+}
+
 func Test_TrafficDistribution_FeatureGateEnableDisable(t *testing.T) {
 
 	////////////////////////////////////////////////////////////////////////////
