@@ -17,11 +17,51 @@ limitations under the License.
 package delegator
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
+
+func ShouldDelegateListMeta(opts *metav1.ListOptions, cache Helper) (Result, error) {
+	return ShouldDelegateList(
+		storage.ListOptions{
+			ResourceVersionMatch: opts.ResourceVersionMatch,
+			ResourceVersion:      opts.ResourceVersion,
+			Predicate: storage.SelectionPredicate{
+				Continue: opts.Continue,
+				Limit:    opts.Limit,
+			},
+			Recursive: true,
+		}, cache)
+}
+
+func ShouldDelegateList(opts storage.ListOptions, cache Helper) (Result, error) {
+	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
+	switch opts.ResourceVersionMatch {
+	case metav1.ResourceVersionMatchExact:
+		return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
+	case metav1.ResourceVersionMatchNotOlderThan:
+		return Result{ShouldDelegate: false}, nil
+	case "":
+		// Continue
+		if len(opts.Predicate.Continue) > 0 {
+			return cache.ShouldDelegateContinue(opts.Predicate.Continue, opts.Recursive)
+		}
+		// Legacy exact match
+		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+			return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
+		}
+		// Consistent Read
+		if opts.ResourceVersion == "" {
+			return cache.ShouldDelegateConsistentRead()
+		}
+		return Result{ShouldDelegate: false}, nil
+	default:
+		return Result{ShouldDelegate: true}, nil
+	}
+}
 
 type Helper interface {
 	ShouldDelegateExactRV(rv string, recursive bool) (Result, error)

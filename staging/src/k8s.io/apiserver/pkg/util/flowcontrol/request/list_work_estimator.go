@@ -83,7 +83,7 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 		}
 	}
 	// TODO: Check whether watchcache is enabled.
-	result, err := shouldDelegateList(&listOptions, delegator.CacheWithoutSnapshots{})
+	result, err := delegator.ShouldDelegateListMeta(&listOptions, delegator.CacheWithoutSnapshots{})
 	if err != nil {
 		return WorkEstimate{InitialSeats: maxSeats}
 	}
@@ -160,34 +160,3 @@ func key(requestInfo *apirequest.RequestInfo) string {
 	}
 	return groupResource.String()
 }
-
-// NOTICE: Keep in sync with shouldDelegateList function in
-//
-//	staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func shouldDelegateList(opts *metav1.ListOptions, cache delegator.Helper) (delegator.Result, error) {
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	switch opts.ResourceVersionMatch {
-	case metav1.ResourceVersionMatchExact:
-		return cache.ShouldDelegateExactRV(opts.ResourceVersion, defaultRecursive)
-	case metav1.ResourceVersionMatchNotOlderThan:
-		return delegator.Result{ShouldDelegate: false}, nil
-	case "":
-		// Continue
-		if len(opts.Continue) > 0 {
-			return cache.ShouldDelegateContinue(opts.Continue, defaultRecursive)
-		}
-		// Legacy exact match
-		if opts.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return cache.ShouldDelegateExactRV(opts.ResourceVersion, defaultRecursive)
-		}
-		// Consistent Read
-		if opts.ResourceVersion == "" {
-			return cache.ShouldDelegateConsistentRead()
-		}
-		return delegator.Result{ShouldDelegate: false}, nil
-	default:
-		return delegator.Result{ShouldDelegate: true}, nil
-	}
-}
-
-var defaultRecursive = true

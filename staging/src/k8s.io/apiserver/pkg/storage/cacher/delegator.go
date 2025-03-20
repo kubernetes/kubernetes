@@ -180,7 +180,7 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	if err != nil {
 		return err
 	}
-	result, err := shouldDelegateList(opts, c.cacher)
+	result, err := delegator.ShouldDelegateList(opts, c.cacher)
 	if err != nil {
 		return err
 	}
@@ -247,35 +247,6 @@ func shouldDelegateListOnNotReadyCache(opts storage.ListOptions) bool {
 	noFieldSelector := pred.Field == nil || pred.Field.Empty()
 	hasLimit := pred.Limit > 0
 	return noLabelSelector && noFieldSelector && hasLimit
-}
-
-// NOTICE: Keep in sync with shouldDelegateList function in
-//
-//	staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
-func shouldDelegateList(opts storage.ListOptions, cache delegator.Helper) (delegator.Result, error) {
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	switch opts.ResourceVersionMatch {
-	case metav1.ResourceVersionMatchExact:
-		return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
-	case metav1.ResourceVersionMatchNotOlderThan:
-		return delegator.Result{ShouldDelegate: false}, nil
-	case "":
-		// Continue
-		if len(opts.Predicate.Continue) > 0 {
-			return cache.ShouldDelegateContinue(opts.Predicate.Continue, opts.Recursive)
-		}
-		// Legacy exact match
-		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return cache.ShouldDelegateExactRV(opts.ResourceVersion, opts.Recursive)
-		}
-		// Consistent Read
-		if opts.ResourceVersion == "" {
-			return cache.ShouldDelegateConsistentRead()
-		}
-		return delegator.Result{ShouldDelegate: false}, nil
-	default:
-		return delegator.Result{ShouldDelegate: true}, nil
-	}
 }
 
 func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, destination runtime.Object, ignoreNotFound bool, preconditions *storage.Preconditions, tryUpdate storage.UpdateFunc, cachedExistingObject runtime.Object) error {
