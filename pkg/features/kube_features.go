@@ -266,8 +266,8 @@ const (
 	// kep: http://kep.k8s.io/5007
 	// alpha: v1.33
 	//
-	// Enables support for the ResourceClaim.status.devices.FabricAttached field and for setting this
-	// status from DRA drivers.
+	// Enables support for delaying the binding of pods
+	// which depend on devices with binding conditions.
 	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
 
 	// owner: @lauralorenz
