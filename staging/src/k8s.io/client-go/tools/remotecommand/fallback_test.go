@@ -288,7 +288,7 @@ KR8NJEkK99Vh/tew6jAMll70xFrE7aF8VLXJVE7w4sQzuvHxl9Q=
 `)
 
 // See (https://github.com/kubernetes/kubernetes/issues/126134).
-func TestFallbackClient_WebSocketHTTPSProxyCausesSPDYFallback(t *testing.T) {
+func TestFallbackClient_WebSocketHTTPSProxyNoFallback(t *testing.T) {
 	cert, err := tls.X509KeyPair(localhostCert, localhostKey)
 	if err != nil {
 		t.Errorf("https (valid hostname): proxy_test: %v", err)
@@ -309,42 +309,40 @@ func TestFallbackClient_WebSocketHTTPSProxyCausesSPDYFallback(t *testing.T) {
 	proxyLocation, err := url.Parse(proxyServer.URL)
 	require.NoError(t, err)
 
-	// Create fake SPDY server. Copy received STDIN data back onto STDOUT stream.
-	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		var stdin, stdout bytes.Buffer
-		ctx, err := createHTTPStreams(w, req, &StreamOptions{
-			Stdin:  &stdin,
-			Stdout: &stdout,
-		})
+	// Create fake WebSocket server. Copy received STDIN data back onto STDOUT stream.
+	websocketServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conns, err := webSocketServerStreams(req, w, streamOptionsFromRequest(req))
 		if err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			return
 		}
-		defer ctx.conn.Close() //nolint:errcheck
-		_, err = io.Copy(ctx.stdoutStream, ctx.stdinStream)
+		defer conns.conn.Close() //nolint:errcheck
+		// Loopback the STDIN stream onto the STDOUT stream.
+		_, err = io.Copy(conns.stdoutStream, conns.stdinStream)
 		if err != nil {
-			t.Fatalf("error copying STDIN to STDOUT: %v", err)
+			t.Fatalf("websocket copy error: %v", err)
 		}
 	}))
-	defer spdyServer.Close() //nolint:errcheck
+	defer websocketServer.Close() //nolint:errcheck
 
-	backendLocation, err := url.Parse(spdyServer.URL)
+	// Now create the WebSocket client (executor), and point it to the TLS proxy server.
+	// The proxy server should open a websocket connection to the fake websocket server.
+	websocketServer.URL = websocketServer.URL + "?" + "stdin=true" + "&" + "stdout=true"
+	websocketLocation, err := url.Parse(websocketServer.URL)
 	require.NoError(t, err)
-
 	clientConfig := &rest.Config{
-		Host:            spdyServer.URL,
+		Host:            websocketLocation.Host,
 		TLSClientConfig: rest.TLSClientConfig{CAData: localhostCert},
 		Proxy: func(req *http.Request) (*url.URL, error) {
 			return proxyLocation, nil
 		},
 	}
-
-	// Websocket with https proxy will fail in dialing (falling back to SPDY).
-	websocketExecutor, err := NewWebSocketExecutor(clientConfig, "GET", backendLocation.String())
+	websocketExecutor, err := NewWebSocketExecutor(clientConfig, "GET", websocketServer.URL)
 	require.NoError(t, err)
-	spdyExecutor, err := NewSPDYExecutor(clientConfig, "POST", backendLocation)
+	emptyURL, _ := url.Parse("")
+	spdyExecutor, err := NewSPDYExecutor(clientConfig, "POST", emptyURL)
 	require.NoError(t, err)
-	// Fallback to spdyExecutor with websocket https proxy error; spdyExecutor succeeds against fake spdy server.
+	// No fallback to spdyExecutor with websocket.
 	sawHTTPSProxyError := false
 	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(err error) bool {
 		if httpstream.IsUpgradeFailure(err) {
@@ -396,9 +394,9 @@ func TestFallbackClient_WebSocketHTTPSProxyCausesSPDYFallback(t *testing.T) {
 		t.Errorf("unexpected data received: %d sent: %d", len(data), len(randomData))
 	}
 
-	// Ensure the https proxy error was observed
-	if !sawHTTPSProxyError {
-		t.Errorf("expected to see https proxy error")
+	// Ensure the https proxy error was *not* observed
+	if sawHTTPSProxyError {
+		t.Errorf("expected to *not* see https proxy error")
 	}
 	// Ensure the proxy was called once
 	if e, a := int64(1), proxyCalled.Load(); e != a {
