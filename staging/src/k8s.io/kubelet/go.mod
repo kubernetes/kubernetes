@@ -9,6 +9,7 @@ godebug default=go1.24
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
 	github.com/gogo/protobuf v1.3.2
+	github.com/google/cadvisor v0.52.1
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/grpc v1.68.1
 	k8s.io/api v0.0.0
