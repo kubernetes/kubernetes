@@ -27,6 +27,7 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 			"[Feature:PodLogsQuerySplitStreams]",
 			"[Feature:PodLifecycleSleepActionAllowZero]",
 			"[Feature:volumegroupsnapshot]",
+			"[Feature:OrderedNamespaceDeletion]", // disabled Beta
 		},
 		// tests for features that are not implemented in openshift
 		"Unimplemented": {

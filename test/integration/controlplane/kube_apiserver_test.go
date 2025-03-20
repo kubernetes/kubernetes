@@ -28,6 +28,9 @@ import (
 	"time"
 
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/zpages/features"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
@@ -124,6 +127,47 @@ func TestLivezAndReadyz(t *testing.T) {
 	}
 	if statusOK, err := endpointReturnsStatusOK(client, "/readyz"); err != nil || !statusOK {
 		t.Fatalf("readyz should be healthy, got %v and error %v", statusOK, err)
+	}
+}
+
+func TestFlagz(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ComponentFlagz, true)
+	testServerFlags := append(framework.DefaultTestServerFlags(), "--emulated-version=1.32")
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, testServerFlags, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	client, err := kubernetes.NewForConfig(server.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	res := client.CoreV1().RESTClient().Get().RequestURI("/flagz").Do(context.TODO())
+	var status int
+	res.StatusCode(&status)
+	if status != http.StatusOK {
+		t.Fatalf("flagz/ should be healthy, got %v", status)
+	}
+
+	expectedHeader := `
+kube-apiserver flags
+Warning: This endpoint is not meant to be machine parseable, has no formatting compatibility guarantees and is for debugging purposes only.`
+
+	raw, err := res.Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(raw, []byte(expectedHeader)) {
+		t.Fatalf("Header mismatch!\nExpected:\n%s\n\nGot:\n%s", expectedHeader, string(raw))
+	}
+	found := false
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.Contains(line, "emulated-version") && strings.Contains(line, "1.32") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("Expected flag --emulated-version=[1.32] to be reflected in /flagz output, got:\n%s", string(raw))
 	}
 }
 
