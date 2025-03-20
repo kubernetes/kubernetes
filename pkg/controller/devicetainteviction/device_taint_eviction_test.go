@@ -1343,18 +1343,18 @@ func TestEviction(t *testing.T) {
 			}()
 
 			// Eventually the controller should have synced it's informers.
-			require.Eventually(tCtx, func() bool {
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
 				return controller.hasSynced.Load() > 0
-			}, 30*time.Second, time.Millisecond, "controller synced")
+			}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("controller synced"))
 			if tt.afterSync != nil {
 				tt.afterSync(tCtx)
 			}
 
 			// Eventually the pod gets deleted (= evicted).
-			assert.Eventually(tCtx, func() bool {
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
 				_, err := fakeClientset.CoreV1().Pods(pod.Namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
 				return apierrors.IsNotFound(err)
-			}, 30*time.Second, time.Millisecond, "pod evicted")
+			}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod evicted"))
 
 			pod := pod.DeepCopy()
 			pod.Status.Conditions = []v1.PodCondition{{
@@ -1369,7 +1369,10 @@ func TestEviction(t *testing.T) {
 
 			// Shortly after deletion we should also see updated metrics.
 			// This is the last thing the controller does for a pod.
+			// However, actually creating the event on the server is asynchronous,
+			// so we also have to wait for that.
 			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+				gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
 				return testPodDeletionsMetrics(controller, 1)
 			}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
 
@@ -1547,11 +1550,11 @@ func TestParallelPodDeletion(t *testing.T) {
 	}()
 
 	// Eventually the pod gets deleted, in this test by us.
-	assert.Eventually(tCtx, func() bool {
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return podGets >= 1
-	}, 30*time.Second, time.Millisecond, "pod eviction started")
+	}).WithTimeout(30 * time.Second).Should(gomega.BeTrueBecause("pod eviction started"))
 
 	// We don't want any events.
 	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
@@ -1625,8 +1628,9 @@ func TestRetry(t *testing.T) {
 		assert.NoError(tCtx, controller.Run(tCtx), "eviction controller failed")
 	}()
 
-	// Eventually the pod gets deleted.
+	// Eventually the pod gets deleted and the event is recorded.
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
+		gomega.NewWithT(tCtx).Expect(listEvents(tCtx)).Should(matchDeletionEvent())
 		return testPodDeletionsMetrics(controller, 1)
 	}).WithTimeout(30*time.Second).Should(gomega.Succeed(), "pod eviction done")
 
@@ -1698,11 +1702,11 @@ func TestEvictionFailure(t *testing.T) {
 	}()
 
 	// Eventually deletion is attempted a few times.
-	assert.Eventually(tCtx, func() bool {
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int {
 		mutex.Lock()
 		defer mutex.Unlock()
-		return podDeletions >= retries
-	}, 30*time.Second, time.Millisecond, "pod eviction failed")
+		return podDeletions
+	}).WithTimeout(30*time.Second).Should(gomega.BeNumerically(">=", retries), "pod eviction failed")
 
 	// Now we can check the API calls.
 	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
