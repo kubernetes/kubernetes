@@ -236,6 +236,9 @@ func addCRIPodMemoryStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandb
 	}
 }
 
+func addCRIPodIOStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
+}
+
 func addCRIPodProcessStats(ps *statsapi.PodStats, criPodStat *runtimeapi.PodSandboxStats) {
 	if criPodStat == nil || criPodStat.Windows == nil || criPodStat.Windows.Process == nil {
 		return
