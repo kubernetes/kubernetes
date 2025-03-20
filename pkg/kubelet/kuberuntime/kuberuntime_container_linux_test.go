@@ -1691,7 +1691,7 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 	assert.Len(t, fakeContainers, 1)
 
 	ctx := context.Background()
-	_, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace)
+	_, _, err := m.getPodContainerStatuses(ctx, pod.UID, pod.Name, pod.Namespace, "")
 	require.NoError(t, err)
 
 	resourceConfig := &cm.ResourceConfig{}
