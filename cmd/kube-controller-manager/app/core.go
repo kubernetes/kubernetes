@@ -254,7 +254,11 @@ func startDeviceTaintEvictionController(ctx context.Context, controllerContext C
 		controllerContext.InformerFactory.Resource().V1beta1().DeviceClasses(),
 		controllerName,
 	)
-	go deviceTaintEvictionController.Run(ctx)
+	go func() {
+		if err := deviceTaintEvictionController.Run(ctx); err != nil {
+			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
+		}
+	}()
 	return nil, true, nil
 }
 

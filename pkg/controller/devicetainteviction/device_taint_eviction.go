@@ -18,6 +18,7 @@ package devicetainteviction
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"slices"
@@ -319,7 +320,8 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 }
 
 // Run starts the controller which will run until the context is done.
-func (tc *Controller) Run(ctx context.Context) {
+// An error is returned for startup problems.
+func (tc *Controller) Run(ctx context.Context) error {
 	defer utilruntime.HandleCrash()
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "controller", tc.name)
@@ -370,7 +372,7 @@ func (tc *Controller) Run(ctx context.Context) {
 	// mutex serializes event processing.
 	var mutex sync.Mutex
 
-	claimHandler, _ := tc.claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	claimHandler, err := tc.claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			claim, ok := obj.(*resourceapi.ResourceClaim)
 			if !ok {
@@ -409,12 +411,15 @@ func (tc *Controller) Run(ctx context.Context) {
 			tc.handleClaimChange(claim, nil)
 		},
 	})
+	if err != nil {
+		return fmt.Errorf("adding claim event handler:%w", err)
+	}
 	defer func() {
 		_ = tc.claimInformer.Informer().RemoveEventHandler(claimHandler)
 	}()
 	tc.haveSynced = append(tc.haveSynced, claimHandler.HasSynced)
 
-	podHandler, _ := tc.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+	podHandler, err := tc.podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -453,6 +458,9 @@ func (tc *Controller) Run(ctx context.Context) {
 			tc.handlePodChange(pod, nil)
 		},
 	})
+	if err != nil {
+		return fmt.Errorf("adding pod event handler: %w", err)
+	}
 	defer func() {
 		_ = tc.podInformer.Informer().RemoveEventHandler(podHandler)
 	}()
@@ -467,8 +475,7 @@ func (tc *Controller) Run(ctx context.Context) {
 	}
 	sliceTracker, err := resourceslicetracker.StartTracker(ctx, opts)
 	if err != nil {
-		logger.Info("Failed to initialize ResourceSlice tracker; device taint processing leading to Pod eviction is now paused", "err", err)
-		return
+		return fmt.Errorf("initialize ResourceSlice tracker: %w", err)
 	}
 	tc.haveSynced = append(tc.haveSynced, sliceTracker.HasSynced)
 	defer sliceTracker.Stop()
@@ -478,11 +485,11 @@ func (tc *Controller) Run(ctx context.Context) {
 	// work which might be done as events get emitted for intermediate
 	// state.
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, tc.haveSynced...) {
-		return
+		return errors.New("wait for cache sync timed out")
 	}
 	logger.V(1).Info("Underlying informers have synced")
 
-	_, _ = sliceTracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err = sliceTracker.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
@@ -519,12 +526,16 @@ func (tc *Controller) Run(ctx context.Context) {
 			tc.handleSliceChange(slice, nil)
 		},
 	})
+	if err != nil {
+		return fmt.Errorf("add slice event handler: %w", err)
+	}
 
 	// sliceTracker.AddEventHandler blocked while delivering events for all known
 	// ResourceSlices. Therefore our own state is up-to-date once we get here.
 	tc.hasSynced.Store(1)
 
 	<-ctx.Done()
+	return nil
 }
 
 func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.ResourceClaim) {
