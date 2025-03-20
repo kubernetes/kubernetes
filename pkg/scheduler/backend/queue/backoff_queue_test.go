@@ -78,7 +78,7 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 	}
 }
 
-func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
+func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	podInfos := map[string]*framework.QueuedPodInfo{
 		"pod0": {
@@ -156,10 +156,11 @@ func TestBackoffQueue_popEachBackoffCompleted(t *testing.T) {
 				for _, podName := range tt.podsInBackoff {
 					bq.add(logger, podInfos[podName], framework.EventUnscheduledPodAdd.Label())
 				}
+				gotPodInfos := bq.popAllBackoffCompleted(logger)
 				var gotPods []string
-				bq.popEachBackoffCompleted(logger, func(pInfo *framework.QueuedPodInfo) {
+				for _, pInfo := range gotPodInfos {
 					gotPods = append(gotPods, pInfo.Pod.Name)
-				})
+				}
 				if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
 					t.Errorf("Unexpected pods moved (-want, +got):\n%s", diff)
 				}
@@ -248,10 +249,11 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			for _, podInfo := range podInfos {
 				bq.add(logger, podInfo, framework.EventUnscheduledPodAdd.Label())
 			}
+			gotPodInfos := bq.popAllBackoffCompleted(logger)
 			var gotPods []string
-			bq.popEachBackoffCompleted(logger, func(pInfo *framework.QueuedPodInfo) {
+			for _, pInfo := range gotPodInfos {
 				gotPods = append(gotPods, pInfo.Pod.Name)
-			})
+			}
 			if diff := cmp.Diff(tt.wantPods, gotPods); diff != "" {
 				t.Errorf("Unexpected pods moved (-want, +got):\n%s", diff)
 			}

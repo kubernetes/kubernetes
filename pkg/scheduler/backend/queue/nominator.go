@@ -35,10 +35,10 @@ import (
 type nominator struct {
 	// nLock synchronizes all operations related to nominator.
 	// It should not be used anywhere else.
-	// Caution: DO NOT take ("SchedulingQueue.lock" or "activeQueue.lock") after taking "nLock".
-	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" first,
+	// Caution: DO NOT take ("SchedulingQueue.lock" or "activeQueue.lock" or "backoffQueue.lock") after taking "nLock".
+	// You should always take "SchedulingQueue.lock" and "activeQueue.lock" and "backoffQueue.lock" first,
 	// otherwise the nominator could end up in deadlock.
-	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock > nLock.
+	// Correct locking order is: SchedulingQueue.lock > activeQueue.lock = backoffQueue.lock > nLock.
 	nLock sync.RWMutex
 
 	// podLister is used to verify if the given pod is alive.

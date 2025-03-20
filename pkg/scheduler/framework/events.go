@@ -31,6 +31,8 @@ const (
 	ScheduleAttemptFailure = "ScheduleAttemptFailure"
 	// BackoffComplete is the event when a pod finishes backoff.
 	BackoffComplete = "BackoffComplete"
+	// PopFromBackoffQ is the event when a pod is popped from backoffQ when activeQ is empty.
+	PopFromBackoffQ = "PopFromBackoffQ"
 	// ForceActivate is the event when a pod is moved from unschedulablePods/backoffQ
 	// to activeQ. Usually it's triggered by plugin implementations.
 	ForceActivate = "ForceActivate"
