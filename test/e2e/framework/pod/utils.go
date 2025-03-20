@@ -256,7 +256,7 @@ func FindPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditi
 	return nil
 }
 
-// FindContainerByName finds the v1.Container in a pod by its name in the provided pod
+// FindContainerInPod finds the container in a pod by its name
 func FindContainerInPod(pod *v1.Pod, containerName string) *v1.Container {
 	for _, container := range pod.Spec.InitContainers {
 		if container.Name == containerName {
