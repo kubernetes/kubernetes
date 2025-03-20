@@ -714,7 +714,7 @@ var _ = SIGDescribe("Security Context", func() {
 		})
 	})
 
-	f.Context("SupplementalGroupsPolicy [LinuxOnly]", feature.SupplementalGroupsPolicy, framework.WithFeatureGate(features.SupplementalGroupsPolicy), func() {
+	f.Context("SupplementalGroupsPolicy [LinuxOnly]", framework.WithFeatureGate(features.SupplementalGroupsPolicy), func() {
 		timeout := 1 * time.Minute
 
 		agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
