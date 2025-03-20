@@ -98,9 +98,9 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		updateFunc   func(s *Scheduler)
-		wantInActive sets.Set[string]
+		name                  string
+		updateFunc            func(s *Scheduler)
+		wantInActiveOrBackoff sets.Set[string]
 	}{
 		{
 			name: "Update of a nominated node name to a different value should trigger rescheduling of lower priority pods",
@@ -110,7 +110,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActive: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a nominated node name should trigger rescheduling of lower priority pods",
@@ -120,14 +120,14 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(medNominatedPriorityPod, updatedPod)
 			},
-			wantInActive: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name, medNominatedPriorityPod.Name),
 		},
 		{
 			name: "Removal of a pod that had nominated node name should trigger rescheduling of lower priority pods",
 			updateFunc: func(s *Scheduler) {
 				s.deletePodFromSchedulingQueue(medNominatedPriorityPod)
 			},
-			wantInActive: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
+			wantInActiveOrBackoff: sets.New(lowPriorityPod.Name, medPriorityPod.Name),
 		},
 		{
 			name: "Addition of a nominated node name to the high priority pod that did not have it before shouldn't trigger rescheduling",
@@ -137,7 +137,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 				updatedPod.ResourceVersion = "1"
 				s.updatePodInSchedulingQueue(highPriorityPod, updatedPod)
 			},
-			wantInActive: sets.New[string](),
+			wantInActiveOrBackoff: sets.New[string](),
 		},
 	}
 
@@ -190,12 +190,15 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 					t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
 				}
 				tt.updateFunc(s)
-				if len(s.SchedulingQueue.PodsInActiveQ()) != len(tt.wantInActive) {
-					t.Errorf("Different number of pods were expected to be in the activeQ, but found actual %v vs. expected %v", s.SchedulingQueue.PodsInActiveQ(), tt.wantInActive)
+
+				podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
+				podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
+				if len(podsInActiveOrBackoff) != len(tt.wantInActiveOrBackoff) {
+					t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, tt.wantInActiveOrBackoff)
 				}
-				for _, pod := range s.SchedulingQueue.PodsInActiveQ() {
-					if !tt.wantInActive.Has(pod.Name) {
-						t.Errorf("Found unexpected pod in activeQ: %s", pod.Name)
+				for _, pod := range podsInActiveOrBackoff {
+					if !tt.wantInActiveOrBackoff.Has(pod.Name) {
+						t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
 					}
 				}
 			})

@@ -118,7 +118,7 @@ func (sched *Scheduler) applyDefaultHandlers() {
 }
 
 type schedulerOptions struct {
-	clock                  clock.Clock
+	clock                  clock.WithTicker
 	componentConfigVersion string
 	kubeConfig             *restclient.Config
 	// Overridden by profile level percentageOfNodesToScore if set in v1.
@@ -231,7 +231,7 @@ func WithExtenders(e ...schedulerapi.Extender) Option {
 }
 
 // WithClock sets clock for PriorityQueue, the default clock is clock.RealClock.
-func WithClock(clock clock.Clock) Option {
+func WithClock(clock clock.WithTicker) Option {
 	return func(o *schedulerOptions) {
 		o.clock = clock
 	}
