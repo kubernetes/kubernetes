@@ -460,7 +460,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	logsBuffer.Reset()
 
 	////////////////////////////////////////////////////////////////////////////
-	// Update the service by setting the `trafficDistribution: PreferLocal` field
+	// Update the service by setting the `trafficDistribution: PreferClose` field
 	//
 	// Assert that the respective EndpointSlices get the same-zone hints.
 	////////////////////////////////////////////////////////////////////////////
@@ -469,7 +469,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	svc.Spec.TrafficDistribution = &trafficDist
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
-		t.Fatalf("Failed to update test service with 'trafficDistribution: PreferLocal': %v", err)
+		t.Fatalf("Failed to update test service with 'trafficDistribution: PreferClose': %v", err)
 	}
 
 	endpointSlicesHaveSameZoneHints := func(ctx context.Context) (bool, error) {
@@ -536,7 +536,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// service.
 	//
 	// Assert that EndpointSlice for service again has the correct same-zone
-	// hints because of the `trafficDistribution: PreferLocal` field.
+	// hints because of the `trafficDistribution: PreferClose` field.
 	////////////////////////////////////////////////////////////////////////////
 	svc.Annotations = map[string]string{}
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
@@ -552,7 +552,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	logsBuffer.Reset()
 
 	////////////////////////////////////////////////////////////////////////////
-	// Remove the field `trafficDistribution: PreferLocal` from the service.
+	// Remove the field `trafficDistribution: PreferClose` from the service.
 	//
 	// Assert that EndpointSlice for service again has no zone hints.
 	////////////////////////////////////////////////////////////////////////////
@@ -588,7 +588,7 @@ func Test_TrafficDistribution_FeatureGateEnableDisable(t *testing.T) {
 	}
 
 	////////////////////////////////////////////////////////////////////////////
-	// Create a Service and set `trafficDistribution: PreferLocal` field.
+	// Create a Service and set `trafficDistribution: PreferClose` field.
 	//
 	// Assert that the field is present in the created Service.
 	////////////////////////////////////////////////////////////////////////////
