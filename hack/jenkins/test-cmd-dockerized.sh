@@ -20,10 +20,10 @@ set -o pipefail
 set -o xtrace
 
 # Runs test-cmd, intended to be run in prow.k8s.io
-set -x;
 
 # TODO: make test-cmd should handle this automatically
 source ./hack/install-etcd.sh
 
+set -x;
 make test-cmd
 

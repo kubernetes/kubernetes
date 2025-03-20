@@ -20,7 +20,6 @@ set -o pipefail
 set -o xtrace
 
 # Runs test-cmd and test-integration, intended to be run in prow.k8s.io
-set -x;
 
 # TODO: make test-integration should handle this automatically
 source ./hack/install-etcd.sh
@@ -32,5 +31,6 @@ export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
 export LOG_LEVEL=4
+set -x;
 make test-cmd
 make test-integration
