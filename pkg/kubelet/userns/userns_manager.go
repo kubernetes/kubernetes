@@ -154,6 +154,7 @@ func MakeUserNsManager(kl userNsPodsManager) (*UsernsManager, error) {
 	}
 	off := int(kubeletMappingID / userNsLength)
 	len := int(kubeletMappingLen / userNsLength)
+	klog.V(5).InfoS("User namespace manager mapping", "offset", off, "length", len, "idsPerPod", userNsLength)
 
 	m := UsernsManager{
 		used:         allocator.NewAllocationMap(len, "user namespaces"),
