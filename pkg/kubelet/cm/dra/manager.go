@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,6 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
@@ -73,6 +75,20 @@ type ManagerImpl struct {
 
 	// getNode is a function that returns the node object using the kubelet's node lister.
 	getNode GetNodeFunc
+
+	// healthInfoCache contains cached health info
+	healthInfoCache *healthInfoCache
+
+	// lastHealthUpdate is the last time the health info cache was updated.
+	lastHealthUpdate time.Time
+
+	// healthInfoMutex protects the healthInfoCache and lastHealthUpdate.
+	healthInfoMutex sync.Mutex
+
+	// drivers tracks known drivers.
+	drivers sets.Set[string]
+
+	driversMutex sync.Mutex
 }
 
 // NewManagerImpl creates a new manager.
@@ -82,16 +98,26 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 		return nil, fmt.Errorf("failed to create claimInfo cache: %w", err)
 	}
 
+	healthInfoCache, err := newHealthInfoCache(stateFileDirectory + "/" + "dra_health_state")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
+	}
+
 	// TODO: for now the reconcile period is not configurable.
 	// We should consider making it configurable in the future.
 	reconcilePeriod := defaultReconcilePeriod
 
 	manager := &ManagerImpl{
-		cache:           claimInfoCache,
-		kubeClient:      kubeClient,
-		reconcilePeriod: reconcilePeriod,
-		activePods:      nil,
-		sourcesReady:    nil,
+		cache:            claimInfoCache,
+		kubeClient:       kubeClient,
+		reconcilePeriod:  reconcilePeriod,
+		activePods:       nil,
+		sourcesReady:     nil,
+		healthInfoCache:  healthInfoCache,
+		lastHealthUpdate: time.Time{},
+		healthInfoMutex:  sync.Mutex{},
+		drivers:          sets.New[string](),
+		driversMutex:     sync.Mutex{},
 	}
 
 	return manager, nil
@@ -103,9 +129,31 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 
 // Start starts the reconcile loop of the manager.
 func (m *ManagerImpl) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+	logger := klog.FromContext(ctx)
 	m.activePods = activePods
 	m.getNode = getNode
 	m.sourcesReady = sourcesReady
+
+	logger.Info("Starting DRA manager")
+
+	// Start health monitoring for known drivers
+	m.driversMutex.Lock()
+	// Snapshot to avoid holding lock during monitoring
+	drivers := m.drivers.Clone()
+	m.driversMutex.Unlock()
+	for driverName := range drivers {
+		go func(name string) {
+			plugin, err := dra.NewDRAPluginClient(name)
+			if err != nil {
+				logger.Error(err, "Failed to get plugin client for health monitoring", "driverName", name)
+				return
+			}
+			if err := m.watchResources(ctx, name, plugin); err != nil {
+				logger.Error(err, "Health monitoring stopped", "driverName", name)
+			}
+		}(driverName)
+	}
+
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
 	return nil
 }
@@ -253,6 +301,9 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			}
 			for driverName := range claimInfo.DriverState {
 				batches[driverName] = append(batches[driverName], claim)
+				m.driversMutex.Lock()
+				m.drivers.Insert(driverName)
+				m.driversMutex.Unlock()
 			}
 
 			return nil
@@ -550,4 +601,54 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 		}
 	}
 	return claimInfos, nil
+}
+
+// watchResources starts a health monitoring stream for a DRA plugin.
+func (m *ManagerImpl) watchResources(ctx context.Context, resourceName string, p *dra.Plugin) error {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Starting to watch resources for plugin", "resourceName", resourceName)
+
+	stream, err := p.WatchResources(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to establish WatchResources stream", "resourceName", resourceName)
+		return err
+	}
+	return m.HandleWatchResourcesStream(ctx, stream, resourceName)
+}
+
+// HandleWatchResourcesStream processes health updates from the DRA plugin.
+func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.NodeHealth_WatchResourcesClient, resourceName string) error {
+	logger := klog.FromContext(ctx)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				logger.Info("Stopping health monitoring", "resourceName", resourceName)
+				return
+			default:
+				resp, err := stream.Recv()
+				if err != nil {
+					logger.Error(err, "Error receiving from WatchResources stream", "resourceName", resourceName)
+					return
+				}
+				// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+				devices := make([]state.DeviceHealth, len(resp.GetDevices()))
+				for i, d := range resp.GetDevices() {
+					devices[i] = state.DeviceHealth{
+						ResourceName: d.ResourceName,
+						PoolName:     d.PoolName,
+						DeviceName:   d.DeviceName,
+						Health:       state.DeviceHealthString(d.Health),
+						LastUpdated:  time.Unix(d.LastUpdated, 0),
+					}
+				}
+				if changed, err := m.healthInfoCache.updateHealthInfo(resourceName, devices); err != nil {
+					logger.Error(err, "Failed to update health info cache", "resourceName", resourceName)
+				} else if changed {
+					logger.V(5).Info("Health info cache updated", "resourceName", resourceName, "devices", devices)
+				}
+			}
+		}
+	}()
+	return nil
 }

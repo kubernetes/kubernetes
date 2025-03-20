@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -213,6 +214,11 @@ func (h *RegistrationHandler) validateSupportedServices(pluginName string, suppo
 	// plugins at that time didn't advertise gRPC services.
 	if chosenService == "" {
 		chosenService = drapbv1alpha4.NodeService
+	}
+
+	// Check for NodeHealth service (optional)
+	if slices.Contains(supportedServices, drahealthv1alpha1.NodeHealthService) {
+		klog.FromContext(h.backgroundCtx).V(4).Info("Plugin supports NodeHealth service", "pluginName", pluginName)
 	}
 
 	return chosenService, nil

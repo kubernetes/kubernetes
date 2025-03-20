@@ -28,6 +28,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -40,6 +41,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 )
@@ -142,6 +144,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 			return nil
 		}
 	}
+
 	ex := &ExamplePlugin{
 		stopCh:      ctx.Done(),
 		logger:      logger,
@@ -174,6 +177,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	nodeServers := []any{
 		drapb.DRAPluginServer(ex), // Casting is done only for clarity here, it's not needed.
 		drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: ex},
+		drahealthv1alpha1.NodeHealthServer(ex),
 	}
 	d, err := kubeletplugin.Start(ctx, nodeServers, opts...)
 	if err != nil {
@@ -585,4 +589,46 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 
 func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
 	return ex.kubeClient.ResourceV1beta1().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+}
+
+var _ drahealthv1alpha1.NodeHealthServer = &ExamplePlugin{}
+
+func (ex *ExamplePlugin) WatchResources(req *drahealthv1alpha1.WatchResourcesRequest, srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	logger := klog.FromContext(srv.Context())
+	logger.Info("Starting WatchResources stream")
+
+	// Mock device health data
+	mockDevices := []drahealthv1alpha1.DeviceHealth{
+		{
+			ResourceName: "test-driver/pool1/device1",
+			PoolName:     "pool1",
+			DeviceName:   "device1",
+			Health:       "Healthy",
+			LastUpdated:  time.Now().Unix(),
+		},
+	}
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-srv.Context().Done():
+			logger.Info("WatchResources stream canceled by kubelet")
+			return srv.Context().Err()
+		case <-ticker.C:
+			// Update timestamp and send health data
+			for i := range mockDevices {
+				mockDevices[i].LastUpdated = time.Now().Unix()
+			}
+			resp := &drahealthv1alpha1.WatchResourcesResponse{
+				Devices: mockDevices,
+			}
+			if err := srv.Send(resp); err != nil {
+				logger.Error(err, "Failed to send health update")
+				return err
+			}
+			logger.V(4).Info("Sent health update", "devices", mockDevices)
+		}
+	}
 }
