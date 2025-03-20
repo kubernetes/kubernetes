@@ -3659,6 +3659,15 @@ func TestRecordAdmissionRejection(t *testing.T) {
             `,
 		},
 		{
+			name:   "SupplementalGroupsPolicyNotSupported",
+			reason: lifecycle.SupplementalGroupsPolicyNotSupported,
+			wants: `
+                # HELP kubelet_admission_rejections_total [ALPHA] Cumulative number pod admission rejections by the Kubelet.
+                # TYPE kubelet_admission_rejections_total counter
+                kubelet_admission_rejections_total{reason="SupplementalGroupsPolicyNotSupported"} 1
+            `,
+		},
+		{
 			name:   "UnexpectedAdmissionError",
 			reason: lifecycle.UnexpectedAdmissionError,
 			wants: `

@@ -327,6 +327,18 @@ func SetContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStat
 	}
 }
 
+func SetInitContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStatus {
+	return func(podstatus *api.PodStatus) {
+		podstatus.InitContainerStatuses = containerStatuses
+	}
+}
+
+func SetEphemeralContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStatus {
+	return func(podstatus *api.PodStatus) {
+		podstatus.EphemeralContainerStatuses = containerStatuses
+	}
+}
+
 func MakeContainerStatus(name string, allocatedResources api.ResourceList) api.ContainerStatus {
 	cs := api.ContainerStatus{
 		Name:               name,

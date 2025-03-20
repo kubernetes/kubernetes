@@ -20,14 +20,19 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -40,6 +45,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
 )
 
 var (
@@ -705,6 +711,249 @@ var _ = SIGDescribe("Security Context", func() {
 			if err := createAndMatchOutput(ctx, podName, "Effective uid: 0", &apeTrue, nonRootTestUserID); err != nil {
 				framework.Failf("Match output for pod %q failed: %v", podName, err)
 			}
+		})
+	})
+
+	f.Context("SupplementalGroupsPolicy [LinuxOnly]", feature.SupplementalGroupsPolicy, framework.WithFeatureGate(features.SupplementalGroupsPolicy), func() {
+		timeout := 1 * time.Minute
+
+		agnhostImage := imageutils.GetE2EImage(imageutils.Agnhost)
+		uidInImage := int64(1000)
+		gidDefinedInImage := int64(50000)
+		supplementalGroup := int64(60000)
+
+		mkPod := func(policy *v1.SupplementalGroupsPolicy) *v1.Pod {
+			// In specified image(agnhost E2E image),
+			// - user-defined-in-image(uid=1000) is defined
+			// - user-defined-in-image belongs to group-defined-in-image(gid=50000)
+			// thus, resultant supplementary group of the container processes should be
+			// - 1000 : self
+			// - 50000: pre-defined groups defined in the container image(/etc/group) of self(uid=1000)
+			// - 60000: specified in SupplementalGroups
+			// $ id -G
+			// 1000 50000 60000 (if SupplementalGroupsPolicy=Merge or not set)
+			// 1000 60000       (if SupplementalGroupsPolicy=Strict)
+			podName := "sppl-grp-plcy-" + string(uuid.NewUUID())
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        podName,
+					Labels:      map[string]string{"name": podName},
+					Annotations: map[string]string{},
+				},
+				Spec: v1.PodSpec{
+					SecurityContext: &v1.PodSecurityContext{
+						RunAsUser:                &uidInImage,
+						SupplementalGroups:       []int64{supplementalGroup},
+						SupplementalGroupsPolicy: policy,
+					},
+					Containers: []v1.Container{
+						{
+							Name:    "test-container",
+							Image:   agnhostImage,
+							Command: []string{"sh", "-c", "id -G; while :; do sleep 1; done"},
+						},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+			}
+		}
+
+		nodeSupportsSupplementalGroupsPolicy := func(ctx context.Context, f *framework.Framework, nodeName string) bool {
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(node).NotTo(gomega.BeNil())
+			if node.Status.Features != nil {
+				supportsSupplementalGroupsPolicy := node.Status.Features.SupplementalGroupsPolicy
+				if supportsSupplementalGroupsPolicy != nil && *supportsSupplementalGroupsPolicy {
+					return true
+				}
+			}
+			return false
+		}
+		waitForContainerUser := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedContainerUser *v1.ContainerUser) error {
+			return framework.Gomega().Eventually(ctx,
+				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
+				WithTimeout(timeout).
+				Should(gcustom.MakeMatcher(func(p *v1.Pod) (bool, error) {
+					for _, s := range p.Status.ContainerStatuses {
+						if s.Name == containerName {
+							return reflect.DeepEqual(s.User, expectedContainerUser), nil
+						}
+					}
+					return false, nil
+				}))
+		}
+		waitForPodLogs := func(ctx context.Context, f *framework.Framework, podName string, containerName string, expectedLog string) error {
+			return framework.Gomega().Eventually(ctx,
+				framework.RetryNotFound(framework.GetObject(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get, podName, metav1.GetOptions{}))).
+				WithTimeout(timeout).
+				Should(gcustom.MakeMatcher(func(p *v1.Pod) (bool, error) {
+					podLogs, err := e2epod.GetPodLogs(ctx, f.ClientSet, p.Namespace, p.Name, containerName)
+					if err != nil {
+						return false, err
+					}
+					return podLogs == expectedLog, nil
+				}))
+		}
+		expectMergePolicyInEffect := func(ctx context.Context, f *framework.Framework, podName string, containerName string, featureSupportedOnNode bool) {
+			expectedOutput := fmt.Sprintf("%d %d %d", uidInImage, gidDefinedInImage, supplementalGroup)
+			expectedContainerUser := &v1.ContainerUser{
+				Linux: &v1.LinuxContainerUser{
+					UID:                uidInImage,
+					GID:                uidInImage,
+					SupplementalGroups: []int64{uidInImage, gidDefinedInImage, supplementalGroup},
+				},
+			}
+
+			if featureSupportedOnNode {
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+			}
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+
+			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
+			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
+		}
+		expectStrictPolicyInEffect := func(ctx context.Context, f *framework.Framework, podName string, containerName string, featureSupportedOnNode bool) {
+			expectedOutput := fmt.Sprintf("%d %d", uidInImage, supplementalGroup)
+			expectedContainerUser := &v1.ContainerUser{
+				Linux: &v1.LinuxContainerUser{
+					UID:                uidInImage,
+					GID:                uidInImage,
+					SupplementalGroups: []int64{uidInImage, supplementalGroup},
+				},
+			}
+
+			if featureSupportedOnNode {
+				framework.ExpectNoError(waitForContainerUser(ctx, f, podName, containerName, expectedContainerUser))
+			}
+			framework.ExpectNoError(waitForPodLogs(ctx, f, podName, containerName, expectedOutput+"\n"))
+
+			stdout := e2epod.ExecCommandInContainer(f, podName, containerName, "id", "-G")
+			gomega.Expect(stdout).To(gomega.Equal(expectedOutput))
+		}
+		expectRejectionEventIssued := func(ctx context.Context, f *framework.Framework, pod *v1.Pod) {
+			framework.ExpectNoError(
+				framework.Gomega().Eventually(ctx,
+					framework.HandleRetry(framework.ListObjects(
+						f.ClientSet.CoreV1().Events(pod.Namespace).List,
+						metav1.ListOptions{
+							FieldSelector: fields.Set{
+								"type":                      core.EventTypeWarning,
+								"reason":                    lifecycle.SupplementalGroupsPolicyNotSupported,
+								"involvedObject.kind":       "Pod",
+								"involvedObject.apiVersion": v1.SchemeGroupVersion.String(),
+								"involvedObject.name":       pod.Name,
+								"involvedObject.uid":        string(pod.UID),
+							}.AsSelector().String(),
+						},
+					))).
+					WithTimeout(timeout).
+					Should(gcustom.MakeMatcher(func(eventList *v1.EventList) (bool, error) {
+						return len(eventList.Items) == 1, nil
+					})),
+			)
+		}
+
+		ginkgo.When("SupplementalGroupsPolicy nil in SecurityContext", func() {
+			ginkgo.When("if the container's primary UID belongs to some groups in the image", func() {
+				var pod *v1.Pod
+				ginkgo.BeforeEach(func(ctx context.Context) {
+					ginkgo.By("creating a pod", func() {
+						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyMerge)))
+					})
+				})
+				ginkgo.When("scheduled node does not support SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does not support SupplementalGroupsPolicy
+						if nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, false)
+					})
+				})
+				ginkgo.When("scheduled node supports SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does support SupplementalGroupsPolicy
+						if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
+					})
+				})
+			})
+		})
+		ginkgo.When("SupplementalGroupsPolicy was set to Merge in PodSpec", func() {
+			ginkgo.When("the container's primary UID belongs to some groups in the image", func() {
+				var pod *v1.Pod
+				ginkgo.BeforeEach(func(ctx context.Context) {
+					ginkgo.By("creating a pod", func() {
+						pod = e2epod.NewPodClient(f).CreateSync(ctx, mkPod(nil))
+					})
+				})
+				ginkgo.When("scheduled node does not support SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does not support SupplementalGroupsPolicy
+						if nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, false)
+					})
+				})
+				ginkgo.When("scheduled node supports SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does support SupplementalGroupsPolicy
+						if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectMergePolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
+					})
+				})
+			})
+		})
+		ginkgo.When("SupplementalGroupsPolicy was set to Strict in PodSpec", func() {
+			ginkgo.When("the container's primary UID belongs to some groups in the image", func() {
+				var pod *v1.Pod
+				ginkgo.BeforeEach(func(ctx context.Context) {
+					ginkgo.By("creating a pod", func() {
+						pod = e2epod.NewPodClient(f).Create(ctx, mkPod(ptr.To(v1.SupplementalGroupsPolicyStrict)))
+						framework.ExpectNoError(e2epod.WaitForPodScheduled(ctx, f.ClientSet, pod.Namespace, pod.Name))
+						var err error
+						pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
+					})
+				})
+				ginkgo.When("scheduled node does not support SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does not support SupplementalGroupsPolicy
+						if nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does support SupplementalGroupsPolicy")
+						}
+					})
+					ginkgo.It("it should reject the pod [LinuxOnly]", func(ctx context.Context) {
+						expectRejectionEventIssued(ctx, f, pod)
+					})
+				})
+				ginkgo.When("scheduled node supports SupplementalGroupsPolicy", func() {
+					ginkgo.BeforeEach(func(ctx context.Context) {
+						// ensure the scheduled node does support SupplementalGroupsPolicy
+						if !nodeSupportsSupplementalGroupsPolicy(ctx, f, pod.Spec.NodeName) {
+							e2eskipper.Skipf("scheduled node does not support SupplementalGroupsPolicy")
+						}
+						framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
+					})
+					ginkgo.It("it should NOT add SupplementalGroups to them [LinuxOnly]", func(ctx context.Context) {
+						expectStrictPolicyInEffect(ctx, f, pod.Name, pod.Spec.Containers[0].Name, true)
+					})
+				})
+			})
 		})
 	})
 })
