@@ -3357,22 +3357,14 @@ func TestAllocator(t *testing.T) {
 			)},
 		},
 		"device-binding-conditions": {
-<<<<<<< HEAD
 			features: Features{
-				DeviceBinding: false,
+				DeviceBinding: true,
 			},
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
 			classes: objects(class(classA, driverA)),
 			slices:  objects(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
 			node:    node(node1, region1),
-=======
-			deviceBinding:    true,
-			claimsToAllocate: objects(claimWithRequests(claim0, nil, request(req0, classA, 1))),
-			classes:          objects(class(classA, driverA)),
-			slices:           objects(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
-			node:             node(node1, region1),
->>>>>>> ef540be65a0 (Update unit test)
 
 			expectResults: []any{
 				resourceapi.AllocationResult{
@@ -3387,7 +3379,7 @@ func TestAllocator(t *testing.T) {
 		},
 		"node-restriction": {
 			features: Features{
-				DeviceBinding: false,
+				DeviceBinding: true,
 			},
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),

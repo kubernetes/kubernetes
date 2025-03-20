@@ -1276,7 +1276,7 @@ func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
-func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodeName string) (*v1.NodeSelector, error) {
+func (alloc *allocator) createNodeSelector(result []internalDeviceResult, targetNodeName string) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
 	ns := &v1.NodeSelector{
@@ -1316,7 +1316,7 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult, nodeNa
 						MatchFields: []v1.NodeSelectorRequirement{{
 							Key:      "metadata.name",
 							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{nodeName},
+							Values:   []string{targetNodeName},
 						}},
 					}},
 				}, nil
