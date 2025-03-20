@@ -349,12 +349,12 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		framework.Logf("TEST2: Pod '%s' CPU requests '%dm'", testPod3.Name, testPod3.Spec.Containers[0].Resources.Requests.Cpu().MilliValue())
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, testPod3))
 
-		// Scheduler focssed pod resize E2E test case #3
+		// Scheduler focused pod resize E2E test case #3
 		//     1. With pod1 + pod2 + pod3 running on node above, attempt to scale up pod1 to requests more CPU than available, verify deferred.
 		//     2. Delete pod2 + pod3 to make room for pod3.
 		//     3. Verify that pod1 resize has completed.
 		//     4. Attempt to scale up pod1 to request more cpu than the node has, verify infeasible.
-		patchTestpod1ExceedNodeCapacity := fmt.Sprintf(`{
+		patchTestpod1ExceedNodeAvailable := fmt.Sprintf(`{
 			"spec": {
 				"containers": [
 					{
@@ -365,8 +365,8 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			}
 		}`, testPod1CPUQuantity.MilliValue(), testPod1CPUQuantity.MilliValue())
 
-		testPod1CPUQuantityResizedAgain := resource.NewMilliQuantity(nodeAvailableMilliCPU*2, resource.DecimalSI)
-		patchTestpod1AgainExceedNodeCapacity := fmt.Sprintf(`{
+		testPod1CPUExceedingAllocatable := resource.NewMilliQuantity(nodeAllocatableMilliCPU*2, resource.DecimalSI)
+		patchTestpod1ExceedNodeAllocatable := fmt.Sprintf(`{
 			"spec": {
 				"containers": [
 					{
@@ -375,11 +375,11 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 					}
 				]
 			}
-		}`, testPod1CPUQuantityResizedAgain.MilliValue(), testPod1CPUQuantityResizedAgain.MilliValue())
+		}`, testPod1CPUExceedingAllocatable.MilliValue(), testPod1CPUExceedingAllocatable.MilliValue())
 
-		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' exceed node capacity", testPod1.Name))
+		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' exceed node available capacity", testPod1.Name))
 		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
-			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ExceedNodeCapacity), metav1.PatchOptions{}, "resize")
+			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ExceedNodeAvailable), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
 		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(3))
 		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod1.Namespace, testPod1.Name, "display pod resize status as deferred", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
@@ -404,7 +404,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' to exceed the node capacity", testPod1.Name))
 		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
-			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1AgainExceedNodeCapacity), metav1.PatchOptions{}, "resize")
+			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ExceedNodeAllocatable), metav1.PatchOptions{}, "resize")
 		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
 		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(4))
 		framework.ExpectNoError(e2epod.WaitForPodCondition(ctx, f.ClientSet, testPod1.Namespace, testPod1.Name, "display pod resize status as infeasible", f.Timeouts.PodStart, func(pod *v1.Pod) (bool, error) {
