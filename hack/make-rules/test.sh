@@ -139,7 +139,8 @@ testargs=()
 eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # gotestsum --format value
-gotestsum_format=standard-quiet
+# "standard-quiet" let's some stderr log messages through, "pkgname-and-test-fails" is similar and doesn't (https://github.com/kubernetes/kubernetes/issues/130934#issuecomment-2739957840).
+gotestsum_format=pkgname-and-test-fails
 if [[ -n "${FULL_LOG:-}" ]] ; then
   gotestsum_format=standard-verbose
 fi
