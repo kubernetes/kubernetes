@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -2952,6 +2953,62 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 	return false, ""
 }
 
+// Get pod resize info in json format
+func getPodResizeInfo(podName string) (string, error) {
+	// Check podAllocs info
+	var jsonData []byte
+	var err error
+
+	podAlloc, exists := allocation.PodResizeReq[podName]
+	if !exists {
+		return "", fmt.Errorf("pod %s info nil", podName)
+	}
+
+	if len(podAlloc.InitContainers) > 0 && len(podAlloc.Containers) > 0 {
+		jsonData, err = json.Marshal(podAlloc)
+	} else if len(podAlloc.InitContainers) > 0 && len(podAlloc.Containers) == 0 {
+		// Defines a temporary structure that only contains the InitContainers word
+		type ContainerOnly struct {
+			InitContainers []allocation.ContainerAllocation `json:"InitContainers"`
+		}
+		// Defines a temporary structure，Assign the InitContainers in PodAllocation to it
+		initcontainerOnly := ContainerOnly{
+			InitContainers: podAlloc.InitContainers,
+		}
+		jsonData, err = json.Marshal(initcontainerOnly)
+
+	} else if len(podAlloc.InitContainers) == 0 && len(podAlloc.Containers) > 0 {
+		// Defines a temporary structure that only contains the Containers word
+		type ContainerOnly struct {
+			Containers []allocation.ContainerAllocation `json:"Containers"`
+		}
+		// Defines a temporary structure，Assign the Containers in PodAllocation to it
+		containerOnly := ContainerOnly{
+			Containers: podAlloc.Containers,
+		}
+		jsonData, err = json.Marshal(containerOnly)
+	}
+
+	if err != nil {
+		return "", fmt.Errorf("JSON error: %w", err)
+	}
+
+	finalMsg := fmt.Sprintf("Pod resize completed, %s", string(jsonData))
+
+	// Clear resize data after pod resize complete
+	delete(allocation.PodResizeReq, podName)
+	return finalMsg, nil
+}
+
+func checkIfPodResizeInProgressExists(resizeStatus []*v1.PodCondition) bool {
+	for _, cond := range resizeStatus {
+		if cond.Type == v1.PodConditionType("PodResizeInProgress") {
+			return true
+		}
+	}
+	return false
+}
+
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
@@ -2967,6 +3024,16 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
 		} else {
 			// (Allocated == Actual) => clear the resize in-progress status.
+			resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
+			ifPodResizeInProgress := checkIfPodResizeInProgressExists(resizeStatus)
+			// If pod resize completed, print ResizeCompleted event
+			if ifPodResizeInProgress {
+				msg, error := getPodResizeInfo(pod.ObjectMeta.Name)
+				if error == nil {
+					kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+				}
+			}
+
 			kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 		}
 	}()
