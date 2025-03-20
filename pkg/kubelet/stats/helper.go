@@ -24,8 +24,10 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 )
@@ -53,6 +55,9 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		}
 		if cstat.Cpu != nil {
 			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+				cpuStats.PSI = &cstat.Cpu.PSI
+			}
 		}
 	}
 	if info.Spec.HasMemory && cstat.Memory != nil {
@@ -70,6 +75,9 @@ func cadvisorInfoToCPUandMemoryStats(info *cadvisorapiv2.ContainerInfo) (*statsa
 		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
 			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
 			memoryStats.AvailableBytes = &availableBytes
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+			memoryStats.PSI = &cstat.Memory.PSI
 		}
 	} else {
 		memoryStats = &statsapi.MemoryStats{
@@ -96,6 +104,9 @@ func cadvisorInfoToContainerStats(name string, info *cadvisorapiv2.ContainerInfo
 	result.CPU = cpu
 	result.Memory = memory
 	result.Swap = cadvisorInfoToSwapStats(info)
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		result.IO = cadvisorInfoToIOStats(info)
+	}
 
 	// NOTE: if they can be found, log stats will be overwritten
 	// by the caller, as it knows more information about the pod,
@@ -305,6 +316,24 @@ func cadvisorInfoToSwapStats(info *cadvisorapiv2.ContainerInfo) *statsapi.SwapSt
 	}
 
 	return swapStats
+}
+
+func cadvisorInfoToIOStats(info *cadvisorapiv2.ContainerInfo) *statsapi.IOStats {
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return nil
+	}
+
+	var ioStats *statsapi.IOStats
+
+	if info.Spec.HasDiskIo && cstat.DiskIo != nil {
+		ioStats = &statsapi.IOStats{
+			Time: metav1.NewTime(cstat.Timestamp),
+			PSI:  &cstat.DiskIo.PSI,
+		}
+	}
+
+	return ioStats
 }
 
 // latestContainerStats returns the latest container stats from cadvisor, or nil if none exist
