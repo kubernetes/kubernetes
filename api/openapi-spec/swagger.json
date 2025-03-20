@@ -6526,6 +6526,16 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.ContainerLifecycleStatus": {
+      "description": "ContainerLifecycleStatus returns the effective stop signal used by the container runtime. If the user has not specified any stop signal, the container runtime will return the default signal from the image or the container runtime default signal in Status.",
+      "properties": {
+        "stopSignal": {
+          "description": "StopSignal defines the effective stop signal used by the container runtime. This can be the stop signal specified by the user or the signal specified in the container image or the default stop signal of the container runtime in that order.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.core.v1.ContainerPort": {
       "description": "ContainerPort represents a network port in a single container.",
       "properties": {
@@ -6695,6 +6705,10 @@
           "$ref": "#/definitions/io.k8s.api.core.v1.ContainerState",
           "description": "LastTerminationState holds the last termination state of the container to help debug container crashes and restarts. This field is not populated if the container is still running and RestartCount is 0."
         },
+        "lifecycle": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.ContainerLifecycleStatus",
+          "description": "Lifecycle reports the effective lifecycle configuration for this container"
+        },
         "name": {
           "description": "Name is a DNS_LABEL representing the unique name of the container. Each container in a pod must have a unique name across all container types. Cannot be updated.",
           "type": "string"
@@ -6719,6 +6733,10 @@
         "state": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ContainerState",
           "description": "State holds details about the container's current condition."
+        },
+        "stopSignal": {
+          "description": "StopSignal reports the effective stop signal for this container",
+          "type": "string"
         },
         "user": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ContainerUser",
@@ -7887,6 +7905,10 @@
         "preStop": {
           "$ref": "#/definitions/io.k8s.api.core.v1.LifecycleHandler",
           "description": "PreStop is called immediately before a container is terminated due to an API request or management event such as liveness/startup probe failure, preemption, resource contention, etc. The handler is not called if the container crashes or exits. The Pod's termination grace period countdown begins before the PreStop hook is executed. Regardless of the outcome of the handler, the container will eventually terminate within the Pod's termination grace period (unless delayed by finalizers). Other management of the container blocks until the hook completes or until the termination grace period is reached. More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks"
+        },
+        "stopSignal": {
+          "description": "StopSignal defines which signal will be sent to a container when it is being stopped. If not specified, the default is defined by the container runtime in use. StopSignal can only be set for Pods with a non-empty .spec.os.name",
+          "type": "string"
         }
       },
       "type": "object"

@@ -1103,6 +1103,11 @@ message ContainerStatus {
   // +listType=map
   // +listMapKey=name
   repeated ResourceStatus allocatedResourcesStatus = 14;
+
+  // StopSignal reports the effective stop signal for this container
+  // +featureGate=ContainerStopSignals
+  // +optional
+  optional string stopSignal = 15;
 }
 
 // ContainerUser represents user identity information
@@ -2208,6 +2213,12 @@ message Lifecycle {
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
   optional LifecycleHandler preStop = 2;
+
+  // StopSignal defines which signal will be sent to a container when it is being stopped.
+  // If not specified, the default is defined by the container runtime in use.
+  // StopSignal can only be set for Pods with a non-empty .spec.os.name
+  // +optional
+  optional string stopSignal = 3;
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle

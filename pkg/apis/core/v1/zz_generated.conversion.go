@@ -3415,6 +3415,7 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *corev1.Container
 	out.VolumeMounts = *(*[]core.VolumeMountStatus)(unsafe.Pointer(&in.VolumeMounts))
 	out.User = (*core.ContainerUser)(unsafe.Pointer(in.User))
 	out.AllocatedResourcesStatus = *(*[]core.ResourceStatus)(unsafe.Pointer(&in.AllocatedResourcesStatus))
+	out.StopSignal = (*core.Signal)(unsafe.Pointer(in.StopSignal))
 	return nil
 }
 
@@ -3442,6 +3443,7 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	out.VolumeMounts = *(*[]corev1.VolumeMountStatus)(unsafe.Pointer(&in.VolumeMounts))
 	out.User = (*corev1.ContainerUser)(unsafe.Pointer(in.User))
 	out.AllocatedResourcesStatus = *(*[]corev1.ResourceStatus)(unsafe.Pointer(&in.AllocatedResourcesStatus))
+	out.StopSignal = (*corev1.Signal)(unsafe.Pointer(in.StopSignal))
 	return nil
 }
 
@@ -4503,6 +4505,7 @@ func Convert_core_KeyToPath_To_v1_KeyToPath(in *core.KeyToPath, out *corev1.KeyT
 func autoConvert_v1_Lifecycle_To_core_Lifecycle(in *corev1.Lifecycle, out *core.Lifecycle, s conversion.Scope) error {
 	out.PostStart = (*core.LifecycleHandler)(unsafe.Pointer(in.PostStart))
 	out.PreStop = (*core.LifecycleHandler)(unsafe.Pointer(in.PreStop))
+	out.StopSignal = (*core.Signal)(unsafe.Pointer(in.StopSignal))
 	return nil
 }
 
@@ -4514,6 +4517,7 @@ func Convert_v1_Lifecycle_To_core_Lifecycle(in *corev1.Lifecycle, out *core.Life
 func autoConvert_core_Lifecycle_To_v1_Lifecycle(in *core.Lifecycle, out *corev1.Lifecycle, s conversion.Scope) error {
 	out.PostStart = (*corev1.LifecycleHandler)(unsafe.Pointer(in.PostStart))
 	out.PreStop = (*corev1.LifecycleHandler)(unsafe.Pointer(in.PreStop))
+	out.StopSignal = (*corev1.Signal)(unsafe.Pointer(in.StopSignal))
 	return nil
 }
 
