@@ -86,6 +86,13 @@ const (
 
 	// PodNodeNameKeyIndex is the name of the index used by PodInformer to index pods by their node name.
 	PodNodeNameKeyIndex = "spec.nodeName"
+
+	// OrphanPodIndexKey is used to index all Orphan pods to this key
+	OrphanPodIndexKey = "_ORPHAN_POD"
+
+	// podControllerUIDIndex is the name for the Pod store's index function,
+	// which is to index by pods's controllerUID.
+	PodControllerUIDIndex = "podControllerUID"
 )
 
 var UpdateTaintBackoff = wait.Backoff{
@@ -1072,6 +1079,30 @@ func AddPodNodeNameIndexer(podInformer cache.SharedIndexInformer) error {
 				return []string{}, nil
 			}
 			return []string{pod.Spec.NodeName}, nil
+		},
+	})
+}
+
+// AddPodControllerUIDIndexer adds an indexer for Pod's controllerRef.UID to the given PodInformer.
+// This indexer is used to efficiently look up pods by their ControllerRef.UID
+func AddPodControllerUIDIndexer(podInformer cache.SharedIndexInformer) error {
+	if _, exists := podInformer.GetIndexer().GetIndexers()[PodControllerUIDIndex]; exists {
+		// indexer already exists, do nothing
+		return nil
+	}
+	return podInformer.AddIndexers(cache.Indexers{
+		PodControllerUIDIndex: func(obj interface{}) ([]string, error) {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				return nil, nil
+			}
+			// Get the ControllerRef of the Pod to check if it's managed by a controller
+			if ref := metav1.GetControllerOf(pod); ref != nil {
+				return []string{string(ref.UID)}, nil
+			}
+			// If the Pod has no controller (i.e., it's orphaned), index it with the OrphanPodIndexKey
+			// This helps identify orphan pods for reconciliation and adoption by controllers
+			return []string{OrphanPodIndexKey}, nil
 		},
 	})
 }
