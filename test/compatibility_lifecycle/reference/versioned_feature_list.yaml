@@ -721,7 +721,7 @@
     version: "1.27"
 - name: KubeletPSI
   versionedSpecs:
-  - default: false
+  - default: true
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"

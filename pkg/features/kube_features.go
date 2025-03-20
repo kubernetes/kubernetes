@@ -1424,7 +1424,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	KubeletPSI: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Alpha},
 	},
 
 	KubeletRegistrationGetOnExistsOnly: {
