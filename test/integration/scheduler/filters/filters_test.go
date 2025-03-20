@@ -2627,3 +2627,102 @@ func TestPodAffinityMatchLabelKeyEnablement(t *testing.T) {
 	}
 
 }
+
+func TestNodeResourcesFilter(t *testing.T) {
+	pause := imageutils.GetPauseImageName()
+	tests := []struct {
+		name        string
+		node        *v1.Node
+		existingPod *v1.Pod
+		incomingPod *v1.Pod
+		fit         bool
+	}{
+		{
+			name: "pod does not fit due to insufficient node resources",
+			node: st.MakeNode().Name("insufficient-node").Capacity(
+				map[v1.ResourceName]string{
+					v1.ResourceCPU:    "3",
+					v1.ResourceMemory: "3G",
+				}).Obj(),
+			existingPod: st.MakePod().Name("insufficient-existing-pod").
+				Res(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "2",
+					v1.ResourceMemory: "2G",
+				}).Container(pause).
+				Obj(),
+			incomingPod: st.MakePod().Name("insufficient-incoming-pod").
+				Res(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "2",
+					v1.ResourceMemory: "2G",
+				}).Container(pause).
+				Obj(),
+			fit: false,
+		},
+		{
+			name: "pod fits with sufficient node resources",
+			node: st.MakeNode().Name("sufficient-node").Capacity(
+				map[v1.ResourceName]string{
+					v1.ResourceCPU:    "3",
+					v1.ResourceMemory: "3G",
+				}).Obj(),
+			existingPod: st.MakePod().Name("sufficient-existing-pod").
+				Res(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1",
+					v1.ResourceMemory: "1G",
+				}).Container(pause).
+				Obj(),
+			incomingPod: st.MakePod().Name("sufficient-incoming-pod").
+				Res(map[v1.ResourceName]string{
+					v1.ResourceCPU:    "1",
+					v1.ResourceMemory: "1G",
+				}).Container(pause).
+				Obj(),
+			fit: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testCtx := initTest(t, "node-resources-filter")
+			cs := testCtx.ClientSet
+			ns := testCtx.NS.Name
+
+			if _, err := createNode(cs, tt.node); err != nil {
+				t.Fatalf("Failed to create node: %v", err)
+			}
+
+			// set namespace to pods
+			tt.incomingPod.SetNamespace(ns)
+			allPods := []*v1.Pod{tt.incomingPod}
+			if tt.existingPod != nil {
+				tt.existingPod.SetNamespace(ns)
+				allPods = append(allPods, tt.existingPod)
+			}
+			defer testutils.CleanupPods(testCtx.Ctx, cs, t, allPods)
+
+			if tt.existingPod != nil {
+				if _, err := runPausePod(testCtx.ClientSet, tt.existingPod); err != nil {
+					t.Fatalf("Failed to create existing pod: %v", err)
+				}
+			}
+
+			testPod, err := cs.CoreV1().Pods(tt.incomingPod.Namespace).Create(testCtx.Ctx, tt.incomingPod, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create pod: %v", err)
+			}
+
+			if tt.fit {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podScheduled(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be scheduled but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			} else {
+				err = wait.PollUntilContextTimeout(testCtx.Ctx, pollInterval, wait.ForeverTestTimeout, false,
+					podUnschedulable(cs, testPod.Namespace, testPod.Name))
+				if err != nil {
+					t.Errorf("Test Failed: Expected pod %s/%s to be unschedulable but got error: %v", testPod.Namespace, testPod.Name, err)
+				}
+			}
+		})
+	}
+}
