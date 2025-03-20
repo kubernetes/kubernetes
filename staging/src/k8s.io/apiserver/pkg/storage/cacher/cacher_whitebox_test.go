@@ -48,6 +48,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
@@ -365,7 +366,7 @@ func TestShouldDelegateList(t *testing.T) {
 			if snapshotAvailable {
 				cacher.watchCache.snapshots.Add(uint64(mustAtoi(oldRV)), fakeOrderedLister{})
 			}
-			result, err := shouldDelegateList(toStorageOpts(opt), cacher)
+			result, err := delegator.ShouldDelegateList(toStorageOpts(opt), cacher)
 			if err != nil {
 				t.Fatal(err)
 			}
