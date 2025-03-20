@@ -22,7 +22,14 @@ limitations under the License.
 package v1beta2
 
 import (
+	context "context"
+
+	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	operation "k8s.io/apimachinery/pkg/api/operation"
+	safe "k8s.io/apimachinery/pkg/api/safe"
+	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -30,5 +37,35 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	scheme.AddValidationFunc((*appsv1beta2.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		return Validate_Scale(ctx, op, nil /* fldPath */, obj.(*appsv1beta2.Scale), safe.Cast[*appsv1beta2.Scale](oldObj))
+	})
 	return nil
+}
+
+func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta2.Scale) (errs field.ErrorList) {
+	// field appsv1beta2.Scale.TypeMeta has no validation
+	// field appsv1beta2.Scale.ObjectMeta has no validation
+
+	// field appsv1beta2.Scale.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *appsv1beta2.ScaleSpec) (errs field.ErrorList) {
+			errs = append(errs, Validate_ScaleSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *appsv1beta2.Scale) *appsv1beta2.ScaleSpec { return &oldObj.Spec }))...)
+
+	// field appsv1beta2.Scale.Status has no validation
+	return errs
+}
+
+func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *appsv1beta2.ScaleSpec) (errs field.ErrorList) {
+	// field appsv1beta2.ScaleSpec.Replicas
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
+			// optional value-type fields with zero-value defaults are purely documentation
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
+			return
+		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *appsv1beta2.ScaleSpec) *int32 { return &oldObj.Replicas }))...)
+
+	return errs
 }
