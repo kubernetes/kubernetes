@@ -53,7 +53,6 @@ const (
 //
 // Implementation is thread-safe.
 type ContainerLogManager interface {
-	// TODO(random-liu): Add RotateLogs function and call it under disk pressure.
 	// Start container log manager.
 	Start()
 	// Clean removes all logs of specified container.
@@ -73,7 +72,6 @@ type LogRotatePolicy struct {
 
 // GetAllLogs gets all inuse (rotated/compressed) logs for a specific container log.
 // Returned logs are sorted in oldest to newest order.
-// TODO(#59902): Leverage this function to support log rotation in `kubectl logs`.
 func GetAllLogs(log string) ([]string, error) {
 	// pattern is used to match all rotated files.
 	pattern := fmt.Sprintf("%s.*", log)
@@ -84,47 +82,6 @@ func GetAllLogs(log string) ([]string, error) {
 	inuse, _ := filterUnusedLogs(logs)
 	sort.Strings(inuse)
 	return append(inuse, log), nil
-}
-
-// compressReadCloser wraps gzip.Reader with a function to close file handler.
-type compressReadCloser struct {
-	f *os.File
-	*gzip.Reader
-}
-
-func (rc *compressReadCloser) Close() error {
-	ferr := rc.f.Close()
-	rerr := rc.Reader.Close()
-	if ferr != nil {
-		return ferr
-	}
-	if rerr != nil {
-		return rerr
-	}
-	return nil
-}
-
-// UncompressLog compresses a compressed log and return a readcloser for the
-// stream of the uncompressed content.
-// TODO(#59902): Leverage this function to support log rotation in `kubectl logs`.
-func UncompressLog(log string) (_ io.ReadCloser, retErr error) {
-	if !strings.HasSuffix(log, compressSuffix) {
-		return nil, fmt.Errorf("log is not compressed")
-	}
-	f, err := os.Open(log)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open log: %w", err)
-	}
-	defer func() {
-		if retErr != nil {
-			f.Close()
-		}
-	}()
-	r, err := gzip.NewReader(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	return &compressReadCloser{f: f, Reader: r}, nil
 }
 
 // parseMaxSize parses quantity string to int64 max size in bytes.
@@ -236,7 +193,6 @@ func (c *containerLogManager) rotateLogs(ctx context.Context) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	klog.V(4).InfoS("Starting container log rotation sequence")
-	// TODO(#59998): Use kubelet pod cache.
 	containers, err := c.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{})
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
