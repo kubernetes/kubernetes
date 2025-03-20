@@ -96,7 +96,7 @@ var map_HPAScalingRules = map[string]string{
 	"stabilizationWindowSeconds": "stabilizationWindowSeconds is the number of seconds for which past recommendations should be considered while scaling up or scaling down. StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour). If not set, use the default values: - For scale up: 0 (i.e. no stabilization is done). - For scale down: 300 (i.e. the stabilization window is 300 seconds long).",
 	"selectPolicy":               "selectPolicy is used to specify which policy should be used. If not set, the default value Max is used.",
 	"policies":                   "policies is a list of potential scaling polices which can be used during scaling. If not set, use the default values: - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window. - For scale down: allow all pods to be removed in a 15s window.",
-	"tolerance":                  "tolerance is the tolerance on the ratio between the current and desired metric value under which no updates are made to the desired number of replicas. If not set, the default cluster-wide tolerance is applied (by default 10%).\n\nThis is an alpha field and requires enabling the HPAConfigurableTolerance feature gate.",
+	"tolerance":                  "tolerance is the tolerance on the ratio between the current and desired metric value under which no updates are made to the desired number of replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not set, the default cluster-wide tolerance is applied (by default 10%).\n\nThis is an alpha field and requires enabling the HPAConfigurableTolerance feature gate.",
 }
 
 func (HPAScalingRules) SwaggerDoc() map[string]string {

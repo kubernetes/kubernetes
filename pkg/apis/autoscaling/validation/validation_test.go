@@ -28,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateScale(t *testing.T) {
@@ -1667,11 +1668,23 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.
 	successCases := []autoscaling.HPAScalingRules{
 		{
 			Policies:  policiesList,
-			Tolerance: resource.NewMilliQuantity(1, resource.DecimalSI),
+			Tolerance: ptr.To(resource.MustParse("0.1")),
 		},
 		{
 			Policies:  policiesList,
-			Tolerance: resource.NewMilliQuantity(0, resource.DecimalSI),
+			Tolerance: ptr.To(resource.MustParse("10")),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: ptr.To(resource.MustParse("0")),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: resource.NewMilliQuantity(100, resource.DecimalSI),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: resource.NewScaledQuantity(1, resource.Milli),
 		},
 		{
 			Policies: policiesList,
@@ -1694,6 +1707,13 @@ func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.
 		{
 			rule: autoscaling.HPAScalingRules{},
 			msg:  "at least one Policy",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{
+				Policies:  policiesList,
+				Tolerance: ptr.To(resource.MustParse("-0.001")),
+			},
+			msg: "greater or equal to zero",
 		},
 		{
 			rule: autoscaling.HPAScalingRules{

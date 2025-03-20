@@ -208,8 +208,8 @@ type HPAScalingRules struct {
 
 	// tolerance is the tolerance on the ratio between the current and desired
 	// metric value under which no updates are made to the desired number of
-	// replicas. If not set, the default cluster-wide tolerance is applied (by
-	// default 10%).
+	// replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+	// set, the default cluster-wide tolerance is applied (by default 10%).
 	//
 	// This is an alpha field and requires enabling the HPAConfigurableTolerance
 	// feature gate.
