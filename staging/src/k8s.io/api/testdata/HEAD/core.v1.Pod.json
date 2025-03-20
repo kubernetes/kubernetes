@@ -689,7 +689,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -985,7 +986,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1281,7 +1283,8 @@
             "sleep": {
               "seconds": 1
             }
-          }
+          },
+          "stopSignal": "stopSignalValue"
         },
         "terminationMessagePath": "terminationMessagePathValue",
         "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1843,7 +1846,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "containerStatuses": [
@@ -1935,7 +1939,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "qosClass": "qosClassValue",
@@ -2028,7 +2033,8 @@
               }
             ]
           }
-        ]
+        ],
+        "stopSignal": "stopSignalValue"
       }
     ],
     "resize": "resizeValue",
