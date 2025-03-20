@@ -224,7 +224,7 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		}
 	}
 
-	doSameZoneTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
+	doSimpleSameZoneTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
 		var clients []*client
 		var endpoints []*endpoint
 
@@ -267,11 +267,114 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		doTrafficDistributionTest(ctx, trafficDist, clients, endpoints)
 	}
 
+	doMultiNodeSameZoneTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
+		ginkgo.By("finding a set of zones and nodes for the test")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodesForZone := make(map[string][]*v1.Node)
+		for _, node := range nodeList.Items {
+			zone := node.Labels[v1.LabelTopologyZone]
+			nodesForZone[zone] = append(nodesForZone[zone], &node)
+		}
+		if len(nodesForZone) < 3 {
+			e2eskipper.Skipf("need at least 3 zones, at least 2 of which have at least 2 schedulable nodes")
+		}
+
+		var clients []*client
+		var endpoints []*endpoint
+
+		// First zone: find a zone with at least 2 nodes, then create a client and
+		// an endpoint on each of them, and expect both clients to talk to both
+		// endpoints.
+		found := false
+		for zone, nodes := range nodesForZone {
+			if len(nodes) < 2 {
+				continue
+			}
+
+			endpointsForZone := []*endpoint{
+				{node: nodes[0]},
+				{node: nodes[1]},
+			}
+
+			clients = append(clients,
+				&client{
+					node:      nodes[0],
+					endpoints: endpointsForZone,
+				},
+				&client{
+					node:      nodes[1],
+					endpoints: endpointsForZone,
+				},
+			)
+			endpoints = append(endpoints, endpointsForZone...)
+
+			// delete this zone from the map so we don't reuse it below
+			delete(nodesForZone, zone)
+			found = true
+			break
+		}
+		if !found {
+			e2eskipper.Skipf("need at least 3 zones, at least 2 of which have at least 2 schedulable nodes")
+		}
+
+		// Second zone: find a zone with at least 2 nodes, then create a client on
+		// one of them and a server on the other.
+		found = false
+		for zone, nodes := range nodesForZone {
+			if len(nodes) < 2 {
+				continue
+			}
+
+			endpointsForZone := []*endpoint{
+				{node: nodes[1]},
+			}
+
+			clients = append(clients,
+				&client{
+					node:      nodes[0],
+					endpoints: endpointsForZone,
+				},
+			)
+			endpoints = append(endpoints, endpointsForZone...)
+
+			delete(nodesForZone, zone)
+			found = true
+			break
+		}
+		if !found {
+			e2eskipper.Skipf("need at least 3 zones, at least 2 of which have at least 2 schedulable nodes")
+		}
+
+		// Third zone: any zone will do (and we know there were at least 3 to
+		// begin with). We create just a client, and expect it to connect to the
+		// servers in the other two zones.
+		for _, nodes := range nodesForZone {
+			clients = append(clients,
+				&client{
+					node:      nodes[0],
+					endpoints: endpoints,
+				},
+			)
+			break
+		}
+
+		doTrafficDistributionTest(ctx, trafficDist, clients, endpoints)
+	}
+
 	framework.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
-		doSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
+		doSimpleSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
+	})
+
+	framework.It("should route traffic correctly between pods on multiple nodes when using PreferClose", func(ctx context.Context) {
+		doMultiNodeSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
 	})
 
 	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
-		doSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+		doSimpleSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+	})
+
+	framework.It("should route traffic currently between pods on multiple nodes when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		doMultiNodeSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 	})
 })
