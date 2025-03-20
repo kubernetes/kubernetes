@@ -218,6 +218,9 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 	success := "true"
 	fallback := "false"
 	if err != nil {
+		if errors.IsResourceExpired(err) {
+			return c.storage.GetList(ctx, key, opts, listObj)
+		}
 		if result.ConsistentRead {
 			if storage.IsTooLargeResourceVersion(err) {
 				fallback = "true"

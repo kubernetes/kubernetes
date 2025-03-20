@@ -344,7 +344,7 @@ func TestShouldDelegateList(t *testing.T) {
 		}
 	}
 
-	runTestCases := func(t *testing.T, testcases map[opts]bool, overrides ...map[opts]bool) {
+	runTestCases := func(t *testing.T, snapshotAvailable bool, testcases map[opts]bool, overrides ...map[opts]bool) {
 		for opt, expectBypass := range testCases {
 			for _, override := range overrides {
 				if bypass, ok := override[opt]; ok {
@@ -362,6 +362,9 @@ func TestShouldDelegateList(t *testing.T) {
 				t.Fatalf("Couldn't create cacher: %v", err)
 			}
 			defer cacher.Stop()
+			if snapshotAvailable {
+				cacher.watchCache.snapshots.Add(uint64(mustAtoi(oldRV)), fakeOrderedLister{})
+			}
 			result, err := shouldDelegateList(toStorageOpts(opt), cacher)
 			if err != nil {
 				t.Fatal(err)
@@ -371,19 +374,46 @@ func TestShouldDelegateList(t *testing.T) {
 			}
 		}
 	}
-	consistentListFromCacheOverrides := map[opts]bool{}
-	for _, recursive := range []bool{true, false} {
-		consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
-		consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
-	}
+
+	// Exacts and continue on current cache RV.
+	listFromSnapshotEnabledOverrides := map[opts]bool{}
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, Limit: 100}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, Limit: 100, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnCacheRV}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnCacheRV}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnCacheRV}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, Continue: continueOnCacheRV}] = false
+
+	// Exacts and continue RV with a snapshot.
+	snapshotAvailableOverrides := map[opts]bool{}
+	snapshotAvailableOverrides[opts{Recursive: true, Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, Limit: 100}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
 
 	t.Run("ConsistentListFromCache=false", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-		runTestCases(t, testCases)
+		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+			runTestCases(t, false, testCases)
+		})
+
+		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+			t.Run("SnapshotAvailable=false", func(t *testing.T) {
+				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides)
+			})
+			t.Run("SnapshotAvailable=true", func(t *testing.T) {
+				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, snapshotAvailableOverrides)
+			})
+		})
 	})
 	t.Run("ConsistentListFromCache=true", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-
 		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
 		//
@@ -391,7 +421,41 @@ func TestShouldDelegateList(t *testing.T) {
 		// However in CI all test are run and there must be a test(s) that properly
 		// initialize the storage layer so that the mentioned method evaluates to true
 		forceRequestWatchProgressSupport(t)
-		runTestCases(t, testCases, consistentListFromCacheOverrides)
+
+		consistentListFromCacheOverrides := map[opts]bool{}
+		for _, recursive := range []bool{true, false} {
+			consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
+			consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
+		}
+
+		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+			runTestCases(t, false, testCases, consistentListFromCacheOverrides)
+		})
+		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+			consistentReadWithSnapshotOverrides := map[opts]bool{}
+			// Continues with negative RV are same as consistent read.
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 0, Continue: continueOnNegativeRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnNegativeRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 0, Continue: continueOnNegativeRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
+			// Exact on RV not yet observed by cache
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV, Limit: 100}] = false
+			t.Run("SnapshotAvailable=false", func(t *testing.T) {
+				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides)
+			})
+			t.Run("SnapshotAvailable=true", func(t *testing.T) {
+				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides, snapshotAvailableOverrides)
+			})
+		})
 	})
 }
 
@@ -564,6 +628,91 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
+		})
+	}
+}
+
+func TestMatchExactResourceVersionFallback(t *testing.T) {
+	tcs := []struct {
+		name               string
+		snapshotsAvailable []bool
+
+		expectStoreRequests    int
+		expectSnapshotRequests int
+	}{
+		{
+			name:                   "Disabled",
+			snapshotsAvailable:     []bool{false, false},
+			expectStoreRequests:    2,
+			expectSnapshotRequests: 1,
+		},
+		{
+			name:                   "Enabled",
+			snapshotsAvailable:     []bool{true, true},
+			expectStoreRequests:    1,
+			expectSnapshotRequests: 2,
+		},
+		{
+			name:                   "Fallback",
+			snapshotsAvailable:     []bool{true, false},
+			expectSnapshotRequests: 2,
+			expectStoreRequests:    2,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			backingStorage := &dummyStorage{}
+			expectStoreRequests := 0
+			backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+				expectStoreRequests++
+				podList := listObj.(*example.PodList)
+				switch opts.ResourceVersionMatch {
+				case "":
+					podList.ResourceVersion = "42"
+				case metav1.ResourceVersionMatchExact:
+					podList.ResourceVersion = opts.ResourceVersion
+				}
+				return nil
+			}
+			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			snapshotRequestCount := 0
+			cacher.watchCache.RWMutex.Lock()
+			cacher.watchCache.snapshots = &fakeSnapshotter{
+				getLessOrEqual: func(rv uint64) (orderedLister, bool) {
+					snapshotAvailable := tc.snapshotsAvailable[snapshotRequestCount]
+					snapshotRequestCount++
+					if snapshotAvailable {
+						return fakeOrderedLister{}, true
+					} else {
+						return nil, false
+					}
+				},
+			}
+			cacher.watchCache.RWMutex.Unlock()
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+			delegator := NewCacheDelegator(cacher, backingStorage)
+
+			result := &example.PodList{}
+			err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true}, result)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result.ResourceVersion != "20" {
+				t.Fatalf("Unexpected List response RV, got: %q, want: %d", result.ResourceVersion, 20)
+			}
+			if expectStoreRequests != tc.expectStoreRequests {
+				t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", expectStoreRequests, tc.expectStoreRequests)
+			}
+			if snapshotRequestCount != tc.expectSnapshotRequests {
+				t.Fatalf("Unexpected number of requests to snapshots, got: %d, want: %d", snapshotRequestCount, tc.expectSnapshotRequests)
+			}
+
 		})
 	}
 }
