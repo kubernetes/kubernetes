@@ -26,8 +26,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -420,4 +422,294 @@ func convertResourceConfigToLinuxContainerResources(rc *cm.ResourceConfig) *runt
 	}
 
 	return lcr
+}
+
+func buildContainerConfigLifecycle(container *v1.Container) (lifecycle *runtimeapi.Lifecycle) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
+		if container.Lifecycle != nil && container.Lifecycle.StopSignal != nil {
+			var signalValue runtimeapi.Signal
+			signalStr := string(*container.Lifecycle.StopSignal)
+
+			signalValue = runtimeapi.Signal_RUNTIME_DEFAULT
+
+			switch signalStr {
+			case "SIGABRT":
+				signalValue = runtimeapi.Signal_SIGABRT
+			case "SIGALRM":
+				signalValue = runtimeapi.Signal_SIGALRM
+			case "SIGBUS":
+				signalValue = runtimeapi.Signal_SIGBUS
+			case "SIGCHLD":
+				signalValue = runtimeapi.Signal_SIGCHLD
+			case "SIGCLD":
+				signalValue = runtimeapi.Signal_SIGCLD
+			case "SIGCONT":
+				signalValue = runtimeapi.Signal_SIGCONT
+			case "SIGFPE":
+				signalValue = runtimeapi.Signal_SIGFPE
+			case "SIGHUP":
+				signalValue = runtimeapi.Signal_SIGHUP
+			case "SIGILL":
+				signalValue = runtimeapi.Signal_SIGILL
+			case "SIGINT":
+				signalValue = runtimeapi.Signal_SIGINT
+			case "SIGIO":
+				signalValue = runtimeapi.Signal_SIGIO
+			case "SIGIOT":
+				signalValue = runtimeapi.Signal_SIGIOT
+			case "SIGKILL":
+				signalValue = runtimeapi.Signal_SIGKILL
+			case "SIGPIPE":
+				signalValue = runtimeapi.Signal_SIGPIPE
+			case "SIGPOLL":
+				signalValue = runtimeapi.Signal_SIGPOLL
+			case "SIGPROF":
+				signalValue = runtimeapi.Signal_SIGPROF
+			case "SIGPWR":
+				signalValue = runtimeapi.Signal_SIGPWR
+			case "SIGQUIT":
+				signalValue = runtimeapi.Signal_SIGQUIT
+			case "SIGSEGV":
+				signalValue = runtimeapi.Signal_SIGSEGV
+			case "SIGSTKFLT":
+				signalValue = runtimeapi.Signal_SIGSTKFLT
+			case "SIGSTOP":
+				signalValue = runtimeapi.Signal_SIGSTOP
+			case "SIGSYS":
+				signalValue = runtimeapi.Signal_SIGSYS
+			case "SIGTERM":
+				signalValue = runtimeapi.Signal_SIGTERM
+			case "SIGTRAP":
+				signalValue = runtimeapi.Signal_SIGTRAP
+			case "SIGTSTP":
+				signalValue = runtimeapi.Signal_SIGTSTP
+			case "SIGTTIN":
+				signalValue = runtimeapi.Signal_SIGTTIN
+			case "SIGTTOU":
+				signalValue = runtimeapi.Signal_SIGTTOU
+			case "SIGURG":
+				signalValue = runtimeapi.Signal_SIGURG
+			case "SIGUSR1":
+				signalValue = runtimeapi.Signal_SIGUSR1
+			case "SIGUSR2":
+				signalValue = runtimeapi.Signal_SIGUSR2
+			case "SIGVTALRM":
+				signalValue = runtimeapi.Signal_SIGVTALRM
+			case "SIGWINCH":
+				signalValue = runtimeapi.Signal_SIGWINCH
+			case "SIGXCPU":
+				signalValue = runtimeapi.Signal_SIGXCPU
+			case "SIGXFSZ":
+				signalValue = runtimeapi.Signal_SIGXFSZ
+			case "SIGRTMIN":
+				signalValue = runtimeapi.Signal_SIGRTMIN
+			case "SIGRTMIN+1":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS1
+			case "SIGRTMIN+2":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS2
+			case "SIGRTMIN+3":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS3
+			case "SIGRTMIN+4":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS4
+			case "SIGRTMIN+5":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS5
+			case "SIGRTMIN+6":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS6
+			case "SIGRTMIN+7":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS7
+			case "SIGRTMIN+8":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS8
+			case "SIGRTMIN+9":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS9
+			case "SIGRTMIN+10":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS10
+			case "SIGRTMIN+11":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS11
+			case "SIGRTMIN+12":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS12
+			case "SIGRTMIN+13":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS13
+			case "SIGRTMIN+14":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS14
+			case "SIGRTMIN+15":
+				signalValue = runtimeapi.Signal_SIGRTMINPLUS15
+			case "SIGRTMAX-14":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS14
+			case "SIGRTMAX-13":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS13
+			case "SIGRTMAX-12":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS12
+			case "SIGRTMAX-11":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS11
+			case "SIGRTMAX-10":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS10
+			case "SIGRTMAX-9":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS9
+			case "SIGRTMAX-8":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS8
+			case "SIGRTMAX-7":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS7
+			case "SIGRTMAX-6":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS6
+			case "SIGRTMAX-5":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS5
+			case "SIGRTMAX-4":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS4
+			case "SIGRTMAX-3":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS3
+			case "SIGRTMAX-2":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS2
+			case "SIGRTMAX-1":
+				signalValue = runtimeapi.Signal_SIGRTMAXMINUS1
+			case "SIGRTMAX":
+				signalValue = runtimeapi.Signal_SIGRTMAX
+			}
+
+			lifecycle := runtimeapi.Lifecycle{
+				StopSignal: signalValue,
+			}
+			return &lifecycle
+		} else {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func fromCRIStopSignal(signal runtimeapi.Signal) *v1.Signal {
+	var signalStr v1.Signal
+	switch signal {
+	case runtimeapi.Signal_SIGABRT:
+		signalStr = "SIGABRT"
+	case runtimeapi.Signal_SIGALRM:
+		signalStr = "SIGALRM"
+	case runtimeapi.Signal_SIGBUS:
+		signalStr = "SIGBUS"
+	case runtimeapi.Signal_SIGCHLD:
+		signalStr = "SIGCHLD"
+	case runtimeapi.Signal_SIGCLD:
+		signalStr = "SIGCLD"
+	case runtimeapi.Signal_SIGCONT:
+		signalStr = "SIGCONT"
+	case runtimeapi.Signal_SIGFPE:
+		signalStr = "SIGFPE"
+	case runtimeapi.Signal_SIGHUP:
+		signalStr = "SIGHUP"
+	case runtimeapi.Signal_SIGILL:
+		signalStr = "SIGILL"
+	case runtimeapi.Signal_SIGINT:
+		signalStr = "SIGINT"
+	case runtimeapi.Signal_SIGIO:
+		signalStr = "SIGIO"
+	case runtimeapi.Signal_SIGIOT:
+		signalStr = "SIGIOT"
+	case runtimeapi.Signal_SIGKILL:
+		signalStr = "SIGKILL"
+	case runtimeapi.Signal_SIGPIPE:
+		signalStr = "SIGPIPE"
+	case runtimeapi.Signal_SIGPOLL:
+		signalStr = "SIGPOLL"
+	case runtimeapi.Signal_SIGPROF:
+		signalStr = "SIGPROF"
+	case runtimeapi.Signal_SIGPWR:
+		signalStr = "SIGPWR"
+	case runtimeapi.Signal_SIGQUIT:
+		signalStr = "SIGQUIT"
+	case runtimeapi.Signal_SIGSEGV:
+		signalStr = "SIGSEGV"
+	case runtimeapi.Signal_SIGSTKFLT:
+		signalStr = "SIGSTKFLT"
+	case runtimeapi.Signal_SIGSTOP:
+		signalStr = "SIGSTOP"
+	case runtimeapi.Signal_SIGSYS:
+		signalStr = "SIGSYS"
+	case runtimeapi.Signal_SIGTERM:
+		signalStr = "SIGTERM"
+	case runtimeapi.Signal_SIGTRAP:
+		signalStr = "SIGTRAP"
+	case runtimeapi.Signal_SIGTSTP:
+		signalStr = "SIGTSTP"
+	case runtimeapi.Signal_SIGTTIN:
+		signalStr = "SIGTTIN"
+	case runtimeapi.Signal_SIGTTOU:
+		signalStr = "SIGTTOU"
+	case runtimeapi.Signal_SIGURG:
+		signalStr = "SIGURG"
+	case runtimeapi.Signal_SIGUSR1:
+		signalStr = "SIGUSR1"
+	case runtimeapi.Signal_SIGUSR2:
+		signalStr = "SIGUSR2"
+	case runtimeapi.Signal_SIGVTALRM:
+		signalStr = "SIGVTALRM"
+	case runtimeapi.Signal_SIGWINCH:
+		signalStr = "SIGWINCH"
+	case runtimeapi.Signal_SIGXCPU:
+		signalStr = "SIGXCPU"
+	case runtimeapi.Signal_SIGXFSZ:
+		signalStr = "SIGXFSZ"
+	case runtimeapi.Signal_SIGRTMIN:
+		signalStr = "SIGRTMIN"
+	case runtimeapi.Signal_SIGRTMINPLUS1:
+		signalStr = "SIGRTMIN+1"
+	case runtimeapi.Signal_SIGRTMINPLUS2:
+		signalStr = "SIGRTMIN+2"
+	case runtimeapi.Signal_SIGRTMINPLUS3:
+		signalStr = "SIGRTMIN+3"
+	case runtimeapi.Signal_SIGRTMINPLUS4:
+		signalStr = "SIGRTMIN+4"
+	case runtimeapi.Signal_SIGRTMINPLUS5:
+		signalStr = "SIGRTMIN+5"
+	case runtimeapi.Signal_SIGRTMINPLUS6:
+		signalStr = "SIGRTMIN+6"
+	case runtimeapi.Signal_SIGRTMINPLUS7:
+		signalStr = "SIGRTMIN+7"
+	case runtimeapi.Signal_SIGRTMINPLUS8:
+		signalStr = "SIGRTMIN+8"
+	case runtimeapi.Signal_SIGRTMINPLUS9:
+		signalStr = "SIGRTMIN+9"
+	case runtimeapi.Signal_SIGRTMINPLUS10:
+		signalStr = "SIGRTMIN+10"
+	case runtimeapi.Signal_SIGRTMINPLUS11:
+		signalStr = "SIGRTMIN+11"
+	case runtimeapi.Signal_SIGRTMINPLUS12:
+		signalStr = "SIGRTMIN+12"
+	case runtimeapi.Signal_SIGRTMINPLUS13:
+		signalStr = "SIGRTMIN+13"
+	case runtimeapi.Signal_SIGRTMINPLUS14:
+		signalStr = "SIGRTMIN+14"
+	case runtimeapi.Signal_SIGRTMINPLUS15:
+		signalStr = "SIGRTMIN+15"
+	case runtimeapi.Signal_SIGRTMAXMINUS14:
+		signalStr = "SIGRTMAX-14"
+	case runtimeapi.Signal_SIGRTMAXMINUS13:
+		signalStr = "SIGRTMAX-13"
+	case runtimeapi.Signal_SIGRTMAXMINUS12:
+		signalStr = "SIGRTMAX-12"
+	case runtimeapi.Signal_SIGRTMAXMINUS11:
+		signalStr = "SIGRTMAX-11"
+	case runtimeapi.Signal_SIGRTMAXMINUS10:
+		signalStr = "SIGRTMAX-10"
+	case runtimeapi.Signal_SIGRTMAXMINUS9:
+		signalStr = "SIGRTMAX-9"
+	case runtimeapi.Signal_SIGRTMAXMINUS8:
+		signalStr = "SIGRTMAX-8"
+	case runtimeapi.Signal_SIGRTMAXMINUS7:
+		signalStr = "SIGRTMAX-7"
+	case runtimeapi.Signal_SIGRTMAXMINUS6:
+		signalStr = "SIGRTMAX-6"
+	case runtimeapi.Signal_SIGRTMAXMINUS5:
+		signalStr = "SIGRTMAX-5"
+	case runtimeapi.Signal_SIGRTMAXMINUS4:
+		signalStr = "SIGRTMAX-4"
+	case runtimeapi.Signal_SIGRTMAXMINUS3:
+		signalStr = "SIGRTMAX-3"
+	case runtimeapi.Signal_SIGRTMAXMINUS2:
+		signalStr = "SIGRTMAX-2"
+	case runtimeapi.Signal_SIGRTMAXMINUS1:
+		signalStr = "SIGRTMAX-1"
+	case runtimeapi.Signal_SIGRTMAX:
+		signalStr = "SIGRTMAX"
+	}
+	return &signalStr
 }
