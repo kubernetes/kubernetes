@@ -1800,12 +1800,165 @@ func TestPodLevelResourceRequests(t *testing.T) {
 			opts:             PodResourcesOptions{SkipPodLevelResources: false},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("15Mi"), v1.ResourceCPU: resource.MustParse("18m")},
 		},
+		{
+			name: "pod-level resources, hugepage request/limit single page size",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceMemory:                  resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			name: "pod-level resources, hugepage request/limit multiple page sizes",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
+		},
+		{
+			name: "pod-level resources, container-level resources, hugepage request/limit single page size",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi")},
+		},
+		{
+			name: "pod-level resources, container-level resources, hugepage request/limit multiple page sizes",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:                     resource.MustParse("1"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi")},
+		},
+		{
+			name: "pod-level resources, container-level resources, hugepage request/limit multiple page sizes between pod-level and container-level",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceMemory:                  resource.MustParse("4Mi"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("4Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			podReqs := PodRequests(getPodLevelResourcesPod(tc.podResources, tc.overhead, tc.containers, tc.initContainers), tc.opts)
 			if diff := cmp.Diff(podReqs, tc.expectedRequests); diff != "" {
 				t.Errorf("got=%v, want=%v, diff=%s", podReqs, tc.expectedRequests, diff)
+			}
+		})
+	}
+}
+
+func TestIsSupportedPodLevelResource(t *testing.T) {
+	testCases := []struct {
+		name     string
+		resource v1.ResourceName
+		expected bool
+	}{
+		{
+			name:     v1.ResourceCPU.String(),
+			resource: v1.ResourceCPU,
+			expected: true,
+		},
+		{
+			name:     v1.ResourceMemory.String(),
+			resource: v1.ResourceMemory,
+			expected: true,
+		},
+		{
+			name:     v1.ResourceEphemeralStorage.String(),
+			resource: v1.ResourceEphemeralStorage,
+			expected: false,
+		},
+		{
+			name:     v1.ResourceHugePagesPrefix + "2Mi",
+			resource: v1.ResourceHugePagesPrefix + "2Mi",
+			expected: true,
+		},
+		{
+			name:     v1.ResourceHugePagesPrefix + "1Gi",
+			resource: v1.ResourceHugePagesPrefix + "1Gi",
+			expected: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSupportedPodLevelResource(tc.resource); got != tc.expected {
+				t.Errorf("Supported pod level resource %s: got=%t, want=%t", tc.resource.String(), got, tc.expected)
 			}
 		})
 	}

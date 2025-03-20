@@ -19610,7 +19610,7 @@ func TestValidatePodResourceConsistency(t *testing.T) {
 			},
 		},
 	}, {
-		name: "indivdual container limits greater than pod limits",
+		name: "individual container limits greater than pod limits",
 		podResources: core.ResourceRequirements{
 			Limits: core.ResourceList{
 				core.ResourceCPU:    resource.MustParse("10"),
@@ -19670,6 +19670,8 @@ func TestValidatePodResourceNames(t *testing.T) {
 		{"memory", false},
 		{"cpu", false},
 		{"storage", true},
+		{v1.ResourceHugePagesPrefix + "2Mi", false},
+		{v1.ResourceHugePagesPrefix + "1Gi", false},
 		{"requests.cpu", true},
 		{"requests.memory", true},
 		{"requests.storage", true},
@@ -19714,6 +19716,8 @@ func TestValidateResourceNames(t *testing.T) {
 		{"memory", true, ""},
 		{"cpu", true, ""},
 		{"storage", true, ""},
+		{v1.ResourceHugePagesPrefix + "2Mi", true, ""},
+		{v1.ResourceHugePagesPrefix + "1Gi", true, ""},
 		{"requests.cpu", true, ""},
 		{"requests.memory", true, ""},
 		{"requests.storage", true, ""},
@@ -24302,6 +24306,48 @@ func TestValidateResourceRequirements(t *testing.T) {
 		},
 		validateFn: ValidateContainerResourceRequirements,
 	}, {
+		name: "container resource hugepage with cpu or memory",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				core.ResourceCPU: resource.MustParse("10"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: ValidateContainerResourceRequirements,
+	}, {
+		name: "container resource hugepage limit without request",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("2Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: ValidateContainerResourceRequirements,
+	}, {
+		name: "pod resource hugepages with cpu or memory",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+			Requests: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("2Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
+		name: "pod resource hugepages limit without request",
+		requirements: core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourceMemory: resource.MustParse("2Mi"),
+				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			},
+		},
+		validateFn: validatePodResourceRequirements,
+	}, {
 		name: "limits and requests of memory resource are equal",
 		requirements: core.ResourceRequirements{
 			Limits: core.ResourceList{
@@ -24363,62 +24409,81 @@ func TestValidateResourceRequirements(t *testing.T) {
 		validateFn   func(requirements *core.ResourceRequirements,
 			podClaimNames sets.Set[string], fldPath *field.Path,
 			opts PodValidationOptions) field.ErrorList
-	}{{
-		name: "hugepage resource without cpu or memory",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+	}{
+		{
+			name: "container resource hugepage without cpu or memory",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
 			},
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+			validateFn: ValidateContainerResourceRequirements,
+		}, {
+			name: "container resource hugepage without limit",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
 			},
+			validateFn: ValidateContainerResourceRequirements,
+		}, {
+			name: "pod resource hugepages without cpu or memory",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource hugepages request without limit",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{
+					core.ResourceMemory: resource.MustParse("2Mi"),
+					core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource with ephemeral-storage",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName(core.ResourceEphemeralStorage): resource.MustParse("2Mi"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName(core.ResourceEphemeralStorage + "2Mi"): resource.MustParse("2Mi"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource with unsupported prefixed resources",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName("kubernetesio/" + core.ResourceCPU): resource.MustParse("2"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName("kubernetesio/" + core.ResourceMemory): resource.MustParse("2"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
+		}, {
+			name: "pod resource with unsupported native resources",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{
+					core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+				},
+				Requests: core.ResourceList{
+					core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
+				},
+			},
+			validateFn: validatePodResourceRequirements,
 		},
-		validateFn: ValidateContainerResourceRequirements,
-	}, {
-		name: "pod resource with hugepages",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("2Mi"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	}, {
-		name: "pod resource with ephemeral-storage",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName(core.ResourceEphemeralStorage): resource.MustParse("2Mi"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName(core.ResourceEphemeralStorage + "2Mi"): resource.MustParse("2Mi"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	}, {
-		name: "pod resource with unsupported prefixed resources",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName("kubernetesio/" + core.ResourceCPU): resource.MustParse("2"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName("kubernetesio/" + core.ResourceMemory): resource.MustParse("2"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	}, {
-		name: "pod resource with unsupported native resources",
-		requirements: core.ResourceRequirements{
-			Limits: core.ResourceList{
-				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
-			},
-			Requests: core.ResourceList{
-				core.ResourceName("kubernetes.io/" + strings.Repeat("a", 63)): resource.MustParse("2"),
-			},
-		},
-		validateFn: validatePodResourceRequirements,
-	},
 		{
 			name: "pod resource with unsupported empty native resource name",
 			requirements: core.ResourceRequirements{

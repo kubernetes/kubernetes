@@ -26,6 +26,9 @@ import (
 	"strings"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/swap"
 
 	v1 "k8s.io/api/core/v1"
@@ -373,10 +376,11 @@ func TestMetrics(t *testing.T) {
 
 func TestGetHugePagesMountOptions(t *testing.T) {
 	testCases := map[string]struct {
-		pod            *v1.Pod
-		medium         v1.StorageMedium
-		shouldFail     bool
-		expectedResult string
+		pod                      *v1.Pod
+		medium                   v1.StorageMedium
+		shouldFail               bool
+		expectedResult           string
+		podLevelResourcesEnabled bool
 	}{
 		"ProperValues": {
 			pod: &v1.Pod{
@@ -605,10 +609,124 @@ func TestGetHugePagesMountOptions(t *testing.T) {
 			shouldFail:     true,
 			expectedResult: "",
 		},
+		"PodLevelResourcesSinglePageSize": {
+			podLevelResourcesEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePages,
+			shouldFail:     false,
+			expectedResult: "pagesize=2Mi",
+		},
+		"PodLevelResourcesSinglePageSizeMediumPrefix": {
+			podLevelResourcesEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePagesPrefix + "2Mi",
+			shouldFail:     false,
+			expectedResult: "pagesize=2Mi",
+		},
+		"PodLevelResourcesMultiPageSize": {
+			podLevelResourcesEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePages,
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"PodLevelResourcesMultiPageSizeMediumPrefix": {
+			podLevelResourcesEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+							v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePagesPrefix + "2Mi",
+			shouldFail:     false,
+			expectedResult: "pagesize=2Mi",
+		},
+		"PodAndContainerLevelResourcesMultiPageSizeHugePagesMedium": {
+			podLevelResourcesEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePages,
+			shouldFail:     true,
+			expectedResult: "",
+		},
+		"PodAndContainerLevelResourcesMultiPageSizeHugePagesMediumPrefix": {
+			podLevelResourcesEnabled: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+						},
+					},
+					Containers: []v1.Container{
+						{
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceName("hugepages-2Mi"): resource.MustParse("100Mi"),
+								},
+							},
+						},
+					},
+				},
+			},
+			medium:         v1.StorageMediumHugePagesPrefix + "2Mi",
+			shouldFail:     false,
+			expectedResult: "pagesize=2Mi",
+		},
 	}
 
 	for testCaseName, testCase := range testCases {
 		t.Run(testCaseName, func(t *testing.T) {
+			if testCase.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+			}
+
 			value, err := getPageSizeMountOption(testCase.medium, testCase.pod)
 			if testCase.shouldFail && err == nil {
 				t.Errorf("%s: Unexpected success", testCaseName)
