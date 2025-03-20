@@ -318,6 +318,10 @@ var (
 			OwnerReference(podName, podUID+"-other", podKind).
 			UID("other").
 			Obj()
+	unscheduledPodWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
+					UID(podUID).
+					PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
+					Obj()
 	podWithClaimName = st.MakePod().Name(podName).Namespace(namespace).
 				UID(podUID).
 				PodResourceClaims(v1.PodResourceClaim{Name: resourceName, ResourceClaimName: &claimName}).
@@ -493,6 +497,23 @@ func TestHandlers(t *testing.T) {
 			//
 			// At the moment, the code reliably cancels right away.
 			wantEvents: []*v1.Event{cancelPodEviction},
+		},
+		"evict-pod-after-scheduling": {
+			initialState: state{
+				pods:            []*v1.Pod{unscheduledPodWithClaimName},
+				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+			},
+			events: []any{
+				// Normally the scheduler shouldn't schedule when there is a taint,
+				// but perhaps it didn't know yet.
+				update(unscheduledPodWithClaimName, podWithClaimName),
+			},
+			finalState: state{
+				slices:          []*resourceapi.ResourceSlice{sliceTainted, slice2},
+				allocatedClaims: []allocatedClaim{{ResourceClaim: inUseClaim, evictionTime: &taintTime}},
+				evicting:        []evictAt{{newObject(podWithClaimName), taintTime.Time}},
+			},
 		},
 		"evict-pod-resourceclaim-unrelated-changes": {
 			initialState: state{

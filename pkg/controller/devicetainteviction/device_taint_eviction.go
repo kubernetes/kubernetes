@@ -794,12 +794,13 @@ func (tc *Controller) handlePodChange(oldPod, newPod *v1.Pod) {
 
 	// Pods get updated quite frequently. There's no need
 	// to check them again unless something changed regarding
-	// their claims.
+	// their claims or they got scheduled.
 	//
 	// In particular this prevents adding the pod again
 	// directly after the eviction condition got added
 	// to it.
 	if oldPod != nil &&
+		oldPod.Spec.NodeName == newPod.Spec.NodeName &&
 		apiequality.Semantic.DeepEqual(oldPod.Status.ResourceClaimStatuses, newPod.Status.ResourceClaimStatuses) {
 		return
 	}
