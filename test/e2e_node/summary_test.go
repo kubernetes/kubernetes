@@ -30,6 +30,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -57,7 +58,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses(ctx)
 		})
-		ginkgo.It("should report resource usage through the stats api", func(ctx context.Context) {
+		f.It("should report resource usage through the stats api", feature.KubeletPSI, func(ctx context.Context) {
 			const pod0 = "stats-busybox-0"
 			const pod1 = "stats-busybox-1"
 
