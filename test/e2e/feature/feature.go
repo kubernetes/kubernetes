@@ -238,9 +238,6 @@ var (
 	// Marks tests that require a cluster with dual-stack pod and service networks.
 	IPv6DualStack = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
-
 	// Owner: sig-network
 	// Marks tests that require kube-dns-autoscaler
 	KubeDNSAutoscaler = framework.WithFeature(framework.ValidFeatures.Add("KubeDNSAutoscaler"))
