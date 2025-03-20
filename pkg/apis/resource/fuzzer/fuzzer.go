@@ -32,7 +32,7 @@ import (
 // leads to errors during roundtrip tests.
 var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *resource.DeviceRequest, c randfill.Continue) {
+		func(r *resource.ExactDeviceRequest, c randfill.Continue) {
 			c.FillNoCustom(r) // fuzz self without calling this function again
 
 			if r.AllocationMode == "" {
@@ -44,6 +44,7 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(r *resource.DeviceSubRequest, c randfill.Continue) {
 			c.FillNoCustom(r) // fuzz self without calling this function again
+
 			if r.AllocationMode == "" {
 				r.AllocationMode = []resource.DeviceAllocationMode{
 					resource.DeviceAllocationModeAll,
@@ -93,6 +94,17 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			// This is necessary because randomly generated content
 			// might be valid JSON which changes during re-encoding.
 			r.Data = &runtime.RawExtension{Raw: []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`)}
+		},
+		func(r *resource.ResourceSliceSpec, c randfill.Continue) {
+			c.FillNoCustom(r)
+			// Setting AllNodes to false is not allowed. It must be
+			// either true or nil.
+			if r.AllNodes != nil && !*r.AllNodes {
+				r.AllNodes = nil
+			}
+			if r.NodeName != nil && *r.NodeName == "" {
+				r.NodeName = nil
+			}
 		},
 	}
 }

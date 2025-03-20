@@ -43,9 +43,11 @@ var obj = &resource.ResourceClaimTemplate{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
 					{
-						Name:            "req-0",
-						DeviceClassName: "class",
-						AllocationMode:  resource.DeviceAllocationModeAll,
+						Name: "req-0",
+						Exactly: &resource.ExactDeviceRequest{
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeAll,
+						},
 					},
 				},
 			},
@@ -63,10 +65,12 @@ var objWithAdminAccess = &resource.ResourceClaimTemplate{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
 					{
-						Name:            "req-0",
-						DeviceClassName: "class",
-						AllocationMode:  resource.DeviceAllocationModeAll,
-						AdminAccess:     ptr.To(true),
+						Name: "req-0",
+						Exactly: &resource.ExactDeviceRequest{
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeAll,
+							AdminAccess:     ptr.To(true),
+						},
 					},
 				},
 			},
@@ -84,10 +88,12 @@ var objWithAdminAccessInNonAdminNamespace = &resource.ResourceClaimTemplate{
 			Devices: resource.DeviceClaim{
 				Requests: []resource.DeviceRequest{
 					{
-						Name:            "req-0",
-						DeviceClassName: "class",
-						AllocationMode:  resource.DeviceAllocationModeAll,
-						AdminAccess:     ptr.To(true),
+						Name: "req-0",
+						Exactly: &resource.ExactDeviceRequest{
+							DeviceClassName: "class",
+							AllocationMode:  resource.DeviceAllocationModeAll,
+							AdminAccess:     ptr.To(true),
+						},
 					},
 				},
 			},
@@ -136,7 +142,7 @@ var ns2 = &corev1.Namespace{
 var adminAccessError = "Forbidden: admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace"
 var fieldImmutableError = "field is immutable"
 var metadataError = "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-var deviceRequestError = "exactly one of `deviceClassName` or `firstAvailable` must be specified"
+var deviceRequestError = "exactly one of `exactly` or `firstAvailable` is required"
 
 func TestClaimTemplateStrategy(t *testing.T) {
 	fakeClient := fake.NewSimpleClientset()
@@ -339,7 +345,7 @@ func TestClaimTemplateStrategyUpdate(t *testing.T) {
 		resourceClaimTemplate := obj.DeepCopy()
 		newClaimTemplate := resourceClaimTemplate.DeepCopy()
 		newClaimTemplate.ResourceVersion = "4"
-		newClaimTemplate.Spec.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+		newClaimTemplate.Spec.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 
 		strategy.PrepareForUpdate(ctx, newClaimTemplate, resourceClaimTemplate)
 		errs := strategy.ValidateUpdate(ctx, newClaimTemplate, resourceClaimTemplate)

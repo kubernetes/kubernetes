@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha3
+package v1beta2
 
 import (
 	v1 "k8s.io/api/core/v1"
@@ -36,8 +36,7 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceSlice
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceSlice represents one or more resources in a pool of similar resources,
 // managed by a common driver. A pool may span more than one ResourceSlice, and exactly how many
@@ -115,7 +114,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,3,opt,name=nodeName"`
 
 	// NodeSelector defines which nodes have access to the resources in the pool,
 	// when that pool is not limited to a single node.
@@ -134,7 +133,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	AllNodes bool `json:"allNodes,omitempty" protobuf:"bytes,5,opt,name=allNodes"`
+	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,5,opt,name=allNodes"`
 
 	// Devices lists some or all of the devices in this pool.
 	//
@@ -161,7 +160,7 @@ type ResourceSliceSpec struct {
 	//
 	// The names of the SharedCounters must be unique in the ResourceSlice.
 	//
-	// The maximum number of SharedCounters is 32.
+	// The maximum number of counters in all sets is 32.
 	//
 	// +optional
 	// +listType=atomic
@@ -178,31 +177,19 @@ type ResourceSliceSpec struct {
 // the portion of counters it uses will no longer be available for use
 // by other devices.
 type CounterSet struct {
-	// CounterSet is the name of the set from which the
-	// counters defined will be consumed.
+	// Name defines the name of the counter set.
+	// It must be a DNS label.
 	//
 	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
-	// Counters defines the counters that will be consumed by the device.
+	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// To ensure this uniqueness, capacities defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// The maximum number of counters is 32.
+	// The maximum number of counters in all sets is 32.
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
-}
-
-// Counter describes a quantity associated with a device.
-type Counter struct {
-	// Value defines how much of a certain device counter is available.
-	//
-	// +required
-	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -250,6 +237,10 @@ const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 
+// Defines the max number of shared counters that can be specified
+// in a ResourceSlice. The number is summed up across all sets.
+const ResourceSliceMaxSharedCounters = 32
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -259,22 +250,13 @@ type Device struct {
 	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
-	// Basic defines one device instance.
-	//
-	// +optional
-	// +oneOf=deviceType
-	Basic *BasicDevice `json:"basic,omitempty" protobuf:"bytes,2,opt,name=basic"`
-}
-
-// BasicDevice defines one device instance.
-type BasicDevice struct {
 	// Attributes defines the set of attributes for this device.
 	// The name of each attribute must be unique in that set.
 	//
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,1,rep,name=attributes"`
+	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,2,rep,name=attributes"`
 
 	// Capacity defines the set of capacities for this device.
 	// The name of each capacity must be unique in that set.
@@ -282,7 +264,7 @@ type BasicDevice struct {
 	// The maximum number of attributes and capacities combined is 32.
 	//
 	// +optional
-	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
+	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,3,rep,name=capacity"`
 
 	// ConsumesCounters defines a list of references to sharedCounters
 	// and the set of counters that the device will
@@ -298,7 +280,7 @@ type BasicDevice struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
-	ConsumesCounters []DeviceCounterConsumption `json:"consumesCounters,omitempty" protobuf:"bytes,3,rep,name=consumesCounters"`
+	ConsumesCounters []DeviceCounterConsumption `json:"consumesCounters,omitempty" protobuf:"bytes,4,rep,name=consumesCounters"`
 
 	// NodeName identifies the node where the device is available.
 	//
@@ -308,9 +290,11 @@ type BasicDevice struct {
 	// +optional
 	// +oneOf=DeviceNodeSelection
 	// +featureGate=DRAPartitionableDevices
-	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,4,opt,name=nodeName"`
+	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,5,opt,name=nodeName"`
 
 	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
 	//
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
@@ -318,7 +302,7 @@ type BasicDevice struct {
 	// +optional
 	// +oneOf=DeviceNodeSelection
 	// +featureGate=DRAPartitionableDevices
-	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,5,opt,name=nodeSelector"`
+	NodeSelector *v1.NodeSelector `json:"nodeSelector,omitempty" protobuf:"bytes,6,opt,name=nodeSelector"`
 
 	// AllNodes indicates that all nodes have access to the device.
 	//
@@ -328,7 +312,7 @@ type BasicDevice struct {
 	// +optional
 	// +oneOf=DeviceNodeSelection
 	// +featureGate=DRAPartitionableDevices
-	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,6,opt,name=allNodes"`
+	AllNodes *bool `json:"allNodes,omitempty" protobuf:"bytes,7,opt,name=allNodes"`
 
 	// If specified, these are the driver-defined taints.
 	//
@@ -340,20 +324,19 @@ type BasicDevice struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
-	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,7,rep,name=taints"`
+	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,8,rep,name=taints"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
 // a device will consume from a CounterSet.
 type DeviceCounterConsumption struct {
-	// CounterSet defines the set from which the
+	// CounterSet is the name of the set from which the
 	// counters defined will be consumed.
 	//
 	// +required
 	CounterSet string `json:"counterSet" protobuf:"bytes,1,opt,name=counterSet"`
 
-	// Counters defines the Counter that will be consumed by
-	// the device.
+	// Counters defines the counters that will be consumed by the device.
 	//
 	// The maximum number counters in a device is 32.
 	// In addition, the maximum number of all counters
@@ -362,6 +345,25 @@ type DeviceCounterConsumption struct {
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
+}
+
+// DeviceCapacity describes a quantity associated with a device.
+type DeviceCapacity struct {
+	// Value defines how much of a certain device capacity is available.
+	//
+	// +required
+	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
+
+	// potential future addition: fields which define how to "consume"
+	// capacity (= share a single device between different consumers).
+}
+
+// Counter describes a quantity associated with a device.
+type Counter struct {
+	// Value defines how much of a certain device counter is available.
+	//
+	// +required
+	Value resource.Quantity `json:"value" protobuf:"bytes,1,rep,name=value"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -443,6 +445,8 @@ const DeviceTaintsMaxLength = 4
 // The device this taint is attached to has the "effect" on
 // any claim which does not tolerate the taint and, through the claim,
 // to pods using the claim.
+//
+// +protobuf.options.(gogoproto.goproto_stringer)=false
 type DeviceTaint struct {
 	// The taint key to be applied to a device.
 	// Must be a label name.
@@ -496,8 +500,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceSliceList
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceSliceList is a collection of ResourceSlices.
 type ResourceSliceList struct {
@@ -512,8 +515,7 @@ type ResourceSliceList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaim
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceClaim describes a request for access to resources in the cluster,
 // for use by workloads. For example, if a workload needs an accelerator device
@@ -599,24 +601,60 @@ const (
 
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
-// also ask for several identical devices.
+// also ask for several identical devices. With FirstAvailable it is also
+// possible to provide a prioritized list of requests.
 type DeviceRequest struct {
 	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
+	//
+	// References using the name in the DeviceRequest will uniquely
+	// identify a request when the Exactly field is set. When the
+	// FirstAvailable field is set, a reference to the name of the
+	// DeviceRequest will match whatever subrequest is chosen by the
+	// scheduler.
 	//
 	// Must be a DNS label.
 	//
 	// +required
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
+	// Exactly specifies the details for a single request that must
+	// be met exactly for the request to be satisfied.
+	//
+	// One of Exactly or FirstAvailable must be set.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	Exactly *ExactDeviceRequest `json:"exactly,omitempty" protobuf:"bytes,2,name=exactly"`
+
+	// FirstAvailable contains subrequests, of which exactly one will be
+	// selected by the scheduler. It tries to
+	// satisfy them in the order in which they are listed here. So if
+	// there are two entries in the list, the scheduler will only check
+	// the second one if it determines that the first one can not be used.
+	//
+	// DRA does not yet implement scoring, so the scheduler will
+	// select the first set of devices that satisfies all the
+	// requests in the claim. And if the requirements can
+	// be satisfied on more than one node, other scheduling features
+	// will determine which node is chosen. This means that the set of
+	// devices allocated to a claim might not be the optimal set
+	// available to the cluster. Scoring will be implemented later.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	// +listType=atomic
+	// +featureGate=DRAPrioritizedList
+	FirstAvailable []DeviceSubRequest `json:"firstAvailable,omitempty" protobuf:"bytes,3,name=firstAvailable"`
+}
+
+// ExactDeviceRequest is a request for one or more identical devices.
+type ExactDeviceRequest struct {
 	// DeviceClassName references a specific DeviceClass, which can define
 	// additional configuration and selectors to be inherited by this
 	// request.
 	//
-	// A class is required if no subrequests are specified in the
-	// firstAvailable list and no class can be set if subrequests
-	// are specified in the firstAvailable list.
-	// Which classes are available depends on the cluster.
+	// A DeviceClassName is required.
 	//
 	// Administrators may use this to restrict which devices may get
 	// requested by only installing classes with selectors for permitted
@@ -624,21 +662,17 @@ type DeviceRequest struct {
 	// then administrators can create an empty DeviceClass for users
 	// to reference.
 	//
-	// +optional
-	// +oneOf=deviceRequestType
-	DeviceClassName string `json:"deviceClassName" protobuf:"bytes,2,name=deviceClassName"`
+	// +required
+	DeviceClassName string `json:"deviceClassName" protobuf:"bytes,1,name=deviceClassName"`
 
 	// Selectors define criteria which must be satisfied by a specific
 	// device in order for that device to be considered for this
 	// request. All selectors must be satisfied for a device to be
 	// considered.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// +optional
 	// +listType=atomic
-	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,3,name=selectors"`
+	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,2,name=selectors"`
 
 	// AllocationMode and its related fields define how devices are allocated
 	// to satisfy this request. Supported values are:
@@ -656,24 +690,18 @@ type DeviceRequest struct {
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other requests must specify this field.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// More modes may get added in the future. Clients must refuse to handle
 	// requests with unknown modes.
 	//
 	// +optional
-	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,4,opt,name=allocationMode"`
+	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,3,opt,name=allocationMode"`
 
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
 	// If AllocationMode is ExactCount and this field is not specified, the default is one.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// +optional
 	// +oneOf=AllocationMode
-	Count int64 `json:"count,omitempty" protobuf:"bytes,5,opt,name=count"`
+	Count int64 `json:"count,omitempty" protobuf:"bytes,4,opt,name=count"`
 
 	// AdminAccess indicates that this is a claim for administrative access
 	// to the device(s). Claims with AdminAccess are expected to be used for
@@ -681,38 +709,13 @@ type DeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// This is an alpha field and requires enabling the DRAAdminAccess
 	// feature gate. Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional
 	// +featureGate=DRAAdminAccess
-	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,6,opt,name=adminAccess"`
-
-	// FirstAvailable contains subrequests, of which exactly one will be
-	// satisfied by the scheduler to satisfy this request. It tries to
-	// satisfy them in the order in which they are listed here. So if
-	// there are two entries in the list, the scheduler will only check
-	// the second one if it determines that the first one cannot be used.
-	//
-	// This field may only be set in the entries of DeviceClaim.Requests.
-	//
-	// DRA does not yet implement scoring, so the scheduler will
-	// select the first set of devices that satisfies all the
-	// requests in the claim. And if the requirements can
-	// be satisfied on more than one node, other scheduling features
-	// will determine which node is chosen. This means that the set of
-	// devices allocated to a claim might not be the optimal set
-	// available to the cluster. Scoring will be implemented later.
-	//
-	// +optional
-	// +oneOf=deviceRequestType
-	// +listType=atomic
-	// +featureGate=DRAPrioritizedList
-	FirstAvailable []DeviceSubRequest `json:"firstAvailable,omitempty" protobuf:"bytes,7,name=firstAvailable"`
+	AdminAccess *bool `json:"adminAccess,omitempty" protobuf:"bytes,5,opt,name=adminAccess"`
 
 	// If specified, the request's tolerations.
 	//
@@ -729,16 +732,13 @@ type DeviceRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
-	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,8,opt,name=tolerations"`
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
 }
 
 // DeviceSubRequest describes a request for device provided in the
@@ -746,10 +746,9 @@ type DeviceRequest struct {
 // is typically a request for a single resource like a device, but can
 // also ask for several identical devices.
 //
-// DeviceSubRequest is similar to Request, but doesn't expose the AdminAccess
-// or FirstAvailable fields, as those can only be set on the top-level request.
-// AdminAccess is not supported for requests with a prioritized list, and
-// recursive FirstAvailable fields are not supported.
+// DeviceSubRequest is similar to ExactDeviceRequest, but doesn't expose the
+// AdminAccess field as that one is only supported when requesting a
+// specific device.
 type DeviceSubRequest struct {
 	// Name can be used to reference this subrequest in the list of constraints
 	// or the list of configurations for the claim. References must use the
@@ -777,7 +776,7 @@ type DeviceSubRequest struct {
 
 	// Selectors define criteria which must be satisfied by a specific
 	// device in order for that device to be considered for this
-	// request. All selectors must be satisfied for a device to be
+	// subrequest. All selectors must be satisfied for a device to be
 	// considered.
 	//
 	// +optional
@@ -785,19 +784,19 @@ type DeviceSubRequest struct {
 	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,3,name=selectors"`
 
 	// AllocationMode and its related fields define how devices are allocated
-	// to satisfy this request. Supported values are:
+	// to satisfy this subrequest. Supported values are:
 	//
 	// - ExactCount: This request is for a specific number of devices.
 	//   This is the default. The exact number is provided in the
 	//   count field.
 	//
-	// - All: This request is for all of the matching devices in a pool.
+	// - All: This subrequest is for all of the matching devices in a pool.
 	//   Allocation will fail if some devices are already allocated,
 	//   unless adminAccess is requested.
 	//
 	// If AllocationMode is not specified, the default mode is ExactCount. If
 	// the mode is ExactCount and count is not specified, the default count is
-	// one. Any other requests must specify this field.
+	// one. Any other subrequests must specify this field.
 	//
 	// More modes may get added in the future. Clients must refuse to handle
 	// requests with unknown modes.
@@ -833,7 +832,7 @@ type DeviceSubRequest struct {
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
-	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,7,opt,name=tolerations"`
+	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
 }
 
 const (
@@ -1315,8 +1314,7 @@ const (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaimList
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
@@ -1332,8 +1330,7 @@ type ResourceClaimList struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,DeviceClass
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // DeviceClass is a vendor- or admin-provided resource that contains
 // device configuration and selectors. It can be referenced in
@@ -1390,8 +1387,7 @@ type DeviceClassConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,DeviceClassList
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
@@ -1406,8 +1402,7 @@ type DeviceClassList struct {
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaimTemplate
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 //
@@ -1442,8 +1437,7 @@ type ResourceClaimTemplateSpec struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.31
-// +k8s:prerelease-lifecycle-gen:replacement=resource.k8s.io,v1beta1,ResourceClaimTemplateList
+// +k8s:prerelease-lifecycle-gen:introduced=1.33
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {
@@ -1545,8 +1539,6 @@ type NetworkDeviceData struct {
 	// associated subnet mask.
 	// e.g.: "192.0.2.5/24" for IPv4 and "2001:db8::5/64" for IPv6.
 	//
-	// Must not contain more than 16 entries.
-	//
 	// +optional
 	// +listType=atomic
 	IPs []string `json:"ips,omitempty" protobuf:"bytes,2,opt,name=ips"`
@@ -1557,108 +1549,4 @@ type NetworkDeviceData struct {
 	//
 	// +optional
 	HardwareAddress string `json:"hardwareAddress,omitempty" protobuf:"bytes,3,opt,name=hardwareAddress"`
-}
-
-// +genclient
-// +genclient:nonNamespaced
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
-
-// DeviceTaintRule adds one taint to all devices which match the selector.
-// This has the same effect as if the taint was specified directly
-// in the ResourceSlice by the DRA driver.
-type DeviceTaintRule struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object metadata
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Spec specifies the selector and one taint.
-	//
-	// Changing the spec automatically increments the metadata.generation number.
-	Spec DeviceTaintRuleSpec `json:"spec" protobuf:"bytes,2,name=spec"`
-
-	// ^^^
-	// A spec gets added because adding a status seems likely.
-	// Such a status could provide feedback on applying the
-	// eviction and/or statistics (number of matching devices,
-	// affected allocated claims, pods remaining to be evicted,
-	// etc.).
-}
-
-// DeviceTaintRuleSpec specifies the selector and one taint.
-type DeviceTaintRuleSpec struct {
-	// DeviceSelector defines which device(s) the taint is applied to.
-	// All selector criteria must be satified for a device to
-	// match. The empty selector matches all devices. Without
-	// a selector, no devices are matches.
-	//
-	// +optional
-	DeviceSelector *DeviceTaintSelector `json:"deviceSelector,omitempty" protobuf:"bytes,1,opt,name=deviceSelector"`
-
-	// The taint that gets applied to matching devices.
-	//
-	// +required
-	Taint DeviceTaint `json:"taint,omitempty" protobuf:"bytes,2,rep,name=taint"`
-}
-
-// DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.
-// The empty selector matches all devices. Without a selector, no devices
-// are matched.
-type DeviceTaintSelector struct {
-	// If DeviceClassName is set, the selectors defined there must be
-	// satisfied by a device to be selected. This field corresponds
-	// to class.metadata.name.
-	//
-	// +optional
-	DeviceClassName *string `json:"deviceClassName,omitempty" protobuf:"bytes,1,opt,name=deviceClassName"`
-
-	// If driver is set, only devices from that driver are selected.
-	// This fields corresponds to slice.spec.driver.
-	//
-	// +optional
-	Driver *string `json:"driver,omitempty" protobuf:"bytes,2,opt,name=driver"`
-
-	// If pool is set, only devices in that pool are selected.
-	//
-	// Also setting the driver name may be useful to avoid
-	// ambiguity when different drivers use the same pool name,
-	// but this is not required because selecting pools from
-	// different drivers may also be useful, for example when
-	// drivers with node-local devices use the node name as
-	// their pool name.
-	//
-	// +optional
-	Pool *string `json:"pool,omitempty" protobuf:"bytes,3,opt,name=pool"`
-
-	// If device is set, only devices with that name are selected.
-	// This field corresponds to slice.spec.devices[].name.
-	//
-	// Setting also driver and pool may be required to avoid ambiguity,
-	// but is not required.
-	//
-	// +optional
-	Device *string `json:"device,omitempty" protobuf:"bytes,4,opt,name=device"`
-
-	// Selectors contains the same selection criteria as a ResourceClaim.
-	// Currently, CEL expressions are supported. All of these selectors
-	// must be satisfied.
-	//
-	// +optional
-	// +listType=atomic
-	Selectors []DeviceSelector `json:"selectors,omitempty" protobuf:"bytes,5,rep,name=selectors"`
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.33
-
-// DeviceTaintRuleList is a collection of DeviceTaintRules.
-type DeviceTaintRuleList struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard list metadata
-	// +optional
-	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-
-	// Items is the list of DeviceTaintRules.
-	Items []DeviceTaintRule `json:"items" protobuf:"bytes,2,rep,name=items"`
 }

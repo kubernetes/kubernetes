@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	extclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -168,23 +168,25 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 					Spec: resourceapi.ResourceClaimSpec{
 						Devices: resourceapi.DeviceClaim{
 							Requests: []resourceapi.DeviceRequest{{
-								Name:            "req-0",
-								DeviceClassName: "example-class",
-								Selectors: []resourceapi.DeviceSelector{{
-									CEL: &resourceapi.CELDeviceSelector{
-										Expression: boolFieldSelectorExpression,
-									},
-								}},
+								Name: "req-0",
+								Exactly: &resourceapi.ExactDeviceRequest{
+									DeviceClassName: "example-class",
+									Selectors: []resourceapi.DeviceSelector{{
+										CEL: &resourceapi.CELDeviceSelector{
+											Expression: boolFieldSelectorExpression,
+										},
+									}},
+								},
 							}},
 						},
 					},
 				}
-				_, err := c.ResourceV1beta1().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
+				_, err := c.ResourceV1beta2().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
 			// authorizer is not available to resource APIs
-			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
-			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
+			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.exactly\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
+			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.exactly\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
 		},
 		{
 			name: "CustomResourceDefinition - rule",
