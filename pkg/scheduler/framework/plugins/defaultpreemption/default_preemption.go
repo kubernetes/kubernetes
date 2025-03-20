@@ -49,6 +49,8 @@ const Name = names.DefaultPreemption
 // IsEligiblePodFunc is a function which may be assigned to the DefaultPreemption plugin.
 // This may implement rules/filtering around preemption eligibility, which is in addition to
 // the internal requirement that the victim pod have lower priority than the preemptor pod.
+// Any customizations should always allow system services to preempt normal pods, to avoid
+// problems if system pods are unable to find space.
 type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool
 
 // MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
@@ -72,7 +74,8 @@ type DefaultPreemption struct {
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
 	// This filtering is in addition to the internal requirement that the victim pod have lower
-	// priority than the preemptor pod.
+	// priority than the preemptor pod. Any customizations should always allow system services
+	// to preempt normal pods, to avoid problems if system pods are unable to find space.
 	IsEligiblePod IsEligiblePodFunc
 
 	// MoreImportantPod is used to sort eligible victims in-place in descending order of highest to
