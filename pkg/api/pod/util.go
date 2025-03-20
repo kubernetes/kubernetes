@@ -800,9 +800,7 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		dropResourcesField(podStatus.ContainerStatuses)
 		dropResourcesField(podStatus.InitContainerStatuses)
 		dropResourcesField(podStatus.EphemeralContainerStatuses)
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
+
 		// Drop AllocatedResources field
 		dropAllocatedResourcesField := func(csl []api.ContainerStatus) {
 			for i := range csl {

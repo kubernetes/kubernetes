@@ -2285,9 +2285,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			allocatedContainer := kubecontainer.GetContainerSpec(pod, cName)
 			if allocatedContainer != nil {
 				status.Resources = convertContainerStatusResources(allocatedContainer, status, cStatus, oldStatuses)
-				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingAllocatedStatus) {
-					status.AllocatedResources = allocatedContainer.Resources.Requests
-				}
+				status.AllocatedResources = allocatedContainer.Resources.Requests
 			}
 		}
 

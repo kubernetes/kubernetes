@@ -311,7 +311,8 @@ const (
 	// owner: @tallclair
 	// kep: http://kep.k8s.io/1287
 	//
-	// Enables the AllocatedResources field in container status. This feature requires
+	// Deprecated: This feature gate is no longer used.
+	// Was: Enables the AllocatedResources field in container status. This feature requires
 	// InPlacePodVerticalScaling also be enabled.
 	InPlacePodVerticalScalingAllocatedStatus featuregate.Feature = "InPlacePodVerticalScalingAllocatedStatus"
 
@@ -1344,6 +1345,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	InPlacePodVerticalScalingAllocatedStatus: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.36
 	},
 
 	InPlacePodVerticalScalingExclusiveCPUs: {
