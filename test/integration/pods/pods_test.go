@@ -79,6 +79,24 @@ func TestPodTopologyLabels(t *testing.T) {
 				"topology.k8s.io/region": "region",
 			},
 		},
+		{
+			name: "labels from Bindings overwriting existing labels on Pod",
+			existingPodLabels: map[string]string{
+				"topology.k8s.io/zone":   "bad-zone",
+				"topology.k8s.io/region": "bad-region",
+				"topology.k8s.io/abc":    "123",
+			},
+			targetNodeLabels: map[string]string{
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+				"topology.k8s.io/abc":    "456", // this label isn't in (zone, region) so isn't copied
+			},
+			expectedPodLabels: map[string]string{
+				"topology.k8s.io/zone":   "zone",
+				"topology.k8s.io/region": "region",
+				"topology.k8s.io/abc":    "123",
+			},
+		},
 	}
 	// Enable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
 	// on start up and not on each invocation at runtime.
@@ -113,6 +131,7 @@ func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
 type podTopologyTestCase struct {
 	name              string
 	targetNodeLabels  map[string]string
+	existingPodLabels map[string]string
 	expectedPodLabels map[string]string
 }
 
@@ -160,6 +179,7 @@ func testPodTopologyLabels(t *testing.T, tests []podTopologyTestCase) {
 			}
 
 			pod := prototypePod()
+			pod.Labels = test.existingPodLabels
 			if pod, err = client.CoreV1().Pods(ns.Name).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 				t.Errorf("Failed to create pod: %v", err)
 			}

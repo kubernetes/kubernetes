@@ -172,7 +172,7 @@ func (p *Plugin) admitPod(ctx context.Context, a admission.Attributes, o admissi
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
-	// avoid overwriting any existing labels on the Pod.
+	// overwrite any existing labels on the pod
 	mergeLabels(pod.Labels, labelsToCopy)
 
 	return nil
@@ -199,12 +199,9 @@ func (p *Plugin) topologyLabelsForNodeName(nodeName string) (map[string]string, 
 	return labels, nil
 }
 
-// mergeLabels merges new into existing, without overwriting existing keys.
+// mergeLabels merges new into existing, overwriting existing keys.
 func mergeLabels(existing, new map[string]string) {
 	for k, v := range new {
-		if _, exists := existing[k]; exists {
-			continue
-		}
 		existing[k] = v
 	}
 }

@@ -89,7 +89,7 @@ func TestPodTopology(t *testing.T) {
 			existingBindingLabels: map[string]string{},
 		},
 		{
-			name: "does not overwrite existing topology labels on Binding objects",
+			name: "overwrites existing topology labels",
 			existingBindingLabels: map[string]string{
 				"topology.k8s.io/zone": "oldValue",
 			},
@@ -97,7 +97,7 @@ func TestPodTopology(t *testing.T) {
 				"topology.k8s.io/zone": "newValue",
 			},
 			expectedBindingLabels: map[string]string{
-				"topology.k8s.io/zone": "oldValue",
+				"topology.k8s.io/zone": "newValue",
 			},
 		},
 		{
