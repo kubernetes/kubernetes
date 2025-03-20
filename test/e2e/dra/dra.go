@@ -1776,7 +1776,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 								}),
 							),
 						}),
-						"Spec": gstruct.MatchAllFields(gstruct.Fields{
+						// Ignoring some fields, like SharedCounters, because we don't run this test
+						// for PRs (it's slow) and don't want CI breaks when fields get added or renamed.
+						"Spec": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 							"Driver":       gomega.Equal(driver.Name),
 							"NodeName":     gomega.Equal(nodeName),
 							"NodeSelector": gomega.BeNil(),
