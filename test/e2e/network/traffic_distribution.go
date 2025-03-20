@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -121,8 +122,8 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	// Main test specifications.
 	////////////////////////////////////////////////////////////////////////////
 
-	ginkgo.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
-
+	// doTrafficDistributionTest runs a test of a service with the given trafficDist.
+	doTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
 		ginkgo.By("finding 3 zones with schedulable nodes")
 		allZonesSet, err := e2enode.GetSchedulableClusterZones(ctx, c)
 		framework.ExpectNoError(err)
@@ -163,7 +164,6 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		}
 		e2epod.NewPodClient(f).CreateBatch(ctx, servingPods)
 
-		trafficDist := v1.ServiceTrafficDistributionPreferClose
 		svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "traffic-dist-test-service",
@@ -268,5 +268,13 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		})
 
 		gomega.Eventually(ctx, requestsFromClient(clientPod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceedByReachingAnyServingPod)
+	}
+
+	framework.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
+		doTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
+	})
+
+	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		doTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 	})
 })
