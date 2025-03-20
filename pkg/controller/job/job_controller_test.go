@@ -2881,7 +2881,7 @@ func TestSingleJobFailedCondition(t *testing.T) {
 }
 
 func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
 	job1.Name = "job1"
@@ -2928,6 +2928,8 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
 	}
 
+	// Verify that the job is updated as succeeded in the client set. However this status is not updated yet in the
+	// informer is not started
 	jobList, err := clientSet.Tracker().List(
 		schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
 		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
@@ -2940,7 +2942,8 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 		t.Fatalf("job status is not succeeded: %v", updatedJob)
 	}
 
-	// add the updated pod from the fake clientset memory to informer cache because informer is not started.
+	// add the updated pod from the fake clientset memory to informer cache because informer is not started. This is to make
+	// sure the job controller informer cache has the latest pod status.
 	podList, err = clientSet.Tracker().List(
 		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
 		schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
@@ -2956,8 +2959,9 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 		t.Fatalf("Unexpected error when adding pod to indexer %v", err)
 	}
 
-	// removing the just created pod from fake clientset memory inorder for the sync job to succeed if creating a new pod because of bug
-	// but the pod will remain inside informer cache
+	// removing the just created pod from fake clientset memory but the pod will remain inside informer cache
+	// of the job controller. We are removing from the client set because in case of a bug if the job controller
+	// is trying to create the pod again it can succeed because it creates using the same name again.
 	err = clientSet.Tracker().Delete(
 		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
 		"default", "")
@@ -2978,7 +2982,7 @@ func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error when syncing jobs %v", err)
 	}
-	// no pod should be created
+	// no pod should be created. Here it is 0 because we had deleted the pod from the client set.
 	if len(podList.(*v1.PodList).Items) != 0 {
 		t.Errorf("expect no pods to be created but %v pods are created", len(podList.(*v1.PodList).Items))
 	}
@@ -6338,7 +6342,7 @@ func TestGetPodsForJob(t *testing.T) {
 }
 
 func TestAddPod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 
@@ -6384,7 +6388,7 @@ func TestAddPod(t *testing.T) {
 }
 
 func TestAddPodOrphan(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6413,7 +6417,7 @@ func TestAddPodOrphan(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6462,7 +6466,7 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6490,7 +6494,7 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 }
 
 func TestUpdatePodChangeControllerRef(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6518,7 +6522,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 }
 
 func TestUpdatePodRelease(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6546,7 +6550,7 @@ func TestUpdatePodRelease(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6591,7 +6595,7 @@ func TestDeletePod(t *testing.T) {
 
 func TestDeletePodOrphan(t *testing.T) {
 	// Disable batching of pod updates to show it does not get requeued at all
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, 0))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, 0))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	jm, informer := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
@@ -7113,7 +7117,7 @@ func TestJobBackoff(t *testing.T) {
 		"failure with pod updates batching": {
 			requeues:    0,
 			phase:       v1.PodFailed,
-			wantBackoff: syncJobBatchPeriod,
+			wantBackoff: SyncJobBatchPeriod,
 		},
 	}
 

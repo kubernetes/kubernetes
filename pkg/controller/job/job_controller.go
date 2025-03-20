@@ -60,8 +60,8 @@ import (
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
 var (
-	// syncJobBatchPeriod is the batch period for controller sync invocations for a Job.
-	syncJobBatchPeriod = time.Second
+	// syncJobBatchPeriod is the batch period for controller sync invocations for a Job. Exported for tests.
+	SyncJobBatchPeriod = time.Second
 	// DefaultJobApiBackOff is the default API backoff period. Exported for tests.
 	DefaultJobApiBackOff = time.Second
 	// MaxJobApiBackOff is the max API backoff period. Exported for tests.
@@ -574,7 +574,7 @@ func (jm *Controller) enqueueSyncJobImmediately(logger klog.Logger, obj interfac
 // - Job status update
 // obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
 func (jm *Controller) enqueueSyncJobBatched(logger klog.Logger, obj interface{}) {
-	jm.enqueueSyncJobInternal(logger, obj, syncJobBatchPeriod)
+	jm.enqueueSyncJobInternal(logger, obj, SyncJobBatchPeriod)
 }
 
 // enqueueSyncJobWithDelay tells the controller to invoke syncJob with a
@@ -582,8 +582,8 @@ func (jm *Controller) enqueueSyncJobBatched(logger klog.Logger, obj interface{})
 // It is used when pod recreations are delayed due to pod failures.
 // obj could be an *batch.Job, or a DeletionFinalStateUnknown marker item.
 func (jm *Controller) enqueueSyncJobWithDelay(logger klog.Logger, obj interface{}, delay time.Duration) {
-	if delay < syncJobBatchPeriod {
-		delay = syncJobBatchPeriod
+	if delay < SyncJobBatchPeriod {
+		delay = SyncJobBatchPeriod
 	}
 	jm.enqueueSyncJobInternal(logger, obj, delay)
 }
