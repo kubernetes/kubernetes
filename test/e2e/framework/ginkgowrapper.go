@@ -210,12 +210,16 @@ func registerInSuite(ginkgoCall func(string, ...interface{}) bool, args []interf
 			addLabel(fullLabel)
 			if arg.alphaBetaLevel != "" {
 				texts = append(texts, fmt.Sprintf("[%[1]s]", arg.alphaBetaLevel))
-				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:"+arg.alphaBetaLevel))
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label(arg.alphaBetaLevel))
 			}
 			if arg.offByDefault {
 				texts = append(texts, "[Feature:OffByDefault]")
-				// TODO: consider this once we have a plan to update the alpha/beta job filters
-				// ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
+				ginkgoArgs = append(ginkgoArgs, ginkgo.Label("Feature:OffByDefault"))
+				// Alphas are always off by default but we may want to select
+				// betas based on defaulted-ness.
+				if arg.alphaBetaLevel == "Beta" {
+					ginkgoArgs = append(ginkgoArgs, ginkgo.Label("BetaOffByDefault"))
+				}
 			}
 			if fullLabel == "Serial" {
 				ginkgoArgs = append(ginkgoArgs, ginkgo.Serial)
@@ -374,12 +378,18 @@ func withFeature(name Feature) interface{} {
 // on the current stability level of the feature, to emulate historic
 // usage of those tags.
 //
-// In addition, [Feature:Alpha] resp. [Feature:Beta] get added to support
-// skipping a test with a dependency on an alpha or beta feature gate in
-// jobs which use the traditional \[Feature:.*\] skip regular expression.
+// For label filtering, Alpha resp. Beta get added to the Ginkgo labels.
 //
-// For label filtering, Feature:Alpha resp. Feature:Beta get added to the
-// Ginkgo labels.
+// [Feature:OffByDefault] gets added to support skipping a test with
+// a dependency on an alpha or beta feature gate in jobs which use the
+// traditional \[Feature:.*\] skip regular expression.
+//
+// Feature:OffByDefault is also available for label filtering.
+//
+// BetaOffByDefault is also added *only as a label* when the feature gate is
+// an off by default beta feature. This can be used to include/exclude based
+// on beta + defaulted-ness. Alpha has no equivalent because all alphas are
+// off by default.
 //
 // If the test can run in any cluster that has alpha resp. beta features and
 // API groups enabled, then annotating it with just WithFeatureGate is
