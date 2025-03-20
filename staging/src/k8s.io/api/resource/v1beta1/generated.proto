@@ -173,7 +173,11 @@ message BasicDevice {
   // UsageRestrictedToNode indicates if the usage of an allocation involving this device
   // has to be limited to exactly the node that was chosen when allocating the claim.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
+  // +featureGate=DRADeviceBindingConditions
   optional bool usageRestrictedToNode = 8;
 
   // BindingConditions defines the conditions for proceeding with binding.
@@ -182,8 +186,12 @@ message BasicDevice {
   // while scheduling the pod.
   // The maximum number of binding conditions is 4.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
   // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions
   repeated string bindingConditions = 9;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -191,8 +199,12 @@ message BasicDevice {
   // If any is true, a binding failure occurred.
   // The maximum number of binding failure conditions is 4.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
   // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions
   repeated string bindingFailureConditions = 10;
 
   // BindingTimeoutSeconds indicates the prepare timeout period.
@@ -201,7 +213,11 @@ message BasicDevice {
   //
   // The default timeout if not set is 600 seconds.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
+  // +featureGate=DRADeviceBindingConditions
   optional int64 bindingTimeoutSeconds = 11;
 }
 
@@ -763,7 +779,11 @@ message DeviceRequestAllocationResult {
   // UsageRestrictedToNode indicates if the usage of an allocation involving this device
   // has to be limited to exactly the node that was chosen when allocating the claim.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
+  // +featureGate=DRADeviceBindingConditions
   optional bool usageRestrictedToNode = 7;
 
   // BindingConditions defines the conditions for proceeding with binding.
@@ -772,8 +792,12 @@ message DeviceRequestAllocationResult {
   // while scheduling the pod.
   // The maximum number of binding conditions is 4.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
   // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions
   repeated string bindingConditions = 8;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -781,8 +805,12 @@ message DeviceRequestAllocationResult {
   // If any is true, a binding failure occurred.
   // The maximum number of binding failure conditions is 4.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
   // +listType=atomic
+  // +featureGate=DRADeviceBindingConditions
   repeated string bindingFailureConditions = 9;
 
   // BindingTimeoutSeconds indicates the prepare timeout period.
@@ -791,7 +819,11 @@ message DeviceRequestAllocationResult {
   //
   // The default timeout if not set is 600 seconds.
   //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions
+  // feature gate.
+  //
   // +optional
+  // +featureGate=DRADeviceBindingConditions
   optional int64 bindingTimeoutSeconds = 10;
 }
 

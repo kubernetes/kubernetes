@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -811,7 +812,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to check if the device is attached to the node.
-	needWait := checkBindingConditions(state)
+	needWait := hasBindingConditions(state)
 
 	// If no device needs to be prepared, we can return early.
 	if !needWait {
@@ -819,18 +820,16 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleStat
 	}
 
 	// We need to decide how long we should wait for the device to be attached to the node.
-	timeoutDefault := 600 * time.Second
-	timeoutMax := 1200 * time.Second
+	const timeoutDefaultSeconds int64 = 600
+	timeoutMax := 20 * time.Minute
 	timeout := 0 * time.Second
+
 	for _, claim := range state.claims {
 		for _, device := range claim.Status.Allocation.Devices.Results {
-			if device.BindingTimeoutSeconds != nil && timeout < time.Duration(*device.BindingTimeoutSeconds)*time.Second {
-				timeout = time.Duration(*device.BindingTimeoutSeconds) * time.Second
+			if deviceTimeout := time.Duration(ptr.Deref(device.BindingTimeoutSeconds, timeoutDefaultSeconds)) * time.Second; timeout < deviceTimeout {
+				timeout = deviceTimeout
 			}
 		}
-	}
-	if timeout <= 0 {
-		timeout = timeoutDefault
 	}
 	if timeout > timeoutMax {
 		timeout = timeoutMax
@@ -942,6 +941,9 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 
 // isClaimBound checks whether a given resource claim is successfully
 // bound to a device.
+// It returns an error if binding failed.
+// It returns true if (and only if) all binding conditions are true,
+// which includes the case that there are no binding conditions.
 func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool, error) {
 	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
 		if len(deviceRequest.BindingConditions) == 0 {
@@ -952,8 +954,12 @@ func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool
 			return false, nil
 		}
 		for _, cond := range deviceRequest.BindingFailureConditions {
-			if apimeta.IsStatusConditionTrue(deviceStatus.Conditions, cond) {
-				return false, fmt.Errorf("claim %s failed to bind", claim.Name)
+			failedCond := apimeta.FindStatusCondition(deviceStatus.Conditions, cond)
+			if failedCond != nil && failedCond.Status == metav1.ConditionTrue {
+				return false, fmt.Errorf("claim %s binding failed: reason=%s, message=%q",
+					claim.Name,
+					failedCond.Reason,
+					failedCond.Message)
 			}
 		}
 		for _, cond := range deviceRequest.BindingConditions {
@@ -979,16 +985,16 @@ func (pl *DynamicResources) hasDeviceBindingStatus(ctx context.Context, state *s
 			return false, err
 		}
 		if !bound {
-			pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device on node %s.", nodeName)
+			pl.fh.EventRecorder().Eventf(claim, pod, v1.EventTypeNormal, "BindingConditionsPending", "Scheduling", "waiting for binding conditions for device on node %s", nodeName)
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-// checkBindingConditions checks all claims in the given state.
+// hasBindingConditions checks all claims in the given state.
 // It returns true if any device has non-empty binding conditions.
-func checkBindingConditions(state *stateData) bool {
+func hasBindingConditions(state *stateData) bool {
 	for _, claim := range state.claims {
 		for _, device := range claim.Status.Allocation.Devices.Results {
 			if len(device.BindingConditions) > 0 {

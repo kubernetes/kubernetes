@@ -352,7 +352,11 @@ type BasicDevice struct {
 	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	UsageRestrictedToNode *bool
 
 	// BindingConditions defines the conditions for proceeding with binding.
@@ -361,8 +365,12 @@ type BasicDevice struct {
 	// while scheduling the pod.
 	// The maximum number of binding conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingConditions []string
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -370,8 +378,12 @@ type BasicDevice struct {
 	// If any is true, a binding failure occurred.
 	// The maximum number of binding failure conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingFailureConditions []string
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
@@ -380,7 +392,11 @@ type BasicDevice struct {
 	//
 	// The default timeout if not set is 600 seconds.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	BindingTimeoutSeconds *int64
 }
 
@@ -1329,7 +1345,12 @@ type DeviceRequestAllocationResult struct {
 
 	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	UsageRestrictedToNode *bool
 
 	// BindingConditions defines the conditions for proceeding with binding.
@@ -1338,8 +1359,12 @@ type DeviceRequestAllocationResult struct {
 	// while scheduling the pod.
 	// The maximum number of binding conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingConditions []string
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -1347,8 +1372,12 @@ type DeviceRequestAllocationResult struct {
 	// If any is true, a binding failure occurred.
 	// The maximum number of binding failure conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingFailureConditions []string
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
@@ -1359,7 +1388,11 @@ type DeviceRequestAllocationResult struct {
 	// The maximum timeout is 1200 seconds.
 	// Any configured timeout exceeding this value will be capped at 1200 seconds
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	BindingTimeoutSeconds *int64
 }
 

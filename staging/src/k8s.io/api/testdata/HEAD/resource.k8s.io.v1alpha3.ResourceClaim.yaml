@@ -97,6 +97,11 @@ status:
         source: sourceValue
       results:
       - adminAccess: true
+        bindingConditions:
+        - bindingConditionsValue
+        bindingFailureConditions:
+        - bindingFailureConditionsValue
+        bindingTimeoutSeconds: 10
         device: deviceValue
         driver: driverValue
         pool: poolValue
@@ -107,6 +112,7 @@ status:
           operator: operatorValue
           tolerationSeconds: 5
           value: valueValue
+        usageRestrictedToNode: true
     nodeSelector:
       nodeSelectorTerms:
       - matchExpressions:
