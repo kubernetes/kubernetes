@@ -4198,6 +4198,25 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 					Message: "could not create pod sandbox",
 				}},
 			},
+			expectedErr:              "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
+			expectedResizeConditions: nil,
+		},
+		{
+			name: "sync results have a non-resize error and a successful pod resize action",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{
+					{
+						Action:  kubecontainer.CreatePodSandbox,
+						Target:  pod.UID,
+						Error:   kubecontainer.ErrCreatePodSandbox,
+						Message: "could not create pod sandbox",
+					},
+					{
+						Action: kubecontainer.ResizePodInPlace,
+						Target: pod.UID,
+					},
+				},
+			},
 			expectedErr: "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
 			expectedResizeConditions: []*v1.PodCondition{{
 				Type:   v1.PodResizeInProgress,
