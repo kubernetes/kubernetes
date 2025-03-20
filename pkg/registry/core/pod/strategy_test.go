@@ -1340,7 +1340,11 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
+			if !tc.enableNodeInclusionPolicy {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
+			}
 
 			pod := podtest.MakePod("foo", podtest.SetGeneration(1))
 			wantPod := pod.DeepCopy()
@@ -1394,6 +1398,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 		t.Error("NodeInclusionPolicy created with unexpected result")
 	}
 
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	// Disable the Feature Gate and expect these fields still exist after updating.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)
 
