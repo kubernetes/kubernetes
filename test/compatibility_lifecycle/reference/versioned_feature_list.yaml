@@ -1035,6 +1035,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: PodLogsQuerySplitStreams
   versionedSpecs:
   - default: false
