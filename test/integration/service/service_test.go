@@ -290,6 +290,71 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 	}
 }
 
+func assertEndpointSliceHints(t *testing.T, ctx context.Context, client *clientset.Clientset, namespace, serviceName string, expectZoneHints, expectNodeHints bool) {
+	t.Helper()
+	logsBuffer := &bytes.Buffer{}
+
+	endpointSlicesHaveExpectedHints := func(ctx context.Context) (bool, error) {
+		slices, err := client.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
+		if err != nil {
+			fmt.Fprintf(logsBuffer, "failed to list EndpointSlices for service %q: %v\n", serviceName, err)
+			return false, nil
+		}
+		if slices == nil || len(slices.Items) == 0 {
+			fmt.Fprintf(logsBuffer, "no EndpointSlices returned for service %q\n", serviceName)
+			return false, nil
+		}
+		fmt.Fprintf(logsBuffer, "EndpointSlices=\n%v\n", format.Object(slices, 1 /* indent one level */))
+
+		for _, slice := range slices.Items {
+			for _, endpoint := range slice.Endpoints {
+				var ip, zone, nodeName string
+				if len(endpoint.Addresses) > 0 {
+					ip = endpoint.Addresses[0]
+				}
+				if endpoint.Zone != nil {
+					zone = *endpoint.Zone
+				}
+				if endpoint.NodeName != nil {
+					nodeName = *endpoint.NodeName
+				}
+				if endpoint.Hints == nil {
+					if expectZoneHints || expectNodeHints {
+						fmt.Fprintf(logsBuffer, "endpoint with ip %v has no hints, expectZoneHints=%v expectNodeHints=%v\n", ip, expectZoneHints, expectNodeHints)
+						return false, nil
+					}
+					continue
+				}
+				if expectZoneHints {
+					if len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
+						fmt.Fprintf(logsBuffer, "endpoint with ip %v does not have the correct hint, want hint for zone %q\n", ip, zone)
+						return false, nil
+					}
+				} else if len(endpoint.Hints.ForZones) != 0 {
+					fmt.Fprintf(logsBuffer, "endpoint with ip %v has unexpected hint for zone %q\n", ip, endpoint.Hints.ForZones[0].Name)
+					return false, nil
+				}
+				if expectNodeHints {
+					if len(endpoint.Hints.ForNodes) != 1 || endpoint.Hints.ForNodes[0].Name != nodeName {
+						fmt.Fprintf(logsBuffer, "endpoint with ip %v does not have the correct hint, want hint for node %q\n", ip, nodeName)
+						return false, nil
+					}
+				} else if len(endpoint.Hints.ForNodes) != 0 {
+					fmt.Fprintf(logsBuffer, "endpoint with ip %v has unexpected hint for node %q\n", ip, endpoint.Hints.ForNodes[0].Name)
+					return false, nil
+				}
+			}
+		}
+		return true, nil
+	}
+
+	err := wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, endpointSlicesHaveExpectedHints)
+	if err != nil {
+		t.Logf("logsBuffer=\n%v", logsBuffer)
+		t.Fatalf("Error waiting for EndpointSlices to have expected hints: %v", err)
+	}
+}
+
 // Test transitions involving the `trafficDistribution` field in Service spec.
 func Test_TransitionsForTrafficDistribution(t *testing.T) {
 
@@ -421,43 +486,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// hints in EndpointSlice.
 	////////////////////////////////////////////////////////////////////////////
 
-	// logsBuffer captures logs during assertions which multiple retires. These
-	// will only be printed if the assertion failed.
-	logsBuffer := &bytes.Buffer{}
-
-	endpointSlicesHaveNoHints := func(ctx context.Context) (bool, error) {
-		slices, err := client.DiscoveryV1().EndpointSlices(ns.GetName()).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svc.GetName())})
-		if err != nil {
-			fmt.Fprintf(logsBuffer, "failed to list EndpointSlices for service %q: %v\n", svc.GetName(), err)
-			return false, nil
-		}
-		if slices == nil || len(slices.Items) == 0 {
-			fmt.Fprintf(logsBuffer, "no EndpointSlices returned for service %q\n", svc.GetName())
-			return false, nil
-		}
-		fmt.Fprintf(logsBuffer, "EndpointSlices=\n%v\n", format.Object(slices, 1 /* indent one level */))
-
-		for _, slice := range slices.Items {
-			for _, endpoint := range slice.Endpoints {
-				var ip string
-				if len(endpoint.Addresses) > 0 {
-					ip = endpoint.Addresses[0]
-				}
-				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) != 0 {
-					fmt.Fprintf(logsBuffer, "endpoint with ip %v has hint %+v, want no hint\n", ip, endpoint.Hints)
-					return false, nil
-				}
-			}
-		}
-		return true, nil
-	}
-
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, endpointSlicesHaveNoHints)
-	if err != nil {
-		t.Logf("logsBuffer=\n%v", logsBuffer)
-		t.Fatalf("Error waiting for EndpointSlices to have same zone hints: %v", err)
-	}
-	logsBuffer.Reset()
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, false)
 
 	////////////////////////////////////////////////////////////////////////////
 	// Update the service by setting the `trafficDistribution: PreferClose` field
@@ -472,43 +501,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 		t.Fatalf("Failed to update test service with 'trafficDistribution: PreferClose': %v", err)
 	}
 
-	endpointSlicesHaveSameZoneHints := func(ctx context.Context) (bool, error) {
-		slices, err := client.DiscoveryV1().EndpointSlices(ns.GetName()).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, svc.GetName())})
-		if err != nil {
-			fmt.Fprintf(logsBuffer, "failed to list EndpointSlices for service %q: %v\n", svc.GetName(), err)
-			return false, nil
-		}
-		if slices == nil || len(slices.Items) == 0 {
-			fmt.Fprintf(logsBuffer, "no EndpointSlices returned for service %q\n", svc.GetName())
-			return false, nil
-		}
-		fmt.Fprintf(logsBuffer, "EndpointSlices=\n%v\n", format.Object(slices, 1 /* indent one level */))
-
-		for _, slice := range slices.Items {
-			for _, endpoint := range slice.Endpoints {
-				var ip string
-				if len(endpoint.Addresses) > 0 {
-					ip = endpoint.Addresses[0]
-				}
-				var zone string
-				if endpoint.Zone != nil {
-					zone = *endpoint.Zone
-				}
-				if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
-					fmt.Fprintf(logsBuffer, "endpoint with ip %v does not have the correct hint, want hint for zone %q\n", ip, zone)
-					return false, nil
-				}
-			}
-		}
-		return true, nil
-	}
-
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, endpointSlicesHaveSameZoneHints)
-	if err != nil {
-		t.Logf("logsBuffer=\n%v", logsBuffer)
-		t.Fatalf("Error waiting for EndpointSlices to have same zone hints: %v", err)
-	}
-	logsBuffer.Reset()
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), true, false)
 
 	////////////////////////////////////////////////////////////////////////////
 	// Update the service with the service.kubernetes.io/topology-mode=Auto
@@ -518,18 +511,14 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// service.kubernetes.io/topology-mode=Auto takes affect, since topology
 	// annotation would not work with only one service pod.
 	////////////////////////////////////////////////////////////////////////////
+
 	svc.Annotations = map[string]string{corev1.AnnotationTopologyMode: "Auto"}
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update test service with 'service.kubernetes.io/topology-mode=Auto' annotation: %v", err)
 	}
 
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, endpointSlicesHaveNoHints)
-	if err != nil {
-		t.Logf("logsBuffer=\n%v", logsBuffer)
-		t.Fatalf("Error waiting for EndpointSlices to have no hints: %v", err)
-	}
-	logsBuffer.Reset()
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, false)
 
 	////////////////////////////////////////////////////////////////////////////
 	// Remove the annotation service.kubernetes.io/topology-mode=Auto from the
@@ -538,36 +527,28 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// Assert that EndpointSlice for service again has the correct same-zone
 	// hints because of the `trafficDistribution: PreferClose` field.
 	////////////////////////////////////////////////////////////////////////////
+
 	svc.Annotations = map[string]string{}
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to remove annotation 'service.kubernetes.io/topology-mode=Auto' from service: %v", err)
 	}
 
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, endpointSlicesHaveSameZoneHints)
-	if err != nil {
-		t.Logf("logsBuffer=\n%v", logsBuffer)
-		t.Fatalf("Error waiting for EndpointSlices to have same zone hints: %v", err)
-	}
-	logsBuffer.Reset()
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), true, false)
 
 	////////////////////////////////////////////////////////////////////////////
 	// Remove the field `trafficDistribution: PreferClose` from the service.
 	//
 	// Assert that EndpointSlice for service again has no zone hints.
 	////////////////////////////////////////////////////////////////////////////
+
 	svc.Spec.TrafficDistribution = nil
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to remove annotation 'service.kubernetes.io/topology-mode=Auto' from service: %v", err)
 	}
 
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Second, true, endpointSlicesHaveNoHints)
-	if err != nil {
-		t.Logf("logsBuffer=\n%v", logsBuffer)
-		t.Fatalf("Error waiting for EndpointSlices to have no hints: %v", err)
-	}
-	logsBuffer.Reset()
+	assertEndpointSliceHints(t, ctx, client, ns.GetName(), svc.GetName(), false, false)
 }
 
 func Test_TrafficDistribution_FeatureGateEnableDisable(t *testing.T) {
