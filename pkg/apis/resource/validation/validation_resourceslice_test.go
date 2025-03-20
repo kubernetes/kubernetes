@@ -44,6 +44,12 @@ func testCapacity() map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
 	}
 }
 
+func testCounters() map[string]resourceapi.Counter {
+	return map[string]resourceapi.Counter{
+		"memory": {Value: resource.MustParse("1Gi")},
+	}
+}
+
 func testResourceSlice(name, nodeName, driverName string, numDevices int) *resourceapi.ResourceSlice {
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{
@@ -273,7 +279,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-node-selection": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `nodeSelector`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required, but multiple fields are set")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `nodeSelector`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = "worker"
@@ -284,7 +290,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"bad-node-selection-all-nodes": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required, but multiple fields are set")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = "worker"
@@ -293,7 +299,7 @@ func TestValidateResourceSlice(t *testing.T) {
 			}(),
 		},
 		"empty-node-selection": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required")},
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec"), "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required")},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.NodeName = ""
@@ -488,6 +494,233 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"bad-PerDeviceNodeSelection": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec"), "{`nodeName`, `perDeviceNodeSelection`}", "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required, but multiple fields are set"),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.NodeName = "worker"
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := true
+					return &r
+				}()
+				return slice
+			}(),
+		},
+		"invalid-false-PerDeviceNodeSelection": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "perDeviceNodeSelection"), false, "must be either unset or set to true"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.NodeName = "worker"
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := false
+					return &r
+				}()
+				return slice
+			}(),
+		},
+		"invalid-node-selector-in-basicdevice": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "nodeName"), "", "must not be empty"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "allNodes"), false, "must be either unset or set to true"),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic"), "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := true
+					return &r
+				}()
+				slice.Spec.NodeName = ""
+				slice.Spec.Devices[0].Basic.NodeName = func() *string {
+					r := ""
+					return &r
+				}()
+				slice.Spec.Devices[0].Basic.AllNodes = func() *bool {
+					r := false
+					return &r
+				}()
+				return slice
+			}(),
+		},
+		"bad-node-selector-in-basicdevice": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic"), "{`nodeName`, `allNodes`}", "exactly one of `nodeName`, `nodeSelector`, or `allNodes` is required when `perDeviceNodeSelection` is set to true in the ResourceSlice spec"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.PerDeviceNodeSelection = func() *bool {
+					r := true
+					return &r
+				}()
+				slice.Spec.NodeName = ""
+				slice.Spec.Devices[0].Basic.NodeName = func() *string {
+					r := "worker"
+					return &r
+				}()
+				slice.Spec.Devices[0].Basic.AllNodes = func() *bool {
+					r := true
+					return &r
+				}()
+				return slice
+			}(),
+		},
+		"bad-name-shared-counters": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name: badName,
+					},
+				}
+				return slice
+			}(),
+		},
+		"bad-countername-shared-counters": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("counters").Key(badName), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name: goodName,
+						Counters: map[string]resourceapi.Counter{
+							badName: {Value: resource.MustParse("1Gi")},
+						},
+					},
+				}
+				return slice
+			}(),
+		},
+		"missing-name-shared-counters": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"duplicate-shared-counters": {
+			wantFailures: field.ErrorList{
+				field.Duplicate(field.NewPath("spec", "sharedCounters").Index(1).Child("name"), goodName),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     goodName,
+						Counters: testCounters(),
+					},
+					{
+						Name:     goodName,
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"too-large-shared-counters": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharedCounters"), resourceapi.ResourceSliceMaxSharedCounters+1, resourceapi.ResourceSliceMaxSharedCounters),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxSharedCounters + 1)
+				return slice
+			}(),
+		},
+		"missing-sharedcounter-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCounter").Index(0).Child("sharedCounter"), ""),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCounter").Index(0).Child("sharedCounter"), "", "must reference a counterSet defined in the ResourceSlice sharedCounters"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].Basic.ConsumesCounter = []resourceapi.DeviceCounterConsumption{
+					{
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"missing-counter-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCounter").Index(0).Child("counters"), ""),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].Basic.ConsumesCounter = []resourceapi.DeviceCounterConsumption{
+					{
+						SharedCounter: "sharedcounters-0",
+					},
+				}
+				return slice
+			}(),
+		},
+		"wrong-counterref-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCounter").Index(0).Child("counters"), "fake", "must reference a counter defined in the ResourceSlice sharedCounters"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].Basic.ConsumesCounter = []resourceapi.DeviceCounterConsumption{
+					{
+						Counters: map[string]resourceapi.Counter{
+							"fake": {Value: resource.MustParse("1Gi")},
+						},
+						SharedCounter: "sharedcounters-0",
+					},
+				}
+				return slice
+			}(),
+		},
+		"wrong-sharedcounterref-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCounter").Index(0).Child("sharedCounter"), "fake", "must reference a counterSet defined in the ResourceSlice sharedCounters"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].Basic.ConsumesCounter = []resourceapi.DeviceCounterConsumption{
+					{
+						Counters:      testCounters(),
+						SharedCounter: "fake",
+					},
+				}
+				return slice
+			}(),
+		},
+		"too-large-consumes-counter": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("basic", "consumesCounter"), resourceapi.ResourceSliceMaxDeviceCounterConsumptions+1, resourceapi.ResourceSliceMaxSharedCounters),
+				field.TooMany(field.NewPath("spec", "sharedCounters"), resourceapi.ResourceSliceMaxDeviceCounterConsumptions+1, resourceapi.ResourceSliceMaxSharedCounters),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(resourceapi.ResourceSliceMaxDeviceCounterConsumptions + 1)
+				slice.Spec.Devices[0].Basic.ConsumesCounter = createConsumesCounter(resourceapi.ResourceSliceMaxDeviceCounterConsumptions + 1)
+				return slice
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -581,4 +814,26 @@ func TestValidateResourceSliceUpdate(t *testing.T) {
 			assertFailures(t, scenario.wantFailures, errs)
 		})
 	}
+}
+
+func createSharedCounters(count int) []resourceapi.CounterSet {
+	sharedCounters := make([]resourceapi.CounterSet, count)
+	for i := 0; i < count; i++ {
+		sharedCounters[i] = resourceapi.CounterSet{
+			Name:     fmt.Sprintf("sharedcounters-%d", i),
+			Counters: testCounters(),
+		}
+	}
+	return sharedCounters
+}
+
+func createConsumesCounter(count int) []resourceapi.DeviceCounterConsumption {
+	consumeCapacity := make([]resourceapi.DeviceCounterConsumption, count)
+	for i := 0; i < count; i++ {
+		consumeCapacity[i] = resourceapi.DeviceCounterConsumption{
+			SharedCounter: fmt.Sprintf("sharedcounters-%d", i),
+			Counters:      testCounters(),
+		}
+	}
+	return consumeCapacity
 }

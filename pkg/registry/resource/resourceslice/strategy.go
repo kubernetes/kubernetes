@@ -157,6 +157,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 // dropDisabledFields removes fields which are covered by a feature gate.
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
+	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -180,6 +181,48 @@ func draDeviceTaintsFeatureInUse(slice *resource.ResourceSlice) bool {
 		if device.Basic != nil && len(device.Basic.Taints) > 0 {
 			return true
 		}
+	}
+	return false
+}
+
+func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices) || draPartitionableDevicesFeatureInUse(oldSlice) {
+		return
+	}
+
+	newSlice.Spec.SharedCounters = nil
+	newSlice.Spec.PerDeviceNodeSelection = nil
+	for _, device := range newSlice.Spec.Devices {
+		if device.Basic != nil {
+			device.Basic.ConsumesCounter = nil
+			device.Basic.NodeName = nil
+			device.Basic.NodeSelector = nil
+			device.Basic.AllNodes = nil
+		}
+
+	}
+}
+
+func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	spec := slice.Spec
+	if len(spec.SharedCounters) > 0 || spec.PerDeviceNodeSelection != nil {
+		return true
+	}
+
+	for _, device := range spec.Devices {
+		if device.Basic != nil {
+			if len(device.Basic.ConsumesCounter) > 0 {
+				return true
+			}
+			if device.Basic.NodeName != nil || device.Basic.NodeSelector != nil || device.Basic.AllNodes != nil {
+				return true
+			}
+		}
+
 	}
 	return false
 }

@@ -52,10 +52,14 @@ func (AllocationResult) SwaggerDoc() map[string]string {
 }
 
 var map_BasicDevice = map[string]string{
-	"":           "BasicDevice defines one device instance.",
-	"attributes": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"capacity":   "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
-	"taints":     "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+	"":                "BasicDevice defines one device instance.",
+	"attributes":      "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"capacity":        "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
+	"consumesCounter": "ConsumesCounter defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumption entries is 32. This is the same as the maximum number of shared counters allowed in a ResourceSlice.",
+	"nodeName":        "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"nodeSelector":    "NodeSelector defines the nodes where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"allNodes":        "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+	"taints":          "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 8.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {
@@ -69,6 +73,25 @@ var map_CELDeviceSelector = map[string]string{
 
 func (CELDeviceSelector) SwaggerDoc() map[string]string {
 	return map_CELDeviceSelector
+}
+
+var map_Counter = map[string]string{
+	"":      "Counter describes a quantity associated with a device.",
+	"value": "Value defines how much of a certain device counter is available.",
+}
+
+func (Counter) SwaggerDoc() map[string]string {
+	return map_Counter
+}
+
+var map_CounterSet = map[string]string{
+	"":         "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourceSlice.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
+	"name":     "Name defines the name of the counter set. It must be a DNS label.",
+	"counters": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of counters is 32.",
+}
+
+func (CounterSet) SwaggerDoc() map[string]string {
+	return map_CounterSet
 }
 
 var map_Device = map[string]string{
@@ -188,6 +211,16 @@ var map_DeviceConstraint = map[string]string{
 
 func (DeviceConstraint) SwaggerDoc() map[string]string {
 	return map_DeviceConstraint
+}
+
+var map_DeviceCounterConsumption = map[string]string{
+	"":              "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
+	"sharedCounter": "SharedCounter defines the shared counter from which the counters defined will be consumed.",
+	"counters":      "Counters defines the Counter that will be consumed by the device.\n\nThe maximum number of Counters is 32.",
+}
+
+func (DeviceCounterConsumption) SwaggerDoc() map[string]string {
+	return map_DeviceCounterConsumption
 }
 
 var map_DeviceRequest = map[string]string{
@@ -447,13 +480,15 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 }
 
 var map_ResourceSliceSpec = map[string]string{
-	"":             "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
-	"driver":       "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
-	"pool":         "Pool describes the pool that this ResourceSlice belongs to.",
-	"nodeName":     "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
-	"nodeSelector": "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
-	"allNodes":     "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
-	"devices":      "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"":                       "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
+	"driver":                 "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
+	"pool":                   "Pool describes the pool that this ResourceSlice belongs to.",
+	"nodeName":               "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
+	"nodeSelector":           "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+	"allNodes":               "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
+	"perDeviceNodeSelection": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {

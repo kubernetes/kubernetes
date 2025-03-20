@@ -12606,6 +12606,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.BasicDevice
   map:
     fields:
+    - name: allNodes
+      type:
+        scalar: boolean
     - name: attributes
       type:
         map:
@@ -12616,6 +12619,18 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: consumesCounter
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceCounterConsumption
+          elementRelationship: atomic
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
     - name: taints
       type:
         list:
@@ -12626,6 +12641,24 @@ var schemaYAML = typed.YAMLObject(`types:
   map:
     fields:
     - name: expression
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.Counter
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1alpha3.CounterSet
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.Counter
+    - name: name
       type:
         scalar: string
       default: ""
@@ -12768,6 +12801,18 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.DeviceCounterConsumption
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.Counter
+    - name: sharedCounter
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.DeviceRequest
   map:
     fields:
@@ -13130,10 +13175,19 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perDeviceNodeSelection
+      type:
+        scalar: boolean
     - name: pool
       type:
         namedType: io.k8s.api.resource.v1alpha3.ResourcePool
       default: {}
+    - name: sharedCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.CounterSet
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.AllocatedDeviceStatus
   map:
     fields:
@@ -13176,6 +13230,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.BasicDevice
   map:
     fields:
+    - name: allNodes
+      type:
+        scalar: boolean
     - name: attributes
       type:
         map:
@@ -13186,6 +13243,18 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: consumesCounter
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCounterConsumption
+          elementRelationship: atomic
+    - name: nodeName
+      type:
+        scalar: string
+    - name: nodeSelector
+      type:
+        namedType: io.k8s.api.core.v1.NodeSelector
     - name: taints
       type:
         list:
@@ -13196,6 +13265,24 @@ var schemaYAML = typed.YAMLObject(`types:
   map:
     fields:
     - name: expression
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.Counter
+  map:
+    fields:
+    - name: value
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+- name: io.k8s.api.resource.v1beta1.CounterSet
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.Counter
+    - name: name
       type:
         scalar: string
       default: ""
@@ -13344,6 +13431,18 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.DeviceCounterConsumption
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.Counter
+    - name: sharedCounter
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.DeviceRequest
   map:
     fields:
@@ -13658,10 +13757,19 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: nodeSelector
       type:
         namedType: io.k8s.api.core.v1.NodeSelector
+    - name: perDeviceNodeSelection
+      type:
+        scalar: boolean
     - name: pool
       type:
         namedType: io.k8s.api.resource.v1beta1.ResourcePool
       default: {}
+    - name: sharedCounters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.CounterSet
+          elementRelationship: atomic
 - name: io.k8s.api.scheduling.v1.PriorityClass
   map:
     fields:

@@ -731,6 +731,71 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
 			},
 		},
+		"add-shared-counters": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name: deviceName,
+					Basic: &resourceapi.BasicDevice{
+						Taints: []resourceapi.DeviceTaint{{
+							Effect:    resourceapi.DeviceTaintEffectNoExecute,
+							TimeAdded: &timeAdded,
+						}},
+					}}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Generation: 1,
+						Slices: []Slice{{Devices: []resourceapi.Device{{
+							Name: deviceName,
+							Basic: &resourceapi.BasicDevice{
+								Taints: []resourceapi.DeviceTaint{
+									{
+										Effect: resourceapi.DeviceTaintEffectNoExecute,
+										// No time added here! Time from existing slice must get copied during update.
+									},
+									{
+										Key:       "example.com/tainted",
+										Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+										TimeAdded: &timeAddedLater,
+									},
+								},
+							}}},
+						}},
+					},
+				},
+			},
+			expectedStats: Stats{
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
+					ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{
+					Name: deviceName,
+					Basic: &resourceapi.BasicDevice{
+						Taints: []resourceapi.DeviceTaint{
+							{
+								Effect:    resourceapi.DeviceTaintEffectNoExecute,
+								TimeAdded: &timeAdded,
+							},
+							{
+								Key:       "example.com/tainted",
+								Effect:    resourceapi.DeviceTaintEffectNoSchedule,
+								TimeAdded: &timeAddedLater,
+							},
+						},
+					}}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
+					Obj(),
+			},
+		},
 	}
 
 	for name, test := range testCases {

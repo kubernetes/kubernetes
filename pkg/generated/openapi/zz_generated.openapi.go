@@ -921,6 +921,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.AllocationResult":                                                         schema_k8sio_api_resource_v1alpha3_AllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.BasicDevice":                                                              schema_k8sio_api_resource_v1alpha3_BasicDevice(ref),
 		"k8s.io/api/resource/v1alpha3.CELDeviceSelector":                                                        schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
+		"k8s.io/api/resource/v1alpha3.Counter":                                                                  schema_k8sio_api_resource_v1alpha3_Counter(ref),
+		"k8s.io/api/resource/v1alpha3.CounterSet":                                                               schema_k8sio_api_resource_v1alpha3_CounterSet(ref),
 		"k8s.io/api/resource/v1alpha3.Device":                                                                   schema_k8sio_api_resource_v1alpha3_Device(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceAllocationConfiguration":                                            schema_k8sio_api_resource_v1alpha3_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceAllocationResult":                                                   schema_k8sio_api_resource_v1alpha3_DeviceAllocationResult(ref),
@@ -933,6 +935,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceClassSpec":                                                          schema_k8sio_api_resource_v1alpha3_DeviceClassSpec(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceConfiguration":                                                      schema_k8sio_api_resource_v1alpha3_DeviceConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceConstraint":                                                         schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceCounterConsumption":                                                 schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult":                                            schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceSelector":                                                           schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
@@ -961,6 +964,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.AllocationResult":                                                          schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.BasicDevice":                                                               schema_k8sio_api_resource_v1beta1_BasicDevice(ref),
 		"k8s.io/api/resource/v1beta1.CELDeviceSelector":                                                         schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref),
+		"k8s.io/api/resource/v1beta1.Counter":                                                                   schema_k8sio_api_resource_v1beta1_Counter(ref),
+		"k8s.io/api/resource/v1beta1.CounterSet":                                                                schema_k8sio_api_resource_v1beta1_CounterSet(ref),
 		"k8s.io/api/resource/v1beta1.Device":                                                                    schema_k8sio_api_resource_v1beta1_Device(ref),
 		"k8s.io/api/resource/v1beta1.DeviceAllocationConfiguration":                                             schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.DeviceAllocationResult":                                                    schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref),
@@ -974,6 +979,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.DeviceClassSpec":                                                           schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref),
 		"k8s.io/api/resource/v1beta1.DeviceConfiguration":                                                       schema_k8sio_api_resource_v1beta1_DeviceConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.DeviceConstraint":                                                          schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref),
+		"k8s.io/api/resource/v1beta1.DeviceCounterConsumption":                                                  schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref),
 		"k8s.io/api/resource/v1beta1.DeviceRequest":                                                             schema_k8sio_api_resource_v1beta1_DeviceRequest(ref),
 		"k8s.io/api/resource/v1beta1.DeviceRequestAllocationResult":                                             schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.DeviceSelector":                                                            schema_k8sio_api_resource_v1beta1_DeviceSelector(ref),
@@ -47260,6 +47266,45 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 					},
+					"consumesCounter": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumesCounter defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumption entries is 32. This is the same as the maximum number of shared counters allowed in a ResourceSlice.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceCounterConsumption"),
+									},
+								},
+							},
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeSelector defines the nodes where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
+						},
+					},
+					"allNodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"taints": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -47283,7 +47328,7 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceCounterConsumption", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47306,6 +47351,67 @@ func schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref common.ReferenceCa
 				Required: []string{"expression"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Counter describes a quantity associated with a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value defines how much of a certain device counter is available.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_CounterSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourceSlice.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name defines the name of the counter set. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of counters is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.Counter"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "counters"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.Counter"},
 	}
 }
 
@@ -47823,6 +47929,45 @@ func schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref common.ReferenceCal
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"sharedCounter": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SharedCounter defines the shared counter from which the counters defined will be consumed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the Counter that will be consumed by the device.\n\nThe maximum number of Counters is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.Counter"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"sharedCounter", "counters"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.Counter"},
 	}
 }
 
@@ -48995,20 +49140,20 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCa
 					},
 					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
+							Description: "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+							Description: "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
 					"allNodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+							Description: "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -49032,12 +49177,38 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCa
 							},
 						},
 					},
+					"perDeviceNodeSelection": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"sharedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.CounterSet"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.Device", "k8s.io/api/resource/v1alpha3.ResourcePool"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.CounterSet", "k8s.io/api/resource/v1alpha3.Device", "k8s.io/api/resource/v1alpha3.ResourcePool"},
 	}
 }
 
@@ -49180,6 +49351,45 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"consumesCounter": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ConsumesCounter defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumption entries is 32. This is the same as the maximum number of shared counters allowed in a ResourceSlice.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceCounterConsumption"),
+									},
+								},
+							},
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"nodeSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeSelector defines the nodes where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
+						},
+					},
+					"allNodes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 					"taints": {
 						VendorExtensible: spec.VendorExtensible{
 							Extensions: spec.Extensions{
@@ -49203,7 +49413,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/api/resource/v1beta1.DeviceTaint"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/api/resource/v1beta1.DeviceCounterConsumption", "k8s.io/api/resource/v1beta1.DeviceTaint"},
 	}
 }
 
@@ -49226,6 +49436,67 @@ func schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref common.ReferenceCal
 				Required: []string{"expression"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_Counter(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "Counter describes a quantity associated with a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"value": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Value defines how much of a certain device counter is available.",
+							Ref:         ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+						},
+					},
+				},
+				Required: []string{"value"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourceSlice.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name defines the name of the counter set. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.Counter"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "counters"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.Counter"},
 	}
 }
 
@@ -49765,6 +50036,45 @@ func schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref common.ReferenceCall
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"sharedCounter": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SharedCounter defines the shared counter from which the counters defined will be consumed.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the Counter that will be consumed by the device.\n\nThe maximum number of Counters is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.Counter"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"sharedCounter", "counters"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.Counter"},
 	}
 }
 
@@ -50751,20 +51061,20 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 					},
 					"nodeName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set. This field is immutable.",
+							Description: "NodeName identifies the node which provides the resources in this pool. A field selector can be used to list only ResourceSlice objects belonging to a certain node.\n\nThis field can be used to limit access from nodes to ResourceSlices with the same node name. It also indicates to autoscalers that adding new nodes of the same type as some old node might also make new resources available.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set. This field is immutable.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"nodeSelector": {
 						SchemaProps: spec.SchemaProps{
-							Description: "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+							Description: "NodeSelector defines which nodes have access to the resources in the pool, when that pool is not limited to a single node.\n\nMust use exactly one term.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
 					"allNodes": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector and AllNodes must be set.",
+							Description: "AllNodes indicates that all nodes have access to the resources in the pool.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -50788,12 +51098,38 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"perDeviceNodeSelection": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"sharedCounters": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.CounterSet"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.Device", "k8s.io/api/resource/v1beta1.ResourcePool"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.CounterSet", "k8s.io/api/resource/v1beta1.Device", "k8s.io/api/resource/v1beta1.ResourcePool"},
 	}
 }
 

@@ -231,6 +231,14 @@ const (
 	// cause pods using them to stop. Users can decide to tolerate taints.
 	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
 
+	// owner: @mortent, @cici37
+	// kep: http://kep.k8s.io/4815
+	//
+	// Enables support for dynamically partitioning devices based on
+	// which parts of them were allocated during scheduling.
+	//
+	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
+
 	// owner: @mortent
 	// kep: http://kep.k8s.io/4816
 	//
@@ -1113,6 +1121,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	DRADeviceTaints: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	DRAPartitionableDevices: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 

@@ -48,14 +48,19 @@ type deviceClassLister interface {
 // available and the current state of the cluster (claims, classes, resource
 // slices).
 type Allocator struct {
-	adminAccessEnabled     bool
-	prioritizedListEnabled bool
-	deviceTaintsEnabled    bool
-	claimsToAllocate       []*resourceapi.ResourceClaim
-	allocatedDevices       sets.Set[DeviceID]
-	classLister            deviceClassLister
-	slices                 []*resourceapi.ResourceSlice
-	celCache               *cel.Cache
+	features         Features
+	claimsToAllocate []*resourceapi.ResourceClaim
+	allocatedDevices sets.Set[DeviceID]
+	classLister      deviceClassLister
+	slices           []*resourceapi.ResourceSlice
+	celCache         *cel.Cache
+}
+
+type Features struct {
+	AdminAccess          bool
+	PrioritizedList      bool
+	PartitionableDevices bool
+	DeviceTaints         bool
 }
 
 // NewAllocator returns an allocator for a certain set of claims or an error if
@@ -63,9 +68,7 @@ type Allocator struct {
 //
 // The returned Allocator can be used multiple times and is thread-safe.
 func NewAllocator(ctx context.Context,
-	adminAccessEnabled bool,
-	prioritizedListEnabled bool,
-	deviceTaintsEnabled bool,
+	features Features,
 	claimsToAllocate []*resourceapi.ResourceClaim,
 	allocatedDevices sets.Set[DeviceID],
 	classLister deviceClassLister,
@@ -73,14 +76,12 @@ func NewAllocator(ctx context.Context,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
-		adminAccessEnabled:     adminAccessEnabled,
-		prioritizedListEnabled: prioritizedListEnabled,
-		deviceTaintsEnabled:    deviceTaintsEnabled,
-		claimsToAllocate:       claimsToAllocate,
-		allocatedDevices:       allocatedDevices,
-		classLister:            classLister,
-		slices:                 slices,
-		celCache:               celCache,
+		features:         features,
+		claimsToAllocate: claimsToAllocate,
+		allocatedDevices: allocatedDevices,
+		classLister:      classLister,
+		slices:           slices,
+		celCache:         celCache,
 	}, nil
 }
 
@@ -117,6 +118,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		Allocator:            a,
 		ctx:                  ctx, // all methods share the same a and thus ctx
 		logger:               klog.FromContext(ctx),
+		node:                 node,
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(a.claimsToAllocate)),
 		requestData:          make(map[requestIndices]requestData),
@@ -126,7 +128,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
 
 	// First determine all eligible pools.
-	pools, err := GatherPools(ctx, alloc.slices, node)
+	pools, err := GatherPools(ctx, alloc.slices, node, a.features)
 	if err != nil {
 		return nil, fmt.Errorf("gather pool information: %w", err)
 	}
@@ -174,7 +176,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 
 			// Error out if the prioritizedList feature is not enabled and the request
 			// has subrequests. This is to avoid surprising behavior for users.
-			if !a.prioritizedListEnabled && hasSubRequests {
+			if !a.features.PrioritizedList && hasSubRequests {
 				return nil, fmt.Errorf("claim %s, request %s: has subrequests, but the DRAPrioritizedList feature is disabled", klog.KObj(claim), request.Name)
 			}
 
@@ -384,7 +386,7 @@ func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest
 		}
 	}
 
-	if !a.adminAccessEnabled && request.hasAdminAccess() {
+	if !a.features.AdminAccess && request.hasAdminAccess() {
 		return requestData, fmt.Errorf("claim %s, request %s: admin access is requested, but the feature is disabled", klog.KObj(claim), request.name())
 	}
 
@@ -461,6 +463,7 @@ type allocator struct {
 	*Allocator
 	ctx                  context.Context
 	logger               klog.Logger
+	node                 *v1.Node
 	pools                []*Pool
 	deviceMatchesRequest map[matchKey]bool
 	constraints          [][]constraint                 // one list of constraints per claim
@@ -526,6 +529,7 @@ type internalDeviceResult struct {
 	request       string // name of the request (if no subrequests) or the subrequest
 	parentRequest string // name of the request which contains the subrequest, empty otherwise
 	id            DeviceID
+	basic         *draapi.BasicDevice
 	slice         *draapi.ResourceSlice
 	adminAccess   *bool
 }
@@ -883,6 +887,25 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 		return false, nil
 	}
 
+	if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
+		var nodeName string
+		var allNodes bool
+		if device.NodeName != nil {
+			nodeName = *device.NodeName
+		}
+		if device.AllNodes != nil {
+			allNodes = *device.AllNodes
+		}
+		matches, err := nodeMatches(alloc.node, nodeName, allNodes, device.NodeSelector)
+		if err != nil {
+			return false, err
+		}
+		if !matches {
+			alloc.deviceMatchesRequest[matchKey] = false
+			return false, nil
+		}
+	}
+
 	alloc.deviceMatchesRequest[matchKey] = true
 	return true, nil
 
@@ -949,6 +972,20 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
+	// The API validation logic has checked the ConsumesCounter referred should exist inside SharedCounters.
+	if alloc.features.PartitionableDevices && len(device.basic.ConsumesCounter) > 0 {
+		// If a device consumes capacity from a capacity pool, verify that
+		// there is sufficient capacity available.
+		ok, err := alloc.checkAvailableCapacity(device)
+		if err != nil {
+			return false, nil, err
+		}
+		if !ok {
+			alloc.logger.V(7).Info("Insufficient capacity", "device", device.id)
+			return false, nil, nil
+		}
+	}
+
 	var parentRequestName string
 	var baseRequestName string
 	var subRequestName string
@@ -962,7 +999,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 
 	// Might be tainted, in which case the taint has to be tolerated.
 	// The check is skipped if the feature is disabled.
-	if alloc.deviceTaintsEnabled && !allTaintsTolerated(device.basic, request) {
+	if alloc.features.DeviceTaints && !allTaintsTolerated(device.basic, request) {
 		return false, nil, nil
 	}
 
@@ -994,6 +1031,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		request:       request.name(),
 		parentRequest: parentRequestName,
 		id:            device.id,
+		basic:         device.basic,
 		slice:         device.slice,
 	}
 	if request.adminAccess() {
@@ -1033,18 +1071,99 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 	return false
 }
 
+func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error) {
+	slice := device.slice
+
+	referencedSharedCounters := sets.New[draapi.UniqueString]()
+	for _, consumedCounter := range device.basic.ConsumesCounter {
+		referencedSharedCounters.Insert(consumedCounter.SharedCounter)
+	}
+
+	// Create a structure that captures the initial counter for all sharedCounters
+	// referenced by the device.
+	availableCounters := make(map[draapi.UniqueString]map[string]draapi.Counter)
+	for _, counterSet := range slice.Spec.SharedCounters {
+		if !referencedSharedCounters.Has(counterSet.Name) {
+			// the API validation logic has been added to make sure the counterSet referred should exist in capacityPools
+			continue
+		}
+		counterShared := make(map[string]draapi.Counter, len(counterSet.Counters))
+		for name, cap := range counterSet.Counters {
+			counterShared[name] = cap
+		}
+		availableCounters[counterSet.Name] = counterShared
+	}
+
+	// Update the data structure to reflect capacity already in use.
+	for _, device := range slice.Spec.Devices {
+		deviceID := DeviceID{
+			Driver: slice.Spec.Driver,
+			Pool:   slice.Spec.Pool.Name,
+			Device: device.Name,
+		}
+		if !alloc.allocatedDevices.Has(deviceID) && !alloc.allocatingDevices[deviceID] {
+			continue
+		}
+		for _, consumedCounter := range device.Basic.ConsumesCounter {
+			counterShared := availableCounters[consumedCounter.SharedCounter]
+			for name, cap := range consumedCounter.Counters {
+				existingCap, ok := counterShared[name]
+				if !ok {
+					// the API validation logic has been added to make sure the capacity referred should exist in capacityPools
+					continue
+				}
+				// This can potentially result in negative available capacity. That is fine,
+				// we just treat it as no capacity available.
+				existingCap.Value.Sub(cap.Value)
+				counterShared[name] = existingCap
+			}
+		}
+	}
+
+	// Check if all consumed capacities for the device can be satisfied.
+	for _, deviceConsumedCounter := range device.basic.ConsumesCounter {
+		counterShared := availableCounters[deviceConsumedCounter.SharedCounter]
+		for name, cap := range deviceConsumedCounter.Counters {
+			availableCap, found := counterShared[name]
+			// If the device requests a capacity that doesn't exist in
+			// the pool, it can not be allocated.
+			if !found {
+				return false, nil
+			}
+			// If the device requests more capacity than is available, it
+			// can not be allocated.
+			if availableCap.Value.Cmp(cap.Value) < 0 {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
+
 // createNodeSelector constructs a node selector for the allocation, if needed,
 // otherwise it returns nil.
 func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.NodeSelector, error) {
 	// Selector with one term. That term gets extended with additional
 	// requirements from the different devices.
-	nodeSelector := &v1.NodeSelector{
+	ns := &v1.NodeSelector{
 		NodeSelectorTerms: []v1.NodeSelectorTerm{{}},
 	}
 
 	for i := range result {
 		slice := result[i].slice
-		if slice.Spec.NodeName != draapi.NullUniqueString {
+		var nodeName draapi.UniqueString
+		var nodeSelector *v1.NodeSelector
+		if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
+			if result[i].basic.NodeName != nil {
+				nodeName = draapi.MakeUniqueString(*result[i].basic.NodeName)
+			}
+			nodeSelector = result[i].basic.NodeSelector
+		} else {
+			nodeName = slice.Spec.NodeName
+			nodeSelector = slice.Spec.NodeSelector
+		}
+		if nodeName != draapi.NullUniqueString {
 			// At least one device is local to one node. This
 			// restricts the allocation to that node.
 			return &v1.NodeSelector{
@@ -1052,29 +1171,29 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 					MatchFields: []v1.NodeSelectorRequirement{{
 						Key:      "metadata.name",
 						Operator: v1.NodeSelectorOpIn,
-						Values:   []string{slice.Spec.NodeName.String()},
+						Values:   []string{nodeName.String()},
 					}},
 				}},
 			}, nil
 		}
-		if slice.Spec.NodeSelector != nil {
-			switch len(slice.Spec.NodeSelector.NodeSelectorTerms) {
+		if nodeSelector != nil {
+			switch len(nodeSelector.NodeSelectorTerms) {
 			case 0:
 				// Nothing?
 			case 1:
 				// Add all terms if they are not present already.
-				addNewNodeSelectorRequirements(slice.Spec.NodeSelector.NodeSelectorTerms[0].MatchFields, &nodeSelector.NodeSelectorTerms[0].MatchFields)
-				addNewNodeSelectorRequirements(slice.Spec.NodeSelector.NodeSelectorTerms[0].MatchExpressions, &nodeSelector.NodeSelectorTerms[0].MatchExpressions)
+				addNewNodeSelectorRequirements(nodeSelector.NodeSelectorTerms[0].MatchFields, &ns.NodeSelectorTerms[0].MatchFields)
+				addNewNodeSelectorRequirements(nodeSelector.NodeSelectorTerms[0].MatchExpressions, &ns.NodeSelectorTerms[0].MatchExpressions)
 			default:
 				// This shouldn't occur, validation must prevent creation of such slices.
-				return nil, fmt.Errorf("unsupported ResourceSlice.NodeSelector with %d terms", len(slice.Spec.NodeSelector.NodeSelectorTerms))
+				return nil, fmt.Errorf("unsupported ResourceSlice.NodeSelector with %d terms", len(nodeSelector.NodeSelectorTerms))
 			}
 		}
 	}
 
-	if len(nodeSelector.NodeSelectorTerms[0].MatchFields) > 0 || len(nodeSelector.NodeSelectorTerms[0].MatchExpressions) > 0 {
+	if len(ns.NodeSelectorTerms[0].MatchFields) > 0 || len(ns.NodeSelectorTerms[0].MatchExpressions) > 0 {
 		// We have a valid node selector.
-		return nodeSelector, nil
+		return ns, nil
 	}
 
 	// Available everywhere.

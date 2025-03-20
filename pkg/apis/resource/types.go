@@ -106,7 +106,7 @@ type ResourceSliceSpec struct {
 	// new nodes of the same type as some old node might also make new
 	// resources available.
 	//
-	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	// This field is immutable.
 	//
 	// +optional
@@ -118,7 +118,7 @@ type ResourceSliceSpec struct {
 	//
 	// Must use exactly one term.
 	//
-	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	//
 	// +optional
 	// +oneOf=NodeSelection
@@ -126,7 +126,7 @@ type ResourceSliceSpec struct {
 
 	// AllNodes indicates that all nodes have access to the resources in the pool.
 	//
-	// Exactly one of NodeName, NodeSelector and AllNodes must be set.
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
 	//
 	// +optional
 	// +oneOf=NodeSelection
@@ -139,6 +139,54 @@ type ResourceSliceSpec struct {
 	// +optional
 	// +listType=atomic
 	Devices []Device
+
+	// PerDeviceNodeSelection defines whether the access from nodes to
+	// resources in the pool is set on the ResourceSlice level or on each
+	// device. If it is set to true, every device defined the ResourceSlice
+	// must specify this individually.
+	//
+	// Exactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.
+	//
+	// +optional
+	// +oneOf=NodeSelection
+	// +featureGate=DRAPartitionableDevices
+	PerDeviceNodeSelection *bool
+
+	// SharedCounters defines a list of counter sets, each of which
+	// has a name and a list of counters available.
+	//
+	// The names of the SharedCounters must be unique in the ResourceSlice.
+	//
+	// The maximum number of SharedCounters is 32.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRAPartitionableDevices
+	SharedCounters []CounterSet
+}
+
+// CounterSet defines a named set of counters
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The counters are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the portion of counters it uses will no longer be available for use
+// by other devices.
+type CounterSet struct {
+	// Name defines the name of the counter set.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string
+
+	// Counters defines the set of counters for this CounterSet
+	// The name of each counter must be unique in that set and must be a DNS label.
+	//
+	// The maximum number of counters is 32.
+	//
+	// +required
+	Counters map[string]Counter
 }
 
 // DriverNameMaxLength is the maximum valid length of a driver name in the
@@ -186,6 +234,28 @@ const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 
+// Defines the max number of SharedCounters that can be specified
+// in a ResourceSlice. This is used to validate the fields:
+// * spec.sharedCounters
+const ResourceSliceMaxSharedCounters = 32
+
+// Defines the max number of Counters from which a device
+// can consume. This is used to validate the fields:
+// * spec.devices[].consumesCounter
+const ResourceSliceMaxDeviceCounterConsumptions = 32
+
+// Defines the max number of counters
+// that can be specified for sharedCounters in a ResourceSlice.
+// This is used to validate the fields:
+// * spec.sharedCounters[].counters
+const ResourceSliceMaxSharedCountersCounters = 32
+
+// Defines the max number of counters
+// that can be specified for consumesCounter in a ResourceSlice.
+// This is used to validate the fields:
+// * spec.devices[].consumesCounter[].counters
+const ResourceSliceMaxDeviceCounterConsumptionCounters = 32
+
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 type Device struct {
@@ -220,6 +290,51 @@ type BasicDevice struct {
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity
 
+	// ConsumesCounter defines a list of references to sharedCounters
+	// and the set of counters that the device will
+	// consume from those counter sets.
+	//
+	// There can only be a single entry per counterSet.
+	//
+	// The maximum number of device counter consumption entries
+	// is 32. This is the same as the maximum number of shared counters
+	// allowed in a ResourceSlice.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRAPartitionableDevices
+	ConsumesCounter []DeviceCounterConsumption
+
+	// NodeName identifies the node where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	// +featureGate=DRAPartitionableDevices
+	NodeName *string
+
+	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	// +featureGate=DRAPartitionableDevices
+	NodeSelector *core.NodeSelector
+
+	// AllNodes indicates that all nodes have access to the device.
+	//
+	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
+	// At most one of NodeName, NodeSelector and AllNodes can be set.
+	//
+	// +optional
+	// +oneOf=DeviceNodeSelection
+	// +featureGate=DRAPartitionableDevices
+	AllNodes *bool
+
 	// If specified, these are the driver-defined taints.
 	//
 	// The maximum number of taints is 8.
@@ -233,6 +348,25 @@ type BasicDevice struct {
 	Taints []DeviceTaint
 }
 
+// DeviceCounterConsumption defines a set of counters that
+// a device will consume from a CounterSet.
+type DeviceCounterConsumption struct {
+	// SharedCounter defines the shared counter from which the
+	// counters defined will be consumed.
+	//
+	// +required
+	SharedCounter string
+
+	// Counters defines the Counter that will be consumed by
+	// the device.
+	//
+	//
+	// The maximum number of Counters is 32.
+	//
+	// +required
+	Counters map[string]Counter
+}
+
 // DeviceCapacity describes a quantity associated with a device.
 type DeviceCapacity struct {
 	// Value defines how much of a certain device capacity is available.
@@ -242,6 +376,14 @@ type DeviceCapacity struct {
 
 	// potential future addition: fields which define how to "consume"
 	// capacity (= share a single device between different consumers).
+}
+
+// Counter describes a quantity associated with a device.
+type Counter struct {
+	// Value defines how much of a certain device counter is available.
+	//
+	// +required
+	Value resource.Quantity
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
