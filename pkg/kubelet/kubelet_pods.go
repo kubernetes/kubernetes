@@ -2105,6 +2105,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			} else {
 				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
 			}
+			// TODO(tallclair,vinaykul,InPlacePodVerticalScaling): Investigate defaulting to actuated resources instead of allocated resources above
+			if _, exists := resources.Requests[v1.ResourceMemory]; exists {
+				// Get memory requests from actuated resources
+				if actuatedResources, found := kl.allocationManager.GetActuatedResources(pod.UID, allocatedContainer.Name); found {
+					resources.Requests[v1.ResourceMemory] = actuatedResources.Requests.Memory().DeepCopy()
+				}
+			}
 		}
 
 		return resources
