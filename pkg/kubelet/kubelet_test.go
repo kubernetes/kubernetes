@@ -4138,5 +4138,112 @@ func TestCrashLoopBackOffConfiguration(t *testing.T) {
 			assert.Equalf(t, tc.expectedInitial, resultInitial, "wrong base calculated, want: %v, got %v", tc.expectedInitial, resultInitial)
 		})
 	}
+}
 
+func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "bar"},
+		},
+	})
+
+	testCases := []struct {
+		name                     string
+		syncResults              *kubecontainer.PodSyncResult
+		expectedErr              string
+		expectedResizeConditions []*v1.PodCondition
+	}{
+		{
+			name: "pod resize error returned from the runtime",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action:  kubecontainer.ResizePodInPlace,
+					Target:  pod.UID,
+					Error:   kubecontainer.ErrResizePodInPlace,
+					Message: "could not resize pod",
+				}},
+			},
+			expectedErr: "failed to \"ResizePodInPlace\" for \"12345678\" with ResizePodInPlaceError: \"could not resize pod\"",
+			expectedResizeConditions: []*v1.PodCondition{{
+				Type:    v1.PodResizeInProgress,
+				Status:  v1.ConditionTrue,
+				Reason:  v1.PodReasonError,
+				Message: "could not resize pod",
+			}},
+		},
+		{
+			name: "pod resize error cleared upon successful run",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action: kubecontainer.ResizePodInPlace,
+					Target: pod.UID,
+				}},
+			},
+			expectedResizeConditions: []*v1.PodCondition{{
+				Type:   v1.PodResizeInProgress,
+				Status: v1.ConditionTrue,
+			}},
+		},
+		{
+			name: "sync results have a non-resize error",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{{
+					Action:  kubecontainer.CreatePodSandbox,
+					Target:  pod.UID,
+					Error:   kubecontainer.ErrCreatePodSandbox,
+					Message: "could not create pod sandbox",
+				}},
+			},
+			expectedErr:              "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
+			expectedResizeConditions: nil,
+		},
+		{
+			name: "sync results have a non-resize error and a successful pod resize action",
+			syncResults: &kubecontainer.PodSyncResult{
+				SyncResults: []*kubecontainer.SyncResult{
+					{
+						Action:  kubecontainer.CreatePodSandbox,
+						Target:  pod.UID,
+						Error:   kubecontainer.ErrCreatePodSandbox,
+						Message: "could not create pod sandbox",
+					},
+					{
+						Action: kubecontainer.ResizePodInPlace,
+						Target: pod.UID,
+					},
+				},
+			},
+			expectedErr: "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
+			expectedResizeConditions: []*v1.PodCondition{{
+				Type:   v1.PodResizeInProgress,
+				Status: v1.ConditionTrue,
+			}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testKubelet.fakeRuntime.SyncResults = tc.syncResults
+			kubelet.podManager.SetPods([]*v1.Pod{pod})
+			isTerminal, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+			require.False(t, isTerminal)
+			if tc.expectedErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+				require.Equal(t, tc.expectedErr, err.Error())
+			}
+			gotResizeConditions := kubelet.statusManager.GetPodResizeConditions(pod.UID)
+			for _, c := range gotResizeConditions {
+				// ignore last probe and transition times for comparison
+				c.LastProbeTime = metav1.Time{}
+				c.LastTransitionTime = metav1.Time{}
+			}
+			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
+		})
+	}
 }

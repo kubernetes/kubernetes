@@ -61,6 +61,7 @@ type FakeRuntime struct {
 	VersionInfo       string
 	APIVersionInfo    string
 	RuntimeType       string
+	SyncResults       *kubecontainer.PodSyncResult
 	Err               error
 	InspectErr        error
 	StatusErr         error
@@ -237,6 +238,9 @@ func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.P
 	f.StartedPods = append(f.StartedPods, string(pod.UID))
 	for _, c := range pod.Spec.Containers {
 		f.StartedContainers = append(f.StartedContainers, c.Name)
+	}
+	if f.SyncResults != nil {
+		return *f.SyncResults
 	}
 	// TODO(random-liu): Add SyncResult for starting and killing containers
 	if f.Err != nil {

@@ -67,7 +67,14 @@ var (
 )
 
 func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	return createTestRuntimeManagerWithErrors(nil)
+}
+
+func createTestRuntimeManagerWithErrors(errors map[string][]error) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
+	if errors != nil {
+		fakeRuntimeService.Errors = errors
+	}
 	fakeImageService := apitest.NewFakeImageService()
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
 	// data in machineInfo is not used. If burstable containers are used in unit test in the future,
@@ -3186,9 +3193,6 @@ func TestDoPodResizeAction(t *testing.T) {
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	_, _, m, err := createTestRuntimeManager()
-	require.NoError(t, err)
-	m.cpuCFSQuota = true // Enforce CPU Limits
 
 	for _, tc := range []struct {
 		testName                  string
@@ -3196,7 +3200,9 @@ func TestDoPodResizeAction(t *testing.T) {
 		desiredResources          containerResources
 		updatedResources          []v1.ResourceName
 		otherContainersHaveLimits bool
+		runtimeErrors             map[string][]error
 		expectedError             string
+		expectedErrorMessage      string
 		expectPodCgroupUpdates    int
 	}{
 		{
@@ -3212,6 +3218,23 @@ func TestDoPodResizeAction(t *testing.T) {
 			otherContainersHaveLimits: true,
 			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
 			expectPodCgroupUpdates:    3, // cpu req, cpu lim, mem lim
+		},
+		{
+			testName: "Increase cpu and memory requests and limits, with computed pod limits and set a runtime error",
+			currentResources: containerResources{
+				cpuRequest: 100, cpuLimit: 100,
+				memoryRequest: 100, memoryLimit: 100,
+			},
+			desiredResources: containerResources{
+				cpuRequest: 200, cpuLimit: 200,
+				memoryRequest: 200, memoryLimit: 200,
+			},
+			otherContainersHaveLimits: true,
+			updatedResources:          []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+			expectPodCgroupUpdates:    1,
+			runtimeErrors:             map[string][]error{"UpdateContainerResources": {fmt.Errorf("error updating container resources")}},
+			expectedError:             "ResizePodInPlaceError",
+			expectedErrorMessage:      "error updating container resources",
 		},
 		{
 			testName: "Increase cpu and memory requests and limits, without computed pod limits",
@@ -3296,6 +3319,10 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
+			_, _, m, err := createTestRuntimeManagerWithErrors(tc.runtimeErrors)
+			require.NoError(t, err)
+			m.cpuCFSQuota = true // Enforce CPU Limits
+
 			mockCM := cmtesting.NewMockContainerManager(t)
 			mockCM.EXPECT().PodHasExclusiveCPUs(mock.Anything).Return(false).Maybe()
 			mockCM.EXPECT().ContainerHasExclusiveCPUs(mock.Anything, mock.Anything).Return(false).Maybe()
@@ -3358,17 +3385,17 @@ func TestDoPodResizeAction(t *testing.T) {
 				containersToUpdate[r] = []containerToUpdateInfo{updateInfo}
 			}
 
-			syncResult := &kubecontainer.PodSyncResult{}
 			actions := podActions{
 				ContainersToUpdate: containersToUpdate,
 			}
-			m.doPodResizeAction(pod, actions, syncResult)
+			resizeResult := m.doPodResizeAction(pod, actions)
 
 			if tc.expectedError != "" {
-				require.Error(t, syncResult.Error())
-				require.EqualError(t, syncResult.Error(), tc.expectedError)
+				require.Error(t, resizeResult.Error)
+				require.EqualError(t, resizeResult.Error, tc.expectedError)
+				require.Equal(t, tc.expectedErrorMessage, resizeResult.Message)
 			} else {
-				require.NoError(t, syncResult.Error())
+				require.NoError(t, resizeResult.Error)
 			}
 
 			mock.AssertExpectationsForObjects(t, mockPCM)
