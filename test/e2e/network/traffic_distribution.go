@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -260,9 +261,16 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	// Main test specifications.
 	////////////////////////////////////////////////////////////////////////////
 
-	ginkgo.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
+	framework.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
 		clientPods, serverPods := allocateClientsAndServers(ctx)
 		svc := createService(ctx, v1.ServiceTrafficDistributionPreferClose)
+		createPods(ctx, svc, clientPods, serverPods)
+		checkTrafficDistribution(ctx, clientPods)
+	})
+
+	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		clientPods, serverPods := allocateClientsAndServers(ctx)
+		svc := createService(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 		createPods(ctx, svc, clientPods, serverPods)
 		checkTrafficDistribution(ctx, clientPods)
 	})
