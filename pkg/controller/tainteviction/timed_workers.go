@@ -57,6 +57,7 @@ type TimedWorker struct {
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
+// Returns nil if the work was started immediately and doesn't need a timer.
 func createWorker(ctx context.Context, args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(ctx context.Context, fireAt time.Time, args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
 	logger := klog.FromContext(ctx)
@@ -90,6 +91,7 @@ func (w *TimedWorker) Cancel() {
 type TimedWorkerQueue struct {
 	sync.Mutex
 	// map of workers keyed by string returned by 'KeyFromWorkArgs' from the given worker.
+	// Entries may be nil if the work didn't need a timer and is already running.
 	workers  map[string]*TimedWorker
 	workFunc func(ctx context.Context, fireAt time.Time, args *WorkArgs) error
 	clock    clock.WithDelayedExecution
@@ -145,6 +147,10 @@ func (q *TimedWorkerQueue) UpdateWork(ctx context.Context, args *WorkArgs, creat
 	q.Lock()
 	defer q.Unlock()
 	if worker, exists := q.workers[key]; exists {
+		if worker == nil {
+			logger.V(4).Info("Keeping existing work, already in progress", "item", key)
+			return
+		}
 		if worker.FireAt.Compare(fireAt) == 0 {
 			logger.V(4).Info("Keeping existing work, same time", "item", key, "createTime", worker.CreatedAt, "firedTime", worker.FireAt)
 			return
