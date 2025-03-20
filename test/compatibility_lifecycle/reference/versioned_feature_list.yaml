@@ -1093,6 +1093,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: QOSReserved
   versionedSpecs:
   - default: false
