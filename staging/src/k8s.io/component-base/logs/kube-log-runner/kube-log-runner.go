@@ -32,10 +32,10 @@ import (
 	"k8s.io/component-base/logs/kube-log-runner/internal/logrotation"
 )
 
-type OpenFunc func(filePath string, enableFlush bool, maxSize int64, maxAge time.Duration) (io.WriteCloser, error)
+type OpenFunc func(filePath string, flushInterval time.Duration, maxSize int64, maxAge time.Duration) (io.WriteCloser, error)
 
 var (
-	enableFlush    *bool
+	flushInterval  *time.Duration
 	logFilePath    *string
 	logFileSize    *resource.QuantityValue
 	logFileAge     *time.Duration
@@ -45,7 +45,7 @@ var (
 
 func initFlags() {
 	logFileSize = &resource.QuantityValue{}
-	enableFlush = flag.Bool("enable-flush", false, "enable flush to log file in every 5 seconds")
+	flushInterval = flag.Duration("flush-interval", 0, "interval to flush log file to disk, default value 0, if non-zero, flush log file every interval")
 	logFilePath = flag.String("log-file", "", "If non-empty, save stdout to this file")
 	flag.Var(logFileSize, "log-file-size", "useful with log-file, in format of resource.quantity, default value 0, if non-zero, rotate log file when it reaches this size")
 	logFileAge = flag.Duration("log-file-age", 0, "useful with log-file-size, in format of timeDuration, if non-zero, remove log files older than this duration")
@@ -83,7 +83,7 @@ func configureAndRun(open OpenFunc) error {
 	}
 
 	if logFilePath != nil && *logFilePath != "" {
-		logFile, err := open(*logFilePath, *enableFlush, maxSize, *logFileAge)
+		logFile, err := open(*logFilePath, *flushInterval, maxSize, *logFileAge)
 
 		if err != nil {
 			return fmt.Errorf("failed to create log file %v: %w", *logFilePath, err)
@@ -128,7 +128,7 @@ func cmdInfo(cmd *exec.Cmd) string {
 		`Command env: (enable-flush=%v, log-file=%v, log-file-size=%v, log-file-age=%v, also-stdout=%v, redirect-stderr=%v)
 Run from directory: %v
 Executable path: %v
-Args (comma-delimited): %v`, *enableFlush, *logFilePath, logFileSize.Value(), *logFileAge, *alsoToStdOut, *redirectStderr,
+Args (comma-delimited): %v`, *flushInterval, *logFilePath, logFileSize.Value(), *logFileAge, *alsoToStdOut, *redirectStderr,
 		cmd.Dir, cmd.Path, strings.Join(cmd.Args, ","),
 	)
 }

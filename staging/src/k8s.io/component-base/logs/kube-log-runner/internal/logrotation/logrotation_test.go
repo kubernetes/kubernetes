@@ -26,7 +26,7 @@ import (
 func TestLogrotationWrite(t *testing.T) {
 	tests := []struct {
 		name             string
-		enableFlush      bool
+		flushInterval    time.Duration
 		maxSize          int64
 		maxAge           time.Duration
 		rotationExpected bool
@@ -34,15 +34,15 @@ func TestLogrotationWrite(t *testing.T) {
 	}{
 		{
 			name:             "no rotation",
-			enableFlush:      false,
+			flushInterval:    0,
 			maxSize:          0,
 			maxAge:           10 * time.Hour,
 			rotationExpected: false,
 			cleanupExpected:  false,
 		},
 		{
-			name:             "Rotation with enableFlush, maxSize, no cleanup",
-			enableFlush:      true,
+			name:             "Rotation with flushInterval, maxSize, no cleanup",
+			flushInterval:    5 * time.Second,
 			maxSize:          int64(1024 * 1024),
 			maxAge:           time.Duration(0),
 			rotationExpected: true,
@@ -50,15 +50,15 @@ func TestLogrotationWrite(t *testing.T) {
 		},
 		{
 			name:             "Rotation with maxSize and cleanup with maxAge",
-			enableFlush:      false,
+			flushInterval:    0,
 			maxSize:          int64(1024 * 1024),
 			maxAge:           24 * time.Hour,
 			rotationExpected: true,
 			cleanupExpected:  true,
 		},
 		{
-			name:             "Rotation with enableFlush, maxSize and cleanup with maxAge",
-			enableFlush:      true,
+			name:             "Rotation with flushInterval, maxSize and cleanup with maxAge",
+			flushInterval:    10 * time.Second,
 			maxSize:          int64(1024 * 1024),
 			maxAge:           24 * time.Hour,
 			rotationExpected: true,
@@ -79,11 +79,11 @@ func TestLogrotationWrite(t *testing.T) {
 			})
 
 			logFilePath := filepath.Join(tmpDir, "test.log")
-			enableFlush := tt.enableFlush
+			flushInterval := tt.flushInterval
 			maxSize := tt.maxSize
 			maxAge := tt.maxAge
 
-			rotationFile, err := Open(logFilePath, enableFlush, maxSize, maxAge)
+			rotationFile, err := Open(logFilePath, flushInterval, maxSize, maxAge)
 			if err != nil {
 				t.Fatalf("Failed to open RotationFile: %v", err)
 			}

@@ -31,21 +31,21 @@ type rotationFile struct {
 	// required, the max size of the log file in bytes, 0 means no rotation
 	maxSize int64
 	// required, the max age of the log file, 0 means no cleanup
-	maxAge      time.Duration
-	filePath    string
-	mut         sync.Mutex
-	file        *os.File
-	currentSize int64
-	lasSyncTime time.Time
-	enableFlush bool
+	maxAge        time.Duration
+	filePath      string
+	mut           sync.Mutex
+	file          *os.File
+	currentSize   int64
+	lasSyncTime   time.Time
+	flushInterval time.Duration
 }
 
-func Open(filePath string, enableFlush bool, maxSize int64, maxAge time.Duration) (io.WriteCloser, error) {
+func Open(filePath string, flushInterval time.Duration, maxSize int64, maxAge time.Duration) (io.WriteCloser, error) {
 	w := &rotationFile{
-		filePath:    filePath,
-		maxSize:     maxSize,
-		maxAge:      maxAge,
-		enableFlush: enableFlush,
+		filePath:      filePath,
+		maxSize:       maxSize,
+		maxAge:        maxAge,
+		flushInterval: flushInterval,
 	}
 
 	logFile, err := os.OpenFile(w.filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
@@ -78,7 +78,7 @@ func (w *rotationFile) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 
-	if w.enableFlush && time.Since(w.lasSyncTime) >= time.Second*5 {
+	if w.flushInterval > 0 && time.Since(w.lasSyncTime) >= w.flushInterval {
 		err = w.file.Sync()
 		if err != nil {
 			return 0, err
@@ -91,11 +91,6 @@ func (w *rotationFile) Write(p []byte) (n int, err error) {
 
 		// if file size over maxsize rotate the log file
 		if w.currentSize >= w.maxSize {
-			// Explicitly call file.Sync() to ensure data is written to disk
-			err = w.file.Sync()
-			if err != nil {
-				return 0, err
-			}
 			err = w.rotate()
 			if err != nil {
 				return 0, err

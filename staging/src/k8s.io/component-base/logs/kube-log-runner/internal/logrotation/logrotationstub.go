@@ -24,9 +24,9 @@ import (
 
 type RotationStub struct{}
 
-func OpenStub(filePath string, enableFlush bool, maxSize int64, maxAge time.Duration) (io.WriteCloser, error) {
+func OpenStub(filePath string, flushInterval time.Duration, maxSize int64, maxAge time.Duration) (io.WriteCloser, error) {
 	w := &RotationStub{}
-	fmt.Printf("filePath: %s, enableFlush: %t, maxSize: %d, maxAge: %s", filePath, enableFlush, maxSize, maxAge)
+	fmt.Printf("filePath: %s, flushInterval: %s, maxSize: %d, maxAge: %s", filePath, flushInterval, maxSize, maxAge)
 	return w, nil
 }
 

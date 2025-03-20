@@ -39,43 +39,43 @@ func TestConfigureAndRun(t *testing.T) {
 		},
 		{
 			name:         "No_log-file_flag_with_extra_other_flags",
-			commandLine:  []string{"-enable-flush=true", "-log-file-size=1Gi", "-log-file-age=24h30m", "echo", "hello"},
+			commandLine:  []string{"-flush-interval=5s", "-log-file-size=1Gi", "-log-file-age=24h30m", "echo", "hello"},
 			outputWanted: "hello\n",
 		},
 		{
 			name:         "log-file_flag_only",
 			commandLine:  []string{"-log-file=test.log", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: false, maxSize: 0, maxAge: 0s",
+			outputWanted: "filePath: test.log, flushInterval: 0s, maxSize: 0, maxAge: 0s",
 		},
 		{
 			name:         "log-file_flag_with_enable-flush_flag",
-			commandLine:  []string{"-log-file=test.log", "-enable-flush=true", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: true, maxSize: 0, maxAge: 0s",
+			commandLine:  []string{"-log-file=test.log", "-flush-interval=10s", "echo", "hello"},
+			outputWanted: "filePath: test.log, flushInterval: 10s, maxSize: 0, maxAge: 0s",
 		},
 		{
 			name:         "log-file_flag_with_enable-flush_flag_and_log-file-size_flag",
-			commandLine:  []string{"-log-file=test.log", "-enable-flush=true", "-log-file-size=15M", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: true, maxSize: 15000000, maxAge: 0s",
+			commandLine:  []string{"-log-file=test.log", "-flush-interval=1m", "-log-file-size=15M", "echo", "hello"},
+			outputWanted: "filePath: test.log, flushInterval: 1m0s, maxSize: 15000000, maxAge: 0s",
 		},
 		{
 			name:         "Invalid_CPU_format_log-file-size_flag",
-			commandLine:  []string{"-log-file=test.log", "-enable-flush=true", "-log-file-size=125m", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: true, maxSize: 1, maxAge: 0s",
+			commandLine:  []string{"-log-file=test.log", "-flush-interval=5s", "-log-file-size=125m", "echo", "hello"},
+			outputWanted: "filePath: test.log, flushInterval: 5s, maxSize: 1, maxAge: 0s",
 		},
 		{
 			name:         "log-file_flag_with_enable-flush_flag_and_log-file-size_flag_and_log-file-age_flag",
-			commandLine:  []string{"-log-file=test.log", "-enable-flush=true", "-log-file-size=1Gi", "-log-file-age=24h30m", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: true, maxSize: 1073741824, maxAge: 24h30m0s",
+			commandLine:  []string{"-log-file=test.log", "-flush-interval=5s", "-log-file-size=1Gi", "-log-file-age=24h30m", "echo", "hello"},
+			outputWanted: "filePath: test.log, flushInterval: 5s, maxSize: 1073741824, maxAge: 24h30m0s",
 		},
 		{
 			name:         "log-file_flag_with_enable-flush_flag_and_log-file-size_flag_and_log-file-age_flag_and_also-stdout_flag",
-			commandLine:  []string{"-log-file=test.log", "-enable-flush=true", "-log-file-size=1500", "-log-file-age=24h30m", "-also-stdout", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: true, maxSize: 1500, maxAge: 24h30m0shello\n",
+			commandLine:  []string{"-log-file=test.log", "-flush-interval=5s", "-log-file-size=1500", "-log-file-age=24h30m", "-also-stdout", "echo", "hello"},
+			outputWanted: "filePath: test.log, flushInterval: 5s, maxSize: 1500, maxAge: 24h30m0shello\n",
 		},
 		{
 			name:         "log-file_flag_with_enable-flush_flag_and_log-file-size_flag_and_log-file-age_flag_and_also-stdout_flag_and_redirect-stderr",
-			commandLine:  []string{"-log-file=test.log", "-enable-flush=true", "-log-file-size=1500", "-log-file-age=24h30m", "-also-stdout", "-redirect-stderr=false", "echo", "hello"},
-			outputWanted: "filePath: test.log, enableFlush: true, maxSize: 1500, maxAge: 24h30m0shello\n",
+			commandLine:  []string{"-log-file=test.log", "-flush-interval=5s", "-log-file-size=1500", "-log-file-age=24h30m", "-also-stdout", "-redirect-stderr=false", "echo", "hello"},
+			outputWanted: "filePath: test.log, flushInterval: 5s, maxSize: 1500, maxAge: 24h30m0shello\n",
 		},
 	}
 

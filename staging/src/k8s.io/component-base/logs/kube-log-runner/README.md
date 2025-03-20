@@ -17,15 +17,16 @@ Why do we need this?
 
 ## Flags
 
-- -enable-flush
-  The `-enable-flush` flag is an optional boolean flag that controls whether the 
-  log file content is periodically flushed to disk.
+- -flush-interval
+  The `-flush-interval` flag is a duration flag that specifies how frequently the log 
+  file content is flushed to disk. The default value is 0, meaning no periodic flushing. 
+  If set to a non-zero value, the log file is flushed at the specified interval.
 
-  Type: Boolean
+  Type: Duration
   
-  Default: false (flushing disabled)
+  Default: 0 (flushing disabled)
   
-  Usage: When set to true, the log file is flushed every 5 seconds. 
+  Usage: When set to non-zero , the log file is flushed every specified interval. 
   While this may not be necessary on Linux, on Windows, it ensures that recent log 
   entries are written to disk in near real-time, which is particularly useful for 
   users who need to monitor logs as they are generated without delay.
@@ -35,6 +36,9 @@ Why do we need this?
   the log file, triggering automatic log rotation when the specified size is reached.
   This is especially useful in production environments where the log file may become
   too large to view effectively.
+  Beware that rotation can happen at arbitrary points in the byte stream emitted by the command.
+  This can lead to splitting a log entry into two parts, with the first part in one file
+  and the second part in the next file.
 
   Type: String (expects a value in Resource.Quantity format, such as 10M or 500K)
 
@@ -46,11 +50,11 @@ Why do we need this?
 
   Backup File Naming Convention:
     `<original-file-name>-<timestamp><file-extension>`.
-    `<original-file-name>`: The name of the original log file, without the file extension.
-    `<timestamp>`: A timestamp is added to each backup file’s name to uniquely identify it
+    * `<original-file-name>`: The name of the original log file, without the file extension.
+    * `<timestamp>`: A timestamp is added to each backup file’s name to uniquely identify it
     based on the time it was created. The timestamp follows the format "20060102-150405".
     For example, a backup created on June 2, 2006, at 3:04:05 PM would include this timestamp.
-    `<file-extension>`: The original file’s extension (e.g., .log) remains unchanged.
+    * `<file-extension>`: The original file’s extension (e.g., .log) remains unchanged.
   This naming convention ensures easy organization and retrieval of rotated log files based on their creation time.
 
 - -log-file-age
@@ -107,13 +111,13 @@ kube-log-runner -log-file=/tmp/log -also-stdout echo "hello world"
 # Copy into log file and print to stdout (same as 2>&1 | tee -a /tmp/log), 
 # will flush the logging file in 5s, 
 # rotate the log file when its size exceedes 10 MB
-kube-log-runner -enable-flush=true -log-file=/tmp/log -log-file-size=10M -also-stdout echo "hello world"
+kube-log-runner -flush-interval=5s -log-file=/tmp/log -log-file-size=10M -also-stdout echo "hello world"
 
 # Copy into log file and print to stdout (same as 2>&1 | tee -a /tmp/log), 
-# will flush the logging file in 5s, 
+# will flush the logging file in 10s, 
 # rotate the log file when its size exceedes 10 MB, 
 # and clean up old rotated log files when their age are older than 168h (7 days)
-kube-log-runner -enable-flush=true -log-file=/tmp/log -log-file-size=10M -log-file-age=168h -also-stdout echo "hello world"
+kube-log-runner -flush-interval=10s -log-file=/tmp/log -log-file-size=10M -log-file-age=168h -also-stdout echo "hello world"
 
 # Redirect only stdout into log file (same as 1>>/tmp/log).
 kube-log-runner -log-file=/tmp/log -redirect-stderr=false echo "hello world"
