@@ -53,7 +53,7 @@ const (
 
 // In injects a matchExpression (with an operator IN) as a selectorTerm
 // to the inner nodeSelector.
-// NOTE: appended selecterTerms are ORed.
+// NOTE: appended selectorTerms are ORed.
 func (s *NodeSelectorWrapper) In(key string, vals []string, t NodeSelectorType) *NodeSelectorWrapper {
 	expression := v1.NodeSelectorRequirement{
 		Key:      key,
@@ -435,7 +435,7 @@ func (p *PodWrapper) NodeAffinityIn(key string, vals []string, t NodeSelectorTyp
 	return p
 }
 
-// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressinos and the operator NotIn)
+// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressions and the operator NotIn)
 // and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
