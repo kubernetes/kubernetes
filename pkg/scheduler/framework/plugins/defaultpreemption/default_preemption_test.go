@@ -55,6 +55,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/preemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -1437,12 +1438,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pl.Evaluator.SelectCandidate(ctx, candidates)
-			if len(tt.expected) == 0 {
-				if s != nil {
-					t.Errorf("expected no candidates, but got %v", s.Name())
-				}
-				return
-			} else if s == nil || len(s.Name()) == 0 {
+			if s == nil || len(s.Name()) == 0 {
 				t.Fatalf("expected any node in %v, but candidate is missing", tt.expected)
 			}
 			found := false
@@ -1485,17 +1481,9 @@ func TestCustomSelection(t *testing.T) {
 		}
 	}
 
-	orderByOldestStart := func(pod1, pod2 *v1.Pod) bool {
-		return util.GetPodStartTime(pod1).Before(util.GetPodStartTime(pod2))
-	}
-	orderByPodName := func(pod1, pod2 *v1.Pod) bool {
-		return pod1.Name < pod2.Name
-	}
-
 	tests := []struct {
 		name         string
 		eligiblePods IsEligiblePodFunc
-		orderPods    MoreImportantPodFunc
 		nodeNames    []string
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -1619,35 +1607,7 @@ func TestCustomSelection(t *testing.T) {
 				st.MakePod().Name("v3").UID("v3").Node("node3").Priority(lowPriority).Req(largeRes).StartTime(epochTime).Obj(),
 			},
 			// the lowPriority pod can be preempted but not the midPriority pod
-			expected: map[string][]string{"node3": {"v3"}},
-		},
-		{
-			name:      "select newest pods",
-			orderPods: orderByOldestStart,
-			nodeNames: []string{"node1"},
-			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
-			// size victims to require at least two to be preempted
-			pods: []*v1.Pod{
-				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
-				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
-			},
-			// the newest two pods are selected, despite one with higher priority
-			expected: map[string][]string{"node1": {"v3", "v1"}},
-		},
-		{
-			name:      "select alphabetically-last pods",
-			orderPods: orderByPodName,
-			nodeNames: []string{"node1"},
-			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
-			// size victims to require at least two to be preempted
-			pods: []*v1.Pod{
-				st.MakePod().Name("foo").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("bar").UID("v2").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
-				st.MakePod().Name("baz").UID("v3").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime).Obj(),
-			},
-			// the last pods in alphabetic order are selected, despite one with higher priority
-			expected: map[string][]string{"node1": {"baz", "foo"}},
+			expected: map[string][]string{"node2": {"v2"}, "node3": {"v3"}},
 		},
 	}
 	for _, tt := range tests {
@@ -1699,34 +1659,159 @@ func TestCustomSelection(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			// Override selection logic
+			// Override eligibility logic
 			if tt.eligiblePods != nil {
 				pl.IsEligiblePod = tt.eligiblePods
 			}
+			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			// check that the candidates match what's expected
+			if len(tt.expected) != len(candidates) {
+				candidateNames := []string{}
+				for _, c := range candidates {
+					candidateNames = append(candidateNames, c.Name())
+				}
+				t.Fatalf("expected %d candidates (%+v) but got %d: %+v", len(tt.expected), tt.expected, len(candidates), candidateNames)
+			}
+			for len(candidates) > 0 {
+				selected := pl.Evaluator.SelectCandidate(ctx, candidates)
+
+				expectVictims, ok := tt.expected[selected.Name()]
+				if !ok {
+					t.Fatalf("got unexpected candidate %+v, when expected is %+v", selected, tt.expected)
+				}
+
+				gotVictims := []string{}
+				for _, p := range selected.Victims().Pods {
+					gotVictims = append(gotVictims, p.Name)
+				}
+				if diff := cmp.Diff(expectVictims, gotVictims); diff != "" {
+					t.Errorf("expect victims %+v on node %s, but got pods %+v", expectVictims, selected.Name(), gotVictims)
+				}
+
+				// remove selected from candidates
+				notSelected := []preemption.Candidate{}
+				for _, c := range candidates {
+					if c.Name() != selected.Name() {
+						notSelected = append(notSelected, c)
+					}
+				}
+				candidates = notSelected
+			}
+		})
+	}
+}
+
+func TestCustomOrdering(t *testing.T) {
+	// Two arbitrary examples of custom selection ordering to check that they behave as expected
+	orderByOldestStart := func(pod1, pod2 *v1.Pod) bool {
+		return util.GetPodStartTime(pod1).Before(util.GetPodStartTime(pod2))
+	}
+	orderByPodName := func(pod1, pod2 *v1.Pod) bool {
+		return pod1.Name < pod2.Name
+	}
+
+	tests := []struct {
+		name         string
+		orderPods    MoreImportantPodFunc
+		nodeNames    []string
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		expectedPods []string
+	}{
+		{
+			name:      "select newest pods",
+			orderPods: orderByOldestStart,
+			nodeNames: []string{"node1"},
+			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
+			// size victims to require at least two to be preempted
+			pods: []*v1.Pod{
+				st.MakePod().Name("v1").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime2).Obj(),
+				st.MakePod().Name("v2").UID("v2").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("v3").UID("v3").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime1).Obj(),
+			},
+			// the newest two pods are selected, despite one with higher priority
+			expectedPods: []string{"v3", "v1"},
+		},
+		{
+			name:      "select alphabetically-last pods",
+			orderPods: orderByPodName,
+			nodeNames: []string{"node1"},
+			pod:       st.MakePod().Name("p2").UID("p2").Priority(highPriority).Req(largeRes).Obj(),
+			// size victims to require at least two to be preempted
+			pods: []*v1.Pod{
+				st.MakePod().Name("foo").UID("v1").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("bar").UID("v2").Node("node1").Priority(lowPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+				st.MakePod().Name("baz").UID("v3").Node("node1").Priority(midPriority).Req(mediumRes).StartTime(epochTime).Obj(),
+			},
+			// the last pods in alphabetic order are selected, despite one with higher priority
+			expectedPods: []string{"baz", "foo"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodes := make([]*v1.Node, len(tt.nodeNames))
+			for i, nodeName := range tt.nodeNames {
+				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
+			}
+
+			var objs []runtime.Object
+			objs = append(objs, tt.pod)
+			for _, pod := range tt.pods {
+				objs = append(objs, pod)
+			}
+			cs := clientsetfake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			fwk, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterPluginAsExtensions(noderesources.Name, nodeResourcesFitFunc, "Filter", "PreFilter"),
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"",
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithLogger(logger),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			state := framework.NewCycleState()
+			// Some tests rely on PreFilter plugin to compute its CycleState.
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+				t.Errorf("Unexpected PreFilter Status: %v", status)
+			}
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			pl, err := New(ctx, getDefaultDefaultPreemptionArgs(), fwk, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Override ordering logic
 			if tt.orderPods != nil {
 				pl.MoreImportantPod = tt.orderPods
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
-			s := pl.Evaluator.SelectCandidate(ctx, candidates)
-			if len(tt.expected) == 0 {
-				if s != nil {
-					t.Errorf("expected no candidates, but got %v", s.Name())
-				}
-				return
-			} else if s == nil || len(s.Name()) == 0 {
-				t.Fatalf("expected any node in %v, but candidate is missing", tt.expected)
+			if len(candidates) != 1 {
+				t.Fatalf("expected exactly one node but got %+v", candidates)
 			}
-			expectPodNames, ok := tt.expected[s.Name()]
-			if !ok {
-				t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
+			podNames := []string{}
+			for _, p := range candidates[0].Victims().Pods {
+				podNames = append(podNames, p.Name)
 			}
-			gotPodNames := []string{}
-			for _, p := range s.Victims().Pods {
-				gotPodNames = append(gotPodNames, p.Name)
-			}
-			if diff := cmp.Diff(expectPodNames, gotPodNames); diff != "" {
-				t.Errorf("expected pods %v, but got %v", expectPodNames, gotPodNames)
+			if diff := cmp.Diff(tt.expectedPods, podNames); diff != "" {
+				t.Errorf("expect pods %+v, but got pods %+v", tt.expectedPods, podNames)
 			}
 		})
 	}
