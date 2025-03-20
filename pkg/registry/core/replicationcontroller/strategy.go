@@ -130,13 +130,12 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	allErrs := corevalidation.ValidateReplicationController(controller, opts)
 
 	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	// FIXME: isSpecRequest(ctx) limits Declarative validation to the spec until subresource support is introduced.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
 		// Run declarative validation with panic recovery
-		declarativeErrs := rest.ValidateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, controller, takeover)
+		declarativeErrs := rest.ValidateDeclaratively(ctx, legacyscheme.Scheme, controller, rest.WithTakeover(takeover))
 
 		// Compare imperative and declarative errors and log + emit metric if there's a mismatch
 		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, allErrs, declarativeErrs, takeover)
@@ -199,13 +198,12 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	}
 
 	// If DeclarativeValidation feature gate is enabled, also run declarative validation
-	// FIXME: This limits Declarative validation to the spec until subresource support is introduced.
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) && isSpecRequest(ctx) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Determine if takeover is enabled
 		takeover := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationTakeover)
 
 		// Run declarative update validation with panic recovery
-		declarativeErrs := rest.ValidateUpdateDeclarativelyWithRecovery(ctx, nil, legacyscheme.Scheme, newRc, oldRc, takeover)
+		declarativeErrs := rest.ValidateUpdateDeclaratively(ctx, legacyscheme.Scheme, newRc, oldRc, rest.WithTakeover(takeover))
 
 		// Compare imperative and declarative errors and emit metric if there's a mismatch
 		rest.CompareDeclarativeErrorsAndEmitMismatches(ctx, errs, declarativeErrs, takeover)
