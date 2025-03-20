@@ -748,7 +748,9 @@ func updateStatefulSetAfterInvariantEstablished(
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
-		metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name, "exceededMaxUnavailable").Inc()
+		if unavailablePods > maxUnavailable {
+			metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name, "exceededMaxUnavailable").Inc()
+		}
 		return &status, nil
 	}
 
