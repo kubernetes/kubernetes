@@ -3865,8 +3865,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			actuated:  &testResources{100, 200, 150, 200},
 			isRunning: true,
 		}},
-		// Memory requests aren't actuated and should be ignored.
-		expectHasResize: false,
+		expectHasResize: true,
 	}, {
 		name: "simple resized container/cpu+mem req",
 		containers: []testContainer{{

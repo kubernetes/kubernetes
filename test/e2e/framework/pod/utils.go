@@ -256,6 +256,21 @@ func FindPodConditionByType(podStatus *v1.PodStatus, conditionType v1.PodConditi
 	return nil
 }
 
+// FindContainerInPod finds the container in a pod by its name
+func FindContainerInPod(pod *v1.Pod, containerName string) *v1.Container {
+	for _, container := range pod.Spec.InitContainers {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
+			return &container
+		}
+	}
+	return nil
+}
+
 // FindContainerStatusInPod finds a container status by its name in the provided pod
 func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerStatus {
 	for _, containerStatus := range pod.Status.InitContainerStatuses {
@@ -290,6 +305,24 @@ func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath, expec
 	cgValue = strings.Trim(cgValue, "\n")
 	if cgValue != expectedCgValue {
 		return fmt.Errorf("cgroup value %q not equal to expected %q", cgValue, expectedCgValue)
+	}
+	return nil
+}
+
+// VerifyOomScoreAdjValue verifies that oom_score_adj for pid 1 (pidof init/systemd -> app)
+// has the expected value in specified container of the pod. It execs into the container,
+// reads the oom_score_adj value from procfs, and compares it against the expected value.
+func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
+	cmd := "cat /proc/1/oom_score_adj"
+	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value %s",
+		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
+	oomScoreAdj, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
+	if err != nil {
+		return fmt.Errorf("failed to find expected value %s for container app process", expectedOomScoreAdj)
+	}
+	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
+	if oomScoreAdj != expectedOomScoreAdj {
+		return fmt.Errorf("oom_score_adj value %s not equal to expected %s", oomScoreAdj, expectedOomScoreAdj)
 	}
 	return nil
 }
