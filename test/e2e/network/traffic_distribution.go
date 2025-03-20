@@ -134,47 +134,9 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 	// Main test specifications.
 	////////////////////////////////////////////////////////////////////////////
 
-	// doTrafficDistributionTest runs a test of a service with the given trafficDist.
-	doTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
-		var clients []*client
-		var endpoints []*endpoint
-
-		ginkgo.By("finding 3 zones with schedulable nodes")
-		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-		framework.ExpectNoError(err)
-		nodeForZone := make(map[string]*v1.Node)
-		for _, node := range nodeList.Items {
-			zone := node.Labels[v1.LabelTopologyZone]
-			if nodeForZone[zone] != nil {
-				continue
-			}
-			nodeForZone[zone] = &node
-			if len(nodeForZone) == 3 {
-				break
-			}
-		}
-		if len(nodeForZone) < 3 {
-			e2eskipper.Skipf("have %d zones with schedulable nodes, need at least 3", len(clients))
-		}
-
-		// We want clients in all three zones
-		for _, node := range nodeForZone {
-			clients = append(clients, &client{node: node})
-		}
-
-		// and endpoints in the first two zones
-		endpoints = []*endpoint{
-			{node: clients[0].node},
-			{node: clients[1].node},
-		}
-
-		// The clients with an endpoint in the same zone should only connect to
-		// that endpoint. The client with no endpoint in its zone should connect
-		// to both endpoints.
-		clients[0].endpoints = []*endpoint{endpoints[0]}
-		clients[1].endpoints = []*endpoint{endpoints[1]}
-		clients[2].endpoints = endpoints
-
+	// doTrafficDistributionTest runs a test of a service with the given trafficDist,
+	// clients, and endpoints, ensuring that connections go to the expected endpoints.
+	doTrafficDistributionTest := func(ctx context.Context, trafficDist string, clients []*client, endpoints []*endpoint) {
 		var servingPods []*v1.Pod
 		servingPodLabels := map[string]string{"app": f.UniqueName}
 		for i, ep := range endpoints {
@@ -262,11 +224,54 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		}
 	}
 
+	doSameZoneTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
+		var clients []*client
+		var endpoints []*endpoint
+
+		ginkgo.By("finding 3 zones with schedulable nodes")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodeForZone := make(map[string]*v1.Node)
+		for _, node := range nodeList.Items {
+			zone := node.Labels[v1.LabelTopologyZone]
+			if nodeForZone[zone] != nil {
+				continue
+			}
+			nodeForZone[zone] = &node
+			if len(nodeForZone) == 3 {
+				break
+			}
+		}
+		if len(nodeForZone) < 3 {
+			e2eskipper.Skipf("have %d zones with schedulable nodes, need at least 3", len(clients))
+		}
+
+		// We want clients in all three zones
+		for _, node := range nodeForZone {
+			clients = append(clients, &client{node: node})
+		}
+
+		// and endpoints in the first two zones
+		endpoints = []*endpoint{
+			{node: clients[0].node},
+			{node: clients[1].node},
+		}
+
+		// The clients with an endpoint in the same zone should only connect to
+		// that endpoint. The client with no endpoint in its zone should connect
+		// to both endpoints.
+		clients[0].endpoints = []*endpoint{endpoints[0]}
+		clients[1].endpoints = []*endpoint{endpoints[1]}
+		clients[2].endpoints = endpoints
+
+		doTrafficDistributionTest(ctx, trafficDist, clients, endpoints)
+	}
+
 	framework.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
-		doTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
+		doSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
 	})
 
 	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
-		doTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+		doSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
 	})
 })
