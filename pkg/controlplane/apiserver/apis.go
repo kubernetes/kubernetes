@@ -91,6 +91,7 @@ func (s *Server) InstallAPIs(restStorageProviders ...RESTStorageProvider) error 
 	// used later in the loop to filter the served resource by those that have expired.
 	resourceExpirationEvaluatorOpts := genericapiserver.ResourceExpirationEvaluatorOptions{
 		CurrentVersion:                          s.GenericAPIServer.EffectiveVersion.EmulationVersion(),
+		Prerelease:                              s.GenericAPIServer.EffectiveVersion.BinaryVersion().PreRelease(),
 		EmulationForwardCompatible:              s.GenericAPIServer.EmulationForwardCompatible,
 		RuntimeConfigEmulationForwardCompatible: s.GenericAPIServer.RuntimeConfigEmulationForwardCompatible,
 	}

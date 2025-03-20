@@ -234,8 +234,8 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&r.emulationVersionConfig, "emulated-version", r.emulationVersionConfig, ""+
 		"The versions different components emulate their capabilities (APIs, features, ...) of.\n"+
 		"If set, the component will emulate the behavior of this version instead of the underlying binary version.\n"+
-		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'. Options are:\n"+strings.Join(r.unsafeVersionFlagOptions(true), "\n")+
-		"If the component is not specified, defaults to \"kube\"")
+		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'.\nOptions are: "+strings.Join(r.unsafeVersionFlagOptions(true), ",")+
+		"\nIf the component is not specified, defaults to \"kube\"")
 
 	if r.featureGatesConfigFlags == nil {
 		r.featureGatesConfigFlags = cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig)

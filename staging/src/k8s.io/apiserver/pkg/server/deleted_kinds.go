@@ -66,6 +66,9 @@ type ResourceExpirationEvaluator interface {
 type ResourceExpirationEvaluatorOptions struct {
 	// CurrentVersion is the current version of the apiserver.
 	CurrentVersion *apimachineryversion.Version
+	// Prerelease holds an optional prerelease portion of the version.
+	// This is used to determine if the current binary is an alpha.
+	Prerelease string
 	// EmulationForwardCompatible indicates whether the apiserver should serve resources that are introduced after the current version,
 	// when resources of the same group and resource name but with lower priority are served.
 	EmulationForwardCompatible bool
@@ -76,7 +79,8 @@ type ResourceExpirationEvaluatorOptions struct {
 
 func NewResourceExpirationEvaluator(currentVersion *apimachineryversion.Version) (ResourceExpirationEvaluator, error) {
 	opts := ResourceExpirationEvaluatorOptions{
-		CurrentVersion: currentVersion,
+		CurrentVersion: apimachineryversion.MajorMinor(currentVersion.Major(), currentVersion.Minor()),
+		Prerelease:     currentVersion.PreRelease(),
 	}
 	return NewResourceExpirationEvaluatorFromOptions(opts)
 }
@@ -94,8 +98,8 @@ func NewResourceExpirationEvaluatorFromOptions(opts ResourceExpirationEvaluatorO
 	}
 	// Only keeps the major and minor versions from input version.
 	ret.currentVersion = apimachineryversion.MajorMinor(currentVersion.Major(), currentVersion.Minor())
-	ret.isAlpha = strings.Contains(currentVersion.PreRelease(), "alpha")
-	ret.isAlphaZero = strings.Contains(currentVersion.PreRelease(), "alpha.0")
+	ret.isAlpha = strings.Contains(opts.Prerelease, "alpha")
+	ret.isAlphaZero = strings.Contains(opts.Prerelease, "alpha.0")
 
 	if envString, ok := os.LookupEnv("KUBE_APISERVER_STRICT_REMOVED_API_HANDLING_IN_ALPHA"); !ok {
 		// do nothing

@@ -79,13 +79,7 @@ func (m *effectiveVersion) BinaryVersion() *version.Version {
 }
 
 func (m *effectiveVersion) EmulationVersion() *version.Version {
-	ver := m.emulationVersion.Load()
-	if ver != nil {
-		// Emulation version can have "alpha" as pre-release to continue serving expired apis while we clean up the test.
-		// The pre-release should not be accessible to the users.
-		return ver.WithPreRelease(m.BinaryVersion().PreRelease())
-	}
-	return ver
+	return m.emulationVersion.Load()
 }
 
 func (m *effectiveVersion) MinCompatibilityVersion() *version.Version {
@@ -140,7 +134,7 @@ func (m *effectiveVersion) AllowedEmulationVersionRange() string {
 		floor = version.MajorMinor(0, 0)
 	}
 
-	return fmt.Sprintf("%s..%s (default=%s)", floor.String(), binaryVersion.String(), m.EmulationVersion().String())
+	return fmt.Sprintf("%s..%s(default:%s)", floor.String(), binaryVersion.String(), m.EmulationVersion().String())
 }
 
 func (m *effectiveVersion) AllowedMinCompatibilityVersionRange() string {
@@ -157,7 +151,7 @@ func (m *effectiveVersion) AllowedMinCompatibilityVersionRange() string {
 		floor = version.MajorMinor(0, 0)
 	}
 
-	return fmt.Sprintf("%s..%s (default=%s)", floor.String(), binaryVersion.String(), m.MinCompatibilityVersion().String())
+	return fmt.Sprintf("%s..%s(default:%s)", floor.String(), binaryVersion.String(), m.MinCompatibilityVersion().String())
 }
 
 func (m *effectiveVersion) Validate() []error {
