@@ -345,7 +345,11 @@ type BasicDevice struct {
 	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,8,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions defines the conditions for proceeding with binding.
@@ -354,8 +358,12 @@ type BasicDevice struct {
 	// while scheduling the pod.
 	// The maximum number of binding conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,9,rep,name=bindingConditions"`
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -363,8 +371,12 @@ type BasicDevice struct {
 	// If any is true, a binding failure occurred.
 	// The maximum number of binding failure conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,10,rep,name=bindingFailureConditions"`
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
@@ -373,7 +385,11 @@ type BasicDevice struct {
 	//
 	// The default timeout if not set is 600 seconds.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,11,opt,name=bindingTimeoutSeconds"`
 }
 
@@ -1319,7 +1335,11 @@ type DeviceRequestAllocationResult struct {
 	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,7,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions defines the conditions for proceeding with binding.
@@ -1328,8 +1348,12 @@ type DeviceRequestAllocationResult struct {
 	// while scheduling the pod.
 	// The maximum number of binding conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,8,rep,name=bindingConditions"`
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -1337,8 +1361,12 @@ type DeviceRequestAllocationResult struct {
 	// If any is true, a binding failure occurred.
 	// The maximum number of binding failure conditions is 4.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
 	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,9,rep,name=bindingFailureConditions"`
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
@@ -1347,7 +1375,11 @@ type DeviceRequestAllocationResult struct {
 	//
 	// The default timeout if not set is 600 seconds.
 	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
 	// +optional
+	// +featureGate=DRADeviceBindingConditions
 	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,10,opt,name=bindingTimeoutSeconds"`
 }
 
