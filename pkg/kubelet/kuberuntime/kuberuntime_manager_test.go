@@ -2926,7 +2926,6 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 
 func TestUpdatePodContainerResources(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
 	assert.NoError(t, err)
