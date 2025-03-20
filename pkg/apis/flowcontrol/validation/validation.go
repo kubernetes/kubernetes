@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	bootstrapv1 "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -78,15 +79,18 @@ var supportedLimitResponseType = sets.NewString(
 // PriorityLevelValidationOptions holds the validation options for a priority level object
 type PriorityLevelValidationOptions struct{}
 
+var earliestGate = bootstrapv1.MakeGate(false)
+var latestGate = bootstrapv1.LatestFeatureGate
+
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&fs.ObjectMeta, false, ValidateFlowSchemaName, field.NewPath("metadata"))
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidateFlowSchemaSpec(fs.Name, &fs.Spec, specPath)...)
-	if mand, ok := internalbootstrap.GetMandatoryFlowSchemasMap(true)[fs.Name]; ok {
+	if mand, ok := internalbootstrap.GetMandatoryFlowSchemasMap(latestGate)[fs.Name]; ok {
 		// The old config objects are a subset of the new config objects,
 		// as far as identify is concerned. The specs may differ.
-		mandOld := internalbootstrap.GetMandatoryFlowSchemasMap(false)[fs.Name]
+		mandOld := internalbootstrap.GetMandatoryFlowSchemasMap(earliestGate)[fs.Name]
 		// For now, accept either the old or the new spec.
 		// In a later release, change this to accept only the new spec.
 		// Check for almost exact equality.  This is a pretty
@@ -368,7 +372,7 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 
 func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.PriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	mand, ok := internalbootstrap.GetMandatoryPriorityLevelConfigurationsMap(true)[pl.Name]
+	mand, ok := internalbootstrap.GetMandatoryPriorityLevelConfigurationsMap(latestGate)[pl.Name]
 	if !ok {
 		// The old config objects are a subset of the new, as far as identity is concerned.
 		return allErrs
@@ -389,7 +393,7 @@ func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.Priorit
 
 	// For now, accept either the old or the new default config.
 	// In a later release, accept only the new.
-	mandOld := internalbootstrap.GetMandatoryPriorityLevelConfigurationsMap(false)[pl.Name]
+	mandOld := internalbootstrap.GetMandatoryPriorityLevelConfigurationsMap(earliestGate)[pl.Name]
 	// Check for almost exact equality.  This is a pretty
 	// strict test, and it is OK in this context because both
 	// sides of this comparison are intended to ultimately

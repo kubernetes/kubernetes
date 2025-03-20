@@ -255,7 +255,7 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
+	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(DefaultVersionedKubernetesFeatureGates()))
 }
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -264,170 +264,172 @@ func init() {
 //
 // Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
-var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	AggregatedDiscoveryRemoveBetaType: {
-		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
-	},
+func DefaultVersionedKubernetesFeatureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
+	return map[featuregate.Feature]featuregate.VersionedSpecs{
+		AggregatedDiscoveryRemoveBetaType: {
+			{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
+			{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
+		},
 
-	AllowParsingUserUIDFromCertAuth: {
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
+		AllowParsingUserUIDFromCertAuth: {
+			{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	AllowUnsafeMalformedObjectDeletion: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-	},
+		AllowUnsafeMalformedObjectDeletion: {
+			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		},
 
-	APFv134Config: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
-	},
+		APFv134Config: {
+			{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	AnonymousAuthConfigurableEndpoints: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-	},
+		AnonymousAuthConfigurableEndpoints: {
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	APIResponseCompression: {
-		{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
-	},
+		APIResponseCompression: {
+			{Version: version.MustParse("1.8"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	APIServerIdentity: {
-		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-	},
+		APIServerIdentity: {
+			{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	APIServerTracing: {
-		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-	},
+		APIServerTracing: {
+			{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	APIServingWithRoutine: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-	},
+		APIServingWithRoutine: {
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+		},
 
-	BtreeWatchCache: {
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
+		BtreeWatchCache: {
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		},
 
-	AuthorizeWithSelectors: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-	},
+		AuthorizeWithSelectors: {
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	CBORServingAndStorage: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-	},
+		CBORServingAndStorage: {
+			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		},
 
-	ConcurrentWatchObjectDecode: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-	},
+		ConcurrentWatchObjectDecode: {
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+		},
 
-	ConsistentListFromCache: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-	},
+		ConsistentListFromCache: {
+			{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	CoordinatedLeaderElection: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
-	},
+		CoordinatedLeaderElection: {
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+		},
 
-	KMSv1: {
-		{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
-	},
+		KMSv1: {
+			{Version: version.MustParse("1.0"), Default: true, PreRelease: featuregate.GA},
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Deprecated},
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Deprecated},
+		},
 
-	ListFromCacheSnapshot: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-	},
+		ListFromCacheSnapshot: {
+			{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		},
 
-	MutatingAdmissionPolicy: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-	},
+		MutatingAdmissionPolicy: {
+			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		},
 
-	OpenAPIEnums: {
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
-	},
+		OpenAPIEnums: {
+			{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	RemoteRequestHeaderUID: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
+		RemoteRequestHeaderUID: {
+			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	ResilientWatchCacheInitialization: {
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-	},
+		ResilientWatchCacheInitialization: {
+			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	RetryGenerateName: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
-	},
+		RetryGenerateName: {
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
+		},
 
-	SeparateCacheWatchRPC: {
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
-	},
+		SeparateCacheWatchRPC: {
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
+		},
 
-	StorageVersionAPI: {
-		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
-	},
+		StorageVersionAPI: {
+			{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
+		},
 
-	StorageVersionHash: {
-		{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.15"), Default: true, PreRelease: featuregate.Beta},
-	},
+		StorageVersionHash: {
+			{Version: version.MustParse("1.14"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.15"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	StreamingCollectionEncodingToJSON: {
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
+		StreamingCollectionEncodingToJSON: {
+			{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	StreamingCollectionEncodingToProtobuf: {
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
+		StreamingCollectionEncodingToProtobuf: {
+			{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	StrictCostEnforcementForVAP: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
+		StrictCostEnforcementForVAP: {
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		},
 
-	StrictCostEnforcementForWebhooks: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
+		StrictCostEnforcementForWebhooks: {
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		},
 
-	StructuredAuthenticationConfiguration: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-	},
+		StructuredAuthenticationConfiguration: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	StructuredAuthorizationConfiguration: {
-		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
+		StructuredAuthorizationConfiguration: {
+			{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		},
 
-	UnauthenticatedHTTP2DOSMitigation: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-	},
+		UnauthenticatedHTTP2DOSMitigation: {
+			{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+		},
 
-	WatchCacheInitializationPostStartHook: {
-		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-	},
+		WatchCacheInitializationPostStartHook: {
+			{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
+		},
 
-	WatchFromStorageWithoutResourceVersion: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
-	},
+		WatchFromStorageWithoutResourceVersion: {
+			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
+		},
 
-	WatchList: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-	},
+		WatchList: {
+			{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+			{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		},
+	}
 }

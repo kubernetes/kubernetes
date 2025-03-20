@@ -35,7 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	bootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-v134"
+	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	bootstraplatest "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-v134"
 	"k8s.io/apiserver/pkg/authentication/user"
 	apifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
@@ -95,7 +96,7 @@ func (t fakeApfFilter) Handle(ctx context.Context,
 	if t.mockDecision == decisionSkipFilter {
 		panic("Handle should not be invoked")
 	}
-	noteFn(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
+	noteFn(bootstraplatest.SuggestedFlowSchemaGlobalDefault, bootstraplatest.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
 	switch t.mockDecision {
 	case decisionNoQueuingExecute:
 		execFn()
@@ -389,7 +390,7 @@ func (f *fakeWatchApfFilter) Handle(ctx context.Context,
 	_ fq.QueueNoteFn,
 	execFn func(),
 ) {
-	noteFn(bootstrap.SuggestedFlowSchemaGlobalDefault, bootstrap.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
+	noteFn(bootstraplatest.SuggestedFlowSchemaGlobalDefault, bootstraplatest.SuggestedPriorityLevelConfigurationGlobalDefault, requestDigest.User.GetName())
 	canExecute := false
 	func() {
 		f.lock.Lock()
@@ -645,7 +646,7 @@ func (f *fakeFilterRequestDigest) Handle(ctx context.Context,
 	_ fq.QueueNoteFn, _ func(),
 ) {
 	f.requestDigestGot = &requestDigest
-	noteFn(bootstrap.MandatoryFlowSchemaCatchAll, bootstrap.MandatoryPriorityLevelConfigurationCatchAll, "")
+	noteFn(bootstrap.Latest.FlowSchemaCatchAll, bootstrap.Latest.PriorityLevelConfigurationCatchAll, "")
 	f.workEstimateGot = workEstimator()
 }
 
@@ -1138,7 +1139,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1(), serverConcurrency, true)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1(), serverConcurrency, bootstrap.LatestFeatureGate)
 
 	factory.Start(stopCh)
 

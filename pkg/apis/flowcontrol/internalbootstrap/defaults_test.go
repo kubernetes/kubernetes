@@ -25,17 +25,18 @@ import (
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	"k8s.io/component-base/featuregate"
 )
 
 func TestBootstrapConfigurationWithDefaulted(t *testing.T) {
-	t.Run("false", caseFn(false))
-	t.Run("true", caseFn(true))
+	t.Run("v134Config=false", caseFn(bootstrap.MakeGate(false)))
+	t.Run("v134Config=true", caseFn(bootstrap.LatestFeatureGate))
 }
 
-func caseFn(v134 bool) func(*testing.T) {
+func caseFn(featureGate featuregate.FeatureGate) func(*testing.T) {
 	return func(t *testing.T) {
 		scheme := NewAPFScheme()
-		bootstrapFlowSchemas := bootstrap.GetFlowSchemas(v134)
+		bootstrapFlowSchemas := bootstrap.GetFlowSchemas(featureGate)
 		for _, original := range bootstrapFlowSchemas {
 			t.Run(fmt.Sprintf("FlowSchema/%s", original.Name), func(t *testing.T) {
 				defaulted := original.DeepCopyObject().(*flowcontrol.FlowSchema)
@@ -48,7 +49,7 @@ func caseFn(v134 bool) func(*testing.T) {
 			})
 		}
 
-		bootstrapPriorityLevels := bootstrap.GetPrioritylevelConfigurations(v134)
+		bootstrapPriorityLevels := bootstrap.GetPrioritylevelConfigurations(featureGate)
 		for _, original := range bootstrapPriorityLevels {
 			t.Run(fmt.Sprintf("PriorityLevelConfiguration/%s", original.Name), func(t *testing.T) {
 				defaulted := original.DeepCopyObject().(*flowcontrol.PriorityLevelConfiguration)

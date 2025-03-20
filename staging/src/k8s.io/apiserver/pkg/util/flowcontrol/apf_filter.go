@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	kubeinformers "k8s.io/client-go/informers"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
@@ -90,7 +91,7 @@ func New(
 	informerFactory kubeinformers.SharedInformerFactory,
 	flowcontrolClient flowcontrolclient.FlowcontrolV1Interface,
 	serverConcurrencyLimit int,
-	v134Config bool,
+	featureGate featuregate.FeatureGate,
 ) Interface {
 	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
@@ -104,7 +105,7 @@ func New(
 		ReqsGaugeVec:           metrics.PriorityLevelConcurrencyGaugeVec,
 		ExecSeatsGaugeVec:      metrics.PriorityLevelExecutionSeatsGaugeVec,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
-		V134Config:             v134Config,
+		FeatureGate:            featureGate,
 	})
 }
 
@@ -148,8 +149,8 @@ type TestableConfig struct {
 	// QueueSetFactory for the queuing implementation
 	QueueSetFactory fq.QueueSetFactory
 
-	// Whether to use modern default config objects
-	V134Config bool
+	// FeatureGate is here so that the correct configuration can be used
+	FeatureGate featuregate.FeatureGate
 }
 
 // NewTestable is extra flexible to facilitate testing

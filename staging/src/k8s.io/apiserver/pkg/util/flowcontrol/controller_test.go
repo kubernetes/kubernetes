@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 
 var mandPLs = func() map[string]*flowcontrol.PriorityLevelConfiguration {
 	ans := make(map[string]*flowcontrol.PriorityLevelConfiguration)
-	for _, mand := range fcboot.GetV1ConfigCollection(true).Mandatory.PriorityLevelConfigurations {
+	for _, mand := range fcboot.Latest.Mandatory.PriorityLevelConfigurations {
 		ans[mand.Name] = mand
 	}
 	return ans
@@ -224,7 +224,7 @@ func (cts *ctlrTestState) popHeldRequest() (plName string, hr *heldRequest, nCou
 
 var mandQueueSetNames = func() sets.String {
 	mandQueueSetNames := sets.NewString()
-	for _, mpl := range fcboot.GetV1ConfigCollection(true).Mandatory.PriorityLevelConfigurations {
+	for _, mpl := range fcboot.Latest.Mandatory.PriorityLevelConfigurations {
 		mandQueueSetNames.Insert(mpl.Name)
 	}
 	return mandQueueSetNames
@@ -246,6 +246,7 @@ func TestConfigConsumer(t *testing.T) {
 				queues:          map[string]*ctlrTestQueueSet{},
 			}
 			ctlr := newTestableController(TestableConfig{
+				FeatureGate:            fcboot.LatestFeatureGate,
 				Name:                   "Controller",
 				Clock:                  clock.RealClock{},
 				AsFieldManager:         ConfigConsumerAsFieldManager,
@@ -377,6 +378,7 @@ func TestAPFControllerWithGracefulShutdown(t *testing.T) {
 		queues:          map[string]*ctlrTestQueueSet{},
 	}
 	controller := newTestableController(TestableConfig{
+		FeatureGate:            fcboot.LatestFeatureGate,
 		Name:                   "Controller",
 		Clock:                  clock.RealClock{},
 		AsFieldManager:         ConfigConsumerAsFieldManager,
@@ -523,8 +525,8 @@ func genPLs(rng *rand.Rand, trial string, oldPLNames sets.String, n int) (pls []
 func genFSs(t *testing.T, rng *rand.Rand, trial string, goodPLNames, badPLNames sets.String, n int) (newFSs []*flowcontrol.FlowSchema, newFSMap map[string]*flowcontrol.FlowSchema, newFTRs map[string]*fsTestingRecord, catchAlls map[bool]*flowcontrol.FlowSchema) {
 	newFTRs = map[string]*fsTestingRecord{}
 	catchAlls = map[bool]*flowcontrol.FlowSchema{
-		false: fcboot.GetV1ConfigCollection(true).FlowSchemaCatchAll,
-		true:  fcboot.GetV1ConfigCollection(true).FlowSchemaCatchAll}
+		false: fcboot.Latest.FlowSchemaCatchAll,
+		true:  fcboot.Latest.FlowSchemaCatchAll}
 	newFSMap = map[string]*flowcontrol.FlowSchema{}
 	add := func(ftr *fsTestingRecord) {
 		newFSs = append(newFSs, ftr.fs)

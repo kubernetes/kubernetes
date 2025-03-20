@@ -22,6 +22,7 @@ import (
 
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -102,6 +103,7 @@ func Test_GetMaxSeats(t *testing.T) {
 			startTime := time.Now()
 			clk, _ := eventclock.NewFake(startTime, 0, nil)
 			c := newTestableController(TestableConfig{
+				FeatureGate:       fcboot.LatestFeatureGate,
 				Name:              "Controller",
 				Clock:             clk,
 				InformerFactory:   informerFactory,

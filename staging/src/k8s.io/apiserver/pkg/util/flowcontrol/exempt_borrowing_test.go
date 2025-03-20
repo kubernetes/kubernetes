@@ -20,7 +20,8 @@ import (
 	"testing"
 	"time"
 
-	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-v134"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	fcbootlatest "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap-v134"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	testeventclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -33,10 +34,10 @@ import (
 func TestUpdateBorrowing(t *testing.T) {
 	startTime := time.Now()
 	clk, _ := testeventclock.NewFake(startTime, 0, nil)
-	plcExempt := fcboot.MandatoryPriorityLevelConfigurationExempt
-	plcHigh := fcboot.SuggestedPriorityLevelConfigurationWorkloadHigh
-	plcMid := fcboot.SuggestedPriorityLevelConfigurationWorkloadLow
-	plcLow := fcboot.MandatoryPriorityLevelConfigurationCatchAll
+	plcExempt := fcbootlatest.MandatoryPriorityLevelConfigurationExempt
+	plcHigh := fcbootlatest.SuggestedPriorityLevelConfigurationWorkloadHigh
+	plcMid := fcbootlatest.SuggestedPriorityLevelConfigurationWorkloadLow
+	plcLow := fcbootlatest.MandatoryPriorityLevelConfigurationCatchAll
 	plcs := []*flowcontrol.PriorityLevelConfiguration{plcHigh, plcExempt, plcMid, plcLow}
 	fses := []*flowcontrol.FlowSchema{}
 	k8sClient := clientsetfake.NewSimpleClientset(plcLow, plcExempt, plcHigh, plcMid)
@@ -46,6 +47,7 @@ func TestUpdateBorrowing(t *testing.T) {
 		*plcMid.Spec.Limited.NominalConcurrencyShares+
 		*plcLow.Spec.Limited.NominalConcurrencyShares) * 6
 	config := TestableConfig{
+		FeatureGate:            fcboot.LatestFeatureGate,
 		Name:                   "test",
 		Clock:                  clk,
 		AsFieldManager:         "testfm",

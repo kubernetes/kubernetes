@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
@@ -137,6 +138,7 @@ func TestBorrowing(t *testing.T) {
 			flowcontrolClient := clientset.FlowcontrolV1()
 			clk := eventclock.Real{}
 			controller := newTestableController(TestableConfig{
+				FeatureGate:            fcboot.LatestFeatureGate,
 				Name:                   "Controller",
 				Clock:                  clk,
 				AsFieldManager:         ConfigConsumerAsFieldManager,

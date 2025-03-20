@@ -20,6 +20,8 @@ import (
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
+	"k8s.io/apiserver/pkg/features"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/install"
 )
@@ -30,9 +32,11 @@ type FlowSchemasMap = map[string]*flowcontrol.FlowSchema
 // GetMandatoryFlowSchemasMap returns the unversioned (internal) mandatory FlowSchema objects,
 // as a deeply immutable map.
 // The arguments are the values of the features that control which config collection to use.
-func GetMandatoryFlowSchemasMap(v134 bool) FlowSchemasMap {
-	return MandatoryFlowSchemasMap[bootstrap.CollectionID{V134: v134}]
+func GetMandatoryFlowSchemasMap(featureGate featuregate.FeatureGate) FlowSchemasMap {
+	return MandatoryFlowSchemasMap[bootstrap.CollectionID{V134: featureGate.Enabled(features.APFv134Config)}]
 }
+
+var oldConfig = bootstrap.GetV1ConfigCollection(bootstrap.MakeGate(false))
 
 // MandatoryFlowSchemasMap holds the unversioned (internal) renditions of the mandatory
 // flow schemas.  In the outer map the key is CollectionId and
@@ -40,8 +44,8 @@ func GetMandatoryFlowSchemasMap(v134 bool) FlowSchemasMap {
 // value is the `*FlowSchema`.  Nobody should mutate anything
 // reachable from this map.
 var MandatoryFlowSchemasMap = map[bootstrap.CollectionID]FlowSchemasMap{
-	{V134: false}: internalizeFSes(bootstrap.GetV1ConfigCollection(false).Mandatory.FlowSchemas),
-	{V134: true}:  internalizeFSes(bootstrap.GetV1ConfigCollection(true).Mandatory.FlowSchemas),
+	{V134: false}: internalizeFSes(oldConfig.Mandatory.FlowSchemas),
+	{V134: true}:  internalizeFSes(bootstrap.Latest.Mandatory.FlowSchemas),
 }
 
 // PriorityLevelConfigurationsMap is a collection of unversioned (internal) PriorityLevelConfiguration objects, indexed by name.
@@ -50,8 +54,8 @@ type PriorityLevelConfigurationsMap = map[string]*flowcontrol.PriorityLevelConfi
 // GetMandatoryPriorityLevelConfigurationsMap returns the mandatory PriorityLevelConfiguration objects,
 // as a deeply immutable map.
 // The arguments are the values of the features that control which config collection to use.
-func GetMandatoryPriorityLevelConfigurationsMap(v134 bool) PriorityLevelConfigurationsMap {
-	return MandatoryPriorityLevelConfigurationsMap[bootstrap.CollectionID{V134: v134}]
+func GetMandatoryPriorityLevelConfigurationsMap(featureGate featuregate.FeatureGate) PriorityLevelConfigurationsMap {
+	return MandatoryPriorityLevelConfigurationsMap[bootstrap.CollectionID{V134: featureGate.Enabled(features.APFv134Config)}]
 }
 
 // MandatoryPriorityLevelConfigurationsMap holds the untyped renditions of the
@@ -60,8 +64,8 @@ func GetMandatoryPriorityLevelConfigurationsMap(v134 bool) PriorityLevelConfigur
 // `*PriorityLevelConfiguration`.  Nobody should mutate anything
 // reachable from this map.
 var MandatoryPriorityLevelConfigurationsMap = map[bootstrap.CollectionID]PriorityLevelConfigurationsMap{
-	{V134: false}: internalizePLs(bootstrap.GetV1ConfigCollection(false).Mandatory.PriorityLevelConfigurations),
-	{V134: true}:  internalizePLs(bootstrap.GetV1ConfigCollection(true).Mandatory.PriorityLevelConfigurations),
+	{V134: false}: internalizePLs(oldConfig.Mandatory.PriorityLevelConfigurations),
+	{V134: true}:  internalizePLs(bootstrap.Latest.Mandatory.PriorityLevelConfigurations),
 }
 
 func internalizeFSes(exts []*flowcontrolv1.FlowSchema) FlowSchemasMap {

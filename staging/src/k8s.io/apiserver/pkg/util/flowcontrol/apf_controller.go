@@ -47,6 +47,7 @@ import (
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 
@@ -124,7 +125,7 @@ type configController struct {
 	queueSetFactory   fq.QueueSetFactory
 	reqsGaugeVec      metrics.RatioedGaugeVec
 	execSeatsGaugeVec metrics.RatioedGaugeVec
-	v134Config        bool
+	featureGate       featuregate.FeatureGate
 
 	// How this controller appears in an ObjectMeta ManagedFieldsEntry.Manager
 	asFieldManager string
@@ -277,7 +278,7 @@ func (stats *seatDemandStats) update(obs fq.IntegratorResults) {
 // NewTestableController is extra flexible to facilitate testing
 func newTestableController(config TestableConfig) *configController {
 	cfgCtlr := &configController{
-		v134Config:             config.V134Config,
+		featureGate:            config.FeatureGate,
 		name:                   config.Name,
 		clock:                  config.Clock,
 		queueSetFactory:        config.QueueSetFactory,
@@ -692,10 +693,10 @@ func (cfgCtlr *configController) lockAndDigestConfigObjects(newPLs []*flowcontro
 
 	// Supply missing mandatory PriorityLevelConfiguration objects
 	if !meal.haveExemptPL {
-		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.v134Config).PriorityLevelConfigurationExempt)
+		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.featureGate).PriorityLevelConfigurationExempt)
 	}
 	if !meal.haveCatchAllPL {
-		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.v134Config).PriorityLevelConfigurationCatchAll)
+		meal.imaginePL(fcboot.GetV1ConfigCollection(cfgCtlr.featureGate).PriorityLevelConfigurationCatchAll)
 	}
 
 	meal.finishQueueSetReconfigsLocked()
@@ -787,10 +788,10 @@ func (meal *cfgMeal) digestFlowSchemasLocked(newFSs []*flowcontrol.FlowSchema) {
 
 	// Supply missing mandatory FlowSchemas, in correct position
 	if !haveExemptFS {
-		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.GetV1ConfigCollection(meal.cfgCtlr.v134Config).FlowSchemaExempt}, fsSeq...)
+		fsSeq = append(apihelpers.FlowSchemaSequence{fcboot.GetV1ConfigCollection(meal.cfgCtlr.featureGate).FlowSchemaExempt}, fsSeq...)
 	}
 	if !haveCatchAllFS {
-		fsSeq = append(fsSeq, fcboot.GetV1ConfigCollection(meal.cfgCtlr.v134Config).FlowSchemaCatchAll)
+		fsSeq = append(fsSeq, fcboot.GetV1ConfigCollection(meal.cfgCtlr.featureGate).FlowSchemaCatchAll)
 	}
 
 	meal.cfgCtlr.flowSchemas = fsSeq

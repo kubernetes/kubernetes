@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	flowcontrolbootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 )
 
@@ -59,13 +60,17 @@ func TestConfigFlap(t *testing.T) {
 	})
 }
 
+var featureGates = map[bool]featuregate.FeatureGate{
+	false: flowcontrolbootstrap.MakeGate(false),
+	true:  flowcontrolbootstrap.LatestFeatureGate}
+
 func flapTo(t *testing.T, trial string, v134 bool) bool {
 	flapName := fmt.Sprintf("%s v134=%v", trial, v134)
 	t.Log("Preparing for " + flapName)
 	ctx, client, _, tearDown := setup(t, 100, 100, v134)
 	defer tearDown()
 	t.Log("Waiting for " + flapName)
-	if !waitForConfig(t, ctx, client, flapName, v134) {
+	if !waitForConfig(t, ctx, client, flapName, featureGates[v134]) {
 		t.Fatal("Failed to establish " + flapName)
 		return false
 	}
@@ -75,8 +80,8 @@ func flapTo(t *testing.T, trial string, v134 bool) bool {
 
 var errSuccess = errors.New("gotit")
 
-func waitForConfig(t *testing.T, ctx context.Context, client clientset.Interface, phaseName string, v134 bool) bool {
-	expectedSlices := flowcontrolbootstrap.GetV1ConfigCollection(v134)
+func waitForConfig(t *testing.T, ctx context.Context, client clientset.Interface, phaseName string, featureGate featuregate.FeatureGate) bool {
+	expectedSlices := flowcontrolbootstrap.GetV1ConfigCollection(featureGate)
 	expectedPLCs := slicesToMap(widenToObject, expectedSlices.Mandatory.PriorityLevelConfigurations, expectedSlices.Suggested.PriorityLevelConfigurations)
 	expectedFSes := slicesToMap(widenToObject, expectedSlices.Mandatory.FlowSchemas, expectedSlices.Suggested.FlowSchemas)
 	var iteration int

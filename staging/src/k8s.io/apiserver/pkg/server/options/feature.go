@@ -22,7 +22,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
@@ -79,12 +78,11 @@ func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interfac
 			return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight)
 
 		}
-		v134Config := c.FeatureGate.Enabled(features.APFv134Config)
 		c.FlowControl = utilflowcontrol.New(
 			informers,
 			clientset.FlowcontrolV1(),
 			c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight,
-			v134Config,
+			c.FeatureGate,
 		)
 	}
 

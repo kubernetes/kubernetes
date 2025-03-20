@@ -769,7 +769,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 	}
 
 	validChangesInExemptFieldOfExemptPLFn := func() flowcontrol.PriorityLevelConfigurationSpec {
-		have := fcboot.GetV1ConfigCollection(true).PriorityLevelConfigurationExempt
+		have := fcboot.Latest.PriorityLevelConfigurationExempt
 		return flowcontrol.PriorityLevelConfigurationSpec{
 			Type: flowcontrol.PriorityLevelEnablementExempt,
 			Exempt: &flowcontrol.ExemptPriorityLevelConfiguration{
