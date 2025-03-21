@@ -158,6 +158,7 @@ func toSelectableFields(slice *resource.ResourceSlice) fields.Set {
 func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRADeviceTaintsFields(newSlice, oldSlice)
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
+	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -200,6 +201,21 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 			device.Basic.AllNodes = nil
 		}
 
+	}
+}
+
+func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+		return
+	}
+
+	for _, device := range newSlice.Spec.Devices {
+		if device.Basic != nil {
+			device.Basic.BindingConditions = nil
+			device.Basic.BindingFailureConditions = nil
+			device.Basic.BindingTimeoutSeconds = nil
+			device.Basic.UsageRestrictedToNode = nil
+		}
 	}
 }
 
