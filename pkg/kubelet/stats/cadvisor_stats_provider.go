@@ -156,6 +156,9 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 			podStats.CPU = cpu
 			podStats.Memory = memory
 			podStats.Swap = cadvisorInfoToSwapStats(podInfo)
+			if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+				podStats.IO = cadvisorInfoToIOStats(podInfo)
+			}
 			// ProcessStats were accumulated as the containers were iterated.
 		}
 

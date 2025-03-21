@@ -32,7 +32,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubepodtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
@@ -63,6 +65,7 @@ const (
 	offsetFsInodeUsage
 	offsetAcceleratorDutyCycle
 	offsetMemSwapUsageBytes
+	offsetPSIDataTotal
 )
 
 var (
@@ -265,6 +268,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 		CreationTime: testTime(creationTime, seed),
 		HasCpu:       true,
 		HasMemory:    true,
+		HasDiskIo:    true,
 		HasNetwork:   true,
 		Labels:       labels,
 		Memory: cadvisorapiv2.MemorySpec{
@@ -280,8 +284,10 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 
 	stats := cadvisorapiv2.ContainerStats{
 		Timestamp: testTime(timestamp, seed),
-		Cpu:       &cadvisorapiv1.CpuStats{},
-		CpuInst:   &cadvisorapiv2.CpuInstStats{},
+		Cpu: &cadvisorapiv1.CpuStats{
+			PSI: getTestPSIStats(seed),
+		},
+		CpuInst: &cadvisorapiv2.CpuInstStats{},
 		Memory: &cadvisorapiv1.MemoryStats{
 			Usage:      uint64(seed + offsetMemUsageBytes),
 			WorkingSet: uint64(seed + offsetMemWorkingSetBytes),
@@ -291,6 +297,7 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				Pgmajfault: uint64(seed + offsetMemMajorPageFaults),
 			},
 			Swap: uint64(seed + offsetMemSwapUsageBytes),
+			PSI:  getTestPSIStats(seed),
 		},
 		Network: &cadvisorapiv2.NetworkStats{
 			Interfaces: []cadvisorapiv1.InterfaceStats{{
@@ -323,12 +330,31 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 				DutyCycle:   uint64(seed + offsetAcceleratorDutyCycle),
 			},
 		},
+		DiskIo: &cadvisorapiv1.DiskIoStats{
+			PSI: getTestPSIStats(seed),
+		},
 	}
 	stats.Cpu.Usage.Total = uint64(seed + offsetCPUUsageCoreSeconds)
 	stats.CpuInst.Usage.Total = uint64(seed + offsetCPUUsageCores)
 	return cadvisorapiv2.ContainerInfo{
 		Spec:  spec,
 		Stats: []*cadvisorapiv2.ContainerStats{&stats},
+	}
+}
+
+func getTestPSIStats(seed int) cadvisorapiv1.PSIStats {
+	return cadvisorapiv1.PSIStats{
+		Full: getTestPSIData(seed),
+		Some: getTestPSIData(seed),
+	}
+}
+
+func getTestPSIData(seed int) cadvisorapiv1.PSIData {
+	return cadvisorapiv1.PSIData{
+		Total:  uint64(seed + offsetPSIDataTotal),
+		Avg10:  float64(10),
+		Avg60:  float64(10),
+		Avg300: float64(10),
 	}
 }
 
@@ -469,6 +495,7 @@ func checkCPUStats(t *testing.T, label string, seed int, stats *statsapi.CPUStat
 	assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".CPU.Time")
 	assert.EqualValues(t, seed+offsetCPUUsageCores, *stats.UsageNanoCores, label+".CPU.UsageCores")
 	assert.EqualValues(t, seed+offsetCPUUsageCoreSeconds, *stats.UsageCoreNanoSeconds, label+".CPU.UsageCoreSeconds")
+	checkPSIStats(t, label+".CPU", seed, stats.PSI)
 }
 
 func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.MemoryStats) {
@@ -483,6 +510,28 @@ func checkMemoryStats(t *testing.T, label string, seed int, info cadvisorapiv2.C
 	} else {
 		expected := info.Spec.Memory.Limit - *stats.WorkingSetBytes
 		assert.EqualValues(t, expected, *stats.AvailableBytes, label+".Mem.AvailableBytes")
+	}
+	checkPSIStats(t, label+".Mem", seed, stats.PSI)
+}
+
+func checkIOStats(t *testing.T, label string, seed int, info cadvisorapiv2.ContainerInfo, stats *statsapi.IOStats) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		assert.EqualValues(t, testTime(timestamp, seed).Unix(), stats.Time.Time.Unix(), label+".Mem.Time")
+		checkPSIStats(t, label+".IO", seed, stats.PSI)
+	}
+}
+
+func checkPSIStats(t *testing.T, label string, seed int, stats *statsapi.PSIStats) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		require.NotNil(t, stats, label+".PSI")
+		assert.EqualValues(t, seed+offsetPSIDataTotal, stats.Full.Total, label+".PSI.Full.Total")
+		assert.InDelta(t, 10, stats.Full.Avg10, 0.01, label+".PSI.Full.Avg10")
+		assert.InDelta(t, 10, stats.Full.Avg60, 0.01, label+".PSI.Full.Avg60")
+		assert.InDelta(t, 10, stats.Full.Avg300, 0.01, label+".PSI.Full.Avg300")
+		assert.EqualValues(t, seed+offsetPSIDataTotal, stats.Some.Total, label+".PSI.Some.Total")
+		assert.InDelta(t, 10, stats.Some.Avg10, 0.01, label+".PSI.Some.Avg10")
+		assert.InDelta(t, 10, stats.Some.Avg60, 0.01, label+".PSI.Some.Avg60")
+		assert.InDelta(t, 10, stats.Some.Avg300, 0.01, label+".PSI.Some.Avg300")
 	}
 }
 
