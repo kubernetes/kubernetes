@@ -82,6 +82,7 @@ func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interfac
 			informers,
 			clientset.FlowcontrolV1(),
 			c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight,
+			c.FeatureGate,
 		)
 	}
 
