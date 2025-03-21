@@ -18,8 +18,9 @@ package genericclioptions
 
 import (
 	"fmt"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -49,12 +50,7 @@ type GoTemplatePrintFlags struct {
 
 // AllowedFormats returns slice of string of allowed GoTemplatePrint printing format
 func (f *GoTemplatePrintFlags) AllowedFormats() []string {
-	formats := make([]string, 0, len(templateFormats))
-	for format := range templateFormats {
-		formats = append(formats, format)
-	}
-	sort.Strings(formats)
-	return formats
+	return slices.Sorted(maps.Keys(templateFormats))
 }
 
 // ToPrinter receives an templateFormat and returns a printer capable of
