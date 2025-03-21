@@ -1330,16 +1330,6 @@ type DeviceRequestAllocationResult struct {
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration
 
-	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
-	// has to be limited to exactly the node that was chosen when allocating the claim.
-	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
-	//
-	// +optional
-	// +featureGate=DRADeviceBindingConditions
-	UsageRestrictedToNode *bool
-
 	// BindingConditions defines the conditions for proceeding with binding.
 	// All of these conditions must be set in the per-device status
 	// conditions with a value of True to proceed with binding the pod to the node
