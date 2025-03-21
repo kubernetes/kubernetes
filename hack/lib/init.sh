@@ -167,24 +167,35 @@ export KUBE_NONSERVER_GROUP_VERSIONS
 # testone $T/linkdir/linkfile
 # testone $T/linkdir/linkdir
 function kube::readlinkdashf {
-  # run in a subshell for simpler 'cd'
+  # Run in a subshell for simpler 'cd' 
   (
-    if [[ -d "${1}" ]]; then # This also catch symlinks to dirs.
-      cd "${1}"
+    local target="$1"
+    local max_symlinks=10
+    local count=0
+
+    while [[ -L "$target" && $count -lt $max_symlinks ]]; do
+      local link_target=$(readlink "$target")
+      count=$((count + 1))
+      
+      # If the symlink target is relative, make it absolute relative to the symlink's directory
+      if [[ "$link_target" != /* ]]; then
+        target="$(dirname "$target")/$link_target"
+      else
+        target="$link_target"
+      fi
+    done
+
+    # Now get the physical path
+    if [[ -d "$target" ]]; then
+      cd "$target"
       pwd -P
     else
-      cd "$(dirname "${1}")"
-      local f
-      f=$(basename "${1}")
-      if [[ -L "${f}" ]]; then
-        readlink "${f}"
-      else
-        echo "$(pwd -P)/${f}"
-      fi
+      cd "$(dirname "$target")"
+      local file=$(basename "$target")
+      echo "$(pwd -P)/$file"
     fi
   )
 }
-
 # This emulates "realpath" which is not available on MacOS X
 # Test:
 # T=/tmp/$$.$RANDOM
