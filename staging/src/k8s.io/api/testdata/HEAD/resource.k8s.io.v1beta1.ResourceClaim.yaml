@@ -97,6 +97,11 @@ status:
         source: sourceValue
       results:
       - adminAccess: true
+        bindingConditions:
+        - bindingConditionsValue
+        bindingFailureConditions:
+        - bindingFailureConditionsValue
+        bindingTimeoutSeconds: 9
         device: deviceValue
         driver: driverValue
         pool: poolValue
