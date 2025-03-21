@@ -2147,6 +2147,19 @@ func TestValidationExpressions(t *testing.T) {
 				`!format.named("unknown").hasValue()`,
 			},
 		},
+		{name: "image",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			valid: []string{
+				`isImage("reg.io/repo/img:tag")`,
+				`image("reg.io/repo/img@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").containsDigest()`,
+				`image("reg.io/repo/img:tag").registry() == "reg.io"`,
+				`image("reg.io/repo/img:tag").repository() != "wrongrepo"`,
+				`image("reg.io/repo/img:tag").identifier() == "tag"`,
+				`image("reg.io/repo/img:tag").tag() == "tag"`,
+				`image("reg.io/repo/img@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").digest() == "sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2"`,
+			},
+		},
 	}
 
 	for i := range tests {

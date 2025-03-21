@@ -203,7 +203,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 
 			return &cost
 		}
-	case "quantity", "isQuantity", "semver", "isSemver":
+	case "quantity", "isQuantity", "semver", "isSemver", "image", "isImage":
 		if len(args) >= 1 {
 			cost := uint64(math.Ceil(float64(actualSize(args[0])) * common.StringTraversalCostFactor))
 			return &cost
@@ -237,7 +237,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 		// Simply dictionary lookup
 		cost := uint64(1)
 		return &cost
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch", "containsDigest", "registry", "repository", "identifier", "tag", "digest":
 		cost := uint64(1)
 		return &cost
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
@@ -255,6 +255,7 @@ func (l *CostEstimator) CallCost(function, overloadId string, args []ref.Val, re
 				*cel.Format, cel.Format, // Formats have a small max size. Format takes pointer receiver.
 				*cel.URL, cel.URL, // TODO: Computing the actual cost is expensive, and changing this would be a breaking change
 				*cel.Semver, cel.Semver,
+				*cel.Image, cel.Image,
 				*authorizerVal, authorizerVal, *pathCheckVal, pathCheckVal, *groupCheckVal, groupCheckVal,
 				*resourceCheckVal, resourceCheckVal, *decisionVal, decisionVal:
 				return &unitCost
@@ -487,7 +488,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 
 			return &checker.CallEstimate{CostEstimate: ipCompCost}
 		}
-	case "quantity", "isQuantity", "semver", "isSemver":
+	case "quantity", "isQuantity", "semver", "isSemver", "image", "isImage":
 		if target != nil {
 			sz := l.sizeEstimate(args[0])
 			return &checker.CallEstimate{CostEstimate: sz.MultiplyByCostFactor(common.StringTraversalCostFactor)}
@@ -499,7 +500,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 		}
 	case "format.named":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
-	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch":
+	case "sign", "asInteger", "isInteger", "asApproximateFloat", "isGreaterThan", "isLessThan", "compareTo", "add", "sub", "major", "minor", "patch", "containsDigest", "registry", "repository", "identifier", "tag", "digest":
 		return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 	case "getScheme", "getHostname", "getHost", "getPort", "getEscapedPath", "getQuery":
 		// url accessors
@@ -519,7 +520,7 @@ func (l *CostEstimator) EstimateCallCost(function, overloadId string, target *ch
 				if t.Kind() == types.StructKind {
 					switch t {
 					case cel.QuantityType, AuthorizerType, PathCheckType, // O(1) cost equality checks
-						GroupCheckType, ResourceCheckType, DecisionType, cel.SemverType:
+						GroupCheckType, ResourceCheckType, DecisionType, cel.SemverType, cel.ImageType:
 						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: 1}}
 					case cel.FormatType:
 						return &checker.CallEstimate{CostEstimate: checker.CostEstimate{Min: 1, Max: cel.MaxFormatSize}.MultiplyByCostFactor(common.StringTraversalCostFactor)}

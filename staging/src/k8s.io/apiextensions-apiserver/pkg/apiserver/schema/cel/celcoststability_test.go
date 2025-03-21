@@ -1195,6 +1195,19 @@ func TestCelCostStability(t *testing.T) {
 				`quantity(self.val1).isInteger()`:                                                                                        4,
 			},
 		},
+		{name: "image",
+			obj:    objs("20", "200M"),
+			schema: schemas(stringType, stringType),
+			expectCost: map[string]int64{
+				`isImage("reg.io/repo/img:tag")`: 2,
+				`image("reg.io/repo/img@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").containsDigest()`: 10,
+				`image("reg.io/repo/img:tag").registry() == "reg.io"`:                                                               4,
+				`image("reg.io/repo/img:tag").repository() != "wrongrepo"`:                                                          4,
+				`image("reg.io/repo/img:tag").identifier() == "tag"`:                                                                4,
+				`image("reg.io/repo/img:tag").tag() == "tag"`:                                                                       4,
+				`image("reg.io/repo/img@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").digest() == "sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2"`: 18,
+			},
+		},
 	}
 
 	for _, tt := range cases {
