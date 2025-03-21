@@ -354,7 +354,10 @@ type BasicDevice struct {
 	// All of these conditions must be set in the per-device status
 	// conditions with a value of True to proceed with binding the pod to the node
 	// while scheduling the pod.
+	//
 	// The maximum number of binding conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
 	//
 	// This is an alpha field and requires enabling the DRADeviceBindingConditions
 	// feature gate.
@@ -367,7 +370,10 @@ type BasicDevice struct {
 	// BindingFailureConditions defines the conditions for binding failure.
 	// They may be set in the per-device status conditions.
 	// If any is true, a binding failure occurred.
+	//
 	// The maximum number of binding failure conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
 	//
 	// This is an alpha field and requires enabling the DRADeviceBindingConditions
 	// feature gate.
@@ -1355,7 +1361,10 @@ type DeviceRequestAllocationResult struct {
 	// All of these conditions must be set in the per-device status
 	// conditions with a value of True to proceed with binding the pod to the node
 	// while scheduling the pod.
+	//
 	// The maximum number of binding conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
 	//
 	// This is an alpha field and requires enabling the DRADeviceBindingConditions
 	// feature gate.
@@ -1368,7 +1377,10 @@ type DeviceRequestAllocationResult struct {
 	// BindingFailureConditions defines the conditions for binding failure.
 	// They may be set in the per-device status conditions.
 	// If any is true, a binding failure occurred.
+	//
 	// The maximum number of binding failure conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
 	//
 	// This is an alpha field and requires enabling the DRADeviceBindingConditions
 	// feature gate.
