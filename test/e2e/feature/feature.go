@@ -237,9 +237,6 @@ var (
 	// Ingress.networking.k8s.io to be present.
 	Ingress = framework.WithFeature(framework.ValidFeatures.Add("Ingress"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
-
 	// Owner: sig-network
 	// Marks tests that require a cluster with dual-stack pod and service networks.
 	IPv6DualStack = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
