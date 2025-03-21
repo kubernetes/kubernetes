@@ -35,7 +35,7 @@ import (
 // Stats is best effort and we evict based on stats being successful
 
 // Container runtime filesystem should display different stats for imagefs and nodefs
-var _ = SIGDescribe("Summary", feature.SeparateDisk, func() {
+var _ = SIGDescribe("Summary", feature.SeparateDisk, framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), func() {
 	f := framework.NewDefaultFramework("summary-test")
 	f.It("should display different stats for imagefs and nodefs", func(ctx context.Context) {
 		summary := eventuallyGetSummary(ctx)
