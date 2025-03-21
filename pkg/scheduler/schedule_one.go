@@ -292,29 +292,18 @@ func (sched *Scheduler) bindingCycle(
 		return status
 	}
 
-	// Run "prebind" plugins.
-	if status := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
-		if status.IsRejected() {
-			fitErr := &framework.FitError{
-				NumAllNodes: 1,
-				Pod:         assumedPodInfo.Pod,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatus:         framework.NewDefaultNodeToStatus(),
-					UnschedulablePlugins: sets.New(status.Plugin()),
-				},
-			}
-			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, status)
-			return framework.NewStatus(status.Code()).WithError(fitErr)
-		}
-		return status
-	}
-
 	// Any failures after this point cannot lead to the Pod being considered unschedulable.
-	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and PreBind is the last one in the scheduling/binding cycle.
+	// We define the Pod as "unschedulable" only when Pods are rejected at specific extension points, and Permit is the last one in the scheduling/binding cycle.
+	// If a Pod fails on PreBind or Bind, it should be moved to BackoffQ for retry.
 	//
 	// We can call Done() here because
-	// we can free the cluster events stored in the scheduling queue sonner, which is worth for busy clusters memory consumption wise.
+	// we can free the cluster events stored in the scheduling queue sooner, which is worth for busy clusters memory consumption wise.
 	sched.SchedulingQueue.Done(assumedPod.UID)
+
+	// Run "prebind" plugins.
+	if status := fwk.RunPreBindPlugins(ctx, state, assumedPod, scheduleResult.SuggestedHost); !status.IsSuccess() {
+		return status
+	}
 
 	// Run "bind" plugins.
 	if status := sched.bind(ctx, fwk, assumedPod, scheduleResult.SuggestedHost, state); !status.IsSuccess() {
