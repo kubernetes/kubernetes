@@ -56,12 +56,11 @@ var _ = SIGDescribe("Security Context", func() {
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
 	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
 		podClient = e2epod.NewPodClient(f)
 	})
 
 	ginkgo.Context("When creating a pod with HostUsers", func() {
-		e2eskipper.SkipIfNodeOSDistroIs("windows")
-
 		containerName := "userns-test"
 		makePod := func(hostUsers bool) *v1.Pod {
 			return &v1.Pod{
@@ -710,8 +709,9 @@ var _ = SIGDescribe("Security Context", func() {
 })
 
 var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", func() {
-	e2eskipper.SkipIfNodeOSDistroIs("windows")
-
+	ginkgo.BeforeEach(func() {
+		e2eskipper.SkipIfNodeOSDistroIs("windows")
+	})
 	f := framework.NewDefaultFramework("user-namespaces-pss-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
