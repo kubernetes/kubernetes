@@ -57,6 +57,7 @@ type tlsCacheKey struct {
 	keyFile            string
 	serverName         string
 	nextProtos         string
+	cipherSuites       string
 	disableCompression bool
 	// these functions are wrapped to allow them to be used as map keys
 	getCert *GetCertHolder
@@ -165,6 +166,7 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 		caData:             string(c.TLS.CAData),
 		serverName:         c.TLS.ServerName,
 		nextProtos:         strings.Join(c.TLS.NextProtos, ","),
+		cipherSuites:       convertUint16ArrayToString(c.TLS.CipherSuites),
 		disableCompression: c.DisableCompression,
 		getCert:            c.TLS.GetCertHolder,
 		dial:               c.DialHolder,
@@ -179,4 +181,12 @@ func tlsConfigKey(c *Config) (tlsCacheKey, bool, error) {
 	}
 
 	return k, true, nil
+}
+
+func convertUint16ArrayToString(uintArray []uint16) string {
+	result := ""
+	for _, value := range uintArray {
+		result = result + fmt.Sprintf("%d", value)
+	}
+	return fmt.Sprint(result)
 }

@@ -148,6 +148,10 @@ type TLSConfig struct {
 	// To indicate to the server http/1.1 is preferred over http/2, set to ["http/1.1", "h2"] (though the server is free to ignore that preference).
 	// To use only http/1.1, set to ["http/1.1"].
 	NextProtos []string
+	// CipherSuites is a list of enabled TLS 1.0–1.2 cipher suites. The order of
+	// the list is ignored.
+	// Used to populate tls.Config.CipherSuites.
+	CipherSuites []uint16
 
 	// Callback that returns a TLS client certificate. CertData, CertFile, KeyData and KeyFile supercede this field.
 	// This struct indirection is used to make transport configs cacheable.

@@ -134,6 +134,14 @@ func TestNew(t *testing.T) {
 			}},
 		},
 
+		"cipher suite": {
+			TLS:          true,
+			DefaultRoots: true,
+			Config: &Config{TLS: TLSConfig{
+				CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_GCM_SHA384},
+			}},
+		},
+
 		"ca transport": {
 			TLS: true,
 			Config: &Config{

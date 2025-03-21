@@ -141,8 +141,10 @@ func TestTLSConfigKey(t *testing.T) {
 				GetCertHolder: getCert,
 			},
 		},
-		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
-		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
+		"http2, http1.1":                  {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
+		"http1.1-only":                    {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
+		"TLS_RSA_WITH_AES_256_GCM_SHA384": {TLS: TLSConfig{CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_256_GCM_SHA384}}},
+		"TLS_RSA_WITH_AES_128_GCM_SHA256, TLS_RSA_WITH_AES_256_GCM_SHA384": {TLS: TLSConfig{CipherSuites: []uint16{tls.TLS_RSA_WITH_AES_128_GCM_SHA256, tls.TLS_RSA_WITH_AES_256_GCM_SHA384}}},
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {
