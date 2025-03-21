@@ -28,7 +28,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -293,14 +292,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion, err := semver.ParseTolerant(c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String())
-		if err != nil {
-			return err
-		}
-		emulationVersion, err := semver.ParseTolerant(c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().String())
-		if err != nil {
-			return err
-		}
+		binaryVersion := c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String()
+		emulationVersion := c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().String()
 
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
@@ -308,8 +301,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 			"kube-system",
 			id,
 			kubeControllerManager,
-			binaryVersion.FinalizeVersion(),
-			emulationVersion.FinalizeVersion(),
+			binaryVersion,
+			emulationVersion,
 			coordinationv1.OldestEmulationVersion,
 		)
 		if err != nil {

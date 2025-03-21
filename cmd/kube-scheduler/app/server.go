@@ -24,7 +24,6 @@ import (
 	"os"
 	goruntime "runtime"
 
-	"github.com/blang/semver/v4"
 	"github.com/spf13/cobra"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -215,14 +214,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	readyzChecks = append(readyzChecks, handlerSyncCheck)
 
 	if cc.LeaderElection != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion, err := semver.ParseTolerant(cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String())
-		if err != nil {
-			return err
-		}
-		emulationVersion, err := semver.ParseTolerant(cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().String())
-		if err != nil {
-			return err
-		}
+		binaryVersion := cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String()
+		emulationVersion := cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().String()
 
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
@@ -230,8 +223,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			metav1.NamespaceSystem,
 			cc.LeaderElection.Lock.Identity(),
 			kubeScheduler,
-			binaryVersion.FinalizeVersion(),
-			emulationVersion.FinalizeVersion(),
+			binaryVersion,
+			emulationVersion,
 			coordinationv1.OldestEmulationVersion,
 		)
 		if err != nil {

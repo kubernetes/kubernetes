@@ -269,3 +269,63 @@ func TestInfo(t *testing.T) {
 		})
 	}
 }
+
+func TestEffectiveVersionString(t *testing.T) {
+	tests := []struct {
+		name                    string
+		binaryVersion           string
+		emulationVersion        string
+		minCompatibilityVersion string
+		expectedString          string
+	}{
+		{
+			name:                    "basic case with all versions specified",
+			binaryVersion:           "v1.34.0",
+			emulationVersion:        "v1.32.0",
+			minCompatibilityVersion: "v1.31.0",
+			expectedString:          "{BinaryVersion: 1.34.0, EmulationVersion: 1.32, MinCompatibilityVersion: 1.31}",
+		},
+		{
+			name:                    "emulation version same as binary version",
+			binaryVersion:           "v1.33.0",
+			emulationVersion:        "v1.33.0",
+			minCompatibilityVersion: "v1.32.0",
+			expectedString:          "{BinaryVersion: 1.33.0, EmulationVersion: 1.33, MinCompatibilityVersion: 1.32}",
+		},
+		{
+			name:                    "only binary version specified",
+			binaryVersion:           "v1.35.0",
+			emulationVersion:        "",
+			minCompatibilityVersion: "",
+			expectedString:          "{BinaryVersion: 1.35.0, EmulationVersion: 1.35, MinCompatibilityVersion: 1.34}",
+		},
+		{
+			name:                    "pre-release and build metadata",
+			binaryVersion:           "v1.34.0-alpha.1+abc123",
+			emulationVersion:        "v1.33.0",
+			minCompatibilityVersion: "v1.32.0",
+			expectedString:          "{BinaryVersion: 1.34.0-alpha.1+abc123, EmulationVersion: 1.33, MinCompatibilityVersion: 1.32}",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			effective := NewEffectiveVersionFromString(test.binaryVersion, "", "")
+
+			if test.emulationVersion != "" {
+				emulationVersion := version.MustParse(test.emulationVersion)
+				effective.SetEmulationVersion(emulationVersion)
+			}
+
+			if test.minCompatibilityVersion != "" {
+				minCompatibilityVersion := version.MustParse(test.minCompatibilityVersion)
+				effective.SetMinCompatibilityVersion(minCompatibilityVersion)
+			}
+
+			result := effective.String()
+			if result != test.expectedString {
+				t.Errorf("expected: %s, got: %s", test.expectedString, result)
+			}
+		})
+	}
+}
