@@ -964,6 +964,20 @@ const (
 	// restore the old behavior. Please file issues if you hit issues and have to use this Feature Gate.
 	// The Feature Gate will be locked to true and then removed in +2 releases (1.35) if there are no bug reported
 	DisableCPUQuotaWithExclusiveCPUs featuregate.Feature = "DisableCPUQuotaWithExclusiveCPUs"
+
+	// owner: @munnerz
+	// kep: https://kep.k8s.io/4742
+	// alpha: v1.33
+	//
+	// Enables the PodTopologyLabelsAdmission admission plugin that mutates `pod/binding`
+	// requests by copying the `topology.k8s.io/{zone,region}` labels from the assigned
+	// Node object (in the Binding being admitted) onto the Binding
+	// so that it can be persisted onto the Pod object when the Pod is being scheduled.
+	// This allows workloads running in pods to understand the topology information of their assigned node.
+	// Enabling this feature also permits external schedulers to set labels on pods in an atomic
+	// operation when scheduling a Pod by setting the `metadata.labels` field on the submitted Binding,
+	// similar to how `metadata.annotations` behaves.
+	PodTopologyLabelsAdmission featuregate.Feature = "PodTopologyLabelsAdmission"
 )
 
 // defaultVersionedKubernetesFeatureGates consists of all known Kubernetes-specific feature keys with VersionedSpecs.
@@ -1569,6 +1583,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
+	},
+
+	PodTopologyLabelsAdmission: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PortForwardWebsockets: {
