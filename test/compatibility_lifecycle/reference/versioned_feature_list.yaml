@@ -539,6 +539,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: HPAConfigurableTolerance
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: HPAScaleToZero
   versionedSpecs:
   - default: false

@@ -28,6 +28,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidateScale(t *testing.T) {
@@ -367,8 +368,9 @@ func TestValidateBehavior(t *testing.T) {
 func prepareHPAWithBehavior(b autoscaling.HorizontalPodAutoscalerBehavior) autoscaling.HorizontalPodAutoscaler {
 	return autoscaling.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "myautoscaler",
-			Namespace: metav1.NamespaceDefault,
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "1",
 		},
 		Spec: autoscaling.HorizontalPodAutoscalerSpec{
 			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
@@ -1650,5 +1652,238 @@ func TestValidateHorizontalPodAutoscalerScaleToZeroUpdateDisabled(t *testing.T) 
 		if errs := ValidateHorizontalPodAutoscalerUpdate(&nonZeroCase, &zeroCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerConfigurableToleranceEnabled(t *testing.T) {
+	// Enable HPAConfigurableTolerance feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
+
+	policiesList := []autoscaling.HPAScalingPolicy{{
+		Type:          autoscaling.PodsScalingPolicy,
+		Value:         1,
+		PeriodSeconds: 1800,
+	}}
+
+	successCases := []autoscaling.HPAScalingRules{
+		{
+			Policies:  policiesList,
+			Tolerance: ptr.To(resource.MustParse("0.1")),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: ptr.To(resource.MustParse("10")),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: ptr.To(resource.MustParse("0")),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: resource.NewMilliQuantity(100, resource.DecimalSI),
+		},
+		{
+			Policies:  policiesList,
+			Tolerance: resource.NewScaledQuantity(1, resource.Milli),
+		},
+		{
+			Policies: policiesList,
+		},
+	}
+	for _, c := range successCases {
+		b := autoscaling.HorizontalPodAutoscalerBehavior{
+			ScaleDown: &c,
+		}
+		hpa := prepareHPAWithBehavior(b)
+		if errs := ValidateHorizontalPodAutoscaler(&hpa); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	failureCases := []struct {
+		rule autoscaling.HPAScalingRules
+		msg  string
+	}{
+		{
+			rule: autoscaling.HPAScalingRules{},
+			msg:  "at least one Policy",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{
+				Policies:  policiesList,
+				Tolerance: ptr.To(resource.MustParse("-0.001")),
+			},
+			msg: "greater or equal to zero",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{
+				Policies:  policiesList,
+				Tolerance: resource.NewMilliQuantity(-10, resource.DecimalSI),
+			},
+			msg: "greater or equal to zero",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{
+				StabilizationWindowSeconds: utilpointer.Int32(60),
+			},
+			msg: "at least one Policy",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{
+				Tolerance:                  resource.NewMilliQuantity(1, resource.DecimalSI),
+				StabilizationWindowSeconds: utilpointer.Int32(60),
+			},
+			msg: "at least one Policy",
+		},
+	}
+	for _, c := range failureCases {
+		b := autoscaling.HorizontalPodAutoscalerBehavior{
+			ScaleUp: &c.rule,
+		}
+		hpa := prepareHPAWithBehavior(b)
+		errs := ValidateHorizontalPodAutoscaler(&hpa)
+		if len(errs) != 1 {
+			t.Fatalf("expected exactly one error, got: %v", errs)
+		}
+		if !strings.Contains(errs[0].Error(), c.msg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], c.msg)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerConfigurableToleranceDisabled(t *testing.T) {
+	// Disable HPAConfigurableTolerance feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
+
+	maxPolicy := autoscaling.MaxPolicySelect
+	policiesList := []autoscaling.HPAScalingPolicy{{
+		Type:          autoscaling.PodsScalingPolicy,
+		Value:         1,
+		PeriodSeconds: 1800,
+	}}
+
+	successCases := []autoscaling.HPAScalingRules{
+		{
+			Policies: policiesList,
+		},
+		{
+			SelectPolicy: &maxPolicy,
+			Policies:     policiesList,
+		},
+		{
+			StabilizationWindowSeconds: utilpointer.Int32(60),
+			Policies:                   policiesList,
+		},
+	}
+	for _, c := range successCases {
+		b := autoscaling.HorizontalPodAutoscalerBehavior{
+			ScaleDown: &c,
+		}
+		hpa := prepareHPAWithBehavior(b)
+		if errs := ValidateHorizontalPodAutoscaler(&hpa); len(errs) != 0 {
+			t.Errorf("expected success: %v", errs)
+		}
+	}
+
+	failureCases := []struct {
+		rule autoscaling.HPAScalingRules
+		msg  string
+	}{
+		{
+			rule: autoscaling.HPAScalingRules{
+				Policies:  policiesList,
+				Tolerance: resource.NewMilliQuantity(1, resource.DecimalSI),
+			},
+			msg: "not supported",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{},
+			msg:  "at least one Policy",
+		},
+		{
+			rule: autoscaling.HPAScalingRules{
+				StabilizationWindowSeconds: utilpointer.Int32(60),
+			},
+			msg: "at least one Policy",
+		},
+	}
+	for _, c := range failureCases {
+		b := autoscaling.HorizontalPodAutoscalerBehavior{
+			ScaleUp: &c.rule,
+		}
+		hpa := prepareHPAWithBehavior(b)
+		errs := ValidateHorizontalPodAutoscaler(&hpa)
+		if len(errs) != 1 {
+			t.Fatalf("expected exactly one error, got: %v", errs)
+		}
+		if !strings.Contains(errs[0].Error(), c.msg) {
+			t.Errorf("unexpected error: %q, expected: %q", errs[0], c.msg)
+		}
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerUpdateConfigurableToleranceEnabled(t *testing.T) {
+	// Enable HPAConfigurableTolerance feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)
+
+	policiesList := []autoscaling.HPAScalingPolicy{{
+		Type:          autoscaling.PodsScalingPolicy,
+		Value:         1,
+		PeriodSeconds: 1800,
+	}}
+
+	withToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
+		ScaleUp: &autoscaling.HPAScalingRules{
+			Policies:  policiesList,
+			Tolerance: resource.NewMilliQuantity(10, resource.DecimalSI),
+		}})
+	withoutToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
+		ScaleUp: &autoscaling.HPAScalingRules{
+			Policies: policiesList,
+		}})
+
+	if errs := ValidateHorizontalPodAutoscalerUpdate(&withToleranceHPA, &withoutToleranceHPA); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	if errs := ValidateHorizontalPodAutoscalerUpdate(&withoutToleranceHPA, &withToleranceHPA); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+}
+
+func TestValidateHorizontalPodAutoscalerConfigurableToleranceUpdateDisabled(t *testing.T) {
+	// Disable HPAConfigurableTolerance feature gate.
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, false)
+
+	policiesList := []autoscaling.HPAScalingPolicy{{
+		Type:          autoscaling.PodsScalingPolicy,
+		Value:         1,
+		PeriodSeconds: 1800,
+	}}
+
+	withToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
+		ScaleUp: &autoscaling.HPAScalingRules{
+			Policies:  policiesList,
+			Tolerance: resource.NewMilliQuantity(10, resource.DecimalSI),
+		}})
+	withoutToleranceHPA := prepareHPAWithBehavior(autoscaling.HorizontalPodAutoscalerBehavior{
+		ScaleUp: &autoscaling.HPAScalingRules{
+			Policies: policiesList,
+		}})
+	notSupportedErrorMsg := "not supported"
+
+	errs := ValidateHorizontalPodAutoscalerUpdate(&withToleranceHPA, &withoutToleranceHPA)
+	if len(errs) == 0 {
+		t.Errorf("expected failure for %q", notSupportedErrorMsg)
+	} else if !strings.Contains(errs[0].Error(), notSupportedErrorMsg) {
+		t.Errorf("unexpected error: %q, expected: %q", errs[0], notSupportedErrorMsg)
+	}
+
+	if errs := ValidateHorizontalPodAutoscalerUpdate(&withoutToleranceHPA, &withoutToleranceHPA); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	if errs := ValidateHorizontalPodAutoscalerUpdate(&withoutToleranceHPA, &withToleranceHPA); len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
 	}
 }

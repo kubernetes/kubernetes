@@ -171,12 +171,18 @@ const (
 	DisabledPolicySelect ScalingPolicySelect = "Disabled"
 )
 
-// HPAScalingRules configures the scaling behavior for one direction.
-// These Rules are applied after calculating DesiredReplicas from metrics for the HPA.
+// HPAScalingRules configures the scaling behavior for one direction via
+// scaling Policy Rules and a configurable metric tolerance.
+//
+// Scaling Policy Rules are applied after calculating DesiredReplicas from metrics for the HPA.
 // They can limit the scaling velocity by specifying scaling policies.
 // They can prevent flapping by specifying the stabilization window, so that the
 // number of replicas is not set instantly, instead, the safest value from the stabilization
 // window is chosen.
+//
+// The tolerance is applied to the metric values and prevents scaling too
+// eagerly for small metric variations. (Note that setting a tolerance requires
+// enabling the alpha HPAConfigurableTolerance feature gate.)
 type HPAScalingRules struct {
 	// stabilizationWindowSeconds is the number of seconds for which past recommendations should be
 	// considered while scaling up or scaling down.
@@ -193,10 +199,24 @@ type HPAScalingRules struct {
 	SelectPolicy *ScalingPolicySelect `json:"selectPolicy,omitempty" protobuf:"bytes,1,opt,name=selectPolicy"`
 
 	// policies is a list of potential scaling polices which can be used during scaling.
-	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+	// If not set, use the default values:
+	// - For scale up: allow doubling the number of pods, or an absolute change of 4 pods in a 15s window.
+	// - For scale down: allow all pods to be removed in a 15s window.
 	// +listType=atomic
 	// +optional
 	Policies []HPAScalingPolicy `json:"policies,omitempty" listType:"atomic" protobuf:"bytes,2,rep,name=policies"`
+
+	// tolerance is the tolerance on the ratio between the current and desired
+	// metric value under which no updates are made to the desired number of
+	// replicas (e.g. 0.01 for 1%). Must be greater than or equal to zero. If not
+	// set, the default cluster-wide tolerance is applied (by default 10%).
+	//
+	// This is an alpha field and requires enabling the HPAConfigurableTolerance
+	// feature gate.
+	//
+	// +featureGate=HPAConfigurableTolerance
+	// +optional
+	Tolerance *resource.Quantity `json:"tolerance,omitempty" protobuf:"bytes,4,opt,name=tolerance"`
 }
 
 // HPAScalingPolicyType is the type of the policy which could be used while making scaling decisions.
