@@ -45,6 +45,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	restclient "k8s.io/client-go/rest"
+	cache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -65,6 +66,7 @@ import (
 
 const waitInterval = time.Second
 const fastPodFailureBackoff = 100 * time.Millisecond
+const fastSyncJobBatchPeriod = 100 * time.Millisecond
 
 // Time duration used to account for controller latency in tests in which it is
 // expected the Job controller does not make a change. In that cases we wait a
@@ -4067,6 +4069,69 @@ func TestNodeSelectorUpdate(t *testing.T) {
 
 }
 
+// TestDelayedJobUpdateEvent tests that a Job that only executes one Pod even when
+// the job events are delayed. This test verfies the finishedJobStore is working
+// correctly and preventing from job controller creating a new pod if the job complete
+// even is delayed.
+func TestDelayedJobUpdateEvent(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
+	t.Cleanup(setDurationDuringTest(&jobcontroller.SyncJobBatchPeriod, fastSyncJobBatchPeriod))
+	closeFn, restConfig, clientSet, ns := setup(t, "simple")
+	t.Cleanup(closeFn)
+	// the transform is used to introduce a delay for the job events. Since all the object have to go through
+	// transform func first before being added to the informer cache, this would serve as an indirect way to
+	// introduce watch event delay.
+	transformOpt := informers.WithTransform(cache.TransformFunc(func(obj interface{}) (interface{}, error) {
+		_, ok := obj.(*batchv1.Job)
+		if ok {
+			// This will make sure pod events are processed before the job events occur.
+			time.Sleep(2 * fastSyncJobBatchPeriod)
+		}
+		return obj, nil
+	}))
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig, transformOpt)
+	t.Cleanup(func() {
+		cancel()
+	})
+	resetMetrics()
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	if _, err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
+		t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
+	}
+	validateJobComplete(ctx, t, clientSet, jobObj)
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Failed:      0,
+		Succeeded:   1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+	validateCounterMetric(ctx, t, metrics.JobFinishedNum, metricLabelsWithValue{
+		Labels: []string{"NonIndexed", "succeeded", "CompletionsReached"},
+		Value:  1,
+	})
+	validateCounterMetric(ctx, t, metrics.JobPodsFinished, metricLabelsWithValue{
+		Labels: []string{"NonIndexed", "succeeded"},
+		Value:  1,
+	})
+	jobPods, err := getJobPods(ctx, t, clientSet, jobObj, func(ps v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Error %v getting the list of pods for job %q", err, klog.KObj(jobObj))
+	}
+	if len(jobPods) != 1 {
+		t.Errorf("Found %d Pods for the job %q, want 1", len(jobPods), klog.KObj(jobObj))
+	}
+}
+
 type podsByStatus struct {
 	Active      int
 	Ready       *int32
@@ -4488,9 +4553,9 @@ func setup(t testing.TB, nsBaseName string) (framework.TearDownFunc, *restclient
 	return closeFn, config, clientSet, ns
 }
 
-func startJobControllerAndWaitForCaches(tb testing.TB, restConfig *restclient.Config) (context.Context, context.CancelFunc) {
+func startJobControllerAndWaitForCaches(tb testing.TB, restConfig *restclient.Config, options ...informers.SharedInformerOption) (context.Context, context.CancelFunc) {
 	tb.Helper()
-	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-informers")), 0)
+	informerSet := informers.NewSharedInformerFactoryWithOptions(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "job-informers")), 0, options...)
 	jc, ctx, cancel := createJobControllerWithSharedInformers(tb, restConfig, informerSet)
 	informerSet.Start(ctx.Done())
 	go jc.Run(ctx, 1)
