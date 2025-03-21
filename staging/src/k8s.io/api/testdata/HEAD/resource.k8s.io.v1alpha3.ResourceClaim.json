@@ -143,14 +143,13 @@
                 "tolerationSeconds": 5
               }
             ],
-            "usageRestrictedToNode": true,
             "bindingConditions": [
               "bindingConditionsValue"
             ],
             "bindingFailureConditions": [
               "bindingFailureConditionsValue"
             ],
-            "bindingTimeoutSeconds": 10
+            "bindingTimeoutSeconds": 9
           }
         ],
         "config": [

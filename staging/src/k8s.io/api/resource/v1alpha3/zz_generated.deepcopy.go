@@ -620,11 +620,6 @@ func (in *DeviceRequestAllocationResult) DeepCopyInto(out *DeviceRequestAllocati
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.UsageRestrictedToNode != nil {
-		in, out := &in.UsageRestrictedToNode, &out.UsageRestrictedToNode
-		*out = new(bool)
-		**out = **in
-	}
 	if in.BindingConditions != nil {
 		in, out := &in.BindingConditions, &out.BindingConditions
 		*out = make([]string, len(*in))

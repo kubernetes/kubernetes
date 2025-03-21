@@ -1030,7 +1030,6 @@ func autoConvert_v1alpha3_DeviceRequestAllocationResult_To_resource_DeviceReques
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	out.Tolerations = *(*[]resource.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
-	out.UsageRestrictedToNode = (*bool)(unsafe.Pointer(in.UsageRestrictedToNode))
 	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
@@ -1049,7 +1048,6 @@ func autoConvert_resource_DeviceRequestAllocationResult_To_v1alpha3_DeviceReques
 	out.Device = in.Device
 	out.AdminAccess = (*bool)(unsafe.Pointer(in.AdminAccess))
 	out.Tolerations = *(*[]resourcev1alpha3.DeviceToleration)(unsafe.Pointer(&in.Tolerations))
-	out.UsageRestrictedToNode = (*bool)(unsafe.Pointer(in.UsageRestrictedToNode))
 	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
 	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
 	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
