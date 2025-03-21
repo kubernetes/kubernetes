@@ -592,13 +592,12 @@ func sliceWithOneDeviceAndBindingConditions(name, node, pool, driver string, bin
 // deviceRequestAllocationResult returns an DeviceRequestAllocationResult object for testing purposes,
 // specifying the driver, pool, device, usage restriction, binding conditions,
 // binding failure conditions, and binding timeout.
-func deviceRequestAllocationResult(request, driver, pool, device string, usageRestrictedToNode *bool, bindingConditions, bindingFailureConditions []string, bindingTimeout *int64) resourceapi.DeviceRequestAllocationResult {
+func deviceRequestAllocationResult(request, driver, pool, device string, bindingConditions, bindingFailureConditions []string, bindingTimeout *int64) resourceapi.DeviceRequestAllocationResult {
 	return resourceapi.DeviceRequestAllocationResult{
 		Request:                  request,
 		Driver:                   driver,
 		Pool:                     pool,
 		Device:                   device,
-		UsageRestrictedToNode:    usageRestrictedToNode,
 		BindingConditions:        bindingConditions,
 		BindingFailureConditions: bindingFailureConditions,
 		BindingTimeoutSeconds:    bindingTimeout,
@@ -3370,7 +3369,7 @@ func TestAllocator(t *testing.T) {
 				resourceapi.AllocationResult{
 					Devices: resourceapi.DeviceAllocationResult{
 						Results: []resourceapi.DeviceRequestAllocationResult{
-							deviceRequestAllocationResult(req0, driverA, pool1, device1, ptr.To(false), []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
+							deviceRequestAllocationResult(req0, driverA, pool1, device1, []string{"IsPrepare"}, []string{"BindingFailed"}, nil),
 						},
 					},
 					NodeSelector: localNodeSelector(node1),

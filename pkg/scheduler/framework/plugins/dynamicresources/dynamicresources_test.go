@@ -215,7 +215,6 @@ var (
 				Pool:                     nodeName,
 				Device:                   "instance-1",
 				Request:                  "req-1",
-				UsageRestrictedToNode:    ptr.To(true),
 				BindingConditions:        bindingConditions,
 				BindingFailureConditions: bindingFailureConditions,
 				BindingTimeoutSeconds:    &bindingTimeout,
