@@ -4062,6 +4062,12 @@ type PodValidationOptions struct {
 	AllowSidecarResizePolicy bool
 	// Allow invalid label-value in RequiredNodeSelector
 	AllowInvalidLabelValueInRequiredNodeAffinity bool
+	// Allow merging selectors built from MatchLabelKeys into LabelSelector of TopologySpreadConstraints
+	AllowMatchLabelKeysInPodTopologySpreadSelectorMerge bool
+	// Allow invalid MatchLabelKeys in TopologySpreadConstraints against current(>=v1.33) validation
+	AllowLegacyTopologySpreadConstraintsMatchLabelKeys bool
+	// Allow invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.33) validation
+	AllowLegacyIncompatibleTopologySpreadConstraintsMatchLabelKeys bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -4685,7 +4691,7 @@ func validatePodAffinityTerm(podAffinityTerm core.PodAffinityTerm, allowInvalidL
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), name, msg))
 		}
 	}
-	allErrs = append(allErrs, validateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector)...)
+	allErrs = append(allErrs, ValidateMatchLabelKeysAndMismatchLabelKeys(fldPath, podAffinityTerm.MatchLabelKeys, podAffinityTerm.MismatchLabelKeys, podAffinityTerm.LabelSelector)...)
 	if len(podAffinityTerm.TopologyKey) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("topologyKey"), "can not be empty"))
 	}
@@ -8011,7 +8017,15 @@ func validateTopologySpreadConstraints(constraints []core.TopologySpreadConstrai
 		if err := validateNodeInclusionPolicy(subFldPath.Child("nodeTaintsPolicy"), constraint.NodeTaintsPolicy); err != nil {
 			allErrs = append(allErrs, err)
 		}
-		allErrs = append(allErrs, validateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+		if opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge {
+			if !opts.AllowLegacyTopologySpreadConstraintsMatchLabelKeys {
+				allErrs = append(allErrs, ValidateMatchLabelKeysAndMismatchLabelKeys(subFldPath, constraint.MatchLabelKeys, nil, constraint.LabelSelector)...)
+			}
+		} else {
+			if !opts.AllowLegacyIncompatibleTopologySpreadConstraintsMatchLabelKeys {
+				allErrs = append(allErrs, ValidateMatchLabelKeysInTopologySpread(subFldPath.Child("matchLabelKeys"), constraint.MatchLabelKeys, constraint.LabelSelector)...)
+			}
+		}
 		if !opts.AllowInvalidTopologySpreadConstraintLabelSelector {
 			allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(constraint.LabelSelector, unversionedvalidation.LabelSelectorValidationOptions{AllowInvalidLabelValueInSelector: false}, subFldPath.Child("labelSelector"))...)
 		}
@@ -8078,11 +8092,11 @@ func validateNodeInclusionPolicy(fldPath *field.Path, policy *core.NodeInclusion
 	return nil
 }
 
-// validateMatchLabelKeysAndMismatchLabelKeys checks if both matchLabelKeys and mismatchLabelKeys are valid.
+// ValidateMatchLabelKeysAndMismatchLabelKeys checks if both matchLabelKeys and mismatchLabelKeys are valid.
 // - validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
 // - validate that the user doens't specify the same key in both matchLabelKeys and labelSelector.
 // - validate that any matchLabelKeys are not duplicated with mismatchLabelKeys.
-func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+func ValidateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelKeys, mismatchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
 	var allErrs field.ErrorList
 	// 1. validate that all matchLabelKeys and mismatchLabelKeys are valid label names.
 	allErrs = append(allErrs, validateLabelKeys(fldPath.Child("matchLabelKeys"), matchLabelKeys, labelSelector)...)
@@ -8112,7 +8126,7 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 				// Before validateLabelKeysWithSelector is called, the labelSelector has already got the selector created from matchLabelKeys.
 				// Here, we found the duplicate key in labelSelector and the key is specified in labelKeys.
 				// Meaning that the same key is specified in both labelSelector and matchLabelKeys/mismatchLabelKeys.
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector"))
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("duplicatedLabelKeys"))
 			}
 
 			labelSelectorKeys.Insert(key)
@@ -8123,15 +8137,15 @@ func validateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 	mismatchLabelKeysSet := sets.New(mismatchLabelKeys...)
 	for i, k := range matchLabelKeys {
 		if mismatchLabelKeysSet.Has(k) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), k, "exists in both matchLabelKeys and mismatchLabelKeys"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), k, "exists in both matchLabelKeys and mismatchLabelKeys").WithOrigin("duplicatedMismatchLabelKeys"))
 		}
 	}
 
 	return allErrs
 }
 
-// validateMatchLabelKeysInTopologySpread tests that the elements are a valid label name and are not already included in labelSelector.
-func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
+// ValidateMatchLabelKeysInTopologySpread tests that the elements are a valid label name and are not already included in labelSelector.
+func ValidateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys []string, labelSelector *metav1.LabelSelector) field.ErrorList {
 	if len(matchLabelKeys) == 0 {
 		return nil
 	}
@@ -8153,7 +8167,7 @@ func validateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys 
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("overlappingKeys"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("duplicatedLabelKeys"))
 		}
 	}
 

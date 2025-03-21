@@ -2580,6 +2580,123 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	}
 }
 
+func TestValidateLegacyTopologySpreadConstrainMatchLabelKeysOption(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "Create",
+			wantOption: false,
+		},
+		{
+			name: "UpdateInvalidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value2", "value3"},
+							},
+						},
+					},
+				}},
+			},
+			wantOption: true,
+		},
+		{
+			name: "UpdateValidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				}},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowLegacyTopologySpreadConstraintsMatchLabelKeys {
+				t.Errorf("Got AllowLegacyTopologySpreadConstraintsMatchLabelKeys=%t, want %t", gotOptions.AllowLegacyTopologySpreadConstraintsMatchLabelKeys, tc.wantOption)
+			}
+		})
+	}
+}
+
+func TestValidateLegacyIncompatibleTopologySpreadConstrainMatchLabelKeysOption(t *testing.T) {
+	testCases := []struct {
+		name       string
+		oldPodSpec *api.PodSpec
+		wantOption bool
+	}{
+		{
+			name:       "Create",
+			wantOption: false,
+		},
+		{
+			name: "UpdateInvalidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value2", "value3"},
+							},
+						},
+					},
+				}},
+			},
+			wantOption: true,
+		},
+		{
+			name: "UpdateValidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector:  &metav1.LabelSelector{},
+				}},
+			},
+			wantOption: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.AllowLegacyIncompatibleTopologySpreadConstraintsMatchLabelKeys {
+				t.Errorf("Got AllowLegacyIncompatibleTopologySpreadConstraintsMatchLabelKeys=%t, want %t", gotOptions.AllowLegacyTopologySpreadConstraintsMatchLabelKeys, tc.wantOption)
+			}
+		})
+	}
+}
 func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 	testCases := []struct {
 		name       string
