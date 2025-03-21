@@ -520,7 +520,7 @@ type PreFilterPlugin interface {
 	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
+	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod, nodes []*NodeInfo) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
