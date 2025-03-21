@@ -187,7 +187,7 @@
             "type": "object"
           },
           "bindingConditions": {
-            "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+            "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
             "items": {
               "default": "",
               "type": "string"
@@ -196,7 +196,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "bindingFailureConditions": {
-            "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+            "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
             "items": {
               "default": "",
               "type": "string"
@@ -775,7 +775,7 @@
             "type": "boolean"
           },
           "bindingConditions": {
-            "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod. The maximum number of binding conditions is 4.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+            "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
             "items": {
               "default": "",
               "type": "string"
@@ -784,7 +784,7 @@
             "x-kubernetes-list-type": "atomic"
           },
           "bindingFailureConditions": {
-            "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred. The maximum number of binding failure conditions is 4.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+            "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
             "items": {
               "default": "",
               "type": "string"
@@ -829,10 +829,6 @@
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
-          },
-          "usageRestrictedToNode": {
-            "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
-            "type": "boolean"
           }
         },
         "required": [

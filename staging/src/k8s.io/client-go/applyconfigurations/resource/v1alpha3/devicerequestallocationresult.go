@@ -27,7 +27,6 @@ type DeviceRequestAllocationResultApplyConfiguration struct {
 	Device                   *string                              `json:"device,omitempty"`
 	AdminAccess              *bool                                `json:"adminAccess,omitempty"`
 	Tolerations              []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
-	UsageRestrictedToNode    *bool                                `json:"usageRestrictedToNode,omitempty"`
 	BindingConditions        []string                             `json:"bindingConditions,omitempty"`
 	BindingFailureConditions []string                             `json:"bindingFailureConditions,omitempty"`
 	BindingTimeoutSeconds    *int64                               `json:"bindingTimeoutSeconds,omitempty"`
@@ -89,14 +88,6 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithTolerations(values
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}
-	return b
-}
-
-// WithUsageRestrictedToNode sets the UsageRestrictedToNode field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the UsageRestrictedToNode field is set to the value of the last call.
-func (b *DeviceRequestAllocationResultApplyConfiguration) WithUsageRestrictedToNode(value bool) *DeviceRequestAllocationResultApplyConfiguration {
-	b.UsageRestrictedToNode = &value
 	return b
 }
 

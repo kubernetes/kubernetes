@@ -12912,9 +12912,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceToleration
           elementRelationship: atomic
-    - name: usageRestrictedToNode
-      type:
-        scalar: boolean
 - name: io.k8s.api.resource.v1alpha3.DeviceSelector
   map:
     fields:
@@ -13578,9 +13575,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceToleration
           elementRelationship: atomic
-    - name: usageRestrictedToNode
-      type:
-        scalar: boolean
 - name: io.k8s.api.resource.v1beta1.DeviceSelector
   map:
     fields:
