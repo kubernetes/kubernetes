@@ -34,6 +34,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -138,6 +139,9 @@ type Runtime interface {
 	ListPodSandboxMetrics(ctx context.Context) ([]*runtimeapi.PodSandboxMetrics, error)
 	// GetContainerStatus returns the status for the container.
 	GetContainerStatus(ctx context.Context, id ContainerID) (*Status, error)
+	// GetContainerSwapBehavior reports whether a container could be swappable.
+	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
+	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the

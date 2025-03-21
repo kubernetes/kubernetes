@@ -33,7 +33,9 @@ import (
 
 	mock "github.com/stretchr/testify/mock"
 
-	types "k8s.io/apimachinery/pkg/types"
+	pkgtypes "k8s.io/apimachinery/pkg/types"
+
+	types "k8s.io/kubernetes/pkg/kubelet/types"
 
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -419,6 +421,53 @@ func (_c *MockRuntime_GetContainerStatus_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// GetContainerSwapBehavior provides a mock function with given fields: pod, _a1
+func (_m *MockRuntime) GetContainerSwapBehavior(pod *corev1.Pod, _a1 *corev1.Container) types.SwapBehavior {
+	ret := _m.Called(pod, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetContainerSwapBehavior")
+	}
+
+	var r0 types.SwapBehavior
+	if rf, ok := ret.Get(0).(func(*corev1.Pod, *corev1.Container) types.SwapBehavior); ok {
+		r0 = rf(pod, _a1)
+	} else {
+		r0 = ret.Get(0).(types.SwapBehavior)
+	}
+
+	return r0
+}
+
+// MockRuntime_GetContainerSwapBehavior_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetContainerSwapBehavior'
+type MockRuntime_GetContainerSwapBehavior_Call struct {
+	*mock.Call
+}
+
+// GetContainerSwapBehavior is a helper method to define mock.On call
+//   - pod *corev1.Pod
+//   - _a1 *corev1.Container
+func (_e *MockRuntime_Expecter) GetContainerSwapBehavior(pod interface{}, _a1 interface{}) *MockRuntime_GetContainerSwapBehavior_Call {
+	return &MockRuntime_GetContainerSwapBehavior_Call{Call: _e.mock.On("GetContainerSwapBehavior", pod, _a1)}
+}
+
+func (_c *MockRuntime_GetContainerSwapBehavior_Call) Run(run func(pod *corev1.Pod, _a1 *corev1.Container)) *MockRuntime_GetContainerSwapBehavior_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(*corev1.Pod), args[1].(*corev1.Container))
+	})
+	return _c
+}
+
+func (_c *MockRuntime_GetContainerSwapBehavior_Call) Return(_a0 types.SwapBehavior) *MockRuntime_GetContainerSwapBehavior_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockRuntime_GetContainerSwapBehavior_Call) RunAndReturn(run func(*corev1.Pod, *corev1.Container) types.SwapBehavior) *MockRuntime_GetContainerSwapBehavior_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetImageRef provides a mock function with given fields: ctx, image
 func (_m *MockRuntime) GetImageRef(ctx context.Context, image container.ImageSpec) (string, error) {
 	ret := _m.Called(ctx, image)
@@ -534,7 +583,7 @@ func (_c *MockRuntime_GetImageSize_Call) RunAndReturn(run func(context.Context, 
 }
 
 // GetPodStatus provides a mock function with given fields: ctx, uid, name, namespace
-func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name string, namespace string) (*container.PodStatus, error) {
+func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid pkgtypes.UID, name string, namespace string) (*container.PodStatus, error) {
 	ret := _m.Called(ctx, uid, name, namespace)
 
 	if len(ret) == 0 {
@@ -543,10 +592,10 @@ func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name str
 
 	var r0 *container.PodStatus
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, types.UID, string, string) (*container.PodStatus, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pkgtypes.UID, string, string) (*container.PodStatus, error)); ok {
 		return rf(ctx, uid, name, namespace)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, types.UID, string, string) *container.PodStatus); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, pkgtypes.UID, string, string) *container.PodStatus); ok {
 		r0 = rf(ctx, uid, name, namespace)
 	} else {
 		if ret.Get(0) != nil {
@@ -554,7 +603,7 @@ func (_m *MockRuntime) GetPodStatus(ctx context.Context, uid types.UID, name str
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, types.UID, string, string) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, pkgtypes.UID, string, string) error); ok {
 		r1 = rf(ctx, uid, name, namespace)
 	} else {
 		r1 = ret.Error(1)
@@ -570,16 +619,16 @@ type MockRuntime_GetPodStatus_Call struct {
 
 // GetPodStatus is a helper method to define mock.On call
 //   - ctx context.Context
-//   - uid types.UID
+//   - uid pkgtypes.UID
 //   - name string
 //   - namespace string
 func (_e *MockRuntime_Expecter) GetPodStatus(ctx interface{}, uid interface{}, name interface{}, namespace interface{}) *MockRuntime_GetPodStatus_Call {
 	return &MockRuntime_GetPodStatus_Call{Call: _e.mock.On("GetPodStatus", ctx, uid, name, namespace)}
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, uid types.UID, name string, namespace string)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) Run(run func(ctx context.Context, uid pkgtypes.UID, name string, namespace string)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(types.UID), args[2].(string), args[3].(string))
+		run(args[0].(context.Context), args[1].(pkgtypes.UID), args[2].(string), args[3].(string))
 	})
 	return _c
 }
@@ -589,7 +638,7 @@ func (_c *MockRuntime_GetPodStatus_Call) Return(_a0 *container.PodStatus, _a1 er
 	return _c
 }
 
-func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(context.Context, types.UID, string, string) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
+func (_c *MockRuntime_GetPodStatus_Call) RunAndReturn(run func(context.Context, pkgtypes.UID, string, string) (*container.PodStatus, error)) *MockRuntime_GetPodStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

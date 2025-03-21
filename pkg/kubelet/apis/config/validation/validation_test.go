@@ -385,7 +385,7 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		name: "specify MemorySwap.SwapBehavior without enabling NodeSwap",
 		configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
 			conf.FeatureGates = map[string]bool{"NodeSwap": false}
-			conf.MemorySwap.SwapBehavior = kubetypes.LimitedSwap
+			conf.MemorySwap.SwapBehavior = string(kubetypes.LimitedSwap)
 			return conf
 		},
 		errMsg: "invalid configuration: memorySwap.swapBehavior cannot be set when NodeSwap feature flag is disabled",
