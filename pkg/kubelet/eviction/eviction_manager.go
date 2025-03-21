@@ -193,7 +193,7 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 			if threshold.Signal == evictionapi.SignalMemoryAvailable || threshold.Signal == evictionapi.SignalAllocatableMemoryAvailable {
 				notifier, err := NewMemoryThresholdNotifier(logger, threshold, m.config.PodCgroupRoot, &CgroupNotifierFactory{}, thresholdHandler)
 				if err != nil {
-					logger.Info("Eviction manager: failed to create memory threshold notifier", "err", err)
+					logger.Error(err, "Eviction manager: failed to create memory threshold notifier")
 				} else {
 					go notifier.Start(ctx)
 					m.thresholdNotifiers = append(m.thresholdNotifiers, notifier)
