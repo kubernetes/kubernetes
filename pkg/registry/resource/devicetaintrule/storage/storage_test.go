@@ -18,6 +18,7 @@ package storage
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -53,8 +54,9 @@ func validNewDeviceTaint(name string) *resource.DeviceTaintRule {
 		},
 		Spec: resource.DeviceTaintRuleSpec{
 			Taint: resource.DeviceTaint{
-				Key:    "example.com/taint",
-				Effect: resource.DeviceTaintEffectNoExecute,
+				Key:       "example.com/taint",
+				Effect:    resource.DeviceTaintEffectNoExecute,
+				TimeAdded: &metav1.Time{Time: time.Now().Truncate(time.Second)}, // Must know in advance what will be stored.
 			},
 		},
 	}
