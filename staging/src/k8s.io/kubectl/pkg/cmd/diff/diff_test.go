@@ -64,6 +64,7 @@ func TestDiffProgram(t *testing.T) {
 	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
 
 	t.Setenv("LANG", "C")
+	t.Setenv("LANGUAGE", "en_US")
 
 	for i, c := range externalDiffCommands {
 		t.Setenv("KUBECTL_EXTERNAL_DIFF", c)
