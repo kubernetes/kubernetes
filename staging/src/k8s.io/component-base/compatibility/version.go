@@ -95,7 +95,7 @@ func (m *effectiveVersion) String() string {
 		return "<nil>"
 	}
 	return fmt.Sprintf("{BinaryVersion: %s, EmulationVersion: %s, MinCompatibilityVersion: %s}",
-		m.BinaryVersion().String(), m.EmulationVersion().String(), m.MinCompatibilityVersion().String())
+		m.BinaryVersion().String(), majorMinor(m.EmulationVersion()).String(), majorMinor(m.MinCompatibilityVersion()).String())
 }
 
 func majorMinor(ver *version.Version) *version.Version {
