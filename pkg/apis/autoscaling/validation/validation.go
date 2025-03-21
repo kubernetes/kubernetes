@@ -23,11 +23,9 @@ import (
 	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -103,48 +101,16 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 
 // ValidateHorizontalPodAutoscaler validates a HorizontalPodAutoscaler and returns an
 // ErrorList with any errors.
-func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
+func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler, opts HorizontalPodAutoscalerSpecValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName, field.NewPath("metadata"))
-
-	// MinReplicasLowerBound represents a minimum value for minReplicas
-	// 0 when HPA scale-to-zero feature is enabled
-	var minReplicasLowerBound int32
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
-		minReplicasLowerBound = 0
-	} else {
-		minReplicasLowerBound = 1
-	}
-
-	opts := HorizontalPodAutoscalerSpecValidationOptions{
-		AllowTolerance:        utilfeature.DefaultMutableFeatureGate.Enabled(features.HPAConfigurableTolerance),
-		MinReplicasLowerBound: minReplicasLowerBound,
-	}
-
 	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(autoscaler.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
 
 // ValidateHorizontalPodAutoscalerUpdate validates an update to a HorizontalPodAutoscaler and returns an
 // ErrorList with any errors.
-func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
+func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler, opts HorizontalPodAutoscalerSpecValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
-
-	// minReplicasLowerBound represents a minimum value for minReplicas
-	// 0 when HPA scale-to-zero feature is enabled or HPA object already has minReplicas=0
-	var minReplicasLowerBound int32
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || (oldAutoscaler.Spec.MinReplicas != nil && *oldAutoscaler.Spec.MinReplicas == 0) {
-		minReplicasLowerBound = 0
-	} else {
-		minReplicasLowerBound = 1
-	}
-
-	opts := HorizontalPodAutoscalerSpecValidationOptions{
-		AllowTolerance:        utilfeature.DefaultMutableFeatureGate.Enabled(features.HPAConfigurableTolerance),
-		MinReplicasLowerBound: minReplicasLowerBound,
-	}
-
 	allErrs = append(allErrs, validateHorizontalPodAutoscalerSpec(newAutoscaler.Spec, field.NewPath("spec"), opts)...)
 	return allErrs
 }
@@ -162,8 +128,6 @@ func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *a
 // HorizontalPodAutoscalerSpecValidationOptions contains the different settings for
 // HorizontalPodAutoscaler spec validation.
 type HorizontalPodAutoscalerSpecValidationOptions struct {
-	// Allow setting a tolerance on HPAScalingRules.
-	AllowTolerance bool
 	// The minimum value for minReplicas.
 	MinReplicasLowerBound int32
 }
@@ -234,12 +198,8 @@ func validateScalingRules(rules *autoscaling.HPAScalingRules, fldPath *field.Pat
 				allErrs = append(allErrs, policyErrs...)
 			}
 		}
-
-		if rules.Tolerance != nil && !opts.AllowTolerance {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("tolerance"), "tolerance is not supported when the HPAConfigurableTolerance feature gate is not enabled"))
-		}
-		if rules.Tolerance != nil && rules.Tolerance.Sign() < 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("tolerance"), rules.Tolerance, "must be greater or equal to zero"))
+		if rules.Tolerance != nil {
+			allErrs = append(allErrs, apivalidation.ValidateNonnegativeQuantity(*rules.Tolerance, fldPath.Child("tolerance"))...)
 		}
 	}
 	return allErrs
