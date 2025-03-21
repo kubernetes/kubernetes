@@ -66516,7 +66516,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"cpuManagerPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "cpuManagerPolicy is the name of the policy to use. Requires the CPUManager feature gate to be enabled. Default: \"None\"",
+							Description: "cpuManagerPolicy is the name of the policy to use. Default: \"None\"",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -66546,7 +66546,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					},
 					"cpuManagerReconcilePeriod": {
 						SchemaProps: spec.SchemaProps{
-							Description: "cpuManagerReconcilePeriod is the reconciliation period for the CPU Manager. Requires the CPUManager feature gate to be enabled. Default: \"10s\"",
+							Description: "cpuManagerReconcilePeriod is the reconciliation period for the CPU Manager. Default: \"10s\"",
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
 						},
 					},

@@ -391,7 +391,6 @@ type KubeletConfiguration struct {
 	// +optional
 	CgroupDriver string `json:"cgroupDriver,omitempty"`
 	// cpuManagerPolicy is the name of the policy to use.
-	// Requires the CPUManager feature gate to be enabled.
 	// Default: "None"
 	// +optional
 	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
@@ -410,7 +409,6 @@ type KubeletConfiguration struct {
 	// +optional
 	CPUManagerPolicyOptions map[string]string `json:"cpuManagerPolicyOptions,omitempty"`
 	// cpuManagerReconcilePeriod is the reconciliation period for the CPU Manager.
-	// Requires the CPUManager feature gate to be enabled.
 	// Default: "10s"
 	// +optional
 	CPUManagerReconcilePeriod metav1.Duration `json:"cpuManagerReconcilePeriod,omitempty"`

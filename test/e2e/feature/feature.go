@@ -70,7 +70,13 @@ var (
 	// Marks tests that require coordinated leader election
 	CoordinatedLeaderElection = framework.WithFeature(framework.ValidFeatures.Add("CoordinatedLeaderElection"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// owning-sig: sig-node
+	// kep: https://kep.k8s.io/3570
+	// test-infra jobs:
+	// - https://testgrid.k8s.io/sig-node-kubelet#kubelet-serial-gce-e2e-cpu-manager
+	//
+	// This label is used for tests which need:
+	// - run only CPU Manager tests on specific jobs, i.e., ci-kubernetes-node-kubelet-serial-cpu-manager and pull-kubernetes-node-kubelet-serial-cpu-manager
 	CPUManager = framework.WithFeature(framework.ValidFeatures.Add("CPUManager"))
 
 	// OWNER: sig-node
