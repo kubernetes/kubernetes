@@ -1852,6 +1852,16 @@ func TestSMTAlignmentErrorText(t *testing.T) {
 	}
 }
 
+func TestStaticPolicyCanAllocateExclusively(t *testing.T) {
+	policy, err := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.New(), topologymanager.NewFakeManager(), nil)
+	if err != nil {
+		t.Fatalf("NewStaticPolicy() failed")
+	}
+	if !policy.CanAllocateExclusively() {
+		t.Errorf("Static policy can always allocate resource exclusively")
+	}
+}
+
 func newCPUSetPtr(cpus ...int) *cpuset.CPUSet {
 	ret := cpuset.New(cpus...)
 	return &ret
