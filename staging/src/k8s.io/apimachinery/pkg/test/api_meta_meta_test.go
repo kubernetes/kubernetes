@@ -147,7 +147,7 @@ func TestGenericTypeMeta(t *testing.T) {
 		Name              string                  `json:"name,omitempty"`
 		GenerateName      string                  `json:"generateName,omitempty"`
 		UID               string                  `json:"uid,omitempty"`
-		CreationTimestamp metav1.Time             `json:"creationTimestamp,omitempty"`
+		CreationTimestamp metav1.Time             `json:"creationTimestamp,omitempty,omitzero"`
 		SelfLink          string                  `json:"selfLink,omitempty"`
 		ResourceVersion   string                  `json:"resourceVersion,omitempty"`
 		APIVersion        string                  `json:"apiVersion,omitempty"`

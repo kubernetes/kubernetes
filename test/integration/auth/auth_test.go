@@ -166,8 +166,7 @@ var aPod = `
   "kind": "Pod",
   "apiVersion": "v1",
   "metadata": {
-    "name": "a",
-    "creationTimestamp": null%s
+    "name": "a"%s
   },
   "spec": {
     "containers": [

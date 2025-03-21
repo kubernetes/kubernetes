@@ -52,6 +52,7 @@ type A struct {
 	A int    `json:"aa,omitempty"`
 	B string `json:"ab,omitempty"`
 	C bool   `json:"ac,omitempty"`
+	D D      `json:"ad,omitzero"`
 }
 
 type B struct {
