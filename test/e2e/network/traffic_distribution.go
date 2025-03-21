@@ -27,9 +27,9 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -41,9 +41,10 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
-var _ = common.SIGDescribe(feature.TrafficDistribution, framework.WithFeatureGate(features.ServiceTrafficDistribution), func() {
+var _ = common.SIGDescribe("Traffic Distribution", func() {
 	f := framework.NewDefaultFramework("traffic-distribution")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
@@ -51,7 +52,6 @@ var _ = common.SIGDescribe(feature.TrafficDistribution, framework.WithFeatureGat
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		c = f.ClientSet
-		e2eskipper.SkipUnlessAtLeastNZones(ctx, c, 3)
 	})
 
 	////////////////////////////////////////////////////////////////////////////
@@ -79,30 +79,49 @@ var _ = common.SIGDescribe(feature.TrafficDistribution, framework.WithFeatureGat
 		}
 	}
 
-	// endpointSlicesHaveSameZoneHints returns a matcher function to be used with
+	// endpointSlicesHaveExpectedHints returns a matcher function to be used with
 	// gomega.Eventually().Should(...). It checks that the passed EndpointSlices
-	// have zone-hints which match the endpoint's zone.
-	endpointSlicesHaveSameZoneHints := framework.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (func() string, error) {
-		if len(slices) == 0 {
-			return nil, fmt.Errorf("no endpointslices found")
-		}
-		for _, slice := range slices {
-			for _, endpoint := range slice.Endpoints {
-				var ip string
-				if len(endpoint.Addresses) > 0 {
-					ip = endpoint.Addresses[0]
-				}
-				var zone string
-				if endpoint.Zone != nil {
-					zone = *endpoint.Zone
-				}
-				if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
-					return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for zone %q\nEndpointSlices=\n%v", ip, zone, format.Object(slices, 1 /* indent one level */)), nil
+	// have hints appropriate for trafficDist and nodesHaveZones
+	endpointSlicesHaveExpectedHints := func(trafficDist string, nodesHaveZones bool) gomegatypes.GomegaMatcher {
+		return framework.MakeMatcher(func(slices []discoveryv1.EndpointSlice) (func() string, error) {
+			if len(slices) == 0 {
+				return nil, fmt.Errorf("no endpointslices found")
+			}
+
+			expectNodeHints := trafficDist == v1.ServiceTrafficDistributionPreferSameNode
+			expectZoneHints := nodesHaveZones
+			for _, slice := range slices {
+				for _, endpoint := range slice.Endpoints {
+					var ip string
+					if len(endpoint.Addresses) > 0 {
+						ip = endpoint.Addresses[0]
+					}
+					var zone, nodeName string
+					if endpoint.Zone != nil {
+						zone = *endpoint.Zone
+					}
+					if endpoint.NodeName != nil {
+						nodeName = *endpoint.NodeName
+					}
+					if expectZoneHints {
+						if endpoint.Hints == nil || len(endpoint.Hints.ForZones) != 1 || endpoint.Hints.ForZones[0].Name != zone {
+							return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for zone %q\nEndpointSlices=\n%v", ip, zone, format.Object(slices, 1 /* indent one level */)), nil
+						}
+					} else if endpoint.Hints != nil && len(endpoint.Hints.ForZones) != 0 {
+						return gomegaCustomError("endpoint with ip %v has zone hint which it should not have\nEndpointSlices=\n%v", ip, format.Object(slices, 1 /* indent one level */)), nil
+					}
+					if expectNodeHints {
+						if endpoint.Hints == nil || len(endpoint.Hints.ForNodes) != 1 || endpoint.Hints.ForNodes[0].Name != nodeName {
+							return gomegaCustomError("endpoint with ip %v does not have the correct hint, want hint for node %q\nEndpointSlices=\n%v", ip, nodeName, format.Object(slices, 1 /* indent one level */)), nil
+						}
+					} else if endpoint.Hints != nil && len(endpoint.Hints.ForNodes) != 0 {
+						return gomegaCustomError("endpoint with ip %v has node hint which it should not have\nEndpointSlices=\n%v", ip, format.Object(slices, 1 /* indent one level */)), nil
+					}
 				}
 			}
-		}
-		return nil, nil
-	})
+			return nil, nil
+		})
+	}
 
 	// requestsFromClient returns a helper function to be used with
 	// gomega.Eventually(...). It fetches the logs from the clientPod and returns
@@ -119,164 +138,323 @@ var _ = common.SIGDescribe(feature.TrafficDistribution, framework.WithFeatureGat
 		}
 	}
 
+	// Data structures for representing client and endpoint pods
+	type endpoint struct {
+		node *v1.Node
+		pod  *v1.Pod
+	}
+
+	type client struct {
+		node      *v1.Node
+		endpoints []*endpoint
+		pod       *v1.Pod
+	}
+
 	////////////////////////////////////////////////////////////////////////////
 	// Main test specifications.
 	////////////////////////////////////////////////////////////////////////////
 
-	ginkgo.When("Service has trafficDistribution=PreferClose", func() {
-		ginkgo.It("should route traffic to an endpoint that is close to the client", func(ctx context.Context) {
-
-			ginkgo.By("finding 3 zones with schedulable nodes")
-			allZonesSet, err := e2enode.GetSchedulableClusterZones(ctx, c)
-			framework.ExpectNoError(err)
-			if len(allZonesSet) < 3 {
-				framework.Failf("got %d zones with schedulable nodes, want atleast 3 zones with schedulable nodes", len(allZonesSet))
+	// doTrafficDistributionTest runs a test of a service with the given trafficDist,
+	// clients, and endpoints, ensuring that connections go to the expected endpoints.
+	doTrafficDistributionTest := func(ctx context.Context, trafficDist string, clients []*client, endpoints []*endpoint) {
+		nodesHaveZones := false
+		var servingPods []*v1.Pod
+		servingPodLabels := map[string]string{"app": f.UniqueName}
+		for i, ep := range endpoints {
+			node := ep.node.Name
+			zone := ep.node.Labels[v1.LabelTopologyZone]
+			if zone != "" {
+				nodesHaveZones = true
 			}
-			zones := allZonesSet.UnsortedList()[:3]
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, fmt.Sprintf("endpoint-%d-%s", i, node), nil, nil, nil, "serve-hostname")
+			ginkgo.By(fmt.Sprintf("creating a server pod %q on node %q in zone %q", pod.Name, node, zone))
+			nodeSelection := e2epod.NodeSelection{Name: node}
+			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
+			pod.Labels = servingPodLabels
 
-			ginkgo.By(fmt.Sprintf("finding a node in each of the chosen 3 zones %v", zones))
-			nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
-			framework.ExpectNoError(err)
-			nodeForZone := make(map[string]string)
-			for _, zone := range zones {
-				found := false
-				for _, node := range nodeList.Items {
-					if zone == node.Labels[v1.LabelTopologyZone] {
-						found = true
-						nodeForZone[zone] = node.GetName()
-					}
-				}
-				if !found {
-					framework.Failf("could not find a node in zone %q; nodes=\n%v", zone, format.Object(nodeList, 1 /* indent one level */))
-				}
+			ep.pod = pod
+			servingPods = append(servingPods, pod)
+		}
+		e2epod.NewPodClient(f).CreateBatch(ctx, servingPods)
+
+		svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "traffic-dist-test-service",
+			},
+			Spec: v1.ServiceSpec{
+				Selector:            servingPodLabels,
+				TrafficDistribution: &trafficDist,
+				Ports: []v1.ServicePort{{
+					Port:       80,
+					TargetPort: intstr.FromInt32(9376),
+					Protocol:   v1.ProtocolTCP,
+				}},
+			},
+		})
+		ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
+
+		ginkgo.By("ensuring EndpointSlice for service have correct same-zone hints")
+		gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveExpectedHints(trafficDist, nodesHaveZones))
+
+		for i, cp := range clients {
+			node := cp.node.Name
+			zone := cp.node.Labels[v1.LabelTopologyZone]
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, fmt.Sprintf("client-%d-%s", i, node), nil, nil, nil)
+			ginkgo.By(fmt.Sprintf("creating a client pod %q on node %q in zone %q", pod.Name, node, zone))
+			nodeSelection := e2epod.NodeSelection{Name: node}
+			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
+			cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
+			pod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+			pod.Spec.Containers[0].Name = pod.Name
+
+			cp.pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+		}
+
+		for _, cp := range clients {
+			wantedEndpoints := sets.New[string]()
+			for _, ep := range cp.endpoints {
+				wantedEndpoints.Insert(ep.pod.Name)
 			}
+			unreachedEndpoints := wantedEndpoints.Clone()
 
-			ginkgo.By(fmt.Sprintf("creating 1 pod each in 2 zones %v (out of the total 3 zones)", zones[:2]))
-			zoneForServingPod := make(map[string]string)
-			var servingPods []*v1.Pod
-			servingPodLabels := map[string]string{"app": f.UniqueName}
-			for _, zone := range zones[:2] {
-				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "serving-pod-in-"+zone, nil, nil, nil, "serve-hostname")
-				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
-				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
-				pod.Labels = servingPodLabels
+			ginkgo.By(fmt.Sprintf("ensuring that requests from %s on %s go to the endpoint(s) %v", cp.pod.Name, cp.node.Name, wantedEndpoints.UnsortedList()))
 
-				servingPods = append(servingPods, pod)
-				zoneForServingPod[pod.Name] = zone
-				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), pod.GetName(), metav1.DeleteOptions{})
-			}
-			e2epod.NewPodClient(f).CreateBatch(ctx, servingPods)
-
-			trafficDist := v1.ServiceTrafficDistributionPreferClose
-			svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "traffic-dist-test-service",
-				},
-				Spec: v1.ServiceSpec{
-					Selector:            servingPodLabels,
-					TrafficDistribution: &trafficDist,
-					Ports: []v1.ServicePort{{
-						Port:       80,
-						TargetPort: intstr.FromInt32(9376),
-						Protocol:   v1.ProtocolTCP,
-					}},
-				},
-			})
-			ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
-			ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Services(f.Namespace.Name).Delete), svc.GetName(), metav1.DeleteOptions{})
-
-			ginkgo.By("ensuring EndpointSlice for service have correct same-zone hints")
-			gomega.Eventually(ctx, endpointSlicesForService(svc.GetName())).WithPolling(5 * time.Second).WithTimeout(e2eservice.ServiceEndpointsTimeout).Should(endpointSlicesHaveSameZoneHints)
-
-			ginkgo.By("keeping traffic within the same zone as the client, when serving pods exist in the same zone")
-
-			createClientPod := func(ctx context.Context, zone string) *v1.Pod {
-				pod := e2epod.NewAgnhostPod(f.Namespace.Name, "client-pod-in-"+zone, nil, nil, nil)
-				pod.Spec.NodeName = nodeForZone[zone]
-				nodeSelection := e2epod.NodeSelection{Name: nodeForZone[zone]}
-				e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
-				cmd := fmt.Sprintf(`date; for i in $(seq 1 3000); do sleep 1; echo "Date: $(date) Try: ${i}"; curl -q -s --connect-timeout 2 http://%s:80/ ; echo; done`, svc.Name)
-				pod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
-				pod.Spec.Containers[0].Name = pod.Name
-
-				ginkgo.DeferCleanup(framework.IgnoreNotFound(c.CoreV1().Pods(f.Namespace.Name).Delete), pod.GetName(), metav1.DeleteOptions{})
-				return e2epod.NewPodClient(f).CreateSync(ctx, pod)
-			}
-
-			for _, clientZone := range zones[:2] {
-				framework.Logf("creating a client pod for probing the service from zone=%q which also has a serving pod", clientZone)
-				clientPod := createClientPod(ctx, clientZone)
-
-				framework.Logf("ensuring that requests from clientPod=%q on zone=%q stay in the same zone", clientPod.Name, clientZone)
-
-				requestsSucceedAndStayInSameZone := framework.MakeMatcher(func(reverseChronologicalLogLines []string) (func() string, error) {
-					logLines := reverseChronologicalLogLines
-					if len(logLines) < 20 {
-						return gomegaCustomError("got %d log lines, waiting for at least 20\nreverseChronologicalLogLines=\n%v", len(logLines), strings.Join(reverseChronologicalLogLines, "\n")), nil
-					}
-					consecutiveSameZone := 0
-
-					for _, logLine := range logLines {
-						if logLine == "" || strings.HasPrefix(logLine, "Date:") {
-							continue
-						}
-						destZone, ok := zoneForServingPod[logLine]
-						if !ok {
-							return gomegaCustomError("could not determine dest zone from log line: %s\nreverseChronologicalLogLines=\n%v", logLine, strings.Join(reverseChronologicalLogLines, "\n")), nil
-						}
-						if clientZone != destZone {
-							return gomegaCustomError("expected request from clientPod=%q to stay in it's zone=%q, delivered to zone=%q\nreverseChronologicalLogLines=\n%v", clientPod.Name, clientZone, destZone, strings.Join(reverseChronologicalLogLines, "\n")), nil
-						}
-						consecutiveSameZone++
-						if consecutiveSameZone >= 10 {
-							return nil, nil // Pass condition.
-						}
-					}
-					// Ideally, the matcher would never reach this condition
-					return gomegaCustomError("requests didn't meet the required criteria to stay in same zone\nreverseChronologicalLogLines=\n%v", strings.Join(reverseChronologicalLogLines, "\n")), nil
-				})
-
-				gomega.Eventually(ctx, requestsFromClient(clientPod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceedAndStayInSameZone)
-			}
-
-			ginkgo.By("routing traffic cluster-wide, when there are no serving pods in the same zone as the client")
-
-			clientZone := zones[2]
-			framework.Logf("creating a client pod for probing the service from zone=%q which DOES NOT has a serving pod", clientZone)
-			clientPod := createClientPod(ctx, clientZone)
-
-			framework.Logf("ensuring that requests from clientPod=%q on zone=%q (without a serving pod) are not dropped, and get routed to one of the serving pods anywhere in the cluster", clientPod.Name, clientZone)
-
-			requestsSucceedByReachingAnyServingPod := framework.MakeMatcher(func(reverseChronologicalLogLines []string) (func() string, error) {
+			requestsSucceed := framework.MakeMatcher(func(reverseChronologicalLogLines []string) (func() string, error) {
 				logLines := reverseChronologicalLogLines
 				if len(logLines) < 20 {
 					return gomegaCustomError("got %d log lines, waiting for at least 20\nreverseChronologicalLogLines=\n%v", len(logLines), strings.Join(reverseChronologicalLogLines, "\n")), nil
 				}
-
-				// Requests are counted as successful when the response read from the log
-				// lines is the name of a recognizable serving pod.
 				consecutiveSuccessfulRequests := 0
 
 				for _, logLine := range logLines {
 					if logLine == "" || strings.HasPrefix(logLine, "Date:") {
 						continue
 					}
-					_, servingPodExists := zoneForServingPod[logLine]
-					if !servingPodExists {
-						return gomegaCustomError("request from client pod likely failed because we got an unrecognizable response = %v; want response to be one of the serving pod names\nreverseChronologicalLogLines=\n%v", logLine, strings.Join(reverseChronologicalLogLines, "\n")), nil
+					destEndpoint := logLine
+					if !wantedEndpoints.Has(destEndpoint) {
+						return gomegaCustomError("request from %s should not have reached %s\nreverseChronologicalLogLines=\n%v", cp.pod.Name, destEndpoint, strings.Join(reverseChronologicalLogLines, "\n")), nil
 					}
 					consecutiveSuccessfulRequests++
-					if consecutiveSuccessfulRequests >= 10 {
-						return nil, nil // Pass condition
+					unreachedEndpoints.Delete(destEndpoint)
+					if consecutiveSuccessfulRequests >= 10 && len(unreachedEndpoints) == 0 {
+						return nil, nil // Pass condition.
 					}
 				}
 				// Ideally, the matcher would never reach this condition
-				return gomegaCustomError("requests didn't meet the required criteria to reach a serving pod\nreverseChronologicalLogLines=\n%v", strings.Join(reverseChronologicalLogLines, "\n")), nil
+				return gomegaCustomError("requests didn't meet the required criteria to reach all endpoints %v\nreverseChronologicalLogLines=\n%v", wantedEndpoints.UnsortedList(), strings.Join(reverseChronologicalLogLines, "\n")), nil
 			})
 
-			gomega.Eventually(ctx, requestsFromClient(clientPod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceedByReachingAnyServingPod)
+			gomega.Eventually(ctx, requestsFromClient(cp.pod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceed)
+		}
+	}
 
-		})
+	doSimpleSameZoneTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
+		var clients []*client
+		var endpoints []*endpoint
 
+		ginkgo.By("finding 3 zones with schedulable nodes")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodeForZone := make(map[string]*v1.Node)
+		for _, node := range nodeList.Items {
+			zone := node.Labels[v1.LabelTopologyZone]
+			if nodeForZone[zone] != nil {
+				continue
+			}
+			nodeForZone[zone] = &node
+			if len(nodeForZone) == 3 {
+				break
+			}
+		}
+		if len(nodeForZone) < 3 {
+			e2eskipper.Skipf("have %d zones with schedulable nodes, need at least 3", len(clients))
+		}
+
+		// We want clients in all three zones
+		for _, node := range nodeForZone {
+			clients = append(clients, &client{node: node})
+		}
+
+		// and endpoints in the first two zones
+		endpoints = []*endpoint{
+			{node: clients[0].node},
+			{node: clients[1].node},
+		}
+
+		// The clients with an endpoint in the same zone should only connect to
+		// that endpoint. The client with no endpoint in its zone should connect
+		// to both endpoints.
+		clients[0].endpoints = []*endpoint{endpoints[0]}
+		clients[1].endpoints = []*endpoint{endpoints[1]}
+		clients[2].endpoints = endpoints
+
+		doTrafficDistributionTest(ctx, trafficDist, clients, endpoints)
+	}
+
+	doMultiNodeSameZoneTrafficDistributionTest := func(ctx context.Context, trafficDist string) {
+		ginkgo.By("finding a set of zones and nodes for the test")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodesForZone := make(map[string][]*v1.Node)
+		for _, node := range nodeList.Items {
+			zone := node.Labels[v1.LabelTopologyZone]
+			nodesForZone[zone] = append(nodesForZone[zone], &node)
+		}
+		if len(nodesForZone) < 3 {
+			e2eskipper.Skipf("need at least 3 zones, at least 2 of which have at least 2 schedulable nodes")
+		}
+
+		var clients []*client
+		var endpoints []*endpoint
+
+		// First zone: find a zone with at least 2 nodes, then create a client and
+		// an endpoint on each of them, and expect both clients to talk to both
+		// endpoints.
+		found := false
+		for zone, nodes := range nodesForZone {
+			if len(nodes) < 2 {
+				continue
+			}
+
+			endpointsForZone := []*endpoint{
+				{node: nodes[0]},
+				{node: nodes[1]},
+			}
+
+			clients = append(clients,
+				&client{
+					node:      nodes[0],
+					endpoints: endpointsForZone,
+				},
+				&client{
+					node:      nodes[1],
+					endpoints: endpointsForZone,
+				},
+			)
+			endpoints = append(endpoints, endpointsForZone...)
+
+			// delete this zone from the map so we don't reuse it below
+			delete(nodesForZone, zone)
+			found = true
+			break
+		}
+		if !found {
+			e2eskipper.Skipf("need at least 3 zones, at least 2 of which have at least 2 schedulable nodes")
+		}
+
+		// Second zone: find a zone with at least 2 nodes, then create a client on
+		// one of them and a server on the other.
+		found = false
+		for zone, nodes := range nodesForZone {
+			if len(nodes) < 2 {
+				continue
+			}
+
+			endpointsForZone := []*endpoint{
+				{node: nodes[1]},
+			}
+
+			clients = append(clients,
+				&client{
+					node:      nodes[0],
+					endpoints: endpointsForZone,
+				},
+			)
+			endpoints = append(endpoints, endpointsForZone...)
+
+			delete(nodesForZone, zone)
+			found = true
+			break
+		}
+		if !found {
+			e2eskipper.Skipf("need at least 3 zones, at least 2 of which have at least 2 schedulable nodes")
+		}
+
+		// Third zone: any zone will do (and we know there were at least 3 to
+		// begin with). We create just a client, and expect it to connect to the
+		// servers in the other two zones.
+		for _, nodes := range nodesForZone {
+			clients = append(clients,
+				&client{
+					node:      nodes[0],
+					endpoints: endpoints,
+				},
+			)
+			break
+		}
+
+		doTrafficDistributionTest(ctx, trafficDist, clients, endpoints)
+	}
+
+	framework.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
+		doSimpleSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
+	})
+
+	framework.It("should route traffic correctly between pods on multiple nodes when using PreferClose", func(ctx context.Context) {
+		doMultiNodeSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferClose)
+	})
+
+	framework.It("should route traffic to an endpoint in the same zone when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		doSimpleSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+	})
+
+	framework.It("should route traffic currently between pods on multiple nodes when using PreferSameZone", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		doMultiNodeSameZoneTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameZone)
+	})
+
+	framework.It("should route traffic to an endpoint on the same node when using PreferSameNode", framework.WithFeatureGate(features.PreferSameTrafficDistribution), func(ctx context.Context) {
+		var clients []*client
+		var endpoints []*endpoint
+
+		ginkgo.By("finding a set of nodes for the test")
+		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
+		framework.ExpectNoError(err)
+		nodes := make([]*v1.Node, 0, 3)
+		for _, node := range nodeList.Items {
+			nodes = append(nodes, &node)
+			if len(nodes) == 3 {
+				break
+			}
+		}
+		if len(nodes) < 3 {
+			e2eskipper.Skipf("have %d schedulable nodes, need at least 3", len(nodes))
+		}
+
+		// The first node should have a client and two endpoints. The client should
+		// connect to both endpoints.
+		endpointsForNode := []*endpoint{
+			{node: nodes[0]},
+			{node: nodes[0]},
+		}
+		clients = append(clients,
+			&client{
+				node:      nodes[0],
+				endpoints: endpointsForNode,
+			},
+		)
+		endpoints = append(endpoints, endpointsForNode...)
+
+		// The second node should have a client and a single endpoint.
+		endpointsForNode = []*endpoint{
+			{node: nodes[1]},
+		}
+		clients = append(clients,
+			&client{
+				node:      nodes[1],
+				endpoints: endpointsForNode,
+			},
+		)
+		endpoints = append(endpoints, endpointsForNode...)
+
+		// The third node should have just a client, and connect to all of the
+		// other endpoints since it has no local endpoint.
+		clients = append(clients,
+			&client{
+				node:      nodes[2],
+				endpoints: endpoints,
+			},
+		)
+
+		doTrafficDistributionTest(ctx, v1.ServiceTrafficDistributionPreferSameNode, clients, endpoints)
 	})
 })
