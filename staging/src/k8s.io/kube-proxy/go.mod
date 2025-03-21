@@ -2,7 +2,7 @@
 
 module k8s.io/kube-proxy
 
-go 1.24.1
+go 1.24.0
 
 godebug default=go1.24
 

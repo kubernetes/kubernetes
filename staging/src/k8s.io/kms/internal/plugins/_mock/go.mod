@@ -1,6 +1,6 @@
 module k8s.io/kms/plugins/mock
 
-go 1.24.1
+go 1.24.0
 
 godebug default=go1.24
 
