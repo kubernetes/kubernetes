@@ -1702,6 +1702,146 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 			prioritizedListFeatureGate: false,
 		},
+		"good-binding-conditions": {
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"too-many-binding-conditions": {
+			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), 5, 4)},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2", "condition3", "condition4", "condition5"},
+							BindingFailureConditions: []string{"condition6", "condition7"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"too-many-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), 5, 4)},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4", "condition5", "condition6", "condition7"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-binding-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions").Index(1), "condition2!", "must match condition type format")},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2!"},
+							BindingFailureConditions: []string{"condition3", "condition4"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"invalid-binding-failure-conditions": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions").Index(1), "condition4!", "must match condition type format")},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4!"},
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"good-binding-timeout": {
+			oldClaim: validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4"},
+							BindingTimeoutSeconds:    ptr.To(int64(10)),
+						}},
+					},
+				}
+				return claim
+			},
+		},
+		"bad-binding-timeout": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingTimeout"), ptr.To(int64(-10)), "must be greater than zero")},
+			oldClaim:     validClaim,
+			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
+				claim.Status.Allocation = &resource.AllocationResult{
+					Devices: resource.DeviceAllocationResult{
+						Results: []resource.DeviceRequestAllocationResult{{
+							Request:                  goodName,
+							Driver:                   goodName,
+							Pool:                     goodName,
+							Device:                   goodName,
+							AdminAccess:              ptr.To(false),
+							BindingConditions:        []string{"condition1", "condition2"},
+							BindingFailureConditions: []string{"condition3", "condition4"},
+							BindingTimeoutSeconds:    ptr.To(int64(-10)),
+						}},
+					},
+				}
+				return claim
+			},
+		},
 	}
 
 	for name, scenario := range scenarios {
