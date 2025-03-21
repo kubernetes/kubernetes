@@ -414,10 +414,10 @@ func TestServerRunOptionsWithShutdownWatchTerminationGracePeriod(t *testing.T) {
 		})
 	}
 
-	t.Run("default should be zero", func(t *testing.T) {
+	t.Run("default should be 67s", func(t *testing.T) {
 		options := NewServerRunOptions()
-		if options.ShutdownWatchTerminationGracePeriod != time.Duration(0) {
-			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be zero, but got: %s", options.ShutdownWatchTerminationGracePeriod)
+		if options.ShutdownWatchTerminationGracePeriod != 67*time.Second {
+			t.Errorf("expected default of ShutdownWatchTerminationGracePeriod to be 67s, but got: %s", options.ShutdownWatchTerminationGracePeriod)
 		}
 	})
 }

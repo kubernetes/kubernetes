@@ -319,9 +319,6 @@ type Config struct {
 	// number of active watch request(s) in flight and during shutdown
 	// it will wait, at most, for the specified duration and allow these
 	// active watch requests to drain with some rate limiting in effect.
-	// The default is zero, which implies the apiserver will not keep
-	// track of active watch request(s) in flight and will not wait
-	// for them to drain, this maintains backward compatibility.
 	// This grace period is orthogonal to other grace periods, and
 	// it is not overridden by any other grace period.
 	ShutdownWatchTerminationGracePeriod time.Duration
@@ -465,10 +462,12 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 
 		// Default to treating watch as a long-running operation
 		// Generic API servers have no inherent long-running subresources
-		LongRunningFunc:                     genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
-		lifecycleSignals:                    lifecycleSignals,
-		StorageObjectCountTracker:           flowcontrolrequest.NewStorageObjectCountTracker(),
-		ShutdownWatchTerminationGracePeriod: time.Duration(0),
+		LongRunningFunc:           genericfilters.BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString()),
+		lifecycleSignals:          lifecycleSignals,
+		StorageObjectCountTracker: flowcontrolrequest.NewStorageObjectCountTracker(),
+		// By default, attempt to drain existing watch connections during graceful shutdown.
+		// Use a value close to a minute that is unique enough to jump out in logs.
+		ShutdownWatchTerminationGracePeriod: 67 * time.Second,
 
 		APIServerID:           id,
 		StorageVersionManager: storageversion.NewDefaultManager(),
