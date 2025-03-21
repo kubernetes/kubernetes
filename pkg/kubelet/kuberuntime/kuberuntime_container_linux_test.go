@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	libcontainercgroups "github.com/opencontainers/cgroups"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -738,7 +739,11 @@ func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", tc.target, false)
 			assert.NoError(t, err)
-			if diff := cmp.Diff(tc.want, got.SecurityContext.NamespaceOptions); diff != "" {
+			if diff := cmp.Diff(
+				tc.want,
+				got.SecurityContext.NamespaceOptions,
+				cmpopts.IgnoreUnexported(runtimeapi.NamespaceOption{}),
+			); diff != "" {
 				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
 			}
 		})
