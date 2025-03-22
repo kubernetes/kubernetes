@@ -19,11 +19,12 @@ package rest
 import (
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	deviceclassstore "k8s.io/kubernetes/pkg/registry/resource/deviceclass/storage"
@@ -56,6 +57,12 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		return genericapiserver.APIGroupInfo{}, err
 	} else if len(storageMap) > 0 {
 		apiGroupInfo.VersionedResourcesStorageMap[resourcev1beta1.SchemeGroupVersion.Version] = storageMap
+	}
+
+	if storageMap, err := p.v1beta2Storage(apiResourceConfigSource, restOptionsGetter, p.NamespaceClient); err != nil {
+		return genericapiserver.APIGroupInfo{}, err
+	} else if len(storageMap) > 0 {
+		apiGroupInfo.VersionedResourcesStorageMap[resourcev1beta2.SchemeGroupVersion.Version] = storageMap
 	}
 
 	return apiGroupInfo, nil
@@ -137,6 +144,45 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 	}
 
 	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1beta1.SchemeGroupVersion.WithResource(resource)) {
+		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceSliceStorage
+	}
+
+	return storage, nil
+}
+
+func (p RESTStorageProvider) v1beta2Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	if resource := "deviceclasses"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
+		deviceclassStorage, err := deviceclassstore.NewREST(restOptionsGetter)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = deviceclassStorage
+	}
+
+	if resource := "resourceclaims"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClaimStorage, resourceClaimStatusStorage, err := resourceclaimstore.NewREST(restOptionsGetter, nsClient)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClaimStorage
+		storage[resource+"/status"] = resourceClaimStatusStorage
+	}
+
+	if resource := "resourceclaimtemplates"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
+		resourceClaimTemplateStorage, err := resourceclaimtemplatestore.NewREST(restOptionsGetter, nsClient)
+		if err != nil {
+			return nil, err
+		}
+		storage[resource] = resourceClaimTemplateStorage
+	}
+
+	if resource := "resourceslices"; apiResourceConfigSource.ResourceEnabled(resourcev1beta2.SchemeGroupVersion.WithResource(resource)) {
 		resourceSliceStorage, err := resourceslicestore.NewREST(restOptionsGetter)
 		if err != nil {
 			return nil, err

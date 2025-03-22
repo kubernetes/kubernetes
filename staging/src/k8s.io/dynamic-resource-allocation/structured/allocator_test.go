@@ -285,7 +285,7 @@ func partitionableDevice(name string, capacity any, attributes map[resourceapi.Q
 		panic(fmt.Sprintf("unexpected capacity type %T: %+v", capacity, capacity))
 	}
 
-	device.Basic.ConsumesCounter = consumesCapacity
+	device.Basic.ConsumesCounters = consumesCapacity
 	return device
 }
 
@@ -328,8 +328,8 @@ func (in wrapDevice) withTaints(taints ...resourceapi.DeviceTaint) wrapDevice {
 
 func deviceCapacityConsumption(capacityPool string, capacity map[resourceapi.QualifiedName]resource.Quantity) resourceapi.DeviceCounterConsumption {
 	return resourceapi.DeviceCounterConsumption{
-		SharedCounter: capacityPool,
-		Counters:      toDeviceCounter(capacity),
+		CounterSet: capacityPool,
+		Counters:   toDeviceCounter(capacity),
 	}
 }
 

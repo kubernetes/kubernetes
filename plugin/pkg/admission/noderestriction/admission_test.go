@@ -2154,7 +2154,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: nodename,
+			NodeName: pointer.String(nodename),
 		},
 	}
 	sliceOtherNode := &resourceapi.ResourceSlice{
@@ -2162,7 +2162,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: nodename + "-other",
+			NodeName: pointer.String(nodename + "-other"),
 		},
 	}
 	sliceNoNode := &resourceapi.ResourceSlice{
@@ -2170,7 +2170,7 @@ func TestAdmitResourceSlice(t *testing.T) {
 			Name: "something",
 		},
 		Spec: resourceapi.ResourceSliceSpec{
-			NodeName: "",
+			NodeName: nil,
 		},
 	}
 

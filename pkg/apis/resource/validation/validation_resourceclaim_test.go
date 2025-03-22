@@ -59,10 +59,12 @@ var (
 	validClaimSpec        = resource.ResourceClaimSpec{
 		Devices: resource.DeviceClaim{
 			Requests: []resource.DeviceRequest{{
-				Name:            goodName,
-				DeviceClassName: goodName,
-				AllocationMode:  resource.DeviceAllocationModeExactCount,
-				Count:           1,
+				Name: goodName,
+				Exactly: &resource.ExactDeviceRequest{
+					DeviceClassName: goodName,
+					AllocationMode:  resource.DeviceAllocationModeExactCount,
+					Count:           1,
+				},
 			}},
 		},
 	}
@@ -238,18 +240,18 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"bad-classname": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.Spec.Devices.Requests[0].DeviceClassName = badName
+				claim.Spec.Devices.Requests[0].Exactly.DeviceClassName = badName
 				return claim
 			}(),
 		},
-		"missing-classname-and-firstavailable": {
-			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "devices", "requests").Index(0), "exactly one of `deviceClassName` or `firstAvailable` must be specified")},
+		"missing-classname": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), "")},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.Spec.Devices.Requests[0].DeviceClassName = ""
+				claim.Spec.Devices.Requests[0].Exactly.DeviceClassName = ""
 				return claim
 			}(),
 		},
@@ -382,9 +384,9 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"allocation-mode": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(2).Child("count"), int64(-1), "must be greater than zero"),
-				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(3).Child("allocationMode"), resource.DeviceAllocationMode("other"), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(4).Child("count"), int64(2), "must not be specified when allocationMode is 'All'"),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(2).Child("exactly", "count"), int64(-1), "must be greater than zero"),
+				field.NotSupported(field.NewPath("spec", "devices", "requests").Index(3).Child("exactly", "allocationMode"), resource.DeviceAllocationMode("other"), []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(4).Child("exactly", "count"), int64(2), "must not be specified when allocationMode is 'All'"),
 				field.Duplicate(field.NewPath("spec", "devices", "requests").Index(5).Child("name"), "foo"),
 			},
 			claim: func() *resource.ResourceClaim {
@@ -392,30 +394,30 @@ func TestValidateClaim(t *testing.T) {
 
 				goodReq := &claim.Spec.Devices.Requests[0]
 				goodReq.Name = "foo"
-				goodReq.AllocationMode = resource.DeviceAllocationModeExactCount
-				goodReq.Count = 1
+				goodReq.Exactly.AllocationMode = resource.DeviceAllocationModeExactCount
+				goodReq.Exactly.Count = 1
 
 				req := goodReq.DeepCopy()
 				req.Name += "2"
-				req.AllocationMode = resource.DeviceAllocationModeAll
-				req.Count = 0
+				req.Exactly.AllocationMode = resource.DeviceAllocationModeAll
+				req.Exactly.Count = 0
 				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *req)
 
 				req = goodReq.DeepCopy()
 				req.Name += "3"
-				req.AllocationMode = resource.DeviceAllocationModeExactCount
-				req.Count = -1
+				req.Exactly.AllocationMode = resource.DeviceAllocationModeExactCount
+				req.Exactly.Count = -1
 				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *req)
 
 				req = goodReq.DeepCopy()
 				req.Name += "4"
-				req.AllocationMode = resource.DeviceAllocationMode("other")
+				req.Exactly.AllocationMode = resource.DeviceAllocationMode("other")
 				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *req)
 
 				req = goodReq.DeepCopy()
 				req.Name += "5"
-				req.AllocationMode = resource.DeviceAllocationModeAll
-				req.Count = 2
+				req.Exactly.AllocationMode = resource.DeviceAllocationModeAll
+				req.Exactly.Count = 2
 				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *req)
 
 				req = goodReq.DeepCopy()
@@ -503,13 +505,13 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"CEL-compile-errors": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(1).Child("selectors").Index(1).Child("cel", "expression"), `device.attributes[true].someBoolean`, "compilation failed: ERROR: <input>:1:18: found no matching overload for '_[_]' applied to '(map(string, map(string, any)), bool)'\n | device.attributes[true].someBoolean\n | .................^"),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(1).Child("exactly", "selectors").Index(1).Child("cel", "expression"), `device.attributes[true].someBoolean`, "compilation failed: ERROR: <input>:1:18: found no matching overload for '_[_]' applied to '(map(string, map(string, any)), bool)'\n | device.attributes[true].someBoolean\n | .................^"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, claim.Spec.Devices.Requests[0])
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *claim.Spec.Devices.Requests[0].DeepCopy())
 				claim.Spec.Devices.Requests[1].Name += "-2"
-				claim.Spec.Devices.Requests[1].Selectors = []resource.DeviceSelector{
+				claim.Spec.Devices.Requests[1].Exactly.Selectors = []resource.DeviceSelector{
 					{
 						// Good selector.
 						CEL: &resource.CELDeviceSelector{
@@ -528,14 +530,14 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"CEL-length": {
 			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices", "requests").Index(1).Child("selectors").Index(1).Child("cel", "expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength),
+				field.TooLong(field.NewPath("spec", "devices", "requests").Index(1).Child("exactly", "selectors").Index(1).Child("cel", "expression"), "" /*unused*/, resource.CELSelectorExpressionMaxLength),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, claim.Spec.Devices.Requests[0])
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *claim.Spec.Devices.Requests[0].DeepCopy())
 				claim.Spec.Devices.Requests[1].Name += "-2"
 				expression := `device.driver == ""`
-				claim.Spec.Devices.Requests[1].Selectors = []resource.DeviceSelector{
+				claim.Spec.Devices.Requests[1].Exactly.Selectors = []resource.DeviceSelector{
 					{
 						// Good selector.
 						CEL: &resource.CELDeviceSelector{
@@ -554,11 +556,11 @@ func TestValidateClaim(t *testing.T) {
 		},
 		"CEL-cost": {
 			wantFailures: field.ErrorList{
-				field.Forbidden(field.NewPath("spec", "devices", "requests").Index(0).Child("selectors").Index(0).Child("cel", "expression"), "too complex, exceeds cost limit"),
+				field.Forbidden(field.NewPath("spec", "devices", "requests").Index(0).Child("exactly", "selectors").Index(0).Child("cel", "expression"), "too complex, exceeds cost limit"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.Spec.Devices.Requests[0].Selectors = []resource.DeviceSelector{
+				claim.Spec.Devices.Requests[0].Exactly.Selectors = []resource.DeviceSelector{
 					{
 						CEL: &resource.CELDeviceSelector{
 							// From https://github.com/kubernetes/kubernetes/blob/50fc400f178d2078d0ca46aee955ee26375fc437/test/integration/apiserver/cel/validatingadmissionpolicy_test.go#L2150.
@@ -576,17 +578,20 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
-		"prioritized-list-field-on-parent": {
+		"prioritized-list-both-first-available-and-exactly-set": {
 			wantFailures: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0), nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified"),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(0), nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"),
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
-				claim.Spec.Devices.Requests[0].DeviceClassName = goodName
-				claim.Spec.Devices.Requests[0].Selectors = validSelector
-				claim.Spec.Devices.Requests[0].AllocationMode = resource.DeviceAllocationModeAll
-				claim.Spec.Devices.Requests[0].Count = 2
-				claim.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+
+				claim.Spec.Devices.Requests[0].Exactly = &resource.ExactDeviceRequest{
+					DeviceClassName: goodName,
+					Selectors:       validSelector,
+					AllocationMode:  resource.DeviceAllocationModeExactCount,
+					Count:           2,
+					AdminAccess:     ptr.To(true),
+				}
 				return claim
 			}(),
 		},
@@ -620,9 +625,7 @@ func TestValidateClaim(t *testing.T) {
 			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpec)
-				claim.Spec.Devices.Requests[0].DeviceClassName = ""
-				claim.Spec.Devices.Requests[0].AllocationMode = ""
-				claim.Spec.Devices.Requests[0].Count = 0
+				claim.Spec.Devices.Requests[0].Exactly = nil
 				var subRequests []resource.DeviceSubRequest
 				for i := 0; i <= 8; i++ {
 					subRequests = append(subRequests, resource.DeviceSubRequest{
@@ -742,7 +745,7 @@ func TestValidateClaim(t *testing.T) {
 				allErrs = append(allErrs,
 					field.Required(fldPath.Index(0).Child("operator"), ""),
 				)
-				fldPath = field.NewPath("spec", "devices", "requests").Index(1).Child("tolerations")
+				fldPath = field.NewPath("spec", "devices", "requests").Index(1).Child("exactly", "tolerations")
 				allErrs = append(allErrs,
 					field.Required(fldPath.Index(3).Child("operator"), ""),
 
@@ -765,7 +768,7 @@ func TestValidateClaim(t *testing.T) {
 				}
 				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, *validClaimSpec.Devices.Requests[0].DeepCopy())
 				claim.Spec.Devices.Requests[1].Name += "-other"
-				claim.Spec.Devices.Requests[1].Tolerations = []resource.DeviceToleration{
+				claim.Spec.Devices.Requests[1].Exactly.Tolerations = []resource.DeviceToleration{
 					{
 						// Minimal valid toleration: match all taints.
 						Operator: resource.DeviceTolerationOpExists,
@@ -822,12 +825,12 @@ func TestValidateClaimUpdate(t *testing.T) {
 		"invalid-update": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimSpec {
 				spec := validClaim.Spec.DeepCopy()
-				spec.Devices.Requests[0].DeviceClassName += "2"
+				spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return *spec
 			}(), "field is immutable")},
 			oldClaim: validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
-				claim.Spec.Devices.Requests[0].DeviceClassName += "2"
+				claim.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return claim
 			},
 		},

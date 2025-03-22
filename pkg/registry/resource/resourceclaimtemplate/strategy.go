@@ -155,7 +155,9 @@ func dropDisabledDRAAdminAccessFields(newClaimTemplate, oldClaimTemplate *resour
 	}
 
 	for i := range newClaimTemplate.Spec.Spec.Devices.Requests {
-		newClaimTemplate.Spec.Spec.Devices.Requests[i].AdminAccess = nil
+		if newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly != nil {
+			newClaimTemplate.Spec.Spec.Devices.Requests[i].Exactly.AdminAccess = nil
+		}
 	}
 }
 
@@ -165,7 +167,7 @@ func draAdminAccessFeatureInUse(claimTemplate *resource.ResourceClaimTemplate) b
 	}
 
 	for _, request := range claimTemplate.Spec.Spec.Devices.Requests {
-		if request.AdminAccess != nil {
+		if request.Exactly != nil && request.Exactly.AdminAccess != nil {
 			return true
 		}
 	}

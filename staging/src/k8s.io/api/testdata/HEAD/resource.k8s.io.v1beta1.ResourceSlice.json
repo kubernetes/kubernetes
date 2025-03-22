@@ -93,9 +93,9 @@
               "value": "0"
             }
           },
-          "consumesCounter": [
+          "consumesCounters": [
             {
-              "sharedCounter": "sharedCounterValue",
+              "counterSet": "counterSetValue",
               "counters": {
                 "countersKey": {
                   "value": "0"

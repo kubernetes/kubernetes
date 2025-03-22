@@ -178,10 +178,10 @@ func TestValidateClaimTemplate(t *testing.T) {
 			}(),
 		},
 		"bad-classname": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0).Child("exactly", "deviceClassName"), badName, "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')")},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpec)
-				template.Spec.Spec.Devices.Requests[0].DeviceClassName = badName
+				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName = badName
 				return template
 			}(),
 		},
@@ -189,11 +189,16 @@ func TestValidateClaimTemplate(t *testing.T) {
 			wantFailures: nil,
 			template:     testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable),
 		},
-		"proritized-list-class-name-on-parent": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0), nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified")},
+		"prioritized-list-both-first-available-and-exactly-set": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "spec", "devices", "requests").Index(0), nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"),
+			},
 			template: func() *resource.ResourceClaimTemplate {
 				template := testClaimTemplate(goodName, goodNS, validClaimSpecWithFirstAvailable)
-				template.Spec.Spec.Devices.Requests[0].DeviceClassName = goodName
+				template.Spec.Spec.Devices.Requests[0].Exactly = &resource.ExactDeviceRequest{
+					DeviceClassName: goodName,
+					AllocationMode:  resource.DeviceAllocationModeAll,
+				}
 				return template
 			}(),
 		},
@@ -230,12 +235,12 @@ func TestValidateClaimTemplateUpdate(t *testing.T) {
 		"invalid-update-class": {
 			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec"), func() resource.ResourceClaimTemplateSpec {
 				spec := validClaimTemplate.Spec.DeepCopy()
-				spec.Spec.Devices.Requests[0].DeviceClassName += "2"
+				spec.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return *spec
 			}(), "field is immutable")},
 			oldClaimTemplate: validClaimTemplate,
 			update: func(template *resource.ResourceClaimTemplate) *resource.ResourceClaimTemplate {
-				template.Spec.Spec.Devices.Requests[0].DeviceClassName += "2"
+				template.Spec.Spec.Devices.Requests[0].Exactly.DeviceClassName += "2"
 				return template
 			},
 		},
