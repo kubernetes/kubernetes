@@ -741,7 +741,7 @@ func TestNodeAddress(t *testing.T) {
 			}
 			hostname := testKubeletHostname
 
-			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
+			nodeAddressesFunc := func(ctx context.Context) ([]v1.NodeAddress, error) {
 				return testCase.nodeAddresses, nil
 			}
 
@@ -859,7 +859,7 @@ func TestNodeAddress_NoCloudProvider(t *testing.T) {
 				}
 				return nil
 			}
-			nodeAddressesFunc := func() ([]v1.NodeAddress, error) {
+			nodeAddressesFunc := func(ctx context.Context) ([]v1.NodeAddress, error) {
 				return nil, fmt.Errorf("not reached")
 			}
 			resolvedAddressesFunc := func(net.IP) (net.IP, error) {
