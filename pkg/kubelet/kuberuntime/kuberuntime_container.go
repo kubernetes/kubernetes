@@ -672,13 +672,10 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
-		if signal := status.GetStopSignal().String(); signal != "" {
+		signal := status.GetStopSignal().String()
+		if signal != "" {
 			cStatusStopSignal = fromCRIStopSignal(status.GetStopSignal())
-		} else {
-			cStatusStopSignal = nil
 		}
-	} else {
-		cStatusStopSignal = nil
 	}
 
 	cStatus := &kubecontainer.Status{
