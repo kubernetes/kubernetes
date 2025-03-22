@@ -1457,7 +1457,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			name: "minimum options",
 			node: &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-XXX",
+					Name: "node-name-max-length-is-44-characters-the-rest-will-be-truncated",
 				},
 			},
 			opts: &DebugOptions{
@@ -1467,7 +1467,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 			},
 			expected: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "node-debugger-node-XXX-1",
+					Name: "node-debugger-node-name-max-length-is-44-characters-the-r-1",
 				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
@@ -1487,7 +1487,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 					HostIPC:       true,
 					HostNetwork:   true,
 					HostPID:       true,
-					NodeName:      "node-XXX",
+					NodeName:      "node-name-max-length-is-44-characters-the-rest-will-be-truncated",
 					RestartPolicy: corev1.RestartPolicyNever,
 					Volumes: []corev1.Volume{
 						{
