@@ -17,7 +17,6 @@ limitations under the License.
 package prober
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -32,12 +31,14 @@ import (
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/probe"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func init() {
 }
 
 func TestDoProbe(t *testing.T) {
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
@@ -131,7 +132,6 @@ func TestDoProbe(t *testing.T) {
 		}
 
 		for i, test := range tests {
-			ctx := context.Background()
 			w := newTestWorker(m, probeType, test.probe)
 			if test.podStatus != nil {
 				m.statusManager.SetPodStatus(w.pod, *test.podStatus)
@@ -158,7 +158,7 @@ func TestDoProbe(t *testing.T) {
 }
 
 func TestInitialDelay(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
@@ -191,7 +191,7 @@ func TestInitialDelay(t *testing.T) {
 }
 
 func TestFailureThreshold(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
@@ -226,7 +226,7 @@ func TestFailureThreshold(t *testing.T) {
 }
 
 func TestSuccessThreshold(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 3, FailureThreshold: 1})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
@@ -261,7 +261,7 @@ func TestSuccessThreshold(t *testing.T) {
 }
 
 func TestStartupProbeSuccessThreshold(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	successThreshold := 1
 	failureThreshold := 3
@@ -294,7 +294,7 @@ func TestStartupProbeSuccessThreshold(t *testing.T) {
 }
 
 func TestStartupProbeFailureThreshold(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	successThreshold := 1
 	failureThreshold := 3
@@ -346,13 +346,14 @@ func TestStartupProbeFailureThreshold(t *testing.T) {
 }
 
 func TestCleanUp(t *testing.T) {
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, readiness, startup} {
 		key := probeKey{testPodUID, testContainerName, probeType}
 		w := newTestWorker(m, probeType, v1.Probe{})
 		m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(probeType != startup))
-		go w.run()
+		go w.run(ctx)
 		m.workers[key] = w
 
 		// Wait for worker to run.
@@ -411,7 +412,7 @@ func resultsManager(m *manager, probeType probeType) results.Manager {
 }
 
 func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 
 	for _, probeType := range [...]probeType{liveness, startup} {
@@ -452,7 +453,7 @@ func TestOnHoldOnLivenessOrStartupCheckFailure(t *testing.T) {
 }
 
 func TestResultRunOnLivenessCheckFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatus())
@@ -494,7 +495,7 @@ func TestResultRunOnLivenessCheckFailure(t *testing.T) {
 }
 
 func TestResultRunOnStartupCheckFailure(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 3})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
@@ -530,7 +531,7 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 }
 
 func TestLivenessProbeDisabledByStarted(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	w := newTestWorker(m, liveness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
@@ -549,7 +550,7 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 }
 
 func TestStartupProbeDisabledByStarted(t *testing.T) {
-	ctx := context.Background()
+	ctx := ktesting.Init(t)
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
