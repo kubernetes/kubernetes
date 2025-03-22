@@ -388,6 +388,8 @@ type Status struct {
 	User *ContainerUser
 	// Mounts are the volume mounts of the container
 	Mounts []Mount
+	// StopSignal is used to show the container's effective stop signal in the Status
+	StopSignal *v1.Signal
 }
 
 // ContainerUser represents user identity information

@@ -270,6 +270,12 @@ func SetContainerImage(image string) TweakContainer {
 	}
 }
 
+func SetContainerLifecycle(lifecycle api.Lifecycle) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.Lifecycle = &lifecycle
+	}
+}
+
 func MakeResourceRequirements(requests, limits map[string]string) api.ResourceRequirements {
 	rr := api.ResourceRequirements{Requests: api.ResourceList{}, Limits: api.ResourceList{}}
 	for k, v := range requests {

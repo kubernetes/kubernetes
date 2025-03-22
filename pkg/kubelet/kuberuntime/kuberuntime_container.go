@@ -360,6 +360,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
 	}
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
+	lifecycle := buildContainerConfigLifecycle(container)
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{
@@ -379,6 +380,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 		Stdin:       container.Stdin,
 		StdinOnce:   container.StdinOnce,
 		Tty:         container.TTY,
+		Lifecycle:   lifecycle,
 	}
 
 	// set platform specific configurations.
@@ -668,6 +670,16 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		cStatusUser = toKubeContainerUser(status.User)
 	}
 
+	var cStatusStopSignal *v1.Signal
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
+		signal := status.GetStopSignal().String()
+		// Here Signal_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
+		// This happens only when the container runtime version doesn't support StopSignal yet
+		if signal != "" && signal != "RUNTIME_DEFAULT" {
+			cStatusStopSignal = runtimeSignalToString(status.GetStopSignal())
+		}
+	}
+
 	cStatus := &kubecontainer.Status{
 		ID: kubecontainer.ContainerID{
 			Type: runtimeName,
@@ -684,6 +696,7 @@ func toKubeContainerStatus(status *runtimeapi.ContainerStatus, runtimeName strin
 		CreatedAt:           time.Unix(0, status.CreatedAt),
 		Resources:           cStatusResources,
 		User:                cStatusUser,
+		StopSignal:          cStatusStopSignal,
 	}
 
 	if status.State != runtimeapi.ContainerState_CONTAINER_CREATED {

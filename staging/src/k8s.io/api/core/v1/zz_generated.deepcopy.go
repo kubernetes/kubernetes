@@ -1055,6 +1055,11 @@ func (in *ContainerStatus) DeepCopyInto(out *ContainerStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.StopSignal != nil {
+		in, out := &in.StopSignal, &out.StopSignal
+		*out = new(Signal)
+		**out = **in
+	}
 	return
 }
 
@@ -2100,6 +2105,11 @@ func (in *Lifecycle) DeepCopyInto(out *Lifecycle) {
 		in, out := &in.PreStop, &out.PreStop
 		*out = new(LifecycleHandler)
 		(*in).DeepCopyInto(*out)
+	}
+	if in.StopSignal != nil {
+		in, out := &in.StopSignal, &out.StopSignal
+		*out = new(Signal)
+		**out = **in
 	}
 	return
 }

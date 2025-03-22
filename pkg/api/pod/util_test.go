@@ -3436,6 +3436,148 @@ func TestDropPodLifecycleSleepAction(t *testing.T) {
 	}
 }
 
+func TestDropContainerStopSignals(t *testing.T) {
+	makeContainer := func(lifecycle *api.Lifecycle) api.Container {
+		container := api.Container{Name: "foo"}
+		if lifecycle != nil {
+			container.Lifecycle = lifecycle
+		}
+		return container
+	}
+
+	makeEphemeralContainer := func(lifecycle *api.Lifecycle) api.EphemeralContainer {
+		container := api.EphemeralContainer{
+			EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "foo"},
+		}
+		if lifecycle != nil {
+			container.Lifecycle = lifecycle
+		}
+		return container
+	}
+
+	makePod := func(os api.OSName, containers []api.Container, initContainers []api.Container, ephemeralContainers []api.EphemeralContainer) *api.PodSpec {
+		return &api.PodSpec{
+			OS:                  &api.PodOS{Name: os},
+			Containers:          containers,
+			InitContainers:      initContainers,
+			EphemeralContainers: ephemeralContainers,
+		}
+	}
+
+	testCases := []struct {
+		featuregateEnabled bool
+		oldLifecycle       *api.Lifecycle
+		newLifecycle       *api.Lifecycle
+		expectedLifecycle  *api.Lifecycle
+	}{
+		// feature gate is turned on and stopsignal is not in use - Lifecycle stays nil
+		{
+			featuregateEnabled: true,
+			oldLifecycle:       nil,
+			newLifecycle:       nil,
+			expectedLifecycle:  nil,
+		},
+		// feature gate is turned off and StopSignal is in use - StopSignal is not dropped
+		{
+			featuregateEnabled: false,
+			oldLifecycle:       &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM)},
+			newLifecycle:       &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM)},
+			expectedLifecycle:  &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM)},
+		},
+		// feature gate is turned off and StopSignal is not in use - Entire lifecycle is dropped
+		{
+			featuregateEnabled: false,
+			oldLifecycle:       &api.Lifecycle{StopSignal: nil},
+			newLifecycle:       &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM)},
+			expectedLifecycle:  nil,
+		},
+		// feature gate is turned on and StopSignal is in use - StopSignal is not dropped
+		{
+			featuregateEnabled: true,
+			oldLifecycle:       &api.Lifecycle{StopSignal: nil},
+			newLifecycle:       &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM)},
+			expectedLifecycle:  &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM)},
+		},
+		// feature gate is turned off and PreStop is in use - StopSignal alone is dropped
+		{
+			featuregateEnabled: false,
+			oldLifecycle: &api.Lifecycle{StopSignal: nil, PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+			newLifecycle: &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM), PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+			expectedLifecycle: &api.Lifecycle{StopSignal: nil, PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+		},
+		// feature gate is turned on and PreStop is in use - StopSignal is not dropped
+		{
+			featuregateEnabled: true,
+			oldLifecycle: &api.Lifecycle{StopSignal: nil, PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+			newLifecycle: &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM), PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+			expectedLifecycle: &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM), PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+		},
+		// feature gate is turned off and PreStop and StopSignal are in use - nothing is dropped
+		{
+			featuregateEnabled: true,
+			oldLifecycle: &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM), PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+			newLifecycle: &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM), PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+			expectedLifecycle: &api.Lifecycle{StopSignal: ptr.To(api.SIGTERM), PreStop: &api.LifecycleHandler{
+				Exec: &api.ExecAction{Command: []string{"foo"}},
+			}},
+		},
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("test_%d", i), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ContainerStopSignals, tc.featuregateEnabled)
+			// Containers
+			{
+				oldPod := makePod(api.Linux, []api.Container{makeContainer(tc.oldLifecycle.DeepCopy())}, nil, nil)
+				newPod := makePod(api.Linux, []api.Container{makeContainer(tc.newLifecycle.DeepCopy())}, nil, nil)
+				expectedPod := makePod(api.Linux, []api.Container{makeContainer(tc.expectedLifecycle.DeepCopy())}, nil, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+
+				if diff := cmp.Diff(expectedPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// InitContainers
+			{
+				oldPod := makePod(api.Linux, nil, []api.Container{makeContainer(tc.oldLifecycle.DeepCopy())}, nil)
+				newPod := makePod(api.Linux, nil, []api.Container{makeContainer(tc.newLifecycle.DeepCopy())}, nil)
+				expectPod := makePod(api.Linux, nil, []api.Container{makeContainer(tc.expectedLifecycle.DeepCopy())}, nil)
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+			// EphemeralContainers
+			{
+				oldPod := makePod(api.Linux, nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.oldLifecycle.DeepCopy())})
+				newPod := makePod(api.Linux, nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.newLifecycle.DeepCopy())})
+				expectPod := makePod(api.Linux, nil, nil, []api.EphemeralContainer{makeEphemeralContainer(tc.expectedLifecycle.DeepCopy())})
+				dropDisabledFields(newPod, nil, oldPod, nil)
+				if diff := cmp.Diff(expectPod, newPod); diff != "" {
+					t.Fatalf("Unexpected modification to new pod; diff (-got +want)\n%s", diff)
+				}
+			}
+
+		})
+	}
+}
+
 func TestDropSupplementalGroupsPolicy(t *testing.T) {
 	supplementalGroupsPolicyMerge := api.SupplementalGroupsPolicyMerge
 	podWithSupplementalGroupsPolicy := func() *api.Pod {
