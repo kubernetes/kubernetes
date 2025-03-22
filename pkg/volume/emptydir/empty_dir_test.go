@@ -1208,3 +1208,55 @@ func TestTmpfsMountOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestSetupDirStickyBit(t *testing.T) {
+	tests := []struct {
+		name      string
+		stickyBit bool
+		wantPerm  os.FileMode
+	}{
+		{
+			name:      "with sticky bit",
+			stickyBit: true,
+			wantPerm:  os.FileMode(stickyBitPerm),
+		},
+		{
+			name:      "without sticky bit",
+			stickyBit: false,
+			wantPerm:  os.FileMode(defaultPerm),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp directory for test
+			tempDir, err := os.MkdirTemp("", "empty_dir_test")
+			if err != nil {
+				t.Fatalf("error creating temp dir: %v", err)
+			}
+			defer os.RemoveAll(tempDir)
+
+			// Create test directory path
+			testDir := filepath.Join(tempDir, "test-dir")
+
+			// Setup empty dir with/without sticky bit
+			ed := &emptyDir{
+				stickyBit: tt.stickyBit,
+			}
+
+			if err := ed.setupDir(testDir); err != nil {
+				t.Fatalf("unexpected error setting up directory: %v", err)
+			}
+
+			// Check permissions
+			fi, err := os.Stat(testDir)
+			if err != nil {
+				t.Fatalf("error getting file info: %v", err)
+			}
+
+			if fi.Mode().Perm() != tt.wantPerm.Perm() {
+				t.Errorf("got permission %v, want %v", fi.Mode().Perm(), tt.wantPerm.Perm())
+			}
+		})
+	}
+}
