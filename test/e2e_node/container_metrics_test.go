@@ -74,7 +74,7 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 				"container_spec_cpu_shares":                     preciseSample(2),
 				"container_spec_memory_limit_bytes":             preciseSample(79998976),
 				"container_spec_memory_reservation_limit_bytes": preciseSample(0),
-				"container_spec_memory_swap_limit_bytes":        preciseSample(0),
+				"container_spec_memory_swap_limit_bytes":        boundedSample(0, 80*e2evolume.Mb),
 				"container_start_time_seconds":                  boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
 				"container_tasks_state":                         preciseSample(0),
 				"container_threads":                             boundedSample(0, 10),
