@@ -17,9 +17,10 @@ limitations under the License.
 package replicaset
 
 import (
-	"k8s.io/utils/ptr"
 	"reflect"
 	"testing"
+
+	"k8s.io/utils/ptr"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -245,13 +246,23 @@ func TestSelectorImmutability(t *testing.T) {
 		},
 		{
 			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
+				APIGroup:   "apps",
+				APIVersion: "v1",
 				Resource:   "replicasets",
 			},
 			map[string]string{"a": "b"},
-			map[string]string{"c": "d"},
-			nil,
+			map[string]string{"c": "v1"},
+			field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: field.NewPath("spec").Child("selector").String(),
+					BadValue: &metav1.LabelSelector{
+						MatchLabels:      map[string]string{"c": "v1"},
+						MatchExpressions: []metav1.LabelSelectorRequirement{},
+					},
+					Detail: "field is immutable",
+				},
+			},
 		},
 	}
 

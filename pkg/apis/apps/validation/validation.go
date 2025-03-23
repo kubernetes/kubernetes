@@ -321,6 +321,7 @@ func ValidateDaemonSetUpdate(ds, oldDS *apps.DaemonSet, opts apivalidation.PodVa
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&ds.ObjectMeta, &oldDS.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDaemonSetSpecUpdate(&ds.Spec, &oldDS.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateDaemonSetSpec(&ds.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(ds.Spec.Selector, oldDS.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	return allErrs
 }
 
@@ -648,6 +649,7 @@ func ValidateDeploymentStatus(status *apps.DeploymentStatus, fldPath *field.Path
 func ValidateDeploymentUpdate(update, old *apps.Deployment, opts apivalidation.PodValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateDeploymentSpec(&update.Spec, &old.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.Selector, old.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	return allErrs
 }
 
@@ -702,6 +704,7 @@ func ValidateReplicaSetUpdate(rs, oldRs *apps.ReplicaSet, opts apivalidation.Pod
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&rs.ObjectMeta, &oldRs.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidateReplicaSetSpec(&rs.Spec, &oldRs.Spec, field.NewPath("spec"), opts)...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(rs.Spec.Selector, oldRs.Spec.Selector, field.NewPath("spec").Child("selector"))...)
 	return allErrs
 }
 
