@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	golangruntime "runtime"
 	"strings"
 	"sync"
 	"time"
@@ -483,6 +484,17 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
 
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 1<<16)
+			stackSize := golangruntime.Stack(buf, false)
+			stackTrace := string(buf[:stackSize])
+			klog.Errorf("Panic occurred in Reflector watch operation: %v\nStack Trace:\n%s", r, stackTrace)
+
+			panic(r)
+		}
+	}()
+
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
@@ -577,6 +589,11 @@ func (r *Reflector) list(ctx context.Context) error {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				buf := make([]byte, 1<<16)
+				stackSize := golangruntime.Stack(buf, false)
+				stackTrace := string(buf[:stackSize])
+				klog.Errorf("Panic occurred in Reflector list operation: %v\nStack Trace:\n%s", r, stackTrace)
+
 				panicCh <- r
 			}
 		}()

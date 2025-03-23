@@ -25,6 +25,7 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -1638,6 +1639,95 @@ func getPodListItems(start int, numItems int) (string, string, *v1.PodList) {
 	}
 
 	return out.Items[0].GetName(), out.Items[exemptObjectIndex].GetName(), out
+}
+
+func TestReflectorPanicLogging(t *testing.T) {
+	tests := []struct {
+		name         string
+		listFunc     func(options metav1.ListOptions) (runtime.Object, error)
+		watchFunc    func(options metav1.ListOptions) (watch.Interface, error)
+		expectPanic  bool
+		panicMessage string
+	}{
+		{
+			name: "Panic in ListFunc",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				panic("simulated panic in ListFunc")
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+			expectPanic:  true,
+			panicMessage: "simulated panic in ListFunc",
+		},
+		{
+			name: "Nil Pointer Dereference in List",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				var obj *unstructured.UnstructuredList
+				return obj, nil
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+			expectPanic:  true,
+			panicMessage: "runtime error: invalid memory address or nil pointer dereference",
+		},
+		{
+			name: "Nil Pointer Dereference in Watch",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &unstructured.UnstructuredList{}, nil
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return nil, nil
+			},
+			expectPanic:  true,
+			panicMessage: "runtime error: invalid memory address or nil pointer dereference",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			store := NewStore(MetaNamespaceKeyFunc)
+			panicCh := make(chan interface{}, 1)
+
+			lw := &ListWatch{
+				ListFunc:  tt.listFunc,
+				WatchFunc: tt.watchFunc,
+			}
+
+			r := &Reflector{
+				name:              "test-reflector",
+				listerWatcher:     lw,
+				store:             store,
+				watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+			}
+
+			go func() {
+				defer func() {
+					if p := recover(); p != nil {
+						panicCh <- p
+					}
+				}()
+				_ = r.ListAndWatchWithContext(ctx)
+			}()
+
+			select {
+			case p := <-panicCh:
+				if !tt.expectPanic {
+					t.Fatalf("Unexpected panic: %v", p)
+				}
+				if !strings.Contains(fmt.Sprintf("%v", p), tt.panicMessage) {
+					t.Errorf("Unexpected panic message. Got: %v, Expected substring: %v", p, tt.panicMessage)
+				}
+				t.Logf("Panic successfully captured: %v", p)
+			case <-time.After(3 * time.Second):
+				if tt.expectPanic {
+					t.Fatal("Timeout waiting for panic to be captured")
+				}
+			}
+		})
+	}
 }
 
 func getConfigmapListItems(start int, numItems int) (string, string, *v1.ConfigMapList) {
