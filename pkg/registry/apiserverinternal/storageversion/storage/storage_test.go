@@ -28,10 +28,9 @@ import (
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
-	"k8s.io/kubernetes/pkg/registry/registrytest"
-
 	// Ensure that admissionregistration package is initialized.
 	_ "k8s.io/kubernetes/pkg/apis/apiserverinternal/install"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 
 func TestCreate(t *testing.T) {

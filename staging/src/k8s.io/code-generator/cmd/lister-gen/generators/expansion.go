@@ -22,11 +22,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 	"k8s.io/klog/v2"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // expansionGenerator produces a file for a expansion interfaces.

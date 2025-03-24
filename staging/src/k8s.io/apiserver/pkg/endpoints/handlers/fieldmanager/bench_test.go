@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields"
 	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"sigs.k8s.io/yaml"
 )
 
 var fakeTypeConverter = func() managedfields.TypeConverter {

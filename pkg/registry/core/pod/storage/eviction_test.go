@@ -41,7 +41,6 @@ import (
 	podapi "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
-
 	"k8s.io/utils/ptr"
 )
 

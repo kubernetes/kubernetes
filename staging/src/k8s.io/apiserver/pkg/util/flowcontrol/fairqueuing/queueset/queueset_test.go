@@ -31,8 +31,6 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/clock"
-
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
@@ -45,6 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // fairAlloc computes the max-min fair allocation of the given

@@ -19,9 +19,9 @@ package cbor
 import (
 	"io"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/fxamacker/cbor/v2"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // NewFramer returns a runtime.Framer based on RFC 8742 CBOR Sequences. Each frame contains exactly

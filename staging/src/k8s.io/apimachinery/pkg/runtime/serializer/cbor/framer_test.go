@@ -22,9 +22,9 @@ import (
 	"io"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
-
 	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 )
 
 // TestFrameReaderReadError tests that the frame reader does not resume after encountering a

@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
@@ -50,8 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
-
-	"k8s.io/klog/v2"
 )
 
 // This file contains the controller base functionality, i.e. framework to

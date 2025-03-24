@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/onsi/ginkgo/v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,8 +29,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-
-	"github.com/onsi/ginkgo/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 

@@ -30,9 +30,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/coordination/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/clock"
-
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 type LeaseCandidateGCController struct {

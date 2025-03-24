@@ -25,6 +25,8 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -33,8 +35,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	"github.com/onsi/gomega"
 )
 
 // ExecOptions passed to ExecWithOptions

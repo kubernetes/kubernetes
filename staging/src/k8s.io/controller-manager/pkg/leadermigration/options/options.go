@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/controller-manager/config"
 	migrationconfig "k8s.io/controller-manager/pkg/leadermigration/config"
 )

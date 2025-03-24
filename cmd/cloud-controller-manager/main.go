@@ -39,8 +39,6 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/klog/v2"
 	kcmnames "k8s.io/kubernetes/cmd/kube-controller-manager/names"
-	// For existing cloud providers, the option to import legacy providers is still available.
-	// e.g. _"k8s.io/legacy-cloud-providers/<provider>"
 )
 
 func main() {

@@ -27,11 +27,10 @@ import (
 	"github.com/lithammer/dedent"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/ptr"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/utils/ptr"
 )
 
 func TestBytesToJoinConfiguration(t *testing.T) {

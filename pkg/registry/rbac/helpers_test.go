@@ -20,13 +20,13 @@ import (
 	"reflect"
 	"testing"
 
+	"sigs.k8s.io/randfill"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
-
-	"sigs.k8s.io/randfill"
 )
 
 func newPod() *kapi.Pod {

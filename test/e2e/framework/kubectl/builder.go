@@ -29,9 +29,8 @@ import (
 	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
-	uexec "k8s.io/utils/exec"
-
 	"k8s.io/kubernetes/test/e2e/framework"
+	uexec "k8s.io/utils/exec"
 )
 
 // KubectlBuilder is used to build, customize and execute a kubectl Command.

@@ -19,6 +19,8 @@ package storageversion
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -26,7 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // storageVersionStrategy implements verification logic for StorageVersion.

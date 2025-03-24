@@ -21,10 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
-
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )

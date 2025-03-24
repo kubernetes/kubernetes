@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
+
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"

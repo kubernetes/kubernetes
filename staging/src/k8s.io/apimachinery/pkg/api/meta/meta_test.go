@@ -21,11 +21,11 @@ import (
 	"reflect"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
-
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 )
 
 func TestAsPartialObjectMetadata(t *testing.T) {

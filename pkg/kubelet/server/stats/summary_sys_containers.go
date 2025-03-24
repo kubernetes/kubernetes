@@ -22,10 +22,10 @@ package stats
 import (
 	"errors"
 
-	"k8s.io/klog/v2"
-
 	cadvisormemory "github.com/google/cadvisor/cache/memory"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )

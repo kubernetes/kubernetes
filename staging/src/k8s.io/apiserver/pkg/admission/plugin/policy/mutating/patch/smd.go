@@ -20,10 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
-	celtypes "github.com/google/cel-go/common/types"
 	"strings"
 
+	celgo "github.com/google/cel-go/cel"
+	celtypes "github.com/google/cel-go/common/types"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/v4/schema"
 	"sigs.k8s.io/structured-merge-diff/v4/typed"

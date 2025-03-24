@@ -21,9 +21,8 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/probe"
-
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/probe"
 )
 
 // New creates Prober.

@@ -18,15 +18,15 @@ package persistentvolume
 
 import (
 	"context"
-
-	"github.com/google/go-cmp/cmp"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )

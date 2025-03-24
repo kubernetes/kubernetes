@@ -19,9 +19,11 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"github.com/onsi/gomega"
 	"sync"
 	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -40,8 +42,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("CustomResourceFieldSelectors [Privileged:ClusterAdmin]", func() {

@@ -24,11 +24,10 @@ import (
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // genFakeForType produces a file for each top-level type.

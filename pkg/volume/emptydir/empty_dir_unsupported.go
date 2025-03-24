@@ -20,10 +20,9 @@ limitations under the License.
 package emptydir
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/mount-utils"
-
-	v1 "k8s.io/api/core/v1"
 )
 
 // realMountDetector pretends to implement mediumer.

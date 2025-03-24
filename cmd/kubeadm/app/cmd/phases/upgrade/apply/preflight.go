@@ -25,8 +25,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog/v2"
-	utilsexec "k8s.io/utils/exec"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -36,6 +34,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
+	utilsexec "k8s.io/utils/exec"
 )
 
 // NewPreflightPhase returns a new prefight phase.

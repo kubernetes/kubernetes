@@ -18,13 +18,13 @@ package config
 
 import (
 	"bytes"
-	utiltesting "k8s.io/client-go/util/testing"
 	"os"
 	"strings"
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 type currentContextTest struct {

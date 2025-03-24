@@ -24,22 +24,21 @@ import (
 	"sync/atomic"
 	"time"
 
+	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
+	v1 "k8s.io/api/coordination/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/reconcilers"
 	"k8s.io/client-go/discovery"
+	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-
-	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	v1 "k8s.io/api/coordination/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
 )
 
 // Local discovery cache needs to be refreshed periodically to store

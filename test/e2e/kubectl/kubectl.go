@@ -39,7 +39,8 @@ import (
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	"github.com/google/go-cmp/cmp"
-
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"sigs.k8s.io/yaml"
 
 	v1 "k8s.io/api/core/v1"
@@ -83,9 +84,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
 	"k8s.io/utils/pointer"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 const (

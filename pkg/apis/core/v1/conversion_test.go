@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -36,15 +37,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/core"
-	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	utilpointer "k8s.io/utils/pointer"
-
-	// ensure types are installed
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	// ensure types are installed corereplicationcontroller<->replicaset conversions
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
+	"k8s.io/kubernetes/pkg/apis/core"
+	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
+	// ensure types are installed
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestPodLogOptions(t *testing.T) {

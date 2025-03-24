@@ -22,8 +22,9 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	v1 "k8s.io/api/admissionregistration/v1"
 	"sigs.k8s.io/randfill"
+
+	v1 "k8s.io/api/admissionregistration/v1"
 )
 
 func TestMutatingWebhookAccessor(t *testing.T) {

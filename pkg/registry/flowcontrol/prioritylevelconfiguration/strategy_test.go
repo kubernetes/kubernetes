@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	"k8s.io/utils/ptr"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestPriorityLevelConfigurationValidation(t *testing.T) {

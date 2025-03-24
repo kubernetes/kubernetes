@@ -20,11 +20,12 @@ import (
 	"context"
 	"fmt"
 
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
-	"sigs.k8s.io/yaml"
 )
 
 // PluginFactory is a function that builds a plugin.

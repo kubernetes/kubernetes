@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/compatibility"
 	utilversion "k8s.io/component-base/version"
-
 	"k8s.io/kubernetes/test/utils/image"
 )
 

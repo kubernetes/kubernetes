@@ -19,8 +19,6 @@ package storage
 import (
 	"testing"
 
-	"k8s.io/utils/ptr"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/internalversion"
@@ -38,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 func newStorage(t *testing.T) (*JobStorage, *etcd3testing.EtcdTestServer) {

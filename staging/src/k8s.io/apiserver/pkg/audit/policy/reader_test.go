@@ -23,14 +23,13 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apiserver/pkg/apis/audit"
-
-	// import to call webhook's init() function to register audit.Policy to schema
-	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"k8s.io/apiserver/pkg/apis/audit"
+	// import to call webhook's init() function to register audit.Policy to schema
+	_ "k8s.io/apiserver/plugin/pkg/audit/webhook"
 )
 
 const policyDefPattern = `

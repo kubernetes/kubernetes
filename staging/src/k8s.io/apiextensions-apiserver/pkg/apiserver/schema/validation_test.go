@@ -21,10 +21,10 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/randfill"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
-
-	"sigs.k8s.io/randfill"
 )
 
 func TestValidateStructuralMetadataInvariants(t *testing.T) {

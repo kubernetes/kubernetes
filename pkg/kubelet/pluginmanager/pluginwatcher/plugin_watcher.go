@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/klog/v2"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"

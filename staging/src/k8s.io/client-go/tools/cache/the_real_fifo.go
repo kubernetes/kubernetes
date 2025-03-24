@@ -18,11 +18,12 @@ package cache
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utiltrace "k8s.io/utils/trace"
-	"sync"
-	"time"
 )
 
 // RealFIFO is a Queue in which every notification from the Reflector is passed

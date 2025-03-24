@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	netutils "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -54,6 +53,7 @@ import (
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	netutils "k8s.io/utils/net"
 )
 
 // podStrategy implements behavior for Pods

@@ -24,9 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/client-go/tools/metrics"
+	"k8s.io/klog/v2"
 )
 
 // The following constants shadow the special values used in the prometheus metrics implementation.

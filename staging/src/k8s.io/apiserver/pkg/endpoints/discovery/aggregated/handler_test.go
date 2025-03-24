@@ -22,7 +22,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-
 	"sort"
 	"strconv"
 	"strings"

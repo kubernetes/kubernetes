@@ -31,10 +31,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	ginkgotypes "github.com/onsi/ginkgo/v2/types"
 
+	_ "k8s.io/component-base/logs/testinit" // Ensure command line flags are registered.
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
-
-	_ "k8s.io/component-base/logs/testinit" // Ensure command line flags are registered.
 )
 
 var (

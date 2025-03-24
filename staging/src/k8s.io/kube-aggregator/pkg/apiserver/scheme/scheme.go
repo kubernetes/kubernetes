@@ -19,7 +19,6 @@ package scheme
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
 )
 

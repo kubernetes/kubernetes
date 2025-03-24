@@ -21,28 +21,25 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"fmt"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
+	"text/template"
 	"time"
-
-	utiltesting "k8s.io/client-go/util/testing"
 
 	"k8s.io/api/imagepolicy/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
+	utiltesting "k8s.io/client-go/util/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-
-	"fmt"
-	"os"
-	"path/filepath"
-	"text/template"
-
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 )
 

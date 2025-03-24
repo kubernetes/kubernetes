@@ -25,10 +25,9 @@ import (
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/utils/ptr"
-
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/utils/ptr"
 )
 
 func TestControllerStrategy(t *testing.T) {

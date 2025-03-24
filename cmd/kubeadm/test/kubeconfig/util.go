@@ -23,7 +23,6 @@ import (
 	"time"
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 )
 

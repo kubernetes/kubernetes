@@ -17,9 +17,8 @@ limitations under the License.
 package resourceclaim
 
 import (
-	"k8s.io/utils/lru"
-
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/lru"
 )
 
 // uidCache is an LRU cache for uid.

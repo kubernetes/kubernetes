@@ -22,9 +22,8 @@ import (
 
 	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"go.opentelemetry.io/otel/trace"
-
 	dto "github.com/prometheus/client_model/go"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Counter is our internal representation for our wrapping struct around prometheus

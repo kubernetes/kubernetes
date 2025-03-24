@@ -24,6 +24,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/onsi/gomega"
+
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,8 +43,6 @@ import (
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-
-	"github.com/onsi/gomega"
 )
 
 // DriverDefinition needs to be filled in via a .yaml or .json

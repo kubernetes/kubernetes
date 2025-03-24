@@ -19,9 +19,10 @@ package version
 import (
 	"fmt"
 	"io"
+	"math"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"math"
 )
 
 // supportedMinorVersionSkew is the maximum supported difference between the client and server minor versions.

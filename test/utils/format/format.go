@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/onsi/gomega/format"
-
 	"sigs.k8s.io/yaml"
 )
 

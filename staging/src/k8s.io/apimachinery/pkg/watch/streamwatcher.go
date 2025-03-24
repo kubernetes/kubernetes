@@ -21,11 +21,10 @@ import (
 	"io"
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.

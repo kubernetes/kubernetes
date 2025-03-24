@@ -21,21 +21,21 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	typedeventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func newTestEvent(namespace, name, label string) *eventsv1.Event {

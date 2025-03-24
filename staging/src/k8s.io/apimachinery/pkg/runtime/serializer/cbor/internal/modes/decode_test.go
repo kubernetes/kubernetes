@@ -23,10 +23,10 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
-
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-cmp/cmp"
+
+	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 )
 
 type int64BinaryUnmarshaler int64

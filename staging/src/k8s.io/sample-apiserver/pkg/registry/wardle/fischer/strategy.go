@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-
 	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 

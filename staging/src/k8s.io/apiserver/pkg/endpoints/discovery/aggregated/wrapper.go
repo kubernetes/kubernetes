@@ -19,14 +19,13 @@ package aggregated
 import (
 	"net/http"
 
+	"github.com/emicklei/go-restful/v3"
+
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/emicklei/go-restful/v3"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 )
 

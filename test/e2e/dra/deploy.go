@@ -37,6 +37,7 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/format"
 	"google.golang.org/grpc"
+	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -67,7 +68,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/yaml"
 )
 
 const (

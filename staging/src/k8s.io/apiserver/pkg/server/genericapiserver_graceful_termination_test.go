@@ -34,6 +34,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"golang.org/x/net/http2"
+
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -43,9 +46,6 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-
-	"github.com/google/go-cmp/cmp"
-	"golang.org/x/net/http2"
 )
 
 func TestMain(m *testing.M) {

@@ -20,6 +20,7 @@ import (
 	"flag"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/code-generator/cmd/informer-gen/args"
 	"k8s.io/code-generator/cmd/informer-gen/generators"
 	"k8s.io/code-generator/pkg/util"

@@ -23,7 +23,9 @@ import (
 	"strings"
 	"time"
 
+	semver "github.com/blang/semver/v4"
 	"github.com/onsi/ginkgo/v2"
+
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,8 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-
-	semver "github.com/blang/semver/v4"
 )
 
 // waits for a deployment to be created and the desired replicas

@@ -23,11 +23,11 @@ import (
 	"testing"
 	"time"
 
-	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-	"sigs.k8s.io/yaml"
-
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
+	"sigs.k8s.io/yaml"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 type TimeHolder struct {

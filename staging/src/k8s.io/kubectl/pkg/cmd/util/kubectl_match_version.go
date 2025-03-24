@@ -23,13 +23,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubectl/pkg/scheme"
-
-	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/component-base/version"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (

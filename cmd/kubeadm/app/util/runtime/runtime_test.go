@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 

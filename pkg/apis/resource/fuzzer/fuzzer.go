@@ -19,11 +19,12 @@ package fuzzer
 import (
 	"time"
 
+	"sigs.k8s.io/randfill"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/resource"
-	"sigs.k8s.io/randfill"
 )
 
 // Funcs contains the fuzzer functions for the resource group.

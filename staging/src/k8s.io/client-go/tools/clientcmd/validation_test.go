@@ -23,10 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {

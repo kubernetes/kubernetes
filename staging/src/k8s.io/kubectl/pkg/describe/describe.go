@@ -33,6 +33,7 @@ import (
 	"unicode"
 
 	"github.com/fatih/camelcase"
+
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"

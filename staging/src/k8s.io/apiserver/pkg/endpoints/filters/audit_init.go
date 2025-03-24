@@ -19,11 +19,11 @@ package filters
 import (
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"k8s.io/apimachinery/pkg/types"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
-
-	"github.com/google/uuid"
 )
 
 // WithAuditInit initializes the audit context and attaches the Audit-ID associated with a request.

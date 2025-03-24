@@ -22,14 +22,13 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/code-generator/cmd/register-gen/args"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
+	"k8s.io/klog/v2"
 )
 
 // NameSystems returns the name system used by the generators in this package.

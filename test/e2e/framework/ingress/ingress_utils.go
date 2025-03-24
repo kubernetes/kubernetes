@@ -37,7 +37,7 @@ import (
 	"strings"
 	"time"
 
-	netutils "k8s.io/utils/net"
+	"github.com/onsi/ginkgo/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -62,8 +62,7 @@ import (
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/ginkgo/v2"
+	netutils "k8s.io/utils/net"
 )
 
 const (

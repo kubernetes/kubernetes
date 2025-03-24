@@ -22,6 +22,7 @@ import (
 	goflag "flag"
 
 	flag "github.com/spf13/pflag"
+
 	"k8s.io/code-generator/cmd/go-to-protobuf/protobuf"
 	"k8s.io/klog/v2"
 )

@@ -20,10 +20,11 @@ import (
 	"bytes"
 	"fmt"
 
+	"sigs.k8s.io/yaml"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
-	"sigs.k8s.io/yaml"
 )
 
 const (

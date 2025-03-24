@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"k8s.io/pod-security-admission/api"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
+	"k8s.io/pod-security-admission/api"
 )
 
 const (

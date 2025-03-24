@@ -26,12 +26,13 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/randfill"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	clientauthenticationapi "k8s.io/client-go/pkg/apis/clientauthentication"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
-	"sigs.k8s.io/randfill"
 )
 
 func TestConfigToExecCluster(t *testing.T) {

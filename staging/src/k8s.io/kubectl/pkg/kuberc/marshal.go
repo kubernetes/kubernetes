@@ -24,11 +24,9 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
 )
 

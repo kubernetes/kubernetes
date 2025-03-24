@@ -18,12 +18,11 @@ package events
 
 import (
 	"context"
+	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
-
-	"os"
-	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"

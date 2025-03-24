@@ -25,8 +25,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -35,6 +33,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 	bootstraptokenutil "k8s.io/cluster-bootstrap/util/tokens"
+	"k8s.io/klog/v2"
 )
 
 // TODO: A few methods in this package is copied from other sources. Either

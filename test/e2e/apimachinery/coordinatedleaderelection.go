@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,8 +37,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("CoordinatedLeaderElection", feature.CoordinatedLeaderElection, framework.WithFeatureGate(kubefeatures.CoordinatedLeaderElection), func() {

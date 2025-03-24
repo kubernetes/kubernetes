@@ -21,18 +21,18 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/instrumentation/common"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 const (

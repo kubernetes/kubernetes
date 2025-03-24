@@ -24,8 +24,6 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/discovery"
 	"k8s.io/klog/v2"
-	svmrest "k8s.io/kubernetes/pkg/registry/storagemigration/rest"
-
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
 	apiserverinternalrest "k8s.io/kubernetes/pkg/registry/apiserverinternal/rest"
 	authenticationrest "k8s.io/kubernetes/pkg/registry/authentication/rest"
@@ -36,6 +34,7 @@ import (
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	flowcontrolrest "k8s.io/kubernetes/pkg/registry/flowcontrol/rest"
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
+	svmrest "k8s.io/kubernetes/pkg/registry/storagemigration/rest"
 )
 
 // RESTStorageProvider is a factory type for REST storage.

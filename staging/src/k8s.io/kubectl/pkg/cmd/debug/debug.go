@@ -25,6 +25,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -56,7 +57,6 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	"k8s.io/kubectl/pkg/util/term"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/yaml"
 )
 
 var (

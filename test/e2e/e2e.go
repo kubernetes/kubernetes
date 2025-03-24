@@ -27,8 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -36,8 +34,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
+	// ensure auth plugins are loaded
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/component-base/logs"
+	// Ensure that logging flags are part of the command line.
+	_ "k8s.io/component-base/logs/testinit"
 	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/daemonset"
@@ -47,13 +51,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereporters "k8s.io/kubernetes/test/e2e/reporters"
 	utilnet "k8s.io/utils/net"
-
-	clientset "k8s.io/client-go/kubernetes"
-	// ensure auth plugins are loaded
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
-	// Ensure that logging flags are part of the command line.
-	_ "k8s.io/component-base/logs/testinit"
 )
 
 const (

@@ -39,7 +39,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"

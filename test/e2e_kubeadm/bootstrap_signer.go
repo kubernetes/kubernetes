@@ -19,10 +19,10 @@ package kubeadm
 import (
 	"context"
 
+	"github.com/onsi/ginkgo/v2"
+
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 const (

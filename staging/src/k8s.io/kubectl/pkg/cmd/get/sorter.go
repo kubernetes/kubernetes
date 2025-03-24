@@ -22,8 +22,6 @@ import (
 	"reflect"
 	"sort"
 
-	"k8s.io/klog/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/klog/v2"
 )
 
 // SortingPrinter sorts list types before delegating to another printer.

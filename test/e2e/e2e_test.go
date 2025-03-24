@@ -26,24 +26,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	yaml "sigs.k8s.io/yaml/goyaml.v2"
 
-	// Never, ever remove the line with "/ginkgo". Without it,
-	// the ginkgo test runner will not detect that this
-	// directory contains a Ginkgo test suite.
-	// See https://github.com/kubernetes/kubernetes/issues/74827
-	// "github.com/onsi/ginkgo/v2"
-
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
-	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
-	testfixtures "k8s.io/kubernetes/test/fixtures"
-
-	// define and freeze constants
-	_ "k8s.io/kubernetes/test/e2e/feature"
-
 	// test sources
 	_ "k8s.io/kubernetes/test/e2e/apimachinery"
 	_ "k8s.io/kubernetes/test/e2e/apps"
@@ -53,6 +38,15 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/cloud"
 	_ "k8s.io/kubernetes/test/e2e/common"
 	_ "k8s.io/kubernetes/test/e2e/dra"
+	// define and freeze constants
+	_ "k8s.io/kubernetes/test/e2e/feature"
+	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/config"
+	// reconfigure framework
+	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
+	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	_ "k8s.io/kubernetes/test/e2e/instrumentation"
 	_ "k8s.io/kubernetes/test/e2e/kubectl"
 	_ "k8s.io/kubernetes/test/e2e/lifecycle"
@@ -63,12 +57,9 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/storage"
 	_ "k8s.io/kubernetes/test/e2e/storage/csimock"
 	_ "k8s.io/kubernetes/test/e2e/storage/external"
+	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	_ "k8s.io/kubernetes/test/e2e/windows"
-
-	// reconfigure framework
-	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
-	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
-	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
+	testfixtures "k8s.io/kubernetes/test/fixtures"
 	_ "k8s.io/kubernetes/test/utils/format"
 )
 

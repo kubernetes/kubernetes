@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,8 +38,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
-
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // svcStrategy implements behavior for Services

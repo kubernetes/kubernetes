@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"net/url"
 
-	restclient "k8s.io/client-go/rest"
-
 	"golang.org/x/net/websocket"
+
+	restclient "k8s.io/client-go/rest"
 )
 
 type extractRT struct {

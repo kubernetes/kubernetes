@@ -20,14 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/utils/ptr"
-
 	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
+	"k8s.io/utils/ptr"
 )
 
 func TestDefaultsKubeProxyConfiguration(t *testing.T) {

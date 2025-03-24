@@ -33,14 +33,10 @@ import (
 	"sync"
 	"time"
 
-	codes "google.golang.org/grpc/codes"
-	crierror "k8s.io/cri-api/pkg/errors"
-
-	"github.com/opencontainers/selinux/go-selinux"
-	grpcstatus "google.golang.org/grpc/status"
-
 	"github.com/armon/circbuf"
-	"k8s.io/klog/v2"
+	"github.com/opencontainers/selinux/go-selinux"
+	codes "google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,7 +45,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierror "k8s.io/cri-api/pkg/errors"
 	remote "k8s.io/cri-client/pkg"
+	"k8s.io/klog/v2"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"

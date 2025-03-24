@@ -27,9 +27,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +37,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 const (

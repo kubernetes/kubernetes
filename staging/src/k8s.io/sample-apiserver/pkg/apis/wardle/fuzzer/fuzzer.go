@@ -17,10 +17,10 @@ limitations under the License.
 package fuzzer
 
 import (
-	"k8s.io/sample-apiserver/pkg/apis/wardle"
 	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/sample-apiserver/pkg/apis/wardle"
 )
 
 // Funcs returns the fuzzer functions for the apps api group.

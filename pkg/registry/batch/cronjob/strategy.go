@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchvalidation "k8s.io/kubernetes/pkg/apis/batch/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // cronJobStrategy implements verification logic for Replication Controllers.

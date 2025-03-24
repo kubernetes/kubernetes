@@ -23,9 +23,8 @@ import (
 	"net/http"
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/klog/v2"
 )
 
 // WarningHandler is an interface for handling warning headers

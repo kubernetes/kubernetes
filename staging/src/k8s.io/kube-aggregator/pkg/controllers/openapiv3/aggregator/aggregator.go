@@ -35,11 +35,10 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	"k8s.io/klog/v2"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v2aggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/openapiconv"
-
-	v2aggregator "k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator"
 )
 
 var ErrAPIServiceNotFound = errors.New("resource not found")

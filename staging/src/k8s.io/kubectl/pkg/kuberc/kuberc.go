@@ -24,9 +24,6 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/kubectl/pkg/config"
-	kuberc "k8s.io/kubectl/pkg/config/install"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -34,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/kubectl/pkg/config"
+	kuberc "k8s.io/kubectl/pkg/config/install"
 )
 
 const RecommendedKubeRCFileName = "kuberc"

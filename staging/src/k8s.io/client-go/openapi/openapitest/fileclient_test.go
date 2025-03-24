@@ -19,9 +19,10 @@ package openapitest_test
 import (
 	"testing"
 
+	kjson "sigs.k8s.io/json"
+
 	"k8s.io/client-go/openapi/openapitest"
 	"k8s.io/kube-openapi/pkg/spec3"
-	kjson "sigs.k8s.io/json"
 )
 
 func TestOpenAPIEmbeddedTest(t *testing.T) {

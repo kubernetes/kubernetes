@@ -37,6 +37,7 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	cloudprovidernodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
@@ -45,8 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
-
-	"k8s.io/klog/v2"
 )
 
 const (

@@ -19,7 +19,6 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/cpuset"
 	"os"
 	"os/exec"
 	"regexp"
@@ -27,6 +26,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,8 +38,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	admissionapi "k8s.io/pod-security-admission/api"
-
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -45,9 +45,8 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/cpuset"
 )
 
 const (

@@ -25,6 +25,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -42,10 +46,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/gcustom"
 )
 
 var (

@@ -24,7 +24,6 @@ import (
 	"k8s.io/api/scheduling/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 )

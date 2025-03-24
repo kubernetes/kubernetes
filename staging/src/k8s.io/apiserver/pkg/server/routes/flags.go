@@ -24,9 +24,8 @@ import (
 	"path"
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/klog/v2"
 )
 
 var (

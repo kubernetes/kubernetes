@@ -19,8 +19,9 @@ package internal
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type stripMetaManager struct {

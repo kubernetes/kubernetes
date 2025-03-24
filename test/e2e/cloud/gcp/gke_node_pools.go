@@ -21,13 +21,13 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/onsi/ginkgo/v2"
+
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("GKE node pools", feature.GKENodePool, func() {

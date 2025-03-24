@@ -18,7 +18,6 @@ package v2beta2
 
 import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
-
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )

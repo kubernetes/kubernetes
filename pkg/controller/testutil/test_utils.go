@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -47,8 +49,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
-
-	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 )
 
 var (

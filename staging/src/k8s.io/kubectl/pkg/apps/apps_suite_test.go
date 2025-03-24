@@ -17,10 +17,10 @@ limitations under the License.
 package apps
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"testing"
 )
 
 func TestApps(t *testing.T) {

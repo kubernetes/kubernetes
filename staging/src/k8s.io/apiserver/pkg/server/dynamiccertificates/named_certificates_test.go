@@ -31,9 +31,9 @@ import (
 	"testing"
 	"time"
 
-	netutils "k8s.io/utils/net"
-
 	"github.com/stretchr/testify/assert"
+
+	netutils "k8s.io/utils/net"
 )
 
 type testCertSpec struct {

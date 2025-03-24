@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"

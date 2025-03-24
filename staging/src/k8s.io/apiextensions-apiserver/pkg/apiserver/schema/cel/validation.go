@@ -36,6 +36,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/cel/model"
 	"k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -44,8 +45,6 @@ import (
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-
-	celconfig "k8s.io/apiserver/pkg/apis/cel"
 )
 
 // Validator parallels the structure of schema.Structural and includes the compiled CEL programs

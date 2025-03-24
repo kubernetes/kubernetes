@@ -26,6 +26,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	dto "github.com/prometheus/client_model/go"
+
 	"k8s.io/component-base/metrics"
 	"k8s.io/utils/pointer"
 )

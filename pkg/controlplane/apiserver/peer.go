@@ -24,13 +24,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/reconcilers"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/transport"
-
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/transport"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 

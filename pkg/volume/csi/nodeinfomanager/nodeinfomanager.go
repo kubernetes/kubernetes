@@ -26,7 +26,6 @@ import (
 	"math"
 	"strings"
 	"sync"
-
 	"time"
 
 	v1 "k8s.io/api/core/v1"

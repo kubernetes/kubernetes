@@ -23,10 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/pod-security-admission/admission/api"
 )
 

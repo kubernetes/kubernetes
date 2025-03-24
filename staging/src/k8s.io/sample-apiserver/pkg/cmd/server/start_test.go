@@ -19,10 +19,10 @@ package server
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/util/compatibility"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestWardleEmulationVersionToKubeEmulationVersion(t *testing.T) {

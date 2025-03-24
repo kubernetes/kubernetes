@@ -18,10 +18,10 @@ package openapi
 
 import (
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
-	"sigs.k8s.io/yaml"
 )
 
 // OpenAPIResourcesGetter represents a function to return

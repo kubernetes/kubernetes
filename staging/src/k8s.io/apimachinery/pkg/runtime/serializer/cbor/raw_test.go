@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestTranscodeRawTypes(t *testing.T) {

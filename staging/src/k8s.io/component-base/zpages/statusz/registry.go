@@ -20,11 +20,10 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/klog/v2"
-
 	"k8s.io/component-base/compatibility"
 	compbasemetrics "k8s.io/component-base/metrics"
 	utilversion "k8s.io/component-base/version"
+	"k8s.io/klog/v2"
 )
 
 type statuszRegistry interface {

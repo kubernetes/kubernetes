@@ -22,9 +22,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"k8s.io/utils/clock"
-	"k8s.io/utils/ptr"
-
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -35,6 +32,8 @@ import (
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/utils/clock"
+	"k8s.io/utils/ptr"
 )
 
 var noRestraintQSF = fqtesting.NewNoRestraintFactory()

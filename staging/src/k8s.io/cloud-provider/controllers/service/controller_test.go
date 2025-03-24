@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +53,6 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	_ "k8s.io/controller-manager/pkg/features/register"
 	"k8s.io/klog/v2/ktesting"
-
 	utilpointer "k8s.io/utils/pointer"
 )
 

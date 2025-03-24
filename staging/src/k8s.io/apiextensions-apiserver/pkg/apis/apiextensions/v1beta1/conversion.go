@@ -19,10 +19,9 @@ package v1beta1
 import (
 	"bytes"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/util/json"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 )
 
 func Convert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *apiextensions.JSONSchemaProps, out *JSONSchemaProps, s conversion.Scope) error {

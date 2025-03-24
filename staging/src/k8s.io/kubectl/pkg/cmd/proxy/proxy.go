@@ -30,7 +30,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
-
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/proxy"
 	"k8s.io/kubectl/pkg/util/i18n"

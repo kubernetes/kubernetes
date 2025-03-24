@@ -19,10 +19,9 @@ package podresources
 import (
 	"context"
 
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
-
 	"k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // v1alpha1PodResourcesServer implements PodResourcesListerServer

@@ -17,9 +17,8 @@ limitations under the License.
 package generators
 
 import (
-	"k8s.io/gengo/v2/types"
-
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	"k8s.io/gengo/v2/types"
 )
 
 // refGraph maps existing types to the package the corresponding applyConfig types will be generated in

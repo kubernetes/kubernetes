@@ -21,10 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/spf13/pflag"
 
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/controller-manager/config"
 	migrationconfig "k8s.io/controller-manager/pkg/leadermigration/config"
 )

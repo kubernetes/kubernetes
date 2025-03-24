@@ -19,12 +19,13 @@ package objectmeta
 import (
 	"fmt"
 
+	kjson "sigs.k8s.io/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	utiljson "k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	kjson "sigs.k8s.io/json"
 )
 
 // GetObjectMeta calls GetObjectMetaWithOptions without returning unknown field paths.

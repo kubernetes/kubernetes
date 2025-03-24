@@ -22,6 +22,9 @@ import (
 	"path"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
@@ -32,9 +35,6 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 	"k8s.io/kubernetes/test/utils/format"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 var storageVersionServerVersion = utilversion.MustParseSemantic("v1.13.99")

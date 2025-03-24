@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/klog/v2"
-
 	// Initialize command line parameters.
 	_ "k8s.io/component-base/logs/testinit"
+	"k8s.io/klog/v2"
 )
 
 func init() {

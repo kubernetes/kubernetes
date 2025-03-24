@@ -30,6 +30,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	auditapi "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/component-base/metrics"

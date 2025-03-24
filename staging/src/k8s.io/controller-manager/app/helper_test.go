@@ -19,9 +19,9 @@ package app
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestIsControllerEnabled(t *testing.T) {

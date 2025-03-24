@@ -25,9 +25,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	netutils "k8s.io/utils/net"
 )
 
 // GetControlPlaneEndpoint returns a properly formatted endpoint for the control plane built according following rules:

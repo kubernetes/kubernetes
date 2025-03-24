@@ -22,6 +22,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	v2 "k8s.io/kubectl/pkg/explain/v2"
 )

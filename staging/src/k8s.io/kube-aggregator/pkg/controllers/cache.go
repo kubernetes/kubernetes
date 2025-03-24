@@ -19,10 +19,9 @@ package controllers
 import (
 	"fmt"
 
-	"k8s.io/klog/v2"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 )
 
 // WaitForCacheSync is a wrapper around cache.WaitForCacheSync that generates log messages

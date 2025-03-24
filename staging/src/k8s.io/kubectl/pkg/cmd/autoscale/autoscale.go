@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
@@ -36,6 +35,7 @@ import (
 	autoscalingv1client "k8s.io/client-go/kubernetes/typed/autoscaling/v1"
 	autoscalingv2client "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	"k8s.io/client-go/scale"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"

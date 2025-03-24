@@ -27,12 +27,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+
 	"k8s.io/kubernetes/test/e2e/chaosmonkey"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/junit"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 type chaosMonkeyAdapter struct {

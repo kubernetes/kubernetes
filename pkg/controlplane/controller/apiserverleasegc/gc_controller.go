@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/coordination/v1"
 	"k8s.io/client-go/tools/cache"
-
 	"k8s.io/klog/v2"
 )
 

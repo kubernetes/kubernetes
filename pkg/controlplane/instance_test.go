@@ -30,8 +30,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
-	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 
 	autoscalingapiv2beta1 "k8s.io/api/autoscaling/v2beta1"
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
@@ -63,8 +61,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	utilversion "k8s.io/component-base/version"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
-	netutils "k8s.io/utils/net"
-
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -73,6 +69,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -81,8 +78,10 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
+	netutils "k8s.io/utils/net"
 )
 
 // setUp is a convenience function for setting up for (most) tests.

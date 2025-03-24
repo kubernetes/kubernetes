@@ -23,9 +23,9 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"sigs.k8s.io/yaml"
+
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caContent string, t *testing.T) Config {

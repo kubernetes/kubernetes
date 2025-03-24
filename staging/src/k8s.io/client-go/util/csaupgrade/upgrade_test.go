@@ -24,12 +24,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/util/csaupgrade"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 func TestFindOwners(t *testing.T) {

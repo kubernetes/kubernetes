@@ -25,9 +25,8 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
+
 	certificatesv1 "k8s.io/api/certificates/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +38,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/keyutil"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func copyFile(src, dst string) (err error) {

@@ -47,7 +47,6 @@ import (
 	kubeletportforward "k8s.io/kubelet/pkg/cri/streaming/portforward"
 	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-
 	"k8s.io/kubernetes/test/integration/framework"
 )
 

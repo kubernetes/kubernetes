@@ -24,12 +24,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
-
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"

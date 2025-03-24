@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/logs/internal/setverbositylevel"
 	"k8s.io/component-base/logs/klogflags"

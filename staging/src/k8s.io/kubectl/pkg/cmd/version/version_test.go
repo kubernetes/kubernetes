@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 

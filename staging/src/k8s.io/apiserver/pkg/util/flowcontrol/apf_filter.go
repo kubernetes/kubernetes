@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"time"
 
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	endpointsrequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -30,11 +31,9 @@ import (
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	kubeinformers "k8s.io/client-go/informers"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-
-	flowcontrol "k8s.io/api/flowcontrol/v1"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
 )
 
 // ConfigConsumerAsFieldManager is how the config consuminng

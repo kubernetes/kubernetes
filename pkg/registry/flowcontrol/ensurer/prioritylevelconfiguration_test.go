@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +32,6 @@ import (
 	toolscache "k8s.io/client-go/tools/cache"
 	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
 	"k8s.io/utils/ptr"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestEnsurePriorityLevel(t *testing.T) {

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"go.uber.org/goleak"
+
 	"k8s.io/apiserver/pkg/server/healthz"
 )
 

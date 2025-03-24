@@ -29,6 +29,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	"sigs.k8s.io/randfill"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +54,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
-	"sigs.k8s.io/randfill"
 )
 
 var (

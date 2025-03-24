@@ -19,6 +19,8 @@ package storage
 import (
 	"context"
 
+	"github.com/onsi/ginkgo/v2"
+
 	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -27,8 +29,6 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 // PersistentVolumeUpgradeTest test that a pv is available before and after a cluster upgrade.

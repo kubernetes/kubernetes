@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-
 	"golang.org/x/crypto/ssh"
 
 	v1 "k8s.io/api/core/v1"

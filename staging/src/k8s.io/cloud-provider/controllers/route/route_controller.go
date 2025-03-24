@@ -24,9 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -44,6 +41,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 const (

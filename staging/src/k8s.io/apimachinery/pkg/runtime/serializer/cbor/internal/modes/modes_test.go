@@ -22,6 +22,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
 )
 

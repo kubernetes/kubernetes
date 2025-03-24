@@ -26,6 +26,8 @@ import (
 	"strings"
 	"sync"
 
+	"sigs.k8s.io/kustomize/kyaml/filesys"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,7 +41,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}

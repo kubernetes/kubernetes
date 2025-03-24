@@ -21,6 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,9 +33,6 @@ import (
 	toolscache "k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	flowcontrolapisv1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 )
 
 func init() {

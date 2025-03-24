@@ -32,11 +32,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	"k8s.io/utils/ptr"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/utils/ptr"
 )
 
 func TestCreateConfigMap(t *testing.T) {

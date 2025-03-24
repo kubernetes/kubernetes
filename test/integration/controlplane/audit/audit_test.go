@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+
 	"k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,8 +47,6 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
-
-	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 )
 
 const (

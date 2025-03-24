@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,7 +42,6 @@ import (
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/yaml"
 )
 
 func TestConvert(t *testing.T) {

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 

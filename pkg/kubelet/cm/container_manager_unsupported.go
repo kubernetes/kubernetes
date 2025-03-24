@@ -23,8 +23,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/mount-utils"
-
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -32,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/mount-utils"
 )
 
 type unsupportedContainerManager struct {

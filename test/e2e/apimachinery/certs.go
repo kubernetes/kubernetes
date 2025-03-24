@@ -21,12 +21,11 @@ import (
 	"os"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/test/utils"
-
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/utils"
 )
 
 type certContext struct {

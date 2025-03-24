@@ -22,12 +22,11 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"

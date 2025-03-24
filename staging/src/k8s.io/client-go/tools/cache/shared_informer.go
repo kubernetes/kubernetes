@@ -27,14 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/tools/cache/synctrack"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
-
-	"k8s.io/klog/v2"
-
-	clientgofeaturegate "k8s.io/client-go/features"
 )
 
 // SharedInformer provides eventually consistent linkage of its

@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
 

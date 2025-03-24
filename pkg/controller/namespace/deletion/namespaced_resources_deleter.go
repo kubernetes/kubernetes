@@ -23,8 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +34,7 @@ import (
 	"k8s.io/client-go/discovery"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 )
 

@@ -22,9 +22,9 @@ import (
 	"sync"
 	"testing"
 
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
-
 	"github.com/stretchr/testify/assert"
+
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
 
 func TestEnabled(t *testing.T) {

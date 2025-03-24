@@ -24,9 +24,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/apimachinery/pkg/util/json"
-
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 func TestCoerce(t *testing.T) {

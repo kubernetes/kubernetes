@@ -23,10 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-	"k8s.io/utils/exec"
-
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,9 +35,12 @@ import (
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
 // ProbeOperation represents a type of operation for probing volume plugins.

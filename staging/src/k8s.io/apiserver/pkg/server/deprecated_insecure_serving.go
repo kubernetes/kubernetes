@@ -21,11 +21,10 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // DeprecatedInsecureServingInfo is the main context object for the insecure http server.

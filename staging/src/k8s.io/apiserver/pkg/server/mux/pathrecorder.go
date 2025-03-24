@@ -25,10 +25,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"k8s.io/klog/v2"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
 // PathRecorderMux wraps a mux object and records the registered exposedPaths.

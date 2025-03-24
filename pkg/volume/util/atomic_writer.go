@@ -26,9 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
 const (

@@ -26,11 +26,10 @@ import (
 	v1beta1 "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/utils/ptr"
-
 	// ensure types are installed
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetDefaultAllocationMode(t *testing.T) {

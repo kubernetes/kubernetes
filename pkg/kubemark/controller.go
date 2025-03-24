@@ -32,7 +32,6 @@ import (
 	kubeclient "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-
 	"k8s.io/klog/v2"
 )
 

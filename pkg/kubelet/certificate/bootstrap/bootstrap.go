@@ -30,8 +30,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	certificatesv1 "k8s.io/api/certificates/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -46,6 +44,7 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2"
 )
 
 const tmpPrivateKeyFile = "kubelet-client.key.tmp"

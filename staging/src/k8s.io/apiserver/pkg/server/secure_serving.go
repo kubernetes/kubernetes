@@ -29,12 +29,12 @@ import (
 	"time"
 
 	"golang.org/x/net/http2"
-	"k8s.io/component-base/cli/flag"
-	"k8s.io/klog/v2"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
 )
 
 const (

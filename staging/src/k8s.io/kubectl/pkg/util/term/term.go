@@ -20,10 +20,9 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/cli-runtime/pkg/printers"
-
 	"github.com/moby/term"
 
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubectl/pkg/util/interrupt"
 )
 

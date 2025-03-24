@@ -22,11 +22,10 @@ import (
 	"path"
 	"strings"
 
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // genFakeForGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.

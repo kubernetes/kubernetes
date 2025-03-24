@@ -19,15 +19,14 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-
-	"errors"
-	"os"
 )
 
 const success = "\033[0;32mSUCCESS\033[0m"

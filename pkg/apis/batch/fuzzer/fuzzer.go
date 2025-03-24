@@ -19,11 +19,12 @@ package fuzzer
 import (
 	"math"
 
+	"sigs.k8s.io/randfill"
+
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/randfill"
 )
 
 // Funcs returns the fuzzer functions for the batch api group.

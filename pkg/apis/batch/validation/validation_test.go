@@ -18,11 +18,10 @@ package validation
 
 import (
 	"errors"
-	_ "time/tzdata"
-
 	"fmt"
 	"strings"
 	"testing"
+	_ "time/tzdata"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

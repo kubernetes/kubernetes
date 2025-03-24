@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/klog/v2"
-
 	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
 )
 

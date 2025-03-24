@@ -31,8 +31,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	certificates "k8s.io/api/certificates/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,6 +40,7 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate/csr"
 	"k8s.io/client-go/util/keyutil"
+	"k8s.io/klog/v2"
 )
 
 var (

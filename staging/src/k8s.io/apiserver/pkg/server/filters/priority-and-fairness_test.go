@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	flowcontrol "k8s.io/api/flowcontrol/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -53,8 +55,6 @@ import (
 	"k8s.io/klog/v2"
 	clocktesting "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestMain(m *testing.M) {

@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -43,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.

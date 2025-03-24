@@ -26,8 +26,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
-	netutils "k8s.io/utils/net"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/server"
@@ -35,6 +33,8 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 type SecureServingOptions struct {

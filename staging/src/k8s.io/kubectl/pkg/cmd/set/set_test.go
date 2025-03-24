@@ -23,7 +23,6 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-
 	clientcmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 

@@ -18,9 +18,9 @@ package statusupdater
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
 
 func NewFakeNodeStatusUpdater(returnError bool) NodeStatusUpdater {

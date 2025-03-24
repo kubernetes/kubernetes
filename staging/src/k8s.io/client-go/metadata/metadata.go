@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +33,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/client-go/util/watchlist"
+	"k8s.io/klog/v2"
 )
 
 var deleteScheme = runtime.NewScheme()

@@ -17,10 +17,9 @@ limitations under the License.
 package listtype
 
 import (
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // ValidateListSetsAndMaps validates that arrays with x-kubernetes-list-type "map" and "set" fulfill the uniqueness

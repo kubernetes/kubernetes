@@ -22,10 +22,9 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 )
 
 func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, driverName string, host volume.VolumeHost) error {

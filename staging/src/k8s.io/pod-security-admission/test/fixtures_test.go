@@ -25,13 +25,14 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/yaml"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/policy"
-	"sigs.k8s.io/yaml"
 )
 
 const updateEnvVar = "UPDATE_POD_SECURITY_FIXTURE_DATA"

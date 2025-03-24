@@ -23,9 +23,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"sigs.k8s.io/randfill"
+
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/randfill"
 )
 
 func TestLabelSelectorAsSelector(t *testing.T) {

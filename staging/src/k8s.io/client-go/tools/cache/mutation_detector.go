@@ -24,10 +24,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/klog/v2"
 )
 
 var mutationDetectionEnabled = false

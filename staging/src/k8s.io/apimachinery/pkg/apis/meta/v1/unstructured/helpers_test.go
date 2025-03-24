@@ -24,9 +24,9 @@ import (
 	"sync"
 	"testing"
 
-	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
-
 	"github.com/stretchr/testify/assert"
+
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 )
 
 // TestCodecOfUnstructuredList tests that there are no data races in Encode().

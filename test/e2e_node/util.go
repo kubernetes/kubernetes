@@ -32,9 +32,9 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/procfs"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
+	"github.com/coreos/go-systemd/v22/dbus"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
@@ -59,16 +59,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/util"
-
-	"github.com/coreos/go-systemd/v22/dbus"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")

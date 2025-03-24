@@ -29,12 +29,12 @@ import (
 
 	"github.com/pkg/errors"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"sigs.k8s.io/yaml"
 )
 
 // PatchTarget defines a target to be patched, such as a control-plane static Pod.

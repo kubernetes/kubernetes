@@ -26,6 +26,7 @@ import (
 	"text/template"
 
 	"github.com/go-openapi/jsonreference"
+
 	"k8s.io/kubectl/pkg/util/term"
 )
 

@@ -32,6 +32,9 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	_ "k8s.io/kubernetes/pkg/apis/discovery/install"
 	_ "k8s.io/kubernetes/pkg/apis/events/install"
+	// Put the deprecated apis last to ensure that the latest apis can be used first.
+	// Related issue: https://github.com/kubernetes/kubernetes/issues/112682
+	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/flowcontrol/install"
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
 	_ "k8s.io/kubernetes/pkg/apis/networking/install"
@@ -42,8 +45,4 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	_ "k8s.io/kubernetes/pkg/apis/storage/install"
 	_ "k8s.io/kubernetes/pkg/apis/storagemigration/install"
-
-	// Put the deprecated apis last to ensure that the latest apis can be used first.
-	// Related issue: https://github.com/kubernetes/kubernetes/issues/112682
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 )

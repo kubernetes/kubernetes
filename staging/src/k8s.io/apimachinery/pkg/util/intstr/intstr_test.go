@@ -23,11 +23,11 @@ import (
 	"reflect"
 	"testing"
 
-	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-	"sigs.k8s.io/yaml"
-
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
+	"sigs.k8s.io/yaml"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 func TestFromInt(t *testing.T) {

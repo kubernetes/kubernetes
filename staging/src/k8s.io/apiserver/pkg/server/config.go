@@ -45,6 +45,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
+	// install apis
+	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -86,9 +88,6 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/clock"
 	utilsnet "k8s.io/utils/net"
-
-	// install apis
-	_ "k8s.io/apiserver/pkg/apis/apiserver/install"
 )
 
 // hostnameFunc is a function to set the hostnameFunc of this apiserver.

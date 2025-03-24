@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"

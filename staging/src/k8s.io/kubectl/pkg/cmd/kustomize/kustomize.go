@@ -18,12 +18,12 @@ package kustomize
 
 import (
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/kustomize/kustomize/v5/commands/build"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"sigs.k8s.io/kustomize/kustomize/v5/commands/build"
-	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // NewCmdKustomize returns an adapted kustomize build command.

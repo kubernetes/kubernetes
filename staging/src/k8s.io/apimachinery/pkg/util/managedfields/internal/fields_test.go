@@ -21,9 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestFieldsRoundTrip tests that a fields trie can be round tripped as a path set

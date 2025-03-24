@@ -19,9 +19,8 @@ package validation
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/apis/storagemigration"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/storagemigration"
 )
 
 // TestValidateStorageVersionMigration tests the ValidateStorageVersionMigration function

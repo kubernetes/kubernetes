@@ -19,14 +19,12 @@ package config
 import (
 	"bytes"
 	"os"
-	"testing"
-
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"reflect"
+	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 type setConfigTest struct {

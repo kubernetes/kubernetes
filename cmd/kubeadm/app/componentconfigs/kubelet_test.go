@@ -29,11 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	"k8s.io/utils/ptr"
-
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/utils/ptr"
 )
 
 func testKubeletConfigMap(contents string) *v1.ConfigMap {

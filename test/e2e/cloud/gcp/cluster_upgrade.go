@@ -19,6 +19,8 @@ package gcp
 import (
 	"context"
 
+	"github.com/onsi/ginkgo/v2"
+
 	"k8s.io/kubernetes/test/e2e/cloud/gcp/common"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -31,8 +33,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades/storage"
 	"k8s.io/kubernetes/test/utils/junit"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 // TODO: Those tests should be split by SIG and moved to SIG-owned directories,

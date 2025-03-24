@@ -21,15 +21,15 @@ package storagemigration
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storagemigration"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	svmvalidation "k8s.io/kubernetes/pkg/apis/storagemigration/validation"
 )
 

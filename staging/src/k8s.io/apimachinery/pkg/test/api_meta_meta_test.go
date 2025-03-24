@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"testing"
 
+	"sigs.k8s.io/randfill"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/randfill"
 )
 
 func TestAPIObjectMeta(t *testing.T) {

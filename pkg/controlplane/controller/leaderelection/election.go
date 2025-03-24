@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+
 	v1 "k8s.io/api/coordination/v1"
 	v1beta1 "k8s.io/api/coordination/v1beta1"
 	"k8s.io/utils/clock"

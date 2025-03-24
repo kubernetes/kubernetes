@@ -19,9 +19,10 @@ package cel
 import (
 	"context"
 	"fmt"
-	"github.com/google/cel-go/interpreter"
 	"math"
 	"time"
+
+	"github.com/google/cel-go/interpreter"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"

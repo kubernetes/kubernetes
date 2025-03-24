@@ -21,14 +21,13 @@ import (
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/cli"
-	"k8s.io/kube-aggregator/pkg/cmd/server"
-
 	// force compilation of packages we'll later rely upon
 	_ "k8s.io/kube-aggregator/pkg/apis/apiregistration/install"
 	_ "k8s.io/kube-aggregator/pkg/apis/apiregistration/validation"
 	_ "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	_ "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1beta1"
+	"k8s.io/kube-aggregator/pkg/cmd/server"
 )
 
 func main() {

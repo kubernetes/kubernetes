@@ -21,9 +21,8 @@ import (
 	"reflect"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utiltesting "k8s.io/client-go/util/testing"
 	internal "k8s.io/controller-manager/config"
 )
 

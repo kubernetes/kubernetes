@@ -17,10 +17,10 @@ limitations under the License.
 package openapi_test
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"testing"
 )
 
 func TestOpenapi(t *testing.T) {

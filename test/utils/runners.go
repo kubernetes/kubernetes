@@ -43,10 +43,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"k8s.io/utils/pointer"
-
-	"k8s.io/klog/v2"
 )
 
 const (

@@ -18,7 +18,6 @@ package aggregated
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )

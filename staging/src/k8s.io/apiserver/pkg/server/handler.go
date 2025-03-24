@@ -25,13 +25,13 @@ import (
 	"strings"
 
 	"github.com/emicklei/go-restful/v3"
-	"k8s.io/klog/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/server/mux"
+	"k8s.io/klog/v2"
 )
 
 // APIServerHandlers holds the different http.Handlers used by the API server.

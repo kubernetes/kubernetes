@@ -24,7 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/utils/pointer"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -49,9 +50,7 @@ import (
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	"k8s.io/utils/pointer"
 )
 
 const (

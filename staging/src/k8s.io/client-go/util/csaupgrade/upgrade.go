@@ -23,11 +23,12 @@ import (
 	"fmt"
 	"reflect"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // Finds all managed fields owners of the given operation type which owns all of

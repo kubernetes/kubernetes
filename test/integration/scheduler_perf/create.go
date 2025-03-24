@@ -24,6 +24,8 @@ import (
 	"os"
 	"time"
 
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -33,7 +35,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
-	"sigs.k8s.io/yaml"
 )
 
 // createAny defines an op where some object gets created from a YAML file.

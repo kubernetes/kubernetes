@@ -35,11 +35,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"         // nolint:depguard // this package provides test utilities
 	"github.com/google/go-cmp/cmp/cmpopts" // nolint:depguard // this package provides test utilities
+	"sigs.k8s.io/randfill"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"sigs.k8s.io/randfill"
 )
 
 // Scheme is similar to runtime.Scheme, but for validation testing purposes. Scheme only supports validation,

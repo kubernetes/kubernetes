@@ -25,16 +25,16 @@ import (
 	"path"
 	"sync"
 
-	"google.golang.org/grpc"
-	"k8s.io/klog/v2"
-
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
+	"google.golang.org/grpc"
+
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )

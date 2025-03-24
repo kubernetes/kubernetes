@@ -43,10 +43,9 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
-	netutils "k8s.io/utils/net"
-
 	// add the related feature gates
 	_ "k8s.io/controller-manager/pkg/features/register"
+	netutils "k8s.io/utils/net"
 )
 
 const (

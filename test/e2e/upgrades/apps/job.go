@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/onsi/ginkgo/v2"
+
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,8 +31,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	"k8s.io/kubernetes/test/e2e/upgrades"
-
-	"github.com/onsi/ginkgo/v2"
 )
 
 // JobUpgradeTest is a test harness for batch Jobs.

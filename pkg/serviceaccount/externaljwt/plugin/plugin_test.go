@@ -36,10 +36,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 
-	"k8s.io/kubernetes/pkg/serviceaccount"
-
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
+	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
 var (

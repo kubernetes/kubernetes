@@ -41,8 +41,6 @@ import (
 	"testing"
 	"time"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	"github.com/google/go-cmp/cmp"
 
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
@@ -65,6 +63,7 @@ import (
 	"k8s.io/client-go/rest"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	resttransport "k8s.io/client-go/transport"
+	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"

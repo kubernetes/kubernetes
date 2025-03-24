@@ -18,10 +18,11 @@ package mutation
 
 import (
 	"fmt"
+	"reflect"
+
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
-	"reflect"
 )
 
 var jsonPatchType = types.NewObjectType(JSONPatchTypeName)

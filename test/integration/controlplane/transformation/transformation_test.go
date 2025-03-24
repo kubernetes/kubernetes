@@ -29,7 +29,6 @@ import (
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
-
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"

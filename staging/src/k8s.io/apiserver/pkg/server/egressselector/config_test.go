@@ -23,10 +23,9 @@ import (
 	"strings"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/apis/apiserver"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 func strptr(s string) *string {

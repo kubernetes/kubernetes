@@ -19,10 +19,9 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	"k8s.io/component-base/cli/globalflag"
-
 	// ensure libs have a chance to globally register their flags
 	_ "k8s.io/apiserver/pkg/admission"
+	"k8s.io/component-base/cli/globalflag"
 )
 
 // AddCustomGlobalFlags explicitly registers flags that internal packages register

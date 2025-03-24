@@ -31,11 +31,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/wait"
 	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-
-	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 )
 
 func TestExternalPublicKeyGetter(t *testing.T) {

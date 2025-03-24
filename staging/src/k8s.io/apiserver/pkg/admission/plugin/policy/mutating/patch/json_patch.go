@@ -21,10 +21,10 @@ import (
 	gojson "encoding/json"
 	"errors"
 	"fmt"
-	celgo "github.com/google/cel-go/cel"
 	"reflect"
 	"strconv"
 
+	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/traits"
 	"google.golang.org/protobuf/types/known/structpb"

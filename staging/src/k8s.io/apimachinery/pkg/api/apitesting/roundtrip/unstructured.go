@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp" //nolint:depguard
+
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metafuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"
@@ -36,8 +38,6 @@ import (
 	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 )
 
 // RoundtripToUnstructured verifies the roundtrip faithfulness of all external types in a scheme

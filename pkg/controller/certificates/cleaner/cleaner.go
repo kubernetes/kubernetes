@@ -27,8 +27,6 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	capi "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -37,6 +35,7 @@ import (
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1"
 	csrclient "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1"
+	"k8s.io/klog/v2"
 )
 
 const (

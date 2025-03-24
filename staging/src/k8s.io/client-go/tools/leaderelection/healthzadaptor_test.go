@@ -19,10 +19,9 @@ package leaderelection
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
-
-	"net/http"
 
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	testingclock "k8s.io/utils/clock/testing"

@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/rest"
-
 	cmint "k8s.io/metrics/pkg/apis/custom_metrics"
 	cmv1beta1 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta1"
 	cmv1beta2 "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"

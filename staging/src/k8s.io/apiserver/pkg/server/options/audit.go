@@ -26,7 +26,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"gopkg.in/natefinch/lumberjack.v2"
-	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -42,6 +41,7 @@ import (
 	pluginlog "k8s.io/apiserver/plugin/pkg/audit/log"
 	plugintruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	pluginwebhook "k8s.io/apiserver/plugin/pkg/audit/webhook"
+	"k8s.io/klog/v2"
 )
 
 const (

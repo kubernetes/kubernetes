@@ -23,10 +23,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/kube-openapi/pkg/util/proto/validation"
-
 	// This dependency is needed to register API types.
 	"k8s.io/kube-openapi/pkg/util/proto/testing"
+	"k8s.io/kube-openapi/pkg/util/proto/validation"
 	"k8s.io/kubectl/pkg/util/openapi"
 )
 

@@ -34,9 +34,8 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/klog/v2"
-
 	_ "k8s.io/component-base/logs/json/register"
+	"k8s.io/klog/v2"
 )
 
 var featureGate = featuregate.NewFeatureGate()

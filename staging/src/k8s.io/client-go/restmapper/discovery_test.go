@@ -21,6 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	openapi_v2 "github.com/google/gnostic-models/openapiv2"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -30,9 +33,6 @@ import (
 	"k8s.io/client-go/openapi"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
-
-	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRESTMapper(t *testing.T) {

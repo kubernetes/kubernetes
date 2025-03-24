@@ -25,6 +25,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	flag "github.com/spf13/pflag"
+	"sigs.k8s.io/randfill"
+	"sigs.k8s.io/yaml"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,11 +37,6 @@ import (
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/google/go-cmp/cmp"
-	flag "github.com/spf13/pflag"
-	"sigs.k8s.io/randfill"
-	"sigs.k8s.io/yaml"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")

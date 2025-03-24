@@ -25,9 +25,9 @@ import (
 	"strconv"
 	"strings"
 
-	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
-
 	inf "gopkg.in/inf.v0"
+
+	cbor "k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct"
 )
 
 // Quantity is a fixed-point representation of a number.

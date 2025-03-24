@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/pflag"
 
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 )

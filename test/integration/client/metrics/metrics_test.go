@@ -29,14 +29,13 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
+	// the metrics are loaded on cmd/kube-apiserver/apiserver.go
+	// so we need to load them here to be available for the test
+	_ "k8s.io/component-base/metrics/prometheus/restclient"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-
-	// the metrics are loaded on cmd/kube-apiserver/apiserver.go
-	// so we need to load them here to be available for the test
-	_ "k8s.io/component-base/metrics/prometheus/restclient"
 )
 
 // IMPORTANT: metrics are stored globally so all the test must run serially

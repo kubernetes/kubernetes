@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
-
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 

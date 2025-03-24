@@ -24,10 +24,9 @@ import (
 
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue"
-	netutils "k8s.io/utils/net"
-
 	cp "k8s.io/kubernetes/pkg/controlplane/apiserver/options"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
+	netutils "k8s.io/utils/net"
 )
 
 // completedOptions is a private wrapper that enforces a call of Complete() before Run can be invoked.

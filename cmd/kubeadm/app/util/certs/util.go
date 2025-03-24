@@ -27,7 +27,6 @@ import (
 
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 

@@ -22,13 +22,14 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	internaltesting "k8s.io/apimachinery/pkg/util/managedfields/internal/testing"
-	"sigs.k8s.io/yaml"
 )
 
 func TestLastAppliedUpdater(t *testing.T) {

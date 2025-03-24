@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+
 	clientfeatures "k8s.io/client-go/features"
 	"k8s.io/component-base/featuregate"
 )

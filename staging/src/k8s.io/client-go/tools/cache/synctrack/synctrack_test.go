@@ -19,9 +19,8 @@ package synctrack
 import (
 	"strings"
 	"sync"
-	"time"
-
 	"testing"
+	"time"
 )
 
 func testSingleFileFuncs(upstreamHasSynced func() bool) (start func(), finished func(), hasSynced func() bool) {

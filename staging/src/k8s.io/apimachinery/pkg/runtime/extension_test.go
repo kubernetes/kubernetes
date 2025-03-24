@@ -22,10 +22,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestEmbeddedRawExtensionMarshal(t *testing.T) {

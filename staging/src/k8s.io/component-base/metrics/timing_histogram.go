@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/blang/semver/v4"
+
 	promext "k8s.io/component-base/metrics/prometheusextension"
 )
 

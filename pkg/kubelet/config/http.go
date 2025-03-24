@@ -23,12 +23,11 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 	utilio "k8s.io/utils/io"
 )
 

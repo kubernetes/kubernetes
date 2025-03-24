@@ -25,11 +25,10 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/system"
 	"k8s.io/kubernetes/test/utils"
-
-	"k8s.io/klog/v2"
 )
 
 var buildDependencies = flag.Bool("build-dependencies", true, "If true, build all dependencies.")

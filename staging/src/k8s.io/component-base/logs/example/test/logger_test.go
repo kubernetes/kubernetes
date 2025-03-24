@@ -26,10 +26,6 @@ import (
 
 	"k8s.io/component-base/logs/example"
 	"k8s.io/klog/v2/ktesting"
-	// This import could be used to add command line flags for per-test
-	// output with a default verbosity of 5. This example instead
-	// uses a TestMain where the default verbosity gets lowered.
-	// "k8s.io/klog/v2/ktesting/init"
 )
 
 func TestLogger(t *testing.T) {

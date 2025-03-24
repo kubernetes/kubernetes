@@ -25,11 +25,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
-	utilpointer "k8s.io/utils/pointer"
 	kjson "sigs.k8s.io/json"
-
-	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	apiextensionsfuzzer "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/fuzzer"
@@ -43,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
+	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // TestRoundTrip checks the conversion to go-openapi types.

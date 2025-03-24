@@ -26,9 +26,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
-	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
-
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/cache"
 )
 
 const (

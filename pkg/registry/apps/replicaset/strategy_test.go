@@ -17,7 +17,6 @@ limitations under the License.
 package replicaset
 
 import (
-	"k8s.io/utils/ptr"
 	"reflect"
 	"testing"
 
@@ -30,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 const (

@@ -25,6 +25,7 @@ import (
 	"net"
 	"strings"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app/config"
 	cloudnodecontroller "k8s.io/cloud-provider/controllers/node"
@@ -35,8 +36,6 @@ import (
 	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func startCloudNodeController(ctx context.Context, initContext ControllerInitContext, controlexContext controllermanagerapp.ControllerContext, completedConfig *config.CompletedConfig, cloud cloudprovider.Interface) (controller.Interface, bool, error) {

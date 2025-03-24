@@ -17,9 +17,8 @@ limitations under the License.
 package validation
 
 import (
-	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
-
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
 )
 
 // ValidateConfiguration validates the configuration.

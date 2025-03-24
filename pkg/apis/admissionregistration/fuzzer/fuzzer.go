@@ -20,7 +20,6 @@ import (
 	"sigs.k8s.io/randfill"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 

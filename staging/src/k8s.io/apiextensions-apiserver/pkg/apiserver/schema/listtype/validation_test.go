@@ -19,9 +19,8 @@ package listtype
 import (
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/validation/field"
-
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 func TestValidateListSetsAndMaps(t *testing.T) {

@@ -20,10 +20,10 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
-	"k8s.io/utils/path"
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/utils/path"
 )
 
 // EgressSelectorOptions holds the api server egress selector options.

@@ -47,6 +47,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
@@ -73,8 +74,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
-
-	"google.golang.org/grpc"
 )
 
 const (

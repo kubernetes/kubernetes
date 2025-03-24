@@ -25,6 +25,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiserverapis "k8s.io/apiserver/pkg/apis/apiserver"
 	apiserver "k8s.io/apiserver/pkg/server"
@@ -38,9 +41,6 @@ import (
 	cmoptions "k8s.io/controller-manager/options"
 	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	netutils "k8s.io/utils/net"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestDefaultFlags(t *testing.T) {

@@ -20,16 +20,15 @@ import (
 	"context"
 	"fmt"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	clientgofeaturegate "k8s.io/client-go/features"
 	"k8s.io/client-go/metadata"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
-	"k8s.io/kubernetes/pkg/features"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	clientgofeaturegate "k8s.io/client-go/features"
 	svm "k8s.io/kubernetes/pkg/controller/storageversionmigrator"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func newStorageVersionMigratorControllerDescriptor() *ControllerDescriptor {

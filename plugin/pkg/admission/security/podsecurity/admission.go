@@ -23,12 +23,6 @@ import (
 	"io"
 	"sync"
 
-	// install conversions for types we need to convert
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
-
 	admissionv1 "k8s.io/api/admission/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -47,8 +41,13 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	// install conversions for types we need to convert
+	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	"k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
 	podsecurityadmissionapi "k8s.io/pod-security-admission/api"

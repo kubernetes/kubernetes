@@ -17,10 +17,9 @@ limitations under the License.
 package model
 
 import (
+	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/common"
-
-	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 // SchemaDeclType converts the structural schema to a CEL declaration, or returns nil if the

@@ -28,6 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -56,10 +60,6 @@ import (
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.

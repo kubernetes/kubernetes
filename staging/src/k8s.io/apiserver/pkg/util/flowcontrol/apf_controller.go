@@ -29,6 +29,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
+
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,15 +47,13 @@ import (
 	fcfmt "k8s.io/apiserver/pkg/util/flowcontrol/format"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
+	flowcontrolapplyconfiguration "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
+	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
-
-	flowcontrol "k8s.io/api/flowcontrol/v1"
-	flowcontrolapplyconfiguration "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1"
-	flowcontrollister "k8s.io/client-go/listers/flowcontrol/v1"
 )
 
 const timeFmt = "2006-01-02T15:04:05.999"

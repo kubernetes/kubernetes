@@ -20,9 +20,9 @@ import (
 	"net"
 	"strconv"
 
-	netutils "k8s.io/utils/net"
-
 	"github.com/pkg/errors"
+
+	netutils "k8s.io/utils/net"
 )
 
 // APIEndpointFromString returns an APIEndpoint struct based on a "host:port" raw string.

@@ -21,12 +21,11 @@ package main
 import (
 	"strings"
 
-	"github.com/gogo/protobuf/vanity/command"
-
 	// dependencies that are required for our packages
 	_ "github.com/gogo/protobuf/gogoproto"
 	_ "github.com/gogo/protobuf/proto"
 	_ "github.com/gogo/protobuf/sortkeys"
+	"github.com/gogo/protobuf/vanity/command"
 )
 
 func main() {

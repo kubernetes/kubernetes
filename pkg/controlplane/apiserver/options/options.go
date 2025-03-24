@@ -36,13 +36,12 @@ import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/klog/v2"
-	netutil "k8s.io/utils/net"
-
 	"k8s.io/kubernetes/pkg/apis/authentication/validation"
 	_ "k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin"
+	netutil "k8s.io/utils/net"
 )
 
 // Options define the flags and validation for a generic controlplane. If the

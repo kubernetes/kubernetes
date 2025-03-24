@@ -18,11 +18,10 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-	"os"
-
 	"errors"
+	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -31,8 +30,9 @@ import (
 
 	"github.com/spf13/pflag"
 	"golang.org/x/tools/go/packages"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
+
+	"k8s.io/klog/v2"
 )
 
 const (

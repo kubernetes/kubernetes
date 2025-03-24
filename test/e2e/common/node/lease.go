@@ -22,6 +22,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
+
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,9 +35,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/gomega"
 )
 
 func getPatchBytes(oldLease, newLease *coordinationv1.Lease) ([]byte, error) {

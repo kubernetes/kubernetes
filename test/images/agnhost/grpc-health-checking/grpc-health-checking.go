@@ -22,12 +22,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"time"
 
-	"net/http"
-
 	"github.com/spf13/cobra"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"

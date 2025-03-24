@@ -21,10 +21,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/utils/ptr"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/utils/ptr"
 )
 
 // Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration converts a private InitConfiguration to public InitConfiguration.

@@ -19,10 +19,9 @@ package flexvolume
 import (
 	"testing"
 
-	"k8s.io/mount-utils"
-
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/utils/harness"
+	"k8s.io/mount-utils"
 )
 
 func TestTearDownAt(tt *testing.T) {

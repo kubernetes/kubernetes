@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
-
 	"k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 )
 

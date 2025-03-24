@@ -30,6 +30,8 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -38,8 +40,6 @@ import (
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
-
-	"sigs.k8s.io/yaml"
 )
 
 func getKubeletConfigFilePath() (string, error) {

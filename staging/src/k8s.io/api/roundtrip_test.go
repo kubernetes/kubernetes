@@ -78,7 +78,6 @@ import (
 	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	svmv1alpha1 "k8s.io/api/storagemigration/v1alpha1"
-
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
 	genericfuzzer "k8s.io/apimachinery/pkg/apis/meta/fuzzer"

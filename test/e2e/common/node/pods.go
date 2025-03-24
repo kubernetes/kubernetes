@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/util/retry"
-
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"golang.org/x/net/websocket"
 
 	v1 "k8s.io/api/core/v1"
@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/util/podutils"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -56,9 +57,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/pointer"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 const (

@@ -27,10 +27,10 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"k8s.io/client-go/util/cert"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 )

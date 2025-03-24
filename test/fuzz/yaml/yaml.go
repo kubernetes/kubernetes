@@ -23,9 +23,10 @@ import (
 	"fmt"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sigyaml "sigs.k8s.io/yaml"
 	yaml "sigs.k8s.io/yaml/goyaml.v2"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // FuzzDurationStrict is a fuzz target for strict-unmarshaling Duration defined

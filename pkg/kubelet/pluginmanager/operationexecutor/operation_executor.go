@@ -22,7 +22,6 @@ package operationexecutor
 
 import (
 	"k8s.io/apimachinery/pkg/types"
-
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/util/goroutinemap"
 )

@@ -24,10 +24,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
-
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 )
 
 func TestPrune(t *testing.T) {

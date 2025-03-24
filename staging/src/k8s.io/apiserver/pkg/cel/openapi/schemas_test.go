@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/google/cel-go/common/types"
-
 	"google.golang.org/protobuf/proto"
 
 	apiservercel "k8s.io/apiserver/pkg/cel"

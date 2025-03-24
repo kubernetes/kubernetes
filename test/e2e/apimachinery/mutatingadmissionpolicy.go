@@ -19,9 +19,6 @@ package apimachinery
 import (
 	"context"
 	"fmt"
-	"k8s.io/apiserver/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
-	"k8s.io/utils/ptr"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -37,10 +34,13 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = SIGDescribe("MutatingAdmissionPolicy [Privileged:ClusterAdmin]", feature.MutatingAdmissionPolicy, framework.WithFeatureGate(features.MutatingAdmissionPolicy), func() {

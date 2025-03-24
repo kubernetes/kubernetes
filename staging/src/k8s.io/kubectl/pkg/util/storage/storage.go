@@ -17,9 +17,10 @@ limitations under the License.
 package storage
 
 import (
+	"strings"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"strings"
 )
 
 // TODO(yue9944882): Remove this helper package once it's copied to k/api

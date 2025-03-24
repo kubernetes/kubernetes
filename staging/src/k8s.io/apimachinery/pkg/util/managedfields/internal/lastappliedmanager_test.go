@@ -21,6 +21,10 @@ import (
 	"reflect"
 	"testing"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/merge"
+	"sigs.k8s.io/yaml"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -29,9 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
 	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/v4/merge"
-	"sigs.k8s.io/yaml"
 )
 
 type testArgs struct {

@@ -19,6 +19,8 @@ package poddisruptionbudget
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/policy/validation"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // podDisruptionBudgetStrategy implements verification logic for PodDisruptionBudgets.

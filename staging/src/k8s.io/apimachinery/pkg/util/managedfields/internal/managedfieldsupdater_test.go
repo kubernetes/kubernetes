@@ -22,15 +22,15 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
+	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/managedfields/internal"
-	"sigs.k8s.io/yaml"
+	"k8s.io/apimachinery/pkg/util/managedfields/managedfieldstest"
 )
 
 func TestManagedFieldsUpdateDoesModifyTime(t *testing.T) {

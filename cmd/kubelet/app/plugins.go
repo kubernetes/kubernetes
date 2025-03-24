@@ -19,8 +19,6 @@ package app
 // This file exists to force the desired plugin implementations to be linked.
 import (
 	"k8s.io/component-base/featuregate"
-	"k8s.io/utils/exec"
-
 	// Volume plugins
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -38,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
+	"k8s.io/utils/exec"
 )
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.

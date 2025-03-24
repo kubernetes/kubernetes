@@ -22,9 +22,8 @@ package componentconfigs
 import (
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	"k8s.io/utils/ptr"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	"k8s.io/utils/ptr"
 )
 
 // Mutate allows applying pre-defined modifications to the config before it's marshaled.

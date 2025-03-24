@@ -22,10 +22,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor/internal/modes"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 // TestAppendixA roundtrips the examples of encoded CBOR data items in RFC 8949 Appendix A. For

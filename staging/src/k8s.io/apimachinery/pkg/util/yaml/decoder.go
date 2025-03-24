@@ -27,9 +27,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	jsonutil "k8s.io/apimachinery/pkg/util/json"
-
 	"sigs.k8s.io/yaml"
+
+	jsonutil "k8s.io/apimachinery/pkg/util/json"
 )
 
 // Unmarshal unmarshals the given data

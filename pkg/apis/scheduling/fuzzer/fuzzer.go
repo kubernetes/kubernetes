@@ -17,10 +17,11 @@ limitations under the License.
 package fuzzer
 
 import (
+	"sigs.k8s.io/randfill"
+
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"sigs.k8s.io/randfill"
 )
 
 // Funcs returns the fuzzer functions for the scheduling api group.

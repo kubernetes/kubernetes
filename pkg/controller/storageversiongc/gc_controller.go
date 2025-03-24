@@ -35,10 +35,9 @@ import (
 	coordlisters "k8s.io/client-go/listers/coordination/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/controlplane/apiserver"
-
-	"k8s.io/klog/v2"
 )
 
 // Controller watches kube-apiserver leases and storageversions, and delete stale

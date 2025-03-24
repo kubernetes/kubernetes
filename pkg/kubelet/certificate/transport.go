@@ -26,13 +26,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/connrotation"
+	"k8s.io/klog/v2"
 )
 
 // UpdateTransport instruments a restconfig with a transport that dynamically uses

@@ -29,12 +29,12 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e_node/remote"
-
 	"github.com/google/uuid"
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/yaml"
+	"k8s.io/kubernetes/test/e2e_node/remote"
 )
 
 var _ remote.Runner = (*GCERunner)(nil)

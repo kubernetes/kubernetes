@@ -28,17 +28,9 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/time/rate"
-
-	"k8s.io/klog/v2"
-	"k8s.io/utils/lru"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
-
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
-	"k8s.io/utils/pointer"
+	"golang.org/x/time/rate"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -64,10 +56,15 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	metricsutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	c "k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/lru"
+	"k8s.io/utils/pointer"
 )
 
 type testRESTMapper struct {

@@ -20,14 +20,13 @@ import (
 	"testing"
 	"time"
 
+	flowcontrol "k8s.io/api/flowcontrol/v1"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	testeventclock "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing/eventclock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-
-	flowcontrol "k8s.io/api/flowcontrol/v1"
 )
 
 func TestUpdateBorrowing(t *testing.T) {

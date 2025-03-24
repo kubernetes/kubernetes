@@ -20,17 +20,16 @@ import (
 	"reflect"
 	"testing"
 
-	v2 "k8s.io/api/apidiscovery/v2"
-	v2beta1 "k8s.io/api/apidiscovery/v2beta1"
-	v2scheme "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
-	v2beta1scheme "k8s.io/apiserver/pkg/apis/apidiscovery/v2beta1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/randfill"
+
+	v2 "k8s.io/api/apidiscovery/v2"
+	v2beta1 "k8s.io/api/apidiscovery/v2beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	v2scheme "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
+	v2beta1scheme "k8s.io/apiserver/pkg/apis/apidiscovery/v2beta1"
 )
 
 func TestConversionRoundTrip(t *testing.T) {

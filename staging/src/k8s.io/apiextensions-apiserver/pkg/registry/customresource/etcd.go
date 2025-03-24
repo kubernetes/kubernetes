@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // CustomResourceStorage includes dummy storage for CustomResources, and their Status and Scale subresources.

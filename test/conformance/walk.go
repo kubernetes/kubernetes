@@ -32,7 +32,6 @@ import (
 	"text/template"
 
 	"github.com/onsi/ginkgo/v2/types"
-
 	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 

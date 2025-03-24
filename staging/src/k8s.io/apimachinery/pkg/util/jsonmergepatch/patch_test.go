@@ -22,9 +22,10 @@ import (
 	"testing"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	"sigs.k8s.io/yaml"
+
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/json"
-	"sigs.k8s.io/yaml"
 )
 
 type FilterNullTestCases struct {

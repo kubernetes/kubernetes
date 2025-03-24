@@ -19,10 +19,9 @@ package flexvolume
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type detacherDefaults flexVolumeDetacher

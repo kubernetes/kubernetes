@@ -22,13 +22,13 @@ import (
 	"slices"
 
 	"github.com/spf13/pflag"
-	"k8s.io/klog/v2"
 
 	"k8s.io/code-generator/cmd/client-gen/args"
 	"k8s.io/code-generator/cmd/client-gen/generators"
 	"k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
+	"k8s.io/klog/v2"
 )
 
 func main() {

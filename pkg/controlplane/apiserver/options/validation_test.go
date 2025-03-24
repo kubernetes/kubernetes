@@ -23,14 +23,13 @@ import (
 	"testing"
 
 	kubeapiserveradmission "k8s.io/apiserver/pkg/admission"
+	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	basecompatibility "k8s.io/component-base/compatibility"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/features"
-
-	peerreconcilers "k8s.io/apiserver/pkg/reconcilers"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 

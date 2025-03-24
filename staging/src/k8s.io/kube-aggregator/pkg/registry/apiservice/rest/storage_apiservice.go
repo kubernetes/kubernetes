@@ -22,7 +22,6 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"

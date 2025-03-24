@@ -21,9 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apiserver/pkg/authorization/authorizer"
-
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )

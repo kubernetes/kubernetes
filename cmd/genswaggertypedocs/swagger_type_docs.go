@@ -21,9 +21,9 @@ import (
 	"io"
 	"os"
 
-	kruntime "k8s.io/apimachinery/pkg/runtime"
-
 	flag "github.com/spf13/pflag"
+
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 )
 

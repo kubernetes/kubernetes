@@ -20,11 +20,10 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/api/core/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
+	"k8s.io/klog/v2"
 )
 
 func validateSecretForSigning(ctx context.Context, secret *v1.Secret) (tokenID, tokenSecret string, ok bool) {

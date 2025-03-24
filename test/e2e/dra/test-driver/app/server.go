@@ -32,7 +32,6 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"k8s.io/component-base/metrics"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/component-base/featuregate"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
+	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/term"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"

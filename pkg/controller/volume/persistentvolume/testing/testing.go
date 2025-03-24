@@ -25,7 +25,6 @@ import (
 	"sync"
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
-	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2"
 )
 
 // ErrVersionConflict is the error returned when resource version of requested

@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"

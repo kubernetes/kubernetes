@@ -22,14 +22,12 @@ import (
 	"strings"
 	"testing"
 
-	api "k8s.io/api/core/v1"
-
-	v1 "k8s.io/api/admissionregistration/v1"
-
 	celtypes "github.com/google/cel-go/common/types"
 	"github.com/stretchr/testify/require"
 
 	admissionv1 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/admissionregistration/v1"
+	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"

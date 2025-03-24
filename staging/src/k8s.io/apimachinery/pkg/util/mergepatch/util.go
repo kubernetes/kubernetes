@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"k8s.io/apimachinery/pkg/util/dump"
 	"sigs.k8s.io/yaml"
+
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 // PreconditionFunc asserts that an incompatible change is not present within a patch.

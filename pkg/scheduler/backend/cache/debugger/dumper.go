@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"

@@ -25,8 +25,8 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/common/types/traits"
-
 	exprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
+
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 

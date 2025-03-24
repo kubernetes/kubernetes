@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"golang.org/x/net/http2"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 

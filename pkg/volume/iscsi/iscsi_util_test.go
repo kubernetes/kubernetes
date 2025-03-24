@@ -26,11 +26,10 @@ import (
 	"reflect"
 	"testing"
 
-	testingexec "k8s.io/utils/exec/testing"
-
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	testingexec "k8s.io/utils/exec/testing"
 )
 
 const (

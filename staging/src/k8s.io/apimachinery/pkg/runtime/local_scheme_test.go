@@ -17,11 +17,11 @@ limitations under the License.
 package runtime
 
 import (
+	"reflect"
 	"testing"
 
-	"reflect"
-
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 

@@ -26,11 +26,10 @@ import (
 	"sync"
 	"time"
 
-	baseclocktest "k8s.io/utils/clock/testing"
-
 	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 	"k8s.io/klog/v2"
+	baseclocktest "k8s.io/utils/clock/testing"
 )
 
 // waitGroupCounter is a wait group used for a GoRoutineCounter.  This private
