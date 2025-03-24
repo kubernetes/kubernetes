@@ -165,7 +165,8 @@
             "value": 2,
             "periodSeconds": 3
           }
-        ]
+        ],
+        "tolerance": "0"
       },
       "scaleDown": {
         "stabilizationWindowSeconds": 3,
@@ -176,7 +177,8 @@
             "value": 2,
             "periodSeconds": 3
           }
-        ]
+        ],
+        "tolerance": "0"
       }
     }
   },

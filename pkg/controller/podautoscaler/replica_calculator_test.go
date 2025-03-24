@@ -90,9 +90,10 @@ type replicaCalcTestCase struct {
 
 	timestamp time.Time
 
-	resource  *resourceInfo
-	metric    *metricInfo
-	container string
+	tolerances *Tolerances
+	resource   *resourceInfo
+	metric     *metricInfo
+	container  string
 
 	podReadiness         []v1.ConditionStatus
 	podStartTime         []metav1.Time
@@ -343,7 +344,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(testClient, controller.NoResyncPeriodFunc())
 	informer := informerFactory.Core().V1().Pods()
 
-	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingTolerance, defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
+	replicaCalc := NewReplicaCalculator(metricsClient, informer.Lister(), defaultTestingCPUInitializationPeriod, defaultTestingDelayOfInitialReadinessStatus)
 
 	stop := make(chan struct{})
 	defer close(stop)
@@ -357,8 +358,14 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 	})
 	require.NoError(t, err, "something went horribly wrong...")
 
+	// Use default if tolerances are not specified in the test case.
+	tolerances := Tolerances{defaultTestingTolerance, defaultTestingTolerance}
+	if tc.tolerances != nil {
+		tolerances = *tc.tolerances
+	}
+
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, testNamespace, selector, tc.container)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -381,12 +388,12 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, testNamespace, tc.metric.singleObject, selector, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.singleObject, selector, nil)
 	case objectPerPodMetric:
 		if tc.metric.singleObject == nil {
 			t.Fatal("Metric specified as objectMetric but metric.singleObject is nil.")
 		}
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, testNamespace, tc.metric.singleObject, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetObjectPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.singleObject, nil)
 	case externalMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalMetric but metric.selector is nil.")
@@ -394,7 +401,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		if tc.metric.targetUsage <= 0 {
 			t.Fatalf("Metric specified as externalMetric but metric.targetUsage is %d which is <=0.", tc.metric.targetUsage)
 		}
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, testNamespace, tc.metric.selector, selector)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector, selector)
 	case externalPerPodMetric:
 		if tc.metric.selector == nil {
 			t.Fatal("Metric specified as externalPerPodMetric but metric.selector is nil.")
@@ -403,9 +410,9 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 			t.Fatalf("Metric specified as externalPerPodMetric but metric.perPodTargetUsage is %d which is <=0.", tc.metric.perPodTargetUsage)
 		}
 
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, testNamespace, tc.metric.selector)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector)
 	case podMetric:
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, testNamespace, selector, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, selector, nil)
 	default:
 		t.Fatalf("Unknown metric type: %d", tc.metric.metricType)
 	}
@@ -1255,6 +1262,188 @@ func TestReplicaCalcTolerancePerPodCMExternal(t *testing.T) {
 			name:              "qps",
 			levels:            []int64{8600},
 			perPodTargetUsage: 2900,
+			expectedUsage:     2867,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:        externalPerPodMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcConfigurableTolerance(t *testing.T) {
+	testCases := []struct {
+		name string
+		replicaCalcTestCase
+	}{
+		{
+			name: "Outside of a 0% tolerance",
+			replicaCalcTestCase: replicaCalcTestCase{
+				tolerances:       &Tolerances{0., 0.},
+				currentReplicas:  3,
+				expectedReplicas: 4,
+				resource: &resourceInfo{
+					name:                v1.ResourceCPU,
+					requests:            []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+					levels:              makePodMetricLevels(909, 1010, 1111),
+					targetUtilization:   100,
+					expectedUtilization: 101,
+					expectedValue:       numContainersPerPod * 1010,
+				},
+			},
+		},
+		{
+			name: "Within a 200% scale-up tolerance",
+			replicaCalcTestCase: replicaCalcTestCase{
+				tolerances:       &Tolerances{defaultTestingTolerance, 2.},
+				currentReplicas:  3,
+				expectedReplicas: 3,
+				resource: &resourceInfo{
+					name:                v1.ResourceCPU,
+					requests:            []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+					levels:              makePodMetricLevels(1890, 1910, 1900),
+					targetUtilization:   100,
+					expectedUtilization: 190,
+					expectedValue:       numContainersPerPod * 1900,
+				},
+			},
+		},
+		{
+			name: "Outside 8% scale-up tolerance (and superfuous scale-down tolerance)",
+			replicaCalcTestCase: replicaCalcTestCase{
+				tolerances:       &Tolerances{2., .08},
+				currentReplicas:  3,
+				expectedReplicas: 4,
+				resource: &resourceInfo{
+					name:                v1.ResourceCPU,
+					requests:            []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+					levels:              makePodMetricLevels(1100, 1080, 1090),
+					targetUtilization:   100,
+					expectedUtilization: 109,
+					expectedValue:       numContainersPerPod * 1090,
+				},
+			},
+		},
+		{
+			name: "Within a 36% scale-down tolerance",
+			replicaCalcTestCase: replicaCalcTestCase{
+				tolerances:       &Tolerances{.36, defaultTestingTolerance},
+				currentReplicas:  3,
+				expectedReplicas: 3,
+				resource: &resourceInfo{
+					name:                v1.ResourceCPU,
+					requests:            []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+					levels:              makePodMetricLevels(660, 640, 650),
+					targetUtilization:   100,
+					expectedUtilization: 65,
+					expectedValue:       numContainersPerPod * 650,
+				},
+			},
+		},
+		{
+			name: "Outside a 34% scale-down tolerance",
+			replicaCalcTestCase: replicaCalcTestCase{
+				tolerances:       &Tolerances{.34, defaultTestingTolerance},
+				currentReplicas:  3,
+				expectedReplicas: 2,
+				resource: &resourceInfo{
+					name:                v1.ResourceCPU,
+					requests:            []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+					levels:              makePodMetricLevels(660, 640, 650),
+					targetUtilization:   100,
+					expectedUtilization: 65,
+					expectedValue:       numContainersPerPod * 650,
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.runTest)
+	}
+}
+
+func TestReplicaCalcConfigurableToleranceCM(t *testing.T) {
+	tc := replicaCalcTestCase{
+		tolerances:       &Tolerances{defaultTestingTolerance, .01},
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{20000, 21000, 21000},
+			targetUsage:   20000,
+			expectedUsage: 20666,
+			metricType:    podMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcConfigurableToleranceCMObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		tolerances:       &Tolerances{defaultTestingTolerance, .01},
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{20666},
+			targetUsage:   20000,
+			expectedUsage: 20666,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcConfigurableTolerancePerPodCMObject(t *testing.T) {
+	tc := replicaCalcTestCase{
+		tolerances:       &Tolerances{defaultTestingTolerance, .01},
+		currentReplicas:  4,
+		expectedReplicas: 5,
+		metric: &metricInfo{
+			metricType:        objectPerPodMetric,
+			name:              "qps",
+			levels:            []int64{20208},
+			perPodTargetUsage: 5000,
+			expectedUsage:     5052,
+			singleObject: &autoscalingv2.CrossVersionObjectReference{
+				Kind:       "Deployment",
+				APIVersion: "apps/v1",
+				Name:       "some-deployment",
+			},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcConfigurableToleranceCMExternal(t *testing.T) {
+	tc := replicaCalcTestCase{
+		tolerances:       &Tolerances{defaultTestingTolerance, .01},
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		metric: &metricInfo{
+			name:          "qps",
+			levels:        []int64{8900},
+			targetUsage:   8800,
+			expectedUsage: 8900,
+			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+			metricType:    externalMetric,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcConfigurableTolerancePerPodCMExternal(t *testing.T) {
+	tc := replicaCalcTestCase{
+		tolerances:       &Tolerances{defaultTestingTolerance, .01},
+		currentReplicas:  3,
+		expectedReplicas: 4,
+		metric: &metricInfo{
+			name:              "qps",
+			levels:            []int64{8600},
+			perPodTargetUsage: 2800,
 			expectedUsage:     2867,
 			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
 			metricType:        externalPerPodMetric,

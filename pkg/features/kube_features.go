@@ -293,6 +293,12 @@ const (
 	// Make the kubelet use shutdown configuration based on pod priority values for graceful shutdown.
 	GracefulNodeShutdownBasedOnPodPriority featuregate.Feature = "GracefulNodeShutdownBasedOnPodPriority"
 
+	// owner: @jm-franc
+	// kep: https://kep.k8s.io/4951
+	//
+	// Enables support of configurable HPA scale-up and scale-down tolerances.
+	HPAConfigurableTolerance featuregate.Feature = "HPAConfigurableTolerance"
+
 	// owner: @dxist
 	//
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
@@ -1345,6 +1351,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
+	},
+
+	HPAConfigurableTolerance: {
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	HPAScaleToZero: {
