@@ -62,7 +62,7 @@ func TestGetDeploymentPatch(t *testing.T) {
 		t.Errorf("expected strategic merge patch, got %v", patchType)
 	}
 	expectedPatch := `[` +
-		`{"op":"replace","path":"/spec/template","value":{"metadata":{"creationTimestamp":null},"spec":{"containers":[{"name":"","image":"foo","resources":{}}]}}},` +
+		`{"op":"replace","path":"/spec/template","value":{"metadata":{},"spec":{"containers":[{"name":"","image":"foo","resources":{}}]}}},` +
 		`{"op":"replace","path":"/metadata/annotations","value":{"a":"true"}}` +
 		`]`
 	if string(patchBytes) != expectedPatch {

@@ -93,7 +93,6 @@ kind: Pod
 metadata:
   annotations:
     kubeadm.kubernetes.io/etcd.advertise-client-urls: https://:2379
-  creationTimestamp: null
   labels:
     component: etcd
     tier: control-plane
