@@ -26,8 +26,10 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -420,4 +422,98 @@ func convertResourceConfigToLinuxContainerResources(rc *cm.ResourceConfig) *runt
 	}
 
 	return lcr
+}
+
+var signalNameToRuntimeEnum = map[string]runtimeapi.Signal{
+	"SIGABRT":     runtimeapi.Signal_SIGABRT,
+	"SIGALRM":     runtimeapi.Signal_SIGALRM,
+	"SIGBUS":      runtimeapi.Signal_SIGBUS,
+	"SIGCHLD":     runtimeapi.Signal_SIGCHLD,
+	"SIGCLD":      runtimeapi.Signal_SIGCLD,
+	"SIGCONT":     runtimeapi.Signal_SIGCONT,
+	"SIGFPE":      runtimeapi.Signal_SIGFPE,
+	"SIGHUP":      runtimeapi.Signal_SIGHUP,
+	"SIGILL":      runtimeapi.Signal_SIGILL,
+	"SIGINT":      runtimeapi.Signal_SIGINT,
+	"SIGIO":       runtimeapi.Signal_SIGIO,
+	"SIGIOT":      runtimeapi.Signal_SIGIOT,
+	"SIGKILL":     runtimeapi.Signal_SIGKILL,
+	"SIGPIPE":     runtimeapi.Signal_SIGPIPE,
+	"SIGPOLL":     runtimeapi.Signal_SIGPOLL,
+	"SIGPROF":     runtimeapi.Signal_SIGPROF,
+	"SIGPWR":      runtimeapi.Signal_SIGPWR,
+	"SIGQUIT":     runtimeapi.Signal_SIGQUIT,
+	"SIGSEGV":     runtimeapi.Signal_SIGSEGV,
+	"SIGSTKFLT":   runtimeapi.Signal_SIGSTKFLT,
+	"SIGSTOP":     runtimeapi.Signal_SIGSTOP,
+	"SIGSYS":      runtimeapi.Signal_SIGSYS,
+	"SIGTERM":     runtimeapi.Signal_SIGTERM,
+	"SIGTRAP":     runtimeapi.Signal_SIGTRAP,
+	"SIGTSTP":     runtimeapi.Signal_SIGTSTP,
+	"SIGTTIN":     runtimeapi.Signal_SIGTTIN,
+	"SIGTTOU":     runtimeapi.Signal_SIGTTOU,
+	"SIGURG":      runtimeapi.Signal_SIGURG,
+	"SIGUSR1":     runtimeapi.Signal_SIGUSR1,
+	"SIGUSR2":     runtimeapi.Signal_SIGUSR2,
+	"SIGVTALRM":   runtimeapi.Signal_SIGVTALRM,
+	"SIGWINCH":    runtimeapi.Signal_SIGWINCH,
+	"SIGXCPU":     runtimeapi.Signal_SIGXCPU,
+	"SIGXFSZ":     runtimeapi.Signal_SIGXFSZ,
+	"SIGRTMIN":    runtimeapi.Signal_SIGRTMIN,
+	"SIGRTMIN+1":  runtimeapi.Signal_SIGRTMINPLUS1,
+	"SIGRTMIN+2":  runtimeapi.Signal_SIGRTMINPLUS2,
+	"SIGRTMIN+3":  runtimeapi.Signal_SIGRTMINPLUS3,
+	"SIGRTMIN+4":  runtimeapi.Signal_SIGRTMINPLUS4,
+	"SIGRTMIN+5":  runtimeapi.Signal_SIGRTMINPLUS5,
+	"SIGRTMIN+6":  runtimeapi.Signal_SIGRTMINPLUS6,
+	"SIGRTMIN+7":  runtimeapi.Signal_SIGRTMINPLUS7,
+	"SIGRTMIN+8":  runtimeapi.Signal_SIGRTMINPLUS8,
+	"SIGRTMIN+9":  runtimeapi.Signal_SIGRTMINPLUS9,
+	"SIGRTMIN+10": runtimeapi.Signal_SIGRTMINPLUS10,
+	"SIGRTMIN+11": runtimeapi.Signal_SIGRTMINPLUS11,
+	"SIGRTMIN+12": runtimeapi.Signal_SIGRTMINPLUS12,
+	"SIGRTMIN+13": runtimeapi.Signal_SIGRTMINPLUS13,
+	"SIGRTMIN+14": runtimeapi.Signal_SIGRTMINPLUS14,
+	"SIGRTMIN+15": runtimeapi.Signal_SIGRTMINPLUS15,
+	"SIGRTMAX-14": runtimeapi.Signal_SIGRTMAXMINUS14,
+	"SIGRTMAX-13": runtimeapi.Signal_SIGRTMAXMINUS13,
+	"SIGRTMAX-12": runtimeapi.Signal_SIGRTMAXMINUS12,
+	"SIGRTMAX-11": runtimeapi.Signal_SIGRTMAXMINUS11,
+	"SIGRTMAX-10": runtimeapi.Signal_SIGRTMAXMINUS10,
+	"SIGRTMAX-9":  runtimeapi.Signal_SIGRTMAXMINUS9,
+	"SIGRTMAX-8":  runtimeapi.Signal_SIGRTMAXMINUS8,
+	"SIGRTMAX-7":  runtimeapi.Signal_SIGRTMAXMINUS7,
+	"SIGRTMAX-6":  runtimeapi.Signal_SIGRTMAXMINUS6,
+	"SIGRTMAX-5":  runtimeapi.Signal_SIGRTMAXMINUS5,
+	"SIGRTMAX-4":  runtimeapi.Signal_SIGRTMAXMINUS4,
+	"SIGRTMAX-3":  runtimeapi.Signal_SIGRTMAXMINUS3,
+	"SIGRTMAX-2":  runtimeapi.Signal_SIGRTMAXMINUS2,
+	"SIGRTMAX-1":  runtimeapi.Signal_SIGRTMAXMINUS1,
+	"SIGRTMAX":    runtimeapi.Signal_SIGRTMAX,
+}
+
+func getContainerConfigStopSignal(container *v1.Container) (stopsignal *runtimeapi.Signal) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
+		if container.Lifecycle != nil && container.Lifecycle.StopSignal != nil {
+			var signalValue runtimeapi.Signal
+			signalStr := string(*container.Lifecycle.StopSignal)
+			signalValue = signalNameToRuntimeEnum[signalStr]
+			return &signalValue
+		} else {
+			return nil
+		}
+	}
+
+	return nil
+}
+
+func runtimeSignalToString(signal runtimeapi.Signal) *v1.Signal {
+	var convertedSignal v1.Signal
+	for key, value := range signalNameToRuntimeEnum {
+		if value == signal {
+			convertedSignal = v1.Signal(key)
+		}
+	}
+
+	return &convertedSignal
 }

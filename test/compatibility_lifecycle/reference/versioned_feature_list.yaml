@@ -241,6 +241,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: ContainerStopSignals
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: ContextualLogging
   versionedSpecs:
   - default: false

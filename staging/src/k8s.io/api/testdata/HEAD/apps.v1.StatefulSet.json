@@ -748,7 +748,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1044,7 +1045,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",
@@ -1340,7 +1342,8 @@
                 "sleep": {
                   "seconds": 1
                 }
-              }
+              },
+              "stopSignal": "stopSignalValue"
             },
             "terminationMessagePath": "terminationMessagePathValue",
             "terminationMessagePolicy": "terminationMessagePolicyValue",

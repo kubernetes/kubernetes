@@ -285,6 +285,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -501,6 +502,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:
@@ -719,6 +721,7 @@ spec:
             tcpSocket:
               host: hostValue
               port: portValue
+          stopSignal: stopSignalValue
         livenessProbe:
           exec:
             command:

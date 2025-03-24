@@ -1188,6 +1188,78 @@ message ContainerConfig {
 
     // CDI devices for the container.
     repeated CDIDevice CDI_devices = 17;
+
+    // The custom stop signal for the container
+    Signal stop_signal = 18;
+}
+
+enum Signal {
+    RUNTIME_DEFAULT   = 0;
+    SIGABRT           = 1;
+    SIGALRM           = 2;
+    SIGBUS            = 3;
+    SIGCHLD           = 4;
+    SIGCLD            = 5;
+    SIGCONT           = 6;
+    SIGFPE            = 7;
+    SIGHUP            = 8;
+    SIGILL            = 9;
+    SIGINT            = 10;
+    SIGIO             = 11;
+    SIGIOT            = 12;
+    SIGKILL           = 13;
+    SIGPIPE           = 14;
+    SIGPOLL           = 15;
+    SIGPROF           = 16;
+    SIGPWR            = 17;
+    SIGQUIT           = 18;
+    SIGSEGV           = 19;
+    SIGSTKFLT         = 20;
+    SIGSTOP           = 21;
+    SIGSYS            = 22;
+    SIGTERM           = 23;
+    SIGTRAP           = 24;
+    SIGTSTP           = 25;
+    SIGTTIN           = 26;
+    SIGTTOU           = 27;
+    SIGURG            = 28;
+    SIGUSR1           = 29;
+    SIGUSR2           = 30;
+    SIGVTALRM         = 31;
+    SIGWINCH          = 32;
+    SIGXCPU           = 33;
+    SIGXFSZ           = 34;
+    SIGRTMIN          = 35;
+    SIGRTMINPLUS1     = 36;
+    SIGRTMINPLUS2     = 37;
+    SIGRTMINPLUS3     = 38;
+    SIGRTMINPLUS4     = 39;
+    SIGRTMINPLUS5     = 40;
+    SIGRTMINPLUS6     = 41;
+    SIGRTMINPLUS7     = 42;
+    SIGRTMINPLUS8     = 43;
+    SIGRTMINPLUS9     = 44;
+    SIGRTMINPLUS10    = 45;
+    SIGRTMINPLUS11    = 46;
+    SIGRTMINPLUS12    = 47;
+    SIGRTMINPLUS13    = 48;
+    SIGRTMINPLUS14    = 49;
+    SIGRTMINPLUS15    = 50;
+    SIGRTMAXMINUS14   = 51;
+    SIGRTMAXMINUS13   = 52;
+    SIGRTMAXMINUS12   = 53;
+    SIGRTMAXMINUS11   = 54;
+    SIGRTMAXMINUS10   = 55;
+    SIGRTMAXMINUS9    = 56;
+    SIGRTMAXMINUS8    = 57;
+    SIGRTMAXMINUS7    = 58;
+    SIGRTMAXMINUS6    = 59;
+    SIGRTMAXMINUS5    = 60;
+    SIGRTMAXMINUS4    = 61;
+    SIGRTMAXMINUS3    = 62;
+    SIGRTMAXMINUS2    = 63;
+    SIGRTMAXMINUS1    = 64;
+    SIGRTMAX          = 65;
 }
 
 message CreateContainerRequest {
@@ -1361,6 +1433,9 @@ message ContainerStatus {
     string image_id = 17;
     // User identities initially attached to the container
     ContainerUser user = 18;
+
+    // Returns the stop signal used by the container runtime to terminate the container 
+    Signal stop_signal = 19;
 }
 
 message ContainerStatusResponse {
