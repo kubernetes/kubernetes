@@ -2980,6 +2980,78 @@ type LifecycleHandler struct {
 	Sleep *SleepAction `json:"sleep,omitempty" protobuf:"bytes,4,opt,name=sleep"`
 }
 
+// Signal defines the stop signal of containers
+// +enum
+type Signal string
+
+const (
+	SIGABRT         Signal = "SIGABRT"
+	SIGALRM         Signal = "SIGALRM"
+	SIGBUS          Signal = "SIGBUS"
+	SIGCHLD         Signal = "SIGCHLD"
+	SIGCLD          Signal = "SIGCLD"
+	SIGCONT         Signal = "SIGCONT"
+	SIGFPE          Signal = "SIGFPE"
+	SIGHUP          Signal = "SIGHUP"
+	SIGILL          Signal = "SIGILL"
+	SIGINT          Signal = "SIGINT"
+	SIGIO           Signal = "SIGIO"
+	SIGIOT          Signal = "SIGIOT"
+	SIGKILL         Signal = "SIGKILL"
+	SIGPIPE         Signal = "SIGPIPE"
+	SIGPOLL         Signal = "SIGPOLL"
+	SIGPROF         Signal = "SIGPROF"
+	SIGPWR          Signal = "SIGPWR"
+	SIGQUIT         Signal = "SIGQUIT"
+	SIGSEGV         Signal = "SIGSEGV"
+	SIGSTKFLT       Signal = "SIGSTKFLT"
+	SIGSTOP         Signal = "SIGSTOP"
+	SIGSYS          Signal = "SIGSYS"
+	SIGTERM         Signal = "SIGTERM"
+	SIGTRAP         Signal = "SIGTRAP"
+	SIGTSTP         Signal = "SIGTSTP"
+	SIGTTIN         Signal = "SIGTTIN"
+	SIGTTOU         Signal = "SIGTTOU"
+	SIGURG          Signal = "SIGURG"
+	SIGUSR1         Signal = "SIGUSR1"
+	SIGUSR2         Signal = "SIGUSR2"
+	SIGVTALRM       Signal = "SIGVTALRM"
+	SIGWINCH        Signal = "SIGWINCH"
+	SIGXCPU         Signal = "SIGXCPU"
+	SIGXFSZ         Signal = "SIGXFSZ"
+	SIGRTMIN        Signal = "SIGRTMIN"
+	SIGRTMINPLUS1   Signal = "SIGRTMIN+1"
+	SIGRTMINPLUS2   Signal = "SIGRTMIN+2"
+	SIGRTMINPLUS3   Signal = "SIGRTMIN+3"
+	SIGRTMINPLUS4   Signal = "SIGRTMIN+4"
+	SIGRTMINPLUS5   Signal = "SIGRTMIN+5"
+	SIGRTMINPLUS6   Signal = "SIGRTMIN+6"
+	SIGRTMINPLUS7   Signal = "SIGRTMIN+7"
+	SIGRTMINPLUS8   Signal = "SIGRTMIN+8"
+	SIGRTMINPLUS9   Signal = "SIGRTMIN+9"
+	SIGRTMINPLUS10  Signal = "SIGRTMIN+10"
+	SIGRTMINPLUS11  Signal = "SIGRTMIN+11"
+	SIGRTMINPLUS12  Signal = "SIGRTMIN+12"
+	SIGRTMINPLUS13  Signal = "SIGRTMIN+13"
+	SIGRTMINPLUS14  Signal = "SIGRTMIN+14"
+	SIGRTMINPLUS15  Signal = "SIGRTMIN+15"
+	SIGRTMAXMINUS14 Signal = "SIGRTMAX-14"
+	SIGRTMAXMINUS13 Signal = "SIGRTMAX-13"
+	SIGRTMAXMINUS12 Signal = "SIGRTMAX-12"
+	SIGRTMAXMINUS11 Signal = "SIGRTMAX-11"
+	SIGRTMAXMINUS10 Signal = "SIGRTMAX-10"
+	SIGRTMAXMINUS9  Signal = "SIGRTMAX-9"
+	SIGRTMAXMINUS8  Signal = "SIGRTMAX-8"
+	SIGRTMAXMINUS7  Signal = "SIGRTMAX-7"
+	SIGRTMAXMINUS6  Signal = "SIGRTMAX-6"
+	SIGRTMAXMINUS5  Signal = "SIGRTMAX-5"
+	SIGRTMAXMINUS4  Signal = "SIGRTMAX-4"
+	SIGRTMAXMINUS3  Signal = "SIGRTMAX-3"
+	SIGRTMAXMINUS2  Signal = "SIGRTMAX-2"
+	SIGRTMAXMINUS1  Signal = "SIGRTMAX-1"
+	SIGRTMAX        Signal = "SIGRTMAX"
+)
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -3001,6 +3073,11 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler `json:"preStop,omitempty" protobuf:"bytes,2,opt,name=preStop"`
+	// StopSignal defines which signal will be sent to a container when it is being stopped.
+	// If not specified, the default is defined by the container runtime in use.
+	// StopSignal can only be set for Pods with a non-empty .spec.os.name
+	// +optional
+	StopSignal *Signal `json:"stopSignal,omitempty" protobuf:"bytes,3,opt,name=stopSignal"`
 }
 
 type ConditionStatus string
@@ -3154,6 +3231,10 @@ type ContainerStatus struct {
 	// +listType=map
 	// +listMapKey=name
 	AllocatedResourcesStatus []ResourceStatus `json:"allocatedResourcesStatus,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,14,rep,name=allocatedResourcesStatus"`
+	// StopSignal reports the effective stop signal for this container
+	// +featureGate=ContainerStopSignals
+	// +optional
+	StopSignal *Signal `json:"stopSignal,omitempty" protobuf:"bytes,15,opt,name=stopSignal"`
 }
 
 // ResourceStatus represents the status of a single resource allocated to a Pod.
