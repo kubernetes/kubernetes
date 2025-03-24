@@ -155,6 +155,11 @@ func TestWatchListMatchSingle(t *testing.T) {
 	storagetesting.RunWatchListMatchSingle(ctx, t, store)
 }
 
+func TestWatchErrorEventIsBlockingFurtherEvent(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchErrorIsBlockingFurtherEvents(ctx, t, &storeWithPrefixTransformer{store})
+}
+
 // =======================================================================
 // Implementation-specific tests are following.
 // The following tests are exercising the details of the implementation
