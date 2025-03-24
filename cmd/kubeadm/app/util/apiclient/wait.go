@@ -246,7 +246,7 @@ func getControlPlaneComponents(podMap map[string]*v1.Pod, addressAPIServer strin
 
 // WaitForControlPlaneComponents waits for all control plane components to report "ok".
 func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiSeverAddress string) error {
-	fmt.Printf("[control-plane-check] Waiting for healthy control plane components."+
+	_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Waiting for healthy control plane components."+
 		" This can take up to %v\n", w.timeout)
 
 	components, err := getControlPlaneComponents(podMap, apiSeverAddress)
@@ -259,7 +259,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 
 	for _, comp := range components {
 		url := fmt.Sprintf("https://%s/%s", comp.addressPort, comp.endpoint)
-		fmt.Printf("[control-plane-check] Checking %s at %s\n", comp.name, url)
+		_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Checking %s at %s\n", comp.name, url)
 
 		go func(comp controlPlaneComponent) {
 			tr := &http.Transport{
@@ -305,11 +305,11 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 					return true, nil
 				})
 			if err != nil {
-				fmt.Printf("[control-plane-check] %s is not healthy after %v\n", comp.name, time.Since(start))
+				_, _ = fmt.Fprintf(w.writer, "[control-plane-check] %s is not healthy after %v\n", comp.name, time.Since(start))
 				errChan <- lastError
 				return
 			}
-			fmt.Printf("[control-plane-check] %s is healthy after %v\n", comp.name, time.Since(start))
+			_, _ = fmt.Fprintf(w.writer, "[control-plane-check] %s is healthy after %v\n", comp.name, time.Since(start))
 			errChan <- nil
 		}(comp)
 	}
@@ -324,7 +324,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
 func (w *KubeWaiter) WaitForAPI() error {
-	fmt.Printf("[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
+	_, _ = fmt.Fprintf(w.writer, "[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
 
 	start := time.Now()
 	err := wait.PollUntilContextTimeout(
@@ -340,11 +340,11 @@ func (w *KubeWaiter) WaitForAPI() error {
 			return true, nil
 		})
 	if err != nil {
-		fmt.Printf("[api-check] The API server is not healthy after %v\n", time.Since(start))
+		_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is not healthy after %v\n", time.Since(start))
 		return err
 	}
 
-	fmt.Printf("[api-check] The API server is healthy after %v\n", time.Since(start))
+	_, _ = fmt.Fprintf(w.writer, "[api-check] The API server is healthy after %v\n", time.Since(start))
 	return nil
 }
 
@@ -359,12 +359,12 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
 			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
 			if err != nil {
-				fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
+				_, _ = fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 				return false, nil
 			}
 
 			if lastKnownPodNumber != len(pods.Items) {
-				fmt.Fprintf(w.writer, "[apiclient] Found %d Pods for label selector %s\n", len(pods.Items), kvLabel)
+				_, _ = fmt.Fprintf(w.writer, "[apiclient] Found %d Pods for label selector %s\n", len(pods.Items), kvLabel)
 				lastKnownPodNumber = len(pods.Items)
 			}
 
@@ -391,10 +391,10 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 	)
 
 	if healthzPort == 0 {
-		fmt.Println("[kubelet-check] Skipping the kubelet health check because the healthz port is set to 0")
+		_, _ = fmt.Fprintln(w.writer, "[kubelet-check] Skipping the kubelet health check because the healthz port is set to 0")
 		return nil
 	}
-	fmt.Printf("[kubelet-check] Waiting for a healthy kubelet at %s. This can take up to %v\n",
+	_, _ = fmt.Fprintf(w.writer, "[kubelet-check] Waiting for a healthy kubelet at %s. This can take up to %v\n",
 		healthzEndpoint, w.timeout)
 
 	formatError := func(cause string) error {
@@ -429,11 +429,11 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 			return true, nil
 		})
 	if err != nil {
-		fmt.Printf("[kubelet-check] The kubelet is not healthy after %v\n", time.Since(start))
+		_, _ = fmt.Fprintf(w.writer, "[kubelet-check] The kubelet is not healthy after %v\n", time.Since(start))
 		return lastError
 	}
 
-	fmt.Printf("[kubelet-check] The kubelet is healthy after %v\n", time.Since(start))
+	_, _ = fmt.Fprintf(w.writer, "[kubelet-check] The kubelet is healthy after %v\n", time.Since(start))
 	return nil
 }
 
@@ -540,10 +540,10 @@ func PrintControlPlaneErrorHelpScreen(outputWriter io.Writer, criSocket string) 
 		Socket: criSocket,
 	}
 	_ = controlPlaneFailTempl.Execute(outputWriter, context)
-	fmt.Println("")
+	_, _ = fmt.Fprintln(outputWriter, "")
 }
 
 // PrintKubeletErrorHelpScreen prints help text on kubelet errors.
 func PrintKubeletErrorHelpScreen(outputWriter io.Writer) {
-	fmt.Fprintln(outputWriter, kubeletFailMsg)
+	_, _ = fmt.Fprintln(outputWriter, kubeletFailMsg)
 }
