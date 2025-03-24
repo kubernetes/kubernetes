@@ -376,17 +376,20 @@ func fieldInfoFromField(structType reflect.Type, field int) *fieldInfo {
 	typeField := structType.Field(field)
 	jsonTag := typeField.Tag.Get("json")
 	if len(jsonTag) == 0 {
-		// Make the first character lowercase.
-		if typeField.Name == "" {
+		if info.name == "" && !typeField.Anonymous {
+			// match stdlib behavior for naming fields that don't specify a json tag name
 			info.name = typeField.Name
-		} else {
-			info.name = strings.ToLower(typeField.Name[:1]) + typeField.Name[1:]
 		}
 	} else {
 		items := strings.Split(jsonTag, ",")
 		info.name = items[0]
+		if info.name == "" && !typeField.Anonymous {
+			// match stdlib behavior for naming fields that don't specify a json tag name
+			info.name = typeField.Name
+		}
+
 		for i := range items {
-			if items[i] == "omitempty" {
+			if i > 0 && items[i] == "omitempty" {
 				info.omitempty = true
 				break
 			}
