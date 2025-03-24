@@ -289,7 +289,8 @@ func TestReadRotatedLog(t *testing.T) {
 	err = file.Close()
 	assert.NoErrorf(t, err, "could not close file.")
 
-	time.Sleep(20 * time.Millisecond)
+	// waitLog.wait may wait 1 second
+	time.Sleep(1500 * time.Millisecond)
 	// Make the function ReadLogs end.
 	fakeRuntimeService.Lock()
 	fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED

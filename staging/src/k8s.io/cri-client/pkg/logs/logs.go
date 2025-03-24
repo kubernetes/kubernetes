@@ -306,8 +306,12 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		//nolint:errcheck
+		f.Close()
+	}()
 
+	var waiter *waitLog
 	// Search start point based on tail line.
 	start, err := findTailLineStartIndex(f, opts.tail)
 	if err != nil {
@@ -360,13 +364,14 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 					if err := watcher.Add(dir); err != nil {
 						return fmt.Errorf("failed to watch directory %q: %w", dir, err)
 					}
+					waiter = newWaitLog(logger, containerID, baseName, watcher, runtimeService)
 					// If we just created the watcher, try again to read as we might have missed
 					// the event.
 					continue
 				}
 				var recreated bool
 				// Wait until the next log change.
-				found, recreated, err = waitLogs(ctx, logger, containerID, baseName, watcher, runtimeService)
+				found, recreated, err = waiter.wait(ctx)
 				if err != nil {
 					return err
 				}
@@ -378,7 +383,6 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 						}
 						return fmt.Errorf("failed to open log file %q: %v", path, err)
 					}
-					defer newF.Close()
 					f.Close()
 					f = newF
 					r = bufio.NewReader(f)
@@ -452,30 +456,84 @@ func isContainerRunning(ctx context.Context, logger *klog.Logger, id string, r i
 	return true, nil
 }
 
-// waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
+const waitDuration time.Duration = time.Millisecond * 150
+
+type waitLog struct {
+	lastCheck      time.Time
+	lastWriteEvent time.Time
+	// There was a create event.
+	recreated bool
+
+	logger         *klog.Logger
+	id             string
+	logName        string
+	w              *fsnotify.Watcher
+	runtimeService internalapi.RuntimeService
+}
+
+func newWaitLog(logger *klog.Logger, id string, logName string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) *waitLog {
+	return &waitLog{
+		logger:         logger,
+		id:             id,
+		logName:        logName,
+		w:              w,
+		runtimeService: runtimeService,
+		recreated:      false,
+	}
+}
+
+// wait for the next log write. It returns two booleans and an error. The first boolean
 // indicates whether a new log is found; the second boolean if the log file was recreated;
 // the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, logger *klog.Logger, id string, logName string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
-	// no need to wait if the pod is not running
-	if running, err := isContainerRunning(ctx, logger, id, runtimeService); !running {
-		return false, false, err
+func (wl *waitLog) wait(ctx context.Context) (bool, bool, error) {
+	if time.Since(wl.lastCheck) > waitDuration {
+		// no need to wait if the pod is not running
+		if running, err := isContainerRunning(ctx, wl.logger, wl.id, wl.runtimeService); !running {
+			return false, false, err
+		}
+		wl.lastCheck = time.Now()
 	}
+
+	if wl.recreated {
+		wl.recreated = false
+		// Reopen the log file now.
+		return true, true, nil
+	}
+
 	errRetry := 5
 	for {
 		select {
 		case <-ctx.Done():
 			return false, false, fmt.Errorf("context cancelled")
-		case e := <-w.Events:
+		case e := <-wl.w.Events:
 			switch e.Op {
-			case fsnotify.Write, fsnotify.Rename, fsnotify.Remove, fsnotify.Chmod:
+			case fsnotify.Write:
+				// case 1: If we have skipped a Write Event,and there no Write anymore.
+				//    We will wait at most 1 second, then read file from last position.
+				// case 2: If we have skipped a Write Event, then there is a Create event.
+				//   waitLog.recreated will be to true. Then return `true, false, nil`,
+				//   which indicates there is update in the log file, read file from last position to EOF.
+				//   And re-enter waitLog.wait. As waitLog.recreated is true, return `true, false, nil`,
+				//   indicates the log file has been rotated, then open the new file, close the old one
+				//   and read from the start.
+				if time.Since(wl.lastWriteEvent) > waitDuration {
+					wl.lastWriteEvent = time.Now()
+					return true, false, nil
+				}
+			case fsnotify.Rename, fsnotify.Remove, fsnotify.Chmod:
 				return true, false, nil
 			case fsnotify.Create:
-				return true, filepath.Base(e.Name) == logName, nil
+				if filepath.Base(e.Name) == wl.logName {
+					wl.lastWriteEvent = time.Now()
+					wl.recreated = true
+				}
+				// Mimic a Write event, reading the logs between the lastWriteEvent and the EOF of the file.
+				return true, false, nil
 			default:
-				internal.LogErr(logger, nil, "Received unexpected fsnotify event, retrying", "event", e)
+				internal.LogErr(wl.logger, nil, "Received unexpected fsnotify event, retrying", "event", e)
 			}
-		case err := <-w.Errors:
-			internal.LogErr(logger, err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
+		case err := <-wl.w.Errors:
+			internal.LogErr(wl.logger, err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
 			if errRetry == 0 {
 				return false, false, err
 			}
