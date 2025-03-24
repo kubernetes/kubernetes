@@ -105,11 +105,9 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		pod       *v1.Pod
 	}
 
-	////////////////////////////////////////////////////////////////////////////
-	// Main test specifications.
-	////////////////////////////////////////////////////////////////////////////
-
-	ginkgo.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
+	// allocateClientsAndServers figures out where to put clients and servers for
+	// a simple "same-zone" traffic distribution test.
+	allocateClientsAndServers := func(ctx context.Context) ([]*clientPod, []*serverPod) {
 		ginkgo.By("finding 3 zones with schedulable nodes")
 		nodeList, err := e2enode.GetReadySchedulableNodes(ctx, c)
 		framework.ExpectNoError(err)
@@ -149,29 +147,21 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 		clientPods[1].endpoints = []*serverPod{serverPods[1]}
 		clientPods[2].endpoints = serverPods
 
-		var podsToCreate []*v1.Pod
-		servingPodLabels := map[string]string{"app": f.UniqueName}
-		for i, sp := range serverPods {
-			node := sp.node.Name
-			zone := sp.node.Labels[v1.LabelTopologyZone]
-			pod := e2epod.NewAgnhostPod(f.Namespace.Name, fmt.Sprintf("server-%d-%s", i, node), nil, nil, nil, "serve-hostname")
-			ginkgo.By(fmt.Sprintf("creating a server pod %q on node %q in zone %q", pod.Name, node, zone))
-			nodeSelection := e2epod.NodeSelection{Name: node}
-			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
-			pod.Labels = servingPodLabels
+		return clientPods, serverPods
+	}
 
-			sp.pod = pod
-			podsToCreate = append(podsToCreate, pod)
-		}
-		e2epod.NewPodClient(f).CreateBatch(ctx, podsToCreate)
-
-		trafficDist := v1.ServiceTrafficDistributionPreferClose
-		svc := createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
+	// createService creates the service for a traffic distribution test
+	createService := func(ctx context.Context, trafficDist string) *v1.Service {
+		serviceName := "traffic-dist-test-service"
+		ginkgo.By(fmt.Sprintf("creating a service %q with trafficDistribution %q", serviceName, trafficDist))
+		return createServiceReportErr(ctx, c, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "traffic-dist-test-service",
+				Name: serviceName,
 			},
 			Spec: v1.ServiceSpec{
-				Selector:            servingPodLabels,
+				Selector: map[string]string{
+					"app": f.UniqueName,
+				},
 				TrafficDistribution: &trafficDist,
 				Ports: []v1.ServicePort{{
 					Port:       80,
@@ -180,10 +170,29 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 				}},
 			},
 		})
-		ginkgo.By(fmt.Sprintf("creating a service=%q with trafficDistribution=%v", svc.GetName(), *svc.Spec.TrafficDistribution))
+	}
+
+	// createPods creates endpoint pods for svc as described by serverPods, waits for
+	// the EndpointSlices to be updated, and creates clientPods as described by
+	// clientPods.
+	createPods := func(ctx context.Context, svc *v1.Service, clientPods []*clientPod, serverPods []*serverPod) {
+		var podsToCreate []*v1.Pod
+		for i, sp := range serverPods {
+			node := sp.node.Name
+			zone := sp.node.Labels[v1.LabelTopologyZone]
+			pod := e2epod.NewAgnhostPod(f.Namespace.Name, fmt.Sprintf("server-%d-%s", i, node), nil, nil, nil, "serve-hostname")
+			ginkgo.By(fmt.Sprintf("creating a server pod %q on node %q in zone %q", pod.Name, node, zone))
+			nodeSelection := e2epod.NodeSelection{Name: node}
+			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
+			pod.Labels = svc.Spec.Selector
+
+			sp.pod = pod
+			podsToCreate = append(podsToCreate, pod)
+		}
+		e2epod.NewPodClient(f).CreateBatch(ctx, podsToCreate)
 
 		ginkgo.By("waiting for EndpointSlices to be created")
-		err = framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, len(serverPods), 1*time.Second, e2eservice.ServiceEndpointsTimeout)
+		err := framework.WaitForServiceEndpointsNum(ctx, c, svc.Namespace, svc.Name, len(serverPods), 1*time.Second, e2eservice.ServiceEndpointsTimeout)
 		framework.ExpectNoError(err)
 		slices := endpointSlicesForService(svc.Name)
 		framework.Logf("got slices:\n%v", format.Object(slices, 1))
@@ -204,7 +213,11 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 			podsToCreate = append(podsToCreate, pod)
 		}
 		e2epod.NewPodClient(f).CreateBatch(ctx, podsToCreate)
+	}
 
+	// checkTrafficDistribution checks that traffic from clientPods is distributed in
+	// the expected way.
+	checkTrafficDistribution := func(ctx context.Context, clientPods []*clientPod) {
 		for _, cp := range clientPods {
 			wantedEndpoints := sets.New[string]()
 			for _, sp := range cp.endpoints {
@@ -241,5 +254,16 @@ var _ = common.SIGDescribe("Traffic Distribution", func() {
 
 			gomega.Eventually(ctx, requestsFromClient(cp.pod)).WithPolling(5 * time.Second).WithTimeout(e2eservice.KubeProxyLagTimeout).Should(requestsSucceed)
 		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Main test specifications.
+	////////////////////////////////////////////////////////////////////////////
+
+	ginkgo.It("should route traffic to an endpoint in the same zone when using PreferClose", func(ctx context.Context) {
+		clientPods, serverPods := allocateClientsAndServers(ctx)
+		svc := createService(ctx, v1.ServiceTrafficDistributionPreferClose)
+		createPods(ctx, svc, clientPods, serverPods)
+		checkTrafficDistribution(ctx, clientPods)
 	})
 })
