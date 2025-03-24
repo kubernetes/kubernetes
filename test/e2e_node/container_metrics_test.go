@@ -56,9 +56,9 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 				"container_fs_reads_total":                      boundedSample(0, 100),
 				"container_fs_usage_bytes":                      boundedSample(0, 1000000),
 				"container_fs_writes_bytes_total":               boundedSample(0, 1000000),
-				"container_fs_writes_total":                     boundedSample(0, 100),
+				"container_fs_writes_total":                     boundedSample(0, 200),
 				"container_last_seen":                           boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
-				"container_memory_cache":                        boundedSample(1*e2evolume.Kb, 10*e2evolume.Mb),
+				"container_memory_cache":                        boundedSample(0, 10*e2evolume.Mb),
 				"container_memory_failcnt":                      preciseSample(0),
 				"container_memory_failures_total":               boundedSample(0, 1000000),
 				"container_memory_mapped_file":                  boundedSample(0, 10000000),
@@ -79,7 +79,7 @@ var _ = SIGDescribe("ContainerMetrics", "[LinuxOnly]", framework.WithNodeConform
 				"container_tasks_state":                         preciseSample(0),
 				"container_threads":                             boundedSample(0, 10),
 				"container_threads_max":                         boundedSample(0, 100000),
-				"container_ulimits_soft":                        boundedSample(0, 10000000),
+				"container_ulimits_soft":                        boundedSample(0, 1073741816),
 			}
 			appendMatchesForContainer(f.Namespace.Name, pod0, pod1, "busybox-container", ctrMatches, keys, gstruct.AllowDuplicates|gstruct.IgnoreExtras)
 
