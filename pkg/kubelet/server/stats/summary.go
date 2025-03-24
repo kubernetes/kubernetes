@@ -24,7 +24,9 @@ import (
 	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
@@ -112,6 +114,9 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		Runtime:          &statsapi.RuntimeStats{ContainerFs: containerFsStats, ImageFs: imageFsStats},
 		Rlimit:           rlimit,
 		SystemContainers: sp.GetSystemContainersStats(nodeConfig, podStats, updateStats),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		nodeStats.IO = rootStats.IO
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,

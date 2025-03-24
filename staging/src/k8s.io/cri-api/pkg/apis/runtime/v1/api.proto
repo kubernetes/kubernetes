@@ -748,6 +748,8 @@ message LinuxPodSandboxStats {
     ProcessUsage process = 4;
     // Stats of containers in the measured pod sandbox.
     repeated ContainerStats containers = 5;
+    // IO usage gathered for the pod sandbox.
+    IoUsage io = 6;
 }
 
 // WindowsPodSandboxStats provides the resource usage statistics for a pod sandbox on windows
@@ -1793,6 +1795,8 @@ message ContainerStats {
     FilesystemUsage writable_layer = 4;
     // Swap usage gathered from the container.
     SwapUsage swap = 5;
+    // IO usage gathered from the container.
+    IoUsage io = 6;
 }
 
 // WindowsContainerStats provides the resource usage statistics for a container specific for Windows
@@ -1807,6 +1811,27 @@ message WindowsContainerStats {
     WindowsFilesystemUsage writable_layer = 4;
 }
 
+// PSI statistics for an individual resource.
+message PsiStats {
+	// PSI data for all tasks in the cgroup.
+	PsiData Full = 1;
+	// PSI data for some tasks in the cgroup.
+	PsiData Some = 2;
+}
+
+// PSI data for an individual resource.
+message PsiData {
+	// Total time duration for tasks in the cgroup have waited due to congestion.
+	// Unit: nanoseconds.
+	uint64 Total = 1;
+	// The average (in %) tasks have waited due to congestion over a 10 second window.
+	double Avg10 = 2;
+	// The average (in %) tasks have waited due to congestion over a 60 second window.
+	double Avg60 = 3;
+	// The average (in %) tasks have waited due to congestion over a 300 second window.
+	double Avg300 = 4;
+}
+
 // CpuUsage provides the CPU usage information.
 message CpuUsage {
     // Timestamp in nanoseconds at which the information were collected. Must be > 0.
@@ -1816,6 +1841,8 @@ message CpuUsage {
     // Total CPU usage (sum of all cores) averaged over the sample window.
     // The "core" unit can be interpreted as CPU core-nanoseconds per second.
     UInt64Value usage_nano_cores = 3;
+    // CPU PSI statistics.
+    PsiStats psi = 4;
 }
 
 // WindowsCpuUsage provides the CPU usage information specific to Windows
@@ -1845,6 +1872,15 @@ message MemoryUsage {
     UInt64Value page_faults = 6;
     // Cumulative number of major page faults.
     UInt64Value major_page_faults = 7;
+    // Memory PSI statistics.
+    PsiStats psi = 8;
+}
+
+message IoUsage {
+    // Timestamp in nanoseconds at which the information were collected. Must be > 0.
+    int64 timestamp = 1;
+    // IO PSI statistics.
+    PsiStats psi = 2;
 }
 
 message SwapUsage {

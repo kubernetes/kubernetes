@@ -709,6 +709,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+- name: KubeletPSI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: KubeletRegistrationGetOnExistsOnly
   versionedSpecs:
   - default: true

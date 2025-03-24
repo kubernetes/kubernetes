@@ -455,6 +455,11 @@ func (s *Server) InstallAuthNotRequiredHandlers() {
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
+		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
+	}
+
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 	r.RawMustRegister(metrics.NewPrometheusMachineCollector(prometheusHostAdapter{s.host}, includedMetrics))
