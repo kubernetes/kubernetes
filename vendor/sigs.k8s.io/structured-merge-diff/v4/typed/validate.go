@@ -157,7 +157,7 @@ func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List)
 func (v *validatingObjectWalker) doList(t *schema.List) (errs ValidationErrors) {
 	list, err := listValue(v.allocator, v.value)
 	if err != nil {
-		return errorf(err.Error())
+		return errorf("%v", err)
 	}
 
 	if list == nil {
@@ -193,7 +193,7 @@ func (v *validatingObjectWalker) visitMapItems(t *schema.Map, m value.Map) (errs
 func (v *validatingObjectWalker) doMap(t *schema.Map) (errs ValidationErrors) {
 	m, err := mapValue(v.allocator, v.value)
 	if err != nil {
-		return errorf(err.Error())
+		return errorf("%v", err)
 	}
 	if m == nil {
 		return nil

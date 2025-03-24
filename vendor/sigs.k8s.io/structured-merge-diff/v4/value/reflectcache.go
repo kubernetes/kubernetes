@@ -59,6 +59,8 @@ type FieldCacheEntry struct {
 	JsonName string
 	// isOmitEmpty is true if the field has the json 'omitempty' tag.
 	isOmitEmpty bool
+	// omitzero is set if the field has the json 'omitzero' tag.
+	omitzero func(reflect.Value) bool
 	// fieldPath is a list of field indices (see FieldByIndex) to lookup the value of
 	// a field in a reflect.Value struct. The field indices in the list form a path used
 	// to traverse through intermediary 'inline' fields.
@@ -69,7 +71,13 @@ type FieldCacheEntry struct {
 }
 
 func (f *FieldCacheEntry) CanOmit(fieldVal reflect.Value) bool {
-	return f.isOmitEmpty && (safeIsNil(fieldVal) || isZero(fieldVal))
+	if f.isOmitEmpty && (safeIsNil(fieldVal) || isEmpty(fieldVal)) {
+		return true
+	}
+	if f.omitzero != nil && f.omitzero(fieldVal) {
+		return true
+	}
+	return false
 }
 
 // GetFrom returns the field identified by this FieldCacheEntry from the provided struct.
@@ -147,7 +155,7 @@ func typeReflectEntryOf(cm reflectCacheMap, t reflect.Type, updates reflectCache
 func buildStructCacheEntry(t reflect.Type, infos map[string]*FieldCacheEntry, fieldPath [][]int) {
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		jsonName, omit, isInline, isOmitempty := lookupJsonTags(field)
+		jsonName, omit, isInline, isOmitempty, omitzero := lookupJsonTags(field)
 		if omit {
 			continue
 		}
@@ -161,7 +169,7 @@ func buildStructCacheEntry(t reflect.Type, infos map[string]*FieldCacheEntry, fi
 			}
 			continue
 		}
-		info := &FieldCacheEntry{JsonName: jsonName, isOmitEmpty: isOmitempty, fieldPath: append(fieldPath, field.Index), fieldType: field.Type}
+		info := &FieldCacheEntry{JsonName: jsonName, isOmitEmpty: isOmitempty, omitzero: omitzero, fieldPath: append(fieldPath, field.Index), fieldType: field.Type}
 		infos[jsonName] = info
 	}
 }
