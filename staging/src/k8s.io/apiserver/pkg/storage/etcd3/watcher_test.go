@@ -174,7 +174,6 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
 	// make resultChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
-	w.errChan = make(chan error)
 	// The event flow goes like:
 	// - first we send an error, it should block on resultChan.
 	// - Then we cancel ctx. The blocking on resultChan should be freed up
@@ -185,7 +184,6 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 		w.run(false, true)
 		wg.Done()
 	}()
-	w.errChan <- fmt.Errorf("some error")
 	cancel()
 	wg.Wait()
 }
