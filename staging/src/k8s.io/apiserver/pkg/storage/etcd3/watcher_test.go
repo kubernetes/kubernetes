@@ -144,6 +144,11 @@ func TestEtcdWatchSemanticInitialEventsExtended(t *testing.T) {
 	storagetesting.RunWatchSemanticInitialEventsExtended(ctx, t, store)
 }
 
+func TestWatchErrorEventIsBlockingFurtherEvent(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchErrorIsBlockingFurtherEvents(ctx, t, &storeWithPrefixTransformer{store})
+}
+
 // =======================================================================
 // Implementation-specific tests are following.
 // The following tests are exercising the details of the implementation
