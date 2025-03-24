@@ -2605,7 +2605,6 @@ metadata:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: ReplicationController
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
-  creationTimestamp: null
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2639,7 +2638,6 @@ metadata:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: ReplicationController,Service
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
-  creationTimestamp: null
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2674,7 +2672,6 @@ metadata:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: ReplicationController,Service
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
-  creationTimestamp: null
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2709,7 +2706,6 @@ metadata:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-kinds: Service
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
-  creationTimestamp: null
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
@@ -2872,7 +2868,6 @@ metadata:
     applyset.kubernetes.io/additional-namespaces: test
     applyset.kubernetes.io/contains-group-kinds: ReplicationController
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
-  creationTimestamp: null
   labels:
     applyset.kubernetes.io/id: applyset-rhp1a-HVAVT_dFgyEygyA1BEB82HPp2o10UiFTpqtAs-v1
   name: my-set
@@ -3090,7 +3085,6 @@ metadata:
     applyset.kubernetes.io/additional-namespaces: ""
     applyset.kubernetes.io/contains-group-resources: replicationcontrollers
     applyset.kubernetes.io/tooling: kubectl/v0.0.0-master+$Format:%H$
-  creationTimestamp: null
   labels:
     applyset.kubernetes.io/id: applyset-0eFHV8ySqp7XoShsGvyWFQD3s96yqwHmzc4e0HR1dsY-v1
   name: my-set
