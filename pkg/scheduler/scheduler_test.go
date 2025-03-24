@@ -31,10 +31,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -570,6 +572,56 @@ func TestInitPluginsWithIndexers(t *testing.T) {
 				t.Fatalf("Failed to create scheduler: %v", err)
 			}
 		})
+	}
+}
+
+func TestTrimManagedFields(t *testing.T) {
+	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
+	testPod.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{
+			Operation:   metav1.ManagedFieldsOperationApply,
+			FieldsType:  "FieldsV1",
+			APIVersion:  "v1",
+			Subresource: "scale",
+		},
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	client := fake.NewClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
+		}
+		return obj, nil
+	}
+	informerFactory := NewInformerFactory(client, 0, informers.WithTransform(trim))
+	podInformer := informerFactory.Core().V1().Pods().Informer()
+	handler, err := podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			pod := obj.(*v1.Pod)
+			if pod.ManagedFields != nil {
+				t.Errorf("Expected pod.ManagedFields to be nil, got %v", pod.ManagedFields)
+			}
+		},
+	})
+	if err != nil {
+		t.Errorf("Failed to create pod handler: %v", err)
+	}
+
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+	err = wait.PollUntilContextCancel(ctx, syncedPollPeriod, true, func(ctx context.Context) (done bool, err error) {
+		if !handler.HasSynced() {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Errorf("Failed to wait for pod handler: %v", err)
 	}
 }
 

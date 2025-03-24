@@ -30,6 +30,7 @@ import (
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -84,7 +85,16 @@ type ShutdownFunc func()
 // and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
 // will keep running until the context is canceled.
 func StartScheduler(ctx context.Context, clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
-	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
+	// Dropping `.metadata.managedFields` to improve memory usage.
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
+		}
+		return obj, nil
+	}
+	informerFactory := scheduler.NewInformerFactory(clientSet, 0, informers.WithTransform(trim))
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1()})
 	go func() {
@@ -590,7 +600,16 @@ func InitTestSchedulerWithOptions(
 	testCtx.SchedulerCtx = ctx
 
 	// 1. Create scheduler
-	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod)
+	// Dropping `.metadata.managedFields` to improve memory usage.
+	trim := func(obj interface{}) (interface{}, error) {
+		if accessor, err := meta.Accessor(obj); err == nil {
+			if accessor.GetManagedFields() != nil {
+				accessor.SetManagedFields(nil)
+			}
+		}
+		return obj, nil
+	}
+	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, resyncPeriod, informers.WithTransform(trim))
 	if testCtx.KubeConfig != nil {
 		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
 		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
