@@ -4044,26 +4044,24 @@ func TestFieldValidation(t *testing.T) {
 	var (
 		strictDecodingErr          = `strict decoding error: duplicate field \"other\", unknown field \"unknown\"`
 		strictDecodingWarns        = []string{`duplicate field "other"`, `unknown field "unknown"`}
-		strictDecodingErrYAML      = `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
-		strictDecodingWarnsYAML    = []string{`line 6: key "other" already set in map`, `unknown field "unknown"`}
-		strictDecodingErrYAMLPut   = `strict decoding error: yaml: unmarshal errors:\n  line 7: key \"other\" already set in map, unknown field \"unknown\"`
-		strictDecodingWarnsYAMLPut = []string{`line 7: key "other" already set in map`, `unknown field "unknown"`}
+		strictDecodingErrYAML      = `strict decoding error: yaml: unmarshal errors:\n  line 5: key \"other\" already set in map, unknown field \"unknown\"`
+		strictDecodingWarnsYAML    = []string{`line 5: key "other" already set in map`, `unknown field "unknown"`}
+		strictDecodingErrYAMLPut   = `strict decoding error: yaml: unmarshal errors:\n  line 6: key \"other\" already set in map, unknown field \"unknown\"`
+		strictDecodingWarnsYAMLPut = []string{`line 6: key "other" already set in map`, `unknown field "unknown"`}
 
-		invalidJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+		invalidJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{}, "other":"foo","other":"bar","unknown":"baz"}`)
 		invalidYAMLDataPost = []byte(`apiVersion: test.group/version
 kind: Simple
-metadata:
-  creationTimestamp: null
+metadata: {}
 other: foo
 other: bar
 unknown: baz`)
 
-		invalidJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"foo","other":"bar","unknown":"baz"}`)
+		invalidJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id"}, "other":"foo","other":"bar","unknown":"baz"}`)
 		invalidYAMLDataPut = []byte(`apiVersion: test.group/version
 kind: Simple
 metadata:
   name: id
-  creationTimestamp: null
 other: foo
 other: bar
 unknown: baz`)
@@ -4180,19 +4178,17 @@ unknown: baz`)
 // strict, warn, and ignore field validation handling.
 func BenchmarkFieldValidation(b *testing.B) {
 	var (
-		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"creationTimestamp":null}, "other":"foo"}`)
+		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{}, "other":"foo"}`)
 		validYAMLDataPost = []byte(`apiVersion: test.group/version
 kind: Simple
-metadata:
-  creationTimestamp: null
+metadata: {}
 other: foo`)
 
-		validJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id", "creationTimestamp":null}, "other":"bar"}`)
+		validJSONDataPut = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{"name":"id"}, "other":"bar"}`)
 		validYAMLDataPut = []byte(`apiVersion: test.group/version
 kind: Simple
 metadata:
   name: id
-  creationTimestamp: null
 other: bar`)
 
 		validMergePatch = []byte(`{"labels":{"foo":"bar"}, "other": "bar"}`)
