@@ -167,10 +167,15 @@ func doPodResizeAdmissionPluginsTests() {
 			e2epod.VerifyPodResources(resizedPod, expected)
 
 			ginkgo.By("patching pod for resize with memory exceeding resource quota")
-			_, pErrExceedMemory := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-				resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedMemory), metav1.PatchOptions{}, "resize")
-			gomega.Expect(pErrExceedMemory).To(gomega.HaveOccurred())
-			gomega.Expect(pErrExceedMemory).To(gomega.MatchError(gomega.ContainSubstring(tc.wantMemoryError)))
+			framework.ExpectNoError(framework.Gomega().
+				// Use Eventually because we need to wait for the quota controller to sync.
+				Eventually(ctx, func(ctx context.Context) error {
+					_, pErrExceedMemory := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
+						resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedMemory), metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "resize")
+					return pErrExceedMemory
+				}).
+				WithTimeout(f.Timeouts.PodStart).
+				Should(gomega.MatchError(gomega.ContainSubstring(tc.wantMemoryError))))
 
 			ginkgo.By("verifying pod patched for resize exceeding memory resource quota remains unchanged")
 			patchedPodExceedMemory, pErrEx2 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
@@ -179,10 +184,15 @@ func doPodResizeAdmissionPluginsTests() {
 			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected))
 
 			ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding resource quota", resizedPod.Name))
-			_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
-				resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{}, "resize")
-			gomega.Expect(pErrExceedCPU).To(gomega.HaveOccurred())
-			gomega.Expect(pErrExceedCPU).To(gomega.MatchError(gomega.ContainSubstring(tc.wantCPUError)))
+			framework.ExpectNoError(framework.Gomega().
+				// Use Eventually because we need to wait for the quota controller to sync.
+				Eventually(ctx, func(ctx context.Context) error {
+					_, pErrExceedCPU := f.ClientSet.CoreV1().Pods(resizedPod.Namespace).Patch(ctx,
+						resizedPod.Name, types.StrategicMergePatchType, []byte(patchStringExceedCPU), metav1.PatchOptions{DryRun: []string{metav1.DryRunAll}}, "resize")
+					return pErrExceedCPU
+				}).
+				WithTimeout(f.Timeouts.PodStart).
+				Should(gomega.MatchError(gomega.ContainSubstring(tc.wantCPUError))))
 
 			ginkgo.By("verifying pod patched for resize exceeding CPU resource quota remains unchanged")
 			patchedPodExceedCPU, pErrEx1 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
