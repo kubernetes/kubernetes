@@ -18,6 +18,7 @@ P0 ("things we need to do for 1.34"):
   - mutual exclusivitiy - field X is not allowed when Y
   - might require cross-field/conditional defaulting
     - might break the zero-value checking
+    - consider merging defaulter-gen with validation-gen?
 - Conditions
   - plumb feature gates down
 - Stop using "+k8s:validation-gen=TypeMeta" to find root types?
@@ -27,12 +28,26 @@ P0 ("things we need to do for 1.34"):
     // +k8s:validation-gen:matchTypesWith(TypeMeta)
     // +k8s:validation-gen:matchTypesWithout(ListMeta)
     ```
+  - Idea:
+    - at the pkg level:
+      ```
+      // +k8s:validation-gen:matchTypesWith=field=TypeMeta
+      // +k8s:validation-gen:matchTypesWithout=field=ListMeta
+      // +k8s:validation-gen:matchTypesWith=enabled=true
+      ```
+    - at each root type which wants generation:
+      ```
+      // +k8s:validation-gen:enabled=true
+      ```
 
 P1:
 - Validation logic for:
     - listMap key requiredness (no auto-fail if you have same list map key)
       - defaulted keys (key in a list map must be required but can have a default.  If default, need to use that in X places. Related to default ordering)
     - immutable (update)
+- most apimachinery validate functions should return internal-error for nil pointers
+  (assuming we keep passing pointers)
+  - maybe lint that pointer fields are always optional?
 - Should defaults take +k8s:default?
   - Adopted convention of prefix "+k8s:", do defaults also get "+k8s:"?
 - Validation logic for:
@@ -61,11 +76,14 @@ P1:
   - uniqueness
   - correlated updates
   - single field manager
+- Correlated updates for listType=set?
+  - sort of meaningless but consistent?
 - Investigate "chains" style output so CRDs can use the same primitives
 - Simplify the "always nilable" logic
   - e.g. always pass non-pointer `value` and pointer `oldValue`; return
     internal error if a pointer field is nil and not checked for
     `required`/`optional`.
+- Should union failures (more than 1 specified) skip validating the union members?
 
 P2:
 - Deduplicate `jsontagutil.go`. It was copy-pasted in from applyconfig-gen
