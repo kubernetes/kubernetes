@@ -113,6 +113,7 @@ type DynamicResources struct {
 	enablePartitionableDevices    bool
 	enableDeviceTaints            bool
 	enableDeviceBindingConditions bool
+	enableDeviceStatus            bool
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -135,6 +136,7 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		enableSchedulingQueueHint:     fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices:    fts.EnablePartitionableDevices,
 		enableDeviceBindingConditions: fts.EnableDRADeviceBindingConditions,
+		enableDeviceStatus:            fts.EnableDRAResourceClaimDeviceStatus,
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -467,7 +469,7 @@ func (pl *DynamicResources) PreFilter(ctx context.Context, state fwk.CycleState,
 			PrioritizedList:      pl.enablePrioritizedList,
 			PartitionableDevices: pl.enablePartitionableDevices,
 			DeviceTaints:         pl.enableDeviceTaints,
-			DeviceBinding:        pl.enableDeviceBindingConditions,
+			DeviceBinding:        pl.enableDeviceBindingConditions && pl.enableDeviceStatus,
 		}
 		allocator, err := structured.NewAllocator(ctx, features, allocateClaims, allAllocatedDevices, pl.draManager.DeviceClasses(), slices, pl.celCache)
 		if err != nil {
@@ -551,7 +553,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		}
 
 		// If the claim is not ready to bind, cannot use this allocation.
-		if claim.Status.Allocation == nil || !pl.enableDeviceBindingConditions {
+		if claim.Status.Allocation == nil || !pl.enableDeviceBindingConditions || !pl.enableDeviceStatus {
 			continue
 		}
 
@@ -813,7 +815,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 		}
 	}
 
-	if !pl.enableDeviceBindingConditions {
+	if !pl.enableDeviceBindingConditions || !pl.enableDeviceStatus {
 		// If we get here, we know that reserving the claim for
 		// the pod worked and we can proceed with binding it.
 		return nil
