@@ -59,7 +59,7 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
+	sigs.k8s.io/structured-merge-diff/v4 v4.7.0
 	sigs.k8s.io/yaml v1.4.0
 )
 
