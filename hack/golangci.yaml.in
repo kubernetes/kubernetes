@@ -175,6 +175,7 @@ linters:
   enable: # please keep this alphabetized
     - depguard
     - forbidigo
+    - gci
     - ginkgolinter
     - gocritic
     - govet
@@ -232,6 +233,12 @@ linters-settings: # please keep this alphabetized
       pkg: ^github.com/onsi/gomega$
       msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
     {{- end}}
+  gci:
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(k8s.io) # Custom section: groups all imports with the specified Prefix.
+    custom-order: true
   {{- if .Base }}
   gocritic:
     enabled-checks:

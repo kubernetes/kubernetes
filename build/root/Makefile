@@ -363,6 +363,9 @@ lint:
 	hack/verify-golangci-lint.sh
 endif
 
+lint-fix:
+	hack/verify-golangci-lint.sh -f
+
 define RELEASE_HELP_INFO
 # Build a release
 # Use the 'release-in-a-container' target to build the release when already in

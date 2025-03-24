@@ -30,6 +30,7 @@ Usage: $0 [-r <revision>|-a] [-s] [-c none|<config>] [-- <golangci-lint run flag
    -g <github action file>: also write results with --out-format=github-actions
        to a separate file
    -c <config|"none">: use the specified configuration or none instead of the default hack/golangci.yaml
+   -f: fix found issues (if it's supported by the linter)
    [packages]: check specific packages or directories instead of everything
 EOF
   exit 1
@@ -54,7 +55,7 @@ golangci_config="${KUBE_ROOT}/hack/golangci.yaml"
 base=
 hints=
 githubactions=
-while getopts "ar:sng:c:" o; do
+while getopts "ar:sng:c:f" o; do
   case "${o}" in
     a)
       base="$(git merge-base origin/master HEAD)"
@@ -70,6 +71,9 @@ while getopts "ar:sng:c:" o; do
     n)
       golangci_config="${KUBE_ROOT}/hack/golangci-hints.yaml"
       hints=1
+      ;;
+    f)
+      golangci+=(--fix)
       ;;
     g)
       githubactions="${OPTARG}"
