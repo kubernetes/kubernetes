@@ -983,6 +983,9 @@ func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool
 
 // hasDeviceBindingStatus checks the binding status of devices within the
 // given state claims.
+// It returns an error if binding has failed.
+// It returns true if (and only if) all binding conditions are true,
+// which includes the case when there are no binding conditions.
 func (pl *DynamicResources) hasDeviceBindingStatus(ctx context.Context, state *stateData, pod *v1.Pod, nodeName string) (bool, error) {
 	for claimIndex, claim := range state.claims {
 		claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
