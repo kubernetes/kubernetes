@@ -2670,7 +2670,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
 					},
 				},
-				expectedErrNum: 3,
+				expectedErrNum: 4,
 			},
 			"invalid pod": {
 				old: apps.Deployment{
@@ -3086,7 +3086,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 					Template: validPodTemplate.Template,
 				},
 			},
-			expectedErrNum: 3,
+			expectedErrNum: 4,
 		},
 		"invalid pod": {
 			old: apps.ReplicaSet{
