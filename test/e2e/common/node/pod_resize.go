@@ -515,11 +515,11 @@ func doPodResizeTests() {
 			},
 			patchString: fmt.Sprintf(`{"spec":{"containers":[
 							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
-						]}}`, increasedCPU, increasedCPULimit),
+						]}}`, reducedCPU, reducedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit},
+					Resources: &e2epod.ContainerResources{CPUReq: reducedCPU, CPULim: reducedCPULimit},
 				},
 			},
 		},
