@@ -142,6 +142,8 @@ type Runtime interface {
 	// GetContainerSwapBehavior reports whether a container could be swappable.
 	// This is used to decide whether to handle InPlacePodVerticalScaling for containers.
 	GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubelettypes.SwapBehavior
+	// GeneratePodEvents retrieves event information for a specified Pod, including Pod sandbox status and container statuses.
+	GeneratePodEvents(ctx context.Context, id string) (*runtimeapi.ContainerEventResponse, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
