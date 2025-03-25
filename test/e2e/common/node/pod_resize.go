@@ -510,16 +510,16 @@ func doPodResizeTests() {
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: "2m", CPULim: "10m"},
+					Resources: &e2epod.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
 				},
 			},
-			patchString: `{"spec":{"containers":[
-							{"name":"c1", "resources":{"requests":{"cpu":"1m"},"limits":{"cpu":"5m"}}}
-						]}}`,
+			patchString: fmt.Sprintf(`{"spec":{"containers":[
+							{"name":"c1", "resources":{"requests":{"cpu":"%s"},"limits":{"cpu":"%s"}}}
+						]}}`, increasedCPU, increasedCPULimit),
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: "1m", CPULim: "5m"},
+					Resources: &e2epod.ContainerResources{CPUReq: increasedCPU, CPULim: increasedCPULimit},
 				},
 			},
 		},
@@ -1206,6 +1206,8 @@ func doPodResizeTests() {
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
 				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
+
+				ginkgo.By(fmt.Sprintf("verifying pod resized for %s", opStr))
 				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
 			}
 

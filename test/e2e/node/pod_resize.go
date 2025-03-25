@@ -161,6 +161,8 @@ func doPodResizeAdmissionPluginsTests() {
 
 			ginkgo.By("waiting for resize to be actuated")
 			resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
+
+			ginkgo.By("verifying pod resized")
 			e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
 
 			ginkgo.By("verifying pod resources after resize")
@@ -399,7 +401,11 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 				Resources: &e2epod.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 			},
 		}
+
+		ginkgo.By("waiting for resize to be actuated")
 		resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, testPod1, expected)
+
+		ginkgo.By("verifying pod resized")
 		e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
 
 		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' to exceed the node capacity", testPod1.Name))
