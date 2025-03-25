@@ -18,12 +18,15 @@ package pod
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	psaapi "k8s.io/pod-security-admission/api"
@@ -292,20 +295,23 @@ func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerSt
 }
 
 // VerifyCgroupValue verifies that the given cgroup path has the expected value in
-// the specified container of the pod. It execs into the container to retrive the
-// cgroup value and compares it against the expected value.
-func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath, expectedCgValue string) error {
+// the specified container of the pod. It execs into the container to retrieve the
+// cgroup value, and ensures that the retrieved cgroup value is equivalent to at
+// least one of the values in expectedCgValues.
+func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath string, expectedCgValues ...string) error {
 	cmd := fmt.Sprintf("head -n 1 %s", cgPath)
-	framework.Logf("Namespace %s Pod %s Container %s - looking for cgroup value %s in path %s",
-		pod.Namespace, pod.Name, cName, expectedCgValue, cgPath)
+	framework.Logf("Namespace %s Pod %s Container %s - looking for one of the expected cgroup values %s in path %s",
+		pod.Namespace, pod.Name, cName, expectedCgValues, cgPath)
 	cgValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to find expected value %q in container cgroup %q", expectedCgValue, cgPath)
+		return fmt.Errorf("failed to find one of the expected cgroup values %q in container cgroup %q", expectedCgValues, cgPath)
 	}
 	cgValue = strings.Trim(cgValue, "\n")
-	if cgValue != expectedCgValue {
-		return fmt.Errorf("cgroup value %q not equal to expected %q", cgValue, expectedCgValue)
+
+	if err := framework.Gomega().Expect(cgValue).To(gomega.BeElementOf(expectedCgValues)); err != nil {
+		return fmt.Errorf("value of cgroup %q for container %q should match one of the expectations: %w", cgPath, cName, err)
 	}
+
 	return nil
 }
 
@@ -337,4 +343,36 @@ func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
 		return false
 	}
 	return len(out) != 0
+}
+
+// TODO: Remove the rounded cpu limit values when https://github.com/opencontainers/runc/issues/4622
+// is fixed.
+func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity) []string {
+	var expectedCPULimits []string
+	milliCPULimit := cpuLimit.MilliValue()
+
+	cpuQuota := kubecm.MilliCPUToQuota(milliCPULimit, kubecm.QuotaPeriod)
+	if cpuLimit.IsZero() {
+		cpuQuota = -1
+	}
+	expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuota))
+
+	if milliCPULimit%10 != 0 && cpuQuota != -1 {
+		roundedCPULimit := (milliCPULimit/10 + 1) * 10
+		cpuQuotaRounded := kubecm.MilliCPUToQuota(roundedCPULimit, kubecm.QuotaPeriod)
+		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded))
+	}
+
+	return expectedCPULimits
+}
+
+func getExpectedCPULimitFromCPUQuota(cpuQuota int64) string {
+	expectedCPULimitString := strconv.FormatInt(cpuQuota, 10)
+	if *podOnCgroupv2Node {
+		if expectedCPULimitString == "-1" {
+			expectedCPULimitString = "max"
+		}
+		expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
+	}
+	return expectedCPULimitString
 }
