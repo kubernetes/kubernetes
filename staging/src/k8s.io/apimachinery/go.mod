@@ -9,7 +9,7 @@ godebug default=go1.24
 require (
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/davecgh/go-spew v1.1.1
-	github.com/fxamacker/cbor/v2 v2.7.0
+	github.com/fxamacker/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic-models v0.6.9
 	github.com/google/go-cmp v0.7.0
@@ -53,4 +53,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace sigs.k8s.io/structured-merge-diff/v4 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f
+replace (
+	github.com/fxamacker/cbor/v2 => github.com/liggitt/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
+	sigs.k8s.io/structured-merge-diff/v4 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f
+)
