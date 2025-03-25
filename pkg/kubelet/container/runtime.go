@@ -145,6 +145,8 @@ type Runtime interface {
 	// IsPodResizeInProgress checks whether the given pod is in the process of resizing
 	// (allocated resources != actuated resources).
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *PodStatus) bool
+	// GeneratePodEvents retrieves event information for a specified Pod, including Pod sandbox status and container statuses.
+	GeneratePodEvents(ctx context.Context, id string) (*runtimeapi.ContainerEventResponse, error)
 }
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the

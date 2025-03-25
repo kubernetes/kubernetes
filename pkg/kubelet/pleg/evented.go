@@ -417,5 +417,13 @@ func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventRespon
 }
 
 func (e *EventedPLEG) RequestPodReSync(podUID types.UID) {
-	e.genericPleg.RequestPodReSync(podUID)
+	event, err := e.runtime.GeneratePodEvents(context.TODO(), string(podUID))
+	if err != nil {
+		e.logger.Error(err, "Evented PLEG: error generating pod event", "podUID", podUID)
+		return
+	}
+
+	status := e.runtime.GeneratePodStatus(event)
+	e.cache.Set(podUID, status, nil, e.clock.Now())
+	e.sendPodLifecycleEvent(&PodLifecycleEvent{ID: types.UID(event.PodSandboxStatus.Metadata.Uid), Type: PodSync, Data: event.ContainerId})
 }
