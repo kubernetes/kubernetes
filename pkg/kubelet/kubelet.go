@@ -2968,6 +2968,21 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
 		} else {
 			// (Allocated == Actual) => clear the resize in-progress status.
+			// If pod resize completed, print ResizeCompleted event
+			resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
+			ifPodResizeInProgress := slices.ContainsFunc(resizeStatus, func(cond *v1.PodCondition) bool {
+				return cond != nil && cond.Type == v1.PodConditionType("PodResizeInProgress")
+			})
+			if ifPodResizeInProgress {
+				if msg, err := allocation.GetPodResizeInfo(pod); err == nil {
+					kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+				} else {
+					klog.ErrorS(err, "Pod Resize info error")
+				}
+				// Clear resize data after pod resize complete
+				allocation.ClearPodResizeAllocation(pod)
+			}
+
 			kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 		}
 	}()

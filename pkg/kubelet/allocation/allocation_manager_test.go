@@ -169,3 +169,201 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 		})
 	}
 }
+
+func TestSavePodResizeAllocation(t *testing.T) {
+	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "34567",
+			Name:      "test",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(400, resource.DecimalSI),
+						},
+					},
+				},
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+						},
+					},
+				},
+			},
+			InitContainers: []v1.Container{
+				{
+					Name: "c1-restartable-init",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(1000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+						},
+					},
+					RestartPolicy: &containerRestartPolicyAlways,
+				},
+				{
+					Name: "c1-init",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(600, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(800, resource.DecimalSI),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                   string
+		container              v1.Container
+		reqOld                 v1.ResourceRequirements
+		reqNew                 v1.ResourceRequirements
+		expectResizeAllocation *PodResourceSummary
+	}{{
+		name:      "Resize-container-CPU-requests-limits",
+		container: *pod.Spec.Containers[0].DeepCopy(),
+		reqOld: v1.ResourceRequirements{
+			Requests: v1.ResourceList{},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU: *resource.NewMilliQuantity(4000, resource.DecimalSI),
+			},
+		},
+		reqNew: v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: *resource.NewMilliQuantity(5000, resource.DecimalSI),
+			},
+			Limits: v1.ResourceList{
+				v1.ResourceCPU: *resource.NewMilliQuantity(6000, resource.DecimalSI),
+			},
+		},
+		expectResizeAllocation: &PodResourceSummary{
+			Containers: map[string]v1.ResourceRequirements{
+				"c1": {
+					Requests: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(5000, resource.DecimalSI),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU: *resource.NewMilliQuantity(6000, resource.DecimalSI),
+					},
+				},
+			},
+		},
+	},
+		{
+			name:      "Resize-container-only-CPU-requests",
+			container: *pod.Spec.Containers[0].DeepCopy(),
+			reqOld:    *pod.Spec.Containers[0].Resources.DeepCopy(),
+			reqNew: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU: *resource.NewMilliQuantity(5000, resource.DecimalSI),
+				},
+			},
+			expectResizeAllocation: &PodResourceSummary{
+				Containers: map[string]v1.ResourceRequirements{
+					"c1": {
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: *resource.NewMilliQuantity(5000, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{},
+					},
+				},
+			},
+		}, {
+			name:      "Resize-container-memory-limits",
+			container: *pod.Spec.Containers[1].DeepCopy(),
+			reqOld:    *pod.Spec.Containers[1].Resources.DeepCopy(),
+			reqNew: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+				},
+			},
+			expectResizeAllocation: &PodResourceSummary{
+				Containers: map[string]v1.ResourceRequirements{
+					"c2": {
+						Requests: v1.ResourceList{},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+						},
+					},
+				},
+			},
+		}, {
+			name:      "resize-restartable-init-container-memroy-cpu",
+			container: *pod.Spec.InitContainers[0].DeepCopy(),
+			reqOld:    *pod.Spec.InitContainers[0].Resources.DeepCopy(),
+			reqNew: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(4000, resource.DecimalSI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(5000, resource.DecimalSI),
+					v1.ResourceCPU:    *resource.NewMilliQuantity(6000, resource.DecimalSI),
+				},
+			},
+			expectResizeAllocation: &PodResourceSummary{
+				InitContainers: map[string]v1.ResourceRequirements{
+					"c1-restartable-init": {
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(4000, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceMemory: *resource.NewQuantity(5000, resource.DecimalSI),
+							v1.ResourceCPU:    *resource.NewMilliQuantity(6000, resource.DecimalSI),
+						},
+					},
+				},
+			},
+		}, {
+			name:      "resize-init-container-cpu-memory",
+			container: *pod.Spec.InitContainers[1].DeepCopy(),
+			reqOld:    *pod.Spec.InitContainers[1].Resources.DeepCopy(),
+			reqNew: v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(4000, resource.DecimalSI),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceMemory: *resource.NewQuantity(5000, resource.DecimalSI),
+					v1.ResourceCPU:    *resource.NewMilliQuantity(6000, resource.DecimalSI),
+				},
+			},
+			expectResizeAllocation: &PodResourceSummary{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			SavePodResizeAllocation(pod, test.container, test.reqOld, test.reqNew)
+			podResizeAlloc := GetOrCreatePodResizeAllocation(pod)
+			assert.Equal(t, test.expectResizeAllocation, podResizeAlloc)
+			ClearPodResizeAllocation(pod)
+		})
+	}
+}
