@@ -848,7 +848,7 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 	// We need to wait for the device to be attached to the node.
 	err = wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, true,
 		func(ctx context.Context) (bool, error) {
-			return pl.hasDeviceBindingStatus(ctx, state, pod, nodeName)
+			return pl.hasDeviceBindingStatus(state, pod, nodeName)
 		})
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
@@ -983,12 +983,9 @@ func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool
 
 // hasDeviceBindingStatus checks the binding status of devices within the
 // given state claims.
-// It returns an error if binding has failed.
-// It returns true if (and only if) all binding conditions are true,
-// which includes the case when there are no binding conditions.
-func (pl *DynamicResources) hasDeviceBindingStatus(ctx context.Context, state *stateData, pod *v1.Pod, nodeName string) (bool, error) {
+func (pl *DynamicResources) hasDeviceBindingStatus(state *stateData, pod *v1.Pod, nodeName string) (bool, error) {
 	for claimIndex, claim := range state.claims {
-		claim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).Get(ctx, claim.Name, metav1.GetOptions{})
+		claim, err := pl.draManager.ResourceClaims().Get(claim.Namespace, claim.Name)
 		if err != nil {
 			return false, err
 		}
