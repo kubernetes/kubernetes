@@ -14,121 +14,85 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script runs e2e tests on Google Cloud Platform.
-# Usage: `hack/ginkgo-e2e.sh`.
+# This script replaces hack/ginkgo-e2e.sh when not using a cloud provider.
+#
+# It always runs e2e tests without provider=skeleton and reads cluster info only
+# from KUBECONFIG, with no special GCP setup code and no dependency on cluster/
+#
+# It does not pass any cloud provider related flags and is not compatible with
+# ginkgo-e2e.sh, please use ginkgo-e2e.sh when testing with the existing cloud
+# provider support and tests that require this.
+#
+#
+# Usage: `hack/e2e.sh`.
+#
+# Make sure the current KUBECONFIG points to the desired cluster to test.
+#
+# You also need to build e2e.test and ginkgo, and you should build kubectl though
+# it can fall back to the system kubectl.
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Find the ginkgo binary build as part of the release.
-ginkgo=$(kube::util::find-binary "ginkgo")
-e2e_test=$(kube::util::find-binary "e2e.test")
-
-# --- Setup some env vars.
-
-GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
-GINKGO_SILENCE_SKIPS=${GINKGO_SILENCE_SKIPS:-y} # set to 'n' to see S character for each skipped test
-GINKGO_FORCE_NEWLINES=${GINKGO_FORCE_NEWLINES:-$( if [ "${CI:-false}" = "true" ]; then echo "y"; else echo "n"; fi )} # set to 'y' to print a newline after each S or o character
-CLOUD_CONFIG=${CLOUD_CONFIG:-""}
-
-
-# If 'y', Ginkgo's reporter will not use escape sequence to color output.
+# Options
+################################################################################
+# GINKGO_PARALLEL: set to 'y' to run tests in parallel
+GINKGO_PARALLEL=${GINKGO_PARALLEL:-n}
+# GINKGO_SILENCE_SKIPS: set to 'n' to see S character for each skipped test
+GINKGO_SILENCE_SKIPS=${GINKGO_SILENCE_SKIPS:-y}
+# GINKGO_FORCE_NEWLINES: set to 'y' to print a newline after each S or o character
+GINKGO_FORCE_NEWLINES=${GINKGO_FORCE_NEWLINES:-$( if [ "${CI:-false}" = "true" ]; then echo "y"; else echo "n"; fi )}
+# GINKGO_NO_COLOR: If 'y', Ginkgo's reporter will not use escape sequence to color output.
 #
 # Since Kubernetes 1.25, the default is to use colors only when connected to
-# a terminal. That is the right choice for all Prow jobs (Spyglass doesn't
+# a terminal. That is the right choice for all Prow jobs (The UI doesn't
 # render them properly).
 GINKGO_NO_COLOR=${GINKGO_NO_COLOR:-$(if [ -t 2 ]; then echo n; else echo y; fi)}
-
-# If set, the command executed will be:
+# E2E_TEST_DEBUG_TOOL: If set, the command executed will be:
 # - `dlv exec` if set to "delve"
 # - `gdb` if set to "gdb"
 # NOTE: for this to work the e2e.test binary has to be compiled with
 # make DBG=1 WHAT=test/e2e/e2e.test
 E2E_TEST_DEBUG_TOOL=${E2E_TEST_DEBUG_TOOL:-}
-
-: "${KUBECTL:="${KUBE_ROOT}/cluster/kubectl.sh"}"
-: "${KUBE_CONFIG_FILE:="config-test.sh"}"
-
-export KUBECTL KUBE_CONFIG_FILE
-
-source "${KUBE_ROOT}/cluster/kube-util.sh"
-
-function detect-master-from-kubeconfig() {
-    export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-
-    local cc
-    cc=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
-    if [[ -n "${KUBE_CONTEXT:-}" ]]; then
-      cc="${KUBE_CONTEXT}"
-    fi
-    local cluster
-    cluster=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
-    KUBE_MASTER_URL=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
-}
-
-# ---- Do cloud-provider-specific setup
-if [[ -n "${KUBERNETES_CONFORMANCE_TEST:-}" ]]; then
-    echo "Conformance test: not doing test setup."
-    KUBERNETES_PROVIDER=${KUBERNETES_CONFORMANCE_PROVIDER:-"skeleton"}
-
-    detect-master-from-kubeconfig
-
-    auth_config=(
-      "--kubeconfig=${KUBECONFIG}"
-    )
-else
-    echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
-
-    prepare-e2e
-
-    detect-master >/dev/null
-
-    KUBE_MASTER_URL="${KUBE_MASTER_URL:-}"
-    if [[ -z "${KUBE_MASTER_URL:-}" && -n "${KUBE_MASTER_IP:-}" ]]; then
-      KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
-    fi
-
-    auth_config=(
-      "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
-    )
-fi
-
-if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
-  NODE_INSTANCE_GROUP="${NODE_INSTANCE_PREFIX}-group"
-fi
-
-if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-  set_num_migs
-  NODE_INSTANCE_GROUP=""
-  for ((i=1; i<=NUM_MIGS; i++)); do
-    if [[ ${i} == "${NUM_MIGS}" ]]; then
-      # We are assigning the same mig names as create-nodes function from cluster/gce/util.sh.
-      NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group"
-    else
-      NODE_INSTANCE_GROUP="${NODE_INSTANCE_GROUP}${NODE_INSTANCE_PREFIX}-group-${i},"
-    fi
-  done
-fi
-
-# TODO(kubernetes/test-infra#3330): Allow NODE_INSTANCE_GROUP to be
-# set before we get here, which eliminates any cluster/gke use if
-# KUBERNETES_CONFORMANCE_PROVIDER is set to "gke".
-if [[ -z "${NODE_INSTANCE_GROUP:-}" ]] && [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-  detect-node-instance-groups
-  NODE_INSTANCE_GROUP=$(kube::util::join , "${NODE_INSTANCE_GROUP[@]}")
-fi
-
-if [[ "${KUBERNETES_PROVIDER}" == "azure" ]]; then
-    if [[ ${CLOUD_CONFIG} == "" ]]; then
-        echo "Missing azure cloud config"
-        exit 1
+# KUBE_DNS_DOMAIN: defaults to cluster.local, passed to tests.
+KUBE_DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
+# PREPULL_IMAGES: if set, tell e2e.test to pre-pull test images.
+PREPULL_IMAGES="${PREPULL_IMAGES:-false}"
+# KUBECTL: the kubectl binary to use, defaults to the one found in _output
+KUBECTL="${KUBECTL:-"$(kube::util::find-binary "kubectl")"}"
+if [[ ! -x "$KUBECTL" ]]; then
+    echo "WARNING: No kubectl found in _output, falling back on system kubectl ..."
+    KUBECTL="kubectl"
+    if ! command -v "${KUBECTL}"; then
+        echo "ERROR: Failed to find system kubectl fallback, kubectl is required to test. Exiting"
+        exit -1
     fi
 fi
+export KUBECTL
+# NUM_NODES: If set, explicitly inform the tests how many worker nodes exist
+# Otherwise e2e.test will attempt to auto-detect it.
+# Not passed if not set.
+################################################################################
+
+# Find the locally compiled ginkgo and e2e.test binary
+ginkgo=$(kube::util::find-binary "ginkgo")
+e2e_test=$(kube::util::find-binary "e2e.test")
+
+
+# TODO: e2e.test should probably handle this inside the binary instead of bash
+local cc
+cc=$("${KUBECTL}" config view -o jsonpath="{.current-context}")
+if [[ -n "${KUBE_CONTEXT:-}" ]]; then
+    cc="${KUBE_CONTEXT}"
+fi
+local cluster
+cluster=$("${KUBECTL}" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.cluster}")
+KUBE_MASTER_URL=$("${KUBECTL}" config view -o jsonpath="{.clusters[?(@.name == \"${cluster}\")].cluster.server}")
+
 
 # These arguments are understood by both Ginkgo test suite and CLI.
 # Some arguments (like --nodes) are only supported when using the CLI.
@@ -139,8 +103,8 @@ ginkgo_args=(
   "--source-root=${KUBE_ROOT}"
 )
 
-# NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, set it manually here as "24h"
-# for backward compatibility purpose.
+# NOTE: Ginkgo's default timeout has been reduced from 24h to 1h in V2, 
+# set it manually here as "24h" for backward compatibility purpose.
 ginkgo_args+=("--timeout=${GINKGO_TIMEOUT:-24h}")
 
 if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
@@ -255,26 +219,10 @@ case "${GINKGO_SHOW_COMMAND:-${CI:-no}}" in y|yes|true) set -x ;; esac
 "${program[@]}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --host="${KUBE_MASTER_URL}" \
-  --provider="${KUBERNETES_PROVIDER}" \
-  --gce-project="${PROJECT:-}" \
-  --gce-zone="${ZONE:-}" \
-  --gce-region="${REGION:-}" \
-  --gce-multizone="${MULTIZONE:-false}" \
-  --gke-cluster="${CLUSTER_NAME:-}" \
-  --kube-master="${KUBE_MASTER:-}" \
-  --cluster-tag="${CLUSTER_ID:-}" \
-  --cloud-config-file="${CLOUD_CONFIG:-}" \
+  --provider=skeleton \
   --repo-root="${KUBE_ROOT}" \
-  --node-instance-group="${NODE_INSTANCE_GROUP:-}" \
-  --prefix="${KUBE_GCE_INSTANCE_PREFIX:-e2e}" \
-  --network="${KUBE_GCE_NETWORK:-${KUBE_GKE_NETWORK:-e2e}}" \
-  --node-tag="${NODE_TAG:-}" \
-  --master-tag="${MASTER_TAG:-}" \
-  --docker-config-file="${DOCKER_CONFIG_FILE:-}" \
-  --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
-  --prepull-images="${PREPULL_IMAGES:-false}" \
-  ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
-  ${NODE_OS_DISTRIBUTION:+"--node-os-distro=${NODE_OS_DISTRIBUTION}"} \
+  --dns-domain="${KUBE_DNS_DOMAIN}" \
+  --prepull-images="${PREPULL_IMAGES}" \
   ${NUM_NODES:+"--num-nodes=${NUM_NODES}"} \
   ${E2E_REPORT_DIR:+"--report-dir=${E2E_REPORT_DIR}"} \
   ${E2E_REPORT_PREFIX:+"--report-prefix=${E2E_REPORT_PREFIX}"} \
