@@ -891,7 +891,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
+			policyName:         kubeletconfig.StaticCPUManagerPolicy,
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -933,7 +933,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		reservedSystemCPUs := cpuset.New(0)
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
+			policyName:         kubeletconfig.StaticCPUManagerPolicy,
 			reservedSystemCPUs: reservedSystemCPUs,
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -959,7 +959,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			cpumanager.StrictCPUReservationOption: "true",
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:              string(cpumanager.PolicyStatic),
+			policyName:              kubeletconfig.StaticCPUManagerPolicy,
 			reservedSystemCPUs:      reservedSystemCPUs,
 			enableCPUManagerOptions: true,
 			options:                 cpuPolicyOptions,
@@ -998,7 +998,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
@@ -1035,7 +1035,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      reservedSystemCPUs,
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
@@ -1058,7 +1058,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
+				policyName:                       kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: true,
 			},
@@ -1079,7 +1079,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:                       string(cpumanager.PolicyStatic),
+				policyName:                       kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:               cpuset.New(0),
 				disableCPUQuotaWithExclusiveCPUs: false,
 			},
@@ -1101,7 +1101,7 @@ func runCPUManagerTests(f *framework.Framework) {
 
 		// Enable CPU Manager in the kubelet.
 		newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-			policyName:         string(cpumanager.PolicyStatic),
+			policyName:         kubeletconfig.StaticCPUManagerPolicy,
 			reservedSystemCPUs: cpuset.CPUSet{},
 		})
 		updateKubeletConfig(ctx, f, newCfg, true)
@@ -1185,7 +1185,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
@@ -1259,7 +1259,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		}
 		newCfg := configureCPUManagerInKubelet(oldCfg,
 			&cpuManagerKubeletArguments{
-				policyName:              string(cpumanager.PolicyStatic),
+				policyName:              kubeletconfig.StaticCPUManagerPolicy,
 				reservedSystemCPUs:      cpuset.New(0),
 				enableCPUManagerOptions: true,
 				options:                 cpuPolicyOptions,
