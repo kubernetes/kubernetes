@@ -505,6 +505,24 @@ func ResizeContainerPatch(containers []ResizableContainerInfo) (string, error) {
 	return string(patchBytes), nil
 }
 
+// UpdateExpectedContainerRestarts updates the RestartCounts in expectedContainers by
+// adding them to the existing RestartCounts in the containerStatuses of the provided pod.
+// This reduces the flakiness of the RestartCount assertions by grabbing the current
+// restart count right before the resize operation, and verify the expected increment (0 or 1)
+// rather than the absolute count.
+func UpdateExpectedContainerRestarts(ctx context.Context, pod *v1.Pod, expectedContainers []ResizableContainerInfo) []ResizableContainerInfo {
+	initialRestarts := make(map[string]int32)
+	newExpectedContainers := []ResizableContainerInfo{}
+	for _, ctr := range pod.Status.ContainerStatuses {
+		initialRestarts[ctr.Name] = ctr.RestartCount
+	}
+	for i, ctr := range expectedContainers {
+		newExpectedContainers = append(newExpectedContainers, expectedContainers[i])
+		newExpectedContainers[i].RestartCount += initialRestarts[ctr.Name]
+	}
+	return newExpectedContainers
+}
+
 func formatErrors(err error) error {
 	// Put each error on a new line for readability.
 	var agg utilerrors.Aggregate
