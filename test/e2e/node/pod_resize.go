@@ -133,7 +133,7 @@ func doPodResizeAdmissionPluginsTests() {
 				{"name":"c1", "resources":{"requests":{"cpu":"600m"},"limits":{"cpu":"600m"}}}
 			]}}`
 			patchStringExceedMemory := `{"spec":{"containers":[
-				{"name":"c1", "resources":{"requests":{"cpu":"250m","memory":"750Mi"},"limits":{"cpu":"250m","memory":"750Mi"}}}
+				{"name":"c1", "resources":{"requests":{"memory":"750Mi"},"limits":{"memory":"750Mi"}}}
 			]}}`
 
 			tc.enableAdmissionPlugin(ctx, f)
@@ -161,6 +161,8 @@ func doPodResizeAdmissionPluginsTests() {
 
 			ginkgo.By("waiting for resize to be actuated")
 			resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
+
+			ginkgo.By("verifying pod resized")
 			e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
 
 			ginkgo.By("verifying pod resources after resize")
