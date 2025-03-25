@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -2952,6 +2953,27 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 	return false, ""
 }
 
+// Get pod resize info in json format
+func getPodResizeInfo(pod *v1.Pod) (string, error) {
+	// Check podAllocs info
+	var jsonData []byte
+	var err error
+
+	podAlloc, exist := allocation.GetPodResizeAllocation(pod)
+	if !exist {
+		return "", nil
+	}
+
+	jsonData, err = json.Marshal(podAlloc)
+	if err != nil {
+		return "", fmt.Errorf("podAlloc JSON error: %w", err)
+	}
+
+	finalMsg := fmt.Sprintf("Pod resize completed, %s", string(jsonData))
+
+	return finalMsg, nil
+}
+
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
@@ -2967,6 +2989,21 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
 		} else {
 			// (Allocated == Actual) => clear the resize in-progress status.
+			// If pod resize completed, print ResizeCompleted event
+			resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
+			ifPodResizeInProgress := slices.ContainsFunc(resizeStatus, func(cond *v1.PodCondition) bool {
+				return cond != nil && cond.Type == v1.PodConditionType("PodResizeInProgress")
+			})
+			if ifPodResizeInProgress {
+				if msg, err := getPodResizeInfo(pod); err == nil {
+					kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
+				} else {
+					klog.ErrorS(err, "Pod Resize info error")
+				}
+				// Clear resize data after pod resize complete
+				allocation.ClearPodResizeAllocation(pod)
+			}
+
 			kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 		}
 	}()
