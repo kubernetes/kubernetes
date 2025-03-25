@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -58,8 +59,7 @@ func TestRegistrationHandler(t *testing.T) {
 		},
 	}
 
-	for _, test := range []struct {
-		description       string
+	for description, test := range map[string]struct {
 		pluginName        string
 		endpoint          string
 		withClient        bool
@@ -67,50 +67,43 @@ func TestRegistrationHandler(t *testing.T) {
 		shouldError       bool
 		chosenService     string
 	}{
-		{
-			description: "no-services-provided",
+		"no-services-provided": {
 			pluginName:  pluginB,
 			endpoint:    endpointB,
 			shouldError: true,
 		},
-		{
-			description:       "current-service",
+		"current-service": {
 			pluginName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
-		{
-			description:       "two-services",
+		"two-services": {
 			pluginName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapbv1alpha4.NodeService, drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
-		{
-			description:       "old-service",
+		"old-service": {
 			pluginName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapbv1alpha4.NodeService},
 			chosenService:     drapbv1alpha4.NodeService,
 		},
-		{
+		"version": {
 			// Legacy behavior.
-			description:       "version",
 			pluginName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{"1.0.0"},
 			chosenService:     drapbv1alpha4.NodeService,
 		},
-		{
-			description:       "replace",
+		"replace": {
 			pluginName:        pluginA,
 			endpoint:          endpointB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
-		{
-			description:       "manage-resource-slices",
+		"manage-resource-slices": {
 			withClient:        true,
 			pluginName:        pluginB,
 			endpoint:          endpointB,
@@ -118,7 +111,7 @@ func TestRegistrationHandler(t *testing.T) {
 			chosenService:     drapb.DRAPluginService,
 		},
 	} {
-		t.Run(test.description, func(t *testing.T) {
+		t.Run(description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 
 			// Stand-alone kubelet has no connection to an
@@ -130,7 +123,11 @@ func TestRegistrationHandler(t *testing.T) {
 				fakeClient.AddReactor("delete-collection", "resourceslices", func(action cgotesting.Action) (bool, runtime.Object, error) {
 					deleteAction := action.(cgotesting.DeleteCollectionAction)
 					restrictions := deleteAction.GetListRestrictions()
-					fieldsSelector := fields.SelectorFromSet(expectedSliceFields)
+					if !restrictions.Labels.Empty() {
+						return false, nil, fmt.Errorf("unexpected label selector: %s, expected empty selector", restrictions.Labels.String())
+					}
+
+					expectedFieldsSelector := fields.SelectorFromSet(expectedSliceFields)
 					// The order of field requirements is random because it comes
 					// from a map. We need to sort.
 					normalize := func(selector string) string {
@@ -138,8 +135,11 @@ func TestRegistrationHandler(t *testing.T) {
 						sort.Strings(requirements)
 						return strings.Join(requirements, ",")
 					}
-					assert.Equal(t, "", restrictions.Labels.String(), "label selector in DeleteCollection")
-					assert.Equal(t, normalize(fieldsSelector.String()), normalize(restrictions.Fields.String()), "field selector in DeleteCollection")
+					normalizedFieldsSelector := normalize(restrictions.Fields.String())
+					normalizedExpectedFieldsSelector := normalize(expectedFieldsSelector.String())
+					if normalizedFieldsSelector != normalizedExpectedFieldsSelector {
+						return false, nil, fmt.Errorf("unexpected field selector %s, expected: %s", normalizedFieldsSelector, normalizedExpectedFieldsSelector)
+					}
 
 					// There's only one object that could get matched, so delete it.
 					// Delete doesn't return an error if already deleted, which is what
