@@ -225,7 +225,7 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 //     updates failed on conflict errors and we have retries left, re-get the failed quota from our cache for the latest version
 //     and recurse into this method with the subset.  It's safe for us to evaluate ONLY the subset, because the other quota
 //     documents for these waiters have already been evaluated.  Step 1, will mark all the ones that should already have succeeded.
-func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAttributes []*admissionWaiter, remainingRetries int) {
+func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAttributes []*admissionWaiter, retries int) {
 	// yet another copy to compare against originals to see if we actually have deltas
 	originalQuotas, err := copyQuotas(quotas)
 	if err != nil {
@@ -277,6 +277,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 	// 3. if the quota changed and the update fails, add the original to a retry list
 	var updatedFailedQuotas []corev1.ResourceQuota
 	var lastErr error
+	remainingRetries := retries - 1
 	for i := range quotas {
 		newQuota := quotas[i]
 
@@ -286,6 +287,10 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 		}
 
 		if err := e.quotaAccessor.UpdateQuotaStatus(&newQuota); err != nil {
+			// If there is a transient update error, it doesn't count against the retry quota
+			if apierrors.IsConflict(err) {
+				remainingRetries = retries
+			}
 			updatedFailedQuotas = append(updatedFailedQuotas, newQuota)
 			lastErr = err
 		}
@@ -338,7 +343,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []corev1.ResourceQuota, admissionAtt
 			}
 		}
 	}
-	e.checkQuotas(quotasToCheck, admissionAttributes, remainingRetries-1)
+	e.checkQuotas(quotasToCheck, admissionAttributes, remainingRetries)
 }
 
 func copyQuotas(in []corev1.ResourceQuota) ([]corev1.ResourceQuota, error) {
