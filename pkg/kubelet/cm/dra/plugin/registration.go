@@ -217,13 +217,14 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	pluginInstance := &Plugin{
-		name:              pluginName,
-		backgroundCtx:     ctx,
-		cancel:            cancel,
-		conn:              nil,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: timeout,
+		name:                pluginName,
+		backgroundCtx:       ctx,
+		cancel:              cancel,
+		conn:                nil,
+		endpoint:            endpoint,
+		chosenService:       chosenService,
+		clientCallTimeout:   timeout,
+		registrationHandler: h,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key

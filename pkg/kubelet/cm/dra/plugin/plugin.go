@@ -57,11 +57,12 @@ type Plugin struct {
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
-	mutex             sync.Mutex
-	conn              *grpc.ClientConn
-	endpoint          string
-	chosenService     string // e.g. drapbv1beta1.DRAPluginService
-	clientCallTimeout time.Duration
+	mutex               sync.Mutex
+	conn                *grpc.ClientConn
+	endpoint            string
+	chosenService       string // e.g. drapbv1beta1.DRAPluginService
+	registrationHandler *RegistrationHandler
+	clientCallTimeout   time.Duration
 }
 
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
