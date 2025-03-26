@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"path"
 	"sort"
 	"strings"
@@ -47,6 +48,71 @@ const (
 
 func getFakeNode() (*v1.Node, error) {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}, nil
+}
+
+func getSlice(name string) *resourceapi.ResourceSlice {
+	return &resourceapi.ResourceSlice{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: resourceapi.ResourceSliceSpec{
+			NodeName: nodeName,
+		},
+	}
+}
+
+func getFakeClient(t *testing.T, nodeName, pluginName string, slice *resourceapi.ResourceSlice) kubernetes.Interface {
+	expectedSliceFields := fields.Set{"spec.nodeName": nodeName}
+	fakeClient := fake.NewClientset(slice)
+	fakeClient.AddReactor("delete-collection", "resourceslices", func(action cgotesting.Action) (bool, runtime.Object, error) {
+		deleteAction := action.(cgotesting.DeleteCollectionAction)
+		restrictions := deleteAction.GetListRestrictions()
+		fieldsSelector := fields.SelectorFromSet(expectedSliceFields)
+		// The order of field requirements is random because it comes
+		// from a map. We need to sort.
+		normalize := func(selector string) string {
+			requirements := strings.Split(selector, ",")
+			sort.Strings(requirements)
+			return strings.Join(requirements, ",")
+		}
+		assert.Empty(t, restrictions.Labels.String(), "label selector in DeleteCollection")
+		assert.Equal(t, normalize(fieldsSelector.String()), normalize(restrictions.Fields.String()), "field selector in DeleteCollection")
+
+		// There's only one object that could get matched, so delete it.
+		// Delete doesn't return an error if already deleted, which is what
+		// we need here (no error when nothing to delete).
+		err := fakeClient.Tracker().Delete(resourceapi.SchemeGroupVersion.WithResource("resourceslices"), "", slice.Name)
+
+		// Set expected slice fields for the next call of this reactor.
+		// The reactor will be called next time when resourceslices object is deleted
+		// by the kubelet after plugin deregistration.
+		switch len(expectedSliceFields) {
+		case 1:
+			// Startup cleanup done, now expect cleanup for test plugin.
+			expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": pluginName}
+		case 2:
+			// Test plugin cleanup done, now expect cleanup for the other plugin.
+			otherPlugin := pluginA
+			if otherPlugin == pluginName {
+				otherPlugin = pluginB
+			}
+			expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": otherPlugin}
+		}
+		return true, nil, err
+	})
+	return fakeClient
+}
+
+func requireNoSlices(t *testing.T, ctx context.Context, client kubernetes.Interface) {
+	t.Helper()
+	if client == nil {
+		return
+	}
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		slices, err := client.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{})
+		if !assert.NoError(t, err, "list slices") {
+			return
+		}
+		assert.Empty(t, slices.Items, "slices")
+	}, time.Minute, time.Second)
 }
 
 func TestRegistrationHandler(t *testing.T) {
@@ -136,64 +202,14 @@ func TestRegistrationHandler(t *testing.T) {
 			// apiserver, so faking one is optional.
 			var client kubernetes.Interface
 			if test.withClient {
-				expectedSliceFields := fields.Set{"spec.nodeName": nodeName}
-				fakeClient := fake.NewClientset(slice)
-				fakeClient.AddReactor("delete-collection", "resourceslices", func(action cgotesting.Action) (bool, runtime.Object, error) {
-					deleteAction := action.(cgotesting.DeleteCollectionAction)
-					restrictions := deleteAction.GetListRestrictions()
-					fieldsSelector := fields.SelectorFromSet(expectedSliceFields)
-					// The order of field requirements is random because it comes
-					// from a map. We need to sort.
-					normalize := func(selector string) string {
-						requirements := strings.Split(selector, ",")
-						sort.Strings(requirements)
-						return strings.Join(requirements, ",")
-					}
-					assert.Equal(t, "", restrictions.Labels.String(), "label selector in DeleteCollection")
-					assert.Equal(t, normalize(fieldsSelector.String()), normalize(restrictions.Fields.String()), "field selector in DeleteCollection")
-
-					// There's only one object that could get matched, so delete it.
-					// Delete doesn't return an error if already deleted, which is what
-					// we need here (no error when nothing to delete).
-					err := fakeClient.Tracker().Delete(resourceapi.SchemeGroupVersion.WithResource("resourceslices"), "", slice.Name)
-
-					// Set expected slice fields for the next call of this reactor.
-					// The reactor will be called next time when resourceslices object is deleted
-					// by the kubelet after plugin deregistration.
-					switch len(expectedSliceFields) {
-					case 1:
-						// Startup cleanup done, now expect cleanup for test plugin.
-						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.pluginName}
-					case 2:
-						// Test plugin cleanup done, now expect cleanup for the other plugin.
-						otherPlugin := pluginA
-						if otherPlugin == test.pluginName {
-							otherPlugin = pluginB
-						}
-						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": otherPlugin}
-					}
-					return true, nil, err
-				})
-				client = fakeClient
+				client = getFakeClient(t, nodeName, test.pluginName, getSlice("test-slice"))
 			}
 
 			// The handler wipes all slices at startup.
 			handler := newRegistrationHandler(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
 			tCtx.Cleanup(handler.Stop)
-			requireNoSlices := func() {
-				t.Helper()
-				if client == nil {
-					return
-				}
-				require.EventuallyWithT(t, func(t *assert.CollectT) {
-					slices, err := client.ResourceV1beta1().ResourceSlices().List(tCtx, metav1.ListOptions{})
-					if !assert.NoError(t, err, "list slices") {
-						return
-					}
-					assert.Empty(t, slices.Items, "slices")
-				}, time.Minute, time.Second)
-			}
-			requireNoSlices()
+
+			requireNoSlices(t, tCtx, client)
 
 			// Simulate one existing plugin A.
 			err = handler.RegisterPlugin(pluginA, endpointA, []string{service}, nil)
@@ -246,10 +262,89 @@ func TestRegistrationHandler(t *testing.T) {
 				// Nop.
 				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
 
-				requireNoSlices()
+				requireNoSlices(t, tCtx, client)
 			})
 			assert.Equal(t, test.endpoint, plugin.endpoint, "plugin endpoint")
 			assert.Equal(t, test.chosenService, plugin.chosenService, "chosen service")
+		})
+	}
+}
+
+func TestConnectionHandling(t *testing.T) {
+	for description, test := range map[string]struct {
+		delay               time.Duration
+		requireSliceRemoval bool
+	}{
+		"wipe-slices-on-disconnect": {
+			delay:               time.Second, // very short wiping delay for testing
+			requireSliceRemoval: true,
+		},
+		"no-wipe-slices-on-reconnect": {
+			delay:               time.Minute, // long delay to avoid wiping
+			requireSliceRemoval: false,
+		},
+	} {
+		t.Run(description, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+
+			service := drapb.DRAPluginService
+			pluginName := "test-plugin"
+			sliceName := "test-slice"
+
+			slice := getSlice(sliceName)
+			client := getFakeClient(t, nodeName, pluginName, slice)
+
+			// The handler wipes all slices at startup.
+			handler := newRegistrationHandler(tCtx, client, getFakeNode, test.delay)
+			tCtx.Cleanup(handler.Stop)
+
+			// Run GRPC service
+			endpoint := path.Join(t.TempDir(), "dra-plugin-test.sock")
+			teardown, err := setupFakeGRPCServer(service, endpoint)
+			require.NoError(t, err)
+			defer teardown()
+
+			requireNoSlices(t, tCtx, client)
+
+			err = handler.RegisterPlugin(pluginName, endpoint, []string{service}, nil)
+			require.NoError(t, err)
+
+			err = WaitForConnection(tCtx, pluginName, endpoint, ConnectionPollInterval, ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to plugin %s at %s", pluginName, endpoint)
+
+			plugin := draPlugins.get(pluginName)
+			assert.NotNil(t, plugin, "plugin should present in the plugin store")
+			assert.NotNil(t, plugin.conn, "plugin should be connected")
+
+			// Create the slice as if the plugin had done that while it runs.
+			_, err = client.ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+			require.NoError(t, err, "recreate slice")
+
+			// Simulate connection drop
+			require.NoError(t, plugin.conn.Close())
+
+			if test.requireSliceRemoval {
+				// Slice should be removed
+				requireNoSlices(t, tCtx, client)
+			} else {
+				// Simulate reconnect
+				plugin.conn = nil
+				conn, err := plugin.getOrCreateGRPCConn()
+				require.NoError(t, err, "failed to create gRPC connection for plugin %s", pluginName)
+				assert.NotNil(t, conn, "gRPC connection should be created")
+
+				// There shouldn't be any pending wipes for the plugin.
+				require.Eventuallyf(t, func() bool {
+					handler.mutex.Lock()
+					defer handler.mutex.Unlock()
+					return handler.pendingWipes != nil && handler.pendingWipes[pluginName] == nil
+				}, time.Minute, time.Second, "wiping should be stopped for plugin %s", pluginName)
+
+				// Slice should still be there
+				slices, err := client.ResourceV1beta1().ResourceSlices().List(tCtx, metav1.ListOptions{})
+				require.NoError(t, err, "list slices")
+				assert.Len(t, slices.Items, 1, "slices")
+			}
 		})
 	}
 }
