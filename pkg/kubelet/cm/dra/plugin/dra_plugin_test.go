@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 	"sync"
 	"testing"
@@ -56,18 +56,13 @@ func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1
 	return &drapbv1beta1.NodeUnprepareResourcesResponse{}, nil
 }
 
+// tearDown is an idempotent cleanup function.
 type tearDown func()
 
-func setupFakeGRPCServer(service string) (string, tearDown, error) {
-	p, err := os.MkdirTemp("", "dra_plugin")
-	if err != nil {
-		return "", nil, err
-	}
-
-	closeCh := make(chan struct{})
-	addr := filepath.Join(p, "server.sock")
+func setupFakeGRPCServer(service, addr string) (tearDown, error) {
+	ctx, cancel := context.WithCancel(context.Background())
 	teardown := func() {
-		close(closeCh)
+		cancel()
 		if err := os.RemoveAll(addr); err != nil {
 			panic(err)
 		}
@@ -76,7 +71,7 @@ func setupFakeGRPCServer(service string) (string, tearDown, error) {
 	listener, err := net.Listen("unix", addr)
 	if err != nil {
 		teardown()
-		return "", nil, err
+		return nil, err
 	}
 
 	s := grpc.NewServer()
@@ -87,7 +82,7 @@ func setupFakeGRPCServer(service string) (string, tearDown, error) {
 	case drapbv1alpha4.NodeService:
 		drapbv1alpha4.RegisterNodeServer(s, drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 	default:
-		return "", nil, fmt.Errorf("unsupported gRPC service: %s", service)
+		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}
 
 	go func() {
@@ -96,17 +91,18 @@ func setupFakeGRPCServer(service string) (string, tearDown, error) {
 				panic(err)
 			}
 		}()
-		<-closeCh
+		<-ctx.Done()
 		s.GracefulStop()
 	}()
 
-	return addr, teardown, nil
+	return teardown, nil
 }
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	service := drapbv1beta1.DRAPluginService
-	addr, teardown, err := setupFakeGRPCServer(service)
+	addr := path.Join(t.TempDir(), "dra.sock")
+	teardown, err := setupFakeGRPCServer(service, addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,27 +208,23 @@ func TestGetDRAPlugin(t *testing.T) {
 func TestGRPCMethods(t *testing.T) {
 	for _, test := range []struct {
 		description   string
-		serverSetup   func(string) (string, tearDown, error)
 		service       string
 		chosenService string
 		expectError   string
 	}{
 		{
 			description:   "v1alpha4",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1alpha4.NodeService,
 			chosenService: drapbv1alpha4.NodeService,
 		},
 		{
 			description:   "v1beta1",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: drapbv1beta1.DRAPluginService,
 		},
 		{
 			// In practice, such a mismatch between plugin and kubelet should not happen.
 			description:   "mismatch",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: drapbv1alpha4.NodeService,
 			expectError:   "unknown service v1alpha3.Node",
@@ -240,7 +232,6 @@ func TestGRPCMethods(t *testing.T) {
 		{
 			// In practice, kubelet wouldn't choose an invalid service.
 			description:   "internal-error",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: "some-other-service",
 			expectError:   "unsupported chosen service",
@@ -248,7 +239,8 @@ func TestGRPCMethods(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			addr, teardown, err := setupFakeGRPCServer(test.service)
+			addr := path.Join(t.TempDir(), "dra.sock")
+			teardown, err := setupFakeGRPCServer(test.service, addr)
 			if err != nil {
 				t.Fatal(err)
 			}
