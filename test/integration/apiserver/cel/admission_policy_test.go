@@ -499,24 +499,14 @@ func TestPolicyAdmission(t *testing.T) {
 	// Note: this only works because there are no overlapping resource names in-process that are not co-located
 	convertedResources := map[string]schema.GroupVersionResource{}
 	// build the webhook rules enumerating the specific group/version/resources we want
-	convertedV1beta1Rules := []admissionregistrationv1beta1.NamedRuleWithOperations{}
 	convertedV1Rules := []admissionregistrationv1.NamedRuleWithOperations{}
 	for _, gvr := range gvrsToTest {
 		metaGVR := metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
 
 		convertedGVR, ok := convertedResources[gvr.Resource]
 		if !ok {
-			// this is the first time we've seen this resource
-			// record the fully qualified resource we expect
 			convertedGVR = gvr
 			convertedResources[gvr.Resource] = gvr
-			// add an admission rule indicating we can receive this version
-			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionregistrationv1beta1.NamedRuleWithOperations{
-				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
-					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
-					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
-				},
-			})
 			convertedV1Rules = append(convertedV1Rules, admissionregistrationv1.NamedRuleWithOperations{
 				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
 					Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.OperationAll},
@@ -530,20 +520,168 @@ func TestPolicyAdmission(t *testing.T) {
 		holder.gvrToConvertedGVK[metaGVR] = schema.GroupVersionKind{Group: resourcesByGVR[convertedGVR].Group, Version: resourcesByGVR[convertedGVR].Version, Kind: resourcesByGVR[convertedGVR].Kind}
 	}
 
-	if err := createV1beta1ValidatingPolicyAndBinding(client, convertedV1beta1Rules); err != nil {
-		t.Fatal(err)
-	}
 	if err := createV1ValidatingPolicyAndBinding(client, convertedV1Rules); err != nil {
 		t.Fatal(err)
 	}
 
-	// Allow the policy & binding to establish
 	time.Sleep(1 * time.Second)
 
 	start := time.Now()
 	count := 0
 
 	// Test admission on all resources, subresources, and verbs
+	for _, gvr := range gvrsToTest {
+		resource := resourcesByGVR[gvr]
+		t.Run(gvr.Group+"."+gvr.Version+"."+strings.ReplaceAll(resource.Name, "/", "."), func(t *testing.T) {
+			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
+				if shouldTestResourceVerb(gvr, resource, verb) {
+					t.Run(verb, func(t *testing.T) {
+						count++
+						holder.reset(t)
+						testFunc := getTestFunc(gvr, verb)
+						testFunc(&testContext{
+							t:               t,
+							admissionHolder: holder,
+							client:          dynamicClient,
+							clientset:       client,
+							verb:            verb,
+							gvr:             gvr,
+							resource:        resource,
+							resources:       resourcesByGVR,
+						})
+						holder.verify(t)
+					})
+				}
+			}
+		})
+	}
+
+	if count >= 10 {
+		duration := time.Since(start)
+		perResourceDuration := time.Duration(int(duration) / count)
+		if perResourceDuration >= 150*time.Millisecond {
+			t.Errorf("expected resources to process in < 150ms, average was %v", perResourceDuration)
+		}
+	}
+}
+
+func TestV1Beta1PolicyAdmission(t *testing.T) {
+	holder := &policyExpectationHolder{
+		holder: holder{
+			t:                 t,
+			gvrToConvertedGVR: map[metav1.GroupVersionResource]metav1.GroupVersionResource{},
+			gvrToConvertedGVK: map[metav1.GroupVersionResource]schema.GroupVersionKind{},
+		},
+	}
+
+	server := apiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--enable-admission-plugins", "ValidatingAdmissionPolicy",
+		"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection",
+		"--runtime-config=api/all=true",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	clientConfig := server.ClientConfig
+	clientConfig.Impersonate.UserName = testClientUsername
+	clientConfig.Impersonate.Groups = []string{"system:masters", "system:authenticated"}
+	clientConfig.WarningHandler = holder
+	client, err := clientset.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
+
+	if _, err := client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, resources, err := client.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		t.Fatalf("Failed to get ServerGroupsAndResources with error: %+v", err)
+	}
+
+	gvrsToTest := []schema.GroupVersionResource{}
+	resourcesByGVR := map[schema.GroupVersionResource]metav1.APIResource{}
+
+	for _, list := range resources {
+		defaultGroupVersion, err := schema.ParseGroupVersion(list.GroupVersion)
+		if err != nil {
+			t.Errorf("Failed to get GroupVersion for: %+v", list)
+			continue
+		}
+		for _, resource := range list.APIResources {
+			if resource.Group == "" {
+				resource.Group = defaultGroupVersion.Group
+			}
+			if resource.Version == "" {
+				resource.Version = defaultGroupVersion.Version
+			}
+			gvr := defaultGroupVersion.WithResource(resource.Name)
+			resourcesByGVR[gvr] = resource
+			if shouldTestResource(gvr, resource) {
+				gvrsToTest = append(gvrsToTest, gvr)
+			}
+		}
+	}
+
+	sort.SliceStable(gvrsToTest, func(i, j int) bool {
+		if gvrsToTest[i].Group < gvrsToTest[j].Group {
+			return true
+		}
+		if gvrsToTest[i].Group > gvrsToTest[j].Group {
+			return false
+		}
+		if gvrsToTest[i].Version < gvrsToTest[j].Version {
+			return true
+		}
+		if gvrsToTest[i].Version > gvrsToTest[j].Version {
+			return false
+		}
+		if gvrsToTest[i].Resource < gvrsToTest[j].Resource {
+			return true
+		}
+		if gvrsToTest[i].Resource > gvrsToTest[j].Resource {
+			return false
+		}
+		return true
+	})
+
+	convertedResources := map[string]schema.GroupVersionResource{}
+	convertedV1beta1Rules := []admissionregistrationv1beta1.NamedRuleWithOperations{}
+	for _, gvr := range gvrsToTest {
+		metaGVR := metav1.GroupVersionResource{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource}
+
+		convertedGVR, ok := convertedResources[gvr.Resource]
+		if !ok {
+			convertedGVR = gvr
+			convertedResources[gvr.Resource] = gvr
+			convertedV1beta1Rules = append(convertedV1beta1Rules, admissionregistrationv1beta1.NamedRuleWithOperations{
+				RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+					Operations: []admissionregistrationv1beta1.OperationType{admissionregistrationv1beta1.OperationAll},
+					Rule:       admissionregistrationv1beta1.Rule{APIGroups: []string{gvr.Group}, APIVersions: []string{gvr.Version}, Resources: []string{gvr.Resource}},
+				},
+			})
+		}
+
+		holder.gvrToConvertedGVR[metaGVR] = metav1.GroupVersionResource{Group: convertedGVR.Group, Version: convertedGVR.Version, Resource: convertedGVR.Resource}
+		holder.gvrToConvertedGVK[metaGVR] = schema.GroupVersionKind{Group: resourcesByGVR[convertedGVR].Group, Version: resourcesByGVR[convertedGVR].Version, Kind: resourcesByGVR[convertedGVR].Kind}
+	}
+
+	if err := createV1beta1ValidatingPolicyAndBinding(client, convertedV1beta1Rules); err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	start := time.Now()
+	count := 0
+
 	for _, gvr := range gvrsToTest {
 		resource := resourcesByGVR[gvr]
 		t.Run(gvr.Group+"."+gvr.Version+"."+strings.ReplaceAll(resource.Name, "/", "."), func(t *testing.T) {
