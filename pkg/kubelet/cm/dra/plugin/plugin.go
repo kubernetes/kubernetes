@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
@@ -90,6 +91,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
 		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
+		grpc.WithStatsHandler(p),
 	)
 	if err != nil {
 		return nil, err
@@ -180,3 +182,25 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 		return err
 	}
 }
+
+func (p *Plugin) HandleConn(ctx context.Context, connStats stats.ConnStats) {
+	logger := klog.FromContext(ctx)
+	switch connStats.(type) {
+	case *stats.ConnBegin:
+		logger.V(2).Info("Connection begin", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
+	case *stats.ConnEnd:
+		logger.V(2).Info("Connection end", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
+		p.mutex.Lock()
+		registrationHandler := p.registrationHandler
+		p.mutex.Unlock()
+		if registrationHandler == nil {
+			logger.V(2).Info("Can't unregister plugin on connection drop: registration handler is nil", "plugin", p.name, "endpoint", p.endpoint)
+		} else {
+			registrationHandler.DeRegisterPlugin(p.name, p.endpoint)
+		}
+	}
+}
+
+func (p *Plugin) HandleRPC(ctx context.Context, stats stats.RPCStats)                  {}
+func (p *Plugin) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context { return ctx }
+func (p *Plugin) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context   { return ctx }
