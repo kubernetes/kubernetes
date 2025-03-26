@@ -26,6 +26,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	grpcstats "google.golang.org/grpc/stats"
+
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -58,11 +60,21 @@ type DRAPluginManager struct {
 	getNode       func() (*v1.Node, error)
 	wipingDelay   time.Duration
 
+	// TODO: replace pendingWipes with some kind of workqueue.
+	// As it stands, WaitGroup suffers from a data race:
+	// - Queueing a new wiping creates a goroutine and adds to
+	//   to wg.
+	// - Concurrently, wg.Wait reads from it.
+	//
+	// This is not allowed, all wg.Adds must come before wg.Wait.
+	//
+	// This race can be triggered with
+	//     go test -count=10 -race ./...
 	wg    sync.WaitGroup
 	mutex sync.RWMutex
 
 	// driver name -> DRAPlugin in the order in which they got added
-	store map[string][]*DRAPlugin
+	store map[string][]*monitoredPlugin
 
 	// pendingWipes maps a driver name to a cancel function for
 	// wiping of that plugin's ResourceSlices. Entries get added
@@ -75,6 +87,54 @@ type DRAPluginManager struct {
 }
 
 var _ cache.PluginHandler = &DRAPluginManager{}
+
+// monitoredPlugin tracks whether the gRPC connection of a plugin is
+// currently connected. Fot that it implements the [grpcstats.Handler]
+// interface.
+//
+// The tagging functions might be useful for contextual logging. But
+// for now all that matters is HandleConn.
+type monitoredPlugin struct {
+	*DRAPlugin
+	pm *DRAPluginManager
+
+	// connected is protect by store.mutex.
+	connected bool
+}
+
+var _ grpcstats.Handler = &monitoredPlugin{}
+
+func (m *monitoredPlugin) TagRPC(ctx context.Context, info *grpcstats.RPCTagInfo) context.Context {
+	return ctx
+}
+
+func (m *monitoredPlugin) HandleRPC(context.Context, grpcstats.RPCStats) {
+}
+
+func (m *monitoredPlugin) TagConn(ctx context.Context, info *grpcstats.ConnTagInfo) context.Context {
+	return ctx
+}
+
+func (m *monitoredPlugin) HandleConn(_ context.Context, stats grpcstats.ConnStats) {
+	connected := false
+	switch stats.(type) {
+	case *grpcstats.ConnBegin:
+		connected = true
+	case *grpcstats.ConnEnd:
+		// We have to ask for a reconnect, otherwise gRPC wouldn't try and
+		// thus we wouldn't be notified about a restart of the plugin.
+		m.conn.Connect()
+	default:
+		return
+	}
+
+	logger := klog.FromContext(m.pm.backgroundCtx)
+	m.pm.mutex.Lock()
+	defer m.pm.mutex.Unlock()
+	logger.V(2).Info("Connection changed", "driverName", m.driverName, "endpoint", m.endpoint, "connected", connected)
+	m.connected = connected
+	m.pm.sync(m.driverName)
+}
 
 // NewDRAPluginManager creates a new DRAPluginManager, with support for wiping ResourceSlices
 // when the plugin(s) for a DRA driver are not available too long.
@@ -216,14 +276,29 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
 
+	logger := klog.FromContext(pm.backgroundCtx)
+
 	plugins := pm.store[driverName]
 	if len(plugins) == 0 {
+		logger.V(5).Info("No plugin registered", "driverName", driverName)
 		return nil
 	}
+
 	// Heuristic: pick the most recent one. It's most likely
 	// the newest, except when kubelet got restarted and registered
 	// all running plugins in random order.
-	return plugins[len(plugins)-1]
+	//
+	// Prefer plugins which are connected, otherwise also
+	// disconnected ones.
+	for i := len(plugins) - 1; i >= 0; i-- {
+		if plugin := plugins[i]; plugin.connected {
+			logger.V(5).Info("Preferring connected plugin", "driverName", driverName, "endpoint", plugin.endpoint)
+			return plugin.DRAPlugin
+		}
+	}
+	plugin := plugins[len(plugins)-1]
+	logger.V(5).Info("No plugin connected, using latest one", "driverName", driverName, "endpoint", plugin.endpoint)
+	return plugin.DRAPlugin
 }
 
 // RegisterPlugin implements [cache.PluginHandler].
@@ -259,8 +334,14 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
+	p := &DRAPlugin{
+		driverName:        driverName,
+		endpoint:          endpoint,
+		chosenService:     chosenService,
+		clientCallTimeout: clientCallTimeout,
+	}
 	if pm.store == nil {
-		pm.store = make(map[string][]*DRAPlugin)
+		pm.store = make(map[string][]*monitoredPlugin)
 	}
 	for _, oldP := range pm.store[driverName] {
 		if oldP.endpoint == endpoint {
@@ -271,6 +352,11 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 
 	logger := klog.FromContext(pm.backgroundCtx)
 
+	mp := &monitoredPlugin{
+		DRAPlugin: p,
+		pm:     pm,
+	}
+
 	// The gRPC connection gets created once. gRPC then connects to the gRPC server on demand.
 	target := "unix:" + endpoint
 	logger.V(4).Info("Creating new gRPC connection", "target", target)
@@ -278,20 +364,20 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 		target,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(driverName)),
+		grpc.WithStatsHandler(mp),
 	)
 	if err != nil {
 		return fmt.Errorf("create gRPC connection to DRA driver %s plugin at endpoint %s: %w", driverName, endpoint, err)
 	}
+	p.conn = conn
 
-	p := &DRAPlugin{
-		driverName:        driverName,
-		endpoint:          endpoint,
-		conn:              conn,
-		chosenService:     chosenService,
-		clientCallTimeout: clientCallTimeout,
-	}
+	// Ensure that gRPC tries to connect even if we don't call any gRPC method.
+	// This is necessary to detect early whether a plugin is really available.
+	// This is currently an experimental gRPC method. Should it be removed we
+	// would need to do something else, like sending a fake gRPC method call.
+	conn.Connect()
 
-	pm.store[p.driverName] = append(pm.store[p.driverName], p)
+	pm.store[p.driverName] = append(pm.store[p.driverName], mp)
 	logger.V(3).Info("Registered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "chosenService", p.chosenService, "numPlugins", len(pm.store[p.driverName]))
 	pm.sync(p.driverName)
 	return nil
@@ -312,7 +398,7 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 	defer pm.mutex.Unlock()
 
 	plugins := pm.store[driverName]
-	i := slices.IndexFunc(plugins, func(p *DRAPlugin) bool { return p.driverName == driverName && p.endpoint == endpoint })
+	i := slices.IndexFunc(plugins, func(mp *monitoredPlugin) bool { return mp.driverName == driverName && mp.endpoint == endpoint })
 	if i == -1 {
 		return
 	}
@@ -382,7 +468,12 @@ func (pm *DRAPluginManager) sync(driverName string) {
 // usable returns true if at least one endpoint is ready to handle gRPC calls for the DRA driver.
 // Must be called while holding the mutex.
 func (pm *DRAPluginManager) usable(driverName string) bool {
-	return len(pm.store[driverName]) > 0
+	for _, mp := range pm.store[driverName] {
+		if mp.connected {
+			return true
+		}
+	}
+	return false
 }
 
 // ValidatePlugin implements [cache.PluginHandler].
