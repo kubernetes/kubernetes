@@ -217,13 +217,14 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	pluginInstance := &Plugin{
-		name:              pluginName,
-		backgroundCtx:     ctx,
-		cancel:            cancel,
-		conn:              nil,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: timeout,
+		name:                pluginName,
+		backgroundCtx:       ctx,
+		cancel:              cancel,
+		conn:                nil,
+		endpoint:            endpoint,
+		chosenService:       chosenService,
+		clientCallTimeout:   timeout,
+		registrationHandler: h,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
@@ -287,50 +288,74 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 		if !last {
 			return
 		}
-
-		// Prepare for canceling the background wiping. This needs to run
-		// in the context of the registration handler, the one from
-		// the plugin is canceled.
-		logger = klog.FromContext(h.backgroundCtx)
-		logger = klog.LoggerWithName(logger, "driver-cleanup")
-		logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
-		ctx, cancel := context.WithCancelCause(h.backgroundCtx)
-		ctx = klog.NewContext(ctx, logger)
-
-		// Clean up the ResourceSlices for the deleted Plugin since it
-		// may have died without doing so itself and might never come
-		// back.
-		//
-		// May get canceled if the plugin comes back quickly enough
-		// (see RegisterPlugin).
-		h.mutex.Lock()
-		defer h.mutex.Unlock()
-		if cancel := h.pendingWipes[pluginName]; cancel != nil {
-			(*cancel)(errors.New("plugin deregistered a second time"))
-		}
-		h.pendingWipes[pluginName] = &cancel
-
-		h.wg.Add(1)
-		go func() {
-			defer h.wg.Done()
-			defer func() {
-				h.mutex.Lock()
-				defer h.mutex.Unlock()
-
-				// Cancel our own context, but remove it from the map only if it
-				// is the current entry. Perhaps it already got replaced.
-				cancel(errors.New("wiping done"))
-				if h.pendingWipes[pluginName] == &cancel {
-					delete(h.pendingWipes, pluginName)
-				}
-			}()
-			h.wipeResourceSlices(ctx, h.wipingDelay, pluginName)
-		}()
-		return
+		h.cleanupResourceSlices(pluginName)
 	}
 
 	logger := klog.FromContext(h.backgroundCtx)
 	logger.V(3).Info("Deregister DRA plugin not necessary, was already removed")
+}
+
+// cleanupResourceSlices initiates the cleanup process for ResourceSlices
+// associated with a given plugin. It prepares a new context and logger for
+// the cleanup operation, ensuring that any previous cleanup for the same
+// plugin is canceled if still pending. The cleanup is performed
+// asynchronously in a background goroutine, which will remove the
+// ResourceSlices after a delay unless the plugin is back online before the
+// cleanup completes.
+func (h *RegistrationHandler) cleanupResourceSlices(pluginName string) *context.CancelCauseFunc {
+	// Prepare for canceling the background wiping. This needs to run
+	// in the context of the registration handler, the one from
+	// the plugin is canceled.
+	logger := klog.FromContext(h.backgroundCtx)
+	logger = klog.LoggerWithName(logger, "driver-cleanup")
+	logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
+
+	logger.V(3).Info("Starting ResourceSlices cleanup")
+
+	// Clean up the ResourceSlices for the Plugin since it
+	// may have died without doing so itself and might never come
+	// back.
+	//
+	// May get canceled if the plugin comes back quickly enough
+	// (see RegisterPlugin).
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+	if cancel := h.pendingWipes[pluginName]; cancel != nil {
+		logger.V(3).Info("Previously started cleanup detected, do nothing")
+		return nil
+	}
+
+	ctx, cancel := context.WithCancelCause(h.backgroundCtx)
+	ctx = klog.NewContext(ctx, logger)
+	h.pendingWipes[pluginName] = &cancel
+
+	h.wg.Add(1)
+	go func() {
+		defer h.wg.Done()
+		defer h.cancelCleanup(pluginName, &cancel)
+		h.wipeResourceSlices(ctx, h.wipingDelay, pluginName)
+	}()
+
+	return &cancel
+}
+
+// cancelCleanup cancels the cleanup context for the specified plugin by invoking the provided
+// cancel function. It also removes the entry from the pendingWipes map if the cancel function
+// matches the entry.
+func (h *RegistrationHandler) cancelCleanup(pluginName string, cancel *context.CancelCauseFunc) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	if cancel == nil {
+		return
+	}
+
+	// Cancel our own context, but remove it from the map only if it
+	// is the current entry. Perhaps it already got replaced.
+	(*cancel)(errors.New("wiping done"))
+	if cancel == h.pendingWipes[pluginName] {
+		delete(h.pendingWipes, pluginName)
+	}
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection

@@ -44,10 +44,15 @@ func (s *pluginsStore) get(pluginName string) *Plugin {
 	if len(instances) == 0 {
 		return nil
 	}
-	// Heuristic: pick the most recent one. It's most likely
-	// the newest, except when kubelet got restarted and registered
-	// all running plugins in random order.
-	return instances[len(instances)-1]
+	// Heuristic: pick the most recent connected one. It's most likely
+	// the newest, except when plugin disconnects or kubelet got restarted
+	// and registered all running plugins in random order.
+	for i := len(instances) - 1; i >= 0; i-- {
+		if instances[i].connected {
+			return instances[i]
+		}
+	}
+	return nil
 }
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
@@ -93,4 +98,16 @@ func (s *pluginsStore) remove(pluginName, endpoint string) (*Plugin, bool) {
 		p.cancel(errors.New("plugin got removed"))
 	}
 	return p, last
+}
+
+// pluginRegistered checks if the plugin with the specified name and
+// endpoint is registered in the pluginsStore.
+// Returns true if a plugin registered, otherwise returns false.
+func (s *pluginsStore) pluginRegistered(pluginName, endpoint string) bool {
+	s.RLock()
+	defer s.RUnlock()
+
+	return slices.ContainsFunc(s.store[pluginName], func(p *Plugin) bool {
+		return p.name == pluginName && p.endpoint == endpoint
+	})
 }
