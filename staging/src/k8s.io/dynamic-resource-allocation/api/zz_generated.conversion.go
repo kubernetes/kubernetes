@@ -164,8 +164,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 func autoConvert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1beta1.BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[v1beta1.QualifiedName]v1beta1.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[v1beta1.QualifiedName]v1beta1.DeviceCapacity)(unsafe.Pointer(&in.Capacity))
-	if in.ConsumesCounter != nil {
-		in, out := &in.ConsumesCounter, &out.ConsumesCounter
+	if in.ConsumesCounters != nil {
+		in, out := &in.ConsumesCounters, &out.ConsumesCounters
 		*out = make([]v1beta1.DeviceCounterConsumption, len(*in))
 		for i := range *in {
 			if err := Convert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(&(*in)[i], &(*out)[i], s); err != nil {
@@ -173,7 +173,7 @@ func autoConvert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1
 			}
 		}
 	} else {
-		out.ConsumesCounter = nil
+		out.ConsumesCounters = nil
 	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
@@ -190,8 +190,8 @@ func Convert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1beta
 func autoConvert_v1beta1_BasicDevice_To_api_BasicDevice(in *v1beta1.BasicDevice, out *BasicDevice, s conversion.Scope) error {
 	out.Attributes = *(*map[QualifiedName]DeviceAttribute)(unsafe.Pointer(&in.Attributes))
 	out.Capacity = *(*map[QualifiedName]DeviceCapacity)(unsafe.Pointer(&in.Capacity))
-	if in.ConsumesCounter != nil {
-		in, out := &in.ConsumesCounter, &out.ConsumesCounter
+	if in.ConsumesCounters != nil {
+		in, out := &in.ConsumesCounters, &out.ConsumesCounters
 		*out = make([]DeviceCounterConsumption, len(*in))
 		for i := range *in {
 			if err := Convert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(&(*in)[i], &(*out)[i], s); err != nil {
@@ -199,7 +199,7 @@ func autoConvert_v1beta1_BasicDevice_To_api_BasicDevice(in *v1beta1.BasicDevice,
 			}
 		}
 	} else {
-		out.ConsumesCounter = nil
+		out.ConsumesCounters = nil
 	}
 	out.NodeName = (*string)(unsafe.Pointer(in.NodeName))
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
@@ -348,7 +348,7 @@ func Convert_v1beta1_DeviceCapacity_To_api_DeviceCapacity(in *v1beta1.DeviceCapa
 }
 
 func autoConvert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(in *DeviceCounterConsumption, out *v1beta1.DeviceCounterConsumption, s conversion.Scope) error {
-	if err := Convert_api_UniqueString_To_string(&in.SharedCounter, &out.SharedCounter, s); err != nil {
+	if err := Convert_api_UniqueString_To_string(&in.CounterSet, &out.CounterSet, s); err != nil {
 		return err
 	}
 	out.Counters = *(*map[string]v1beta1.Counter)(unsafe.Pointer(&in.Counters))
@@ -361,7 +361,7 @@ func Convert_api_DeviceCounterConsumption_To_v1beta1_DeviceCounterConsumption(in
 }
 
 func autoConvert_v1beta1_DeviceCounterConsumption_To_api_DeviceCounterConsumption(in *v1beta1.DeviceCounterConsumption, out *DeviceCounterConsumption, s conversion.Scope) error {
-	if err := Convert_string_To_api_UniqueString(&in.SharedCounter, &out.SharedCounter, s); err != nil {
+	if err := Convert_string_To_api_UniqueString(&in.CounterSet, &out.CounterSet, s); err != nil {
 		return err
 	}
 	out.Counters = *(*map[string]Counter)(unsafe.Pointer(&in.Counters))

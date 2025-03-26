@@ -99,8 +99,8 @@ func (in *BasicDevice) DeepCopyInto(out *BasicDevice) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
-	if in.ConsumesCounter != nil {
-		in, out := &in.ConsumesCounter, &out.ConsumesCounter
+	if in.ConsumesCounters != nil {
+		in, out := &in.ConsumesCounters, &out.ConsumesCounters
 		*out = make([]DeviceCounterConsumption, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

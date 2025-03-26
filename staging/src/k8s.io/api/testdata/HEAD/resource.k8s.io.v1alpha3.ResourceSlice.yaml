@@ -45,11 +45,11 @@ spec:
           version: versionValue
       capacity:
         capacityKey: "0"
-      consumesCounter:
-      - counters:
+      consumesCounters:
+      - counterSet: counterSetValue
+        counters:
           countersKey:
             value: "0"
-        sharedCounter: sharedCounterValue
       nodeName: nodeNameValue
       nodeSelector:
         nodeSelectorTerms:
