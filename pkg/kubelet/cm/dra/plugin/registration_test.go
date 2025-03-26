@@ -249,3 +249,50 @@ func TestRegistrationHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestUnregisterOnConnectionDrop(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	service := drapb.DRAPluginService
+	pluginName := "test-plugin"
+	sliceName := "test-slice"
+
+	slice := getSlice(sliceName)
+	client := getFakeClient(t, nodeName, pluginName, slice)
+
+	// The handler wipes all slices at startup.
+	handler := newRegistrationHandler(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+	tCtx.Cleanup(handler.Stop)
+
+	// Run GRPC service
+	endpoint, teardown, err := setupFakeGRPCServer(service)
+	require.NoError(t, err)
+	defer teardown()
+
+	err = handler.RegisterPlugin(pluginName, endpoint, []string{service}, nil)
+	require.NoError(t, err)
+
+	requireNoSlices(t, tCtx, client)
+
+	plugin := draPlugins.get(pluginName)
+	assert.NotNil(t, plugin, "plugin should present in the plugin store")
+
+	// Establish connection to the plugin
+	conn, err := plugin.getOrCreateGRPCConn()
+	require.NoError(t, err)
+
+	// Create the slice as if the plugin had done that while it runs.
+	_, err = client.ResourceV1beta1().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+	require.NoError(t, err, "recreate slice")
+
+	// Simulate disconnect
+	require.NoError(t, conn.Close())
+
+	// The plugin should be unregistered
+	assert.Eventually(t, func() bool {
+		return draPlugins.get(pluginName) == nil
+	}, time.Minute, time.Second)
+
+	// Slice should be removed
+	requireNoSlices(t, tCtx, client)
+}
