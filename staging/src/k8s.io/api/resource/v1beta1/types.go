@@ -279,20 +279,21 @@ type BasicDevice struct {
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty" protobuf:"bytes,2,rep,name=capacity"`
 
-	// ConsumesCounter defines a list of references to sharedCounters
+	// ConsumesCounters defines a list of references to sharedCounters
 	// and the set of counters that the device will
 	// consume from those counter sets.
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The maximum number of device counter consumption entries
-	// is 32. This is the same as the maximum number of shared counters
-	// allowed in a ResourceSlice.
+	// The total number of device counter consumption entries
+	// must be <= 32. In addition, the total number in the
+	// entire ResourceSlice must be <= 1024 (for example,
+	// 64 devices with 16 counters each).
 	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
-	ConsumesCounter []DeviceCounterConsumption `json:"consumesCounter,omitempty" protobuf:"bytes,3,rep,name=consumesCounter"`
+	ConsumesCounters []DeviceCounterConsumption `json:"consumesCounters,omitempty" protobuf:"bytes,3,rep,name=consumesCounters"`
 
 	// NodeName identifies the node where the device is available.
 	//
@@ -305,6 +306,8 @@ type BasicDevice struct {
 	NodeName *string `json:"nodeName,omitempty" protobuf:"bytes,4,opt,name=nodeName"`
 
 	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
 	//
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
@@ -325,7 +328,7 @@ type BasicDevice struct {
 
 	// If specified, these are the driver-defined taints.
 	//
-	// The maximum number of taints is 8.
+	// The maximum number of taints is 4.
 	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.
@@ -339,17 +342,18 @@ type BasicDevice struct {
 // DeviceCounterConsumption defines a set of counters that
 // a device will consume from a CounterSet.
 type DeviceCounterConsumption struct {
-	// SharedCounter defines the shared counter from which the
+	// CounterSet is the name of the set from which the
 	// counters defined will be consumed.
 	//
 	// +required
-	SharedCounter string `json:"sharedCounter" protobuf:"bytes,1,opt,name=sharedCounter"`
+	CounterSet string `json:"counterSet" protobuf:"bytes,1,opt,name=counterSet"`
 
-	// Counters defines the Counter that will be consumed by
-	// the device.
+	// Counters defines the counters that will be consumed by the device.
 	//
-	//
-	// The maximum number of Counters is 32.
+	// The maximum number counters in a device is 32.
+	// In addition, the maximum number of all counters
+	// in all devices is 1024 (for example, 64 devices with
+	// 16 counters each).
 	//
 	// +required
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
@@ -368,6 +372,14 @@ type DeviceCapacity struct {
 
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
+
+// Limit for the total number of counters in each device.
+const ResourceSliceMaxCountersPerDevice = 32
+
+// Limit for the total number of counters defined in devices in
+// a ResourceSlice. We want to allow up to 64 devices to specify
+// up to 16 counters, so the limit for the ResourceSlice will be 1024.
+const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
 
 // QualifiedName is the name of a device attribute or capacity.
 //
@@ -432,7 +444,7 @@ type DeviceAttribute struct {
 const DeviceAttributeMaxValueLength = 64
 
 // DeviceTaintsMaxLength is the maximum number of taints per device.
-const DeviceTaintsMaxLength = 8
+const DeviceTaintsMaxLength = 4
 
 // The device this taint is attached to has the "effect" on
 // any claim which does not tolerate the taint and, through the claim,
@@ -790,7 +802,7 @@ type DeviceSubRequest struct {
 	//   Allocation will fail if some devices are already allocated,
 	//   unless adminAccess is requested.
 	//
-	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// If AllocationMode is not specified, the default mode is ExactCount. If
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other subrequests must specify this field.
 	//

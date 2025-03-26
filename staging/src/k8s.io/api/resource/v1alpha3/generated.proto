@@ -114,20 +114,21 @@ message BasicDevice {
   // +optional
   map<string, .k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 2;
 
-  // ConsumesCounter defines a list of references to sharedCounters
+  // ConsumesCounters defines a list of references to sharedCounters
   // and the set of counters that the device will
   // consume from those counter sets.
   //
   // There can only be a single entry per counterSet.
   //
-  // The maximum number of device counter consumption entries
-  // is 32. This is the same as the maximum number of shared counters
-  // allowed in a ResourceSlice.
+  // The total number of device counter consumption entries
+  // must be <= 32. In addition, the total number in the
+  // entire ResourceSlice must be <= 1024 (for example,
+  // 64 devices with 16 counters each).
   //
   // +optional
   // +listType=atomic
   // +featureGate=DRAPartitionableDevices
-  repeated DeviceCounterConsumption consumesCounter = 3;
+  repeated DeviceCounterConsumption consumesCounters = 3;
 
   // NodeName identifies the node where the device is available.
   //
@@ -161,7 +162,7 @@ message BasicDevice {
 
   // If specified, these are the driver-defined taints.
   //
-  // The maximum number of taints is 8.
+  // The maximum number of taints is 4.
   //
   // This is an alpha field and requires enabling the DRADeviceTaints
   // feature gate.
@@ -246,13 +247,13 @@ message Counter {
 // the portion of counters it uses will no longer be available for use
 // by other devices.
 message CounterSet {
-  // Name defines the name of the counter set.
-  // It must be a DNS label.
+  // CounterSet is the name of the set from which the
+  // counters defined will be consumed.
   //
   // +required
   optional string name = 1;
 
-  // Counters defines the set of counters for this CounterSet
+  // Counters defines the counters that will be consumed by the device.
   // The name of each counter must be unique in that set and must be a DNS label.
   //
   // To ensure this uniqueness, capacities defined by the vendor
@@ -500,16 +501,19 @@ message DeviceConstraint {
 // DeviceCounterConsumption defines a set of counters that
 // a device will consume from a CounterSet.
 message DeviceCounterConsumption {
-  // SharedCounter defines the shared counter from which the
+  // CounterSet defines the set from which the
   // counters defined will be consumed.
   //
   // +required
-  optional string sharedCounter = 1;
+  optional string counterSet = 1;
 
   // Counters defines the Counter that will be consumed by
   // the device.
   //
-  // The maximum number of Counters is 32.
+  // The maximum number counters in a device is 32.
+  // In addition, the maximum number of all counters
+  // in all devices is 1024 (for example, 64 devices with
+  // 16 counters each).
   //
   // +required
   map<string, Counter> counters = 2;
@@ -786,7 +790,7 @@ message DeviceSubRequest {
   //   Allocation will fail if some devices are already allocated,
   //   unless adminAccess is requested.
   //
-  // If AlloctionMode is not specified, the default mode is ExactCount. If
+  // If AllocationMode is not specified, the default mode is ExactCount. If
   // the mode is ExactCount and count is not specified, the default count is
   // one. Any other requests must specify this field.
   //

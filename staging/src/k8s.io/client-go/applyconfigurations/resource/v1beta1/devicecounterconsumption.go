@@ -21,8 +21,8 @@ package v1beta1
 // DeviceCounterConsumptionApplyConfiguration represents a declarative configuration of the DeviceCounterConsumption type for use
 // with apply.
 type DeviceCounterConsumptionApplyConfiguration struct {
-	SharedCounter *string                              `json:"sharedCounter,omitempty"`
-	Counters      map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	CounterSet *string                              `json:"counterSet,omitempty"`
+	Counters   map[string]CounterApplyConfiguration `json:"counters,omitempty"`
 }
 
 // DeviceCounterConsumptionApplyConfiguration constructs a declarative configuration of the DeviceCounterConsumption type for use with
@@ -31,11 +31,11 @@ func DeviceCounterConsumption() *DeviceCounterConsumptionApplyConfiguration {
 	return &DeviceCounterConsumptionApplyConfiguration{}
 }
 
-// WithSharedCounter sets the SharedCounter field in the declarative configuration to the given value
+// WithCounterSet sets the CounterSet field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the SharedCounter field is set to the value of the last call.
-func (b *DeviceCounterConsumptionApplyConfiguration) WithSharedCounter(value string) *DeviceCounterConsumptionApplyConfiguration {
-	b.SharedCounter = &value
+// If called multiple times, the CounterSet field is set to the value of the last call.
+func (b *DeviceCounterConsumptionApplyConfiguration) WithCounterSet(value string) *DeviceCounterConsumptionApplyConfiguration {
+	b.CounterSet = &value
 	return b
 }
 

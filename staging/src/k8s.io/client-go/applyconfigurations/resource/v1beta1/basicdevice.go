@@ -26,13 +26,13 @@ import (
 // BasicDeviceApplyConfiguration represents a declarative configuration of the BasicDevice type for use
 // with apply.
 type BasicDeviceApplyConfiguration struct {
-	Attributes      map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
-	Capacity        map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
-	ConsumesCounter []DeviceCounterConsumptionApplyConfiguration                        `json:"consumesCounter,omitempty"`
-	NodeName        *string                                                             `json:"nodeName,omitempty"`
-	NodeSelector    *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
-	AllNodes        *bool                                                               `json:"allNodes,omitempty"`
-	Taints          []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
+	Attributes       map[resourcev1beta1.QualifiedName]DeviceAttributeApplyConfiguration `json:"attributes,omitempty"`
+	Capacity         map[resourcev1beta1.QualifiedName]DeviceCapacityApplyConfiguration  `json:"capacity,omitempty"`
+	ConsumesCounters []DeviceCounterConsumptionApplyConfiguration                        `json:"consumesCounters,omitempty"`
+	NodeName         *string                                                             `json:"nodeName,omitempty"`
+	NodeSelector     *v1.NodeSelectorApplyConfiguration                                  `json:"nodeSelector,omitempty"`
+	AllNodes         *bool                                                               `json:"allNodes,omitempty"`
+	Taints           []DeviceTaintApplyConfiguration                                     `json:"taints,omitempty"`
 }
 
 // BasicDeviceApplyConfiguration constructs a declarative configuration of the BasicDevice type for use with
@@ -69,15 +69,15 @@ func (b *BasicDeviceApplyConfiguration) WithCapacity(entries map[resourcev1beta1
 	return b
 }
 
-// WithConsumesCounter adds the given value to the ConsumesCounter field in the declarative configuration
+// WithConsumesCounters adds the given value to the ConsumesCounters field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the ConsumesCounter field.
-func (b *BasicDeviceApplyConfiguration) WithConsumesCounter(values ...*DeviceCounterConsumptionApplyConfiguration) *BasicDeviceApplyConfiguration {
+// If called multiple times, values provided by each call will be appended to the ConsumesCounters field.
+func (b *BasicDeviceApplyConfiguration) WithConsumesCounters(values ...*DeviceCounterConsumptionApplyConfiguration) *BasicDeviceApplyConfiguration {
 	for i := range values {
 		if values[i] == nil {
-			panic("nil value passed to WithConsumesCounter")
+			panic("nil value passed to WithConsumesCounters")
 		}
-		b.ConsumesCounter = append(b.ConsumesCounter, *values[i])
+		b.ConsumesCounters = append(b.ConsumesCounters, *values[i])
 	}
 	return b
 }

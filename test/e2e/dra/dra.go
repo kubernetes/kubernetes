@@ -36,6 +36,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapiv1beta2 "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1265,6 +1266,88 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		})
 	}
 
+	v1beta2Tests := func() {
+		nodes := NewNodes(f, 1, 1)
+		maxAllocations := 1
+		generateResources := func() Resources {
+			return perNode(maxAllocations, nodes)()
+		}
+		driver := NewDriver(f, nodes, generateResources) // All tests get their own driver instance.
+		b := newBuilder(f, driver)
+		// We have to set the parameters *before* creating the class.
+		b.classParameters = `{"x":"y"}`
+		expectedEnv := []string{"admin_x", "y"}
+		_, expected := b.parametersEnv()
+		expectedEnv = append(expectedEnv, expected...)
+
+		ginkgo.It("supports simple ResourceClaim", func(ctx context.Context) {
+			pod, template := b.podInlineWithV1beta2()
+			b.create(ctx, pod, template)
+			b.testPod(ctx, f, pod, expectedEnv...)
+		})
+
+		f.It("supports requests with alternatives", feature.DRAPrioritizedList, func(ctx context.Context) {
+			claimName := "external-multiclaim"
+			parameters, _ := b.parametersEnv()
+			claim := &resourceapiv1beta2.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: claimName,
+				},
+				Spec: resourceapiv1beta2.ResourceClaimSpec{
+					Devices: resourceapiv1beta2.DeviceClaim{
+						Requests: []resourceapiv1beta2.DeviceRequest{{
+							Name: "request-1",
+							FirstAvailable: []resourceapiv1beta2.DeviceSubRequest{
+								{
+									Name:            "sub-request-1",
+									DeviceClassName: b.className(),
+									AllocationMode:  resourceapiv1beta2.DeviceAllocationModeExactCount,
+									Count:           2,
+								},
+								{
+									Name:            "sub-request-2",
+									DeviceClassName: b.className(),
+									AllocationMode:  resourceapiv1beta2.DeviceAllocationModeExactCount,
+									Count:           1,
+								},
+							},
+						}},
+						Config: []resourceapiv1beta2.DeviceClaimConfiguration{{
+							DeviceConfiguration: resourceapiv1beta2.DeviceConfiguration{
+								Opaque: &resourceapiv1beta2.OpaqueDeviceConfiguration{
+									Driver: b.driver.Name,
+									Parameters: runtime.RawExtension{
+										Raw: []byte(parameters),
+									},
+								},
+							},
+						}},
+					},
+				},
+			}
+			pod := b.podExternal()
+			podClaimName := "resource-claim"
+			pod.Spec.ResourceClaims = []v1.PodResourceClaim{
+				{
+					Name:              podClaimName,
+					ResourceClaimName: &claimName,
+				},
+			}
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod, expectedEnv...)
+
+			var allocatedResourceClaim *resourceapi.ResourceClaim
+			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
+				var err error
+				allocatedResourceClaim, err = f.ClientSet.ResourceV1beta1().ResourceClaims(f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				return allocatedResourceClaim, err
+			}).WithTimeout(f.Timeouts.PodDelete).ShouldNot(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
+			results := allocatedResourceClaim.Status.Allocation.Devices.Results
+			gomega.Expect(results).To(gomega.HaveLen(1))
+			gomega.Expect(results[0].Request).To(gomega.Equal("request-1/sub-request-2"))
+		})
+	}
+
 	ginkgo.Context("on single node", func() {
 		singleNodeTests()
 	})
@@ -1275,6 +1358,14 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 	ginkgo.Context("with prioritized list", func() {
 		prioritizedListTests()
+	})
+
+	ginkgo.Context("with prioritized list", func() {
+		prioritizedListTests()
+	})
+
+	ginkgo.Context("with v1beta2 API", func() {
+		v1beta2Tests()
 	})
 
 	framework.Context("with device taints", feature.DRADeviceTaints, framework.WithFeatureGate(features.DRADeviceTaints), func() {
@@ -2102,6 +2193,34 @@ func (b *builder) claimSpec() resourceapi.ResourceClaimSpec {
 	return spec
 }
 
+// claimSpecWithV1beta2 returns the device request for a claim or claim template
+// with the associated config using the v1beta2 API.
+func (b *builder) claimSpecWithV1beta2() resourceapiv1beta2.ResourceClaimSpec {
+	parameters, _ := b.parametersEnv()
+	spec := resourceapiv1beta2.ResourceClaimSpec{
+		Devices: resourceapiv1beta2.DeviceClaim{
+			Requests: []resourceapiv1beta2.DeviceRequest{{
+				Name: "my-request",
+				Exactly: &resourceapiv1beta2.ExactDeviceRequest{
+					DeviceClassName: b.className(),
+				},
+			}},
+			Config: []resourceapiv1beta2.DeviceClaimConfiguration{{
+				DeviceConfiguration: resourceapiv1beta2.DeviceConfiguration{
+					Opaque: &resourceapiv1beta2.OpaqueDeviceConfiguration{
+						Driver: b.driver.Name,
+						Parameters: runtime.RawExtension{
+							Raw: []byte(parameters),
+						},
+					},
+				},
+			}},
+		},
+	}
+
+	return spec
+}
+
 // parametersEnv returns the default user env variables as JSON (config) and key/value list (pod env).
 func (b *builder) parametersEnv() (string, []string) {
 	return `{"a":"b"}`,
@@ -2154,6 +2273,20 @@ func (b *builder) podInline() (*v1.Pod, *resourceapi.ResourceClaimTemplate) {
 		},
 		Spec: resourceapi.ResourceClaimTemplateSpec{
 			Spec: b.claimSpec(),
+		},
+	}
+	return pod, template
+}
+
+func (b *builder) podInlineWithV1beta2() (*v1.Pod, *resourceapiv1beta2.ResourceClaimTemplate) {
+	pod, _ := b.podInline()
+	template := &resourceapiv1beta2.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		},
+		Spec: resourceapiv1beta2.ResourceClaimTemplateSpec{
+			Spec: b.claimSpecWithV1beta2(),
 		},
 	}
 	return pod, template
@@ -2213,8 +2346,12 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 			createdObj, err = b.f.ClientSet.CoreV1().ConfigMaps(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaim:
 			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourceapiv1beta2.ResourceClaim:
+			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceClaimTemplate:
 			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
+		case *resourceapiv1beta2.ResourceClaimTemplate:
+			createdObj, err = b.f.ClientSet.ResourceV1beta2().ResourceClaimTemplates(b.f.Namespace.Name).Create(ctx, obj, metav1.CreateOptions{})
 		case *resourceapi.ResourceSlice:
 			createdObj, err = b.f.ClientSet.ResourceV1beta1().ResourceSlices().Create(ctx, obj, metav1.CreateOptions{})
 			ginkgo.DeferCleanup(func(ctx context.Context) {

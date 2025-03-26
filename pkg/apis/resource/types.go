@@ -111,7 +111,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	NodeName string
+	NodeName *string
 
 	// NodeSelector defines which nodes have access to the resources in the pool,
 	// when that pool is not limited to a single node.
@@ -130,7 +130,7 @@ type ResourceSliceSpec struct {
 	//
 	// +optional
 	// +oneOf=NodeSelection
-	AllNodes bool
+	AllNodes *bool
 
 	// Devices lists some or all of the devices in this pool.
 	//
@@ -157,7 +157,7 @@ type ResourceSliceSpec struct {
 	//
 	// The names of the SharedCounters must be unique in the ResourceSlice.
 	//
-	// The maximum number of SharedCounters is 32.
+	// The maximum number of counters in all sets is 32.
 	//
 	// +optional
 	// +listType=atomic
@@ -183,7 +183,7 @@ type CounterSet struct {
 	// Counters defines the set of counters for this CounterSet
 	// The name of each counter must be unique in that set and must be a DNS label.
 	//
-	// The maximum number of counters is 32.
+	// The maximum number of counters in all sets is 32.
 	//
 	// +required
 	Counters map[string]Counter
@@ -234,27 +234,9 @@ const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 
-// Defines the max number of SharedCounters that can be specified
-// in a ResourceSlice. This is used to validate the fields:
-// * spec.sharedCounters
+// Defines the max number of shared counters that can be specified
+// in a ResourceSlice. The number is summed up across all sets.
 const ResourceSliceMaxSharedCounters = 32
-
-// Defines the max number of Counters from which a device
-// can consume. This is used to validate the fields:
-// * spec.devices[].consumesCounter
-const ResourceSliceMaxDeviceCounterConsumptions = 32
-
-// Defines the max number of counters
-// that can be specified for sharedCounters in a ResourceSlice.
-// This is used to validate the fields:
-// * spec.sharedCounters[].counters
-const ResourceSliceMaxSharedCountersCounters = 32
-
-// Defines the max number of counters
-// that can be specified for consumesCounter in a ResourceSlice.
-// This is used to validate the fields:
-// * spec.devices[].consumesCounter[].counters
-const ResourceSliceMaxDeviceCounterConsumptionCounters = 32
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -265,15 +247,6 @@ type Device struct {
 	// +required
 	Name string
 
-	// Basic defines one device instance.
-	//
-	// +optional
-	// +oneOf=deviceType
-	Basic *BasicDevice
-}
-
-// BasicDevice defines one device instance.
-type BasicDevice struct {
 	// Attributes defines the set of attributes for this device.
 	// The name of each attribute must be unique in that set.
 	//
@@ -290,20 +263,21 @@ type BasicDevice struct {
 	// +optional
 	Capacity map[QualifiedName]DeviceCapacity
 
-	// ConsumesCounter defines a list of references to sharedCounters
+	// ConsumesCounters defines a list of references to sharedCounters
 	// and the set of counters that the device will
 	// consume from those counter sets.
 	//
 	// There can only be a single entry per counterSet.
 	//
-	// The maximum number of device counter consumption entries
-	// is 32. This is the same as the maximum number of shared counters
-	// allowed in a ResourceSlice.
+	// The total number of device counter consumption entries
+	// must be <= 32. In addition, the total number in the
+	// entire ResourceSlice must be <= 1024 (for example,
+	// 64 devices with 16 counters each).
 	//
 	// +optional
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
-	ConsumesCounter []DeviceCounterConsumption
+	ConsumesCounters []DeviceCounterConsumption
 
 	// NodeName identifies the node where the device is available.
 	//
@@ -316,6 +290,8 @@ type BasicDevice struct {
 	NodeName *string
 
 	// NodeSelector defines the nodes where the device is available.
+	//
+	// Must use exactly one term.
 	//
 	// Must only be set if Spec.PerDeviceNodeSelection is set to true.
 	// At most one of NodeName, NodeSelector and AllNodes can be set.
@@ -337,7 +313,7 @@ type BasicDevice struct {
 
 	// If specified, these are the driver-defined taints.
 	//
-	// The maximum number of taints is 8.
+	// The maximum number of taints is 4.
 	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.
@@ -351,17 +327,18 @@ type BasicDevice struct {
 // DeviceCounterConsumption defines a set of counters that
 // a device will consume from a CounterSet.
 type DeviceCounterConsumption struct {
-	// SharedCounter defines the shared counter from which the
+	// CounterSet is the name of the set from which the
 	// counters defined will be consumed.
 	//
 	// +required
-	SharedCounter string
+	CounterSet string
 
-	// Counters defines the Counter that will be consumed by
-	// the device.
+	// Counters defines the counters that will be consumed by the device.
 	//
-	//
-	// The maximum number of Counters is 32.
+	// The maximum number counters in a device is 32.
+	// In addition, the maximum number of all counters
+	// in all devices is 1024 (for example, 64 devices with
+	// 16 counters each).
 	//
 	// +required
 	Counters map[string]Counter
@@ -388,6 +365,14 @@ type Counter struct {
 
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
+
+// Limit for the total number of counters in each device.
+const ResourceSliceMaxCountersPerDevice = 32
+
+// Limit for the total number of counters defined in devices in
+// a ResourceSlice. We want to allow up to 64 devices to specify
+// up to 16 counters, so the limit for the ResourceSlice will be 1024.
+const ResourceSliceMaxDeviceCountersPerSlice = 1024 // 64 * 16
 
 // QualifiedName is the name of a device attribute or capacity.
 //
@@ -452,7 +437,7 @@ type DeviceAttribute struct {
 const DeviceAttributeMaxValueLength = 64
 
 // DeviceTaintsMaxLength is the maximum number of taints per device.
-const DeviceTaintsMaxLength = 8
+const DeviceTaintsMaxLength = 4
 
 // The device this taint is attached to has the "effect" on
 // any claim which does not tolerate the taint and, through the claim,
@@ -608,25 +593,60 @@ const (
 
 // DeviceRequest is a request for devices required for a claim.
 // This is typically a request for a single resource like a device, but can
-// also ask for several identical devices.
+// also ask for several identical devices. With FirstAvailable it is also
+// possible to provide a prioritized list of requests.
 type DeviceRequest struct {
 	// Name can be used to reference this request in a pod.spec.containers[].resources.claims
 	// entry and in a constraint of the claim.
 	//
-	// Must be a DNS label and unique among all DeviceRequests in a
-	// ResourceClaim.
+	// References using the name in the DeviceRequest will uniquely
+	// identify a request when the Exactly field is set. When the
+	// FirstAvailable field is set, a reference to the name of the
+	// DeviceRequest will match whatever subrequest is chosen by the
+	// scheduler.
+	//
+	// Must be a DNS label.
 	//
 	// +required
 	Name string
 
+	// Exactly specifies the details for a single request that must
+	// be met exactly for the request to be satisfied.
+	//
+	// One of Exactly or FirstAvailable must be set.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	Exactly *ExactDeviceRequest
+
+	// FirstAvailable contains subrequests, of which exactly one will be
+	// selected by the scheduler. It tries to
+	// satisfy them in the order in which they are listed here. So if
+	// there are two entries in the list, the scheduler will only check
+	// the second one if it determines that the first one can not be used.
+	//
+	// DRA does not yet implement scoring, so the scheduler will
+	// select the first set of devices that satisfies all the
+	// requests in the claim. And if the requirements can
+	// be satisfied on more than one node, other scheduling features
+	// will determine which node is chosen. This means that the set of
+	// devices allocated to a claim might not be the optimal set
+	// available to the cluster. Scoring will be implemented later.
+	//
+	// +optional
+	// +oneOf=deviceRequestType
+	// +listType=atomic
+	// +featureGate=DRAPrioritizedList
+	FirstAvailable []DeviceSubRequest
+}
+
+// ExactDeviceRequest is a request for one or more identical devices.
+type ExactDeviceRequest struct {
 	// DeviceClassName references a specific DeviceClass, which can define
 	// additional configuration and selectors to be inherited by this
 	// request.
 	//
-	// A class is required if no subrequests are specified in the
-	// firstAvailable list and no class can be set if subrequests
-	// are specified in the firstAvailable list.
-	// Which classes are available depends on the cluster.
+	// A DeviceClassName is required.
 	//
 	// Administrators may use this to restrict which devices may get
 	// requested by only installing classes with selectors for permitted
@@ -634,17 +654,13 @@ type DeviceRequest struct {
 	// then administrators can create an empty DeviceClass for users
 	// to reference.
 	//
-	// +optional
-	// +oneOf=deviceRequestType
+	// +required
 	DeviceClassName string
 
 	// Selectors define criteria which must be satisfied by a specific
 	// device in order for that device to be considered for this
 	// request. All selectors must be satisfied for a device to be
 	// considered.
-	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
 	//
 	// +optional
 	// +listType=atomic
@@ -666,9 +682,6 @@ type DeviceRequest struct {
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other requests must specify this field.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// More modes may get added in the future. Clients must refuse to handle
 	// requests with unknown modes.
 	//
@@ -677,9 +690,6 @@ type DeviceRequest struct {
 
 	// Count is used only when the count mode is "ExactCount". Must be greater than zero.
 	// If AllocationMode is ExactCount and this field is not specified, the default is one.
-	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
 	//
 	// +optional
 	// +oneOf=AllocationMode
@@ -691,9 +701,6 @@ type DeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// This is an alpha field and requires enabling the DRAAdminAccess
 	// feature gate. Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
@@ -701,28 +708,6 @@ type DeviceRequest struct {
 	// +optional
 	// +featureGate=DRAAdminAccess
 	AdminAccess *bool
-
-	// FirstAvailable contains subrequests, of which exactly one will be
-	// satisfied by the scheduler to satisfy this request. It tries to
-	// satisfy them in the order in which they are listed here. So if
-	// there are two entries in the list, the scheduler will only check
-	// the second one if it determines that the first one cannot be used.
-	//
-	// This field may only be set in the entries of DeviceClaim.Requests.
-	//
-	// DRA does not yet implement scoring, so the scheduler will
-	// select the first set of devices that satisfies all the
-	// requests in the claim. And if the requirements can
-	// be satisfied on more than one node, other scheduling features
-	// will determine which node is chosen. This means that the set of
-	// devices allocated to a claim might not be the optimal set
-	// available to the cluster. Scoring will be implemented later.
-	//
-	// +optional
-	// +oneOf=deviceRequestType
-	// +listType=atomic
-	// +featureGate=DRAPrioritizedList
-	FirstAvailable []DeviceSubRequest
 
 	// If specified, the request's tolerations.
 	//
@@ -739,9 +724,6 @@ type DeviceRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This field can only be set when deviceClassName is set and no subrequests
-	// are specified in the firstAvailable list.
-	//
 	// This is an alpha field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
@@ -756,10 +738,9 @@ type DeviceRequest struct {
 // is typically a request for a single resource like a device, but can
 // also ask for several identical devices.
 //
-// DeviceSubRequest is similar to Request, but doesn't expose the AdminAccess
-// or FirstAvailable fields, as those can only be set on the top-level request.
-// AdminAccess is not supported for requests with a prioritized list, and
-// recursive FirstAvailable fields are not supported.
+// DeviceSubRequest is similar to ExactDeviceRequest, but doesn't expose the
+// AdminAccess field as that one is only supported when requesting a
+// specific device.
 type DeviceSubRequest struct {
 	// Name can be used to reference this subrequest in the list of constraints
 	// or the list of configurations for the claim. References must use the
@@ -805,7 +786,7 @@ type DeviceSubRequest struct {
 	//   Allocation will fail if some devices are already allocated,
 	//   unless adminAccess is requested.
 	//
-	// If AlloctionMode is not specified, the default mode is ExactCount. If
+	// If AllocationMode is not specified, the default mode is ExactCount. If
 	// the mode is ExactCount and count is not specified, the default count is
 	// one. Any other subrequests must specify this field.
 	//

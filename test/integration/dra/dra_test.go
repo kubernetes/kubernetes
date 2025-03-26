@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +35,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourcev1beta2api "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -124,7 +127,8 @@ func TestDRA(t *testing.T) {
 		},
 		"core": {
 			apis: map[schema.GroupVersion]bool{
-				resourceapi.SchemeGroupVersion: true,
+				resourceapi.SchemeGroupVersion:        true,
+				resourcev1beta2api.SchemeGroupVersion: true,
 			},
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
 			f: func(tCtx ktesting.TContext) {
@@ -136,22 +140,26 @@ func TestDRA(t *testing.T) {
 		},
 		"all": {
 			apis: map[schema.GroupVersion]bool{
-				resourceapi.SchemeGroupVersion:      true,
-				resourcealphaapi.SchemeGroupVersion: true,
+				resourceapi.SchemeGroupVersion:        true,
+				resourcev1beta2api.SchemeGroupVersion: true,
+				resourcealphaapi.SchemeGroupVersion:   true,
 			},
 			features: map[featuregate.Feature]bool{
 				features.DynamicResourceAllocation: true,
 				// Additional DRA feature gates go here,
 				// in alphabetical order,
 				// as needed by tests for them.
-				features.DRAAdminAccess:     true,
-				features.DRAPrioritizedList: true,
+				features.DRAAdminAccess:          true,
+				features.DRADeviceTaints:         true,
+				features.DRAPartitionableDevices: true,
+				features.DRAPrioritizedList:      true,
 			},
 			f: func(tCtx ktesting.TContext) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, true) })
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
+				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 			},
 		},
 	} {
@@ -355,6 +363,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext) {
 								Name: "device-tainted-default",
 								Basic: &resourceapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
+										Key:    "dra.example.com/taint",
+										Value:  "taint-value",
 										Effect: resourceapi.DeviceTaintEffectNoExecute,
 										// TimeAdded is added by apiserver.
 									}},
@@ -364,6 +374,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext) {
 								Name: "device-tainted-time-added",
 								Basic: &resourceapi.BasicDevice{
 									Taints: []resourceapi.DeviceTaint{{
+										Key:       "dra.example.com/taint",
+										Value:     "taint-value",
 										Effect:    resourceapi.DeviceTaintEffectNoExecute,
 										TimeAdded: ptr.To(metav1.Now()),
 									}},
@@ -396,4 +408,27 @@ func testPublishResourceSlices(tCtx ktesting.TContext) {
 
 	// No further changes necessary.
 	ktesting.Consistently(tCtx, getStats).WithTimeout(10 * time.Second).Should(gomega.Equal(expectedStats))
+}
+
+// testMaxResourceSlice creates a ResourceSlice that is as large as possible
+// and prints some information about it.
+func testMaxResourceSlice(tCtx ktesting.TContext) {
+	slice := NewMaxResourceSlice()
+	createdSlice, err := tCtx.Client().ResourceV1beta2().ResourceSlices().Create(tCtx, slice, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err)
+	totalSize := createdSlice.Size()
+	var managedFieldsSize int
+	for _, f := range createdSlice.ManagedFields {
+		managedFieldsSize += f.Size()
+	}
+	specSize := createdSlice.Spec.Size()
+	tCtx.Logf("\n\nTotal size: %s\nManagedFields size: %s (%.0f%%)\nSpec size: %s (%.0f)%%\n\nManagedFields:\n%s",
+		resource.NewQuantity(int64(totalSize), resource.BinarySI),
+		resource.NewQuantity(int64(managedFieldsSize), resource.BinarySI), float64(managedFieldsSize)*100/float64(totalSize),
+		resource.NewQuantity(int64(specSize), resource.BinarySI), float64(specSize)*100/float64(totalSize),
+		klog.Format(createdSlice.ManagedFields),
+	)
+	if diff := cmp.Diff(slice.Spec, createdSlice.Spec); diff != "" {
+		tCtx.Errorf("ResourceSliceSpec got modified during Create (- want, + got):\n%s", diff)
+	}
 }

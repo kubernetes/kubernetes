@@ -36,7 +36,12 @@ func AuthorizedForAdmin(ctx context.Context, deviceRequests []resource.DeviceReq
 	// no need to check old request since spec is immutable
 
 	for i := range deviceRequests {
-		value := deviceRequests[i].AdminAccess
+		// AdminAccess can not be set on subrequests, so it can
+		// only be used when the Exactly field is set.
+		if deviceRequests[i].Exactly == nil {
+			continue
+		}
+		value := deviceRequests[i].Exactly.AdminAccess
 		if value != nil && *value {
 			adminRequested = true
 			adminAccessPath = field.NewPath("spec", "devices", "requests").Index(i).Child("adminAccess")

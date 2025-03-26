@@ -972,8 +972,8 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
-	// The API validation logic has checked the ConsumesCounter referred should exist inside SharedCounters.
-	if alloc.features.PartitionableDevices && len(device.basic.ConsumesCounter) > 0 {
+	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
+	if alloc.features.PartitionableDevices && len(device.basic.ConsumesCounters) > 0 {
 		// If a device consumes capacity from a capacity pool, verify that
 		// there is sufficient capacity available.
 		ok, err := alloc.checkAvailableCapacity(device)
@@ -1075,8 +1075,8 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 	slice := device.slice
 
 	referencedSharedCounters := sets.New[draapi.UniqueString]()
-	for _, consumedCounter := range device.basic.ConsumesCounter {
-		referencedSharedCounters.Insert(consumedCounter.SharedCounter)
+	for _, consumedCounter := range device.basic.ConsumesCounters {
+		referencedSharedCounters.Insert(consumedCounter.CounterSet)
 	}
 
 	// Create a structure that captures the initial counter for all sharedCounters
@@ -1104,8 +1104,8 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 		if !alloc.allocatedDevices.Has(deviceID) && !alloc.allocatingDevices[deviceID] {
 			continue
 		}
-		for _, consumedCounter := range device.Basic.ConsumesCounter {
-			counterShared := availableCounters[consumedCounter.SharedCounter]
+		for _, consumedCounter := range device.Basic.ConsumesCounters {
+			counterShared := availableCounters[consumedCounter.CounterSet]
 			for name, cap := range consumedCounter.Counters {
 				existingCap, ok := counterShared[name]
 				if !ok {
@@ -1121,8 +1121,8 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 	}
 
 	// Check if all consumed capacities for the device can be satisfied.
-	for _, deviceConsumedCounter := range device.basic.ConsumesCounter {
-		counterShared := availableCounters[deviceConsumedCounter.SharedCounter]
+	for _, deviceConsumedCounter := range device.basic.ConsumesCounters {
+		counterShared := availableCounters[deviceConsumedCounter.CounterSet]
 		for name, cap := range deviceConsumedCounter.Counters {
 			availableCap, found := counterShared[name]
 			// If the device requests a capacity that doesn't exist in
