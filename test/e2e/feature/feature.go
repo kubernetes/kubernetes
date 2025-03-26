@@ -523,14 +523,6 @@ var (
 	// - ci-kubernetes-node-e2e-cri-proxy-serial
 	CriProxy = framework.WithFeature(framework.ValidFeatures.Add("CriProxy"))
 
-	// Owner: sig-network
-	// Marks tests that require a cluster with Topology Hints enabled.
-	TopologyHints = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
-
-	// Owner: sig-network
-	// Marks tests that require a cluster with Traffic Distribution enabled.
-	TrafficDistribution = framework.WithFeature(framework.ValidFeatures.Add("Traffic Distribution"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	TopologyManager = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
 
