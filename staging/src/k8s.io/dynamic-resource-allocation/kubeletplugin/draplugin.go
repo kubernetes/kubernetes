@@ -397,6 +397,26 @@ func FlockDirectoryPath(path string) Option {
 	}
 }
 
+// RegistrationService controls whether the kubelet plugin gRPC service
+// is started. It's on by default. This is meant for testing, normal
+// DRA drivers should use the default.
+func RegistrationService(enabled bool) Option {
+	return func(o *options) error {
+		o.registrationService = enabled
+		return nil
+	}
+}
+
+// DRAService controls whether the DRA gRPC service
+// is started. It's on by default. This is meant for testing, normal
+// DRA drivers should use the default.
+func DRAService(enabled bool) Option {
+	return func(o *options) error {
+		o.draService = enabled
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -413,6 +433,8 @@ type options struct {
 	serialize                  bool
 	flockDirectoryPath         string
 	nodeV1beta1                bool
+	registrationService        bool
+	draService                 bool
 }
 
 // Helper combines the kubelet registration service and the DRA node plugin
@@ -442,8 +464,9 @@ type Helper struct {
 	resourceSliceController *resourceslice.Controller
 }
 
-// Start sets up two gRPC servers (one for registration, one for the DRA node
-// client) and implements them by calling a [DRAPlugin] implementation.
+// Start sets up all enabled gRPC servers (by default, one for registration,
+// one for the DRA node client) and implements them by calling a [DRAPlugin]
+// implementation.
 //
 // The context and/or DRAPlugin.Stop can be used to stop all background activity.
 // Stop also blocks. A logger can be stored in the context to add values or
@@ -462,6 +485,8 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		pluginRegistrationEndpoint: endpoint{
 			dir: KubeletRegistryDir,
 		},
+		draService:          true,
+		registrationService: true,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -530,34 +555,42 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		}
 	}()
 
-	// Run the node plugin gRPC server first to ensure that it is ready.
 	var supportedServices []string
+	if o.nodeV1beta1 {
+		logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+		supportedServices = append(supportedServices, drapb.DRAPluginService)
+	}
+	if len(supportedServices) == 0 {
+		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+	}
 	draEndpoint := endpoint{
 		dir:        o.pluginDataDirectoryPath,
 		file:       "dra" + uidPart + ".sock", // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
 		listenFunc: o.draEndpointListen,
 	}
-	pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
-		if o.nodeV1beta1 {
-			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-			drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
-			supportedServices = append(supportedServices, drapb.DRAPluginService)
+
+	if o.draService {
+		// Run the node plugin gRPC server first to ensure that it is ready.
+		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
+			if o.nodeV1beta1 {
+				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+			}
+		})
+		if err != nil {
+			return nil, fmt.Errorf("start DRA service: %w", err)
 		}
-	})
-	if err != nil {
-		return nil, fmt.Errorf("start node client: %v", err)
-	}
-	d.pluginServer = pluginServer
-	if len(supportedServices) == 0 {
-		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+		d.pluginServer = pluginServer
 	}
 
-	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("start registrar: %v", err)
+	if o.registrationService {
+		// Now make it available to kubelet.
+		registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("start registrar: %w", err)
+		}
+		d.registrar = registrar
 	}
-	d.registrar = registrar
 
 	// startGRPCServer and startRegistrar don't implement cancellation
 	// themselves, we add that for both here.
