@@ -168,6 +168,7 @@ func init() {
 		return parseServiceConfig(js, defaultMaxCallAttempts)
 	}
 }
+
 func parseServiceConfig(js string, maxAttempts int) *serviceconfig.ParseResult {
 	if len(js) == 0 {
 		return &serviceconfig.ParseResult{Err: fmt.Errorf("no JSON service config provided")}
@@ -267,18 +268,21 @@ func parseServiceConfig(js string, maxAttempts int) *serviceconfig.ParseResult {
 	return &serviceconfig.ParseResult{Config: &sc}
 }
 
+func isValidRetryPolicy(jrp *jsonRetryPolicy) bool {
+	return jrp.MaxAttempts > 1 &&
+		jrp.InitialBackoff > 0 &&
+		jrp.MaxBackoff > 0 &&
+		jrp.BackoffMultiplier > 0 &&
+		len(jrp.RetryableStatusCodes) > 0
+}
+
 func convertRetryPolicy(jrp *jsonRetryPolicy, maxAttempts int) (p *internalserviceconfig.RetryPolicy, err error) {
 	if jrp == nil {
 		return nil, nil
 	}
 
-	if jrp.MaxAttempts <= 1 ||
-		jrp.InitialBackoff <= 0 ||
-		jrp.MaxBackoff <= 0 ||
-		jrp.BackoffMultiplier <= 0 ||
-		len(jrp.RetryableStatusCodes) == 0 {
-		logger.Warningf("grpc: ignoring retry policy %v due to illegal configuration", jrp)
-		return nil, nil
+	if !isValidRetryPolicy(jrp) {
+		return nil, fmt.Errorf("invalid retry policy (%+v): ", jrp)
 	}
 
 	if jrp.MaxAttempts < maxAttempts {
@@ -297,7 +301,7 @@ func convertRetryPolicy(jrp *jsonRetryPolicy, maxAttempts int) (p *internalservi
 	return rp, nil
 }
 
-func min(a, b *int) *int {
+func minPointers(a, b *int) *int {
 	if *a < *b {
 		return a
 	}
@@ -309,7 +313,7 @@ func getMaxSize(mcMax, doptMax *int, defaultVal int) *int {
 		return &defaultVal
 	}
 	if mcMax != nil && doptMax != nil {
-		return min(mcMax, doptMax)
+		return minPointers(mcMax, doptMax)
 	}
 	if mcMax != nil {
 		return mcMax
