@@ -1200,13 +1200,14 @@ func doPodResizeTests() {
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
 				framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
+				expected := e2epod.UpdateExpectedContainerRestarts(ctx, patchedPod, expectedContainers)
 
 				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
-				e2epod.VerifyPodResources(patchedPod, expectedContainers)
+				e2epod.VerifyPodResources(patchedPod, expected)
 
 				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
-				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
+				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expected)
+				e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
 			}
 
 			patchAndVerify(tc.patchString, tc.expected, "resize")
@@ -1219,7 +1220,7 @@ func doPodResizeTests() {
 					gomega.Expect(c.Name).To(gomega.Equal(tc.expected[i].Name),
 						"test case containers & expectations should be in the same order")
 					// Resizes that trigger a restart should trigger a second restart when rolling back.
-					rollbackContainers[i].RestartCount = tc.expected[i].RestartCount * 2
+					rollbackContainers[i].RestartCount = tc.expected[i].RestartCount
 				}
 
 				rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)

@@ -155,6 +155,7 @@ func doPodResizeAdmissionPluginsTests() {
 			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx, newPods[0].Name,
 				types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
 			framework.ExpectNoError(pErr, "failed to patch pod for resize")
+			expected = e2epod.UpdateExpectedContainerRestarts(ctx, patchedPod, expected)
 
 			ginkgo.By("verifying pod patched for resize within resource quota")
 			e2epod.VerifyPodResources(patchedPod, expected)
@@ -405,8 +406,9 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		ginkgo.By(fmt.Sprintf("TEST3: Verify pod '%s' is resized successfully after pod deletion '%s' and '%s", testPod1.Name, testPod2.Name, testPod3.Name))
 		expected := []e2epod.ResizableContainerInfo{
 			{
-				Name:      "c1",
-				Resources: &e2epod.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Name:         "c1",
+				Resources:    &e2epod.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				RestartCount: testPod1.Status.ContainerStatuses[0].RestartCount,
 			},
 		}
 		resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, testPod1, expected)
