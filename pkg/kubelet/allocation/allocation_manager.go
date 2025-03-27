@@ -172,27 +172,11 @@ func compareAndSaveDiff(reqOld, reqNew v1.ResourceRequirements) v1.ResourceRequi
 	return diffReq
 }
 
-// Check Requests and Limists are empty
-func isResizeResourceEmpty(req v1.ResourceRequirements) bool {
-	return len(req.Requests) == 0 && len(req.Limits) == 0
-}
-
-// Compare and save Resize resource to PodResizeReqs
-func updatePodResizeAllocation(pod *v1.Pod, c v1.Container, req1, req2 v1.ResourceRequirements) {
-
-	diffReq := compareAndSaveDiff(req1, req2)
-
-	if isResizeResourceEmpty(diffReq) {
-		return
-	}
-
+func updateContainerResizeAllocation(pod *v1.Pod, c v1.Container, diffReq v1.ResourceRequirements)(*PodResourceSummary) {
 	podResizeAlloc, exists := GetPodResizeAllocation(pod)
 	if !exists {
 		podResizeAlloc = &PodResourceSummary{}
 	}
-
-	resizeManager.mutex.Lock()
-	defer resizeManager.mutex.Unlock()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && podutil.IsRestartableInitContainer(&c) {
 		if podResizeAlloc.InitContainers == nil {
@@ -205,7 +189,21 @@ func updatePodResizeAllocation(pod *v1.Pod, c v1.Container, req1, req2 v1.Resour
 		}
 		podResizeAlloc.Containers[c.Name] = diffReq
 	}
+	return podResizeAlloc
+}
 
+// Compare and save Resize resource to podResizeAllocation
+func UpdatePodResizeAllocation(pod *v1.Pod, c v1.Container, req1, req2 v1.ResourceRequirements) {
+	diffReq := compareAndSaveDiff(req1, req2)
+
+	if len(diffReq.Requests) == 0 && len(diffReq.Limits) == 0 {
+		return
+	}
+	
+	podResizeAlloc := updateContainerResizeAllocation(pod, c, diffReq)
+
+	resizeManager.mutex.Lock()
+	defer resizeManager.mutex.Unlock()
 	resizeManager.podResizeAllocation[pod.UID] = podResizeAlloc
 }
 
@@ -222,7 +220,7 @@ func updatePodFromAllocation(pod *v1.Pod, allocs state.PodResourceInfoMap) (*v1.
 				// Allocation differs from pod spec, retrieve the allocation
 				if !updated {
 					// If this is the first update to be performed, cache resize resource
-					updatePodResizeAllocation(pod, c, cAlloc, c.Resources)
+					UpdatePodResizeAllocation(pod, c, cAlloc, c.Resources)
 					// If this is the first update to be performed, copy the pod
 					pod = pod.DeepCopy()
 					updated = true
