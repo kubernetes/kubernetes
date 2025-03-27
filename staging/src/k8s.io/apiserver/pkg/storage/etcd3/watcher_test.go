@@ -105,7 +105,7 @@ func TestWatchInitializationSignal(t *testing.T) {
 
 func TestProgressNotify(t *testing.T) {
 	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	clusterConfig.WatchProgressNotifyInterval = time.Second
 	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
 	storagetesting.RunOptionalTestProgressNotify(ctx, t, store)
@@ -122,7 +122,7 @@ func TestWatchWithUnsafeDelete(t *testing.T) {
 // etcd implementation doesn't have any effect.
 func TestWatchDispatchBookmarkEvents(t *testing.T) {
 	clusterConfig := testserver.NewTestConfig(t)
-	clusterConfig.ExperimentalWatchProgressNotifyInterval = time.Second
+	clusterConfig.WatchProgressNotifyInterval = time.Second
 	ctx, store, _ := testSetup(t, withClientConfig(clusterConfig))
 
 	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, store, false)
