@@ -254,7 +254,7 @@ func (_c *MockRuntime_GarbageCollect_Call) RunAndReturn(run func(context.Context
 }
 
 // GeneratePodStatus provides a mock function with given fields: event
-func (_m *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) (*container.PodStatus, error) {
+func (_m *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) *container.PodStatus {
 	ret := _m.Called(event)
 
 	if len(ret) == 0 {
@@ -262,10 +262,6 @@ func (_m *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) (*con
 	}
 
 	var r0 *container.PodStatus
-	var r1 error
-	if rf, ok := ret.Get(0).(func(*v1.ContainerEventResponse) (*container.PodStatus, error)); ok {
-		return rf(event)
-	}
 	if rf, ok := ret.Get(0).(func(*v1.ContainerEventResponse) *container.PodStatus); ok {
 		r0 = rf(event)
 	} else {
@@ -274,13 +270,7 @@ func (_m *MockRuntime) GeneratePodStatus(event *v1.ContainerEventResponse) (*con
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(*v1.ContainerEventResponse) error); ok {
-		r1 = rf(event)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // MockRuntime_GeneratePodStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GeneratePodStatus'
@@ -301,12 +291,12 @@ func (_c *MockRuntime_GeneratePodStatus_Call) Run(run func(event *v1.ContainerEv
 	return _c
 }
 
-func (_c *MockRuntime_GeneratePodStatus_Call) Return(_a0 *container.PodStatus, _a1 error) *MockRuntime_GeneratePodStatus_Call {
-	_c.Call.Return(_a0, _a1)
+func (_c *MockRuntime_GeneratePodStatus_Call) Return(_a0 *container.PodStatus) *MockRuntime_GeneratePodStatus_Call {
+	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *MockRuntime_GeneratePodStatus_Call) RunAndReturn(run func(*v1.ContainerEventResponse) (*container.PodStatus, error)) *MockRuntime_GeneratePodStatus_Call {
+func (_c *MockRuntime_GeneratePodStatus_Call) RunAndReturn(run func(*v1.ContainerEventResponse) *container.PodStatus) *MockRuntime_GeneratePodStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -231,28 +231,17 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 		podID := types.UID(event.PodSandboxStatus.Metadata.Uid)
 		shouldSendPLEGEvent := false
 
-		status, err := e.runtime.GeneratePodStatus(event)
-		if err != nil {
-			// nolint:logcheck // Not using the result of klog.V inside the
-			// if branch is okay, we just use it to determine whether the
-			// additional "podStatus" key and its value should be added.
-			if klog.V(6).Enabled() {
-				e.logger.Error(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID, "podStatus", status)
-			} else {
-				e.logger.Error(err, "Evented PLEG: error generating pod status from the received event", "podUID", podID)
-			}
+		status := e.runtime.GeneratePodStatus(event)
+		if klogV := e.logger.V(6); klogV.Enabled() {
+			e.logger.Info("Evented PLEG: Generated pod status from the received event", "podUID", podID, "podStatus", status)
 		} else {
-			if klogV := e.logger.V(6); klogV.Enabled() {
-				e.logger.Info("Evented PLEG: Generated pod status from the received event", "podUID", podID, "podStatus", status)
-			} else {
-				e.logger.V(4).Info("Evented PLEG: Generated pod status from the received event", "podUID", podID)
-			}
-			// Preserve the pod IP across cache updates if the new IP is empty.
-			// When a pod is torn down, kubelet may race with PLEG and retrieve
-			// a pod status after network teardown, but the kubernetes API expects
-			// the completed pod's IP to be available after the pod is dead.
-			status.IPs = e.getPodIPs(podID, status)
+			e.logger.V(4).Info("Evented PLEG: Generated pod status from the received event", "podUID", podID)
 		}
+		// Preserve the pod IP across cache updates if the new IP is empty.
+		// When a pod is torn down, kubelet may race with PLEG and retrieve
+		// a pod status after network teardown, but the kubernetes API expects
+		// the completed pod's IP to be available after the pod is dead.
+		status.IPs = e.getPodIPs(podID, status)
 
 		e.updateRunningPodMetric(status)
 		e.updateRunningContainerMetric(status)
@@ -270,7 +259,7 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 			}
 			shouldSendPLEGEvent = true
 		} else {
-			if e.cache.Set(podID, status, err, time.Unix(0, event.GetCreatedAt())) {
+			if e.cache.Set(podID, status, nil, time.Unix(0, event.GetCreatedAt())) {
 				shouldSendPLEGEvent = true
 			}
 		}

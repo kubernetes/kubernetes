@@ -128,7 +128,7 @@ type Runtime interface {
 	// and store the resulting archive to the checkpoint directory.
 	CheckpointContainer(ctx context.Context, options *runtimeapi.CheckpointContainerRequest) error
 	// Generate pod status from the CRI event
-	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*PodStatus, error)
+	GeneratePodStatus(event *runtimeapi.ContainerEventResponse) *PodStatus
 	// ListMetricDescriptors gets the descriptors for the metrics that will be returned in ListPodSandboxMetrics.
 	// This list should be static at startup: either the client and server restart together when
 	// adding or removing metrics descriptors, or they should not change.
