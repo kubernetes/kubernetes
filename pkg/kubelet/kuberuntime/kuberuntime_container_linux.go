@@ -145,7 +145,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	lcr.OomScoreAdj = int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 
-	lcr.HugepageLimits = GetHugepageLimitsFromResources(ctx, container.Resources)
+	lcr.HugepageLimits = GetHugepageLimitsFromResources(ctx, pod, container.Resources)
 
 	// Configure swap for the container
 	m.configureContainerSwapResources(ctx, lcr, pod, container)
@@ -323,8 +323,7 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 }
 
 // GetHugepageLimitsFromResources returns limits of each hugepages from resources.
-func GetHugepageLimitsFromResources(ctx context.Context, resources v1.ResourceRequirements) []*runtimeapi.HugepageLimit {
-	logger := klog.FromContext(ctx)
+func GetHugepageLimitsFromResources(ctx context.Context, pod *v1.Pod, containerResources v1.ResourceRequirements) []*runtimeapi.HugepageLimit {
 	var hugepageLimits []*runtimeapi.HugepageLimit
 
 	// For each page size, limit to 0.
@@ -336,23 +335,20 @@ func GetHugepageLimitsFromResources(ctx context.Context, resources v1.ResourceRe
 	}
 
 	requiredHugepageLimits := map[string]uint64{}
-	for resourceObj, amountObj := range resources.Limits {
-		if !v1helper.IsHugePageResourceName(resourceObj) {
-			continue
-		}
 
-		pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
-		if err != nil {
-			logger.Info("Failed to get hugepage size from resource", "object", resourceObj, "err", err)
-			continue
+	// When hugepage limits are specified at pod level and no hugepage limits are
+	// specified at container level, the container's cgroup will reflect the pod level limit.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		for limitName, limitAmount := range pod.Spec.Resources.Limits {
+			readAndDefineRequiredHugepageLimit(ctx, requiredHugepageLimits, limitName, limitAmount)
 		}
+	}
 
-		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
-		if err != nil {
-			logger.Info("Size is invalid", "object", resourceObj, "err", err)
-			continue
-		}
-		requiredHugepageLimits[sizeString] = uint64(amountObj.Value())
+	// If both the pod level and the container level specify hugepages, the container
+	// level will have precedence, so the container's hugepages limit will be reflected
+	// in the container's cgroup values.
+	for resourceObj, amountObj := range containerResources.Limits {
+		readAndDefineRequiredHugepageLimit(ctx, requiredHugepageLimits, resourceObj, amountObj)
 	}
 
 	for _, hugepageLimit := range hugepageLimits {
@@ -362,6 +358,27 @@ func GetHugepageLimitsFromResources(ctx context.Context, resources v1.ResourceRe
 	}
 
 	return hugepageLimits
+}
+
+func readAndDefineRequiredHugepageLimit(ctx context.Context, requiredHugepageLimits map[string]uint64, resourceObj v1.ResourceName, amountObj resource.Quantity) {
+	logger := klog.FromContext(ctx)
+
+	if !v1helper.IsHugePageResourceName(resourceObj) {
+		return
+	}
+
+	pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
+	if err != nil {
+		logger.Info("Failed to get hugepage size from resource", "object", resourceObj, "err", err)
+		return
+	}
+
+	sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
+	if err != nil {
+		logger.Info("Size is invalid", "object", resourceObj, "err", err)
+		return
+	}
+	requiredHugepageLimits[sizeString] = uint64(amountObj.Value())
 }
 
 func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *kubecontainer.ContainerResources {

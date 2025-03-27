@@ -50,7 +50,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func makeExpectedConfig(t *testing.T, tCtx context.Context, m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
+func makeExpectedConfig(_ *testing.T, tCtx context.Context, m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int, enforceMemoryQoS bool) *runtimeapi.ContainerConfig {
 	container := &pod.Spec.Containers[containerIndex]
 	podIP := ""
 	restartCount := 0
@@ -676,7 +676,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			}
 		}
 
-		results := GetHugepageLimitsFromResources(tCtx, test.resources)
+		results := GetHugepageLimitsFromResources(tCtx, &v1.Pod{}, test.resources)
 		if !reflect.DeepEqual(expectedHugepages, results) {
 			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
 		}
