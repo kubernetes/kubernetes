@@ -38,7 +38,7 @@ func (s *server) GetPluginHandler() cache.PluginHandler {
 	return s
 }
 
-func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (s *server) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration, desiredStateOfWorld cache.DesiredStateOfWorld) error {
 	klog.V(2).InfoS("Registering plugin at endpoint", "plugin", pluginName, "endpoint", endpoint)
 	return s.connectClient(pluginName, endpoint)
 }
