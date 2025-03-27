@@ -123,7 +123,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			// addrs is a pointer because we're going to mutate it.
 			for i, addr := range *addrs {
 				if addr.IP == ip.String() {
-					for len(*addrs) > r.masterCount {
+					for len(*addrs) > r.masterCount && len(*addrs) > 0 {
 						// wrap around if necessary.
 						remove := (i + 1) % len(*addrs)
 						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
