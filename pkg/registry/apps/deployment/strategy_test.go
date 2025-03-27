@@ -66,40 +66,40 @@ func TestStatusUpdates(t *testing.T) {
 	}
 }
 
-func TestStatusUpdatesWithDeploymentPodReplacementPolicy(t *testing.T) {
+func TestStatusUpdatesWithDeploymentReplicaSetTerminatingReplicas(t *testing.T) {
 	tests := []struct {
-		name                                 string
-		enableDeploymentPodReplacementPolicy bool
-		terminatingReplicas                  *int32
-		terminatingReplicasUpdate            *int32
-		expectedTerminatingReplicas          *int32
+		name                                          string
+		enableDeploymentReplicaSetTerminatingReplicas bool
+		terminatingReplicas                           *int32
+		terminatingReplicasUpdate                     *int32
+		expectedTerminatingReplicas                   *int32
 	}{
 		{
-			name:                                 "should not allow updates when feature gate is disabled",
-			enableDeploymentPodReplacementPolicy: false,
-			terminatingReplicas:                  nil,
-			terminatingReplicasUpdate:            ptr.To[int32](2),
-			expectedTerminatingReplicas:          nil,
+			name: "should not allow updates when feature gate is disabled",
+			enableDeploymentReplicaSetTerminatingReplicas: false,
+			terminatingReplicas:                           nil,
+			terminatingReplicasUpdate:                     ptr.To[int32](2),
+			expectedTerminatingReplicas:                   nil,
 		},
 		{
-			name:                                 "should allow update when the field is in use when feature gate is disabled",
-			enableDeploymentPodReplacementPolicy: false,
-			terminatingReplicas:                  ptr.To[int32](2),
-			terminatingReplicasUpdate:            ptr.To[int32](5),
-			expectedTerminatingReplicas:          ptr.To[int32](5),
+			name: "should allow update when the field is in use when feature gate is disabled",
+			enableDeploymentReplicaSetTerminatingReplicas: false,
+			terminatingReplicas:                           ptr.To[int32](2),
+			terminatingReplicasUpdate:                     ptr.To[int32](5),
+			expectedTerminatingReplicas:                   ptr.To[int32](5),
 		},
 		{
-			name:                                 "should allow updates when feature gate is enabled",
-			enableDeploymentPodReplacementPolicy: true,
-			terminatingReplicas:                  nil,
-			terminatingReplicasUpdate:            ptr.To[int32](2),
-			expectedTerminatingReplicas:          ptr.To[int32](2),
+			name: "should allow updates when feature gate is enabled",
+			enableDeploymentReplicaSetTerminatingReplicas: true,
+			terminatingReplicas:                           nil,
+			terminatingReplicasUpdate:                     ptr.To[int32](2),
+			expectedTerminatingReplicas:                   ptr.To[int32](2),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, tc.enableDeploymentPodReplacementPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, tc.enableDeploymentReplicaSetTerminatingReplicas)
 
 			ctx := genericapirequest.NewDefaultContext()
 			validSelector := map[string]string{"a": "b"}

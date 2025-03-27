@@ -180,7 +180,7 @@ const (
 	// kep: http://kep.k8s.io/3973
 	//
 	// Deployments and replica sets can now also track terminating pods via .status.terminatingReplicas.
-	DeploymentPodReplacementPolicy featuregate.Feature = "DeploymentPodReplacementPolicy"
+	DeploymentReplicaSetTerminatingReplicas featuregate.Feature = "DeploymentReplicaSetTerminatingReplicas"
 
 	// owner: @elezar
 	// kep: http://kep.k8s.io/4009
@@ -1120,7 +1120,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	DeploymentPodReplacementPolicy: {
+	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 

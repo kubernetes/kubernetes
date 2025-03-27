@@ -379,7 +379,7 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: DeploymentPodReplacementPolicy
+- name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false
     lockToDefault: false

@@ -1308,7 +1308,7 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 }
 
 func TestTerminatingReplicasDeploymentStatus(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, false)
 
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
@@ -1366,7 +1366,7 @@ func TestTerminatingReplicasDeploymentStatus(t *testing.T) {
 	}
 
 	// should update terminating replicas when feature gate is enabled
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, true)
 	// Scale down the deployment
 	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Replicas = ptr.To(int32(3))
@@ -1384,7 +1384,7 @@ func TestTerminatingReplicasDeploymentStatus(t *testing.T) {
 	}
 
 	// should not update terminating replicas when feature gate is disabled
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, false)
 	// Scale down the deployment
 	tester.deployment, err = tester.updateDeployment(func(update *apps.Deployment) {
 		update.Spec.Replicas = ptr.To(int32(2))

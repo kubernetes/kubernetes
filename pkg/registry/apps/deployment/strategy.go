@@ -209,7 +209,7 @@ func (deploymentStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 
 // dropDisabledStatusFields removes disabled fields from the deployment status.
 func dropDisabledStatusFields(deploymentStatus, oldDeploymentStatus *apps.DeploymentStatus) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) &&
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) &&
 		(oldDeploymentStatus == nil || oldDeploymentStatus.TerminatingReplicas == nil) {
 		deploymentStatus.TerminatingReplicas = nil
 	}
