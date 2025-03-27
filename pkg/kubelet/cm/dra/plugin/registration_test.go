@@ -36,6 +36,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -201,7 +202,7 @@ func TestRegistrationHandler(t *testing.T) {
 			requireNoSlices(t, tCtx, client)
 
 			// Simulate one existing plugin A.
-			err := handler.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
+			err := handler.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				tCtx.Logf("Removing plugin %s", pluginA)
@@ -222,7 +223,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Add plugin for the first time.
-			err = handler.RegisterPlugin(test.pluginName, test.endpoint, test.supportedServices, nil)
+			err = handler.RegisterPlugin(test.pluginName, test.endpoint, test.supportedServices, nil, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -269,13 +270,17 @@ func TestUnregisterOnConnectionDrop(t *testing.T) {
 	require.NoError(t, err)
 	defer teardown()
 
-	err = handler.RegisterPlugin(pluginName, endpoint, []string{service}, nil)
+	dsw := cache.NewDesiredStateOfWorld()
+	err = handler.RegisterPlugin(pluginName, endpoint, []string{service}, nil, dsw)
 	require.NoError(t, err)
 
 	requireNoSlices(t, tCtx, client)
 
 	plugin := draPlugins.get(pluginName)
 	assert.NotNil(t, plugin, "plugin should present in the plugin store")
+
+	require.NoError(t, dsw.AddOrUpdatePlugin(endpoint))
+	assert.Truef(t, dsw.PluginExists(endpoint), "plugin endpoint %s should exist in the desired state of world", endpoint)
 
 	// Establish connection to the plugin
 	conn, err := plugin.getOrCreateGRPCConn()
@@ -295,4 +300,8 @@ func TestUnregisterOnConnectionDrop(t *testing.T) {
 
 	// Slice should be removed
 	requireNoSlices(t, tCtx, client)
+
+	// Desired state of the world should not have a plugin
+	assert.Falsef(t, dsw.PluginExists(endpoint), "plugin endpoint %s should not exist in the desired state of world", endpoint)
+	assert.Empty(t, dsw.GetPluginsToRegister())
 }
