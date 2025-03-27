@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1063,17 +1064,17 @@ func TestRegisterValidate(t *testing.T) {
 	ctx := context.Background()
 
 	// register multiple types for testing to ensure registration is working as expected
-	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
+	s.AddValidationFunc(&TestType1{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
 		if op.Options.Has("option1") {
 			return field.ErrorList{invalidIfOptionErr}
 		}
-		if len(subresources) == 1 && subresources[0] == "status" {
+		if slices.Equal(op.Request.Subresources, []string{"status"}) {
 			return field.ErrorList{invalidStatusErr}
 		}
 		return field.ErrorList{invalidValue}
 	})
 
-	s.AddValidationFunc(&TestType2{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
+	s.AddValidationFunc(&TestType2{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
 		if oldObject != nil {
 			return field.ErrorList{invalidLength}
 		}

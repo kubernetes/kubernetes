@@ -42,6 +42,24 @@ type Operation struct {
 	//
 	// Unset options are disabled/false.
 	Options sets.Set[string]
+
+	// Request provides information about the request being validated.
+	Request Request
+}
+
+// Request provides information about the request being validated.
+type Request struct {
+	// Subresources is the path to the subresource being validated. Validations
+	// should use this only when the validation of field differs for a particular
+	// subresource. For example, the resize subresource of pod is allowed to change
+	// the value of spec.container[*].resources fields, which are immutable updated
+	// via the root pod resource. In this example, because validation of the fields
+	// are conditional to the subresource, the validator should use Subresources.
+	// Note field wiping, which limits which fields a subresource is allowed to write
+	// to, is handled in strategies, and does should to be implemented using
+	// Subresources since field wiping drops field changes from the request, but does
+	// not require changes to validation logic.
+	Subresources []string
 }
 
 // Code is the request operation to be validated.

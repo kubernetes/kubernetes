@@ -122,12 +122,12 @@ func TestValidateDeclaratively(t *testing.T) {
 	scheme.AddKnownTypes(internalGV, &Pod{})
 	scheme.AddKnownTypes(v1GV, &v1.Pod{})
 
-	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList {
+	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
 		results := field.ErrorList{}
 		if op.Options.Has("option1") {
 			results = append(results, invalidIfOptionErr)
 		}
-		if len(subresources) == 1 && subresources[0] == "status" {
+		if len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "status" {
 			results = append(results, invalidStatusErr)
 		}
 		if op.Type == operation.Update && object.(*v1.Pod).Spec.RestartPolicy != oldObject.(*v1.Pod).Spec.RestartPolicy {

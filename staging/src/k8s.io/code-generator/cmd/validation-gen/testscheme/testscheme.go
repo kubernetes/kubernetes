@@ -47,18 +47,18 @@ import (
 // to also be used as a scheme builder.
 // Must only be used with tests that perform all registration before calls to validate.
 type Scheme struct {
-	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList
+	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList
 	registrationErrors field.ErrorList
 }
 
 // New creates a new Scheme.
 func New() *Scheme {
-	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
+	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}) field.ErrorList{}}
 }
 
 // AddValidationFunc registers a validation function.
 // Last writer wins.
-func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList) {
+func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList) {
 	s.validationFuncs[reflect.TypeOf(srcType)] = fn
 }
 
@@ -68,7 +68,7 @@ func (s *Scheme) Validate(ctx context.Context, opts sets.Set[string], object any
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Create, Options: opts}, object, nil, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: opts}, object, nil)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func (s *Scheme) ValidateUpdate(ctx context.Context, opts sets.Set[string], obje
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Update}, object, oldObject, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: opts}, object, oldObject)
 	}
 	return nil
 }
@@ -243,9 +243,10 @@ func (s *ValidationTestBuilder) Value(value any) *ValidationTester {
 // tests for a validatable value.
 type ValidationTester struct {
 	*ValidationTestBuilder
-	value    any
-	oldValue any
-	opts     sets.Set[string]
+	value        any
+	oldValue     any
+	opts         sets.Set[string]
+	subresources []string
 }
 
 // OldValue sets the oldValue for this ValidationTester. When oldValue is set to
@@ -268,6 +269,12 @@ func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 // Opts sets the ValidationOpts to use.
 func (v *ValidationTester) Opts(opts sets.Set[string]) *ValidationTester {
 	v.opts = opts
+	return v
+}
+
+// Subresource sets the ValidationOpts to use.
+func (v *ValidationTester) Subresources(subresources []string) *ValidationTester {
+	v.subresources = subresources
 	return v
 }
 
@@ -529,9 +536,9 @@ func byFullError(err *field.Error) string {
 func (v *ValidationTester) validate() field.ErrorList {
 	var errs field.ErrorList
 	if v.oldValue == nil {
-		errs = v.s.Validate(context.Background(), v.opts, v.value)
+		errs = v.s.Validate(context.Background(), v.opts, v.value, v.subresources...)
 	} else {
-		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue)
+		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue, v.subresources...)
 	}
 	return errs
 }

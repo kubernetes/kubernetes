@@ -75,7 +75,7 @@ type Scheme struct {
 	// The provided object must be a pointer.
 	// If oldObject is non-nil, update validation is performed and may perform additional
 	// validation such as transition rules and immutability checks.
-	validationFuncs map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList
+	validationFuncs map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList
 
 	// converter stores all registered conversion functions. It also has
 	// default converting behavior.
@@ -105,7 +105,7 @@ func NewScheme() *Scheme {
 		unversionedKinds:          map[string]reflect.Type{},
 		fieldLabelConversionFuncs: map[schema.GroupVersionKind]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
-		validationFuncs:           map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresource ...string) field.ErrorList{},
+		validationFuncs:           map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList{},
 		versionPriority:           map[string][]string{},
 		schemeName:                naming.GetNameFromCallsite(internalPackages...),
 	}
@@ -362,7 +362,7 @@ func (s *Scheme) Default(src Object) {
 // is called. The function will never be called unless the validated object
 // matches srcType. If this function is invoked twice with the same srcType, the
 // fn passed to the later call will be used instead.
-func (s *Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList) {
+func (s *Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList) {
 	s.validationFuncs[reflect.TypeOf(srcType)] = fn
 }
 
@@ -371,7 +371,7 @@ func (s *Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, 
 // is not run when this is called.  Only the generated zz_generated.validations.go validation code is run.
 func (s *Scheme) Validate(ctx context.Context, options sets.Set[string], object Object, subresources ...string) field.ErrorList {
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Create, Options: options}, object, nil, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: options}, object, nil)
 	}
 	return nil
 }
@@ -381,7 +381,7 @@ func (s *Scheme) Validate(ctx context.Context, options sets.Set[string], object 
 // is not run when this is called.  Only the generated zz_generated.validations.go validation code is run.
 func (s *Scheme) ValidateUpdate(ctx context.Context, options sets.Set[string], object, oldObject Object, subresources ...string) field.ErrorList {
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Update, Options: options}, object, oldObject, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: options}, object, oldObject)
 	}
 	return nil
 }
