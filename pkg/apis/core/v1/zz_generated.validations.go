@@ -23,7 +23,6 @@ package v1
 
 import (
 	context "context"
-	fmt "fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -38,20 +37,11 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
-	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
-			return Validate_ReplicationController(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationController), safe.Cast[*corev1.ReplicationController](oldObj))
-		}
-		if len(subresources) == 1 && subresources[0] == "status" {
-			return nil // corev1.ReplicationControllerStatus has no validation
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+	scheme.AddValidationFunc((*corev1.ReplicationController)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		return Validate_ReplicationController(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationController), safe.Cast[*corev1.ReplicationController](oldObj))
 	})
-	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
-			return Validate_ReplicationControllerList(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationControllerList), safe.Cast[*corev1.ReplicationControllerList](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+	scheme.AddValidationFunc((*corev1.ReplicationControllerList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		return Validate_ReplicationControllerList(ctx, op, nil /* fldPath */, obj.(*corev1.ReplicationControllerList), safe.Cast[*corev1.ReplicationControllerList](oldObj))
 	})
 	return nil
 }
