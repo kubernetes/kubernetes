@@ -25,9 +25,9 @@ import (
 
 func TestClone(t *testing.T) {
 	expect := ContainerCPUAssignments{
-		"pod": map[string]cpuset.CPUSet{
-			"container1": cpuset.New(4, 5, 6),
-			"container2": cpuset.New(1, 2, 3),
+		"pod": map[string]ContainerCPUAssignment{
+			"container1": {Original: cpuset.New(4, 5, 6), Resized: cpuset.New()},
+			"container2": {Original: cpuset.New(1, 2, 3), Resized: cpuset.New()},
 		},
 	}
 	actual := expect.Clone()

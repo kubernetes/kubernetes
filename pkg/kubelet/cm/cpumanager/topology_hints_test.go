@@ -590,8 +590,8 @@ func returnTestCases() []testCase {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				string(testPod1.UID): map[string]cpuset.CPUSet{
-					testContainer1.Name: cpuset.New(0, 6),
+				string(testPod1.UID): map[string]state.ContainerCPUAssignment{
+					testContainer1.Name: {Original: cpuset.New(0, 6), Resized: cpuset.New()},
 				},
 			},
 			defaultCPUSet: cpuset.New(),
@@ -611,8 +611,8 @@ func returnTestCases() []testCase {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				string(testPod1.UID): map[string]cpuset.CPUSet{
-					testContainer1.Name: cpuset.New(3, 9),
+				string(testPod1.UID): map[string]state.ContainerCPUAssignment{
+					testContainer1.Name: {Original: cpuset.New(3, 9), Resized: cpuset.New()},
 				},
 			},
 			defaultCPUSet: cpuset.New(),
@@ -632,8 +632,8 @@ func returnTestCases() []testCase {
 			pod:       *testPod4,
 			container: *testContainer4,
 			assignments: state.ContainerCPUAssignments{
-				string(testPod4.UID): map[string]cpuset.CPUSet{
-					testContainer4.Name: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				string(testPod1.UID): map[string]state.ContainerCPUAssignment{
+					testContainer4.Name: {Original: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10), Resized: cpuset.New()},
 				},
 			},
 			defaultCPUSet: cpuset.New(),
@@ -649,8 +649,8 @@ func returnTestCases() []testCase {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				string(testPod1.UID): map[string]cpuset.CPUSet{
-					testContainer1.Name: cpuset.New(0, 6, 3, 9),
+				string(testPod1.UID): map[string]state.ContainerCPUAssignment{
+					testContainer1.Name: {Original: cpuset.New(0, 6, 3, 9), Resized: cpuset.New()},
 				},
 			},
 			defaultCPUSet: cpuset.New(),
@@ -661,8 +661,8 @@ func returnTestCases() []testCase {
 			pod:       *testPod4,
 			container: *testContainer4,
 			assignments: state.ContainerCPUAssignments{
-				string(testPod4.UID): map[string]cpuset.CPUSet{
-					testContainer4.Name: cpuset.New(0, 6, 3, 9),
+				string(testPod4.UID): map[string]state.ContainerCPUAssignment{
+					testContainer4.Name: {Original: cpuset.New(0, 6, 3, 9), Resized: cpuset.New()},
 				},
 			},
 			defaultCPUSet: cpuset.New(),
