@@ -51,14 +51,14 @@ func Test(t *testing.T) {
 		DNSLabelField:        "",
 		DNSLabelPtrField:     ptr.To(""),
 		DNSLabelTypedefField: "",
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("ipField"), "", "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"),
-		field.Invalid(field.NewPath("ipPtrField"), "", "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"),
-		field.Invalid(field.NewPath("ipTypedefField"), "", "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"),
-		field.Invalid(field.NewPath("dnsLabelField"), "", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-		field.Invalid(field.NewPath("dnsLabelPtrField"), "", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-		field.Invalid(field.NewPath("dnsLabelTypedefField"), "", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
+	})
 
 	st.Value(&Struct{
 		IPField:              "Not an IP",
@@ -67,12 +67,12 @@ func Test(t *testing.T) {
 		DNSLabelField:        "Not a DNS label",
 		DNSLabelPtrField:     ptr.To("Not a DNS label"),
 		DNSLabelTypedefField: "Not a DNS label",
-	}).ExpectInvalid(
-		field.Invalid(field.NewPath("ipField"), "Not an IP", "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"),
-		field.Invalid(field.NewPath("ipPtrField"), "Not an IP", "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"),
-		field.Invalid(field.NewPath("ipTypedefField"), "Not an IP", "must be a valid IP address (e.g. 10.9.8.7 or 2001:db8::ffff)"),
-		field.Invalid(field.NewPath("dnsLabelField"), "Not a DNS label", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-		field.Invalid(field.NewPath("dnsLabelPtrField"), "Not a DNS label", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-		field.Invalid(field.NewPath("dnsLabelTypedefField"), "Not a DNS label", "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-	)
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
+	})
 }
