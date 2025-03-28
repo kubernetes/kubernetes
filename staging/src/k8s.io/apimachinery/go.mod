@@ -25,7 +25,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
-	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3
+	sigs.k8s.io/json v0.0.0-20250321135806-7e0d70100414
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
 	sigs.k8s.io/yaml v1.4.0
@@ -52,3 +52,5 @@ require (
 	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace sigs.k8s.io/json => github.com/liggitt/json v0.0.0-20250321135806-7e0d70100414

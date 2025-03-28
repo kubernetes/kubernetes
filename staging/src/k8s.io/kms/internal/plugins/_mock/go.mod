@@ -23,3 +23,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace sigs.k8s.io/json => github.com/liggitt/json v0.0.0-20250321135806-7e0d70100414
