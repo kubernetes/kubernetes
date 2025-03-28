@@ -345,10 +345,19 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 			}
 
 			if expectedMemLimitString != "0" {
-				errs = append(errs, e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
+				if err := e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString); err != nil {
+					errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
+				}
 			}
-			errs = append(errs, e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...))
-			errs = append(errs, e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
+
+			if err := e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...); err != nil {
+				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
+			}
+
+			if err := e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
+				errs = append(errs, fmt.Errorf("failed to verify cpu request cgroup value: %w", err))
+			}
+
 			// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
 			// See https://github.com/opencontainers/runc/pull/4669
 		}
@@ -384,8 +393,7 @@ func verifyContainerRestarts(f *framework.Framework, pod *v1.Pod, gotStatuses []
 		if gotStatus.RestartCount != wantStatuses[i].RestartCount {
 			errs = append(errs, fmt.Errorf("unexpected number of restarts for container %s: got %d, want %d", gotStatus.Name, gotStatus.RestartCount, wantStatuses[i].RestartCount))
 		} else if gotStatus.RestartCount > 0 {
-			err := verifyOomScoreAdj(f, pod, gotStatus.Name)
-			if err != nil {
+			if err := verifyOomScoreAdj(f, pod, gotStatus.Name); err != nil {
 				errs = append(errs, err)
 			}
 		}
