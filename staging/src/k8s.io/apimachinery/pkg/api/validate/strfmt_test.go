@@ -31,84 +31,72 @@ func TestDNS1123Label(t *testing.T) {
 
 	testCases := []struct {
 		name     string
-		label    string
+		input    string
 		wantErrs field.ErrorList
-	}{
-		{
-			name:     "valid label",
-			label:    "valid-label",
-			wantErrs: nil,
+	}{{
+		name:     "valid label",
+		input:    "valid-label",
+		wantErrs: nil,
+	}, {
+		name:     "valid single character label",
+		input:    "a",
+		wantErrs: nil,
+	}, {
+		name:     "valid label with numbers",
+		input:    "123-abc",
+		wantErrs: nil,
+	}, {
+		name:  "invalid: uppercase characters",
+		input: "Invalid-Label",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:     "valid single character label",
-			label:    "a",
-			wantErrs: nil,
+	}, {
+		name:  "invalid: starts with dash",
+		input: "-invalid-label",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:     "valid label with numbers",
-			label:    "123-abc",
-			wantErrs: nil,
+	}, {
+		name:  "invalid: ends with dash",
+		input: "invalid-label-",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:  "invalid: uppercase characters",
-			label: "Invalid-Label",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
+	}, {
+		name:  "invalid: contains dots",
+		input: "invalid.label",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:  "invalid: starts with dash",
-			label: "-invalid-label",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
+	}, {
+		name:  "invalid: contains special characters",
+		input: "invalid@label",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:  "invalid: ends with dash",
-			label: "invalid-label-",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
+	}, {
+		name:  "invalid: too long",
+		input: "a" + strings.Repeat("b", 62) + "c", // 64 characters
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:  "invalid: contains dots",
-			label: "invalid.label",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
+	}, {
+		name:     "valid: max length",
+		input:    "a" + strings.Repeat("b", 61) + "c", // 63 characters
+		wantErrs: nil,
+	}, {
+		name:  "invalid: empty string",
+		input: "",
+		wantErrs: field.ErrorList{
+			field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
 		},
-		{
-			name:  "invalid: contains special characters",
-			label: "invalid@label",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
-		},
-		{
-			name:  "invalid: too long",
-			label: "a" + strings.Repeat("b", 62) + "c", // 64 characters
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
-		},
-		{
-			name:     "valid: max length",
-			label:    "a" + strings.Repeat("b", 61) + "c", // 63 characters
-			wantErrs: nil,
-		},
-		{
-			name:  "invalid: empty string",
-			label: "",
-			wantErrs: field.ErrorList{
-				field.Invalid(fldPath, nil, "").WithOrigin("format=dns-label"),
-			},
-		},
-	}
+	}}
 
 	matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			value := tc.label
+			value := tc.input
 			gotErrs := DNSLabel(ctx, operation.Operation{}, fldPath, &value, nil)
 
 			matcher.Test(t, tc.wantErrs, gotErrs)
