@@ -100,7 +100,6 @@ func NewHollowKubelet(
 		RemoteRuntimeService:      runtimeService,
 		RemoteImageService:        imageService,
 		CAdvisorInterface:         cadvisorInterface,
-		Cloud:                     nil,
 		OSInterface:               &containertest.FakeOS{},
 		ContainerManager:          containerManager,
 		VolumePlugins:             volumePlugins(),
