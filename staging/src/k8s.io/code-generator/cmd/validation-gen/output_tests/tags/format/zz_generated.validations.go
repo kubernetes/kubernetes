@@ -85,6 +85,18 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("ipPtrField"), obj.IPPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.IPPtrField }))...)
 
+	// field Struct.IPTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *IPStringType) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_IPStringType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("ipTypedefField"), &obj.IPTypedefField, safe.Field(oldObj, func(oldObj *Struct) *IPStringType { return &oldObj.IPTypedefField }))...)
+
 	// field Struct.DNSLabelField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
@@ -120,18 +132,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("dnsLabelTypedefField"), &obj.DNSLabelTypedefField, safe.Field(oldObj, func(oldObj *Struct) *UnvalidatedStringType { return &oldObj.DNSLabelTypedefField }))...)
-
-	// field Struct.IPTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *IPStringType) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_IPStringType(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("ipTypedefField"), &obj.IPTypedefField, safe.Field(oldObj, func(oldObj *Struct) *IPStringType { return &oldObj.IPTypedefField }))...)
 
 	return errs
 }
