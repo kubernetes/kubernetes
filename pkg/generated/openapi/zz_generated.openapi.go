@@ -57133,7 +57133,15 @@ func schema_pkg_apis_apiextensions_v1_ExternalDocumentation(ref common.Reference
 }
 
 func schema_pkg_apis_apiextensions_v1_JSON(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
+	return common.EmbedOpenAPIDefinitionIntoV2Extension(common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
+				OneOf:       common.GenerateOpenAPIV3OneOfSchema(apiextensionsv1.JSON{}.OpenAPIV3OneOfTypes()),
+				Format:      apiextensionsv1.JSON{}.OpenAPISchemaFormat(),
+			},
+		},
+	}, common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "JSON represents any valid JSON value. These types are supported: bool, int64, float64, string, []interface{}, map[string]interface{} and nil.",
@@ -57141,7 +57149,7 @@ func schema_pkg_apis_apiextensions_v1_JSON(ref common.ReferenceCallback) common.
 				Format:      apiextensionsv1.JSON{}.OpenAPISchemaFormat(),
 			},
 		},
-	}
+	})
 }
 
 func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallback) common.OpenAPIDefinition {
