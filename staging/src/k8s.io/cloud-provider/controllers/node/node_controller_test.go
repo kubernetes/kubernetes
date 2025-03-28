@@ -39,6 +39,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
+	nodeutil "k8s.io/component-helpers/node/util"
 	_ "k8s.io/controller-manager/pkg/features/register"
 
 	"github.com/google/go-cmp/cmp"
@@ -2289,7 +2290,19 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 	if err != nil {
 		t.Errorf("get instance metadata with error %v", err)
 	}
-	cloudNodeController.updateNodeAddress(ctx, existingNode, instanceMeta)
+
+	nodeModifiers, err := cloudNodeController.getNodeModifiersForInstanceMetadata(ctx, instanceMeta)
+	if err != nil {
+		t.Errorf("get node modifiers with error: %v", err)
+	}
+
+	newNode := existingNode.DeepCopy()
+	for _, modify := range nodeModifiers {
+		modify(newNode)
+	}
+	if _, _, err := nodeutil.PatchNode(clientset.CoreV1(), types.NodeName(existingNode.Name), existingNode, newNode); err != nil {
+		t.Errorf("failed to patch node: %v", err)
+	}
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
 	if err != nil {
@@ -2369,7 +2382,20 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 	if err != nil {
 		t.Errorf("get instance metadata with error %v", err)
 	}
-	cloudNodeController.updateNodeAddress(ctx, existingNode, instanceMeta)
+
+	nodeModifiers, err := cloudNodeController.getNodeModifiersForInstanceMetadata(ctx, instanceMeta)
+	if err != nil {
+		t.Errorf("failed to get node modifiers: %v", err)
+	}
+
+	newNode := existingNode.DeepCopy()
+	for _, modify := range nodeModifiers {
+		modify(newNode)
+	}
+
+	if _, _, err := nodeutil.PatchNode(clientset.CoreV1(), types.NodeName(existingNode.Name), existingNode, newNode); err != nil {
+		t.Errorf("failed to patch node: %v", err)
+	}
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
 	if err != nil {
