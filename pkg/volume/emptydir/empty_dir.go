@@ -47,7 +47,8 @@ import (
 // from the group attribute.
 //
 // https://issue.k8s.io/2630
-const perm os.FileMode = 0777
+var defaultPerm os.FileMode = 0777
+var stickyBitPerm os.FileMode = 01777
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -148,6 +149,8 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, mounter mount.Interface, mountDetector mountDetector) (volume.Mounter, error) {
 	medium := v1.StorageMediumDefault
 	sizeLimit := &resource.Quantity{}
+	stickyBit := false
+
 	if spec.Volume.EmptyDir != nil { // Support a non-specified source as EmptyDir.
 		medium = spec.Volume.EmptyDir.Medium
 		if medium == v1.StorageMediumMemory {
@@ -157,6 +160,8 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 			}
 			sizeLimit = calculateEmptyDirMemorySize(nodeAllocatable.Memory(), spec, pod)
 		}
+
+		stickyBit = spec.Volume.EmptyDir.StickyBit
 	}
 	return &emptyDir{
 		pod:             pod,
@@ -166,6 +171,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 		mounter:         mounter,
 		mountDetector:   mountDetector,
 		plugin:          plugin,
+		stickyBit:       stickyBit,
 		MetricsProvider: volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host)),
 	}, nil
 }
@@ -216,6 +222,7 @@ type emptyDir struct {
 	pod           *v1.Pod
 	volName       string
 	sizeLimit     *resource.Quantity
+	stickyBit     bool
 	medium        v1.StorageMedium
 	mounter       mount.Interface
 	mountDetector mountDetector
@@ -452,6 +459,14 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 
 // setupDir creates the directory with the default permissions specified by the perm constant.
 func (ed *emptyDir) setupDir(dir string) error {
+	var perm os.FileMode
+
+	if ed.stickyBit {
+		perm = os.FileMode(stickyBitPerm)
+	} else {
+		perm = os.FileMode(defaultPerm)
+	}
+
 	// Create the directory if it doesn't already exist.
 	if err := os.MkdirAll(dir, perm); err != nil {
 		return err
