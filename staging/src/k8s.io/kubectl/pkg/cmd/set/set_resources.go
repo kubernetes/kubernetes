@@ -57,6 +57,9 @@ var (
 		# Remove the resource requests for resources on containers in nginx
 		kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
 
+		# Set the resource request and limits for all containers in a pod nginx using the 'resize' subresource
+		kubectl set resources pod nginx --subresource resize --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi
+
 		# Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server
 		kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --local -o yaml`)
 )
@@ -88,6 +91,8 @@ type SetResourcesOptions struct {
 
 	UpdatePodSpecForObject polymorphichelpers.UpdatePodSpecForObjectFunc
 	Resources              []string
+
+	Subresource string
 
 	genericiooptions.IOStreams
 }
@@ -139,6 +144,7 @@ func NewCmdResources(f cmdutil.Factory, streams genericiooptions.IOStreams) *cob
 	cmd.Flags().StringVar(&o.Limits, "limits", o.Limits, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
 	cmd.Flags().StringVar(&o.Requests, "requests", o.Requests, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-set")
+	cmdutil.AddSubresourceFlags(cmd, &o.Subresource, "If specified, set resources will operate on the subresource of the requested object.")
 	return cmd
 }
 
@@ -288,6 +294,7 @@ func (o *SetResourcesOptions) Run() error {
 			NewHelper(info.Client, info.Mapping).
 			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
 			WithFieldManager(o.fieldManager).
+			WithSubresource(o.Subresource).
 			Patch(info.Namespace, info.Name, types.StrategicMergePatchType, patch.Patch, nil)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("failed to patch resources update to pod template %v", err))
