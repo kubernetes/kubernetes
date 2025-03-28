@@ -41,7 +41,7 @@ const (
 
 // InPlacePodVerticalScaling types
 const (
-	// ErrorInconsistentCPUAllocation represent the type of an inconsistentCPUAllocationError
 	ErrorInconsistentCPUAllocation = "inconsistentCPUAllocationError"
-	ErrorGetCPUSet                 = "getCPUSetError"
+	ErrorProhibitedCPUAllocation   = "prohibitedCPUAllocationError"
+	ErrorGetPromisedCPUSet         = "getPromisedCPUSetError"
 )
