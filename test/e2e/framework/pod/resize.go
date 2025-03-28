@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	helpers "k8s.io/component-helpers/resource"
+	"k8s.io/kubectl/pkg/util/podutils"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -437,6 +438,10 @@ func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podC
 						return fmt.Sprintf("resize status %v is still present in the pod status", c)
 					}, nil
 				}
+			}
+			// Wait for the pod to be ready.
+			if !podutils.IsPodReady(pod) {
+				return func() string { return "pod is not ready" }, nil
 			}
 			return nil, nil
 		})),
