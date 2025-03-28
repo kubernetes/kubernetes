@@ -344,10 +344,22 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 			}
 
 			if expectedMemLimitString != "0" {
-				errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
+				err := VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
+				}
 			}
-			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...))
-			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
+
+			err := VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
+			}
+
+			err = VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10))
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to verify cpu request cgroup value: %w", err))
+			}
+
 			// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
 			// See https://github.com/opencontainers/runc/pull/4669
 		}
