@@ -4036,7 +4036,10 @@ var _ = common.SIGDescribe("Services", func() {
 		gomega.Expect(thirdNodeIP).NotTo(gomega.Equal(""), "cluster has at least 3 nodes but could not find a third node IP?")
 
 		checkOneNodePort := func(nodeIP string, expectResponse bool, trafficPolicy v1.ServiceExternalTrafficPolicy, deadline time.Time) {
-			cmd := fmt.Sprintf("curl -g -s --connect-timeout 3 http://%s/clientip", net.JoinHostPort(nodeIP, nodePortStr))
+			// hostExecPod is a hostNetwork Pod, in order to choose the source ip for the connection we need to bind the application or
+			// "the kernel will choose the first address configured on the interface which falls in the same network as the destination address or the nexthop route"
+			// Ref: http://linux-ip.net/html/routing-saddr-selection.html
+			cmd := fmt.Sprintf("curl -g -s --interface %s --connect-timeout 3 http://%s/clientip", hostExecPodNodeIP, net.JoinHostPort(nodeIP, nodePortStr))
 			var clientIP string
 			err := wait.PollUntilContextTimeout(ctx, framework.Poll, time.Until(deadline), true, func(ctx context.Context) (bool, error) {
 				out, err := e2eoutput.RunHostCmd(namespace, execPod.Name, cmd)
