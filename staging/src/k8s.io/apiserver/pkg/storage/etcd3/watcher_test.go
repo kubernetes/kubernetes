@@ -115,7 +115,7 @@ func TestProgressNotify(t *testing.T) {
 func TestWatchWithUnsafeDelete(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AllowUnsafeMalformedObjectDeletion, true)
 	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{store})
+	storagetesting.RunTestWatchWithUnsafeDelete(ctx, t, &storeWithCorruptedTransformer{Interface: store, store: store})
 }
 
 // TestWatchDispatchBookmarkEvents makes sure that
