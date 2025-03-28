@@ -539,6 +539,10 @@ func (f *FakeRuntime) GetContainerStatus(_ context.Context, _ kubecontainer.Cont
 	return nil, f.Err
 }
 
+func (f *FakeRuntime) GeneratePodEvents(ctx context.Context, id string) (*runtimeapi.ContainerEventResponse, error) {
+	return &runtimeapi.ContainerEventResponse{}, nil
+}
+
 func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Container) kubetypes.SwapBehavior {
 	if f.SwapBehavior != nil && f.SwapBehavior[container.Name] != "" {
 		return f.SwapBehavior[container.Name]
