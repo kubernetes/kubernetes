@@ -432,6 +432,8 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		}
 	}
 
+	// node status update should wait for eviction manager to be initialized
+	// to avoid node conditon being updated(taint is removed) before eviction manager is initialized
 	kl.setNodeStatus(ctx, node)
 
 	return node, nil
