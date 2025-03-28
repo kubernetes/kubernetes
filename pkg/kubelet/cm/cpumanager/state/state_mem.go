@@ -27,6 +27,7 @@ import (
 type stateMemory struct {
 	sync.RWMutex
 	logger        logr.Logger
+	promised      ContainerCPUAssignments
 	assignments   ContainerCPUAssignments
 	defaultCPUSet cpuset.CPUSet
 }
@@ -41,9 +42,18 @@ func NewMemoryState(logger logr.Logger) State {
 	logger.Info("Initialized")
 	return &stateMemory{
 		logger:        logger,
+		promised:      ContainerCPUAssignments{},
 		assignments:   ContainerCPUAssignments{},
 		defaultCPUSet: cpuset.New(),
 	}
+}
+
+func (s *stateMemory) GetPromisedCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	res, ok := s.promised[podUID][containerName]
+	return res.Clone(), ok
 }
 
 func (s *stateMemory) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -68,10 +78,28 @@ func (s *stateMemory) GetCPUSetOrDefault(podUID string, containerName string) cp
 	return s.GetDefaultCPUSet()
 }
 
+func (s *stateMemory) GetCPUPromised() ContainerCPUAssignments {
+	s.RLock()
+	defer s.RUnlock()
+	return s.promised.Clone()
+}
+
 func (s *stateMemory) GetCPUAssignments() ContainerCPUAssignments {
 	s.RLock()
 	defer s.RUnlock()
 	return s.assignments.Clone()
+}
+
+func (s *stateMemory) SetPromisedCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.promised[podUID]; !ok {
+		s.promised[podUID] = make(map[string]cpuset.CPUSet)
+	}
+
+	s.promised[podUID][containerName] = cset
+	s.logger.Info("Updated promised CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
 }
 
 func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
@@ -94,6 +122,14 @@ func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
 	s.logger.Info("Updated default CPUSet", "cpuSet", cset)
 }
 
+func (s *stateMemory) SetCPUPromised(a ContainerCPUAssignments) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.promised = a.Clone()
+	s.logger.Info("Updated CPUSet promised", "promised", a)
+}
+
 func (s *stateMemory) SetCPUAssignments(a ContainerCPUAssignments) {
 	s.Lock()
 	defer s.Unlock()
@@ -111,6 +147,13 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 		delete(s.assignments, podUID)
 	}
 	s.logger.V(2).Info("Deleted CPUSet assignment", "podUID", podUID, "containerName", containerName)
+
+	delete(s.promised[podUID], containerName)
+	if len(s.promised[podUID]) == 0 {
+		delete(s.promised, podUID)
+	}
+	s.logger.V(2).Info("Deleted CPUSet promised", "podUID", podUID, "containerName", containerName)
+
 }
 
 func (s *stateMemory) ClearState() {
@@ -119,5 +162,6 @@ func (s *stateMemory) ClearState() {
 
 	s.defaultCPUSet = cpuset.CPUSet{}
 	s.assignments = make(ContainerCPUAssignments)
+	s.promised = make(ContainerCPUAssignments)
 	s.logger.V(2).Info("Cleared state")
 }
