@@ -1147,7 +1147,19 @@ func fixJSONOutput(b *testing.B) {
 // You can pass your own scheduler plugins via outOfTreePluginRegistry.
 // Also, you may want to put your plugins in PluginNames variable in this package
 // to collect metrics for them.
-func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry) {
+func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry, options ...SchedulerPerfOption) {
+	opts := &schedulerPerfOptions{
+		prepareFn: nil,
+	}
+
+	for _, option := range options {
+		option(opts)
+	}
+
+	runBenchmarkPerSchedulingImpl(b, configFile, topicName, outOfTreePluginRegistry, opts)
+}
+
+func runBenchmarkPerSchedulingImpl(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry, options *schedulerPerfOptions) {
 	testCases, err := getTestCases(configFile)
 	if err != nil {
 		b.Fatal(err)
@@ -1192,6 +1204,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						b.Fatalf("workload %s is not valid: %v", w.Name, err)
+					}
+
+					if options.prepareFn != nil {
+						err = options.prepareFn(tCtx)
+						if err != nil {
+							b.Fatalf("failed to run prepareFn: %v", err)
+						}
 					}
 
 					results, err := runWorkload(tCtx, tc, w, informerFactory)
