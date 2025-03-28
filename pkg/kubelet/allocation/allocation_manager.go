@@ -747,8 +747,14 @@ func (m *manager) canResizePod(logger klog.Logger, allocatedPods []*v1.Pod, pod 
 
 	if ok, failReason, failMessage := m.canAdmitPod(logger, allocatedPods, pod); !ok {
 		// Log reason and return.
-		logger.V(3).Info("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
-		return false, v1.PodReasonDeferred, failMessage
+		var msg = "Resize cannot be accommodated: " + "reason " + failReason + ", message" + failMessage
+		logger.V(3).Info(msg, "pod", klog.KObj(pod))
+		if failReason == cpumanager.ErrorProhibitedCPUAllocation {
+			metrics.PodInfeasibleResizes.WithLabelValues("guaranteed_pod_cpu_manager_static_policy_prohibitedCPUAllocationError").Inc()
+			return false, v1.PodReasonInfeasible, failMessage
+		} else {
+			return false, v1.PodReasonDeferred, failMessage
+		}
 	}
 
 	return true, "", ""
