@@ -658,7 +658,11 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
 		var msg string
 		if memRequests > memAvailable {
-			msg = fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAvailable)
+			if cpuRequests > cpuAvailable {
+				msg = fmt.Sprintf("memory, requested: %d, capacity: %d. cpu, requested: %d, capacity: %d", memRequests, memAvailable, cpuRequests, cpuAvailable)
+			} else {
+				msg = fmt.Sprintf("memory, requested: %d, capacity: %d", memRequests, memAvailable)
+			}
 		} else {
 			msg = fmt.Sprintf("cpu, requested: %d, capacity: %d", cpuRequests, cpuAvailable)
 		}
@@ -680,7 +684,13 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	}
 
 	if ok, failReason, failMessage := m.canAdmitPod(allocatedPods, pod); !ok {
-		// Log reason and return.
+		if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+			if failReason == kubetypes.ErrorProhibitedCPUAllocation {
+				klog.V(3).InfoS("Resize is infeasible", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
+				return false, v1.PodReasonInfeasible, failMessage
+			}
+		}
+		// Log reason and return. Let the next sync iteration retry the resize
 		klog.V(3).InfoS("Resize cannot be accommodated", "pod", klog.KObj(pod), "reason", failReason, "message", failMessage)
 		return false, v1.PodReasonDeferred, failMessage
 	}
