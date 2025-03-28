@@ -42,6 +42,13 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+func Validate_DNSLabelStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DNSLabelStringType) (errs field.ErrorList) {
+	// type DNSLabelStringType
+	errs = append(errs, validate.DNSLabel(ctx, op, fldPath, obj, oldObj)...)
+
+	return errs
+}
+
 func Validate_IPStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IPStringType) (errs field.ErrorList) {
 	// type IPStringType
 	errs = append(errs, validate.IPSloppy(ctx, op, fldPath, obj, oldObj)...)
@@ -89,10 +96,10 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 
 	// field Struct.DNSLabelTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *UnvalidatedStringType) (errs field.ErrorList) {
-			errs = append(errs, validate.DNSLabel(ctx, op, fldPath, obj, oldObj)...)
+		func(fldPath *field.Path, obj, oldObj *DNSLabelStringType) (errs field.ErrorList) {
+			errs = append(errs, Validate_DNSLabelStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("dnsLabelTypedefField"), &obj.DNSLabelTypedefField, safe.Field(oldObj, func(oldObj *Struct) *UnvalidatedStringType { return &oldObj.DNSLabelTypedefField }))...)
+		}(fldPath.Child("dnsLabelTypedefField"), &obj.DNSLabelTypedefField, safe.Field(oldObj, func(oldObj *Struct) *DNSLabelStringType { return &oldObj.DNSLabelTypedefField }))...)
 
 	return errs
 }
