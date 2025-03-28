@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	bootstrapv1 "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -78,18 +79,26 @@ var supportedLimitResponseType = sets.NewString(
 // PriorityLevelValidationOptions holds the validation options for a priority level object
 type PriorityLevelValidationOptions struct{}
 
+var earliestGate = bootstrapv1.MakeGate(false)
+var latestGate = bootstrapv1.LatestFeatureGate
+
 // ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&fs.ObjectMeta, false, ValidateFlowSchemaName, field.NewPath("metadata"))
 	specPath := field.NewPath("spec")
 	allErrs = append(allErrs, ValidateFlowSchemaSpec(fs.Name, &fs.Spec, specPath)...)
-	if mand, ok := internalbootstrap.MandatoryFlowSchemas[fs.Name]; ok {
+	if mand, ok := internalbootstrap.GetMandatoryFlowSchemasMap(latestGate)[fs.Name]; ok {
+		// The old config objects are a subset of the new config objects,
+		// as far as identify is concerned. The specs may differ.
+		mandOld := internalbootstrap.GetMandatoryFlowSchemasMap(earliestGate)[fs.Name]
+		// For now, accept either the old or the new spec.
+		// In a later release, change this to accept only the new spec.
 		// Check for almost exact equality.  This is a pretty
 		// strict test, and it is OK in this context because both
 		// sides of this comparison are intended to ultimately
 		// come from the same code.
-		if !apiequality.Semantic.DeepEqual(fs.Spec, mand.Spec) {
-			allErrs = append(allErrs, field.Invalid(specPath, fs.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", fs.Name)))
+		if !(apiequality.Semantic.DeepEqual(fs.Spec, mand.Spec) || mandOld != nil && apiequality.Semantic.DeepEqual(fs.Spec, mandOld.Spec)) {
+			allErrs = append(allErrs, field.Invalid(specPath, fs.Spec, fmt.Sprintf("spec of '%s' must equal the old or new fixed value", fs.Name)))
 		}
 	}
 	allErrs = append(allErrs, ValidateFlowSchemaStatus(&fs.Status, field.NewPath("status"))...)
@@ -363,8 +372,9 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 
 func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.PriorityLevelConfiguration, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	mand, ok := internalbootstrap.MandatoryPriorityLevelConfigurations[pl.Name]
+	mand, ok := internalbootstrap.GetMandatoryPriorityLevelConfigurationsMap(latestGate)[pl.Name]
 	if !ok {
+		// The old config objects are a subset of the new, as far as identity is concerned.
 		return allErrs
 	}
 
@@ -381,12 +391,15 @@ func ValidateIfMandatoryPriorityLevelConfigurationObject(pl *flowcontrol.Priorit
 		return allErrs
 	}
 
+	// For now, accept either the old or the new default config.
+	// In a later release, accept only the new.
+	mandOld := internalbootstrap.GetMandatoryPriorityLevelConfigurationsMap(earliestGate)[pl.Name]
 	// Check for almost exact equality.  This is a pretty
 	// strict test, and it is OK in this context because both
 	// sides of this comparison are intended to ultimately
 	// come from the same code.
-	if !apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) {
-		allErrs = append(allErrs, field.Invalid(fldPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the fixed value", pl.Name)))
+	if !(apiequality.Semantic.DeepEqual(pl.Spec, mand.Spec) || mandOld != nil && apiequality.Semantic.DeepEqual(pl.Spec, mandOld.Spec)) {
+		allErrs = append(allErrs, field.Invalid(fldPath, pl.Spec, fmt.Sprintf("spec of '%s' must equal the old or new fixed value", pl.Name)))
 	}
 	return allErrs
 }

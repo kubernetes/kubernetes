@@ -28,17 +28,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	flowcontrolapply "k8s.io/client-go/applyconfigurations/flowcontrol/v1"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 )
 
 func TestConditionIsolation(t *testing.T) {
-	ctx, kubeConfig, closeFn := setup(t, 10, 10)
+	ctx, loopbackClient, _, closeFn := setup(t, 10, 10, true)
 	defer closeFn()
 
-	loopbackClient := clientset.NewForConfigOrDie(kubeConfig)
-
-	fsOrig := fcboot.SuggestedFlowSchemas[0]
+	fsOrig := fcboot.Latest.Suggested.FlowSchemas[0]
 	t.Logf("Testing Status Condition isolation in FlowSchema %q", fsOrig.Name)
 	fsClient := loopbackClient.FlowcontrolV1().FlowSchemas()
 	var dangleOrig *flowcontrol.FlowSchemaCondition
