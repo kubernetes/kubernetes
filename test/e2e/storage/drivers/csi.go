@@ -147,6 +147,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 	capabilities := map[storageframework.Capability]bool{
 		storageframework.CapPersistence:                    true,
 		storageframework.CapSnapshotDataSource:             true,
+		storageframework.CapSnapshotMetadata:               true,
 		storageframework.CapMultiPODs:                      true,
 		storageframework.CapBlock:                          true,
 		storageframework.CapPVCDataSource:                  true,
