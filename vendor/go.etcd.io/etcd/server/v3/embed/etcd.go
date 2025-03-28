@@ -81,11 +81,23 @@ type Etcd struct {
 
 	Server *etcdserver.EtcdServer
 
-	cfg   Config
-	stopc chan struct{}
-	errc  chan error
+	cfg Config
 
+	// closeOnce is to ensure `stopc` is closed only once, no matter
+	// how many times the Close() method is called.
 	closeOnce sync.Once
+	// stopc is used to notify the sub goroutines not to send
+	// any errors to `errc`.
+	stopc chan struct{}
+	// errc is used to receive error from sub goroutines (including
+	// client handler, peer handler and metrics handler). It's closed
+	// after all these sub goroutines exit (checked via `wg`). Writers
+	// should avoid writing after `stopc` is closed by selecting on
+	// reading from `stopc`.
+	errc chan error
+
+	// wg is used to track the lifecycle of all sub goroutines created by `StartEtcd`.
+	wg sync.WaitGroup
 }
 
 type peerListener struct {
@@ -111,7 +123,7 @@ func StartEtcd(inCfg *Config) (e *Etcd, err error) {
 		if !serving {
 			// errored before starting gRPC server for serveCtx.serversC
 			for _, sctx := range e.sctxs {
-				close(sctx.serversC)
+				sctx.close()
 			}
 		}
 		e.Close()
@@ -367,6 +379,24 @@ func (e *Etcd) Config() Config {
 // Close gracefully shuts down all servers/listeners.
 // Client requests will be terminated with request timeout.
 // After timeout, enforce remaning requests be closed immediately.
+//
+// The rough workflow to shut down etcd:
+//  1. close the `stopc` channel, so that all error handlers (child
+//     goroutines) won't send back any errors anymore;
+//  2. stop the http and grpc servers gracefully, within request timeout;
+//  3. close all client and metrics listeners, so that etcd server
+//     stops receiving any new connection;
+//  4. call the cancel function to close the gateway context, so that
+//     all gateway connections are closed.
+//  5. stop etcd server gracefully, and ensure the main raft loop
+//     goroutine is stopped;
+//  6. stop all peer listeners, so that it stops receiving peer connections
+//     and messages (wait up to 1-second);
+//  7. wait for all child goroutines (i.e. client handlers, peer handlers
+//     and metrics handlers) to exit;
+//  8. close the `errc` channel to release the resource. Note that it's only
+//     safe to close the `errc` after step 7 above is done, otherwise the
+//     child goroutines may send errors back to already closed `errc` channel.
 func (e *Etcd) Close() {
 	fields := []zap.Field{
 		zap.String("name", e.cfg.Name),
@@ -436,6 +466,7 @@ func (e *Etcd) Close() {
 		}
 	}
 	if e.errc != nil {
+		e.wg.Wait()
 		close(e.errc)
 	}
 }
@@ -595,7 +626,9 @@ func (e *Etcd) servePeers() (err error) {
 
 	// start peer servers in a goroutine
 	for _, pl := range e.Peers {
+		e.wg.Add(1)
 		go func(l *peerListener) {
+			defer e.wg.Done()
 			u := l.Addr().String()
 			e.cfg.logger.Info(
 				"serving peer traffic",
@@ -779,7 +812,9 @@ func (e *Etcd) serveClients() (err error) {
 
 	// start client servers in each goroutine
 	for _, sctx := range e.sctxs {
+		e.wg.Add(1)
 		go func(s *serveCtx) {
+			defer e.wg.Done()
 			e.errHandler(s.serve(e.Server, &e.cfg.ClientTLSInfo, h, e.errHandler, e.grpcGatewayDial(splitHttp), splitHttp, gopts...))
 		}(sctx)
 	}
@@ -867,7 +902,9 @@ func (e *Etcd) serveMetrics() (err error) {
 				return err
 			}
 			e.metricsListeners = append(e.metricsListeners, ml)
+			e.wg.Add(1)
 			go func(u url.URL, ln net.Listener) {
+				defer e.wg.Done()
 				e.cfg.logger.Info(
 					"serving metrics",
 					zap.String("address", u.String()),
