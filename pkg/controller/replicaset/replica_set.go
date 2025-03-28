@@ -719,7 +719,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	var terminatingPods []*v1.Pod
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
 		allTerminatingPods := controller.FilterTerminatingPods(allPods)
 		terminatingPods = controller.FilterClaimedPods(rs, selector, allTerminatingPods)
 	}

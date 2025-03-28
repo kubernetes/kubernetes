@@ -47,12 +47,12 @@ func TestCalculateStatus(t *testing.T) {
 	}
 
 	rsStatusTests := []struct {
-		name                                 string
-		enableDeploymentPodReplacementPolicy bool
-		replicaset                           *apps.ReplicaSet
-		activePods                           []*v1.Pod
-		terminatingPods                      []*v1.Pod
-		expectedReplicaSetStatus             apps.ReplicaSetStatus
+		name                                          string
+		enableDeploymentReplicaSetTerminatingReplicas bool
+		replicaset                                    *apps.ReplicaSet
+		activePods                                    []*v1.Pod
+		terminatingPods                               []*v1.Pod
+		expectedReplicaSetStatus                      apps.ReplicaSetStatus
 	}{
 		{
 			"1 fully labelled pod",
@@ -104,7 +104,7 @@ func TestCalculateStatus(t *testing.T) {
 			},
 		},
 		{
-			"2 fully labelled pods with DeploymentPodReplacementPolicy",
+			"2 fully labelled pods with DeploymentReplicaSetTerminatingReplicas",
 			true,
 			fullyLabelledRS,
 			[]*v1.Pod{
@@ -187,7 +187,7 @@ func TestCalculateStatus(t *testing.T) {
 			},
 		},
 		{
-			"1 fully labelled pod and 1 terminating without DeploymentPodReplacementPolicy",
+			"1 fully labelled pod and 1 terminating without DeploymentReplicaSetTerminatingReplicas",
 			false,
 			fullyLabelledRS,
 			[]*v1.Pod{
@@ -205,7 +205,7 @@ func TestCalculateStatus(t *testing.T) {
 			},
 		},
 		{
-			"1 fully labelled pods and 2 terminating with DeploymentPodReplacementPolicy",
+			"1 fully labelled pods and 2 terminating with DeploymentReplicaSetTerminatingReplicas",
 			true,
 			fullyLabelledRS,
 			[]*v1.Pod{
@@ -227,7 +227,7 @@ func TestCalculateStatus(t *testing.T) {
 
 	for _, test := range rsStatusTests {
 		t.Run(test.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, test.enableDeploymentPodReplacementPolicy)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, test.enableDeploymentReplicaSetTerminatingReplicas)
 
 			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil)
 			if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {

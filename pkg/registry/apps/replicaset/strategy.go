@@ -247,7 +247,7 @@ func (rsStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.O
 
 // dropDisabledStatusFields removes disabled fields from the replica set status.
 func dropDisabledStatusFields(rsStatus, oldRSStatus *apps.ReplicaSetStatus) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) &&
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) &&
 		(oldRSStatus == nil || oldRSStatus.TerminatingReplicas == nil) {
 		rsStatus.TerminatingReplicas = nil
 	}
