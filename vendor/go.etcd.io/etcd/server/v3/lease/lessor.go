@@ -26,11 +26,12 @@ import (
 	"time"
 
 	"github.com/coreos/go-semver/semver"
+	"go.uber.org/zap"
+
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/server/v3/lease/leasepb"
 	"go.etcd.io/etcd/server/v3/mvcc/backend"
 	"go.etcd.io/etcd/server/v3/mvcc/buckets"
-	"go.uber.org/zap"
 )
 
 // NoLease is a special LeaseID representing the absence of a lease.
@@ -912,8 +913,8 @@ func (l *Lease) forever() {
 
 // Demoted returns true if the lease's expiry has been reset to forever.
 func (l *Lease) Demoted() bool {
-	l.expiryMu.Lock()
-	defer l.expiryMu.Unlock()
+	l.expiryMu.RLock()
+	defer l.expiryMu.RUnlock()
 	return l.expiry == forever
 }
 

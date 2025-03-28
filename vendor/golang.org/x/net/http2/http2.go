@@ -34,11 +34,19 @@ import (
 )
 
 var (
-	VerboseLogs                    bool
-	logFrameWrites                 bool
-	logFrameReads                  bool
-	inTests                        bool
-	disableExtendedConnectProtocol bool
+	VerboseLogs    bool
+	logFrameWrites bool
+	logFrameReads  bool
+	inTests        bool
+
+	// Enabling extended CONNECT by causes browsers to attempt to use
+	// WebSockets-over-HTTP/2. This results in problems when the server's websocket
+	// package doesn't support extended CONNECT.
+	//
+	// Disable extended CONNECT by default for now.
+	//
+	// Issue #71128.
+	disableExtendedConnectProtocol = true
 )
 
 func init() {
@@ -51,8 +59,8 @@ func init() {
 		logFrameWrites = true
 		logFrameReads = true
 	}
-	if strings.Contains(e, "http2xconnect=0") {
-		disableExtendedConnectProtocol = true
+	if strings.Contains(e, "http2xconnect=1") {
+		disableExtendedConnectProtocol = false
 	}
 }
 
@@ -405,23 +413,6 @@ func (s *sorter) SortStrings(ss []string) {
 	s.v = ss
 	sort.Sort(s)
 	s.v = save
-}
-
-// validPseudoPath reports whether v is a valid :path pseudo-header
-// value. It must be either:
-//
-//   - a non-empty string starting with '/'
-//   - the string '*', for OPTIONS requests.
-//
-// For now this is only used a quick check for deciding when to clean
-// up Opaque URLs before sending requests from the Transport.
-// See golang.org/issue/16847
-//
-// We used to enforce that the path also didn't start with "//", but
-// Google's GFE accepts such paths and Chrome sends them, so ignore
-// that part of the spec. See golang.org/issue/19103.
-func validPseudoPath(v string) bool {
-	return (len(v) > 0 && v[0] == '/') || v == "*"
 }
 
 // incomparable is a zero-width, non-comparable type. Adding it to a struct

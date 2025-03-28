@@ -263,6 +263,12 @@ func (l *lessor) Leases(ctx context.Context) (*LeaseLeasesResponse, error) {
 	return nil, ContextError(ctx, err)
 }
 
+// To identify the context passed to `KeepAlive`, a key/value pair is
+// attached to the context. The key is a `keepAliveCtxKey` object, and
+// the value is the pointer to the context object itself, ensuring
+// uniqueness as each context has a unique memory address.
+type keepAliveCtxKey struct{}
+
 func (l *lessor) KeepAlive(ctx context.Context, id LeaseID) (<-chan *LeaseKeepAliveResponse, error) {
 	ch := make(chan *LeaseKeepAliveResponse, LeaseResponseChSize)
 
@@ -277,6 +283,10 @@ func (l *lessor) KeepAlive(ctx context.Context, id LeaseID) (<-chan *LeaseKeepAl
 	default:
 	}
 	ka, ok := l.keepAlives[id]
+
+	if ctx.Done() != nil {
+		ctx = context.WithValue(ctx, keepAliveCtxKey{}, &ctx)
+	}
 	if !ok {
 		// create fresh keep alive
 		ka = &keepAlive{
@@ -347,7 +357,7 @@ func (l *lessor) keepAliveCtxCloser(ctx context.Context, id LeaseID, donec <-cha
 
 	// close channel and remove context if still associated with keep alive
 	for i, c := range ka.ctxs {
-		if c == ctx {
+		if c.Value(keepAliveCtxKey{}) == ctx.Value(keepAliveCtxKey{}) {
 			close(ka.chs[i])
 			ka.ctxs = append(ka.ctxs[:i], ka.ctxs[i+1:]...)
 			ka.chs = append(ka.chs[:i], ka.chs[i+1:]...)
