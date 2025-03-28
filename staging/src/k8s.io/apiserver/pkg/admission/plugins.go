@@ -20,8 +20,9 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"maps"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -58,12 +59,7 @@ type PluginEnabledFunc func(name string, config io.Reader) bool
 func (ps *Plugins) Registered() []string {
 	ps.lock.Lock()
 	defer ps.lock.Unlock()
-	keys := []string{}
-	for k := range ps.registry {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
+	return slices.Sorted(maps.Keys(ps.registry))
 }
 
 // Register registers a plugin Factory by name. This
