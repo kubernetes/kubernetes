@@ -53,3 +53,7 @@ func getCoreSiblingList(cpuRes int64) string {
 func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
 	return nil, errors.New("not implemented")
 }
+
+func getSMTLevel() int {
+	return 1
+}

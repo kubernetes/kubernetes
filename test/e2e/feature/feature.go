@@ -205,6 +205,16 @@ var (
 	// ImageVolume is used for testing the image volume source feature (https://kep.k8s.io/4639).
 	ImageVolume = framework.WithFeature(framework.ValidFeatures.Add("ImageVolume"))
 
+	// Owner: sig-node
+	// Marks a test for InPlacePodVerticalScaling feature that requires
+	// InPlacePodVerticalScaling feature gate to be enabled.
+	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
+
+	// Owner: sig-node
+	// Marks a test for InPlacePodVerticalScalingExclusiveCPUs feature that requires
+	// InPlacePodVerticalScalingExclusiveCPUs feature gate to be enabled.
+	InPlacePodVerticalScalingExclusiveCPUs = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScalingExclusiveCPUs"))
+
 	// Owner: sig-network
 	// Marks tests that require a conforming implementation of
 	// Ingress.networking.k8s.io to be present.

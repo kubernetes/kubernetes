@@ -46,12 +46,23 @@ func NewMemoryState(logger logr.Logger) State {
 	}
 }
 
+func (s *stateMemory) GetOriginalCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
+	s.RLock()
+	defer s.RUnlock()
+
+	entry, exists := s.assignments[podUID][containerName]
+	return entry.Original.Clone(), exists
+}
+
 func (s *stateMemory) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
 	s.RLock()
 	defer s.RUnlock()
 
-	res, ok := s.assignments[podUID][containerName]
-	return res.Clone(), ok
+	entry, exists := s.assignments[podUID][containerName]
+	if entry.Resized.IsEmpty() {
+		return entry.Original.Clone(), exists
+	}
+	return entry.Resized.Clone(), exists
 }
 
 func (s *stateMemory) GetDefaultCPUSet() cpuset.CPUSet {
@@ -79,11 +90,18 @@ func (s *stateMemory) SetCPUSet(podUID string, containerName string, cset cpuset
 	defer s.Unlock()
 
 	if _, ok := s.assignments[podUID]; !ok {
-		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
+		s.assignments[podUID] = make(map[string]ContainerCPUAssignment)
+		s.assignments[podUID][containerName] = ContainerCPUAssignment{Original: cset, Resized: cpuset.New()}
+		s.logger.Info("Updated CPUSet", "podUID", podUID, "containerName", containerName, "Original cpuSet", cset, "Resized cpuSet", cpuset.New())
+	} else {
+		if entry, ok := s.assignments[podUID][containerName]; !ok {
+			s.assignments[podUID][containerName] = ContainerCPUAssignment{Original: cset, Resized: cpuset.New()}
+			s.logger.Info("Updated CPUSet", "podUID", podUID, "containerName", containerName, "Original cpuSet", cset, "Resized cpuSet", cpuset.New())
+		} else {
+			s.assignments[podUID][containerName] = ContainerCPUAssignment{Original: entry.Original, Resized: cset}
+			s.logger.Info("Updated CPUSet", "podUID", podUID, "containerName", containerName, "Original cpuSet", entry.Original, "Resized cpuSet", cset)
+		}
 	}
-
-	s.assignments[podUID][containerName] = cset
-	s.logger.Info("Updated desired CPUSet", "podUID", podUID, "containerName", containerName, "cpuSet", cset)
 }
 
 func (s *stateMemory) SetDefaultCPUSet(cset cpuset.CPUSet) {
