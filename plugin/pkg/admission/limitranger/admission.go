@@ -210,55 +210,30 @@ func NewLimitRanger(actions LimitRangerActions) (*LimitRanger, error) {
 	}, nil
 }
 
-type defaultResources struct {
-	pod       api.ResourceRequirements
-	container api.ResourceRequirements
-}
-
-// defaultResourceRequirements returns the default requirements for container,
-// if PodLevelResources is enabled, returns the default requirements for pod
+// defaultResourceRequirements returns the default requirements for the
+// limit range type specified
 // the requirement.Limits are taken from the LimitRange defaults (if specified)
 // the requirement.Requests are taken from the LimitRange default request (if specified)
-func defaultResourceRequirements(limitRange *corev1.LimitRange, podLevelResourcesEnabled bool) *defaultResources {
-	defaultResources := defaultResources{}
+func defaultResourceRequirements(limitRange *corev1.LimitRange, limitType corev1.LimitType) api.ResourceRequirements {
+	requirements := api.ResourceRequirements{}
+	requirements.Requests = api.ResourceList{}
+	requirements.Limits = api.ResourceList{}
 
 	for i := range limitRange.Spec.Limits {
 		limit := limitRange.Spec.Limits[i]
 
-		// PodLevelResources must be enabled for pod level defaults to take effect
-		if !podLevelResourcesEnabled && limit.Type == corev1.LimitTypePod {
-			continue
-		}
+		if limit.Type == limitType {
+			for k, v := range limit.DefaultRequest {
+				requirements.Requests[api.ResourceName(k)] = v.DeepCopy()
+			}
+			for k, v := range limit.Default {
+				requirements.Limits[api.ResourceName(k)] = v.DeepCopy()
+			}
 
-		// Limit ranges of pod type will be also allowed to specify defaults,
-		// allong with container type. However it must meet the previous condition
-		// of PodLevelResources being enabled
-		if limit.Type != corev1.LimitTypeContainer && limit.Type != corev1.LimitTypePod {
-			continue
-		}
-
-		requirements := api.ResourceRequirements{}
-		requirements.Requests = api.ResourceList{}
-		requirements.Limits = api.ResourceList{}
-
-		for k, v := range limit.DefaultRequest {
-			requirements.Requests[api.ResourceName(k)] = v.DeepCopy()
-		}
-		for k, v := range limit.Default {
-			requirements.Limits[api.ResourceName(k)] = v.DeepCopy()
-		}
-
-		if len(requirements.Limits) == 0 && len(requirements.Requests) == 0 {
-			continue
-		}
-
-		if limit.Type == corev1.LimitTypePod {
-			defaultResources.pod = requirements
-		} else {
-			defaultResources.container = requirements
+			break
 		}
 	}
-	return &defaultResources
+	return requirements
 }
 
 // mergeResources handles defaulting all of the resources on a container.
@@ -303,22 +278,24 @@ func mergeResources(name string, resources *api.ResourceRequirements, defaultReq
 
 // mergePodResourceRequirements merges enumerated requirements with default requirements
 // it annotates the pod with information about what requirements were modified
-func mergePodResourceRequirements(pod *api.Pod, defaultResources *defaultResources, podLevelResourcesEnabled bool) {
+func mergePodResourceRequirements(pod *api.Pod, defaultResources defaultResources) {
 	annotations := []string{}
-	if podLevelResourcesEnabled && (defaultResources.pod.Requests != nil || defaultResources.pod.Limits != nil) {
+
+	// Check if defaultResources contains pod type
+	if podDefaultRequirements, exists := defaultResources[corev1.LimitTypePod]; exists {
 		if pod.Spec.Resources == nil {
 			pod.Spec.Resources = &api.ResourceRequirements{}
 		}
 
-		annotations = mergeResources(pod.Name, pod.Spec.Resources, &defaultResources.pod, "pod", annotations)
+		annotations = mergeResources(pod.Name, pod.Spec.Resources, &podDefaultRequirements, "pod", annotations)
 	}
 
+	containerDefaultRequirements := defaultResources[corev1.LimitTypeContainer]
 	for i := range pod.Spec.Containers {
-		annotations = mergeResources(pod.Spec.Containers[i].Name, &pod.Spec.Containers[i].Resources, &defaultResources.container, "container", annotations)
+		annotations = mergeResources(pod.Spec.Containers[i].Name, &pod.Spec.Containers[i].Resources, &containerDefaultRequirements, "container", annotations)
 	}
-
 	for i := range pod.Spec.InitContainers {
-		annotations = mergeResources(pod.Spec.InitContainers[i].Name, &pod.Spec.InitContainers[i].Resources, &defaultResources.container, "init container", annotations)
+		annotations = mergeResources(pod.Spec.InitContainers[i].Name, &pod.Spec.InitContainers[i].Resources, &containerDefaultRequirements, "init container", annotations)
 	}
 
 	if len(annotations) > 0 {
@@ -511,14 +488,35 @@ func PersistentVolumeClaimValidateLimitFunc(limitRange *corev1.LimitRange, pvc *
 	return utilerrors.NewAggregate(errs)
 }
 
+type defaultResources map[corev1.LimitType]api.ResourceRequirements
+
 // PodMutateLimitFunc sets resource requirements enumerated by the pod against
-// the specified LimitRange.  The pod may be modified to apply default resource
-// requirements if not specified, and enumerated on the LimitRange
+// the specified LimitRange. The pod may be modified to apply default resource
+// requirements if not specified, and enumerated on the LimitRange.
+// Defaults resource requirements for containers and pods will be applied if specified,
+// however, pods defaults require PodLevelResources to be enabled.
 func PodMutateLimitFunc(limitRange *corev1.LimitRange, pod *api.Pod) error {
 	podLevelResourcesEnabled := feature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 
-	defaultResources := defaultResourceRequirements(limitRange, podLevelResourcesEnabled)
-	mergePodResourceRequirements(pod, defaultResources, podLevelResourcesEnabled)
+	supportedTypes := sets.New(corev1.LimitTypeContainer)
+
+	// PodLevelResources must be enabled for pod level defaults to be generated
+	if podLevelResourcesEnabled {
+		supportedTypes.Insert(corev1.LimitTypePod)
+	}
+
+	defaultResources := defaultResources{}
+	for limitType := range supportedTypes {
+		resourceRequirements := defaultResourceRequirements(limitRange, limitType)
+
+		if len(resourceRequirements.Limits) == 0 && len(resourceRequirements.Requests) == 0 {
+			continue
+		}
+
+		defaultResources[limitType] = resourceRequirements
+	}
+
+	mergePodResourceRequirements(pod, defaultResources)
 	return nil
 }
 

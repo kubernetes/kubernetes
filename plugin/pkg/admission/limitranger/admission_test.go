@@ -207,11 +207,11 @@ func TestDefaultResourceRequirements(t *testing.T) {
 		Limits:   getComputeResourceList("75m", "10Mi"),
 	}
 
-	actual := defaultResourceRequirements(&limitRange, false)
-	if !apiequality.Semantic.DeepEqual(expected, actual.container) {
-		t.Errorf("actual.Limits != expected.Limits; %v != %v", actual.container.Limits, expected.Limits)
-		t.Errorf("actual.Requests != expected.Requests; %v != %v", actual.container.Requests, expected.Requests)
-		t.Errorf("expected != actual; %v != %v", expected, actual.container)
+	actual := defaultResourceRequirements(&limitRange, corev1.LimitTypeContainer)
+	if !apiequality.Semantic.DeepEqual(expected, actual) {
+		t.Errorf("actual.Limits != expected.Limits; %v != %v", actual.Limits, expected.Limits)
+		t.Errorf("actual.Requests != expected.Requests; %v != %v", actual.Requests, expected.Requests)
+		t.Errorf("expected != actual; %v != %v", expected, actual)
 	}
 }
 
@@ -252,8 +252,11 @@ func testMergePodResourceRequirements(t *testing.T, podLevelResourcesEnabled boo
 		pod = validPodWithPodLevelResources("empty-resources", 1, expected, getResourceRequirements(getComputeResourceList("", ""), getComputeResourceList("", "")))
 	}
 
-	defaultRequirements := defaultResourceRequirements(&limitRange, podLevelResourcesEnabled)
-	mergePodResourceRequirements(&pod, defaultRequirements, podLevelResourcesEnabled)
+	defaultRequirements := defaultResources{
+		corev1.LimitTypePod:       defaultResourceRequirements(&limitRange, corev1.LimitTypePod),
+		corev1.LimitTypeContainer: defaultResourceRequirements(&limitRange, corev1.LimitTypeContainer),
+	}
+	mergePodResourceRequirements(&pod, defaultRequirements)
 	if podLevelResourcesEnabled {
 		actual := *pod.Spec.Resources
 		if !apiequality.Semantic.DeepEqual(expectedPod, actual) {
@@ -286,20 +289,20 @@ func testMergePodResourceRequirements(t *testing.T, podLevelResourcesEnabled boo
 
 	expected = api.ResourceRequirements{
 		Requests: api.ResourceList{
-			api.ResourceCPU:    defaultRequirements.container.Requests[api.ResourceCPU],
+			api.ResourceCPU:    defaultRequirements[corev1.LimitTypeContainer].Requests[api.ResourceCPU],
 			api.ResourceMemory: resource.MustParse("512Mi"),
 		},
-		Limits: defaultRequirements.container.Limits,
+		Limits: defaultRequirements[corev1.LimitTypeContainer].Limits,
 	}
 	expectedPod = api.ResourceRequirements{
-		Requests: defaultRequirements.pod.Requests,
+		Requests: defaultRequirements[corev1.LimitTypePod].Requests,
 		Limits: api.ResourceList{
 			api.ResourceCPU:    resource.MustParse("200m"),
 			api.ResourceMemory: resource.MustParse("3Gi"),
 		},
 	}
 
-	mergePodResourceRequirements(&pod, defaultRequirements, podLevelResourcesEnabled)
+	mergePodResourceRequirements(&pod, defaultRequirements)
 
 	if podLevelResourcesEnabled {
 		actual := *pod.Spec.Resources
@@ -337,7 +340,7 @@ func testMergePodResourceRequirements(t *testing.T, podLevelResourcesEnabled boo
 		pod = validPodWithPodLevelResources("limit-memory", 1, input, inputPod)
 	}
 
-	mergePodResourceRequirements(&pod, defaultRequirements, podLevelResourcesEnabled)
+	mergePodResourceRequirements(&pod, defaultRequirements)
 	if podLevelResourcesEnabled {
 		actual := *pod.Spec.Resources
 		if !apiequality.Semantic.DeepEqual(inputPod, actual) {
