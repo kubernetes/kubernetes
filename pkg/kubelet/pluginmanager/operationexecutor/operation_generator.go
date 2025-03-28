@@ -62,6 +62,7 @@ func NewOperationGenerator(recorder record.EventRecorder) OperationGenerator {
 type OperationGenerator interface {
 	// Generates the RegisterPlugin function needed to perform the registration of a plugin
 	GenerateRegisterPluginFunc(
+		ctx context.Context,
 		socketPath string,
 		UUID types.UID,
 		pluginHandlers map[string]cache.PluginHandler,
@@ -69,34 +70,39 @@ type OperationGenerator interface {
 
 	// Generates the UnregisterPlugin function needed to perform the unregistration of a plugin
 	GenerateUnregisterPluginFunc(
+		ctx context.Context,
 		pluginInfo cache.PluginInfo,
 		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
 }
 
 func (og *operationGenerator) GenerateRegisterPluginFunc(
+	ctx context.Context,
 	socketPath string,
 	pluginUUID types.UID,
 	pluginHandlers map[string]cache.PluginHandler,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
 
 	registerPluginFunc := func() error {
-		client, conn, err := dial(socketPath, dialTimeoutDuration)
+		logger := klog.FromContext(ctx)
+
+		client, conn, err := dial(ctx, socketPath, dialTimeoutDuration)
 		if err != nil {
 			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
 		}
 		defer conn.Close()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		// Create separate context from parent context
+		ctxWithTimeout, cancel := context.WithTimeout(ctx, time.Second)
 		defer cancel()
 
-		infoResp, err := client.GetInfo(ctx, &registerapi.InfoRequest{})
+		infoResp, err := client.GetInfo(ctxWithTimeout, &registerapi.InfoRequest{})
 		if err != nil {
 			return fmt.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
 		}
 
 		handler, ok := pluginHandlers[infoResp.Type]
 		if !ok {
-			if err := og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
+			if err := og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
 			return fmt.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
@@ -106,14 +112,14 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			infoResp.Endpoint = socketPath
 		}
 		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
-			if err = og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
+			if err = og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
 				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
 			}
 			return fmt.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
 		}
 		// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
 		// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
-		err = actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
+		err = actualStateOfWorldUpdater.AddPlugin(ctx, cache.PluginInfo{
 			SocketPath: socketPath,
 			UUID:       pluginUUID,
 			Handler:    handler,
@@ -121,14 +127,14 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 			Endpoint:   infoResp.Endpoint,
 		})
 		if err != nil {
-			klog.ErrorS(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
+			logger.Error(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
-			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
+			return og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 		}
 
 		// Notify is called after register to guarantee that even if notify throws an error Register will always be called after validate
-		if err := og.notifyPlugin(client, true, ""); err != nil {
+		if err := og.notifyPlugin(ctx, client, true, ""); err != nil {
 			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
 		}
 		return nil
@@ -137,10 +143,13 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 }
 
 func (og *operationGenerator) GenerateUnregisterPluginFunc(
+	ctx context.Context,
 	pluginInfo cache.PluginInfo,
 	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
 
 	unregisterPluginFunc := func() error {
+		logger := klog.FromContext(ctx)
+
 		if pluginInfo.Handler == nil {
 			return fmt.Errorf("UnregisterPlugin error -- failed to get plugin handler for %s", pluginInfo.SocketPath)
 		}
@@ -150,14 +159,14 @@ func (og *operationGenerator) GenerateUnregisterPluginFunc(
 
 		pluginInfo.Handler.DeRegisterPlugin(pluginInfo.Name, pluginInfo.Endpoint)
 
-		klog.V(4).InfoS("DeRegisterPlugin called", "pluginName", pluginInfo.Name, "pluginHandler", pluginInfo.Handler)
+		logger.V(4).Info("DeRegisterPlugin called", "pluginName", pluginInfo.Name, "pluginHandler", pluginInfo.Handler)
 		return nil
 	}
 	return unregisterPluginFunc
 }
 
-func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient, registered bool, errStr string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeoutDuration)
+func (og *operationGenerator) notifyPlugin(ctx context.Context, client registerapi.RegistrationClient, registered bool, errStr string) error {
+	ctx, cancel := context.WithTimeout(ctx, notifyTimeoutDuration)
 	defer cancel()
 
 	status := &registerapi.RegistrationStatus{
@@ -177,8 +186,8 @@ func (og *operationGenerator) notifyPlugin(client registerapi.RegistrationClient
 }
 
 // Dial establishes the gRPC communication with the picked up plugin socket. https://godoc.org/google.golang.org/grpc#Dial
-func dial(unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func dial(ctx context.Context, unixSocketPath string, timeout time.Duration) (registerapi.RegistrationClient, *grpc.ClientConn, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	c, err := grpc.DialContext(ctx, unixSocketPath,
