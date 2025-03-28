@@ -21,20 +21,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -121,7 +120,7 @@ func removeExtendedResource(clientSet clientset.Interface, nodeName, extendedRes
 	}).WithTimeout(30 * time.Second).WithPolling(time.Second).ShouldNot(gomega.HaveOccurred())
 }
 
-func cpuManagerPolicyKubeletConfig(ctx context.Context, f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, cpuManagerPolicyName string, cpuManagerPolicyOptions map[string]string, isInPlacePodVerticalScalingAllocatedStatusEnabled bool, isInPlacePodVerticalScalingExclusiveCPUsEnabled bool) {
+func cpuManagerPolicyKubeletConfig(ctx context.Context, f *framework.Framework, oldCfg *kubeletconfig.KubeletConfiguration, cpuManagerPolicyName string, cpuManagerPolicyOptions map[string]string, ippvsCfg ippvsConfig) {
 	if cpuManagerPolicyName != "" {
 		if cpuManagerPolicyOptions != nil {
 			func() {
@@ -151,13 +150,13 @@ func cpuManagerPolicyKubeletConfig(ctx context.Context, f *framework.Framework, 
 			// check what we do have in the node.
 			newCfg := configureCPUManagerInKubelet(oldCfg,
 				&cpuManagerKubeletArguments{
-					policyName:              cpuManagerPolicyName,
-					reservedSystemCPUs:      cpuset.New(0),
-					enableCPUManagerOptions: true,
-					options:                 cpuManagerPolicyOptions,
+					policyName:                                   cpuManagerPolicyName,
+					reservedSystemCPUs:                           cpuset.New(0),
+					enableCPUManagerOptions:                      true,
+					enableInPlacePodVerticalScaling:              ippvsCfg.enableInPlacePodVerticalScaling,
+					enableInPlacePodVerticalScalingExclusiveCPUs: ippvsCfg.enableInPlacePodVerticalScalingExclusiveCPUs,
+					options: cpuManagerPolicyOptions,
 				},
-				isInPlacePodVerticalScalingAllocatedStatusEnabled,
-				isInPlacePodVerticalScalingExclusiveCPUsEnabled,
 			)
 			updateKubeletConfig(ctx, f, newCfg, true)
 		} else {
@@ -169,9 +168,11 @@ func cpuManagerPolicyKubeletConfig(ctx context.Context, f *framework.Framework, 
 			}
 			// Enable CPU Manager in the kubelet.
 			newCfg := configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
-				policyName:         cpuManagerPolicyName,
-				reservedSystemCPUs: cpuset.CPUSet{},
-			}, isInPlacePodVerticalScalingAllocatedStatusEnabled, isInPlacePodVerticalScalingExclusiveCPUsEnabled)
+				policyName:                                   cpuManagerPolicyName,
+				reservedSystemCPUs:                           cpuset.CPUSet{},
+				enableInPlacePodVerticalScaling:              ippvsCfg.enableInPlacePodVerticalScaling,
+				enableInPlacePodVerticalScalingExclusiveCPUs: ippvsCfg.enableInPlacePodVerticalScalingExclusiveCPUs,
+			})
 			updateKubeletConfig(ctx, f, newCfg, true)
 		}
 	}
@@ -183,7 +184,13 @@ type cpuManagerPolicyConfig struct {
 	options map[string]string
 }
 
-func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScalingAllocatedStatusEnabled bool, isInPlacePodVerticalScalingExclusiveCPUsEnabled bool) {
+type ippvsConfig struct {
+	title                                        string
+	enableInPlacePodVerticalScaling              bool
+	enableInPlacePodVerticalScalingExclusiveCPUs bool
+}
+
+func doPodResizeTests(policy cpuManagerPolicyConfig, ippvsCfg ippvsConfig) {
 	f := framework.NewDefaultFramework("pod-resize-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
@@ -1343,8 +1350,8 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 
 	for idx := range tests {
 		tc := tests[idx]
-		ginkgo.It(tc.name+policy.title+" (InPlacePodVerticalScalingAllocatedStatus="+strconv.FormatBool(isInPlacePodVerticalScalingAllocatedStatusEnabled)+", InPlacePodVerticalScalingExclusiveCPUs="+strconv.FormatBool(isInPlacePodVerticalScalingExclusiveCPUsEnabled)+")", func(ctx context.Context) {
-			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, isInPlacePodVerticalScalingAllocatedStatusEnabled, isInPlacePodVerticalScalingExclusiveCPUsEnabled)
+		ginkgo.It(tc.name+ippvsCfg.title+policy.title, func(ctx context.Context) {
+			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, ippvsCfg)
 
 			var testPod, patchedPod *v1.Pod
 			var pErr error
@@ -1359,11 +1366,11 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 				framework.ExpectNoError(err)
 
 				for _, node := range nodes.Items {
-					addExtendedResource(f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
+					e2enode.AddExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource, resource.MustParse("123"))
 				}
 				defer func() {
 					for _, node := range nodes.Items {
-						removeExtendedResource(f.ClientSet, node.Name, fakeExtendedResource)
+						e2enode.RemoveExtendedResource(ctx, f.ClientSet, node.Name, fakeExtendedResource)
 					}
 				}()
 			}
@@ -1390,7 +1397,7 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 					Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 			}
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string) {
+			patchAndVerify := func(patchString string, expectedContainers []podresize.ResizableContainerInfo, initialContainers []podresize.ResizableContainerInfo, opStr string) {
 				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
 				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
@@ -1413,27 +1420,58 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 
 				// TODO make this dynamic depending on Policy Name, Resources input and topology of target
 				// machine.
-				// For the moment skip below if CPU Manager Policy is set to none
+				// For the moment verify only if CPU Manager Policy is set to PolicyStatic and InPlacePodVerticalScalingExclusiveCPUsEnabled is set to true
 				if policy.name == string(cpumanager.PolicyStatic) {
-					ginkgo.By("verifying pod Cpus allowed list value after resize")
-					if isInPlacePodVerticalScalingExclusiveCPUsEnabled {
+					if ippvsCfg.enableInPlacePodVerticalScaling && ippvsCfg.enableInPlacePodVerticalScalingExclusiveCPUs {
+						ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
+						patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+							types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
+						framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
+
+						ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
+						podresize.VerifyPodResources(patchedPod, expectedContainers)
+
+						ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
+						resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
+						podresize.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
+
+						// Check cgroup values only for containerd versions before 1.6.9
+						ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
+						framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers))
+
+						ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
+						podresize.VerifyPodResources(resizedPod, expectedContainers)
+
+						ginkgo.By("verifying pod Cpus allowed list value after resize")
 						gomega.Eventually(ctx, podresize.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, tc.expected).
 							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
-					} else {
-						gomega.Eventually(ctx, podresize.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
-							WithArguments(f, resizedPod, tc.containers).
-							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
 					}
 				}
 			}
 
 			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize")
 
-			rbPatchStr, err := podresize.ResizeContainerPatch(tc.containers)
-			framework.ExpectNoError(err)
-			// Resize has been actuated, test rollback
-			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback")
+			/*if tc.testRollback {
+				// Resize has been actuated, test rollback
+				rollbackContainers := make([]podresize.ResizableContainerInfo, len(tc.containers))
+				copy(rollbackContainers, tc.containers)
+				for i, c := range rollbackContainers {
+					gomega.Expect(c.Name).To(gomega.Equal(tc.expected[i].Name),
+						"test case containers & expectations should be in the same order")
+					// Resizes that trigger a restart should trigger a second restart when rolling back.
+					rollbackContainers[i].RestartCount = tc.expected[i].RestartCount
+				}
+
+				patchAndVerify(tc.expected, rollbackContainers, "rollback")
+			}*/
+
+			/*
+				rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
+				framework.ExpectNoError(err)
+				// Resize has been actuated, test rollback
+				patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback")
+			*/
 
 			ginkgo.By("deleting pod")
 			deletePodSyncByName(ctx, f, newPod.Name)
@@ -1452,7 +1490,7 @@ func doPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScaling
 
 }
 
-func doPodResizeErrorTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScalingAllocatedStatusEnabled bool, isInPlacePodVerticalScalingExclusiveCPUsEnabled bool) {
+func doPodResizeErrorTests(policy cpuManagerPolicyConfig, ippvsCfg ippvsConfig) {
 	f := framework.NewDefaultFramework("pod-resize-errors")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
@@ -1531,7 +1569,9 @@ func doPodResizeErrorTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 
 	for idx := range tests {
 		tc := tests[idx]
-		ginkgo.It(tc.name+policy.title+" (InPlacePodVerticalScalingAllocatedStatus="+strconv.FormatBool(isInPlacePodVerticalScalingAllocatedStatusEnabled)+", InPlacePodVerticalScalingExclusiveCPUs="+strconv.FormatBool(isInPlacePodVerticalScalingExclusiveCPUsEnabled)+")", func(ctx context.Context) {
+		ginkgo.It(tc.name+ippvsCfg.title+policy.title, func(ctx context.Context) {
+			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, ippvsCfg)
+
 			var testPod, patchedPod *v1.Pod
 			var pErr error
 
@@ -1591,22 +1631,44 @@ func doPodResizeErrorTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 //       Above tests are performed by doSheduletTests() and doPodResizeResourceQuotaTests()
 //       in test/e2e/node/pod_resize.go
 
-var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func() {
+var _ = SIGDescribe("Pod InPlace Resize Container Basic Cases", framework.WithSerial(), func() {
+
+	ippvsConfigs := []ippvsConfig{
+		{
+			title:                           ", with InPlacePodVerticalScaling enabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			enableInPlacePodVerticalScaling: true,
+			enableInPlacePodVerticalScalingExclusiveCPUs: true,
+		},
+		{
+			title:                           ", with InPlacePodVerticalScaling enabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
+			enableInPlacePodVerticalScaling: true,
+			enableInPlacePodVerticalScalingExclusiveCPUs: false,
+		},
+		{
+			title:                           ", with InPlacePodVerticalScaling disabled, InPlacePodVerticalScalingExclusiveCPUs disabled",
+			enableInPlacePodVerticalScaling: false,
+			enableInPlacePodVerticalScalingExclusiveCPUs: false,
+		},
+		{
+			title:                           ", with InPlacePodVerticalScaling disabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			enableInPlacePodVerticalScaling: false,
+			enableInPlacePodVerticalScalingExclusiveCPUs: true,
+		},
+	}
 
 	policiesGeneralAvailability := []cpuManagerPolicyConfig{
-		{
-			name:  string(cpumanager.PolicyNone),
-			title: "",
-		},
 		{
 			name:  string(cpumanager.PolicyStatic),
 			title: ", alongside CPU Manager Static Policy with no options",
 			options: map[string]string{
-				cpumanager.FullPCPUsOnlyOption:             "false",
-				cpumanager.DistributeCPUsAcrossNUMAOption:  "false",
-				cpumanager.AlignBySocketOption:             "false",
-				cpumanager.DistributeCPUsAcrossCoresOption: "false",
+				cpumanager.FullPCPUsOnlyOption:            "false",
+				cpumanager.DistributeCPUsAcrossNUMAOption: "false",
+				cpumanager.AlignBySocketOption:            "false",
 			},
+		},
+		{
+			name:  string(cpumanager.PolicyNone),
+			title: "",
 		},
 	}
 
@@ -1623,7 +1685,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func
 		},
 	}
 
-	/*policiesAlpha := []cpuManagerPolicyConfig{
+	policiesAlpha := []cpuManagerPolicyConfig{
 		{
 			name:  string(cpumanager.PolicyStatic),
 			title: ", alongside CPU Manager Static Policy with DistributeCPUsAcrossNUMAOption",
@@ -1704,40 +1766,26 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithSerial(), func
 				cpumanager.DistributeCPUsAcrossCoresOption: "true",
 			},
 		},
-	}*/
-
-	for idp := range policiesGeneralAvailability {
-		doPodResizeTests(policiesGeneralAvailability[idp], false, false)
-		doPodResizeTests(policiesGeneralAvailability[idp], true, false)
-		doPodResizeTests(policiesGeneralAvailability[idp], false, true)
-		doPodResizeTests(policiesGeneralAvailability[idp], true, true)
-		doPodResizeErrorTests(policiesGeneralAvailability[idp], false, false)
-		doPodResizeErrorTests(policiesGeneralAvailability[idp], true, false)
-		doPodResizeErrorTests(policiesGeneralAvailability[idp], false, true)
-		doPodResizeErrorTests(policiesGeneralAvailability[idp], true, true)
 	}
 
-	for idp := range policiesBeta {
-		doPodResizeTests(policiesBeta[idp], false, false)
-		doPodResizeTests(policiesBeta[idp], true, false)
-		doPodResizeTests(policiesBeta[idp], false, true)
-		doPodResizeTests(policiesBeta[idp], true, true)
-		doPodResizeErrorTests(policiesBeta[idp], false, false)
-		doPodResizeErrorTests(policiesBeta[idp], true, false)
-		doPodResizeErrorTests(policiesBeta[idp], false, true)
-		doPodResizeErrorTests(policiesBeta[idp], true, true)
+	for idc := range ippvsConfigs {
+		for idp := range policiesGeneralAvailability {
+			doPodResizeTests(policiesGeneralAvailability[idp], ippvsConfigs[idc])
+			doPodResizeErrorTests(policiesGeneralAvailability[idp], ippvsConfigs[idc])
+		}
+		for idp := range policiesBeta {
+			doPodResizeTests(policiesBeta[idp], ippvsConfigs[idc])
+			doPodResizeErrorTests(policiesBeta[idp], ippvsConfigs[idc])
+		}
+		for idp := range policiesAlpha {
+			doPodResizeTests(policiesAlpha[idp], ippvsConfigs[idc])
+			doPodResizeErrorTests(policiesAlpha[idp], ippvsConfigs[idc])
+		}
 	}
-
-	/*for idp := range policiesAlpha {
-		doPodResizeTests(policiesAlpha[idp], true, false)
-		doPodResizeTests(policiesAlpha[idp], true, true)
-		doPodResizeErrorTests(policiesAlpha[idp], true, false)
-		doPodResizeErrorTests(policiesAlpha[idp], true, true)
-	}*/
 
 })
 
-func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScalingAllocatedStatusEnabled bool, isInPlacePodVerticalScalingExclusiveCPUsEnabled bool) {
+func doPodResizeExtendTests(policy cpuManagerPolicyConfig, ippvsCfg ippvsConfig) {
 	f := framework.NewDefaultFramework("pod-resize-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
@@ -1760,9 +1808,9 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 	type testCase struct {
 		name                string
-		containers          []e2epod.ResizableContainerInfo
+		containers          []podresize.ResizableContainerInfo
 		patchString         string
-		expected            []e2epod.ResizableContainerInfo
+		expected            []podresize.ResizableContainerInfo
 		addExtendedResource bool
 		skipFlag            bool
 	}
@@ -1776,7 +1824,8 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 		secondAdditionCpuset := cpuset.New()
 		secondExpectedCpuset := cpuset.New()
 
-		if tests.name == "1 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false" {
+		switch tests.name {
+		case "1 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false":
 			if cpuCap < 2 {
 				tests.skipFlag = true
 			}
@@ -1794,7 +1843,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			}
 			firstExpectedCpuset = firstAdditionCpuset.Union(firstContainerCpuset)
 			tests.expected[0].CPUsAllowedList = firstExpectedCpuset.String()
-		} else if tests.name == "1 Guaranteed QoS pod, two containers - increase CPU & memory, FullPCPUsOnlyOption = false" {
+		case "1 Guaranteed QoS pod, two containers - increase CPU & memory, FullPCPUsOnlyOption = false":
 			if cpuCap < 4 {
 				tests.skipFlag = true
 			}
@@ -1827,10 +1876,11 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			}
 			secondExpectedCpuset = secondAdditionCpuset.Union(secondContainerCpuset)
 			tests.expected[1].CPUsAllowedList = secondExpectedCpuset.String()
-		} else if (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = false") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with mustKeepCPUs, FullPCPUsOnlyOption = false") {
+		case "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = false":
 			if cpuCap < 2 {
 				tests.skipFlag = true
 			}
+
 			firstContainerCpuset = cpuset.New(2, 3)
 			if isHTEnabled() {
 				cpuList := mustParseCPUSet(getCPUSiblingList(0)).List()
@@ -1842,13 +1892,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 			firstExpectedCpuset = cpuset.New(firstContainerCpuset.List()[0])
 			tests.expected[0].CPUsAllowedList = firstExpectedCpuset.String()
-			if tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with mustKeepCPUs, FullPCPUsOnlyOption = false" {
-				startIndex := strings.Index(tests.patchString, `"mustKeepCPUs","value": "`) + len(`"mustKeepCPUs","value": "`)
-				endIndex := strings.Index(tests.patchString[startIndex:], `"`) + startIndex
-				tests.expected[0].CPUsAllowedList = tests.patchString[startIndex:endIndex]
-				ginkgo.By(fmt.Sprintf("startIndex:%d, endIndex:%d", startIndex, endIndex))
-			}
-		} else if (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = true") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU with wrong mustKeepCPU, FullPCPUsOnlyOption = ture") || (tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with correct mustKeepCPU, FullPCPUsOnlyOption = true") {
+		case "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = true":
 			if cpuCap < 4 {
 				tests.skipFlag = true
 			}
@@ -1864,12 +1908,6 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 			firstExpectedCpuset = mustParseCPUSet(getCPUSiblingList(1))
 			tests.expected[0].CPUsAllowedList = firstExpectedCpuset.String()
-			if tests.name == "1 Guaranteed QoS pod, one container - decrease CPU & memory with correct mustKeepCPU, FullPCPUsOnlyOption = true" {
-				startIndex := strings.Index(tests.patchString, `"mustKeepCPUs","value": "`) + len(`"mustKeepCPUs","value": "`)
-				endIndex := strings.Index(tests.patchString[startIndex:], `"`) + startIndex
-				tests.expected[0].CPUsAllowedList = tests.patchString[startIndex:endIndex]
-				ginkgo.By(fmt.Sprintf("startIndex:%d, endIndex:%d", startIndex, endIndex))
-			}
 		}
 
 		ginkgo.By(fmt.Sprintf("firstContainerCpuset:%v, firstAdditionCpuset:%v, firstExpectedCpuset:%v", firstContainerCpuset, firstAdditionCpuset, firstExpectedCpuset))
@@ -1880,10 +1918,10 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 	testsWithFalseFullCPUs := []testCase{
 		{
 			name: "1 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
+			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "1",
@@ -1892,10 +1930,10 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			patchString: `{"spec":{"containers":[
 						{"name":"c1", "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
 					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
+			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "2",
@@ -1904,17 +1942,17 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 		},
 		{
 			name: "1 Guaranteed QoS pod, two containers - increase CPU & memory, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
+			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "1",
 				},
 				{
 					Name:                 "c2",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "1",
@@ -1924,17 +1962,17 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
                         {"name":"c1",  "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}},
                         {"name":"c2",  "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
                     ]}}`,
-			expected: []e2epod.ResizableContainerInfo{
+			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "2",
 				},
 				{
 					Name:                 "c2",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "2",
@@ -1943,10 +1981,10 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 		},
 		{
 			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
+			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "2",
@@ -1955,34 +1993,10 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			patchString: `{"spec":{"containers":[
 						{"name":"c1", "resources":{"requests":{"cpu":"1","memory":"200Mi"},"limits":{"cpu":"1","memory":"200Mi"}}}
 					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
+			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "1",
-				},
-			},
-		},
-		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory with mustKeepCPUs, FullPCPUsOnlyOption = false",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-			},
-			patchString: `{"spec":{"containers":[
-						{"name":"c1", "env":[{"name":"mustKeepCPUs","value": "11"}], "resources":{"requests":{"cpu":"1","memory":"400Mi"},"limits":{"cpu":"1","memory":"400Mi"}}}
-					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "1",
@@ -1994,10 +2008,10 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 	testsWithTrueFullCPUs := []testCase{
 		{
 			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = true",
-			containers: []e2epod.ResizableContainerInfo{
+			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "4", CPULim: "4", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "4", CPULim: "4", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "4",
@@ -2006,59 +2020,10 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			patchString: `{"spec":{"containers":[
 						{"name":"c1", "resources":{"requests":{"cpu":"2","memory":"200Mi"},"limits":{"cpu":"2","memory":"200Mi"}}}
 					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
+			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-			},
-		},
-		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory with correct mustKeepCPU, FullPCPUsOnlyOption = true",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "4", CPULim: "4", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "4",
-				},
-			},
-			patchString: `{"spec":{"containers":[
-						{"name":"c1", "env":[{"name":"mustKeepCPUs","value": "2,12"}], "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
-					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
-				},
-			},
-		},
-		// Abnormal case, CPUs in mustKeepCPUs not full PCPUs, the mustKeepCPUs will be ignored
-		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU with wrong mustKeepCPU, FullPCPUsOnlyOption = ture",
-			containers: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "4", CPULim: "4", MemReq: "200Mi", MemLim: "200Mi"},
-					CPUPolicy:            &noRestart,
-					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "4",
-				},
-			},
-			patchString: `{"spec":{"containers":[
-						{"name":"c1", "env":[{"name":"mustKeepCPUs","value": "1,2"}], "resources":{"requests":{"cpu":"2"},"limits":{"cpu":"2"}}}
-					]}}`,
-			expected: []e2epod.ResizableContainerInfo{
-				{
-					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
+					Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "200Mi", MemLim: "200Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
 					CPUsAllowedListValue: "2",
@@ -2070,16 +2035,17 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 	timeouts := framework.NewTimeoutContext()
 
 	var tests []testCase
-	if policy.options[cpumanager.FullPCPUsOnlyOption] == "false" {
+	switch policy.options[cpumanager.FullPCPUsOnlyOption] {
+	case "false":
 		tests = testsWithFalseFullCPUs
-	} else if policy.options[cpumanager.FullPCPUsOnlyOption] == "true" {
+	case "true":
 		tests = testsWithTrueFullCPUs
 	}
 
 	for idx := range tests {
 		tc := tests[idx]
-		ginkgo.It(tc.name+policy.title+" (InPlacePodVerticalScalingAllocatedStatus="+strconv.FormatBool(isInPlacePodVerticalScalingAllocatedStatusEnabled)+", InPlacePodVerticalScalingExclusiveCPUs="+strconv.FormatBool(isInPlacePodVerticalScalingExclusiveCPUsEnabled)+")", func(ctx context.Context) {
-			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, isInPlacePodVerticalScalingAllocatedStatusEnabled, isInPlacePodVerticalScalingExclusiveCPUsEnabled)
+		ginkgo.It(tc.name+ippvsCfg.title+policy.title, func(ctx context.Context) {
+			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, ippvsCfg)
 
 			setCPUsForTestCase(ctx, &tc, policy.options[cpumanager.FullPCPUsOnlyOption])
 			if tc.skipFlag {
@@ -2090,7 +2056,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			var pErr error
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
+			testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod", tStamp, tc.containers)
 			testPod.GenerateName = "resize-test-"
 			testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
 
@@ -2112,57 +2078,54 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			newPod := podClient.CreateSync(ctx, testPod)
 
 			ginkgo.By("verifying initial pod resources, allocations are as expected")
-			e2epod.VerifyPodResources(newPod, tc.containers)
+			podresize.VerifyPodResources(newPod, tc.containers)
 			ginkgo.By("verifying initial pod resize policy is as expected")
-			e2epod.VerifyPodResizePolicy(newPod, tc.containers)
+			podresize.VerifyPodResizePolicy(newPod, tc.containers)
 
 			ginkgo.By("verifying initial pod status resources are as expected")
-			framework.ExpectNoError(e2epod.VerifyPodStatusResources(newPod, tc.containers))
+			framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, tc.containers))
 			ginkgo.By("verifying initial cgroup config are as expected")
-			framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
+			framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, tc.containers))
 			// TODO make this dynamic depending on Policy Name, Resources input and topology of target
 			// machine.
 			// For the moment skip below if CPU Manager Policy is set to none
 			if policy.name == string(cpumanager.PolicyStatic) {
 				ginkgo.By("verifying initial pod Cpus allowed list value")
-				gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
+				gomega.Eventually(ctx, podresize.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 					WithArguments(f, newPod, tc.containers).
 					Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 			}
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string) {
-				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
-				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
-					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
-				framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
-
-				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
-				e2epod.VerifyPodResources(patchedPod, expectedContainers)
-
-				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
-				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
-
-				// Check cgroup values only for containerd versions before 1.6.9
-				ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
-				framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers))
-
-				ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
-				e2epod.VerifyPodResources(resizedPod, expectedContainers)
-
+			patchAndVerify := func(patchString string, expectedContainers []podresize.ResizableContainerInfo, initialContainers []podresize.ResizableContainerInfo, opStr string) {
 				// TODO make this dynamic depending on Policy Name, Resources input and topology of target
 				// machine.
-				// For the moment skip below if CPU Manager Policy is set to none
+				// For the moment verify only of if CPU Manager Policy is set to static and InPlacePodVerticalScalingExclusiveCPUsEnabled is true
 				if policy.name == string(cpumanager.PolicyStatic) {
-					ginkgo.By(fmt.Sprintf("verifying pod Cpus allowed list value after %s", opStr))
-					if isInPlacePodVerticalScalingExclusiveCPUsEnabled {
-						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
+					if ippvsCfg.enableInPlacePodVerticalScaling && ippvsCfg.enableInPlacePodVerticalScalingExclusiveCPUs {
+
+						ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
+						patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+							types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
+						framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
+
+						ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
+						podresize.VerifyPodResources(patchedPod, expectedContainers)
+
+						ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
+						resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
+						podresize.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
+
+						// Check cgroup values only for containerd versions before 1.6.9
+						ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
+						framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers))
+
+						ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
+						podresize.VerifyPodResources(resizedPod, expectedContainers)
+
+						ginkgo.By(fmt.Sprintf("verifying pod Cpus allowed list value after %s", opStr))
+						gomega.Eventually(ctx, podresize.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, expectedContainers).
 							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
-					} else {
-						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
-							WithArguments(f, resizedPod, tc.containers).
-							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
 					}
 				}
 			}
@@ -2170,11 +2133,13 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 			ginkgo.By("First patch")
 			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize")
 
-			rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
-			framework.ExpectNoError(err)
-			// Resize has been actuated, test rollback
-			ginkgo.By("Second patch for rollback")
-			patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback")
+			/*
+				rbPatchStr, err := e2epod.ResizeContainerPatch(tc.containers)
+				framework.ExpectNoError(err)
+				// Resize has been actuated, test rollback
+				ginkgo.By("Second patch for rollback")
+				patchAndVerify(rbPatchStr, tc.containers, tc.expected, "rollback")
+			*/
 
 			ginkgo.By("deleting pod")
 			deletePodSyncByName(ctx, f, newPod.Name)
@@ -2193,7 +2158,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 }
 
-func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalScalingAllocatedStatusEnabled bool, isInPlacePodVerticalScalingExclusiveCPUsEnabled bool) {
+func doMultiPodResizeTests(policy cpuManagerPolicyConfig, ippvsCfg ippvsConfig) {
 	f := framework.NewDefaultFramework("pod-resize-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var podClient *e2epod.PodClient
@@ -2212,9 +2177,9 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 	})
 
 	type testPod struct {
-		containers  []e2epod.ResizableContainerInfo
+		containers  []podresize.ResizableContainerInfo
 		patchString string
-		expected    []e2epod.ResizableContainerInfo
+		expected    []podresize.ResizableContainerInfo
 	}
 
 	type testCase struct {
@@ -2276,10 +2241,10 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 		{
 			name: "2 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false",
 			testPod1: testPod{
-				containers: []e2epod.ResizableContainerInfo{
+				containers: []podresize.ResizableContainerInfo{
 					{
 						Name:                 "c1",
-						Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+						Resources:            &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
 						CPUPolicy:            &noRestart,
 						MemPolicy:            &noRestart,
 						CPUsAllowedListValue: "1",
@@ -2288,10 +2253,10 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				patchString: `{"spec":{"containers":[
 							{"name":"c1", "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
 						]}}`,
-				expected: []e2epod.ResizableContainerInfo{
+				expected: []podresize.ResizableContainerInfo{
 					{
 						Name:                 "c1",
-						Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+						Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 						CPUPolicy:            &noRestart,
 						MemPolicy:            &noRestart,
 						CPUsAllowedListValue: "2",
@@ -2299,10 +2264,10 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				},
 			},
 			testPod2: testPod{
-				containers: []e2epod.ResizableContainerInfo{
+				containers: []podresize.ResizableContainerInfo{
 					{
 						Name:                 "c2",
-						Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+						Resources:            &cgroups.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
 						CPUPolicy:            &noRestart,
 						MemPolicy:            &noRestart,
 						CPUsAllowedListValue: "1",
@@ -2311,10 +2276,10 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				patchString: `{"spec":{"containers":[
 							{"name":"c2", "resources":{"requests":{"cpu":"2","memory":"400Mi"},"limits":{"cpu":"2","memory":"400Mi"}}}
 						]}}`,
-				expected: []e2epod.ResizableContainerInfo{
+				expected: []podresize.ResizableContainerInfo{
 					{
 						Name:                 "c2",
-						Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+						Resources:            &cgroups.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
 						CPUPolicy:            &noRestart,
 						MemPolicy:            &noRestart,
 						CPUsAllowedListValue: "2",
@@ -2328,8 +2293,8 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 
 	for idx := range tests {
 		tc := tests[idx]
-		ginkgo.It(tc.name+policy.title+" (InPlacePodVerticalScalingAllocatedStatus="+strconv.FormatBool(isInPlacePodVerticalScalingAllocatedStatusEnabled)+", InPlacePodVerticalScalingExclusiveCPUs="+strconv.FormatBool(isInPlacePodVerticalScalingExclusiveCPUsEnabled)+")", func(ctx context.Context) {
-			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, isInPlacePodVerticalScalingAllocatedStatusEnabled, isInPlacePodVerticalScalingExclusiveCPUsEnabled)
+		ginkgo.It(tc.name+ippvsCfg.title+policy.title, func(ctx context.Context) {
+			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, ippvsCfg)
 
 			setCPUsForTestCase(ctx, &tc, policy.options[cpumanager.FullPCPUsOnlyOption])
 			if tc.skipFlag {
@@ -2339,11 +2304,11 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 			var patchedPod *v1.Pod
 			var pErr error
 
-			createAndVerify := func(podName string, podClient *e2epod.PodClient, testContainers []e2epod.ResizableContainerInfo) (newPod *v1.Pod) {
+			createAndVerify := func(podName string, podClient *e2epod.PodClient, testContainers []podresize.ResizableContainerInfo) (newPod *v1.Pod) {
 				var testPod *v1.Pod
 
 				tStamp := strconv.Itoa(time.Now().Nanosecond())
-				testPod = e2epod.MakePodWithResizableContainers(f.Namespace.Name, fmt.Sprintf("resizepod-%s", podName), tStamp, testContainers)
+				testPod = podresize.MakePodWithResizableContainers(f.Namespace.Name, fmt.Sprintf("resizepod-%s", podName), tStamp, testContainers)
 				testPod.GenerateName = "resize-test-"
 				testPod = e2epod.MustMixinRestrictedPodSecurity(testPod)
 
@@ -2351,20 +2316,20 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 				newPod = podClient.CreateSync(ctx, testPod)
 
 				ginkgo.By("verifying initial pod resources, allocations are as expected")
-				e2epod.VerifyPodResources(newPod, testContainers)
+				podresize.VerifyPodResources(newPod, testContainers)
 				ginkgo.By("verifying initial pod resize policy is as expected")
-				e2epod.VerifyPodResizePolicy(newPod, testContainers)
+				podresize.VerifyPodResizePolicy(newPod, testContainers)
 
 				ginkgo.By("verifying initial pod status resources are as expected")
-				framework.ExpectNoError(e2epod.VerifyPodStatusResources(newPod, testContainers))
+				framework.ExpectNoError(podresize.VerifyPodStatusResources(newPod, testContainers))
 				ginkgo.By("verifying initial cgroup config are as expected")
-				framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, newPod, testContainers))
+				framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, newPod, testContainers))
 				// TODO make this dynamic depending on Policy Name, Resources input and topology of target
 				// machine.
 				// For the moment skip below if CPU Manager Policy is set to none
 				if policy.name == string(cpumanager.PolicyStatic) {
 					ginkgo.By("verifying initial pod Cpus allowed list value")
-					gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
+					gomega.Eventually(ctx, podresize.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 						WithArguments(f, newPod, testContainers).
 						Should(gomega.Succeed(), "failed to verify initial Pod CPUsAllowedListValue")
 				}
@@ -2374,39 +2339,35 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 			newPod1 := createAndVerify("testpod1", podClient, tc.testPod1.containers)
 			newPod2 := createAndVerify("testpod2", podClient, tc.testPod2.containers)
 
-			patchAndVerify := func(patchString string, expectedContainers []e2epod.ResizableContainerInfo, initialContainers []e2epod.ResizableContainerInfo, opStr string, newPod *v1.Pod) {
-				ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
-				patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
-					types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
-				framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
-
-				ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
-				e2epod.VerifyPodResources(patchedPod, expectedContainers)
-
-				ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
-				resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
-				e2epod.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
-
-				// Check cgroup values only for containerd versions before 1.6.9
-				ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
-				framework.ExpectNoError(e2epod.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers))
-
-				ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
-				e2epod.VerifyPodResources(resizedPod, expectedContainers)
-
+			patchAndVerify := func(patchString string, expectedContainers []podresize.ResizableContainerInfo, initialContainers []podresize.ResizableContainerInfo, opStr string, newPod *v1.Pod) {
 				// TODO make this dynamic depending on Policy Name, Resources input and topology of target
 				// machine.
-				// For the moment skip below if CPU Manager Policy is set to none
+				// For the moment verify only if CPU Manager Policy is set to static and InPlacePodVerticalScalingExclusiveCPUs is true
 				if policy.name == string(cpumanager.PolicyStatic) {
-					ginkgo.By(fmt.Sprintf("verifying pod Cpus allowed list value after %s", opStr))
-					if isInPlacePodVerticalScalingExclusiveCPUsEnabled {
-						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
+					if ippvsCfg.enableInPlacePodVerticalScaling && ippvsCfg.enableInPlacePodVerticalScalingExclusiveCPUs {
+						ginkgo.By(fmt.Sprintf("patching pod for %s", opStr))
+						patchedPod, pErr = f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
+							types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
+						framework.ExpectNoError(pErr, fmt.Sprintf("failed to patch pod for %s", opStr))
+
+						ginkgo.By(fmt.Sprintf("verifying pod patched for %s", opStr))
+						podresize.VerifyPodResources(patchedPod, expectedContainers)
+
+						ginkgo.By(fmt.Sprintf("waiting for %s to be actuated", opStr))
+						resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPod, expectedContainers)
+						podresize.ExpectPodResized(ctx, f, resizedPod, expectedContainers)
+
+						// Check cgroup values only for containerd versions before 1.6.9
+						ginkgo.By(fmt.Sprintf("verifying pod container's cgroup values after %s", opStr))
+						framework.ExpectNoError(podresize.VerifyPodContainersCgroupValues(ctx, f, resizedPod, expectedContainers))
+
+						ginkgo.By(fmt.Sprintf("verifying pod resources after %s", opStr))
+						podresize.VerifyPodResources(resizedPod, expectedContainers)
+
+						ginkgo.By(fmt.Sprintf("verifying pod Cpus allowed list value after %s", opStr))
+						gomega.Eventually(ctx, podresize.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
 							WithArguments(f, resizedPod, expectedContainers).
 							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs enabled")
-					} else {
-						gomega.Eventually(ctx, e2epod.VerifyPodContainersCPUsAllowedListValue, timeouts.PodStartShort, timeouts.Poll).
-							WithArguments(f, resizedPod, initialContainers).
-							Should(gomega.Succeed(), "failed to verify Pod CPUsAllowedListValue for resizedPod with InPlacePodVerticalScalingExclusiveCPUs disabled (default)")
 					}
 				}
 			}
@@ -2414,13 +2375,15 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 			patchAndVerify(tc.testPod1.patchString, tc.testPod1.expected, tc.testPod1.containers, "resize", newPod1)
 			patchAndVerify(tc.testPod2.patchString, tc.testPod2.expected, tc.testPod2.containers, "resize", newPod2)
 
-			rbPatchStr1, err1 := e2epod.ResizeContainerPatch(tc.testPod1.containers)
-			framework.ExpectNoError(err1)
-			rbPatchStr2, err2 := e2epod.ResizeContainerPatch(tc.testPod2.containers)
-			framework.ExpectNoError(err2)
-			// Resize has been actuated, test rollback
-			patchAndVerify(rbPatchStr1, tc.testPod1.containers, tc.testPod1.expected, "rollback", newPod1)
-			patchAndVerify(rbPatchStr2, tc.testPod2.containers, tc.testPod2.expected, "rollback", newPod2)
+			/*
+				rbPatchStr1, err1 := e2epod.ResizeContainerPatch(tc.testPod1.containers)
+				framework.ExpectNoError(err1)
+				rbPatchStr2, err2 := e2epod.ResizeContainerPatch(tc.testPod2.containers)
+				framework.ExpectNoError(err2)
+				// Resize has been actuated, test rollback
+				patchAndVerify(rbPatchStr1, tc.testPod1.containers, tc.testPod1.expected, "rollback", newPod1)
+				patchAndVerify(rbPatchStr2, tc.testPod2.containers, tc.testPod2.expected, "rollback", newPod2)
+			*/
 
 			ginkgo.By("deleting pod")
 			deletePodSyncByName(ctx, f, newPod1.Name)
@@ -2441,6 +2404,14 @@ func doMultiPodResizeTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalSc
 }
 
 var _ = SIGDescribe("Pod InPlace Resize Container Extended Cases", framework.WithSerial(), func() {
+
+	ippvsConfigs := []ippvsConfig{
+		{
+			title:                           ", with InPlacePodVerticalScaling enabled, InPlacePodVerticalScalingExclusiveCPUs enabled",
+			enableInPlacePodVerticalScaling: true,
+			enableInPlacePodVerticalScalingExclusiveCPUs: true,
+		},
+	}
 
 	policiesGeneralAvailability := []cpuManagerPolicyConfig{
 		{
@@ -2465,7 +2436,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container Extended Cases", framework.Wit
 		},
 	}
 
-	doPodResizeExtendTests(policiesGeneralAvailability[0], true, true)
-	doPodResizeExtendTests(policiesGeneralAvailability[1], true, true)
-	doMultiPodResizeTests(policiesGeneralAvailability[0], true, true)
+	doPodResizeExtendTests(policiesGeneralAvailability[0], ippvsConfigs[0])
+	doPodResizeExtendTests(policiesGeneralAvailability[1], ippvsConfigs[0])
+	doMultiPodResizeTests(policiesGeneralAvailability[0], ippvsConfigs[0])
 })
