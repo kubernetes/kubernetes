@@ -48,8 +48,10 @@ import (
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
-	"k8s.io/component-base/metrics/features"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
+	informermetrics "k8s.io/component-base/metrics/prometheus/informer"
+	reflectormetrics "k8s.io/component-base/metrics/prometheus/reflector"
 	"k8s.io/component-base/metrics/prometheus/slis"
 	"k8s.io/component-base/term"
 	"k8s.io/component-base/version"
@@ -65,7 +67,7 @@ import (
 )
 
 func init() {
-	utilruntime.Must(features.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
+	utilruntime.Must(metricsfeatures.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 	utilruntime.Must(logsapi.AddFeatureGates(utilfeature.DefaultMutableFeatureGate))
 }
 
@@ -495,6 +497,10 @@ func CreateControllerContext(s *cloudcontrollerconfig.CompletedConfig, clientBui
 		ControllerManagerMetrics:        controllersmetrics.NewControllerManagerMetrics("cloud-controller-manager"),
 	}
 	controllersmetrics.Register()
+	if utilfeature.DefaultFeatureGate.Enabled(metricsfeatures.InformerMetrics) {
+		informermetrics.Register()
+		reflectormetrics.Register()
+	}
 	return ctx, nil
 }
 
