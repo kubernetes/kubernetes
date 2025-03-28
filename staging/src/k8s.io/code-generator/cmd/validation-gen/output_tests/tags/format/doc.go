@@ -33,6 +33,9 @@ type Struct struct {
 	// +k8s:format=ip-sloppy
 	IPPtrField *string `json:"ipPtrField"`
 
+	// Note: no validation here
+	IPTypedefField IPStringType `json:"ipTypedefField"`
+
 	// +k8s:format=dns-label
 	DNSLabelField string `json:"dnsLabelField"`
 
@@ -41,9 +44,6 @@ type Struct struct {
 
 	// +k8s:format=dns-label
 	DNSLabelTypedefField UnvalidatedStringType `json:"dnsLabelTypedefField"`
-
-	// Note: no validation here
-	IPTypedefField IPStringType `json:"ipTypedefField"`
 }
 
 // Note: no validation here
