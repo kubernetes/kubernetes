@@ -149,15 +149,26 @@ func TestRegistrationHandler(t *testing.T) {
 					// Set expected slice fields for the next call of this reactor.
 					// The reactor will be called next time when resourceslices object is deleted
 					// by the kubelet after plugin deregistration.
-					expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.pluginName}
-
+					switch len(expectedSliceFields) {
+					case 1:
+						// Startup cleanup done, now expect cleanup for test plugin.
+						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.pluginName}
+					case 2:
+						// Test plugin cleanup done, now expect cleanup for the other plugin.
+						otherPlugin := pluginA
+						if otherPlugin == test.pluginName {
+							otherPlugin = pluginB
+						}
+						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": otherPlugin}
+					}
 					return true, nil, err
 				})
 				client = fakeClient
 			}
 
 			// The handler wipes all slices at startup.
-			handler := NewRegistrationHandler(client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			handler := newRegistrationHandler(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			tCtx.Cleanup(handler.Stop)
 			requireNoSlices := func() {
 				t.Helper()
 				if client == nil {
