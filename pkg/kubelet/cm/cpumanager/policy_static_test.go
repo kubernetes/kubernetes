@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/klog/v2"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -96,8 +95,8 @@ func TestStaticPolicyStart(t *testing.T) {
 			description: "non-corrupted state",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"0": cpuset.New(0),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"0": {Original: cpuset.New(0), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -132,8 +131,8 @@ func TestStaticPolicyStart(t *testing.T) {
 			description: "assigned core 2 is still present in available cpuset",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"0": cpuset.New(0, 1, 2),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"0": {Original: cpuset.New(0, 1, 2), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -144,8 +143,8 @@ func TestStaticPolicyStart(t *testing.T) {
 			topo:        topoDualSocketHT,
 			options:     map[string]string{StrictCPUReservationOption: "true"},
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"0": cpuset.New(0, 1, 2),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"0": {Original: cpuset.New(0, 1, 2), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -155,9 +154,9 @@ func TestStaticPolicyStart(t *testing.T) {
 			description: "core 12 is not present in topology but is in state cpuset",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"0": cpuset.New(0, 1, 2),
-					"1": cpuset.New(3, 4),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"0": {Original: cpuset.New(0, 1, 2), Resized: cpuset.New()},
+					"1": {Original: cpuset.New(3, 4), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(5, 6, 7, 8, 9, 10, 11, 12),
@@ -167,9 +166,9 @@ func TestStaticPolicyStart(t *testing.T) {
 			description: "core 11 is present in topology but is not in state cpuset",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"0": cpuset.New(0, 1, 2),
-					"1": cpuset.New(3, 4),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"0": {Original: cpuset.New(0, 1, 2), Resized: cpuset.New()},
+					"1": {Original: cpuset.New(3, 4), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(5, 6, 7, 8, 9, 10),
@@ -240,8 +239,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(2, 3, 6, 7),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(2, 3, 6, 7), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 1, 4, 5),
@@ -255,8 +254,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(2),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(2), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -270,8 +269,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(1, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(1, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 6, 7, 8, 9, 10, 11),
@@ -285,8 +284,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoDualSocketNoHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 1, 3, 4, 5, 6, 7),
@@ -300,8 +299,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoDualSocketNoHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(4, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(4, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 1, 3, 6, 7),
@@ -315,8 +314,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(2),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(2), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -354,8 +353,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocSock0",
 			topo:        topoQuadSocketFourWayHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(3, 11, 4, 5, 6, 7),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(3, 11, 4, 5, 6, 7), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: largeTopoCPUSet.Difference(cpuset.New(3, 11, 4, 5, 6, 7)),
@@ -370,9 +369,9 @@ func TestStaticPolicyAdd(t *testing.T) {
 			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocAllFullCoresFromThreeSockets",
 			topo:        topoQuadSocketFourWayHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.New(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51,
-						53, 173, 113, 233, 54, 61)),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: largeTopoCPUSet.Difference(cpuset.New(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51,
+						53, 173, 113, 233, 54, 61)), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(1, 25, 13, 38, 2, 9, 11, 35, 23, 48, 12, 51, 53, 173, 113, 233, 54, 61),
@@ -387,9 +386,9 @@ func TestStaticPolicyAdd(t *testing.T) {
 			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocAllSock1+FullCore",
 			topo:        topoQuadSocketFourWayHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": largeTopoCPUSet.Difference(largeTopoSock1CPUSet.Union(cpuset.New(10, 34, 22, 47, 53,
-						173, 61, 181, 108, 228, 115, 235))),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: largeTopoCPUSet.Difference(largeTopoSock1CPUSet.Union(cpuset.New(10, 34, 22, 47, 53,
+						173, 61, 181, 108, 228, 115, 235))), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: largeTopoSock1CPUSet.Union(cpuset.New(10, 34, 22, 47, 53, 173, 61, 181, 108, 228,
@@ -420,8 +419,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocCPUs",
 			topo:        topoQuadSocketFourWayHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.New(10, 11, 53, 37, 55, 67, 52)),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: largeTopoCPUSet.Difference(cpuset.New(10, 11, 53, 37, 55, 67, 52)), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(10, 11, 53, 67, 52),
@@ -446,8 +445,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(1, 2, 5, 6),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer3": {Original: cpuset.New(1, 2, 5, 6), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 3, 4, 7),
@@ -461,8 +460,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(1, 2, 3),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(1, 2, 3), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -476,8 +475,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(1, 2, 3, 4, 5, 6),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(1, 2, 3, 4, 5, 6), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 7),
@@ -493,8 +492,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, NoAlloc",
 			topo:        topoQuadSocketFourWayHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.New(10, 11, 53, 37, 55, 67, 52)),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: largeTopoCPUSet.Difference(cpuset.New(10, 11, 53, 37, 55, 67, 52)), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(10, 11, 53, 37, 55, 67, 52),
@@ -589,8 +588,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			topo:            topoSingleSocketHT,
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(1, 2, 5, 6),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer3": {Original: cpuset.New(1, 2, 5, 6), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 3, 4, 7),
@@ -607,8 +606,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(1, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer3": {Original: cpuset.New(1, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 6, 7),
@@ -625,8 +624,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(1, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer3": {Original: cpuset.New(1, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 6, 7),
@@ -643,8 +642,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(1, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer3": {Original: cpuset.New(1, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 6, 7),
@@ -677,8 +676,8 @@ func TestStaticPolicyAdd(t *testing.T) {
 			},
 			numReservedCPUs: 1,
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer3": cpuset.New(1, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer3": {Original: cpuset.New(1, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 2, 3, 4, 6, 7),
@@ -783,20 +782,20 @@ func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
 	}
 
 	if testCase.expCPUAlloc {
-		cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
+		assignment, found := st.assignments[string(testCase.pod.UID)][container.Name]
 		if !found {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
 				testCase.description, container.Name, st.assignments)
 		}
 
-		if !cset.Equals(testCase.expCSet) {
+		if !assignment.Original.Equals(testCase.expCSet) {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s but got %s",
-				testCase.description, testCase.expCSet, cset)
+				testCase.description, testCase.expCSet, assignment.Original)
 		}
 
-		if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
+		if !assignment.Original.Intersection(st.defaultCPUSet).IsEmpty() {
 			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s to be disoint from the shared cpuset %s",
-				testCase.description, cset, st.defaultCPUSet)
+				testCase.description, assignment.Original, st.defaultCPUSet)
 		}
 	}
 
@@ -949,6 +948,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 				stAssignments:   state.ContainerCPUAssignments{},
 				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			},
+			expAllocErr:            prohibitedCPUAllocationError{RequestedCPUs: "2", AllocatedCPUs: "4", OriginalCPUs: 4, GuaranteedCPUs: 2},
 			expCSetAfterAlloc:      cpuset.New(2, 3, 6, 7),
 			expCSetAfterResizeSize: 4,
 			expCSetAfterRemove:     cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
@@ -1084,11 +1084,12 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		logger, _ := ktesting.NewTestContext(t)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
 		t.Run(testCase.description, func(t *testing.T) {
 
-			policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 
 			st := &mockState{
 				assignments:   testCase.stAssignments,
@@ -1099,7 +1100,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 
 			// allocate
 			for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-				err := policy.Allocate(st, pod, &container)
+				err := policy.Allocate(logger, st, pod, &container)
 				if err != nil {
 					t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 						testCase.description, err)
@@ -1129,7 +1130,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 			}
 			podResized := pod
 			for _, container := range append(podResized.Spec.InitContainers, podResized.Spec.Containers...) {
-				err := policy.Allocate(st, podResized, &container)
+				err := policy.Allocate(logger, st, podResized, &container)
 				if err != nil {
 					if !reflect.DeepEqual(err, testCase.expAllocErr) {
 						t.Errorf("StaticPolicy Allocate() error (%v), expected error: %v but got: %v",
@@ -1153,7 +1154,7 @@ func TestStaticPolicyPodResizeCPUsSingleContainerPod(t *testing.T) {
 			}
 
 			// remove
-			err := policy.RemoveContainer(st, string(pod.UID), testCase.containerName)
+			err := policy.RemoveContainer(logger, st, string(pod.UID), testCase.containerName)
 			if err != nil {
 				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected no error but got %v",
 					testCase.description, err)
@@ -1295,6 +1296,7 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 				stAssignments:   state.ContainerCPUAssignments{},
 				stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7),
 			},
+			expAllocErr:        prohibitedCPUAllocationError{RequestedCPUs: "2", AllocatedCPUs: "4", OriginalCPUs: 4, GuaranteedCPUs: 2},
 			containerName2:     "appContainer-1",
 			expCSetAfterAlloc:  cpuset.New(),
 			expCSetAfterResize: cpuset.New(),
@@ -1420,11 +1422,12 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		logger, _ := ktesting.NewTestContext(t)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.CPUManagerPolicyAlphaOptions, true)
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.InPlacePodVerticalScaling, true)
 		t.Run(testCase.description, func(t *testing.T) {
 
-			policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
+			policy, _ := NewStaticPolicy(logger, testCase.topo, testCase.numReservedCPUs, cpuset.New(), topologymanager.NewFakeManager(), nil)
 
 			st := &mockState{
 				assignments:   testCase.stAssignments,
@@ -1435,7 +1438,7 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 
 			// allocate
 			for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-				err := policy.Allocate(st, pod, &container)
+				err := policy.Allocate(logger, st, pod, &container)
 				if err != nil {
 					t.Errorf("StaticPolicy Allocate() error (%v). expected no error but got %v",
 						testCase.description, err)
@@ -1465,7 +1468,7 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 			}
 			podResized := pod
 			for _, container := range append(podResized.Spec.InitContainers, podResized.Spec.Containers...) {
-				err := policy.Allocate(st, podResized, &container)
+				err := policy.Allocate(logger, st, podResized, &container)
 				if err != nil {
 					if !reflect.DeepEqual(err, testCase.expAllocErr) {
 						t.Errorf("StaticPolicy Allocate() error (%v), expected error: %v but got: %v",
@@ -1490,12 +1493,12 @@ func TestStaticPolicyPodResizeCPUsMultiContainerPod(t *testing.T) {
 			}
 
 			// remove
-			err := policy.RemoveContainer(st, string(pod.UID), testCase.containerName)
+			err := policy.RemoveContainer(logger, st, string(pod.UID), testCase.containerName)
 			if err != nil {
 				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected no error but got %v",
 					testCase.description, err)
 			}
-			err = policy.RemoveContainer(st, string(pod.UID), testCase.containerName2)
+			err = policy.RemoveContainer(logger, st, string(pod.UID), testCase.containerName2)
 			if err != nil {
 				t.Errorf("StaticPolicy RemoveContainer() error (%v) after pod resize. expected no error but got %v",
 					testCase.description, err)
@@ -1520,8 +1523,8 @@ func TestStaticPolicyRemove(t *testing.T) {
 			podUID:        "fakePod",
 			containerName: "fakeContainer1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer1": cpuset.New(1, 2, 3),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer1": {Original: cpuset.New(1, 2, 3), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(4, 5, 6, 7),
@@ -1533,9 +1536,9 @@ func TestStaticPolicyRemove(t *testing.T) {
 			podUID:        "fakePod",
 			containerName: "fakeContainer1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer1": cpuset.New(1, 2, 3),
-					"fakeContainer2": cpuset.New(4, 5, 6, 7),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer1": {Original: cpuset.New(1, 2, 3), Resized: cpuset.New()},
+					"fakeContainer2": {Original: cpuset.New(4, 5, 6, 7), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(),
@@ -1547,9 +1550,9 @@ func TestStaticPolicyRemove(t *testing.T) {
 			podUID:        "fakePod",
 			containerName: "fakeContainer1",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer1": cpuset.New(1, 3, 5),
-					"fakeContainer2": cpuset.New(2, 4),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer1": {Original: cpuset.New(1, 3, 5), Resized: cpuset.New()},
+					"fakeContainer2": {Original: cpuset.New(2, 4), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(6, 7),
@@ -1561,8 +1564,8 @@ func TestStaticPolicyRemove(t *testing.T) {
 			podUID:        "fakePod",
 			containerName: "fakeContainer2",
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer1": cpuset.New(1, 3, 5),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer1": {Original: cpuset.New(1, 3, 5), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(2, 4, 6, 7),
@@ -1681,7 +1684,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			continue
 		}
 
-		cpuAlloc, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, cpuset.New(), nil, nil)
+		cpuAlloc, err := policy.allocateCPUs(logger, st, tc.numRequested, tc.socketMask, cpuset.New(), nil, nil)
 		if err != nil {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v not error %v",
 				tc.description, tc.expCSet, err)
@@ -1831,8 +1834,8 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 			numReservedCPUs: 2,
 			reserved:        cpuset.New(0, 1),
 			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": cpuset.New(2, 3, 6, 7),
+				"fakePod": map[string]state.ContainerCPUAssignment{
+					"fakeContainer100": {Original: cpuset.New(2, 3, 6, 7), Resized: cpuset.New()},
 				},
 			},
 			stDefaultCPUSet: cpuset.New(0, 1, 4, 5),
@@ -1863,20 +1866,20 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 		}
 
 		if testCase.expCPUAlloc {
-			cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
+			assignment, found := st.assignments[string(testCase.pod.UID)][container.Name]
 			if !found {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
 					testCase.description, container.Name, st.assignments)
 			}
 
-			if !cset.Equals(testCase.expCSet) {
+			if !assignment.Original.Equals(testCase.expCSet) {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s but got %s",
-					testCase.description, testCase.expCSet, cset)
+					testCase.description, testCase.expCSet, assignment.Original)
 			}
 
-			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
+			if !assignment.Original.Intersection(st.defaultCPUSet).IsEmpty() {
 				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %s to be disoint from the shared cpuset %s",
-					testCase.description, cset, st.defaultCPUSet)
+					testCase.description, assignment.Original, st.defaultCPUSet)
 			}
 		}
 
@@ -2634,14 +2637,14 @@ func TestStaticPolicyAddWithUncoreAlignment(t *testing.T) {
 
 			if testCase.expCPUAlloc {
 				container := &testCase.pod.Spec.Containers[0]
-				cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
+				assignment, found := st.assignments[string(testCase.pod.UID)][container.Name]
 				if !found {
 					t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
 						testCase.description, container.Name, st.assignments)
 				}
-				if !testCase.expCSet.Equals(cset) {
+				if !testCase.expCSet.Equals(assignment.Original) {
 					t.Errorf("StaticPolicy Allocate() error (%v). expected CPUSet %v but got %v",
-						testCase.description, testCase.expCSet, cset)
+						testCase.description, testCase.expCSet, assignment.Original)
 				}
 				return
 			}
