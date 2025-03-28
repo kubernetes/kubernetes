@@ -53,7 +53,7 @@ type PluginHandler interface {
 	// RegisterPlugin is called so that the plugin can be registered by any
 	// plugin consumer
 	// Error encountered here can still be Notified to the plugin.
-	RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration) error
+	RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration, desdesiredStateOfWorld DesiredStateOfWorld) error
 	// DeRegisterPlugin is called once the pluginwatcher observes that the socket has
 	// been deleted.
 	DeRegisterPlugin(pluginName, endpoint string)

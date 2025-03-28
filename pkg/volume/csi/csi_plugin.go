@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
+	pluginmanagercache "k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi/nodeinfomanager"
@@ -115,7 +116,7 @@ func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string,
 }
 
 // RegisterPlugin is called when a plugin can be registered
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, versions []string, pluginClientTimeout *time.Duration, desiredStateOfWorld pluginmanagercache.DesiredStateOfWorld) error {
 	klog.Info(log("Register new plugin with name: %s at endpoint: %s", pluginName, endpoint))
 
 	highestSupportedVersion, err := h.validateVersions("RegisterPlugin", pluginName, endpoint, versions)
