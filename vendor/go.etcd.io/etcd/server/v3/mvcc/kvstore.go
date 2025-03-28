@@ -225,7 +225,9 @@ func (s *store) updateCompactRev(rev int64) (<-chan struct{}, int64, error) {
 	tx.UnsafePut(buckets.Meta, scheduledCompactKeyName, rbytes)
 	tx.Unlock()
 	// ensure that desired compaction is persisted
+	// gofail: var compactBeforeCommitScheduledCompact struct{}
 	s.b.ForceCommit()
+	// gofail: var compactAfterCommitScheduledCompact struct{}
 
 	s.revMu.Unlock()
 
@@ -484,8 +486,12 @@ func restoreIntoIndex(lg *zap.Logger, idx index) (chan<- revKeyValue, <-chan int
 					continue
 				}
 				ki.put(lg, rev.main, rev.sub)
-			} else if !isTombstone(rkv.key) {
-				ki.restore(lg, revision{rkv.kv.CreateRevision, 0}, rev, rkv.kv.Version)
+			} else {
+				if isTombstone(rkv.key) {
+					ki.restoreTombstone(lg, rev.main, rev.sub)
+				} else {
+					ki.restore(lg, revision{rkv.kv.CreateRevision, 0}, rev, rkv.kv.Version)
+				}
 				idx.Insert(ki)
 				kiCache[rkv.kstr] = ki
 			}

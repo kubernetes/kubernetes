@@ -424,6 +424,7 @@ func (c *RaftCluster) AddMember(m *Member, shouldApplyV3 ShouldApplyV3) {
 		zap.String("local-member-id", c.localID.String()),
 		zap.String("added-peer-id", m.ID.String()),
 		zap.Strings("added-peer-peer-urls", m.PeerURLs),
+		zap.Bool("added-peer-is-learner", m.IsLearner),
 	)
 }
 
@@ -475,6 +476,7 @@ func (c *RaftCluster) RemoveMember(id types.ID, shouldApplyV3 ShouldApplyV3) {
 			zap.String("local-member-id", c.localID.String()),
 			zap.String("removed-remote-peer-id", id.String()),
 			zap.Strings("removed-remote-peer-urls", m.PeerURLs),
+			zap.Bool("removed-remote-peer-is-learner", m.IsLearner),
 		)
 	} else {
 		c.lg.Warn(
@@ -536,6 +538,7 @@ func (c *RaftCluster) PromoteMember(id types.ID, shouldApplyV3 ShouldApplyV3) {
 		"promote member",
 		zap.String("cluster-id", c.cid.String()),
 		zap.String("local-member-id", c.localID.String()),
+		zap.String("promoted-member-id", id.String()),
 	)
 }
 
@@ -693,6 +696,10 @@ func (c *RaftCluster) IsReadyToPromoteMember(id uint64) bool {
 	return true
 }
 
+func (c *RaftCluster) MembersFromStore() (map[types.ID]*Member, map[types.ID]bool) {
+	return membersFromStore(c.lg, c.v2store)
+}
+
 func membersFromStore(lg *zap.Logger, st v2store.Store) (map[types.ID]*Member, map[types.ID]bool) {
 	members := make(map[types.ID]*Member)
 	removed := make(map[types.ID]bool)
@@ -727,6 +734,10 @@ func membersFromStore(lg *zap.Logger, st v2store.Store) (map[types.ID]*Member, m
 		removed[MustParseMemberIDFromKey(lg, n.Key)] = true
 	}
 	return members, removed
+}
+
+func (c *RaftCluster) MembersFromBackend() (map[types.ID]*Member, map[types.ID]bool) {
+	return membersFromBackend(c.lg, c.be)
 }
 
 func membersFromBackend(lg *zap.Logger, be backend.Backend) (map[types.ID]*Member, map[types.ID]bool) {
@@ -900,6 +911,7 @@ func (c *RaftCluster) IsMemberExist(id types.ID) bool {
 	c.Lock()
 	defer c.Unlock()
 	_, ok := c.members[id]
+	// gofail: var afterIsMemberExist struct{}
 	return ok
 }
 
