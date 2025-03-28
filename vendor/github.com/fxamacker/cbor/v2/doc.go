@@ -111,8 +111,13 @@ Decoding Options: https://github.com/fxamacker/cbor#decoding-options
 Struct tags like `cbor:"name,omitempty"` and `json:"name,omitempty"` work as expected.
 If both struct tags are specified then `cbor` is used.
 
-Struct tags like "keyasint", "toarray", and "omitempty" make it easy to use
+Struct tags like "keyasint", "toarray", "omitempty", and "omitzero" make it easy to use
 very compact formats like COSE and CWT (CBOR Web Tokens) with structs.
+
+The "omitzero" option omits zero values from encoding, matching
+[stdlib encoding/json behavior](https://pkg.go.dev/encoding/json#Marshal).
+When specified in the `cbor` tag, the option is always honored.
+When specified in the `json` tag, the option is honored when building with Go 1.24+.
 
 For example, "toarray" makes struct fields encode to array elements.  And "keyasint"
 makes struct fields encode to elements of CBOR map with int keys.

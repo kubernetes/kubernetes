@@ -145,8 +145,8 @@ github.com/felixge/httpsnoop
 # github.com/fsnotify/fsnotify v1.7.0
 ## explicit; go 1.17
 github.com/fsnotify/fsnotify
-# github.com/fxamacker/cbor/v2 v2.7.0
-## explicit; go 1.17
+# github.com/fxamacker/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b => github.com/liggitt/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
+## explicit; go 1.20
 github.com/fxamacker/cbor/v2
 # github.com/go-errors/errors v1.4.2
 ## explicit; go 1.14
@@ -1265,7 +1265,7 @@ sigs.k8s.io/kustomize/kyaml/yaml/walk
 ## explicit; go 1.18
 sigs.k8s.io/randfill
 sigs.k8s.io/randfill/bytesource
-# sigs.k8s.io/structured-merge-diff/v4 v4.6.0
+# sigs.k8s.io/structured-merge-diff/v4 v4.6.0 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f
 ## explicit; go 1.13
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
 sigs.k8s.io/structured-merge-diff/v4/merge
@@ -1277,3 +1277,5 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# github.com/fxamacker/cbor/v2 => github.com/liggitt/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
+# sigs.k8s.io/structured-merge-diff/v4 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f

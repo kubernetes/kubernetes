@@ -15,7 +15,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -47,8 +47,10 @@ require (
 )
 
 replace (
+	github.com/fxamacker/cbor/v2 => github.com/liggitt/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	sigs.k8s.io/structured-merge-diff/v4 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f
 )

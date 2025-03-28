@@ -1438,7 +1438,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "apiVersion": "v1",
             "kind": "Pod",
             "metadata": {
-                "creationTimestamp": null,
                 "name": "foo",
                 "namespace": "test",
                 "resourceVersion": "10"
@@ -1457,7 +1456,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "apiVersion": "v1",
             "kind": "Pod",
             "metadata": {
-                "creationTimestamp": null,
                 "name": "bar",
                 "namespace": "test",
                 "resourceVersion": "11"
@@ -1476,7 +1474,6 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "creationTimestamp": null,
                 "name": "baz",
                 "namespace": "test",
                 "resourceVersion": "12"
@@ -2367,10 +2364,10 @@ DELETED    test        pod/foo   0/0              0          <unknown>   <none> 
 		},
 		{
 			format: "json",
-			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
-{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"creationTimestamp":null,"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+			expected: `{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"bar","namespace":"test","resourceVersion":"9"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"ADDED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"MODIFIED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
+{"type":"DELETED","object":{"apiVersion":"v1","kind":"Pod","metadata":{"name":"foo","namespace":"test","resourceVersion":"12"},"spec":{"containers":null,"dnsPolicy":"ClusterFirst","enableServiceLinks":true,"restartPolicy":"Always","securityContext":{},"terminationGracePeriodSeconds":30},"status":{}}}
 `,
 		},
 		{
@@ -2379,7 +2376,6 @@ DELETED    test        pod/foo   0/0              0          <unknown>   <none> 
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: bar
     namespace: test
     resourceVersion: "9"
@@ -2397,7 +2393,6 @@ object:
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: foo
     namespace: test
     resourceVersion: "10"
@@ -2415,7 +2410,6 @@ object:
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: foo
     namespace: test
     resourceVersion: "11"
@@ -2433,7 +2427,6 @@ object:
   apiVersion: v1
   kind: Pod
   metadata:
-    creationTimestamp: null
     name: foo
     namespace: test
     resourceVersion: "12"

@@ -13,7 +13,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -34,4 +34,8 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace k8s.io/apimachinery => ../apimachinery
+replace (
+	github.com/fxamacker/cbor/v2 => github.com/liggitt/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
+	k8s.io/apimachinery => ../apimachinery
+	sigs.k8s.io/structured-merge-diff/v4 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f
+)

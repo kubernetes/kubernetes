@@ -8,7 +8,7 @@ godebug default=go1.24
 
 require (
 	github.com/emicklei/go-restful/v3 v3.11.0
-	github.com/fxamacker/cbor/v2 v2.7.0
+	github.com/fxamacker/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cel-go v0.23.2
 	github.com/google/gnostic-models v0.6.9
@@ -128,6 +128,7 @@ require (
 )
 
 replace (
+	github.com/fxamacker/cbor/v2 => github.com/liggitt/cbor/v2 v2.7.1-0.20250325215552-cbc35b210c8b
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver
@@ -135,4 +136,5 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
+	sigs.k8s.io/structured-merge-diff/v4 => github.com/liggitt/structured-merge-diff/v4 v4.0.3-0.20250325003739-0e97094ebf2f
 )
