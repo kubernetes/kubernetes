@@ -18,12 +18,9 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
-
-	"k8s.io/klog/v2"
-
-	"fmt"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +35,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	jws "k8s.io/cluster-bootstrap/token/jws"
+	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
