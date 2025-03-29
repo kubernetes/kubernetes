@@ -264,8 +264,10 @@ func NewDisruptionControllerInternal(ctx context.Context,
 // way to take advantage of listers with scale subresources, we use the workload
 // resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet, dc.getScaleController}
+	return []podControllerFinder{
+		dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
+		dc.getPodStatefulSet, dc.getScaleController,
+	}
 }
 
 var (
@@ -644,7 +646,7 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:stylecheck
+	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:staticcheck
 	dc.queue.AddRateLimited(dKey)
 
 	return true
@@ -987,8 +989,8 @@ func (dc *DisruptionController) failSafe(ctx context.Context, pdb *policy.PodDis
 }
 
 func (dc *DisruptionController) updatePdbStatus(ctx context.Context, pdb *policy.PodDisruptionBudget, currentHealthy, desiredHealthy, expectedCount int32,
-	disruptedPods map[string]metav1.Time) error {
-
+	disruptedPods map[string]metav1.Time,
+) error {
 	// We require expectedCount to be > 0 so that PDBs which currently match no
 	// pods are in a safe state when their first pods appear but this controller
 	// has not updated their status yet.  This isn't the only race, but it's a
