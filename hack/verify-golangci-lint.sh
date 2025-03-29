@@ -121,7 +121,7 @@ done
 
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
-GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/cmd/golangci-lint
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 if [ "${golangci_config}" ]; then
   # This cannot be used without a config.
   # This uses `go build` because `go install -buildmode=plugin` doesn't work
