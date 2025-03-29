@@ -17,10 +17,8 @@ limitations under the License.
 package operation
 
 import (
-	"strings"
 	"slices"
-
-	"k8s.io/apimachinery/pkg/util/sets"
+	"strings"
 )
 
 // Operation provides contextual information about a validation request and the API
