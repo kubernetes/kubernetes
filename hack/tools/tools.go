@@ -21,7 +21,7 @@ package tools
 import (
 	// linting tools
 	_ "github.com/aojea/sloppy-netparser"
-	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
 	_ "github.com/golangci/misspell"
 	_ "github.com/jcchavezs/porto/cmd/porto"
 	_ "honnef.co/go/tools/cmd/staticcheck"

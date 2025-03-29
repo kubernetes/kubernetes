@@ -300,17 +300,17 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	for _, i := range filteredInputs {
 		klog.V(3).Infof("considering pkg %q", i)
 		pkg := context.Universe[i]
-		// typesPkg is where the versioned types are defined. Sometimes it is
-		// different from pkg. For example, kubernetes core/v1 types are defined
-		// in k8s.io/api/core/v1, while pkg is at pkg/api/v1.
-		typesPkg := pkg
 
 		// Add conversion and defaulting functions.
 		getManualConversionFunctions(context, pkg, manualConversions)
 
 		// Find the right input pkg, which might not be this one.
 		externalTypes := pkgToExternal[i]
-		typesPkg = context.Universe[externalTypes]
+
+		// typesPkg is where the versioned types are defined. Sometimes it is
+		// different from pkg. For example, kubernetes core/v1 types are defined
+		// in k8s.io/api/core/v1, while pkg is at pkg/api/v1.
+		typesPkg := context.Universe[externalTypes]
 
 		unsafeEquality := TypesEqual(memoryEquivalentTypes)
 		if args.SkipUnsafe {

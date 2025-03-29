@@ -264,8 +264,10 @@ func NewDisruptionControllerInternal(ctx context.Context,
 // way to take advantage of listers with scale subresources, we use the workload
 // resources directly and only fall back to the scale subresource when needed.
 func (dc *DisruptionController) finders() []podControllerFinder {
-	return []podControllerFinder{dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
-		dc.getPodStatefulSet, dc.getScaleController}
+	return []podControllerFinder{
+		dc.getPodReplicationController, dc.getPodDeployment, dc.getPodReplicaSet,
+		dc.getPodStatefulSet, dc.getScaleController,
+	}
 }
 
 var (
@@ -644,7 +646,7 @@ func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing PodDisruptionBudget %v, requeuing: %w", dKey, err)) //nolint:stylecheck
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing PodDisruptionBudget, requeuing", "key", dKey)
 	dc.queue.AddRateLimited(dKey)
 
 	return true
