@@ -49,7 +49,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			errs = append(errs, func() field.ErrorList {
-				if op.Options.Has("FeatureX") {
+				if op.HasOption("FeatureX") {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.XEnabledField")
 				} else {
 					return nil // skip validation
@@ -62,7 +62,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			errs = append(errs, func() field.ErrorList {
-				if !op.Options.Has("FeatureX") {
+				if !op.HasOption("FeatureX") {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.XDisabledField")
 				} else {
 					return nil // skip validation
@@ -75,7 +75,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			errs = append(errs, func() field.ErrorList {
-				if op.Options.Has("FeatureY") {
+				if op.HasOption("FeatureY") {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.YEnabledField")
 				} else {
 					return nil // skip validation
@@ -88,7 +88,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			errs = append(errs, func() field.ErrorList {
-				if !op.Options.Has("FeatureY") {
+				if !op.HasOption("FeatureY") {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.YDisabledField")
 				} else {
 					return nil // skip validation
@@ -101,14 +101,14 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			errs = append(errs, func() field.ErrorList {
-				if !op.Options.Has("FeatureY") {
+				if !op.HasOption("FeatureY") {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.XYMixedField/Y")
 				} else {
 					return nil // skip validation
 				}
 			}()...)
 			errs = append(errs, func() field.ErrorList {
-				if op.Options.Has("FeatureX") {
+				if op.HasOption("FeatureX") {
 					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.XYMixedField/X")
 				} else {
 					return nil // skip validation

@@ -18,8 +18,6 @@ package options
 
 import (
 	"testing"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func Test(t *testing.T) {
@@ -36,7 +34,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts(sets.New("FeatureX", "FeatureY")).ExpectRegexpsByPath(map[string][]string{
+	}).Opts([]string{"FeatureX", "FeatureY"}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionEnabled validations should trigger
 		"xEnabledField": []string{"field Struct.XEnabledField"},
 		"yEnabledField": []string{"field Struct.YEnabledField"},
@@ -45,7 +43,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts(sets.New("FeatureX")).ExpectRegexpsByPath(map[string][]string{
+	}).Opts([]string{"FeatureX"}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionEnabled validations should trigger
 		"xEnabledField":  []string{"field Struct.XEnabledField"},
 		"yDisabledField": []string{"field Struct.YDisabledField"},
@@ -56,7 +54,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{
 		// All zero values
-	}).Opts(sets.New("FeatureY")).ExpectRegexpsByPath(map[string][]string{
+	}).Opts([]string{"FeatureY"}).ExpectRegexpsByPath(map[string][]string{
 		// All ifOptionEnabled validations should trigger
 		"xDisabledField": []string{"field Struct.XDisabledField"},
 		"yEnabledField":  []string{"field Struct.YEnabledField"},
