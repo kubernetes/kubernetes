@@ -201,12 +201,13 @@ func (o TopNodeOptions) RunTopNode() error {
 			availableResources[n.Name] = n.Status.Capacity
 		}
 
-		swapCapacity := int64(0)
 		if n.Status.NodeInfo.Swap != nil && n.Status.NodeInfo.Swap.Capacity != nil {
-			swapCapacity = *n.Status.NodeInfo.Swap.Capacity
+			swapCapacity := *n.Status.NodeInfo.Swap.Capacity
+			availableResources[n.Name]["swap"] = *resource.NewQuantity(swapCapacity, resource.BinarySI)
+		} else {
+			o.Printer.RegisterMissingResource(n.Name, metricsutil.ResourceSwap)
 		}
 
-		availableResources[n.Name]["swap"] = *resource.NewQuantity(swapCapacity, resource.BinarySI)
 	}
 
 	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy)
