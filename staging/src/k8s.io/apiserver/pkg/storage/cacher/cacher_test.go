@@ -176,50 +176,34 @@ func TestListPaging(t *testing.T) {
 	storagetesting.RunTestListPaging(ctx, t, cacher)
 }
 
-func TestList(t *testing.T) {
+func TestLists(t *testing.T) {
 	for _, consistentRead := range []bool{true, false} {
-		t.Run(fmt.Sprintf("ConsistentListFromCache=%v", consistentRead), func(t *testing.T) {
-			for _, listFromCacheSnapshot := range []bool{true, false} {
-				t.Run(fmt.Sprintf("ListFromCacheSnapsthot=%v", listFromCacheSnapshot), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
+		for _, listFromCacheSnapshot := range []bool{true, false} {
+			t.Run(fmt.Sprintf("ConsistentListFromCache=%v,ListFromCacheSnapshot=%v", consistentRead, listFromCacheSnapshot), func(t *testing.T) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
+				t.Run("List", func(t *testing.T) {
+					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
 					storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), true)
 				})
-			}
-		})
-	}
-}
-func TestConsistentList(t *testing.T) {
-	for _, consistentRead := range []bool{true, false} {
-		t.Run(fmt.Sprintf("ConsistentListFromCache=%v", consistentRead), func(t *testing.T) {
-			for _, listFromCacheSnapshot := range []bool{true, false} {
-				t.Run(fmt.Sprintf("ListFromCacheSnapsthot=%v", listFromCacheSnapshot), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
+
+				t.Run("ConsistentList", func(t *testing.T) {
+					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
 					storagetesting.RunTestConsistentList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, consistentRead, listFromCacheSnapshot)
 				})
-			}
-		})
-	}
-}
 
-func TestGetListNonRecursive(t *testing.T) {
-	for _, consistentRead := range []bool{true, false} {
-		t.Run(fmt.Sprintf("ConsistentListFromCache=%v", consistentRead), func(t *testing.T) {
-			for _, listFromCacheSnapshot := range []bool{true, false} {
-				t.Run(fmt.Sprintf("ListFromCacheSnapsthot=%v", listFromCacheSnapshot), func(t *testing.T) {
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, listFromCacheSnapshot)
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, consistentRead)
+				t.Run("GetListNonRecursive", func(t *testing.T) {
+					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
 					storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(server.V3Client.Client), cacher)
 				})
-			}
-		})
+			})
+		}
 	}
 }
 
