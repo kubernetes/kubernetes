@@ -1,22 +1,22 @@
 package e2e
 
-//go:generate go run -mod vendor ./annotate/cmd -- ./annotate/generated/zz_generated.annotations.go
-
 // This file duplicates most of test/e2e/e2e_test.go but limits the included
 // tests (via include.go) to tests that are relevant to openshift.
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
+	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"gopkg.in/yaml.v2"
-
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
@@ -35,9 +35,6 @@ import (
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
 	"k8s.io/kubernetes/test/utils/image"
-
-	// Ensure test annotation
-	"k8s.io/kubernetes/openshift-hack/e2e/annotate/generated"
 )
 
 func TestMain(m *testing.M) {
@@ -109,17 +106,43 @@ func TestMain(m *testing.M) {
 }
 
 func TestE2E(t *testing.T) {
-	// TODO(soltysh): this is raw copy from end of openshift-hack/e2e/annotate/generated/zz_generated.annotations.go
-	// https://issues.redhat.com/browse/OCPBUGS-25641
+	// In order to properly skip tests, we must add the labels that the OTE external binary supplies to the test name
+	// This will then be used by Ginkgo to skip specific tests
+	oteCmd := exec.Command("k8s-tests-ext", "list", "tests")
+	// We can't have OTE also add annotations to the spec names to map to labels, or they won't match the actual spec names
+	//TODO(sgoeddel): once annotation logic is removed, this can be as well
+	oteCmd.Env = append(oteCmd.Env, "OMIT_ANNOTATIONS=true")
+	oteCmd.Stderr = os.Stderr
+	output, err := oteCmd.Output()
+	if err != nil {
+		t.Fatalf("Error running ote list tests command: %v", err)
+	}
+	var specs et.ExtensionTestSpecs
+	if err = json.Unmarshal(output, &specs); err != nil {
+		t.Fatalf("Error parsing ote list tests output: %v", err)
+	}
+
+	nameToLabels := make(map[string][]string, len(specs))
+	for _, spec := range specs {
+		nameToLabels[spec.Name] = spec.Labels.UnsortedList()
+	}
+
 	ginkgo.GetSuite().SetAnnotateFn(func(name string, node types.TestSpec) {
-		if newLabels, ok := generated.Annotations[name]; ok {
-			node.AppendText(newLabels)
+		if newLabels, ok := nameToLabels[name]; ok {
+			for _, label := range newLabels {
+				// Only add the label to the name if it isn't already present to avoid test names that are too long
+				if !strings.Contains(name, label) {
+					node.AppendText(fmt.Sprintf(" %s", label))
+				}
+			}
 		} else {
-			panic(fmt.Sprintf("unable to find test %s", name))
+			// If the name isn't found in the mapping, it is because the test has been disabled via OTE
+			node.AppendText(" [Disabled:missing]")
 		}
 		if strings.Contains(name, "Kubectl client Kubectl prune with applyset should apply and prune objects") {
 			fmt.Printf("Trying to annotate %q\n", name)
 		}
+
 	})
 
 	e2e.RunE2ETests(t)

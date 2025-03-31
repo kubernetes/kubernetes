@@ -1,6 +1,10 @@
 package main
 
-import et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+import (
+	"fmt"
+
+	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+)
 
 // addEnvironmentSelectors adds the environmentSelector field to appropriate specs to facilitate including or excluding
 // them based on attributes of the cluster they are running on
@@ -16,11 +20,11 @@ func addEnvironmentSelectors(specs et.ExtensionTestSpecs) {
 	specs.SelectAny([]et.SelectFunction{ // Since these must use "NameContainsAll" they cannot be included in filterByPlatform
 		et.NameContainsAll("[sig-network] LoadBalancers [Feature:LoadBalancer]", "UDP"),
 		et.NameContainsAll("[sig-network] LoadBalancers [Feature:LoadBalancer]", "session affinity"),
-	}).Exclude(et.PlatformEquals("aws"))
+	}).Exclude(et.PlatformEquals("aws")).AddLabel("[Skipped:aws]")
 
 	specs.SelectAny([]et.SelectFunction{ // Since these must use "NameContainsAll" they cannot be included in filterByNetwork
 		et.NameContainsAll("NetworkPolicy", "named port"),
-	}).Exclude(et.NetworkEquals("OVNKubernetes"))
+	}).Exclude(et.NetworkEquals("OVNKubernetes")).AddLabel("[Skipped:Network/OVNKubernetes]")
 }
 
 // filterByPlatform is a helper function to do, simple, "NameContains" filtering on tests by platform
@@ -127,7 +131,9 @@ func filterByPlatform(specs et.ExtensionTestSpecs) {
 			selectFunctions = append(selectFunctions, et.NameContains(exclusion))
 		}
 
-		specs.SelectAny(selectFunctions).Exclude(et.PlatformEquals(platform))
+		specs.SelectAny(selectFunctions).
+			Exclude(et.PlatformEquals(platform)).
+			AddLabel(fmt.Sprintf("[Skipped:%s]", platform))
 	}
 }
 
@@ -169,7 +175,9 @@ func filterByExternalConnectivity(specs et.ExtensionTestSpecs) {
 			selectFunctions = append(selectFunctions, et.NameContains(exclusion))
 		}
 
-		specs.SelectAny(selectFunctions).Exclude(et.ExternalConnectivityEquals(externalConnectivity))
+		specs.SelectAny(selectFunctions).
+			Exclude(et.ExternalConnectivityEquals(externalConnectivity)).
+			AddLabel(fmt.Sprintf("[Skipped:%s]", externalConnectivity))
 	}
 }
 
@@ -198,7 +206,9 @@ func filterByTopology(specs et.ExtensionTestSpecs) {
 			selectFunctions = append(selectFunctions, et.NameContains(exclusion))
 		}
 
-		specs.SelectAny(selectFunctions).Exclude(et.TopologyEquals(topology))
+		specs.SelectAny(selectFunctions).
+			Exclude(et.TopologyEquals(topology)).
+			AddLabel(fmt.Sprintf("[Skipped:%s]", topology))
 	}
 }
 
@@ -217,7 +227,9 @@ func filterByNoOptionalCapabilities(specs et.ExtensionTestSpecs) {
 	for _, exclusion := range exclusions {
 		selectFunctions = append(selectFunctions, et.NameContains(exclusion))
 	}
-	specs.SelectAny(selectFunctions).Exclude(et.NoOptionalCapabilitiesExist())
+	specs.SelectAny(selectFunctions).
+		Exclude(et.NoOptionalCapabilitiesExist()).
+		AddLabel("[Skipped:NoOptionalCapabilities]")
 }
 
 // filterByNetwork is a helper function to do, simple, "NameContains" filtering on tests by network
@@ -230,6 +242,8 @@ func filterByNetwork(specs et.ExtensionTestSpecs) {
 			selectFunctions = append(selectFunctions, et.NameContains(exclusion))
 		}
 
-		specs.SelectAny(selectFunctions).Exclude(et.NetworkEquals(network))
+		specs.SelectAny(selectFunctions).
+			Exclude(et.NetworkEquals(network)).
+			AddLabel(fmt.Sprintf("[Skipped:%s]", network))
 	}
 }

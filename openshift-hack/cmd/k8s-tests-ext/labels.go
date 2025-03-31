@@ -7,7 +7,7 @@ import (
 func addLabelsToSpecs(specs et.ExtensionTestSpecs) {
 	var namesByLabel = map[string][]string{
 		// tests too slow to be part of conformance
-		"Slow": {
+		"[Slow]": {
 			"[sig-scalability]",                            // disable from the default set for now
 			"should create and stop a working application", // Inordinately slow tests
 
@@ -16,13 +16,13 @@ func addLabelsToSpecs(specs et.ExtensionTestSpecs) {
 			"validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP", // 5m, really?
 		},
 		// tests that are known flaky
-		"Flaky": {
+		"[Flaky]": {
 			"Job should run a job to completion when tasks sometimes fail and are not locally restarted", // seems flaky, also may require too many resources
 			// TODO(node): test works when run alone, but not in the suite in CI
 			"[Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] ReplicationController light Should scale from 1 pod to 2 pods",
 		},
 		// tests that must be run without competition
-		"Serial": {
+		"[Serial]": {
 			"[Disruptive]",
 			"[Feature:Performance]", // requires isolation
 
