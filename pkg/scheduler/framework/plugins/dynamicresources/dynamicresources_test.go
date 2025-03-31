@@ -198,7 +198,7 @@ var (
 	bindingTimeout           = int64(15)
 
 	fabricSlice = func() *resourceapi.ResourceSlice {
-		res := st.MakeResourceSlice(nodeName, driver).Device("instance-1", nil).Obj()
+		res := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
 		res.Spec.Devices[0].Basic.UsageRestrictedToNode = ptr.To(true)
 		res.Spec.Devices[0].Basic.BindingConditions = bindingConditions
 		res.Spec.Devices[0].Basic.BindingFailureConditions = bindingFailureConditions
@@ -420,6 +420,8 @@ func TestPlugin(t *testing.T) {
 		enableDRAAdminAccess bool
 		// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
 		enableDRADeviceBindingConditions bool
+		// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
+		enableDRAResourceClaimDeviceStatus bool
 		// Feature gates. False is chosen so that the uncommon case
 		// doesn't need to be set.
 		disableDRA bool
@@ -1041,9 +1043,10 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"bound-claim-with-successed-binding-conditions": {
-			pod:                              podWithClaimName,
-			claims:                           []*resourceapi.ResourceClaim{boundClaim},
-			enableDRADeviceBindingConditions: true,
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{boundClaim},
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
 			want: want{
 				prebind: result{
 					changes: change{
@@ -1057,10 +1060,11 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"bound-claim-with-failed-binding": {
-			pod:                              podWithClaimName,
-			claims:                           []*resourceapi.ResourceClaim{failedBindingClaim},
-			objs:                             []apiruntime.Object{workerNodeSlice},
-			enableDRADeviceBindingConditions: true,
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{failedBindingClaim},
+			objs:                               []apiruntime.Object{workerNodeSlice},
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
@@ -1081,12 +1085,13 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 		"binding-conditions-with-timeout": {
-			pod:                              podWithClaimName,
-			claims:                           []*resourceapi.ResourceClaim{claim},
-			classes:                          []*resourceapi.DeviceClass{deviceClass},
-			nodes:                            []*v1.Node{workerNode},
-			objs:                             []apiruntime.Object{fabricSlice},
-			enableDRADeviceBindingConditions: true,
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{claim},
+			classes:                            []*resourceapi.DeviceClass{deviceClass},
+			nodes:                              []*v1.Node{workerNode},
+			objs:                               []apiruntime.Object{fabricSlice},
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
 			want: want{
 				reserve: result{
 					inFlightClaim: st.FromResourceClaim(claim).
@@ -1125,11 +1130,12 @@ func TestPlugin(t *testing.T) {
 				nodes = []*v1.Node{workerNode}
 			}
 			features := feature.Features{
-				EnableDRAAdminAccess:             tc.enableDRAAdminAccess,
-				EnableDRADeviceBindingConditions: tc.enableDRADeviceBindingConditions,
-				EnableDRADeviceTaints:            tc.enableDRADeviceTaints,
-				EnableDynamicResourceAllocation:  !tc.disableDRA,
-				EnableDRAPrioritizedList:         tc.enableDRAPrioritizedList,
+				EnableDRAAdminAccess:               tc.enableDRAAdminAccess,
+				EnableDRADeviceBindingConditions:   tc.enableDRADeviceBindingConditions,
+				EnableDRAResourceClaimDeviceStatus: tc.enableDRAResourceClaimDeviceStatus,
+				EnableDRADeviceTaints:              tc.enableDRADeviceTaints,
+				EnableDynamicResourceAllocation:    !tc.disableDRA,
+				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
