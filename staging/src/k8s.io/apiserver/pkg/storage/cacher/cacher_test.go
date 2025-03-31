@@ -224,7 +224,8 @@ func TestGetListNonRecursive(t *testing.T) {
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
-	ctx, store, _ := testSetup(t)
+	ctx, store, terminate := testSetup(t)
+	t.Cleanup(terminate)
 	storagetesting.RunTestGetListRecursivePrefix(ctx, t, store)
 }
 
