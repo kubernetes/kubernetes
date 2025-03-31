@@ -1186,7 +1186,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			prefix:       "/pods/empty",
 			pred:         storage.Everything,
 			rv:           "0",
-			expectRVFunc: resourceVersionNotOlderThan(list.ResourceVersion),
+			expectRVFunc: resourceVersionNotOlderThan(initialRV),
 			expectedOut:  []example.Pod{},
 		},
 		// match=Exact
