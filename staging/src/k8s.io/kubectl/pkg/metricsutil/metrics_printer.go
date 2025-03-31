@@ -19,6 +19,7 @@ package metricsutil
 import (
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 
 	"k8s.io/api/core/v1"
@@ -32,7 +33,7 @@ var (
 	PodColumn       = "POD"
 )
 
-const resourceSwap = "swap"
+const ResourceSwap = "swap"
 
 type ResourceMetricsInfo struct {
 	Name      string
@@ -45,6 +46,8 @@ type TopCmdPrinter struct {
 	measuredResources []v1.ResourceName
 	nodeColumns       []string
 	podColumns        []string
+	// a map from a node name to its missing resources
+	nodesMissingResources map[string][]string
 }
 
 func NewTopCmdPrinter(out io.Writer, showSwap bool) *TopCmdPrinter {
@@ -54,12 +57,13 @@ func NewTopCmdPrinter(out io.Writer, showSwap bool) *TopCmdPrinter {
 			v1.ResourceCPU,
 			v1.ResourceMemory,
 		},
-		nodeColumns: []string{"NAME", "CPU(cores)", "CPU(%)", "MEMORY(bytes)", "MEMORY(%)"},
-		podColumns:  []string{"NAME", "CPU(cores)", "MEMORY(bytes)"},
+		nodeColumns:           []string{"NAME", "CPU(cores)", "CPU(%)", "MEMORY(bytes)", "MEMORY(%)"},
+		podColumns:            []string{"NAME", "CPU(cores)", "MEMORY(bytes)"},
+		nodesMissingResources: make(map[string][]string),
 	}
 
 	if showSwap {
-		printer.measuredResources = append(printer.measuredResources, resourceSwap)
+		printer.measuredResources = append(printer.measuredResources, ResourceSwap)
 		printer.nodeColumns = append(printer.nodeColumns, "SWAP(bytes)", "SWAP(%)")
 		printer.podColumns = append(printer.podColumns, "SWAP(bytes)")
 	}
@@ -141,6 +145,13 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	return nil
 }
 
+func (printer *TopCmdPrinter) RegisterMissingResource(nodeName, resourceName string) {
+	if slices.Contains(printer.nodesMissingResources[nodeName], resourceName) {
+		return
+	}
+	printer.nodesMissingResources[nodeName] = append(printer.nodesMissingResources[nodeName], resourceName)
+}
+
 func printColumnNames(out io.Writer, names []string) {
 	for _, name := range names {
 		printValue(out, name)
@@ -212,6 +223,11 @@ func printValue(out io.Writer, value interface{}) {
 
 func (printer *TopCmdPrinter) printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo, measuredResources []v1.ResourceName) {
 	for _, res := range measuredResources {
+		if missingResources, found := printer.nodesMissingResources[metrics.Name]; found && slices.Contains(missingResources, string(res)) {
+			printSingleMissingResource(out)
+			continue
+		}
+
 		quantity := metrics.Metrics[res]
 		printSingleResourceUsage(out, res, quantity)
 		fmt.Fprint(out, "\t")
@@ -229,11 +245,16 @@ func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quant
 	switch resourceType {
 	case v1.ResourceCPU:
 		fmt.Fprintf(out, "%vm", quantity.MilliValue())
-	case v1.ResourceMemory, resourceSwap:
+	case v1.ResourceMemory, ResourceSwap:
 		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
+}
+
+func printSingleMissingResource(out io.Writer) {
+	const unavailableStr = "<unknown>"
+	_, _ = fmt.Fprintf(out, "%s\t%s\t", unavailableStr, unavailableStr)
 }
 
 func (printer *TopCmdPrinter) printPodResourcesSum(out io.Writer, total v1.ResourceList, columnWidth int, measuredResources []v1.ResourceName) {
