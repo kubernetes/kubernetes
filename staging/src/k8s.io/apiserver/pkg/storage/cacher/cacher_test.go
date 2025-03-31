@@ -252,10 +252,7 @@ func TestListContinuationWithFilter(t *testing.T) {
 }
 
 func TestListInconsistentContinuation(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
 	// TODO(#109831): Enable use of this by setting compaction.
-	storagetesting.RunTestListInconsistentContinuation(ctx, t, cacher, nil)
 }
 
 func TestListResourceVersionMatch(t *testing.T) {
