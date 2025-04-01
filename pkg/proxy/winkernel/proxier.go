@@ -535,6 +535,11 @@ func (ep *endpointInfo) DecrementRefCount() {
 	if !ep.IsLocal() && ep.refCount != nil && *ep.refCount > 0 {
 		*ep.refCount--
 	}
+	refCount := 0
+	if ep.refCount != nil {
+		refCount = int(*ep.refCount)
+	}
+	klog.V(5).InfoS("Endpoint RefCount after decrement.", "endpointInfo", ep, "refCount", refCount)
 }
 
 func (ep *endpointInfo) Cleanup() {
@@ -1770,10 +1775,14 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// remove stale endpoint refcount entries
 	for epIP := range proxier.terminatedEndpoints {
-		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" {
+		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
+		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
 			if refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID); refCount == nil || *refCount == 0 {
-				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID)
-				proxier.hns.deleteEndpoint(epToDelete.hnsID)
+				klog.V(3).InfoS("Deleting unreferenced remote endpoint", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
+				err := proxier.hns.deleteEndpoint(epToDelete.hnsID)
+				if err != nil {
+					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
+				}
 			}
 		}
 	}
