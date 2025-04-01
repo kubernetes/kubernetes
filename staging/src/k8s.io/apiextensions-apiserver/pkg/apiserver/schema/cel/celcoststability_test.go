@@ -121,7 +121,7 @@ func TestCelCostStability(t *testing.T) {
 				"self.val1.lowerAscii() == self.val1.lowerAscii()": 10,
 				// strings version 2
 				"'%d %s %f %s %s'.format([1, 'abc', 1.0, duration('1m'), timestamp('2000-01-01T00:00:00.000Z')]) == '1 abc 1.000000 60s 2000-01-01T00:00:00Z'": 6,
-				"'%e'.format([3.14]) == '3.140000 × 10⁰⁰'":        3,
+				"'%e'.format([3.14]) == '3.140000×10⁰⁰'":          3,
 				"'%o %o %o'.format([7, 8, 9]) == '7 10 11'":       2,
 				"'%b %b %b'.format([7, 8, 9]) == '111 1000 1001'": 3,
 			},

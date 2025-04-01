@@ -3070,6 +3070,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize cacher: %v", err)
 			}
+			defer cacher.Stop()
 
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 				if err := cacher.ready.wait(context.TODO()); err != nil {

@@ -13,7 +13,7 @@ func fillNetHTTPServerConfig(conf *http2Config, srv *http.Server) {
 	fillNetHTTPConfig(conf, srv.HTTP2)
 }
 
-// fillNetHTTPServerConfig sets fields in conf from tr.HTTP2.
+// fillNetHTTPTransportConfig sets fields in conf from tr.HTTP2.
 func fillNetHTTPTransportConfig(conf *http2Config, tr *http.Transport) {
 	fillNetHTTPConfig(conf, tr.HTTP2)
 }

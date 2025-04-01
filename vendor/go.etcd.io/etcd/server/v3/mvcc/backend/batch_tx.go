@@ -310,6 +310,7 @@ func (t *batchTxBuffered) Unlock() {
 		t.backend.readTx.Lock() // blocks txReadBuffer for writing.
 		// gofail: var beforeWritebackBuf struct{}
 		t.buf.writeback(&t.backend.readTx.buf)
+		// gofail: var afterWritebackBuf struct{}
 		t.backend.readTx.Unlock()
 		// We commit the transaction when the number of pending operations
 		// reaches the configured limit(batchLimit) to prevent it from
@@ -359,7 +360,9 @@ func (t *batchTxBuffered) commit(stop bool) {
 
 func (t *batchTxBuffered) unsafeCommit(stop bool) {
 	if t.backend.hooks != nil {
+		// gofail: var commitBeforePreCommitHook struct{}
 		t.backend.hooks.OnPreCommitUnsafe(t)
+		// gofail: var commitAfterPreCommitHook struct{}
 	}
 	if t.backend.readTx.tx != nil {
 		// wait all store read transactions using the current boltdb tx to finish,

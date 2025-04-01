@@ -1186,7 +1186,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			prefix:       "/pods/empty",
 			pred:         storage.Everything,
 			rv:           "0",
-			expectRVFunc: resourceVersionNotOlderThan(list.ResourceVersion),
+			expectRVFunc: resourceVersionNotOlderThan(initialRV),
 			expectedOut:  []example.Pod{},
 		},
 		// match=Exact
@@ -2420,10 +2420,6 @@ type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
 type IncreaseRVFunc func(ctx context.Context, t *testing.T)
 
 func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
-	if compaction == nil {
-		t.Skipf("compaction callback not provided")
-	}
-
 	// Setup storage with the following structure:
 	//  /
 	//   - first/
