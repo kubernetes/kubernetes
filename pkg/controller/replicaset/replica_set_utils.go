@@ -61,7 +61,7 @@ func updateReplicaSetStatus(logger klog.Logger, c appsclient.ReplicaSetInterface
 	var updatedRS *apps.ReplicaSet
 	for i, rs := 0, rs; ; i++ {
 		terminatingReplicasUpdateInfo := ""
-		if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
 			terminatingReplicasUpdateInfo = fmt.Sprintf("terminatingReplicas %s->%s, ", derefInt32ToStr(rs.Status.TerminatingReplicas), derefInt32ToStr(newStatus.TerminatingReplicas))
 		}
 		logger.V(4).Info(fmt.Sprintf("Updating status for %v: %s/%s, ", rs.Kind, rs.Namespace, rs.Name) +
@@ -116,7 +116,7 @@ func calculateStatus(rs *apps.ReplicaSet, activePods []*v1.Pod, terminatingPods 
 	}
 
 	var terminatingReplicasCount *int32
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
 		terminatingReplicasCount = ptr.To(int32(len(terminatingPods)))
 	}
 

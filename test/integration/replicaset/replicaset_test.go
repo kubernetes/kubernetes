@@ -1072,7 +1072,7 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 }
 
 func TestTerminatingReplicas(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, false)
 
 	tCtx, closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
@@ -1108,7 +1108,7 @@ func TestTerminatingReplicas(t *testing.T) {
 	}
 
 	// should update terminating pods when feature gate is enabled
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, true)
 	if err := podClient.Delete(tCtx, pods.Items[1].Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -1125,7 +1125,7 @@ func TestTerminatingReplicas(t *testing.T) {
 	}
 
 	// should revert terminating pods to 0 when feature gate is disabled
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentPodReplacementPolicy, false)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, false)
 	if err := podClient.Delete(tCtx, pods.Items[2].Name, metav1.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}

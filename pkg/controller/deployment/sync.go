@@ -506,7 +506,7 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 		UnavailableReplicas: unavailableReplicas,
 		CollisionCount:      deployment.Status.CollisionCount,
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentPodReplacementPolicy) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
 		status.TerminatingReplicas = deploymentutil.GetTerminatingReplicaCountForReplicaSets(allRSs)
 	}
 

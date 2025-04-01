@@ -610,7 +610,7 @@
             "type": "integer"
           },
           "terminatingReplicas": {
-            "description": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
+            "description": "Total number of terminating pods targeted by this deployment. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.",
             "format": "int32",
             "type": "integer"
           },
@@ -858,7 +858,7 @@
             "type": "integer"
           },
           "terminatingReplicas": {
-            "description": "The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.",
+            "description": "The number of terminating pods for this replica set. Terminating pods have a non-null .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.\n\nThis is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.",
             "format": "int32",
             "type": "integer"
           }
