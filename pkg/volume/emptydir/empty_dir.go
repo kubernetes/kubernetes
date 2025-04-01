@@ -48,7 +48,7 @@ import (
 //
 // https://issue.k8s.io/2630
 var defaultPerm os.FileMode = 0777
-var stickyBitPerm os.FileMode = 01777
+var stickyBitMode os.FileMode = 01000
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
@@ -459,12 +459,9 @@ func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error
 
 // setupDir creates the directory with the default permissions specified by the perm constant.
 func (ed *emptyDir) setupDir(dir string) error {
-	var perm os.FileMode
-
+	var perm os.FileMode = defaultPerm
 	if ed.stickyBit {
-		perm = os.FileMode(stickyBitPerm)
-	} else {
-		perm = os.FileMode(defaultPerm)
+		perm = perm | stickyBitMode
 	}
 
 	// Create the directory if it doesn't already exist.

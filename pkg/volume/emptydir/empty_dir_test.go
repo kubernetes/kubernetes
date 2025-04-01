@@ -1218,12 +1218,12 @@ func TestSetupDirStickyBit(t *testing.T) {
 		{
 			name:      "with sticky bit",
 			stickyBit: true,
-			wantPerm:  os.FileMode(stickyBitPerm),
+			wantPerm:  01777,
 		},
 		{
 			name:      "without sticky bit",
 			stickyBit: false,
-			wantPerm:  os.FileMode(defaultPerm),
+			wantPerm:  0777,
 		},
 	}
 
