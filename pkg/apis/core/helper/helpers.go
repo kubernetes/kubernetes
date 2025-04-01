@@ -372,25 +372,11 @@ func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.Persi
 }
 
 func ClaimContainsAllocatedResources(pvc *core.PersistentVolumeClaim) bool {
-	if pvc == nil {
-		return false
-	}
-
-	if pvc.Status.AllocatedResources != nil {
-		return true
-	}
-	return false
+	return pvc != nil && pvc.Status.AllocatedResources != nil
 }
 
 func ClaimContainsAllocatedResourceStatus(pvc *core.PersistentVolumeClaim) bool {
-	if pvc == nil {
-		return false
-	}
-
-	if pvc.Status.AllocatedResourceStatuses != nil {
-		return true
-	}
-	return false
+	return pvc != nil && pvc.Status.AllocatedResourceStatuses != nil
 }
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations
@@ -474,12 +460,12 @@ func GetPersistentVolumeClaimClass(claim *core.PersistentVolumeClaim) string {
 
 // PersistentVolumeClaimHasClass returns true if given claim has set StorageClassName field.
 func PersistentVolumeClaimHasClass(claim *core.PersistentVolumeClaim) bool {
-	// Use beta annotation first
-	if _, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
+	// Use StorageClassName field first
+	if claim.Spec.StorageClassName != nil {
 		return true
 	}
 
-	if claim.Spec.StorageClassName != nil {
+	if _, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
 		return true
 	}
 
