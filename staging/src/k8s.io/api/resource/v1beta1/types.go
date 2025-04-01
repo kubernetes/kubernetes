@@ -344,7 +344,7 @@ type BasicDevice struct {
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
 	// +optional
-	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,4,opt,name=usageRestrictedToNode"`
+	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,8,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions defines the conditions for proceeding with binding.
 	// All of these conditions must be set in the per-device status
@@ -354,7 +354,7 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +listType=atomic
-	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,5,rep,name=bindingConditions"`
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,9,rep,name=bindingConditions"`
 
 	// BindingFailureConditions defines the conditions for binding failure.
 	// They may be set in the per-device status conditions.
@@ -363,7 +363,7 @@ type BasicDevice struct {
 	//
 	// +optional
 	// +listType=atomic
-	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,6,rep,name=bindingFailureConditions"`
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,10,rep,name=bindingFailureConditions"`
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
 	// If the timeout period is exceeded before all BindingConditions reach a True state,
@@ -372,7 +372,7 @@ type BasicDevice struct {
 	// The default timeout if not set is 600 seconds.
 	//
 	// +optional
-	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,7,opt,name=bindingTimeoutSeconds"`
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,11,opt,name=bindingTimeoutSeconds"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
