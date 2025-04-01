@@ -435,24 +435,28 @@ func GetTaintsFromNodeAnnotations(annotations map[string]string) ([]core.Taint, 
 
 // GetPersistentVolumeClass returns StorageClassName.
 func GetPersistentVolumeClass(volume *core.PersistentVolume) string {
-	// Use beta annotation first
+	// Use StorageClassName field first
+	if len(volume.Spec.StorageClassName) > 0 {
+		return volume.Spec.StorageClassName
+	}
+
 	if class, found := volume.Annotations[core.BetaStorageClassAnnotation]; found {
 		return class
 	}
 
-	return volume.Spec.StorageClassName
+	return ""
 }
 
 // GetPersistentVolumeClaimClass returns StorageClassName. If no storage class was
 // requested, it returns "".
 func GetPersistentVolumeClaimClass(claim *core.PersistentVolumeClaim) string {
-	// Use beta annotation first
-	if class, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
-		return class
-	}
-
+	// Use StorageClassName field first
 	if claim.Spec.StorageClassName != nil {
 		return *claim.Spec.StorageClassName
+	}
+
+	if class, found := claim.Annotations[core.BetaStorageClassAnnotation]; found {
+		return class
 	}
 
 	return ""
