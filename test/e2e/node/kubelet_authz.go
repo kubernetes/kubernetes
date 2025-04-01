@@ -42,15 +42,15 @@ var _ = SIGDescribe(feature.KubeletFineGrainedAuthz, func() {
 
 	ginkgo.Context("when calling kubelet API", func() {
 		ginkgo.It("check /healthz enpoint is accessible via nodes/healthz RBAC", func(ctx context.Context) {
-			sc := runKubeletAuthzTest(ctx, f, "healthz", "healthz")
+			sc := runKubeletAuthzTest(ctx, f, "healthz", fmt.Sprintf("healthz-%s", f.Namespace.Name))
 			gomega.Expect(sc).To(gomega.Equal("200"))
 		})
 		ginkgo.It("check /healthz enpoint is accessible via nodes/proxy RBAC", func(ctx context.Context) {
-			sc := runKubeletAuthzTest(ctx, f, "healthz", "proxy")
+			sc := runKubeletAuthzTest(ctx, f, "healthz", fmt.Sprintf("proxy-%s", f.Namespace.Name))
 			gomega.Expect(sc).To(gomega.Equal("200"))
 		})
 		ginkgo.It("check /healthz enpoint is not accessible via nodes/configz RBAC", func(ctx context.Context) {
-			sc := runKubeletAuthzTest(ctx, f, "healthz", "configz")
+			sc := runKubeletAuthzTest(ctx, f, "healthz", fmt.Sprintf("configz-%s", f.Namespace.Name))
 			gomega.Expect(sc).To(gomega.Equal("403"))
 		})
 	})
