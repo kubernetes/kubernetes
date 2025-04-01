@@ -56,7 +56,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/job/metrics"
-	"k8s.io/kubernetes/pkg/controller/job/util"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
@@ -2878,114 +2877,6 @@ func TestSingleJobFailedCondition(t *testing.T) {
 		t.Errorf("Unexpected status for the failed condition. Expected: %v, saw %v\n", v1.ConditionTrue, failedConditions[0].Status)
 	}
 
-}
-
-func TestJobControllerMissingJobSucceedEvent(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
-	logger, ctx := ktesting.NewTestContext(t)
-	job1 := newJob(1, 1, 6, batch.NonIndexedCompletion)
-	job1.Name = "job1"
-	clientSet := fake.NewSimpleClientset(job1)
-	fakeClock := clocktesting.NewFakeClock(time.Now())
-	jm, informer := newControllerFromClientWithClock(ctx, t, clientSet, controller.NoResyncPeriodFunc, fakeClock)
-	jm.podControl = &controller.RealPodControl{
-		KubeClient: clientSet,
-		Recorder:   testutil.NewFakeRecorder(),
-	}
-	jm.podStoreSynced = alwaysReady
-	jm.jobStoreSynced = alwaysReady
-
-	err := informer.Batch().V1().Jobs().Informer().GetIndexer().Add(job1)
-	if err != nil {
-		t.Fatalf("Unexpected error when adding job to indexer %v", err)
-	}
-	// 1st reconcile should create a new pod
-	err = jm.syncJob(ctx, testutil.GetKey(job1, t))
-	if err != nil {
-		t.Fatalf("Unexpected error when syncing jobs %v", err)
-	}
-
-	podIndexer := informer.Core().V1().Pods().Informer().GetIndexer()
-	podList, err := clientSet.Tracker().List(
-		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
-		schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
-		"default")
-	if err != nil {
-		t.Fatalf("Unexpected error when fetching pods %v", err)
-	}
-	// manually adding the just-created pod from fake clientset memory to informer cache because informer is not started.
-	// we are updating the pod status to succeeded which should update the job status to succeeded and remove the finalizer of the pod.
-	justCreatedPod := podList.(*v1.PodList).Items[0]
-	t.Logf("pod is %v\n", podList.(*v1.PodList).Items[0])
-	justCreatedPod.Status.Phase = v1.PodSucceeded
-	err = podIndexer.Add(&justCreatedPod)
-	if err != nil {
-		t.Fatalf("Unexpected error when adding pod to indexer %v", err)
-	}
-	jm.addPod(logger, &justCreatedPod)
-	err = jm.syncJob(ctx, testutil.GetKey(job1, t))
-	if err != nil {
-		t.Fatalf("Unexpected error when syncing jobs %v", err)
-	}
-
-	// Verify that the job is updated as succeeded in the client set. However this status is not updated yet in the
-	// informer is not started
-	jobList, err := clientSet.Tracker().List(
-		schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"},
-		schema.GroupVersionKind{Group: "batch", Version: "v1", Kind: "Job"},
-		"default")
-	if err != nil {
-		t.Fatalf("Unexpected error when trying to get job from the store: %v", err)
-	}
-	updatedJob := jobList.(*batch.JobList).Items[0]
-	if !util.IsJobSucceeded(&updatedJob) {
-		t.Fatalf("job status is not succeeded: %v", updatedJob)
-	}
-
-	// add the updated pod from the fake clientset memory to informer cache because informer is not started. This is to make
-	// sure the job controller informer cache has the latest pod status.
-	podList, err = clientSet.Tracker().List(
-		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
-		schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
-		"default")
-	if err != nil {
-		t.Fatalf("Unexpected error when fetching pods %v", err)
-	}
-	t.Logf("pod is %v\n", podList.(*v1.PodList).Items[0])
-	updatedPod := podList.(*v1.PodList).Items[0]
-	updatedPod.Status.Phase = v1.PodSucceeded
-	err = podIndexer.Add(&updatedPod)
-	if err != nil {
-		t.Fatalf("Unexpected error when adding pod to indexer %v", err)
-	}
-
-	// removing the just created pod from fake clientset memory but the pod will remain inside informer cache
-	// of the job controller. We are removing from the client set because in case of a bug if the job controller
-	// is trying to create the pod again it can succeed because it creates using the same name again.
-	err = clientSet.Tracker().Delete(
-		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
-		"default", "")
-	if err != nil {
-		t.Fatalf("Unexpected error when deleting pod to indexer %v", err)
-	}
-
-	err = jm.syncJob(ctx, testutil.GetKey(job1, t))
-	if err != nil {
-		t.Fatalf("Unexpected error when syncing jobs %v", err)
-	}
-	time.Sleep(100 * time.Millisecond)
-
-	podList, err = clientSet.Tracker().List(
-		schema.GroupVersionResource{Version: "v1", Resource: "pods"},
-		schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
-		"default")
-	if err != nil {
-		t.Fatalf("Unexpected error when syncing jobs %v", err)
-	}
-	// no pod should be created. Here it is 0 because we had deleted the pod from the client set.
-	if len(podList.(*v1.PodList).Items) != 0 {
-		t.Errorf("expect no pods to be created but %v pods are created", len(podList.(*v1.PodList).Items))
-	}
 }
 
 func TestSyncJobComplete(t *testing.T) {

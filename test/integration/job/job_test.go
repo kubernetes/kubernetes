@@ -4050,11 +4050,11 @@ func TestNodeSelectorUpdate(t *testing.T) {
 
 }
 
-// TestDelayedJobUpdateEvent tests that a Job that only executes one Pod even when
-// the job events are delayed. This test verfies the finishedJobStore is working
-// correctly and preventing from job controller creating a new pod if the job complete
+// TestDelayedJobSucceededUpdateEvent tests that a Job only creates one Pod even when
+// the job success events are delayed. This test verfies the finishedJobStore is working
+// correctly and preventing from job controller creating a new pod if the job success
 // even is delayed.
-func TestDelayedJobUpdateEvent(t *testing.T) {
+func TestDelayedJobSucceededUpdateEvent(t *testing.T) {
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
 	t.Cleanup(setDurationDuringTest(&jobcontroller.SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	closeFn, restConfig, clientSet, ns := setup(t, "simple")
@@ -4104,6 +4104,94 @@ func TestDelayedJobUpdateEvent(t *testing.T) {
 		Labels: []string{"NonIndexed", "succeeded"},
 		Value:  1,
 	})
+	jobPods, err := getJobPods(ctx, t, clientSet, jobObj, func(ps v1.PodStatus) bool { return true })
+	if err != nil {
+		t.Fatalf("Error %v getting the list of pods for job %q", err, klog.KObj(jobObj))
+	}
+	if len(jobPods) != 1 {
+		t.Errorf("Found %d Pods for the job %q, want 1", len(jobPods), klog.KObj(jobObj))
+	}
+}
+
+// TestDelayedJobFailedUpdateEvent tests that a Job only creates one Pod even when
+// the job failed events are delayed. This test verfies the finishedJobStore is working
+// correctly and preventing from job controller creating a new pod if the job failed
+// event is delayed.
+func TestDelayedJobFailedUpdateEvent(t *testing.T) {
+	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
+	t.Cleanup(setDurationDuringTest(&jobcontroller.SyncJobBatchPeriod, fastSyncJobBatchPeriod))
+	closeFn, restConfig, clientSet, ns := setup(t, "pod-failure-policy")
+	t.Cleanup(closeFn)
+	// the transform is used to introduce a delay for the job events. Since all the object have to go through
+	// transform func first before being added to the informer cache, this would serve as an indirect way to
+	// introduce watch event delay.
+	transformOpt := informers.WithTransform(cache.TransformFunc(func(obj interface{}) (interface{}, error) {
+		_, ok := obj.(*batchv1.Job)
+		if ok {
+			// This will make sure pod events are processed before the job events occur.
+			time.Sleep(2 * fastSyncJobBatchPeriod)
+		}
+		return obj, nil
+	}))
+	ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig, transformOpt)
+	t.Cleanup(func() {
+		cancel()
+	})
+	resetMetrics()
+
+	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:                     "main-container",
+							Image:                    "foo",
+							ImagePullPolicy:          v1.PullIfNotPresent,
+							TerminationMessagePolicy: v1.TerminationMessageFallbackToLogsOnError,
+						},
+					},
+				},
+			},
+			BackoffLimit: ptr.To[int32](0),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Failed to create Job: %v", err)
+	}
+	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	op := func(p *v1.Pod) bool {
+		p.Status = v1.PodStatus{
+			Phase: v1.PodFailed,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name: "main-container",
+					State: v1.ContainerState{
+						Terminated: &v1.ContainerStateTerminated{
+							ExitCode: 5,
+						},
+					},
+				},
+			},
+		}
+		return true
+	}
+	if _, err := updateJobPodsStatus(ctx, clientSet, jobObj, op, 1); err != nil {
+		t.Fatalf("Error %q while updating pod status for Job: %v", err, jobObj.Name)
+	}
+	validateJobsPodsStatusOnly(ctx, t, clientSet, jobObj, podsByStatus{
+		Active:      0,
+		Failed:      1,
+		Ready:       ptr.To[int32](0),
+		Terminating: ptr.To[int32](0),
+	})
+
+	validateJobFailed(ctx, t, clientSet, jobObj)
 	jobPods, err := getJobPods(ctx, t, clientSet, jobObj, func(ps v1.PodStatus) bool { return true })
 	if err != nil {
 		t.Fatalf("Error %v getting the list of pods for job %q", err, klog.KObj(jobObj))
