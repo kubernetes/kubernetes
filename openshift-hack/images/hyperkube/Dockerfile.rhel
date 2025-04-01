@@ -1,10 +1,10 @@
 FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
 WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
-RUN make WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler cmd/kubelet cmd/watch-termination openshift-hack/cmd/k8s-tests openshift-hack/cmd/k8s-tests-ext' && \
+RUN make WHAT='cmd/kube-apiserver cmd/kube-controller-manager cmd/kube-scheduler cmd/kubelet cmd/watch-termination openshift-hack/cmd/k8s-tests-ext' && \
     mkdir -p /tmp/build && \
     cp openshift-hack/images/hyperkube/hyperkube openshift-hack/images/hyperkube/kubensenter /tmp/build && \
-    cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/{kube-apiserver,kube-controller-manager,kube-scheduler,kubelet,watch-termination,k8s-tests,k8s-tests-ext} \
+    cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/{kube-apiserver,kube-controller-manager,kube-scheduler,kubelet,watch-termination,k8s-tests-ext} \
     /tmp/build && \
     gzip /tmp/build/k8s-tests-ext
 
