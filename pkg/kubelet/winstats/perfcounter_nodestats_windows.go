@@ -219,7 +219,7 @@ func ProcessorCount() int {
 }
 
 func getActiveProcessorCount(groupNumber uint16) int {
-	r0, _, _ := syscall.Syscall(procGetActiveProcessorCount.Addr(), 1, uintptr(groupNumber), 0, 0)
+	r0, _, _ := syscall.SyscallN(procGetActiveProcessorCount.Addr(), uintptr(groupNumber))
 	return int(r0)
 }
 
