@@ -1346,6 +1346,9 @@ message ContainerStatus {
     string image_id = 17;
     // User identities initially attached to the container
     ContainerUser user = 18;
+    // Actual source of the pulled image when multiple mirrors are
+    // configured for this image.
+    string image_pull_source = 19;
 }
 
 message ContainerStatusResponse {
@@ -1514,6 +1517,9 @@ message Image {
     // It must only be treated as a recommendation -- the client can still request that the image be deleted,
     // and the runtime must oblige.
     bool pinned = 8;
+    // Actual source of the pulled image when multiple mirrors are
+    // configured for this image.
+    string pull_source = 9;
 }
 
 message ListImagesResponse {
