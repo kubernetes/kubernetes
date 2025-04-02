@@ -80,8 +80,8 @@ func testResourceSlice(name, nodeName, driverName string, numDevices int) *resou
 func testResourceSliceWithBindingConditions(name, nodeName, driverName string, numDevices int, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
 	slice := testResourceSlice(name, nodeName, driverName, numDevices)
 	for i := range slice.Spec.Devices {
-		slice.Spec.Devices[i].Basic.BindingConditions = bindingConditions
-		slice.Spec.Devices[i].Basic.BindingFailureConditions = bindingFailureConditions
+		slice.Spec.Devices[i].BindingConditions = bindingConditions
+		slice.Spec.Devices[i].BindingFailureConditions = bindingFailureConditions
 	}
 	return slice
 }
@@ -89,7 +89,7 @@ func testResourceSliceWithBindingConditions(name, nodeName, driverName string, n
 func testResouceSliceWithBindingTimeout(name, nodeName, driverName string, numDevices int, bindingTimeout *int64) *resourceapi.ResourceSlice {
 	slice := testResourceSlice(name, nodeName, driverName, numDevices)
 	for i := range slice.Spec.Devices {
-		slice.Spec.Devices[i].Basic.BindingTimeoutSeconds = bindingTimeout
+		slice.Spec.Devices[i].BindingTimeoutSeconds = bindingTimeout
 	}
 	return slice
 }
@@ -800,26 +800,26 @@ func TestValidateResourceSlice(t *testing.T) {
 			slice: testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4"}),
 		},
 		"too-many-binding-conditions": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "devices").Index(0).Child("bindingConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2", "condition3", "condition4", "condition5"}, []string{"condition5", "condition6"}),
 		},
 		"too-many-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
+			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions"), resourceapi.BindingConditionsMaxSize+1, resourceapi.BindingConditionsMaxSize)},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3", "condition4", "condition5", "condition6", "condition7"}),
 		},
 		"invalid-binding-conditions": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingConditions").Index(1), "condition2!", "must match condition type format")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingConditions").Index(1), "condition2!", "must match condition type format")},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2!"}, []string{"condition3", "condition4"}),
 		},
 		"invalid-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingFailureConditions").Index(0), "condition3!", "must match condition type format")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingFailureConditions").Index(0), "condition3!", "must match condition type format")},
 			slice:        testResourceSliceWithBindingConditions(goodName, goodName, driverName, 1, []string{"condition1", "condition2"}, []string{"condition3!", "condition4"}),
 		},
 		"good-binding-timeout": {
 			slice: testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, ptr.To(int64(10))),
 		},
 		"bad-binding-timeout": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("basic", "bindingTimeout"), ptr.To(int64(-10)), "must be greater than zero")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices").Index(0).Child("bindingTimeout"), ptr.To(int64(-10)), "must be greater than zero")},
 			slice:        testResouceSliceWithBindingTimeout(goodName, goodName, driverName, 1, ptr.To(int64(-10))),
 		},
 	}

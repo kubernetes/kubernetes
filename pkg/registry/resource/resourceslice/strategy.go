@@ -216,13 +216,11 @@ func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.R
 		return
 	}
 
-	for _, device := range newSlice.Spec.Devices {
-		if device.Basic != nil {
-			device.Basic.BindingConditions = nil
-			device.Basic.BindingFailureConditions = nil
-			device.Basic.BindingTimeoutSeconds = nil
-			device.Basic.UsageRestrictedToNode = nil
-		}
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].BindingConditions = nil
+		newSlice.Spec.Devices[i].BindingFailureConditions = nil
+		newSlice.Spec.Devices[i].BindingTimeoutSeconds = nil
+		newSlice.Spec.Devices[i].UsageRestrictedToNode = nil
 	}
 }
 
