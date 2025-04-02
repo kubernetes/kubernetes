@@ -59,11 +59,11 @@ var sliceWithDeviceTaints = func() *resource.ResourceSlice {
 
 var sliceWithBindingConditions = func() *resource.ResourceSlice {
 	slice := slice.DeepCopy()
-	slice.Spec.Devices[0].Basic.BindingConditions = []string{"cond1"}
-	slice.Spec.Devices[0].Basic.BindingFailureConditions = []string{"fail1"}
+	slice.Spec.Devices[0].BindingConditions = []string{"cond1"}
+	slice.Spec.Devices[0].BindingFailureConditions = []string{"fail1"}
 	time := int64(60)
-	slice.Spec.Devices[0].Basic.BindingTimeoutSeconds = &time
-	slice.Spec.Devices[0].Basic.UsageRestrictedToNode = ptr.To(true)
+	slice.Spec.Devices[0].BindingTimeoutSeconds = &time
+	slice.Spec.Devices[0].UsageRestrictedToNode = ptr.To(true)
 	return slice
 }()
 
