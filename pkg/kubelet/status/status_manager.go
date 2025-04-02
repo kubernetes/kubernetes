@@ -156,10 +156,10 @@ type Manager interface {
 	GetPodResizeConditions(podUID types.UID) []*v1.PodCondition
 
 	// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
-	SetPodResizePendingCondition(podUID types.UID, reason, message string)
+	SetPodResizePendingCondition(podUID types.UID, reason, message string, observedGeneration int64)
 
 	// SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
-	SetPodResizeInProgressCondition(podUID types.UID, reason, message string, allowReasonToBeCleared bool)
+	SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64, allowReasonToBeCleared bool)
 
 	// ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.
 	ClearPodResizePendingCondition(podUID types.UID)
@@ -255,18 +255,18 @@ func (m *manager) GetPodResizeConditions(podUID types.UID) []*v1.PodCondition {
 }
 
 // SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
-func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message string) {
+func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message string, observedGeneration int64) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
 	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message),
+		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message, observedGeneration),
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
 	}
 }
 
 // SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
-func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string, allowReasonToBeCleared bool) {
+func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64, allowReasonToBeCleared bool) {
 	oldConditions := m.GetPodResizeConditions(podUID)
 
 	m.podStatusesLock.Lock()
@@ -283,7 +283,7 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	}
 
 	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message),
+		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 	}
 }
@@ -1175,7 +1175,7 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	return false
 }
 
-func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *v1.PodCondition, reason, message string) *v1.PodCondition {
+func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *v1.PodCondition, reason, message string, observedGeneration int64) *v1.PodCondition {
 	now := metav1.NewTime(time.Now())
 	var lastTransitionTime metav1.Time
 	if oldCondition == nil || oldCondition.Reason != reason {
@@ -1187,6 +1187,7 @@ func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *
 	return &v1.PodCondition{
 		Type:               conditionType,
 		Status:             v1.ConditionTrue,
+		ObservedGeneration: observedGeneration,
 		LastProbeTime:      now,
 		LastTransitionTime: lastTransitionTime,
 		Reason:             reason,
