@@ -618,14 +618,22 @@ message PodSandboxStatus {
 message PodSandboxStatusResponse {
     // Status of the PodSandbox.
     PodSandboxStatus status = 1;
-    // Info is extra information of the PodSandbox. The key could be arbitrary string, and
+
+    // Info is extra information of the PodSandbox. The key could be an arbitrary string, and
     // value should be in json format. The information could include anything useful for
-    // debug, e.g. network namespace for linux container based container runtime.
+    // debugging, e.g., network namespace for Linux container-based container runtimes.
     // It should only be returned non-empty when Verbose is true.
     map<string, string> info = 2;
-    // Container statuses
+
+    // Container statuses.
+    // This field MUST be populated if the `timestamp` field is set.
+    // When returning Evented PLEG-compatible responses, runtimes must include the status
+    // of all containers in the pod here.
     repeated ContainerStatus containers_statuses = 3;
-    // Timestamp in nanoseconds at which container and pod statuses were recorded
+
+    // Timestamp in nanoseconds at which container and pod statuses were recorded.
+    // When this field is set, it signals to the kubelet that the runtime supports
+    // Evented PLEG. If set, the `containers_statuses` field must also be populated.
     int64 timestamp = 4;
 }
 
