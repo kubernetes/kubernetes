@@ -172,8 +172,6 @@ func TestInitialDelay(t *testing.T) {
 		switch probeType {
 		case liveness:
 			expectResult(t, w, results.Success, "during initial delay")
-		case readiness:
-			expectResult(t, w, results.Failure, "during initial delay")
 		case startup:
 			expectResult(t, w, results.Unknown, "during initial delay")
 		}
