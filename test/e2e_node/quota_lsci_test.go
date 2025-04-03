@@ -19,6 +19,8 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -42,6 +44,28 @@ const (
 	LSCIQuotaFeature = features.LocalStorageCapacityIsolationFSQuotaMonitoring
 )
 
+
+func copyFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+	_, err = io.Copy(out, in)
+	return err
+}
+
+
 func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespacesEnabled bool) {
 	evictionTestTimeout := 10 * time.Minute
 	sizeLimit := resource.MustParse("100Mi")
@@ -58,6 +82,11 @@ func runOneQuotaTest(f *framework.Framework, quotasRequested bool, userNamespace
 		priority = 1
 	}
 	ginkgo.Context(fmt.Sprintf(testContextFmt, fmt.Sprintf("use quotas for LSCI monitoring (quotas enabled: %v)", quotasRequested)), func() {
+		// print env PATH
+		framework.Logf("PATH: %s", os.Getenv("PATH")) 
+		// copy runc from /home/containerd/usr/local/sbin/runc to /bin/runc
+		copyFile("/home/containerd/usr/local/sbin/runc", "/bin/runc")
+
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			defer withFeatureGate(LSCIQuotaFeature, quotasRequested)()
 			// TODO: remove hardcoded kubelet volume directory path
