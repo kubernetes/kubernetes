@@ -108,6 +108,13 @@ fi
 # Some of the later codegens depend on the results of this, so it needs to come
 # first in the case of regenerating everything.
 function codegen::protobuf() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for protobuf codegen"
+        fi
+        return
+    fi
+
     # NOTE: All output from this script needs to be copied back to the calling
     # source tree.  This is managed in kube::build::copy_output in build/common.sh.
     # If the output set is changed update that function.
@@ -122,7 +129,7 @@ function codegen::protobuf() {
             | sed 's|^|k8s.io/kubernetes/|;s|k8s.io/kubernetes/staging/src/||' \
             | sort -u)
 
-    kube::log::status "Generating protobufs for ${#apis[@]} targets"
+    kube::log::status "protobufs: ${#apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: generating protobufs for:"
         for dir in "${apis[@]}"; do
@@ -154,6 +161,13 @@ function codegen::protobuf() {
 #     register: generate deep-copy functions and register them with a
 #               scheme
 function codegen::deepcopy() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for deepcopy codegen"
+        fi
+        return
+    fi
+
     # Build the tool.
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/deepcopy-gen
@@ -179,7 +193,7 @@ function codegen::deepcopy() {
         tag_pkgs+=("./$dir")
     done
 
-    kube::log::status "Generating deepcopy code for ${#tag_pkgs[@]} targets"
+    kube::log::status "deepcopy: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running deepcopy-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -255,6 +269,13 @@ EOF
 # Some of the later codegens depend on the results of this, so it needs to come
 # first in the case of regenerating everything.
 function codegen::swagger() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for swagger codegen"
+        fi
+        return
+    fi
+
     # Build the tool
     GOPROXY=off go install \
         ./cmd/genswaggertypedocs
@@ -262,7 +283,7 @@ function codegen::swagger() {
     local group_versions=()
     IFS=" " read -r -a group_versions <<< "meta/v1 meta/v1beta1 ${KUBE_AVAILABLE_GROUP_VERSIONS}"
 
-    kube::log::status "Generating swagger for ${#group_versions[@]} targets"
+    kube::log::status "swagger: ${#group_versions[@]} targets"
 
     git_find -z ':(glob)**/types_swagger_doc_generated.go' | xargs -0 rm -f
 
@@ -278,6 +299,13 @@ function codegen::swagger() {
 # comment-tag in column 0 of one file of the form:
 #     // +k8s:prerelease-lifecycle-gen=true
 function codegen::prerelease() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for prerelease codegen"
+        fi
+        return
+    fi
+
     # Build the tool.
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/prerelease-lifecycle-gen
@@ -303,7 +331,7 @@ function codegen::prerelease() {
         tag_pkgs+=("./$dir")
     done
 
-    kube::log::status "Generating prerelease-lifecycle code for ${#tag_pkgs[@]} targets"
+    kube::log::status "prerelease-lifecycle: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running prerelease-lifecycle-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -342,6 +370,13 @@ function codegen::prerelease() {
 #       FIELDNAME: any object with a field of this name is a candidate
 #                  for having a defaulter generated
 function codegen::defaults() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for defaults codegen"
+        fi
+        return
+    fi
+
     # Build the tool.
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/defaulter-gen
@@ -367,7 +402,7 @@ function codegen::defaults() {
         tag_pkgs+=("./$dir")
     done
 
-    kube::log::status "Generating defaulter code for ${#tag_pkgs[@]} targets"
+    kube::log::status "defaults: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running defaulter-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -443,7 +478,7 @@ function codegen::validation() {
         time
     )
 
-    kube::log::status "Generating validation code for ${#tag_pkgs[@]} targets"
+    kube::log::status "validation: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running validation-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -451,13 +486,19 @@ function codegen::validation() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+    local lint_flag=() # empty arrays expand to no-value (as opposed to "")
+    if [[ -n "${LINT:-}" ]]; then
+        lint_flag+=("--lint")
+    else
+        git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+    fi
 
     validation-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
         $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
+        "${lint_flag[@]}" `# may expand to nothing` \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -488,6 +529,13 @@ function codegen::validation() {
 # TODO: it might be better in the long term to make peer-types explicit in the
 # IDL.
 function codegen::conversions() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for conversions codegen"
+        fi
+        return
+    fi
+
     # Build the tool.
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/conversion-gen
@@ -519,7 +567,7 @@ function codegen::conversions() {
         k8s.io/api/core/v1
     )
 
-    kube::log::status "Generating conversion code for ${#tag_pkgs[@]} targets"
+    kube::log::status "conversion: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running conversion-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -549,6 +597,13 @@ function codegen::conversions() {
 #     // +k8s:register-gen=package
 #
 function codegen::register() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for register codegen"
+        fi
+        return
+    fi
+
     # Build the tool.
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/register-gen
@@ -574,7 +629,7 @@ function codegen::register() {
         tag_pkgs+=("./$dir")
     done
 
-    kube::log::status "Generating register code for ${#tag_pkgs[@]} targets"
+    kube::log::status "register: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running register-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -620,6 +675,13 @@ function k8s_tag_files_except() {
 # comment-tag in column 0 of one file of the form:
 #     // +k8s:openapi-gen=true
 function codegen::openapi() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for openapi codegen"
+        fi
+        return
+    fi
+
     # Build the tool.
     GOPROXY=off go install \
         k8s.io/kube-openapi/cmd/openapi-gen
@@ -664,7 +726,7 @@ function codegen::openapi() {
         tag_pkgs+=("./$dir")
     done
 
-    kube::log::status "Generating openapi code"
+    kube::log::status "openapi: ${#tag_pkgs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running openapi-gen for:"
         for dir in "${tag_dirs[@]}"; do
@@ -698,6 +760,13 @@ function codegen::openapi() {
 }
 
 function codegen::applyconfigs() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for applyconfigs codegen"
+        fi
+        return
+    fi
+
     GOPROXY=off go install \
         k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema \
         k8s.io/code-generator/cmd/applyconfiguration-gen
@@ -710,7 +779,7 @@ function codegen::applyconfigs() {
             | sort -u)
     ext_apis+=("k8s.io/apimachinery/pkg/apis/meta/v1")
 
-    kube::log::status "Generating apply-config code for ${#ext_apis[@]} targets"
+    kube::log::status "apply-config: ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running applyconfiguration-gen for:"
         for api in "${ext_apis[@]}"; do
@@ -740,6 +809,13 @@ function codegen::applyconfigs() {
 }
 
 function codegen::clients() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for clients codegen"
+        fi
+        return
+    fi
+
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/client-gen
 
@@ -761,7 +837,7 @@ function codegen::clients() {
         gv_dirs+=("${pkg_dir}")
     done
 
-    kube::log::status "Generating client code for ${#gv_dirs[@]} targets"
+    kube::log::status "clients: ${#gv_dirs[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running client-gen for:"
         for dir in "${gv_dirs[@]}"; do
@@ -795,6 +871,13 @@ function codegen::clients() {
 }
 
 function codegen::listers() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for listers codegen"
+        fi
+        return
+    fi
+
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/lister-gen
 
@@ -805,7 +888,7 @@ function codegen::listers() {
             | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
-    kube::log::status "Generating lister code for ${#ext_apis[@]} targets"
+    kube::log::status "listers: ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running lister-gen for:"
         for api in "${ext_apis[@]}"; do
@@ -835,6 +918,13 @@ function codegen::listers() {
 }
 
 function codegen::informers() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for informers codegen"
+        fi
+        return
+    fi
+
     GOPROXY=off go install \
         k8s.io/code-generator/cmd/informer-gen
 
@@ -845,7 +935,7 @@ function codegen::informers() {
             | while read -r -d $'\0' F; do dirname "${F}"; done \
             | sort -u)
 
-    kube::log::status "Generating informer code for ${#ext_apis[@]} targets"
+    kube::log::status "informers: code for ${#ext_apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: running informer-gen for:"
         for api in "${ext_apis[@]}"; do
@@ -884,6 +974,13 @@ function indent() {
 }
 
 function codegen::subprojects() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for subprojects codegen"
+        fi
+        return
+    fi
+
     # Call generation on sub-projects.
     local subs=(
         staging/src/k8s.io/code-generator/examples
@@ -898,7 +995,7 @@ function codegen::subprojects() {
     local codegen
     codegen="${KUBE_ROOT}/staging/src/k8s.io/code-generator"
     for sub in "${subs[@]}"; do
-        kube::log::status "Generating code for subproject ${sub}"
+        kube::log::status "subproject ${sub}:"
         pushd "${sub}" >/dev/null
         CODEGEN_PKG="${codegen}" \
         UPDATE_API_KNOWN_VIOLATIONS="${UPDATE_API_KNOWN_VIOLATIONS}" \
@@ -909,6 +1006,13 @@ function codegen::subprojects() {
 }
 
 function codegen::protobindings() {
+    if [[ -n "${LINT:-}" ]]; then                                                             
+        if [[ "${KUBE_VERBOSE}" -gt 2 ]]; then
+            kube::log::status "No linter for protobindings codegen"
+        fi
+        return
+    fi
+
     # Each element of this array is a directory containing subdirectories which
     # eventually contain a file named "api.proto".
     local apis=(
@@ -929,7 +1033,7 @@ function codegen::protobindings() {
         "staging/src/k8s.io/externaljwt/apis"
     )
 
-    kube::log::status "Generating protobuf bindings for ${#apis[@]} targets"
+    kube::log::status "protobuf bindings: ${#apis[@]} targets"
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
         kube::log::status "DBG: generating protobuf bindings for:"
         for dir in "${apis[@]}"; do
