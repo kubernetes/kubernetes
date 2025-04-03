@@ -43,6 +43,7 @@ import (
 )
 
 type TopPodOptions struct {
+	PrintFlags         *PrintFlags
 	ResourceName       string
 	Namespace          string
 	LabelSelector      string
@@ -92,11 +93,12 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 		o = &TopPodOptions{
 			IOStreams:          streams,
 			UseProtocolBuffers: true,
+			PrintFlags:         NewPrintFlags(streams.Out),
 		}
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "pod [NAME | -l label]",
+		Use:                   "pod [(-o|--output=)wide] [NAME | -l label]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Display resource (CPU/memory) usage of pods"),
 		Long:                  topPodLong,
@@ -109,6 +111,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericiooptions.
 		},
 		Aliases: []string{"pods", "po"},
 	}
+	o.PrintFlags.AddFlags(cmd)
 	cmdutil.AddLabelSelectorFlagVar(cmd, &o.LabelSelector)
 	cmd.Flags().StringVar(&o.FieldSelector, "field-selector", o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.SortBy, "If non-empty, sort pods list using specified field. The field can be either 'cpu' or 'memory'.")
@@ -152,6 +155,9 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 
 	o.PodClient = clientset.CoreV1()
 
+	if o.PrintFlags == nil {
+		o.PrintFlags = NewPrintFlags(o.Out)
+	}
 	o.Printer = metricsutil.NewTopCmdPrinter(o.Out)
 	return nil
 }
@@ -215,9 +221,56 @@ func (o TopPodOptions) RunTopPod() error {
 		} else {
 			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
+		return nil
 	}
 
-	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
+	if len(o.SortBy) > 0 {
+		o.PrintFlags.EnsureWithSort(o.SortBy)
+	}
+	if o.PrintContainers {
+		o.PrintFlags.EnsureWithContainers()
+	}
+	if o.AllNamespaces {
+		o.PrintFlags.EnsureWithNamespaces()
+	}
+	if o.NoHeaders {
+		o.PrintFlags.EnsureWithNoHeaders()
+	}
+	if o.Sum {
+		o.PrintFlags.EnsureWithSum()
+	}
+	// add pod info for wide output.
+	if *o.PrintFlags.OutputFormat == "wide" {
+		var pods []corev1.Pod
+		if len(o.ResourceName) > 0 {
+			pod, err := o.PodClient.Pods(o.Namespace).Get(context.TODO(), o.ResourceName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			pods = append(pods, *pod)
+		} else {
+			namespace := o.Namespace
+			if o.AllNamespaces {
+				namespace = corev1.NamespaceAll
+			}
+			podList, err := o.PodClient.Pods(namespace).List(context.TODO(), metav1.ListOptions{
+				LabelSelector: labelSelector.String(),
+				FieldSelector: fieldSelector.String(),
+			})
+			if err != nil {
+				return err
+			}
+			pods = append(pods, podList.Items...)
+		}
+
+		o.PrintFlags.SetPodsInfo(&pods)
+	}
+
+	printer, err := o.PrintFlags.ToPrinter()
+	if err != nil {
+		return err
+	}
+	return printer.PrintObj(metrics, o.Out)
 }
 
 func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
