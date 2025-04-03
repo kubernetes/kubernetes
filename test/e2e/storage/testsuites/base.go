@@ -80,6 +80,7 @@ var CSISuites = append(BaseSuites,
 		return InitCustomEphemeralTestSuite(CSIEphemeralTestPatterns())
 	},
 	InitSnapshottableTestSuite,
+	InitSnapshotMetadataTestSuite,
 	InitVolumeGroupSnapshottableTestSuite,
 	InitSnapshottableStressTestSuite,
 	InitVolumePerformanceTestSuite,
