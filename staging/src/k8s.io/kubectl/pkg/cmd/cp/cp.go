@@ -489,9 +489,9 @@ func recursiveTar(srcDir, srcFile localPath, destDir, destFile remotePath, tw *t
 			if err != nil {
 				return err
 			}
-			defer f.Close()
 
 			if _, err := io.Copy(tw, f); err != nil {
+				f.Close()
 				return err
 			}
 			return f.Close()
@@ -559,8 +559,8 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 		if _, err := io.Copy(outFile, tarReader); err != nil {
+			outFile.Close()
 			return err
 		}
 		if err := outFile.Close(); err != nil {
