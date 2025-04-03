@@ -23,11 +23,12 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"sigs.k8s.io/randfill"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/randfill"
 )
 
 func TestCollectionsEncoding(t *testing.T) {
@@ -63,7 +64,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"Int\":1,\"Float32\":1,\"Float64\":1.1}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"Int\":1,\"Float32\":1,\"Float64\":1.1}]}\n",
 		},
 		{
 			name: "Unstructured object float",
@@ -102,7 +103,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{}}]}\n",
 		},
 		// Encoding Go strings containing invalid UTF-8 sequences without error
 		{
@@ -146,7 +147,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "CarpList map nil",
@@ -159,7 +160,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "UnstructuredList items nil",
@@ -237,7 +238,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "CarpList map empty",
@@ -250,7 +251,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "UnstructuredList items empty",
@@ -337,7 +338,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"Slice\":\"AQID\",\"Array\":[1,2,3]}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"Slice\":\"AQID\",\"Array\":[1,2,3]}]}\n",
 		},
 		{
 			name: "UnstructuredList object raw bytes",
@@ -415,7 +416,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					}},
 				},
 			},
-			expect: "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{\"resourceVersion\":\"2345\",\"continue\":\"abc\",\"remainingItemCount\":1},\"items\":[{\"kind\":\"Carp\",\"apiVersion\":\"v1\",\"metadata\":{\"name\":\"pod\",\"namespace\":\"default\",\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{\"resourceVersion\":\"2345\",\"continue\":\"abc\",\"remainingItemCount\":1},\"items\":[{\"kind\":\"Carp\",\"apiVersion\":\"v1\",\"metadata\":{\"name\":\"pod\",\"namespace\":\"default\"},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "List two elements",
@@ -438,7 +439,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					}},
 				},
 			},
-			expect: `{"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"2345"},"items":[{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod","namespace":"default","creationTimestamp":null},"spec":{},"status":{}},{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod2","namespace":"default2","creationTimestamp":null},"spec":{},"status":{}}]}
+			expect: `{"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"2345"},"items":[{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod","namespace":"default"},"spec":{},"status":{}},{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod2","namespace":"default2"},"spec":{},"status":{}}]}
 `,
 		},
 		{
@@ -465,7 +466,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				},
 			},
 			cannotStream: true,
-			expect:       "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}\n",
+			expect:       "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{},\"spec\":{},\"status\":{}}\n",
 		},
 		{
 			name:   "UnstructuredList empty",
