@@ -133,40 +133,38 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 			continue
 		}
 
-		// Add to map with key endpoint ID or IP address
-		// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
-		// TODO: Store by IP only and remove any lookups by endpoint ID.
-		endpointInfos[ep.Id] = &endpointInfo{
-			ip:         ep.IpConfigurations[0].IpAddress,
-			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
-			macAddress: ep.MacAddress,
-			hnsID:      ep.Id,
-			hns:        hns,
-			// only ready and not terminating endpoints were added to HNS
-			ready:       true,
-			serving:     true,
-			terminating: false,
-		}
-		endpointInfos[ep.IpConfigurations[0].IpAddress] = endpointInfos[ep.Id]
+		for index, ipConfig := range ep.IpConfigurations {
 
-		if len(ep.IpConfigurations) == 1 {
-			continue
-		}
+			if index > 1 {
+				// Expecting only ipv4 and ipv6 ipaddresses
+				break
+			}
 
-		// If ipFamilyPolicy is RequireDualStack or PreferDualStack, then there will be 2 IPS (iPV4 and IPV6)
-		// in the endpoint list
-		endpointDualstack := &endpointInfo{
-			ip:         ep.IpConfigurations[1].IpAddress,
-			isLocal:    uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0,
-			macAddress: ep.MacAddress,
-			hnsID:      ep.Id,
-			hns:        hns,
-			// only ready and not terminating endpoints were added to HNS
-			ready:       true,
-			serving:     true,
-			terminating: false,
+			isLocal := uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0
+
+			if _, ok := endpointInfos[ipConfig.IpAddress]; ok && isLocal {
+				// If the endpoint is already part of the queried endpoints map and is local,
+				// then we should not add it again to the map
+				continue
+			}
+
+			// Add to map with key endpoint ID or IP address
+			// Storing this is expensive in terms of memory, however there is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address.
+			// TODO: Store by IP only and remove any lookups by endpoint ID.
+			epInfo := &endpointInfo{
+				ip:         ipConfig.IpAddress,
+				isLocal:    isLocal,
+				macAddress: ep.MacAddress,
+				hnsID:      ep.Id,
+				hns:        hns,
+				// only ready and not terminating endpoints were added to HNS
+				ready:       true,
+				serving:     true,
+				terminating: false,
+			}
+			endpointInfos[ep.Id] = epInfo
+			endpointInfos[ipConfig.IpAddress] = epInfo
 		}
-		endpointInfos[ep.IpConfigurations[1].IpAddress] = endpointDualstack
 	}
 	klog.V(3).InfoS("Queried endpoints from network", "network", networkName, "count", len(endpointInfos))
 	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
