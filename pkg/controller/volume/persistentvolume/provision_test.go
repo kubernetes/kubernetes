@@ -29,7 +29,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/storage/volume"
@@ -174,7 +173,6 @@ var provision2Success = provisionCall{
 func TestProvisionSync(t *testing.T) {
 	// Default enable the HonorPVReclaimPolicy feature gate.
 	// TODO: this will be removed in 1.36
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 	_, ctx := ktesting.NewTestContext(t)
 	tests := []controllerTest{
@@ -603,7 +601,6 @@ func TestProvisionSync(t *testing.T) {
 func TestProvisionMultiSync(t *testing.T) {
 	// Default enable the HonorPVReclaimPolicy feature gate.
 	// TODO: this will be removed in 1.36
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HonorPVReclaimPolicy, true)
 
 	_, ctx := ktesting.NewTestContext(t)

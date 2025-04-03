@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -100,7 +99,6 @@ func TestPodTopologyLabels(t *testing.T) {
 	}
 	// Enable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
 	// on start up and not on each invocation at runtime.
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, true)
 	testPodTopologyLabels(t, tests)
 }
@@ -120,7 +118,6 @@ func TestPodTopologyLabels_FeatureDisabled(t *testing.T) {
 	}
 	// Disable the feature BEFORE starting the test server, as the admission plugin only checks feature gates
 	// on start up and not on each invocation at runtime.
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodTopologyLabelsAdmission, false)
 	testPodTopologyLabels(t, tests)
 }

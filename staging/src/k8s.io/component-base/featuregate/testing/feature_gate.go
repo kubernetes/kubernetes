@@ -46,6 +46,7 @@ func init() {
 // featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.<FeatureName>, true)
 func SetFeatureGateDuringTest(tb TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
 	tb.Helper()
+	changeEmulationVersionIfNecessary(tb, gate, f, value)
 	detectParallelOverrideCleanup := detectParallelOverride(tb, f)
 	originalValue := gate.Enabled(f)
 	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
@@ -86,6 +87,22 @@ func SetFeatureGateDuringTest(tb TB, gate featuregate.FeatureGate, f featuregate
 			}
 		}
 	})
+}
+
+func changeEmulationVersionIfNecessary(tb TB, gate featuregate.FeatureGate, f featuregate.Feature, value bool) {
+	originalEmuVer := gate.(featuregate.MutableVersionedFeatureGate).EmulationVersion()
+	versionedSpecs, err := gate.(featuregate.MutableVersionedFeatureGate).GetVersionedSpecs(f)
+	if err != nil {
+		tb.Fatalf(err.Error())
+	}
+	if len(versionedSpecs) > 1 {
+		// check if the feature is locked
+		lastLifecycle := versionedSpecs[len(versionedSpecs)-1]
+		if lastLifecycle.LockToDefault && !lastLifecycle.Version.GreaterThan(originalEmuVer) && lastLifecycle.Default != value {
+			// if the feature is locked, set the emulation version to the previous version when the feature is not locked.
+			SetFeatureGateEmulationVersionDuringTest(tb, gate, lastLifecycle.Version.SubtractMinor(1))
+		}
+	}
 }
 
 // SetFeatureGateEmulationVersionDuringTest sets the specified gate to the specified emulation version for duration of the test.

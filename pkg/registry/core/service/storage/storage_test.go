@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	machineryutilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -12001,7 +12000,6 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 			// Test here is negative, because starting with v1.30 the feature gate is enabled by default, so we should
 			// now disable it to do the proper test
 			if !loadbalancerIPModeInUse(tc.statusBeforeUpdate) {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, false)
 			}
 			oldSvc := obj.(*api.Service).DeepCopy()
@@ -12011,9 +12009,6 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 				t.Errorf("updated status: %s", err)
 			}
 
-			if !tc.ipModeEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.31"))
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LoadBalancerIPMode, tc.ipModeEnabled)
 			newSvc := obj.(*api.Service).DeepCopy()
 			newSvc.Status = tc.newStatus

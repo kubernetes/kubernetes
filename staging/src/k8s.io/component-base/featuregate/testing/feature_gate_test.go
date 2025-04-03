@@ -258,6 +258,69 @@ func TestSpecialGatesVersioned(t *gotest.T) {
 
 }
 
+func TestLockedFeature(t *gotest.T) {
+	originalEmulationVersion := version.MustParse("1.31")
+	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion)
+
+	err := gate.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
+		"ga_gate": {
+			{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+		},
+		"deprecated_gate": {
+			{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
+			{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Deprecated, LockToDefault: true},
+		},
+	})
+	require.NoError(t, err)
+
+	require.Error(t, gate.Set("ga_gate=false,deprecated_gate=true"))
+	require.NoError(t, gate.Set("ga_gate=true,deprecated_gate=false"))
+
+	before := map[featuregate.Feature]bool{
+		"AllAlpha": false,
+		"AllBeta":  false,
+
+		"ga_gate":         true,
+		"deprecated_gate": false,
+	}
+	expect(t, gate, before)
+	t.Cleanup(func() {
+		expect(t, gate, before)
+		cleanup()
+	})
+
+	t.Run("SetLockedGAGateToFalse", func(t *gotest.T) {
+		SetFeatureGateDuringTest(t, gate, "ga_gate", false)
+		expect(t, gate, map[featuregate.Feature]bool{
+			"AllAlpha": false,
+			"AllBeta":  false,
+
+			"ga_gate":         false,
+			"deprecated_gate": false,
+		})
+
+		require.True(t, gate.EmulationVersion().EqualTo(version.MustParse("1.30")))
+	})
+	require.True(t, gate.EmulationVersion().EqualTo(originalEmulationVersion))
+	expect(t, gate, before)
+
+	t.Run("SetLockedDeprecatedGateToTrue", func(t *gotest.T) {
+		SetFeatureGateDuringTest(t, gate, "ga_gate", false)
+		SetFeatureGateDuringTest(t, gate, "deprecated_gate", true)
+		expect(t, gate, map[featuregate.Feature]bool{
+			"AllAlpha": false,
+			"AllBeta":  false,
+
+			"ga_gate":         false,
+			"deprecated_gate": true,
+		})
+
+		require.True(t, gate.EmulationVersion().EqualTo(version.MustParse("1.29")))
+	})
+	require.True(t, gate.EmulationVersion().EqualTo(originalEmulationVersion))
+}
+
 func TestDetectLeakToMainTest(t *gotest.T) {
 	t.Cleanup(cleanup)
 	gate := featuregate.NewFeatureGate()
