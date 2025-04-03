@@ -1698,6 +1698,73 @@ func RunWatchListMatchSingle(ctx context.Context, t *testing.T, store storage.In
 	TestCheckNoMoreResultsWithIgnoreFunc(t, w, nil)
 }
 
+func RunWatchErrorIsBlockingFurtherEvents(ctx context.Context, t *testing.T, store InterfaceWithPrefixTransformer) {
+	foo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "foo"}}
+	fooKey := fmt.Sprintf("/pods/%s/%s", foo.Namespace, foo.Name)
+	fooCreated := &example.Pod{}
+	if err := store.Create(context.Background(), fooKey, foo, fooCreated, 0); err != nil {
+		t.Errorf("failed to create object: %v", err)
+	}
+	bar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "bar"}}
+	barKey := fmt.Sprintf("/pods/%s/%s", bar.Namespace, bar.Name)
+	barCreated := &example.Pod{}
+	if err := store.Create(context.Background(), barKey, bar, barCreated, 0); err != nil {
+		t.Errorf("failed to create object: %v", err)
+	}
+
+	// Update transformer to ensure that foo will become effectively corrupted.
+	revertTransformer := store.UpdatePrefixTransformer(
+		func(transformer *PrefixTransformer) value.Transformer {
+			transformer.prefix = []byte("other-prefix")
+			return transformer
+		})
+	defer revertTransformer()
+
+	baz := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "baz"}}
+	bazKey := fmt.Sprintf("/pods/%s/%s", baz.Namespace, baz.Name)
+	bazCreated := &example.Pod{}
+	if err := store.Create(context.Background(), bazKey, baz, bazCreated, 0); err != nil {
+		t.Errorf("failed to create object: %v", err)
+	}
+
+	opts := storage.ListOptions{
+		ResourceVersion: fooCreated.ResourceVersion,
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}
+
+	// Run N concurrent watches. Given the asynchronous nature, we increase the
+	// probability of hitting the race in at least one of those watches.
+	concurrentWatches := 10
+	wg := sync.WaitGroup{}
+	for i := 0; i < concurrentWatches; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w, err := store.Watch(ctx, "/pods", opts)
+			if err != nil {
+				t.Errorf("failed to create watch: %v", err)
+				return
+			}
+
+			// We issue the watch starting from object bar.
+			// The object fails TransformFromStorage and generates ERROR watch event.
+			// The further events (i.e. ADDED event for baz object) should not be
+			// emitted, so we verify no events other than ERROR type are emitted.
+			for {
+				event, ok := <-w.ResultChan()
+				if !ok {
+					break
+				}
+				if event.Type != watch.Error {
+					t.Errorf("unexpected event: %#v", event)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
 func makePod(namePrefix string) *example.Pod {
 	return &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{
