@@ -52,10 +52,12 @@ type RegistrationHandler struct {
 	// This is necessary because it implements APIs which don't
 	// provide a context.
 	backgroundCtx context.Context
+	cancel        func(err error)
 	kubeClient    kubernetes.Interface
 	getNode       func() (*v1.Node, error)
 	wipingDelay   time.Duration
 
+	wg    sync.WaitGroup
 	mutex sync.Mutex
 
 	// pendingWipes maps a plugin name to a cancel function for
@@ -76,9 +78,15 @@ var _ cache.PluginHandler = &RegistrationHandler{}
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
 func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
+	// The context and thus logger should come from the caller.
+	return newRegistrationHandler(context.TODO(), kubeClient, getNode, wipingDelay)
+}
+
+func newRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
+	ctx, cancel := context.WithCancelCause(ctx)
 	handler := &RegistrationHandler{
-		// The context and thus logger should come from the caller.
-		backgroundCtx: klog.NewContext(context.TODO(), klog.LoggerWithName(klog.TODO(), "DRA registration handler")),
+		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
+		cancel:        cancel,
 		kubeClient:    kubeClient,
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
@@ -92,11 +100,22 @@ func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1
 	// to start up.
 	//
 	// This has to run in the background.
-	logger := klog.LoggerWithName(klog.FromContext(handler.backgroundCtx), "startup")
-	ctx := klog.NewContext(handler.backgroundCtx, logger)
-	go handler.wipeResourceSlices(ctx, 0 /* no delay */, "" /* all drivers */)
+	handler.wg.Add(1)
+	go func() {
+		defer handler.wg.Done()
+
+		logger := klog.LoggerWithName(klog.FromContext(handler.backgroundCtx), "startup")
+		ctx := klog.NewContext(handler.backgroundCtx, logger)
+		handler.wipeResourceSlices(ctx, 0 /* no delay */, "" /* all drivers */)
+	}()
 
 	return handler
+}
+
+// Stop cancels any remaining background activities and blocks until all goroutines have stopped.
+func (h *RegistrationHandler) Stop() {
+	h.cancel(errors.New("Stop was called"))
+	h.wg.Wait()
 }
 
 // wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
@@ -291,7 +310,9 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 		}
 		h.pendingWipes[pluginName] = &cancel
 
+		h.wg.Add(1)
 		go func() {
+			defer h.wg.Done()
 			defer func() {
 				h.mutex.Lock()
 				defer h.mutex.Unlock()
