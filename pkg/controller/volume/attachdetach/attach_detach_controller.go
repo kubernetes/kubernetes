@@ -21,10 +21,10 @@ package attachdetach
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"net"
 	"time"
 
-	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
 
@@ -734,7 +734,7 @@ func (adc *attachDetachController) processVolumeAttachments(logger klog.Logger) 
 			continue
 		}
 		attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
-		if attachState == cache.AttachStateDetached {
+		if attachState == cache.AttachStateDetached || (!va.DeletionTimestamp.IsZero() && va.Status.Attached) {
 			logger.V(1).Info("Marking volume attachment as uncertain as volume is not attached", "node", klog.KRef("", string(nodeName)), "volumeName", volumeName, "attachState", attachState)
 			err = adc.actualStateOfWorld.MarkVolumeAsUncertain(logger, volumeName, volumeSpec, nodeName)
 			if err != nil {
