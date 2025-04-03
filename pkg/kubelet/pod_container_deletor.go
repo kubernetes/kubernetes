@@ -107,6 +107,8 @@ func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, po
 		filterContainerID = ""
 	}
 
+	klog.InfoS("DEBUG: deleteContainersInPod", "podStatus", podStatus)
+
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep) {
 		select {
 		case p.worker <- candidate.ID:

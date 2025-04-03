@@ -2553,6 +2553,7 @@ func (kl *Kubelet) syncLoopIteration(ctx context.Context, configCh <-chan kubety
 		}
 
 		if e.Type == pleg.ContainerDied {
+			klog.InfoS("DEBUG: CleanUp container", "event", e)
 			if containerID, ok := e.Data.(string); ok {
 				kl.cleanUpContainersInPod(e.ID, containerID)
 			}
