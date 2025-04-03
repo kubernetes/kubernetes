@@ -647,7 +647,7 @@ func TestCSILimits(t *testing.T) {
 				translator:           csiTranslator,
 			}
 			_, ctx := ktesting.NewTestContext(t)
-			_, gotPreFilterStatus := p.PreFilter(ctx, nil, test.newPod)
+			_, gotPreFilterStatus := p.PreFilter(ctx, nil, test.newPod, nil)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got):\n%s", diff)
 			}
