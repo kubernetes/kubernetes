@@ -49,6 +49,27 @@ type AuthorizationRuleResolver interface {
 	VisitRulesFor(ctx context.Context, user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
 }
 
+type PrivilegeEscalationError struct {
+	User                 user.Info
+	Namespace            string
+	MissingRules         []rbacv1.PolicyRule
+	RuleResolutionErrors []error
+}
+
+func (e *PrivilegeEscalationError) Error() string {
+	missingDescriptions := sets.NewString()
+	for _, missing := range e.MissingRules {
+		missingDescriptions.Insert(rbacv1helpers.CompactString(missing))
+	}
+
+	msg := fmt.Sprintf("user %q (groups=%q) is attempting to grant RBAC permissions not currently held:\n%s", e.User.GetName(), e.User.GetGroups(), strings.Join(missingDescriptions.List(), "\n"))
+	if len(e.RuleResolutionErrors) > 0 {
+		msg += fmt.Sprintf("; resolution errors: %v", e.RuleResolutionErrors)
+	}
+
+	return msg
+}
+
 // ConfirmNoEscalation determines if the roles for a given user in a given namespace encompass the provided role.
 func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleResolver, rules []rbacv1.PolicyRule) error {
 	ruleResolutionErrors := []error{}
@@ -73,17 +94,12 @@ func ConfirmNoEscalation(ctx context.Context, ruleResolver AuthorizationRuleReso
 			compactMissingRights = compact
 		}
 
-		missingDescriptions := sets.NewString()
-		for _, missing := range compactMissingRights {
-			missingDescriptions.Insert(rbacv1helpers.CompactString(missing))
+		return &PrivilegeEscalationError{
+			User:                 user,
+			Namespace:            namespace,
+			MissingRules:         compactMissingRights,
+			RuleResolutionErrors: ruleResolutionErrors,
 		}
-
-		msg := fmt.Sprintf("user %q (groups=%q) is attempting to grant RBAC permissions not currently held:\n%s", user.GetName(), user.GetGroups(), strings.Join(missingDescriptions.List(), "\n"))
-		if len(ruleResolutionErrors) > 0 {
-			msg = msg + fmt.Sprintf("; resolution errors: %v", ruleResolutionErrors)
-		}
-
-		return errors.New(msg)
 	}
 	return nil
 }
