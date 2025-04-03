@@ -17,7 +17,6 @@ limitations under the License.
 package prober
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -37,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -80,6 +80,7 @@ func TestTCPPortExhaustion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			podManager := kubepod.NewBasicPodManager()
 			podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 			m := NewManager(
@@ -134,12 +135,12 @@ func TestTCPPortExhaustion(t *testing.T) {
 				}
 				podManager.AddPod(&pod)
 				m.statusManager.SetPodStatus(&pod, pod.Status)
-				m.AddPod(&pod)
+				m.AddPod(tCtx, &pod)
 			}
 			t.Logf("Adding %d pods with %d containers each in %v", numTestPods, numContainers, time.Since(now))
 
-			ctx, cancel := context.WithTimeout(context.Background(), 59*time.Second)
-			defer cancel()
+			ctx := ktesting.WithTimeout(tCtx, 59*time.Second, "timeout 59 Second")
+			defer ctx.Cancel("TestTCPPortExhaustion completed")
 			var wg sync.WaitGroup
 
 			wg.Add(1)
