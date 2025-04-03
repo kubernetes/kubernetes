@@ -50,6 +50,9 @@ type Backoff struct {
 	// exceed the cap then the duration is set to the cap and the
 	// steps parameter is set to zero.
 	Cap time.Duration
+	// When the Duration reaches the Cap value, CapSustain determines whether
+	// it should remain at the Cap value until the Step variable becomes zero.
+	CapSustain bool
 }
 
 // Step returns an amount of time to sleep determined by the original
@@ -60,7 +63,7 @@ func (b *Backoff) Step() time.Duration {
 		return 0
 	}
 	var nextDuration time.Duration
-	nextDuration, b.Duration, b.Steps = delay(b.Steps, b.Duration, b.Cap, b.Factor, b.Jitter)
+	nextDuration, b.Duration, b.Steps = delay(b.Steps, b.Duration, b.Cap, b.Factor, b.Jitter, b.CapSustain)
 	return nextDuration
 }
 
@@ -73,11 +76,12 @@ func (b Backoff) DelayFunc() DelayFunc {
 	cap := b.Cap
 	factor := b.Factor
 	jitter := b.Jitter
+	capSustain := b.CapSustain
 
 	return func() time.Duration {
 		var nextDuration time.Duration
 		// jitter is applied per step and is not cumulative over multiple steps
-		nextDuration, duration, steps = delay(steps, duration, cap, factor, jitter)
+		nextDuration, duration, steps = delay(steps, duration, cap, factor, jitter, capSustain)
 		return nextDuration
 	}
 }
@@ -95,7 +99,7 @@ func (b Backoff) Timer() Timer {
 }
 
 // delay implements the core delay algorithm used in this package.
-func delay(steps int, duration, cap time.Duration, factor, jitter float64) (_ time.Duration, next time.Duration, nextSteps int) {
+func delay(steps int, duration, cap time.Duration, factor, jitter float64, capSustain bool) (_ time.Duration, next time.Duration, nextSteps int) {
 	// when steps is non-positive, do not alter the base duration
 	if steps < 1 {
 		if jitter > 0 {
@@ -110,7 +114,9 @@ func delay(steps int, duration, cap time.Duration, factor, jitter float64) (_ ti
 		next = time.Duration(float64(duration) * factor)
 		if cap > 0 && next > cap {
 			next = cap
-			steps = 0
+			if !capSustain {
+				steps = 0
+			}
 		}
 	} else {
 		next = duration
