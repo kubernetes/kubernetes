@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	admissionapi "k8s.io/pod-security-admission/api"
 
@@ -271,7 +270,7 @@ func configureTopologyManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguratio
 	newCfg.TopologyManagerScope = scope
 
 	// Set the CPU Manager policy to static.
-	newCfg.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+	newCfg.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
 
 	// Set the CPU Manager reconcile period to 1 second.
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
