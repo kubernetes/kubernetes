@@ -85,7 +85,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
-	"k8s.io/kubernetes/pkg/kubelet/cloudresource"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -305,7 +304,6 @@ type Dependencies struct {
 	Flagz                     flagz.Reader
 	Auth                      server.AuthInterface
 	CAdvisorInterface         cadvisor.Interface
-	Cloud                     cloudprovider.Interface
 	ContainerManager          cm.ContainerManager
 	EventClient               v1core.EventsGetter
 	HeartbeatClient           clientset.Interface
@@ -421,7 +419,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	kubeDeps *Dependencies,
 	crOptions *config.ContainerRuntimeOptions,
 	hostname string,
-	hostnameOverridden bool,
 	nodeName types.NodeName,
 	nodeIPs []net.IP,
 	providerID string,
@@ -460,7 +457,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	if !cloudprovider.IsExternal(cloudProvider) && len(cloudProvider) != 0 {
 		cloudprovider.DisableWarningForProvider(cloudProvider)
-		return nil, fmt.Errorf("cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider", cloudProvider)
+		return nil, cloudprovider.ErrorForDisabledProvider(cloudProvider)
 	}
 
 	var nodeHasSynced cache.InformerSynced
@@ -601,7 +598,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	klet := &Kubelet{
 		hostname:                       hostname,
-		hostnameOverridden:             hostnameOverridden,
 		nodeName:                       nodeName,
 		kubeClient:                     kubeDeps.KubeClient,
 		heartbeatClient:                kubeDeps.HeartbeatClient,
@@ -621,7 +617,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                       kubeDeps.Recorder,
 		cadvisor:                       kubeDeps.CAdvisorInterface,
-		cloud:                          kubeDeps.Cloud,
 		externalCloudProvider:          cloudprovider.IsExternal(cloudProvider),
 		providerID:                     providerID,
 		nodeRef:                        nodeRef,
@@ -649,10 +644,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
 		flagz:                          kubeDeps.Flagz,
-	}
-
-	if klet.cloud != nil {
-		klet.cloudResourceSyncManager = cloudresource.NewSyncManager(klet.cloud, nodeName, klet.nodeStatusUpdateFrequency)
 	}
 
 	var secretManager secret.Manager
@@ -1082,8 +1073,6 @@ type Kubelet struct {
 
 	// hostname is the hostname the kubelet detected or was given via flag/config
 	hostname string
-	// hostnameOverridden indicates the hostname was overridden via flag/config
-	hostnameOverridden bool
 
 	nodeName        types.NodeName
 	runtimeCache    kubecontainer.RuntimeCache
@@ -1263,11 +1252,6 @@ type Kubelet struct {
 
 	// Handles certificate rotations.
 	serverCertificateManager certificate.Manager
-
-	// Cloud provider interface.
-	cloud cloudprovider.Interface
-	// Handles requests to cloud provider with timeout
-	cloudResourceSyncManager cloudresource.SyncManager
 
 	// Indicates that the node initialization happens in an external cloud controller
 	externalCloudProvider bool
@@ -1753,11 +1737,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 	if kl.kubeClient == nil {
 		klog.InfoS("No API server defined - no node status update will be sent")
-	}
-
-	// Start the cloud provider sync manager
-	if kl.cloudResourceSyncManager != nil {
-		go kl.cloudResourceSyncManager.Run(wait.NeverStop)
 	}
 
 	if err := kl.initializeModules(ctx); err != nil {
