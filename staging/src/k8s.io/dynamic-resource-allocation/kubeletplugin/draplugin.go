@@ -26,6 +26,7 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/stats"
 	"k8s.io/klog/v2"
 
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
@@ -375,6 +376,16 @@ func FlockDirectoryPath(path string) Option {
 	}
 }
 
+// GRPCStatsHandler is used to monitor RPC calls and connections.
+// Its methods are called by the gRPC server when connections and calls
+// are started and finished.
+func GRPCStatsHandler(option stats.Handler) Option {
+	return func(o *options) error {
+		o.grpcStatsHandlers = append(o.grpcStatsHandlers, option)
+		return nil
+	}
+}
+
 type options struct {
 	logger                     klog.Logger
 	grpcVerbosity              int
@@ -387,6 +398,7 @@ type options struct {
 	draEndpointListen          func(ctx context.Context, path string) (net.Listener, error)
 	unaryInterceptors          []grpc.UnaryServerInterceptor
 	streamInterceptors         []grpc.StreamServerInterceptor
+	grpcStatsHandlers          []stats.Handler
 	kubeClient                 kubernetes.Interface
 	serialize                  bool
 	flockDirectoryPath         string
@@ -509,7 +521,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		file:       "dra" + uidPart + ".sock", // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
 		listenFunc: o.draEndpointListen,
 	}
-	pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
+	pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, nil, draEndpoint, func(grpcServer *grpc.Server) {
 		if o.nodeV1beta1 {
 			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
 			drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
@@ -525,7 +537,7 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}
 
 	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
+	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.grpcStatsHandlers, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("start registrar: %v", err)
 	}

@@ -27,8 +27,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/stats"
 
 	resourceapi "k8s.io/api/resource/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +62,7 @@ type ExamplePlugin struct {
 	mutex     sync.Mutex
 	prepared  map[ClaimID][]kubeletplugin.Device // prepared claims -> result of nodePrepareResource
 	gRPCCalls []GRPCCall
+	connected atomic.Bool // true if there is at least one active GRPC connection
 
 	blockPrepareResourcesMutex   sync.Mutex
 	blockUnprepareResourcesMutex sync.Mutex
@@ -69,6 +72,8 @@ type ExamplePlugin struct {
 
 	unprepareResourcesFailure   error
 	failUnprepareResourcesMutex sync.Mutex
+
+	blockGetInfoMutex sync.Mutex
 }
 
 type GRPCCall struct {
@@ -168,6 +173,9 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.KubeClient(kubeClient),
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
+		kubeletplugin.Serialize(false), // The example plugin does its own locking.
+		kubeletplugin.GRPCInterceptor(ex.getInfoInterceptor),
+		kubeletplugin.GRPCStatsHandler(ex.newStatsHandler()),
 	)
 	d, err := kubeletplugin.Start(ctx, ex, opts...)
 	if err != nil {
@@ -231,6 +239,21 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 		return false
 	}
 	return status.PluginRegistered
+}
+
+func (ex *ExamplePlugin) ResetRegistrationStatus() {
+	status := ex.d.RegistrationStatus()
+	if status != nil {
+		status.Reset()
+	}
+}
+
+// BlockGetInfo locks blockGetInfoMutex and returns unlocking function for it
+func (ex *ExamplePlugin) BlockGetInfo() func() {
+	ex.blockGetInfoMutex.Lock()
+	return func() {
+		ex.blockGetInfoMutex.Unlock()
+	}
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
@@ -553,4 +576,57 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 
 func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
 	return ex.kubeClient.ResourceV1beta1().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+}
+
+// getInfoInterceptor is an interceptor that blocks GetInfo GRPC calls.
+// GetInfo is used by plugin watcher to check if plugin is alive, so blocking it is equivalent to plugin stuckness.
+func (ex *ExamplePlugin) getInfoInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+	if info.FullMethod == "/pluginregistration.Registration/GetInfo" {
+		ex.blockGetInfoMutex.Lock()
+		defer ex.blockGetInfoMutex.Unlock()
+	}
+	return handler(ctx, req)
+}
+
+func (ex *ExamplePlugin) IsConnected() bool {
+	return ex.connected.Load()
+}
+
+type statsHandler struct {
+	connected *atomic.Bool
+}
+
+func (ex *ExamplePlugin) newStatsHandler() stats.Handler {
+	return &statsHandler{connected: &ex.connected}
+}
+
+// grpc.stats.Handler interface method.
+// HandleConn is called when a GRPC connection starts and ends.
+func (h *statsHandler) HandleConn(ctx context.Context, conn stats.ConnStats) {
+	switch conn.(type) {
+	case *stats.ConnBegin:
+		klog.FromContext(ctx).V(3).Info("Handle connection: begin")
+		h.connected.Store(true)
+	case *stats.ConnEnd:
+		klog.FromContext(ctx).V(3).Info("Handle connection: end")
+		h.connected.Store(false)
+	}
+}
+
+// grpc.stats.Handler interface method.
+// TagConn is required by the stats.Handler interface but not used here.
+func (*statsHandler) TagConn(ctx context.Context, connTagInfo *stats.ConnTagInfo) context.Context {
+	klog.FromContext(ctx).V(3).Info("Tag connection", "LocalAddr", connTagInfo.LocalAddr, "RemoteAddr", connTagInfo.RemoteAddr)
+	return ctx
+}
+
+// grpc.stats.Handler interface method.
+// HandleRPC is required by the interface but not used here.
+func (*statsHandler) HandleRPC(_ context.Context, rpcStats stats.RPCStats) {}
+
+// grpc.stats.Handler interface method.
+// TagRPC is required by the interface but not used here.
+func (*statsHandler) TagRPC(ctx context.Context, rpcTagInfo *stats.RPCTagInfo) context.Context {
+	klog.FromContext(ctx).V(3).Info("Tag RPC", "FullMethodName", rpcTagInfo.FullMethodName)
+	return ctx
 }
