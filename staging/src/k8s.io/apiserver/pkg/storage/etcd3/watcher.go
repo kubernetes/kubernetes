@@ -431,7 +431,12 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 	for {
 		select {
 		case e := <-wc.incomingEventChan:
-			res := wc.transform(e)
+			res, err := wc.transform(e)
+			if err != nil {
+				wc.sendError(err)
+				return
+			}
+
 			if res == nil {
 				continue
 			}
@@ -465,12 +470,11 @@ func (wc *watchChan) acceptAll() bool {
 }
 
 // transform transforms an event into a result for user if not filtered.
-func (wc *watchChan) transform(e *event) (res *watch.Event) {
+func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 	curObj, oldObj, err := wc.prepareObjs(e)
 	if err != nil {
 		klog.Errorf("failed to prepare current and previous objects: %v", err)
-		wc.sendError(err)
-		return nil
+		return nil, err
 	}
 
 	switch {
@@ -478,12 +482,11 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 		object := wc.watcher.newFunc()
 		if err := wc.watcher.versioner.UpdateObject(object, uint64(e.rev)); err != nil {
 			klog.Errorf("failed to propagate object version: %v", err)
-			return nil
+			return nil, fmt.Errorf("failed to propagate object resource version: %w", err)
 		}
 		if e.isInitialEventsEndBookmark {
 			if err := storage.AnnotateInitialEventsEndBookmark(object); err != nil {
-				wc.sendError(fmt.Errorf("error while accessing object's metadata gr: %v, type: %v, obj: %#v, err: %v", wc.watcher.groupResource, wc.watcher.objectType, object, err))
-				return nil
+				return nil, fmt.Errorf("error while accessing object's metadata gr: %v, type: %v, obj: %#v, err: %w", wc.watcher.groupResource, wc.watcher.objectType, object, err)
 			}
 		}
 		res = &watch.Event{
@@ -492,7 +495,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 		}
 	case e.isDeleted:
 		if !wc.filter(oldObj) {
-			return nil
+			return nil, nil
 		}
 		res = &watch.Event{
 			Type:   watch.Deleted,
@@ -500,7 +503,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 		}
 	case e.isCreated:
 		if !wc.filter(curObj) {
-			return nil
+			return nil, nil
 		}
 		res = &watch.Event{
 			Type:   watch.Added,
@@ -512,7 +515,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 				Type:   watch.Modified,
 				Object: curObj,
 			}
-			return res
+			return res, nil
 		}
 		curObjPasses := wc.filter(curObj)
 		oldObjPasses := wc.filter(oldObj)
@@ -534,7 +537,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			}
 		}
 	}
-	return res
+	return res, nil
 }
 
 func transformErrorToEvent(err error) *watch.Event {
