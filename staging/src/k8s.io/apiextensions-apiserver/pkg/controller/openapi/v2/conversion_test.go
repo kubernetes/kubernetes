@@ -34,7 +34,7 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	yaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
@@ -646,7 +646,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "preserve-unknown-fields in arrays",
 			in: &apiextensions.JSONSchemaProps{
-				XPreserveUnknownFields: pointer.BoolPtr(true),
+				XPreserveUnknownFields: ptr.To(true),
 				Type:                   "array",
 				Items: &apiextensions.JSONSchemaPropsOrArray{Schema: &apiextensions.JSONSchemaProps{
 					Type: "string",
@@ -657,7 +657,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 		{
 			name: "preserve-unknown-fields in objects",
 			in: &apiextensions.JSONSchemaProps{
-				XPreserveUnknownFields: pointer.BoolPtr(true),
+				XPreserveUnknownFields: ptr.To(true),
 				Type:                   "object",
 				Properties: map[string]apiextensions.JSONSchemaProps{
 					"foo": {
