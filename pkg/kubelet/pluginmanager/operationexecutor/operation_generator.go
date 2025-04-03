@@ -65,7 +65,8 @@ type OperationGenerator interface {
 		socketPath string,
 		UUID types.UID,
 		pluginHandlers map[string]cache.PluginHandler,
-		actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error
+		actualStateOfWorldUpdater ActualStateOfWorldUpdater,
+		desiredStateOfWorld cache.DesiredStateOfWorld) func() error
 
 	// Generates the UnregisterPlugin function needed to perform the unregistration of a plugin
 	GenerateUnregisterPluginFunc(
@@ -77,7 +78,8 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 	socketPath string,
 	pluginUUID types.UID,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorldUpdater ActualStateOfWorldUpdater) func() error {
+	actualStateOfWorldUpdater ActualStateOfWorldUpdater,
+	desiredStateOfWorld cache.DesiredStateOfWorld) func() error {
 
 	registerPluginFunc := func() error {
 		client, conn, err := dial(socketPath, dialTimeoutDuration)
@@ -123,7 +125,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if err != nil {
 			klog.ErrorS(err, "RegisterPlugin error -- failed to add plugin", "path", socketPath)
 		}
-		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil); err != nil {
+		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions, nil, desiredStateOfWorld); err != nil {
 			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 		}
 
