@@ -523,6 +523,10 @@ var (
 	// - ci-kubernetes-node-e2e-cri-proxy-serial
 	CriProxy = framework.WithFeature(framework.ValidFeatures.Add("CriProxy"))
 
+	// owner: @chaunceyctx
+	// remove termination log file automatically when container has been removed.
+	KeepTerminationLogFile = framework.WithFeature(framework.ValidFeatures.Add("KeepTerminationLogFile"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	TopologyManager = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
 
