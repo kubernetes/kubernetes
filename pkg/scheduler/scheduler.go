@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -315,7 +316,7 @@ func New(ctx context.Context,
 		resourceClaimCache = assumecache.NewAssumeCache(logger, resourceClaimInformer, "ResourceClaim", "", nil)
 		resourceSliceTrackerOpts := resourceslicetracker.Options{
 			EnableDeviceTaints: utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
-			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+			SliceInformer:      draapi.NewInformerForResourceSlice(informerFactory),
 			KubeClient:         client,
 		}
 		// If device taints are disabled, the additional informers are not needed and

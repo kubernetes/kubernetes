@@ -36,9 +36,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	resourcelisters "k8s.io/client-go/listers/resource/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 	"k8s.io/dynamic-resource-allocation/cel"
 	"k8s.io/dynamic-resource-allocation/internal/queue"
 	"k8s.io/klog/v2"
@@ -59,7 +59,7 @@ const (
 type Tracker struct {
 	enableDeviceTaints bool
 
-	resourceSliceLister   resourcelisters.ResourceSliceLister
+	resourceSliceLister   draapi.ResourceSliceLister
 	resourceSlices        cache.SharedIndexInformer
 	resourceSlicesHandle  cache.ResourceEventHandlerRegistration
 	deviceTaints          cache.SharedIndexInformer
@@ -111,7 +111,7 @@ type Options struct {
 	// SliceInformer, with no processing of its own.
 	EnableDeviceTaints bool
 
-	SliceInformer resourceinformers.ResourceSliceInformer
+	SliceInformer draapi.ResourceSliceInformer
 	TaintInformer resourcealphainformers.DeviceTaintRuleInformer
 	ClassInformer resourceinformers.DeviceClassInformer
 
@@ -254,12 +254,12 @@ func (t *Tracker) Stop() {
 
 // ListPatchedResourceSlices returns all ResourceSlices in the cluster with
 // modifications from DeviceTaints applied.
-func (t *Tracker) ListPatchedResourceSlices() ([]*resourceapi.ResourceSlice, error) {
+func (t *Tracker) ListPatchedResourceSlices() ([]*draapi.ResourceSlice, error) {
 	if !t.enableDeviceTaints {
 		return t.resourceSliceLister.List(labels.Everything())
 	}
 
-	return typedSlice[*resourceapi.ResourceSlice](t.patchedResourceSlices.List()), nil
+	return typedSlice[*draapi.ResourceSlice](t.patchedResourceSlices.List()), nil
 }
 
 // AddEventHandler adds an event handler to the tracker. Events to a
@@ -339,21 +339,21 @@ func (t *Tracker) pushEvent(oldObj, newObj any) {
 }
 
 func sliceDriverPoolDeviceIndexFunc(obj any) ([]string, error) {
-	slice := obj.(*resourceapi.ResourceSlice)
+	slice := obj.(*draapi.ResourceSlice)
 	drivers := []string{
 		anyDriver,
-		slice.Spec.Driver,
+		slice.Spec.Driver.String(),
 	}
 	pools := []string{
 		anyPool,
-		slice.Spec.Pool.Name,
+		slice.Spec.Pool.Name.String(),
 	}
 	indexValues := make([]string, 0, len(drivers)*len(pools)*(1+len(slice.Spec.Devices)))
 	for _, driver := range drivers {
 		for _, pool := range pools {
 			indexValues = append(indexValues, deviceID(driver, pool, anyDevice))
 			for _, device := range slice.Spec.Devices {
-				indexValues = append(indexValues, deviceID(driver, pool, device.Name))
+				indexValues = append(indexValues, deviceID(driver, pool, device.Name.String()))
 			}
 		}
 	}
@@ -381,7 +381,7 @@ func (t *Tracker) sliceNamesForPatch(ctx context.Context, patch *resourcealphaap
 func (t *Tracker) resourceSliceAdd(ctx context.Context) func(obj any) {
 	logger := klog.FromContext(ctx)
 	return func(obj any) {
-		slice, ok := obj.(*resourceapi.ResourceSlice)
+		slice, ok := obj.(*draapi.ResourceSlice)
 		if !ok {
 			return
 		}
@@ -393,11 +393,11 @@ func (t *Tracker) resourceSliceAdd(ctx context.Context) func(obj any) {
 func (t *Tracker) resourceSliceUpdate(ctx context.Context) func(oldObj, newObj any) {
 	logger := klog.FromContext(ctx)
 	return func(oldObj, newObj any) {
-		oldSlice, ok := oldObj.(*resourceapi.ResourceSlice)
+		oldSlice, ok := oldObj.(*draapi.ResourceSlice)
 		if !ok {
 			return
 		}
-		newSlice, ok := newObj.(*resourceapi.ResourceSlice)
+		newSlice, ok := newObj.(*draapi.ResourceSlice)
 		if !ok {
 			return
 		}
@@ -418,7 +418,7 @@ func (t *Tracker) resourceSliceDelete(ctx context.Context) func(obj any) {
 		if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 			obj = tombstone.Obj
 		}
-		slice, ok := obj.(*resourceapi.ResourceSlice)
+		slice, ok := obj.(*draapi.ResourceSlice)
 		if !ok {
 			return
 		}
@@ -573,16 +573,16 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 		logger.V(5).Info("patched ResourceSlice deleted")
 		return
 	}
-	var oldPatchedSlice *resourceapi.ResourceSlice
+	var oldPatchedSlice *draapi.ResourceSlice
 	if oldSliceExists {
 		var ok bool
-		oldPatchedSlice, ok = oldPatchedObj.(*resourceapi.ResourceSlice)
+		oldPatchedSlice, ok = oldPatchedObj.(*draapi.ResourceSlice)
 		if !ok {
 			t.handleError(ctx, errors.New("invalid type in resource slice cache"), "expectedType", fmt.Sprintf("%T", (*resourceapi.ResourceSlice)(nil)), "gotType", fmt.Sprintf("%T", oldPatchedObj))
 			return
 		}
 	}
-	slice, ok := obj.(*resourceapi.ResourceSlice)
+	slice, ok := obj.(*draapi.ResourceSlice)
 	if !ok {
 		t.handleError(ctx, errors.New("invalid type in resource slice cache"), fmt.Sprintf("expected type to be %T, got %T", (*resourceapi.ResourceSlice)(nil), obj))
 		return
@@ -623,7 +623,7 @@ func (t *Tracker) syncSlice(ctx context.Context, name string, sendEvent bool) {
 	}
 }
 
-func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule) (*resourceapi.ResourceSlice, error) {
+func (t *Tracker) applyPatches(ctx context.Context, slice *draapi.ResourceSlice, taintRules []*resourcealphaapi.DeviceTaintRule) (*draapi.ResourceSlice, error) {
 	logger := klog.FromContext(ctx)
 
 	// slice will be DeepCopied just-in-time, only when necessary.
@@ -638,11 +638,11 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 		var selectorExprs []cel.CompilationResult
 		var deviceName *string
 		if deviceSelector != nil {
-			if deviceSelector.Driver != nil && *deviceSelector.Driver != slice.Spec.Driver {
+			if deviceSelector.Driver != nil && *deviceSelector.Driver != slice.Spec.Driver.String() {
 				logger.V(7).Info("DeviceTaintRule does not apply, mismatched driver", "sliceDriver", slice.Spec.Driver, "taintDriver", *deviceSelector.Driver)
 				continue
 			}
-			if deviceSelector.Pool != nil && *deviceSelector.Pool != slice.Spec.Pool.Name {
+			if deviceSelector.Pool != nil && *deviceSelector.Pool != slice.Spec.Pool.Name.String() {
 				logger.V(7).Info("DeviceTaintRule does not apply, mismatched pool", "slicePool", slice.Spec.Pool.Name, "taintPool", *deviceSelector.Pool)
 				continue
 			}
@@ -674,10 +674,10 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 		}
 	devices:
 		for dIndex, device := range slice.Spec.Devices {
-			deviceID := deviceID(slice.Spec.Driver, slice.Spec.Pool.Name, device.Name)
+			deviceID := deviceID(slice.Spec.Driver.String(), slice.Spec.Pool.Name.String(), device.Name.String())
 			logger := logger.WithValues("device", deviceID)
 
-			if deviceName != nil && *deviceName != device.Name {
+			if deviceName != nil && *deviceName != device.Name.String() {
 				logger.V(7).Info("DeviceTaintRule does not apply, mismatched device", "sliceDevice", device.Name, "taintDevice", *deviceSelector.Device)
 				continue
 			}
@@ -694,7 +694,7 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 					// than the cluster it runs in.
 					return nil, fmt.Errorf("DeviceTaintRule %s: class %s: selector #%d: CEL compile error: %w", taintRule.Name, *deviceSelector.DeviceClassName, i, expr.Error)
 				}
-				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
+				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver.String(), Attributes: deviceAttributes, Capacity: deviceCapacity})
 				logger.V(7).Info("CEL result", "class", *deviceSelector.DeviceClassName, "selector", i, "expression", expr.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 				if err != nil {
 					continue devices
@@ -713,7 +713,7 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 					// than the cluster it runs in.
 					return nil, fmt.Errorf("DeviceTaintRule %s: selector #%d: CEL compile error: %w", taintRule.Name, i, expr.Error)
 				}
-				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver, Attributes: deviceAttributes, Capacity: deviceCapacity})
+				matches, details, err := expr.DeviceMatches(ctx, cel.Device{Driver: slice.Spec.Driver.String(), Attributes: deviceAttributes, Capacity: deviceCapacity})
 				logger.V(7).Info("CEL result", "selector", i, "expression", expr.Expression, "matches", matches, "actualCost", ptr.Deref(details.ActualCost(), 0), "err", err)
 				if err != nil {
 					if t.recorder != nil {
@@ -747,28 +747,28 @@ func (t *Tracker) applyPatches(ctx context.Context, slice *resourceapi.ResourceS
 	return patchedSlice, nil
 }
 
-func getAttributes(device resourceapi.Device) map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
+func getAttributes(device draapi.Device) map[draapi.QualifiedName]draapi.DeviceAttribute {
 	if device.Basic != nil {
 		return device.Basic.Attributes
 	}
 	return nil
 }
 
-func getCapacity(device resourceapi.Device) map[resourceapi.QualifiedName]resourceapi.DeviceCapacity {
+func getCapacity(device draapi.Device) map[draapi.QualifiedName]draapi.DeviceCapacity {
 	if device.Basic != nil {
 		return device.Basic.Capacity
 	}
 	return nil
 }
 
-func getTaints(device resourceapi.Device) []resourceapi.DeviceTaint {
+func getTaints(device draapi.Device) []resourceapi.DeviceTaint {
 	if device.Basic != nil {
 		return device.Basic.Taints
 	}
 	return nil
 }
 
-func appendTaint(device *resourceapi.Device, taint resourceapi.DeviceTaint) {
+func appendTaint(device *draapi.Device, taint resourceapi.DeviceTaint) {
 	if device.Basic != nil {
 		device.Basic.Taints = append(device.Basic.Taints, taint)
 		return

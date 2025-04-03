@@ -19,4 +19,5 @@ limitations under the License.
 // a map.
 //
 // +k8s:conversion-gen=k8s.io/api/resource/v1beta1
+// +k8s:deepcopy-gen=package
 package api
