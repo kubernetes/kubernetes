@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
@@ -103,6 +104,7 @@ func TestQueueWaitTimeLatencyTracker(t *testing.T) {
 	startTime := time.Now()
 	clk, _ := eventclock.NewFake(startTime, 0, nil)
 	controller := newTestableController(TestableConfig{
+		FeatureGate:            fcboot.LatestFeatureGate,
 		Name:                   "Controller",
 		Clock:                  clk,
 		AsFieldManager:         ConfigConsumerAsFieldManager,
