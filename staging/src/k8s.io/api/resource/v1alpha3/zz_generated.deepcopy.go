@@ -129,6 +129,26 @@ func (in *BasicDevice) DeepCopyInto(out *BasicDevice) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.UsageRestrictedToNode != nil {
+		in, out := &in.UsageRestrictedToNode, &out.UsageRestrictedToNode
+		*out = new(bool)
+		**out = **in
+	}
+	if in.BindingConditions != nil {
+		in, out := &in.BindingConditions, &out.BindingConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingFailureConditions != nil {
+		in, out := &in.BindingFailureConditions, &out.BindingFailureConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingTimeoutSeconds != nil {
+		in, out := &in.BindingTimeoutSeconds, &out.BindingTimeoutSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
@@ -599,6 +619,21 @@ func (in *DeviceRequestAllocationResult) DeepCopyInto(out *DeviceRequestAllocati
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
+	}
+	if in.BindingConditions != nil {
+		in, out := &in.BindingConditions, &out.BindingConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingFailureConditions != nil {
+		in, out := &in.BindingFailureConditions, &out.BindingFailureConditions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.BindingTimeoutSeconds != nil {
+		in, out := &in.BindingTimeoutSeconds, &out.BindingTimeoutSeconds
+		*out = new(int64)
+		**out = **in
 	}
 	return
 }

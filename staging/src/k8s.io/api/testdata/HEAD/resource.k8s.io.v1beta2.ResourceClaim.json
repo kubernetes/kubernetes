@@ -144,7 +144,14 @@
                 "effect": "effectValue",
                 "tolerationSeconds": 5
               }
-            ]
+            ],
+            "bindingConditions": [
+              "bindingConditionsValue"
+            ],
+            "bindingFailureConditions": [
+              "bindingFailureConditionsValue"
+            ],
+            "bindingTimeoutSeconds": 9
           }
         ],
         "config": [
