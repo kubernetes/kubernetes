@@ -56,7 +56,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST should be transformed to WATCH if we have the right query param on the request",
 			initialVerb: "LIST",
 			request: &http.Request{
-				Method: "GET",
+				Method: http.MethodGet,
 				URL: &url.URL{
 					RawQuery: "watch=true",
 				},
@@ -67,7 +67,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "LIST isn't transformed to WATCH if we have query params that do not include watch",
 			initialVerb: "LIST",
 			request: &http.Request{
-				Method: "GET",
+				Method: http.MethodGet,
 				URL: &url.URL{
 					RawQuery: "blah=asdf&something=else",
 				},
@@ -81,7 +81,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "GET is transformed to WATCH if we have the right query param on the request",
 			initialVerb: "GET",
 			request: &http.Request{
-				Method: "GET",
+				Method: http.MethodGet,
 				URL: &url.URL{
 					RawQuery: "watch=true",
 				},
@@ -93,7 +93,7 @@ func TestCleanVerb(t *testing.T) {
 			initialVerb:   "LIST",
 			suggestedVerb: "WATCH",
 			request: &http.Request{
-				Method: "GET",
+				Method: http.MethodGet,
 				URL: &url.URL{
 					RawQuery: "/api/v1/watch/pods",
 				},
@@ -105,7 +105,7 @@ func TestCleanVerb(t *testing.T) {
 			initialVerb:   "LIST",
 			suggestedVerb: "WATCHLIST",
 			request: &http.Request{
-				Method: "GET",
+				Method: http.MethodGet,
 				URL: &url.URL{
 					RawQuery: "/api/v1/watch/pods",
 				},
@@ -116,6 +116,18 @@ func TestCleanVerb(t *testing.T) {
 			desc:         "WATCHLIST should be transformed to WATCH",
 			initialVerb:  "WATCHLIST",
 			request:      nil,
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watchlist if no suggestedVerb is provided",
+			initialVerb:   "LIST",
+			suggestedVerb: "",
+			request: &http.Request{
+				Method: http.MethodGet,
+				URL: &url.URL{
+					Path: "/api/v1/watch/namespaces",
+				},
+			},
 			expectedVerb: "WATCH",
 		},
 		{
@@ -150,7 +162,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "Pod logs should be transformed to CONNECT",
 			initialVerb: "GET",
 			request: &http.Request{
-				Method: "GET",
+				Method: http.MethodGet,
 				URL: &url.URL{
 					RawQuery: "/api/v1/namespaces/default/pods/test-pod/log",
 				},
@@ -167,7 +179,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "Pod exec should be transformed to CONNECT",
 			initialVerb: "POST",
 			request: &http.Request{
-				Method: "POST",
+				Method: http.MethodPost,
 				URL: &url.URL{
 					RawQuery: "/api/v1/namespaces/default/pods/test-pod/exec?command=sh",
 				},
@@ -191,7 +203,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "Pod portforward should be transformed to CONNECT",
 			initialVerb: "POST",
 			request: &http.Request{
-				Method: "POST",
+				Method: http.MethodPost,
 				URL: &url.URL{
 					RawQuery: "/api/v1/namespaces/default/pods/test-pod/portforward",
 				},
@@ -215,7 +227,7 @@ func TestCleanVerb(t *testing.T) {
 			desc:        "Deployment scale should not be transformed to CONNECT",
 			initialVerb: "PUT",
 			request: &http.Request{
-				Method: "PUT",
+				Method: http.MethodPut,
 				URL: &url.URL{
 					RawQuery: "/apis/apps/v1/namespaces/default/deployments/test-1/scale",
 				},
@@ -235,6 +247,9 @@ func TestCleanVerb(t *testing.T) {
 			req := &http.Request{URL: &url.URL{}}
 			if tt.request != nil {
 				req = tt.request
+			}
+			if req.URL == nil {
+				req.URL = &url.URL{}
 			}
 			cleansedVerb := cleanVerb(tt.initialVerb, tt.suggestedVerb, req, tt.requestInfo)
 			if cleansedVerb != tt.expectedVerb {
