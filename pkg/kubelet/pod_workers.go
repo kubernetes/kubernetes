@@ -690,10 +690,12 @@ func (p *podWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	if status, ok := p.podSyncStatuses[uid]; ok {
+		klog.InfoS("DEBUG: ShouldPodContentBeRemoved", "uid", uid, "status", status)
 		return status.IsEvicted() || (status.IsDeleted() && status.IsTerminated())
 	}
 	// a pod that hasn't been sent to the pod worker yet should have no content on disk once we have
 	// synced all content.
+	klog.InfoS("DEBUG:  ShouldPodContentBeRemoved podsSynced", "uid", uid)
 	return p.podsSynced
 }
 
