@@ -157,7 +157,7 @@ kube::build::get_docker_wrapped_binaries() {
 # shellcheck disable=SC2120 # optional parameters
 function kube::build::verify_prereqs() {
   local -r require_docker=${1:-true}
-  kube::log::status "Verifying Prerequisites...."
+  kube::log::status "Verifying Prerequisites..."
   kube::build::ensure_tar || return 1
   kube::build::ensure_rsync || return 1
   if ${require_docker}; then
