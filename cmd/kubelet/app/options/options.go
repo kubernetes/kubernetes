@@ -139,7 +139,7 @@ type KubeletFlags struct {
 func NewKubeletFlags() *KubeletFlags {
 	return &KubeletFlags{
 		ContainerRuntimeOptions: *NewContainerRuntimeOptions(),
-		CertDirectory:           "/var/lib/kubelet/pki",
+		CertDirectory:           filepath.Join(filepath.Clean(defaultRootDir), "pki"),
 		RootDirectory:           filepath.Clean(defaultRootDir),
 		MaxContainerCount:       -1,
 		MaxPerPodContainerCount: 1,
