@@ -234,6 +234,25 @@ func Test4xxStatusCodeInvalidPatch(t *testing.T) {
 	}
 }
 
+func TestResourceVersionFutureRev(t *testing.T) {
+	ctx, client, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	var statusCode int
+
+	result := client.AppsV1().RESTClient().
+		Get().
+		Resource("deployments").
+		Param("resourceVersion", "2147483647").
+		Param("limit", "1").
+		Do(ctx)
+	result.StatusCode(&statusCode)
+
+	if statusCode != http.StatusGatewayTimeout {
+		t.Fatalf("Expected status code to be 504, got %v (%#v)", statusCode, result)
+	}
+}
+
 func TestCacheControl(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
