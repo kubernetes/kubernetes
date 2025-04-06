@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -376,6 +377,83 @@ func Test202StatusCode(t *testing.T) {
 		t.Fatalf("Failed to create rs: %v", err)
 	}
 	verifyStatusCode(t, transport, "DELETE", kubeConfig.Host+path.Join("/apis/apps/v1/namespaces", ns.Name, "replicasets", rs.Name), cascDel, 202)
+}
+
+func TestInvalidResourceVersionParam(t *testing.T) {
+	ctx, client, _, tearDownFn := setup(t)
+	defer tearDownFn()
+
+	const InvalidResourceVersion = "-1"
+	var statusCode int
+
+	// test Watch
+	watcher, err := client.CoreV1().RESTClient().
+		Get().
+		Resource("persistentvolumes").
+		Param("resourceVersion", InvalidResourceVersion).
+		Param("watch", "true").
+		Watch(ctx)
+
+	if err != nil {
+		var e *apierrors.StatusError
+		if errors.As(err, &e) {
+			if e.Status().Code != http.StatusBadRequest {
+				t.Fatalf("Expected status code of \"watch\" to be 400, got %v", e.Status().Code)
+			}
+		}
+	}
+
+	if watcher != nil {
+		t.Fatalf("Unexpected watch: %v", watcher)
+	}
+
+	// test Watch
+	watcher, err = client.EventsV1().RESTClient().
+		Get().
+		Resource("events").
+		Param("resourceVersion", InvalidResourceVersion).
+		Param("watch", "true").
+		Watch(ctx)
+
+	if err != nil {
+		var e *apierrors.StatusError
+		if errors.As(err, &e) {
+			if e.Status().Code != http.StatusBadRequest {
+				t.Fatalf("Expected status code of \"watch\" to be 400, got %v", e.Status().Code)
+			}
+		}
+	}
+
+	if watcher != nil {
+		t.Fatalf("Unexpected watch: %v", watcher)
+	}
+
+	// test Get
+	result := client.CoreV1().RESTClient().
+		Get().
+		Resource("persistentvolumes").
+		Name("foo").
+		Param("resourceVersion", InvalidResourceVersion).
+		Do(ctx)
+
+	result.StatusCode(&statusCode)
+
+	if statusCode != 400 {
+		t.Fatalf("Expected status code of \"get\" to be 400, got %v (%#v)", statusCode, result)
+	}
+
+	// test GetList
+	result = client.CoreV1().RESTClient().
+		Get().
+		Resource("persistentvolumes").
+		Param("resourceVersion", InvalidResourceVersion).
+		Do(ctx)
+
+	result.StatusCode(&statusCode)
+
+	if statusCode != 400 {
+		t.Fatalf("Expected status code of \"getlist\" to be 400, got %v (%#v)", statusCode, result)
+	}
 }
 
 var (

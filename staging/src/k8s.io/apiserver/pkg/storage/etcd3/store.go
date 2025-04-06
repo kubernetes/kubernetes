@@ -907,7 +907,7 @@ func (s *store) Watch(ctx context.Context, key string, opts storage.ListOptions)
 	}
 	rev, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 	return s.watcher.Watch(s.watchContext(ctx), preparedKey, int64(rev), opts)
 }
