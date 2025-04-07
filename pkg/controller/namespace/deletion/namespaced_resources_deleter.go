@@ -162,11 +162,12 @@ func (d *namespacedResourcesDeleter) initOpCache(ctx context.Context) {
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
+		return
 	}
 	logger := klog.FromContext(ctx)
 	if len(resources) == 0 {
 		logger.Error(err, "Unable to get any supported resources from server")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+		return
 	}
 
 	for _, rl := range resources {
