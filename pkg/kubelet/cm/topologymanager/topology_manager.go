@@ -226,9 +226,9 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmit
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(attrs.Pod)
+	podAdmitResult, err := m.scope.Admit(attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
 	klog.V(4).InfoS("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))
-	return podAdmitResult, nil
+	return podAdmitResult, err
 }

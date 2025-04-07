@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -44,7 +44,7 @@ func NewPodScope(policy Policy) Scope {
 	}
 }
 
-func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *podScope) Admit(pod *v1.Pod) (lifecycle.PodAdmitResult, error) {
 	bestHint, admit := s.calculateAffinity(pod)
 	klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	if !admit {
@@ -53,7 +53,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 			metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
 		}
 		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-		return admission.GetPodAdmitResult(&TopologyAffinityError{})
+		return admission.GetPodAdmitResult(&TopologyAffinityError{}), nil
 	}
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
@@ -63,7 +63,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-			return admission.GetPodAdmitResult(err)
+			return admission.GetPodAdmitResult(err), nil
 		}
 	}
 	if IsAlignmentGuaranteed(s.policy) {
@@ -71,7 +71,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		klog.V(4).InfoS("Resource alignment at pod scope guaranteed", "pod", klog.KObj(pod))
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
 	}
-	return admission.GetPodAdmitResult(nil)
+	return admission.GetPodAdmitResult(nil), nil
 }
 
 func (s *podScope) accumulateProvidersHints(pod *v1.Pod) []map[string][]TopologyHint {

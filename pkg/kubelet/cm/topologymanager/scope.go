@@ -19,7 +19,7 @@ package topologymanager
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -41,7 +41,7 @@ type podTopologyHints map[string]map[string]TopologyHint
 type Scope interface {
 	Name() string
 	GetPolicy() Policy
-	Admit(pod *v1.Pod) lifecycle.PodAdmitResult
+	Admit(pod *v1.Pod) (lifecycle.PodAdmitResult, error)
 	// AddHintProvider adds a hint provider to manager to indicate the hint provider
 	// wants to be consoluted with when making topology hints
 	AddHintProvider(h HintProvider)
@@ -135,14 +135,14 @@ func (s *scope) RemoveContainer(containerID string) error {
 	return nil
 }
 
-func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *scope) admitPolicyNone(pod *v1.Pod) (lifecycle.PodAdmitResult, error) {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			return admission.GetPodAdmitResult(err)
+			return admission.GetPodAdmitResult(err), nil
 		}
 	}
-	return admission.GetPodAdmitResult(nil)
+	return admission.GetPodAdmitResult(nil), nil
 }
 
 // It would be better to implement this function in topologymanager instead of scope

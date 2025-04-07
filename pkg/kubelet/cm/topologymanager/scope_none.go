@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
@@ -41,6 +41,6 @@ func NewNoneScope() Scope {
 	}
 }
 
-func (s *noneScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *noneScope) Admit(pod *v1.Pod) (lifecycle.PodAdmitResult, error) {
 	return s.admitPolicyNone(pod)
 }
