@@ -39,7 +39,7 @@ import (
 var _ = common.SIGDescribe("Service CIDRs", func() {
 
 	fr := framework.NewDefaultFramework("servicecidrs")
-	fr.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	fr.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
 		cs clientset.Interface
