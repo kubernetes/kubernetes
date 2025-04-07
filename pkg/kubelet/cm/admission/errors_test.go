@@ -38,13 +38,16 @@ func TestAdmissionErrors(t *testing.T) {
 	testCases := []struct {
 		Error                  error
 		expectedAdmissionError bool
+		expectedAdmissionFail  bool
 	}{
 		{
 			nil,
 			false,
+			false,
 		},
 		{
 			errors.New("Not an AdmissionError error"),
+			false,
 			false,
 		},
 		{
@@ -53,11 +56,22 @@ func TestAdmissionErrors(t *testing.T) {
 				"TestAdmissionError",
 			},
 			true,
+			false,
+		},
+		{
+			NewRetryableAdmissionError(errors.New("Retryable error")),
+			false,
+			true,
 		},
 	}
 
 	for _, tc := range testCases {
-		h := GetPodAdmitResult(tc.Error)
+		h, err := GetPodAdmitResult(tc.Error)
+		if tc.expectedAdmissionFail {
+			if err == nil {
+				t.Errorf("expected GetPodAdmitResult to return an error")
+			}
+		}
 		if tc.Error == nil {
 			if !h.Admit {
 				t.Errorf("expected PodAdmitResult.Admit = true")

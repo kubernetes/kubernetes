@@ -2344,13 +2344,13 @@ type testPodAdmitHandler struct {
 }
 
 // Admit rejects all pods in the podsToReject list with a matching UID.
-func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (a *testPodAdmitHandler) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error) {
 	for _, podToReject := range a.podsToReject {
 		if podToReject.UID == attrs.Pod.UID {
-			return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "Pod is rejected"}
+			return lifecycle.PodAdmitResult{Admit: false, Reason: "Rejected", Message: "Pod is rejected"}, nil
 		}
 	}
-	return lifecycle.PodAdmitResult{Admit: true}
+	return lifecycle.PodAdmitResult{Admit: true}, nil
 }
 
 // Test verifies that the kubelet invokes an admission handler during HandlePodAdditions.

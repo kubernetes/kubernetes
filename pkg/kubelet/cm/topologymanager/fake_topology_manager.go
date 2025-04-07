@@ -79,5 +79,5 @@ func (m *fakeManager) RemoveContainer(containerID string) error {
 
 func (m *fakeManager) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error) {
 	klog.InfoS("Topology Admit Handler")
-	return admission.GetPodAdmitResult(nil), nil
+	return admission.GetPodAdmitResult(nil)
 }

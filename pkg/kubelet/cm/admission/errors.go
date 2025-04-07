@@ -44,9 +44,56 @@ func (e *unexpectedAdmissionError) Type() string {
 	return ErrorReasonUnexpected
 }
 
-func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
+type retryableError interface {
+	Error() string
+	Type() string
+	IsRetryable() bool
+}
+
+type retryableAdmissionError struct{ Err error }
+
+var _ Error = (*retryableAdmissionError)(nil)
+
+func (e *retryableAdmissionError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *retryableAdmissionError) Type() string {
+	return ErrorReasonUnexpected
+}
+
+func (e *retryableAdmissionError) IsRetryable() bool {
+	return true
+}
+
+// NewRetryableAdmissionError indicates that an admission error may
+// be retried.
+// At the time of implementation, a single retry will be performed with a 5s delay.
+//
+// note: Initially this is only used by the devicemanager to account
+//
+//	for node restarts and races with plugins coming up.
+//	It is an unclean hack to reduce the scope of the topologymanager refactor.
+func NewRetryableAdmissionError(err error) Error {
 	if err == nil {
-		return lifecycle.PodAdmitResult{Admit: true}
+		return nil
+	}
+	return &retryableAdmissionError{Err: err}
+}
+
+func GetPodAdmitResult(err error) (lifecycle.PodAdmitResult, error) {
+	if err == nil {
+		return lifecycle.PodAdmitResult{Admit: true}, nil
+	}
+
+	var retryableErr retryableError
+	if errors.As(err, &retryableErr) && retryableErr.IsRetryable() {
+		admissionErr := &unexpectedAdmissionError{err}
+		return lifecycle.PodAdmitResult{
+			Message: admissionErr.Error(),
+			Reason:  admissionErr.Type(),
+			Admit:   false,
+		}, retryableErr
 	}
 
 	var admissionErr Error
@@ -58,5 +105,5 @@ func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {
 		Message: admissionErr.Error(),
 		Reason:  admissionErr.Type(),
 		Admit:   false,
-	}
+	}, nil
 }

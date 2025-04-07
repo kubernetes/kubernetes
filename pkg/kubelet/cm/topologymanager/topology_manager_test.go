@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
@@ -563,7 +563,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Container scope Admit
-		ctnActual := ctnScopeManager.Admit(&podAttr)
+		ctnActual, _ := ctnScopeManager.Admit(&podAttr)
 		if ctnActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
 		}
@@ -572,7 +572,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Pod scope Admit
-		podActual := podScopeManager.Admit(&podAttr)
+		podActual, _ := podScopeManager.Admit(&podAttr)
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
 		}

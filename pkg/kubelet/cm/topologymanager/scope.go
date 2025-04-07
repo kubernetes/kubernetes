@@ -139,10 +139,10 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) (lifecycle.PodAdmitResult, error) {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		err := s.allocateAlignedResources(pod, &container)
 		if err != nil {
-			return admission.GetPodAdmitResult(err), nil
+			return admission.GetPodAdmitResult(err)
 		}
 	}
-	return admission.GetPodAdmitResult(nil), nil
+	return admission.GetPodAdmitResult(nil)
 }
 
 // It would be better to implement this function in topologymanager instead of scope
