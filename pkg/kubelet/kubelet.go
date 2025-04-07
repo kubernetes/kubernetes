@@ -2401,7 +2401,7 @@ func (kl *Kubelet) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, stri
 	// TODO: out of resource eviction should have a pod admitter call-out
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
 	for _, podAdmitHandler := range kl.admitHandlers {
-		if result := podAdmitHandler.Admit(attrs); !result.Admit {
+		if result, _ := podAdmitHandler.Admit(attrs); !result.Admit {
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
 
 			return false, result.Reason, result.Message

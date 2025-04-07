@@ -103,12 +103,12 @@ func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 
 // Admit checks that all sysctls given in pod's security context
 // are valid according to the allowlist.
-func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error) {
 	pod := attrs.Pod
 	if pod.Spec.SecurityContext == nil || len(pod.Spec.SecurityContext.Sysctls) == 0 {
 		return lifecycle.PodAdmitResult{
 			Admit: true,
-		}
+		}, nil
 	}
 
 	for _, s := range pod.Spec.SecurityContext.Sysctls {
@@ -117,11 +117,11 @@ func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 				Admit:   false,
 				Reason:  ForbiddenReason,
 				Message: fmt.Sprintf("forbidden sysctl: %v", err),
-			}
+			}, nil
 		}
 	}
 
 	return lifecycle.PodAdmitResult{
 		Admit: true,
-	}
+	}, nil
 }

@@ -214,21 +214,21 @@ type appArmorAdmitHandler struct {
 	apparmor.Validator
 }
 
-func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) (PodAdmitResult, error) {
 	// If the pod is already running or terminated, no need to recheck AppArmor.
 	if attrs.Pod.Status.Phase != v1.PodPending {
-		return PodAdmitResult{Admit: true}
+		return PodAdmitResult{Admit: true}, nil
 	}
 
 	err := a.Validate(attrs.Pod)
 	if err == nil {
-		return PodAdmitResult{Admit: true}
+		return PodAdmitResult{Admit: true}, nil
 	}
 	return PodAdmitResult{
 		Admit:   false,
 		Reason:  AppArmorNotAdmittedReason,
 		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
-	}
+	}, nil
 }
 
 func isHTTPResponseError(err error) bool {
