@@ -333,7 +333,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
 			}
 
-			expectedCPULimits := GetCPULimitCgroupExpectations(cpuLimit)
+			expectedCPULimits := GetCPULimitCgroupExpectations(cpuLimit, *podOnCgroupv2Node)
 			expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
 			if *podOnCgroupv2Node {
 				if expectedMemLimitString == "0" {
@@ -539,7 +539,7 @@ func formatErrors(err error) error {
 
 // TODO: Remove the rounded cpu limit values when https://github.com/opencontainers/runc/issues/4622
 // is fixed.
-func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity) []string {
+func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity, onCgroupV2 bool) []string {
 	var expectedCPULimits []string
 	milliCPULimit := cpuLimit.MilliValue()
 
@@ -547,20 +547,20 @@ func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity) []string {
 	if cpuLimit.IsZero() {
 		cpuQuota = -1
 	}
-	expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuota))
+	expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuota, onCgroupV2))
 
 	if milliCPULimit%10 != 0 && cpuQuota != -1 {
 		roundedCPULimit := (milliCPULimit/10 + 1) * 10
 		cpuQuotaRounded := kubecm.MilliCPUToQuota(roundedCPULimit, kubecm.QuotaPeriod)
-		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded))
+		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded, onCgroupV2))
 	}
 
 	return expectedCPULimits
 }
 
-func getExpectedCPULimitFromCPUQuota(cpuQuota int64) string {
+func getExpectedCPULimitFromCPUQuota(cpuQuota int64, onCgroupV2 bool) string {
 	expectedCPULimitString := strconv.FormatInt(cpuQuota, 10)
-	if *podOnCgroupv2Node {
+	if onCgroupV2 {
 		if expectedCPULimitString == "-1" {
 			expectedCPULimitString = "max"
 		}
