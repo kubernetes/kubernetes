@@ -59,18 +59,23 @@ func estimateMaximumPods(ctx context.Context, c clientset.Interface, min, max in
 	framework.ExpectNoError(err)
 
 	availablePods := int32(0)
+	// estimate some reasonable overhead per-node for pods that are non-test
+	const daemonSetReservedPods = 10
 	for _, node := range nodes.Items {
 		if q, ok := node.Status.Allocatable["pods"]; ok {
 			if num, ok := q.AsInt64(); ok {
-				availablePods += int32(num)
+				if num > daemonSetReservedPods {
+					availablePods += int32(num - daemonSetReservedPods)
+				}
 				continue
 			}
 		}
-		// best guess per node, since default maxPerCore is 10 and most nodes have at least
+		// Only when we fail to obtain the number, we fall back to a best guess
+		// per node. Since default maxPerCore is 10 and most nodes have at least
 		// one core.
 		availablePods += 10
 	}
-	//avoid creating exactly max pods
+	// avoid creating exactly max pods
 	availablePods = int32(float32(availablePods) * 0.5)
 	// bound the top and bottom
 	if availablePods > max {
