@@ -53,6 +53,10 @@ type streamCreator interface {
 	CreateStream(headers http.Header) (httpstream.Stream, error)
 }
 
+type streamStarter interface {
+	StartStream()
+}
+
 type streamProtocolHandler interface {
 	stream(conn streamCreator) error
 }

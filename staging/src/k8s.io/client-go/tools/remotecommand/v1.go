@@ -106,7 +106,10 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 		defer p.remoteStderr.Reset()
 	}
 
-	// now that all the streams have been created, proceed with reading & copying
+	// now that all the streams have been created, start stream and proceed with reading & copying
+	if starter, ok := conn.(streamStarter); ok {
+		go starter.StartStream()
+	}
 
 	// always read from errorStream
 	go func() {
