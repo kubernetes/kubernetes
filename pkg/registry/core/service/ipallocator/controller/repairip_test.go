@@ -17,11 +17,13 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"go.uber.org/goleak"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +34,9 @@ import (
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 var (
@@ -47,7 +51,7 @@ type fakeRepair struct {
 	serviceCIDRStore cache.Store
 }
 
-func newFakeRepair() (*fake.Clientset, *fakeRepair) {
+func newFakeRepair() (*fake.Clientset, *fakeRepair, error) {
 	fakeClient := fake.NewSimpleClientset()
 
 	informerFactory := informers.NewSharedInformerFactory(fakeClient, 0*time.Second)
@@ -75,13 +79,13 @@ func newFakeRepair() (*fake.Clientset, *fakeRepair) {
 		return false, &networkingv1.IPAddress{}, err
 	}))
 
-	r := NewRepairIPAddress(0*time.Second,
+	r, err := NewRepairIPAddress(0*time.Second,
 		fakeClient,
 		serviceInformer,
 		serviceCIDRInformer,
 		ipInformer,
 	)
-	return fakeClient, &fakeRepair{r, serviceIndexer, ipIndexer, serviceCIDRIndexer}
+	return fakeClient, &fakeRepair{r, serviceIndexer, ipIndexer, serviceCIDRIndexer}, err
 }
 
 func TestRepairServiceIP(t *testing.T) {
@@ -319,7 +323,11 @@ func TestRepairServiceIP(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			c, r := newFakeRepair()
+			c, r, err := newFakeRepair()
+			if err != nil {
+				t.Errorf("Unexpected error creating RepairIPAddress: %v", err)
+			}
+			defer r.ShutDown()
 			// add cidrs
 			for _, cidr := range test.cidrs {
 				err := r.serviceCIDRStore.Add(cidr)
@@ -365,6 +373,52 @@ func TestRepairServiceIP(t *testing.T) {
 		})
 	}
 
+}
+
+func TestRepairIpLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, r *RepairIPAddress)
+	}{
+		"run": {
+			runner: func(ctx context.Context, r *RepairIPAddress) { r.RunUntil(func() {}, ctx.Done()) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, r *RepairIPAddress) { r.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
+
+			cl := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			serviceInformer := informerFactory.Core().V1().Services()
+			serviceCIDRInformer := informerFactory.Networking().V1().ServiceCIDRs()
+			ipInformer := informerFactory.Networking().V1().IPAddresses()
+			informerFactory.Start(tCtx.Done())
+
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			r, err := NewRepairIPAddress(
+				0*time.Second,
+				cl,
+				serviceInformer,
+				serviceCIDRInformer,
+				ipInformer,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, r)
+		},
+		)
+	}
 }
 
 func TestRepairIPAddress_syncIPAddress(t *testing.T) {
@@ -483,13 +537,15 @@ func TestRepairIPAddress_syncIPAddress(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c, r := newFakeRepair()
-			err := r.ipAddressStore.Add(tt.ip)
+			c, r, err := newFakeRepair()
 			if err != nil {
+				t.Errorf("Unexpected error creating RepairIPAddress: %v", err)
+			}
+			defer r.ShutDown()
+			if err := r.ipAddressStore.Add(tt.ip); err != nil {
 				t.Fatal(err)
 			}
-			err = r.serviceStore.Add(newService("foo", []string{tt.ip.Name}))
-			if err != nil {
+			if err := r.serviceStore.Add(newService("foo", []string{tt.ip.Name})); err != nil {
 				t.Fatal(err)
 			}
 
