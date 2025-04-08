@@ -81,7 +81,8 @@ type Controller struct {
 	// Must have authority to list all resources in the system, and update quota status
 	rqClient corev1client.ResourceQuotasGetter
 	// A lister/getter of resource quota objects
-	rqLister corelisters.ResourceQuotaLister
+	rqLister            corelisters.ResourceQuotaLister
+	rqHandlerUnregister func() error
 	// A list of functions that return true when their caches have synced
 	informerSyncedFuncs []cache.InformerSynced
 	// ResourceQuota objects that need to be synchronized
@@ -125,7 +126,7 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 
 	logger := klog.FromContext(ctx)
 
-	options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handler, err := options.ResourceQuotaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				rq.addQuota(logger, obj)
@@ -155,6 +156,12 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 		},
 		rq.resyncPeriod(),
 	)
+	if err != nil {
+		return nil, err
+	}
+	rq.rqHandlerUnregister = func() error {
+		return options.ResourceQuotaInformer.Informer().RemoveEventHandler(handler)
+	}
 
 	if options.DiscoveryFunc != nil {
 		qm := NewMonitor(
@@ -177,7 +184,7 @@ func NewController(ctx context.Context, options *ControllerOptions) (*Controller
 			return nil, err
 		}
 
-		if err = qm.SyncMonitors(ctx, resources); err != nil {
+		if err := qm.SyncMonitors(ctx, resources); err != nil {
 			utilruntime.HandleError(fmt.Errorf("initial monitor sync has error: %v", err))
 		}
 
@@ -292,8 +299,7 @@ func (rq *Controller) worker(queue workqueue.TypedRateLimitingInterface[string])
 // Run begins quota controller using the specified number of workers
 func (rq *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer rq.queue.ShutDown()
-	defer rq.missingUsageQueue.ShutDown()
+	defer rq.ShutDown()
 
 	logger := klog.FromContext(ctx)
 
@@ -320,6 +326,13 @@ func (rq *Controller) Run(ctx context.Context, workers int) {
 		logger.Info("periodic quota controller resync disabled")
 	}
 	<-ctx.Done()
+}
+
+func (rq *Controller) ShutDown() {
+	rq.quotaMonitor.ShutDown()
+	rq.queue.ShutDown()
+	rq.missingUsageQueue.ShutDown()
+	rq.rqHandlerUnregister()
 }
 
 // syncResourceQuotaFromKey syncs a quota key
