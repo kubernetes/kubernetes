@@ -172,3 +172,26 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 	}
 	return v1.PodQOSBurstable
 }
+
+// ComparePodQOS compares the QoS classes of two Pods and returns:
+//
+// 1 if p1 has a higher precedence QoS class than p2,
+// -1 if p2 has a higher precedence QoS class than p1,
+// 0 if both have the same QoS class.
+func ComparePodQOS(p1, p2 *v1.Pod) int {
+	p1QOS, p2QOS := GetPodQOS(p1), GetPodQOS(p2)
+
+	// Define the precedence order of QoS classes using a map
+	qosOrder := map[v1.PodQOSClass]int{
+		v1.PodQOSBestEffort: 1,
+		v1.PodQOSBurstable:  2,
+		v1.PodQOSGuaranteed: 3,
+	}
+
+	if qosOrder[p1QOS] > qosOrder[p2QOS] {
+		return 1
+	} else if qosOrder[p1QOS] < qosOrder[p2QOS] {
+		return -1
+	}
+	return 0
+}

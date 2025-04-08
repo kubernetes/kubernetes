@@ -274,3 +274,55 @@ func newPodWithInitContainers(name string, containers []v1.Container, initContai
 		},
 	}
 }
+
+func TestComparePodQOS(t *testing.T) {
+	testCases := []struct {
+		pod1     *v1.Pod
+		pod2     *v1.Pod
+		expected int
+	}{
+		{
+			pod1: newPod("guaranteed", []v1.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			pod2: newPod("guaranteed", []v1.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: 0,
+		},
+		{
+			pod1: newPod("burstable", []v1.Container{
+				newContainer("burstable", getResourceList("5m", "10Mi"), getResourceList("", "")),
+			}),
+			pod2: newPod("guaranteed", []v1.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			expected: -1,
+		},
+		{
+			pod1: newPod("guaranteed", []v1.Container{
+				newContainer("guaranteed", getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+			}),
+			pod2: newPod("burstable", []v1.Container{
+				newContainer("burstable", getResourceList("5m", "10Mi"), getResourceList("", "")),
+			}),
+			expected: 1,
+		},
+	}
+	for id, testCase := range testCases {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+		if actual := ComparePodQOS(testCase.pod1, testCase.pod2); testCase.expected != actual {
+			t.Errorf("[%d]: invalid qos pod %s %s, expected: %d, actual: %d", id, testCase.pod1.Name, testCase.pod2.Name, testCase.expected, actual)
+		}
+
+		// Convert v1.Pod to core.Pod, and then check against `core.helper.ComparePodQOS`.
+		pod1 := core.Pod{}
+		corev1.Convert_v1_Pod_To_core_Pod(testCase.pod1, &pod1, nil)
+		pod2 := core.Pod{}
+		corev1.Convert_v1_Pod_To_core_Pod(testCase.pod2, &pod2, nil)
+
+		if actual := qos.ComparePodQOS(&pod1, &pod2); testCase.expected != actual {
+			t.Errorf("[%d]: conversion invalid qos pod %s %s, expected: %d, actual: %d", id, testCase.pod1.Name, testCase.pod2.Name, testCase.expected, actual)
+		}
+	}
+}
