@@ -622,7 +622,7 @@ func (pf payloadFormat) isCompressed() bool {
 }
 
 type streamReader interface {
-	ReadHeader(header []byte) error
+	ReadMessageHeader(header []byte) error
 	Read(n int) (mem.BufferSlice, error)
 }
 
@@ -656,7 +656,7 @@ type parser struct {
 // that the underlying streamReader must not return an incompatible
 // error.
 func (p *parser) recvMsg(maxReceiveMessageSize int) (payloadFormat, mem.BufferSlice, error) {
-	err := p.r.ReadHeader(p.header[:])
+	err := p.r.ReadMessageHeader(p.header[:])
 	if err != nil {
 		return 0, nil, err
 	}
@@ -664,9 +664,6 @@ func (p *parser) recvMsg(maxReceiveMessageSize int) (payloadFormat, mem.BufferSl
 	pf := payloadFormat(p.header[0])
 	length := binary.BigEndian.Uint32(p.header[1:])
 
-	if length == 0 {
-		return pf, nil, nil
-	}
 	if int64(length) > int64(maxInt) {
 		return 0, nil, status.Errorf(codes.ResourceExhausted, "grpc: received message larger than max length allowed on current machine (%d vs. %d)", length, maxInt)
 	}
@@ -817,7 +814,7 @@ func (p *payloadInfo) free() {
 // the buffer is no longer needed.
 // TODO: Refactor this function to reduce the number of arguments.
 // See: https://google.github.io/styleguide/go/best-practices.html#function-argument-lists
-func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor, isServer bool,
+func recvAndDecompress(p *parser, s recvCompressor, dc Decompressor, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor, isServer bool,
 ) (out mem.BufferSlice, err error) {
 	pf, compressed, err := p.recvMsg(maxReceiveMessageSize)
 	if err != nil {
@@ -841,7 +838,7 @@ func recvAndDecompress(p *parser, s *transport.Stream, dc Decompressor, maxRecei
 			var uncompressedBuf []byte
 			uncompressedBuf, err = dc.Do(compressed.Reader())
 			if err == nil {
-				out = mem.BufferSlice{mem.NewBuffer(&uncompressedBuf, nil)}
+				out = mem.BufferSlice{mem.SliceBuffer(uncompressedBuf)}
 			}
 			size = len(uncompressedBuf)
 		} else {
@@ -877,30 +874,7 @@ func decompress(compressor encoding.Compressor, d mem.BufferSlice, maxReceiveMes
 		return nil, 0, err
 	}
 
-	// TODO: Can/should this still be preserved with the new BufferSlice API? Are
-	//  there any actual benefits to allocating a single large buffer instead of
-	//  multiple smaller ones?
-	//if sizer, ok := compressor.(interface {
-	//	DecompressedSize(compressedBytes []byte) int
-	//}); ok {
-	//	if size := sizer.DecompressedSize(d); size >= 0 {
-	//		if size > maxReceiveMessageSize {
-	//			return nil, size, nil
-	//		}
-	//		// size is used as an estimate to size the buffer, but we
-	//		// will read more data if available.
-	//		// +MinRead so ReadFrom will not reallocate if size is correct.
-	//		//
-	//		// TODO: If we ensure that the buffer size is the same as the DecompressedSize,
-	//		// we can also utilize the recv buffer pool here.
-	//		buf := bytes.NewBuffer(make([]byte, 0, size+bytes.MinRead))
-	//		bytesRead, err := buf.ReadFrom(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
-	//		return buf.Bytes(), int(bytesRead), err
-	//	}
-	//}
-
-	var out mem.BufferSlice
-	_, err = io.Copy(mem.NewWriter(&out, pool), io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1))
+	out, err := mem.ReadAll(io.LimitReader(dcReader, int64(maxReceiveMessageSize)+1), pool)
 	if err != nil {
 		out.Free()
 		return nil, 0, err
@@ -908,10 +882,14 @@ func decompress(compressor encoding.Compressor, d mem.BufferSlice, maxReceiveMes
 	return out, out.Len(), nil
 }
 
+type recvCompressor interface {
+	RecvCompress() string
+}
+
 // For the two compressor parameters, both should not be set, but if they are,
 // dc takes precedence over compressor.
 // TODO(dfawley): wrap the old compressor/decompressor using the new API?
-func recv(p *parser, c baseCodec, s *transport.Stream, dc Decompressor, m any, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor, isServer bool) error {
+func recv(p *parser, c baseCodec, s recvCompressor, dc Decompressor, m any, maxReceiveMessageSize int, payInfo *payloadInfo, compressor encoding.Compressor, isServer bool) error {
 	data, err := recvAndDecompress(p, s, dc, maxReceiveMessageSize, payInfo, compressor, isServer)
 	if err != nil {
 		return err
