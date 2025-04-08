@@ -851,7 +851,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 		return nil
 	}
 	if _, ok := jm.finishedJobExpectations.Load(job.UID); ok {
-		logger.V(2).Info("Skip syncing the job as its marked completed but the completed update event is not yet received", "uid", job.UID, "key", key)
+		logger.V(2).Info("Skip syncing the job as its marked finished but the corresponding update event is not yet received", "uid", job.UID, "key", key)
 		return nil
 	}
 
