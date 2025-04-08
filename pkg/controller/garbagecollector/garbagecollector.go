@@ -133,7 +133,6 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int, initialSyncTim
 	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
-	defer gc.dependencyGraphBuilder.graphChanges.ShutDown()
 
 	// Start events processing pipeline.
 	gc.eventBroadcaster.StartStructuredLogging(3)
