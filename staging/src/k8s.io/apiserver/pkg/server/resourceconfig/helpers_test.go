@@ -802,5 +802,5 @@ func addTestGVs(t *testing.T, s *runtime.Scheme) {
 	s.AddKnownTypes(v2, &runtimetesting.TestType1{}, &runtimetesting.TestType2{})
 
 	require.NoError(t, runtimetesting.RegisterConversions(s))
-	require.NoError(t, s.SetVersionPriority(v2, v1, v2beta2, v2beta1))
+	require.NoError(t, s.SetVersionPriority(v2, v1, v2beta1, v2beta2))
 }
