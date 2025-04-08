@@ -176,9 +176,10 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 	numDeviceRequestType := 0
 	if len(request.FirstAvailable) > 0 {
 		numDeviceRequestType++
-		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
-			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
-				return validateDeviceSubRequest(subRequest, fldPath, stored)
+		allErrs = append(allErrs, validateSetWithIndex(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
+			func(subRequest resource.DeviceSubRequest, fldPath *field.Path, index int) field.ErrorList {
+				lastInList := index == len(request.FirstAvailable)-1
+				return validateDeviceSubRequest(subRequest, fldPath, stored, lastInList)
 			},
 			func(subRequest resource.DeviceSubRequest) (string, string) {
 				return subRequest.Name, "name"
@@ -201,11 +202,11 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 	return allErrs
 }
 
-func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored bool) field.ErrorList {
+func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored, lastInList bool) field.ErrorList {
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
-	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"), lastInList)...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
@@ -216,14 +217,14 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
-	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"), false /* allowZeroCount */)...)
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
 	return allErrs
 }
 
-func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocationMode, count int64, allocModeFldPath, countFldPath *field.Path) field.ErrorList {
+func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocationMode, count int64, allocModeFldPath, countFldPath *field.Path, allowZeroCount bool) field.ErrorList {
 	var allErrs field.ErrorList
 	switch deviceAllocationMode {
 	case resource.DeviceAllocationModeAll:
@@ -231,8 +232,14 @@ func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocation
 			allErrs = append(allErrs, field.Invalid(countFldPath, count, fmt.Sprintf("must not be specified when allocationMode is '%s'", deviceAllocationMode)))
 		}
 	case resource.DeviceAllocationModeExactCount:
-		if count <= 0 {
-			allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be greater than zero"))
+		if allowZeroCount {
+			if count < 0 {
+				allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be zero or greater"))
+			}
+		} else {
+			if count <= 0 {
+				allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be greater than zero"))
+			}
 		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(allocModeFldPath, deviceAllocationMode, []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}))
@@ -933,13 +940,25 @@ func validateCIdentifier(id string, fldPath *field.Path) field.ErrorList {
 }
 
 // validateSlice ensures that a slice does not exceed a certain maximum size
-// and that all entries are valid.
+// and that all entries are valid. This is identical to validateSlice, but doesn't
+// include the index of the item in the callback.
+//
 // A negative maxSize disables the length check.
 func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Path) field.ErrorList, fldPath *field.Path) field.ErrorList {
+	return validateSliceWithIndex(slice, maxSize, func(item T, fldPath *field.Path, _ int) field.ErrorList {
+		return validateItem(item, fldPath)
+	}, fldPath)
+}
+
+// validateSliceWithIndex ensures that a slice does not exceed a certain maximum size
+// and that all entries are valid.
+//
+// A negative maxSize disables the length check.
+func validateSliceWithIndex[T any](slice []T, maxSize int, validateItem func(T, *field.Path, int) field.ErrorList, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateItem(item, idxPath)...)
+		allErrs = append(allErrs, validateItem(item, idxPath, i)...)
 	}
 	if maxSize >= 0 && len(slice) > maxSize {
 		// Dumping the entire field into the error message is likely to be too long,
@@ -951,9 +970,23 @@ func validateSlice[T any](slice []T, maxSize int, validateItem func(T, *field.Pa
 }
 
 // validateSet ensures that a slice contains no duplicates, does not
-// exceed a certain maximum size and that all entries are valid.
+// exceed a certain maximum size and that all entries are valid. This is
+// identical to validateSetWithIndex, but doesn't include the index of
+// the item in the callback.
+//
+// A negative maxSize disables the length check.
 func validateSet[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
-	allErrs := validateSlice(slice, maxSize, validateItem, fldPath)
+	return validateSetWithIndex(slice, maxSize, func(item T, fldPath *field.Path, _ int) field.ErrorList {
+		return validateItem(item, fldPath)
+	}, itemKey, fldPath)
+}
+
+// validateSetWithIndex ensures that a slice contains no duplicates, does not
+// exceed a certain maximum size and that all entries are valid.
+//
+// A negative maxSize disables the length check.
+func validateSetWithIndex[T any, K comparable](slice []T, maxSize int, validateItem func(item T, fldPath *field.Path, index int) field.ErrorList, itemKey func(T) (K, string), fldPath *field.Path) field.ErrorList {
+	allErrs := validateSliceWithIndex(slice, maxSize, validateItem, fldPath)
 	allItems := sets.New[K]()
 	for i, item := range slice {
 		idxPath := fldPath.Index(i)

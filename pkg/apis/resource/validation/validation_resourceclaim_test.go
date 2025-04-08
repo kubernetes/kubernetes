@@ -738,6 +738,59 @@ func TestValidateClaim(t *testing.T) {
 				return claim
 			}(),
 		},
+		"prioritized-list-subrequests-last-entry-count": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(1).Child("firstAvailable").Index(0).Child("count"), int64(-1), "must be zero or greater")},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				claim.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+					{
+						Name:            goodName2,
+						DeviceClassName: goodName,
+						AllocationMode:  resource.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+					{
+						Name:            goodName,
+						DeviceClassName: goodName,
+						AllocationMode:  resource.DeviceAllocationModeExactCount,
+						Count:           0,
+					},
+				}
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, resource.DeviceRequest{
+					Name: goodName2,
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            goodName,
+							DeviceClassName: goodName,
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           -1,
+						},
+					},
+				})
+				return claim
+			}(),
+		},
+		"prioritized-list-subrequests-not-last-entry-count": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(0).Child("firstAvailable").Index(0).Child("count"), int64(0), "must be greater than zero")},
+			claim: func() *resource.ResourceClaim {
+				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
+				claim.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
+					{
+						Name:            goodName2,
+						DeviceClassName: goodName,
+						AllocationMode:  resource.DeviceAllocationModeExactCount,
+						Count:           0,
+					},
+					{
+						Name:            goodName,
+						DeviceClassName: goodName,
+						AllocationMode:  resource.DeviceAllocationModeExactCount,
+						Count:           1,
+					},
+				}
+				return claim
+			}(),
+		},
 		"tolerations": {
 			wantFailures: func() field.ErrorList {
 				var allErrs field.ErrorList
