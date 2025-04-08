@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	"gopkg.in/go-jose/go-jose.v2/jwt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -560,5 +561,44 @@ func TestTokenCreation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTokensControllerLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, c *TokensController)
+	}{
+		"run": {
+			runner: func(ctx context.Context, c *TokensController) { c.Run(ctx, 1) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, c *TokensController) { c.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			cl := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			serviceAccounts := informerFactory.Core().V1().ServiceAccounts()
+			secrets := informerFactory.Core().V1().Secrets()
+			informerFactory.Start(tCtx.Done())
+
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			controller, err := NewTokensController(logger, serviceAccounts, secrets, cl, TokensControllerOptions{})
+			if err != nil {
+				t.Fatalf("error creating Signer: %v", err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, controller)
+		},
+		)
 	}
 }

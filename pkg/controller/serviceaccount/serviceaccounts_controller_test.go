@@ -21,13 +21,15 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"go.uber.org/goleak"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestServiceAccountCreation(t *testing.T) {
@@ -232,6 +234,67 @@ func TestServiceAccountCreation(t *testing.T) {
 				t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
 			}
 		}
+	}
+}
+
+func TestServiceAccountsControllerLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, c *ServiceAccountsController)
+	}{
+		"run": {
+			runner: func(ctx context.Context, c *ServiceAccountsController) { c.Run(ctx, 1) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, c *ServiceAccountsController) { c.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
+
+			ns := metav1.NamespaceDefault
+			defaultName := "default"
+			managedName := "managed"
+			defaultServiceAccount := &v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            defaultName,
+					Namespace:       ns,
+					ResourceVersion: "1",
+				},
+			}
+			managedServiceAccount := &v1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            managedName,
+					Namespace:       ns,
+					ResourceVersion: "1",
+				},
+			}
+			options := DefaultServiceAccountsControllerOptions()
+			options.ServiceAccounts = []v1.ServiceAccount{
+				{ObjectMeta: metav1.ObjectMeta{Name: defaultName}},
+				{ObjectMeta: metav1.ObjectMeta{Name: managedName}},
+			}
+
+			cl := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
+
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			saInformer := informerFactory.Core().V1().ServiceAccounts()
+			nsInformer := informerFactory.Core().V1().Namespaces()
+			informerFactory.Start(tCtx.Done())
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			controller, err := NewServiceAccountsController(saInformer, nsInformer, cl, options)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, controller)
+		},
+		)
 	}
 }
 
