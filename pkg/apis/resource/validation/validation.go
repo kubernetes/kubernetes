@@ -205,7 +205,7 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
-	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"), true /* subRequest */)...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
@@ -216,14 +216,14 @@ func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *fi
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
-	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"), false /* subRequest */)...)
 	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
 	return allErrs
 }
 
-func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocationMode, count int64, allocModeFldPath, countFldPath *field.Path) field.ErrorList {
+func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocationMode, count int64, allocModeFldPath, countFldPath *field.Path, subRequest bool) field.ErrorList {
 	var allErrs field.ErrorList
 	switch deviceAllocationMode {
 	case resource.DeviceAllocationModeAll:
@@ -231,8 +231,14 @@ func validateDeviceAllocationMode(deviceAllocationMode resource.DeviceAllocation
 			allErrs = append(allErrs, field.Invalid(countFldPath, count, fmt.Sprintf("must not be specified when allocationMode is '%s'", deviceAllocationMode)))
 		}
 	case resource.DeviceAllocationModeExactCount:
-		if count <= 0 {
-			allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be greater than zero"))
+		if subRequest {
+			if count < 0 {
+				allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be zero or greater"))
+			}
+		} else {
+			if count <= 0 {
+				allErrs = append(allErrs, field.Invalid(countFldPath, count, "must be greater than zero"))
+			}
 		}
 	default:
 		allErrs = append(allErrs, field.NotSupported(allocModeFldPath, deviceAllocationMode, []resource.DeviceAllocationMode{resource.DeviceAllocationModeAll, resource.DeviceAllocationModeExactCount}))
