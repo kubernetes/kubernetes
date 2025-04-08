@@ -88,9 +88,10 @@ type HorizontalController struct {
 	hpaNamespacer   autoscalingclient.HorizontalPodAutoscalersGetter
 	mapper          apimeta.RESTMapper
 
-	tolerance     float64
-	replicaCalc   *ReplicaCalculator
-	eventRecorder record.EventRecorder
+	tolerance        float64
+	replicaCalc      *ReplicaCalculator
+	eventBroadcaster record.EventBroadcaster
+	eventRecorder    record.EventRecorder
 
 	downscaleStabilisationWindow time.Duration
 
@@ -98,8 +99,9 @@ type HorizontalController struct {
 
 	// hpaLister is able to list/get HPAs from the shared cache from the informer passed in to
 	// NewHorizontalController.
-	hpaLister       autoscalinglisters.HorizontalPodAutoscalerLister
-	hpaListerSynced cache.InformerSynced
+	hpaLister            autoscalinglisters.HorizontalPodAutoscalerLister
+	hpaListerSynced      cache.InformerSynced
+	hpaHandlerUnregister func() error
 
 	// podLister is able to list/get Pods from the shared cache from the informer passed in to
 	// NewHorizontalController.
@@ -126,7 +128,6 @@ type HorizontalController struct {
 
 // NewHorizontalController creates a new HorizontalController.
 func NewHorizontalController(
-	ctx context.Context,
 	evtNamespacer v1core.EventsGetter,
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
@@ -139,13 +140,14 @@ func NewHorizontalController(
 	tolerance float64,
 	cpuInitializationPeriod,
 	delayOfInitialReadinessStatus time.Duration,
-) *HorizontalController {
-	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
+) (*HorizontalController, error) {
+	broadcaster := record.NewBroadcaster()
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
 
 	hpaController := &HorizontalController{
+		eventBroadcaster:             broadcaster,
 		eventRecorder:                recorder,
 		scaleNamespacer:              scaleNamespacer,
 		hpaNamespacer:                hpaNamespacer,
@@ -168,7 +170,7 @@ func NewHorizontalController(
 		hpaSelectors:        selectors.NewBiMultimap(),
 	}
 
-	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handler, err := hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    hpaController.enqueueHPA,
 			UpdateFunc: hpaController.updateHPA,
@@ -176,8 +178,15 @@ func NewHorizontalController(
 		},
 		resyncPeriod,
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register event handler: %w", err)
+	}
+
 	hpaController.hpaLister = hpaInformer.Lister()
 	hpaController.hpaListerSynced = hpaInformer.Informer().HasSynced
+	hpaController.hpaHandlerUnregister = func() error {
+		return hpaInformer.Informer().RemoveEventHandler(handler)
+	}
 
 	hpaController.podLister = podInformer.Lister()
 	hpaController.podListerSynced = podInformer.Informer().HasSynced
@@ -192,13 +201,13 @@ func NewHorizontalController(
 
 	monitor.Register()
 
-	return hpaController
+	return hpaController, nil
 }
 
 // Run begins watching and syncing.
 func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer a.queue.ShutDown()
+	defer a.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting HPA controller")
@@ -213,6 +222,12 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 	}
 
 	<-ctx.Done()
+}
+
+func (a *HorizontalController) ShutDown() {
+	a.queue.ShutDown()
+	a.eventBroadcaster.Shutdown()
+	utilruntime.HandleError(a.hpaHandlerUnregister())
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
