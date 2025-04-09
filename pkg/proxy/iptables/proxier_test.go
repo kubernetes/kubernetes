@@ -6887,9 +6887,6 @@ func TestCleanupLeftovers(t *testing.T) {
 		:OUTPUT - [0:0]
 		:KUBE-FIREWALL - [0:0]
 		:KUBE-KUBELET-CANARY - [0:0]
-		# FIXME: delete canary
-		:KUBE-PROXY-CANARY - [0:0]
-		:KUBE-PROXY-FIREWALL - [0:0]
 
 		# These are created by both kubelet and kube-proxy and intentionally not
 		# cleaned up by kube-proxy.
@@ -6902,9 +6899,6 @@ func TestCleanupLeftovers(t *testing.T) {
 		-A FORWARD -m comment --comment "someone else's forward rule" -s 1.2.3.4 -j DROP
 		-A OUTPUT -m comment --comment "someone else's output rule" -s 1.2.3.4 -j DROP
 
-		# FIXME, this is a bug
-		-A KUBE-PROXY-FIREWALL -m comment --comment "ns5/svc5:p80 traffic not accepted by KUBE-FW-NUKIZ6OKUXPJNT4C" -m tcp -p tcp -d 5.6.7.8 --dport 80 -j DROP
-
 		COMMIT
 
 		*nat
@@ -6913,18 +6907,11 @@ func TestCleanupLeftovers(t *testing.T) {
 		:OUTPUT - [0:0]
 		:POSTROUTING - [0:0]
 		:KUBE-KUBELET-CANARY - [0:0]
-		:KUBE-MARK-MASQ - [0:0]
-		:KUBE-PROXY-CANARY - [0:0]
-
-		# FIXME
-		-A KUBE-MARK-MASQ -j MARK --or-mark 0x4000
-
 		COMMIT
 
 		*mangle
 		:KUBE-IPTABLES-HINT - [0:0]
 		:KUBE-KUBELET-CANARY - [0:0]
-		:KUBE-PROXY-CANARY - [0:0]
 		COMMIT
 		`)
 	expected, err = sortIPTablesRules(expected)

@@ -319,8 +319,6 @@ func TestCleanupLeftovers(t *testing.T) {
 	}
 	got := buf.String()
 
-	// FIXME: KUBE-MARK-MASQ should be deleted
-
 	expected := strings.TrimLeft(dedent.Dedent(`
 		*nat
 		:PREROUTING - [0:0]
@@ -328,8 +326,6 @@ func TestCleanupLeftovers(t *testing.T) {
 		:OUTPUT - [0:0]
 		:POSTROUTING - [0:0]
 		:KUBE-KUBELET-CANARY - [0:0]
-		:KUBE-MARK-MASQ - [0:0]
-		-A KUBE-MARK-MASQ -j MARK --or-mark
 		COMMIT
 		*filter
 		:INPUT - [0:0]

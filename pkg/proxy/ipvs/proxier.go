@@ -462,6 +462,7 @@ var iptablesCleanupChains = []struct {
 	{utiliptables.TableNAT, kubePostroutingChain},
 	{utiliptables.TableNAT, kubeNodePortChain},
 	{utiliptables.TableNAT, kubeLoadBalancerChain},
+	{utiliptables.TableNAT, kubeMarkMasqChain},
 	{utiliptables.TableFilter, kubeForwardChain},
 	{utiliptables.TableFilter, kubeNodePortChain},
 	{utiliptables.TableFilter, kubeProxyFirewallChain},

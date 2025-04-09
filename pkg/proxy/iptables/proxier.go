@@ -440,7 +440,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 		natRules := proxyutil.NewLineBuffer()
 		natChains.Write("*nat")
 		// Start with chains we know we need to remove.
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain, kubeProxyCanaryChain} {
 			if existingNATChains.Has(chain) {
 				chainString := string(chain)
 				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
@@ -476,7 +476,7 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 		filterChains := proxyutil.NewLineBuffer()
 		filterRules := proxyutil.NewLineBuffer()
 		filterChains.Write("*filter")
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeProxyFirewallChain, kubeProxyCanaryChain} {
 			if existingFilterChains.Has(chain) {
 				chainString := string(chain)
 				filterChains.Write(utiliptables.MakeChainLine(chain))
@@ -492,6 +492,10 @@ func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) 
 			encounteredError = true
 		}
 	}
+
+	// Remove our "-t mangle" canary chain; ignore errors since it may not exist.
+	_ = ipt.DeleteChain(utiliptables.TableMangle, kubeProxyCanaryChain)
+
 	return encounteredError
 }
 
