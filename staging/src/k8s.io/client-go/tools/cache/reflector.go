@@ -483,9 +483,7 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
 
-	defer utilruntime.HandleCrashWithContext(ctx, func(ctx context.Context, r interface{}) {
-		panic(r)
-	})
+	defer utilruntime.HandleCrashWithContext(ctx)
 
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
@@ -579,9 +577,22 @@ func (r *Reflector) list(ctx context.Context) error {
 	listCh := make(chan struct{}, 1)
 	panicCh := make(chan interface{}, 1)
 	go func() {
-		defer utilruntime.HandleCrashWithContext(ctx, func(ctx context.Context, r interface{}) {
-			panicCh <- r
-		})
+		defer func() {
+			if r := recover(); r != nil {
+				// Basically utilruntime.HandleCrashWithContext w/o panic
+				// Didn't modify utilruntime.ReallyCrash to avoid race condition
+				logger := klog.FromContext(ctx).WithCallDepth(4)
+				ctxWithLogger := klog.NewContext(ctx, logger)
+
+				for _, fn := range utilruntime.PanicHandlers {
+					fn(ctxWithLogger, r)
+				}
+
+				// Send out the panic content for the outer goroutine to handle
+				panicCh <- r
+			}
+		}()
+
 		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
 		// list request will return the full response.
 		pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {

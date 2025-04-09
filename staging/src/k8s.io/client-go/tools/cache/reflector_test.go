@@ -31,8 +31,6 @@ import (
 	"testing"
 	"time"
 
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1648,7 +1646,6 @@ func TestReflectorListWatchPanicLogging(t *testing.T) {
 		name         string
 		listFunc     func(options metav1.ListOptions) (runtime.Object, error)
 		watchFunc    func(options metav1.ListOptions) (watch.Interface, error)
-		expectPanic  bool
 		expectLogSub []string // substrings expected in captured logs
 	}
 
@@ -1661,12 +1658,7 @@ func TestReflectorListWatchPanicLogging(t *testing.T) {
 			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return watch.NewFake(), nil
 			},
-			expectPanic: true,
-			expectLogSub: []string{
-				"Observed a panic",
-				"simulated panic in ListFunc",
-				"stacktrace",
-			},
+			expectLogSub: []string{"Observed a panic", "simulated panic in ListFunc", "stacktrace"},
 		},
 		{
 			name: "Panic in WatchFunc",
@@ -1676,15 +1668,10 @@ func TestReflectorListWatchPanicLogging(t *testing.T) {
 			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				panic("simulated panic in WatchFunc")
 			},
-			expectPanic: true,
-			expectLogSub: []string{
-				"Observed a panic",
-				"simulated panic in WatchFunc",
-				"stacktrace",
-			},
+			expectLogSub: []string{"Observed a panic", "simulated panic in WatchFunc", "stacktrace"},
 		},
 		{
-			name: "Nil Pointer Dereference in List",
+			name: "Nil Pointer in ListFunc",
 			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				var obj *unstructured.UnstructuredList
 				return obj, nil
@@ -1692,75 +1679,63 @@ func TestReflectorListWatchPanicLogging(t *testing.T) {
 			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return watch.NewFake(), nil
 			},
-			expectPanic: true,
-			expectLogSub: []string{
-				"Observed a panic",
-				"invalid memory address",
-				"stacktrace",
-			},
+			expectLogSub: []string{"Observed a panic", "invalid memory address", "stacktrace"},
 		},
 		{
-			name: "Nil Pointer Dereference in Watch",
+			name: "Nil Pointer in WatchFunc",
 			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				return &unstructured.UnstructuredList{}, nil
 			},
 			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return nil, nil
+				var iface watch.Interface
+				return iface, nil
 			},
-			expectPanic: true,
-			expectLogSub: []string{
-				"Observed a panic",
-				"invalid memory address",
-				"stacktrace",
-			},
+			expectLogSub: []string{"Observed a panic", "invalid memory address", "stacktrace"},
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	// Didn't modify utilruntime.ReallyCrash to avoid race condition
+	// utilruntime.ReallyCrash = false
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 			sink := logger.GetSink().(ktesting.Underlier)
 			ctx := klog.NewContext(context.Background(), logger)
 
 			store := NewStore(MetaNamespaceKeyFunc)
-			panicCh := make(chan interface{}, 1)
-
 			r := &Reflector{
 				name:              "test-reflector",
-				listerWatcher:     &ListWatch{ListFunc: tt.listFunc, WatchFunc: tt.watchFunc},
+				listerWatcher:     &ListWatch{ListFunc: tc.listFunc, WatchFunc: tc.watchFunc},
 				store:             store,
 				watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 				clock:             testingclock.NewFakeClock(time.Now()),
 			}
 
-			utilruntime.ReallyCrash = false
-			defer func() { utilruntime.ReallyCrash = true }()
+			panicCh := make(chan any, 1)
 
 			go func() {
 				defer func() {
 					if r := recover(); r != nil {
 						panicCh <- r
+					} else {
+						panicCh <- nil
 					}
 				}()
 				_ = r.ListAndWatchWithContext(ctx)
 			}()
 
-			select {
-			case p := <-panicCh:
-				t.Logf("Recovered panic: %v", p)
+			if recovered := <-panicCh; recovered != nil {
+				t.Logf("Recovered panic: %v", recovered)
+			}
 
-				logOutput := sink.GetBuffer().String()
-				fmt.Println("--- LOG START ---")
-				fmt.Println(logOutput)
-				fmt.Println("--- LOG END ---")
+			logOutput := sink.GetBuffer().String()
+			t.Log("--- LOG ---")
+			t.Log(logOutput)
+			t.Log("-----------")
 
-				for _, substr := range tt.expectLogSub {
-					assert.Contains(t, logOutput, substr, "Expected substring missing in log")
-				}
-			case <-time.After(3 * time.Second):
-				if tt.expectPanic {
-					t.Fatal("Timeout waiting for panic to be captured")
-				}
+			for _, substr := range tc.expectLogSub {
+				assert.Contains(t, logOutput, substr, "log should contain: %q", substr)
 			}
 		})
 	}
