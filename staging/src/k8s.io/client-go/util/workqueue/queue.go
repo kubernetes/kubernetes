@@ -231,7 +231,9 @@ func (s set[t]) len() int {
 	return len(s)
 }
 
-// Add marks item as needing processing.
+// Add marks item as needing processing. When the queue is shutdown new
+// items will silently be ignored and not queued or marked as dirty for
+// reprocessing.
 func (q *Typed[T]) Add(item T) {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
@@ -309,8 +311,9 @@ func (q *Typed[T]) Done(item T) {
 	}
 }
 
-// ShutDown will cause q to ignore all new items added to it and
-// immediately instruct the worker goroutines to exit.
+// ShutDown will cause q to ignore all new items added to it. Worker
+// goroutines will continue processing items in the queue until it is
+// empty and then receive the shutdown signal.
 func (q *Typed[T]) ShutDown() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
@@ -320,15 +323,12 @@ func (q *Typed[T]) ShutDown() {
 	q.cond.Broadcast()
 }
 
-// ShutDownWithDrain will cause q to ignore all new items added to it. As soon
-// as the worker goroutines have "drained", i.e: finished processing and called
-// Done on all existing items in the queue; they will be instructed to exit and
-// ShutDownWithDrain will return. Hence: a strict requirement for using this is;
-// your workers must ensure that Done is called on all items in the queue once
-// the shut down has been initiated, if that is not the case: this will block
-// indefinitely. It is, however, safe to call ShutDown after having called
-// ShutDownWithDrain, as to force the queue shut down to terminate immediately
-// without waiting for the drainage.
+// ShutDownWithDrain is equivalent to ShutDown but waits until all items
+// in the queue have been processed.
+// ShutDown can be called after ShutDownWithDrain to force
+// ShutDownWithDrain to stop waiting.
+// For ShutDownWithDrain to work the workers must call Done on an item
+// after processing it, otherwise it will block indefinitely.
 func (q *Typed[T]) ShutDownWithDrain() {
 	q.cond.L.Lock()
 	defer q.cond.L.Unlock()
@@ -337,6 +337,8 @@ func (q *Typed[T]) ShutDownWithDrain() {
 	q.shuttingDown = true
 	q.cond.Broadcast()
 
+	// q.drain is important for cases where .ShutDown is called after
+	// .ShutDownWithDrain to skip the wait.
 	for q.processing.len() != 0 && q.drain {
 		q.cond.Wait()
 	}
