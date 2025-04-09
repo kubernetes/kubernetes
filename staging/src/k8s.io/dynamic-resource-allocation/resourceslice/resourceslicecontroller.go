@@ -624,6 +624,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			// we can store.
 			//
 			// TODO (https://github.com/kubernetes/kubernetes/issues/130856): check for dropped fields and report them to the DRA driver.
+			pool.Slices[i].SharedCounters = slice.Spec.SharedCounters
+			pool.Slices[i].PerDeviceNodeSelection = slice.Spec.PerDeviceNodeSelection
 			pool.Slices[i].Devices = slice.Spec.Devices
 		}
 
@@ -693,6 +695,8 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			// of the world so that it matches what we can store.
 			//
 			// TODO (https://github.com/kubernetes/kubernetes/issues/130856): check for dropped fields and report them to the DRA driver.
+			pool.Slices[i].SharedCounters = slice.Spec.SharedCounters
+			pool.Slices[i].PerDeviceNodeSelection = slice.Spec.PerDeviceNodeSelection
 			pool.Slices[i].Devices = slice.Spec.Devices
 		}
 		if added {
