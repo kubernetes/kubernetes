@@ -19,11 +19,13 @@ package resourceconfig
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	cliflag "k8s.io/component-base/cli/flag"
 )
@@ -258,7 +260,11 @@ func EmulationForwardCompatibleResourceConfig(
 			continue
 		}
 		// if a gv is enabled, all the versions with higher priority (all the versions before gv in PrioritizedVersionsForGroup) are also implicitly enabled for emulation forward compatibility.
-		for _, pgv := range registry.PrioritizedVersionsForGroup(gv.Group) {
+		prioritizedVersions := registry.PrioritizedVersionsForGroup(gv.Group)
+		sort.Slice(prioritizedVersions, func(i, j int) bool {
+			return version.CompareKubeAwareVersionStrings(prioritizedVersions[i].Version, prioritizedVersions[j].Version) > 0
+		})
+		for _, pgv := range prioritizedVersions {
 			if pgv.Version == gv.Version {
 				break
 			}
@@ -275,7 +281,11 @@ func EmulationForwardCompatibleResourceConfig(
 			continue
 		}
 		// if a gvr is enabled, all the versions with the same resource name and higher priority (all the versions before gv in PrioritizedVersionsForGroup) are also implicitly enabled for emulation forward compatibility.
-		for _, pgv := range registry.PrioritizedVersionsForGroup(gvr.Group) {
+		prioritizedVersions := registry.PrioritizedVersionsForGroup(gvr.Group)
+		sort.Slice(prioritizedVersions, func(i, j int) bool {
+			return version.CompareKubeAwareVersionStrings(prioritizedVersions[i].Version, prioritizedVersions[j].Version) > 0
+		})
+		for _, pgv := range prioritizedVersions {
 			if pgv.Version == gvr.Version {
 				break
 			}
