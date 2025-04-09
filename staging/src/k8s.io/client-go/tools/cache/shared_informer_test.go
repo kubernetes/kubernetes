@@ -369,6 +369,43 @@ func TestResyncCheckPeriod(t *testing.T) {
 	}
 }
 
+// TestContextHandlers verifies that handlers do not receive further
+// events when their context is canceled without affecting other
+// handlers.
+func TestContextHandlers(t *testing.T) {
+	source := newFakeControllerSource(t)
+	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+
+	listener1Ctx, listener1Cancel := context.WithCancel(context.Background())
+	listener1 := newTestListener("listener1", 0, "pod1")
+	listener1Reg, err := informer.AddContextEventHandler(listener1Ctx, listener1)
+	if err != nil {
+		t.Fatalf("informer did not add handler for listener1: %v", err)
+	}
+
+	listener2 := newTestListener("listener2", 0, "pod1", "pod2")
+	if _, err := informer.AddEventHandler(listener2); err != nil {
+		t.Fatalf("informer did not add handler for listener2: %v", err)
+	}
+	listeners := []*testListener{listener1, listener2}
+
+	informerCtx, informerCancel := context.WithCancel(context.Background())
+	defer informerCancel()
+	go informer.RunWithContext(informerCtx)
+
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+	assert.Eventually(t, listener1Reg.HasSynced, time.Second*3, time.Millisecond)
+	listener1Cancel()
+
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
+
+	for _, listener := range listeners {
+		if !listener.ok() {
+			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
+		}
+	}
+}
+
 // verify that https://github.com/kubernetes/kubernetes/issues/59822 is fixed
 func TestSharedInformerInitializationRace(t *testing.T) {
 	source := newFakeControllerSource(t)
