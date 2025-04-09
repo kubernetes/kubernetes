@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -41,9 +42,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
+	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
 	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/controller-manager/pkg/features"
+	_ "k8s.io/controller-manager/pkg/features/register"
 )
 
 const (
@@ -63,10 +67,12 @@ type RouteController struct {
 	kubeClient       clientset.Interface
 	clusterName      string
 	clusterCIDRs     []*net.IPNet
+	nodeInformer     coreinformers.NodeInformer
 	nodeLister       corelisters.NodeLister
 	nodeListerSynced cache.InformerSynced
 	broadcaster      record.EventBroadcaster
 	recorder         record.EventRecorder
+	workqueue        workqueue.TypedRateLimitingInterface[string]
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
@@ -79,15 +85,65 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		clusterCIDRs:     clusterCIDRs,
+		nodeInformer:     nodeInformer,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) {
+		rc.workqueue = workqueue.NewTypedRateLimitingQueueWithConfig(
+			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "Routes"},
+		)
+
+		rc.nodeInformer.Informer().AddEventHandler(
+			// It is only necessary to reconcile the routes for any events that have the potential to impact them:
+			// - Node is added
+			// - Node is removed
+			// - Node .Status.Addresses is changed
+			//	 TODO: is this a reasonable assumption or are there other values that can impact the Routes?
+			// - Node .Spec.PodCIDRs is changed
+			cache.ResourceEventHandlerFuncs{
+				AddFunc:    rc.enqueueReconcile,
+				UpdateFunc: rc.handleNodeUpdate,
+				DeleteFunc: rc.enqueueReconcile,
+			},
+		)
 	}
 
 	return rc
 }
 
+func (rc *RouteController) enqueueReconcile(_ interface{}) {
+	// reconcileNodeRoutes always reconciles the full cluster. It does not make sense to have
+	// separate entries in the workqueue per node, but a single one for the whole cluster is enough.
+	rc.workqueue.Add("routes")
+}
+
+func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
+	// Resync sends an update with old==new, so these events are ignored here.
+
+	oldNode, oldOk := oldObj.(*v1.Node)
+	newNode, newOk := newObj.(*v1.Node)
+
+	if !oldOk || !newOk {
+		return
+	}
+
+	diffInPodCIDR := !reflect.DeepEqual(oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
+	diffInNodeAddresses := !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
+
+	if diffInPodCIDR || diffInNodeAddresses {
+		rc.enqueueReconcile(newObj)
+	}
+}
+
 func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, controllerManagerMetrics *controllersmetrics.ControllerManagerMetrics) {
 	defer utilruntime.HandleCrash()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) {
+		defer rc.workqueue.ShutDown()
+	}
 
 	rc.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
 	rc.recorder = rc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
@@ -108,18 +164,65 @@ func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, co
 		return
 	}
 
-	// TODO: If we do just the full Resync every 5 minutes (default value)
-	// that means that we may wait up to 5 minutes before even starting
-	// creating a route for it. This is bad.
-	// We should have a watch on node and if we observe a new node (with CIDR?)
-	// trigger reconciliation for that node.
-	go wait.NonSlidingUntil(func() {
-		if err := rc.reconcileNodeRoutes(ctx); err != nil {
-			klog.Errorf("Couldn't reconcile node routes: %v", err)
-		}
-	}, syncPeriod, ctx.Done())
+	if utilfeature.DefaultFeatureGate.Enabled(features.CloudControllerManagerWatchBasedRoutesReconciliation) {
+		// Process any node events that may change the routes.
+		// It does not make sense to add concurrency here, as the routes
+		// controller always processes the whole cluster.
+		go wait.UntilWithContext(ctx, rc.runWorker, time.Second)
+
+		// We should still regularly run the reconcile, even if no events come in. Usually controllers use the
+		// `syncPeriod` for this, but for the route controller the default period is very low (5s) and not useful for
+		// watch-based reconciliation.
+		// Because of our event filters the usual resync period from the informer does not trigger reconciles.
+		// TODO: What time should we use?
+	} else {
+		go wait.NonSlidingUntil(func() {
+			if err := rc.reconcileNodeRoutes(ctx); err != nil {
+				klog.Errorf("Couldn't reconcile node routes: %v", err)
+			}
+		}, syncPeriod, ctx.Done())
+	}
 
 	<-ctx.Done()
+}
+
+func (rc *RouteController) runWorker(ctx context.Context) {
+	for rc.processNextWorkItem(ctx) {
+	}
+}
+
+// processNextWorkItem will read a single work item off the workqueue and
+// attempt to process it, by calling reconcileNodeRoutes.
+func (rc *RouteController) processNextWorkItem(ctx context.Context) bool {
+	obj, shutdown := rc.workqueue.Get()
+	if shutdown {
+		return false
+	}
+
+	// We wrap this block in a func so we can defer rc.workqueue.Done.
+	err := func(key string) error {
+		defer rc.workqueue.Done(key)
+
+		// Run the route reconciliation
+		if err := rc.reconcileNodeRoutes(ctx); err != nil {
+			// Put the item back on the workqueue to handle any transient errors.
+			rc.workqueue.AddRateLimited(key)
+			klog.Infof("Couldn't reconcile node routes: %v, requeuing", err)
+			return fmt.Errorf("couldn't reconcile node routes: %w, requeuing", err)
+		}
+
+		// Finally, if no error occurs we Forget this item so it does not
+		// get queued again until another change happens.
+		rc.workqueue.Forget(key)
+		return nil
+	}(obj)
+
+	if err != nil {
+		utilruntime.HandleError(err)
+		return true
+	}
+
+	return true
 }
 
 func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) error {
