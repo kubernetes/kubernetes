@@ -22,6 +22,10 @@ import (
 	"testing"
 	"time"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/features"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -510,6 +514,91 @@ func TestReconcile(t *testing.T) {
 			}
 		})
 
+	}
+}
+
+func TestHandleNodeUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudControllerManagerWatchBasedRoutesReconciliation, true)
+
+	cluster := "my-k8s"
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
+
+	testCases := []struct {
+		description           string
+		clientset             *fake.Clientset
+		updatedNode           v1.Node
+		expectedWorkqueueItem string
+	}{
+		{
+			description:           "internal IP updated",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}}},
+			expectedWorkqueueItem: "routes",
+		},
+		{
+			description:           "pod CIDR updated",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.121.0.0/24", PodCIDRs: []string{"10.121.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}},
+			expectedWorkqueueItem: "routes",
+		},
+		{
+			description: "node object not updated",
+			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode: node,
+		},
+		{
+			description: "unrelated node update",
+			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					UID:  "01",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR:  "10.120.0.0/24",
+					PodCIDRs: []string{"10.120.0.0/24"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+					Images: []v1.ContainerImage{
+						{
+							Names: []string{
+								"registry.k8s.io/pause:latest",
+							},
+							SizeBytes: 239840,
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
+			routes, ok := cloud.Routes()
+			assert.True(t, ok, "fakecloud failed to run Routes()")
+
+			cidrs := make([]*net.IPNet, 0)
+			_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
+			cidrs = append(cidrs, cidr)
+
+			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
+			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NotNil(t, rc.workqueue)
+
+			rc.handleNodeUpdate(&node, &testCase.updatedNode)
+
+			if testCase.expectedWorkqueueItem != "" {
+				item, shutdown := rc.workqueue.Get()
+				require.False(t, shutdown, "workqueue is shutdown")
+				assert.Equal(t, testCase.expectedWorkqueueItem, item, "unexpected item from workqueue")
+			}
+		})
 	}
 }
 
