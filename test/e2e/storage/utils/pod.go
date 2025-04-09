@@ -22,8 +22,8 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -68,6 +68,12 @@ func StartPodLogs(ctx context.Context, f *framework.Framework, driverNamespace *
 				testName = append(testName, reg.ReplaceAllString(test.LeafNodeText, "_"))
 			}
 		}
+
+		// Make sure each directory name is short enough for Linux + Windows
+		for i, testNameComponent := range testName {
+			testName[i] = ShortenFileName(testNameComponent)
+		}
+
 		// We end the prefix with a slash to ensure that all logs
 		// end up in a directory named after the current test.
 		//
@@ -76,7 +82,7 @@ func StartPodLogs(ctx context.Context, f *framework.Framework, driverNamespace *
 		// keeps each directory name smaller (the full test
 		// name at one point exceeded 256 characters, which was
 		// too much for some filesystems).
-		logDir := framework.TestContext.ReportDir + "/" + strings.Join(testName, "/")
+		logDir := filepath.Join(framework.TestContext.ReportDir, filepath.Join(testName...))
 		to.LogPathPrefix = logDir + "/"
 
 		err := os.MkdirAll(logDir, 0755)
