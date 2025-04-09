@@ -34,8 +34,6 @@ import (
 	"strings"
 	"time"
 
-	securejoin "github.com/cyphar/filepath-securejoin"
-
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
@@ -229,10 +227,14 @@ func (n *nodeLogQuery) validate() field.ErrorList {
 	case len(n.Files) == 1 && n.options != (options{}):
 		allErrs = append(allErrs, field.Invalid(field.NewPath("query"), n.Files, "cannot specify file with options"))
 	case len(n.Files) == 1:
-		if fullLogFilename, err := securejoin.SecureJoin(nodeLogDir, n.Files[0]); err != nil {
+		if root, err := os.OpenRoot(nodeLogDir); err != nil {
 			allErrs = append(allErrs, field.Invalid(field.NewPath("query"), n.Files, err.Error()))
-		} else if _, err := os.Stat(fullLogFilename); err != nil {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("query"), n.Files, err.Error()))
+		} else {
+			// root.Close() never returns errors
+			defer func() { _ = root.Close() }()
+			if _, err := root.Stat(n.Files[0]); err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("query"), n.Files, err.Error()))
+			}
 		}
 	}
 
@@ -401,6 +403,30 @@ func newReaderCtx(ctx context.Context, r io.Reader) io.Reader {
 		ctx:    ctx,
 		Reader: r,
 	}
+}
+
+// heuristicsCopyFileLog returns the contents of the given logFile
+func heuristicsCopyFileLog(ctx context.Context, w io.Writer, logDir, logFileName string) error {
+	f, err := os.OpenInRoot(logDir, logFileName)
+	if err != nil {
+		return err
+	}
+	// Ignoring errors when closing a file opened read-only doesn't cause data loss
+	defer func() { _ = f.Close() }()
+	fInfo, err := f.Stat()
+	if err != nil {
+		return err
+	}
+	// This is to account for the heuristics where logs for service foo
+	// could be in /var/log/foo/
+	if fInfo.IsDir() {
+		return os.ErrNotExist
+	}
+
+	if _, err := io.Copy(w, newReaderCtx(ctx, f)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func safeServiceName(s string) error {
