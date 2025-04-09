@@ -772,19 +772,16 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(context.Context, *v1.Node) er
 // Validate given node IP belongs to the current host
 func validateNodeIP(nodeIP net.IP) error {
 	// Honor IP limitations set in setNodeStatus()
-	if nodeIP.To4() == nil && nodeIP.To16() == nil {
+	switch {
+	case nodeIP.To4() == nil && nodeIP.To16() == nil:
 		return fmt.Errorf("nodeIP must be a valid IP address")
-	}
-	if nodeIP.IsLoopback() {
+	case nodeIP.IsLoopback():
 		return fmt.Errorf("nodeIP can't be loopback address")
-	}
-	if nodeIP.IsMulticast() {
+	case nodeIP.IsMulticast():
 		return fmt.Errorf("nodeIP can't be a multicast address")
-	}
-	if nodeIP.IsLinkLocalUnicast() {
+	case nodeIP.IsLinkLocalUnicast():
 		return fmt.Errorf("nodeIP can't be a link-local unicast address")
-	}
-	if nodeIP.IsUnspecified() {
+	case nodeIP.IsUnspecified():
 		return fmt.Errorf("nodeIP can't be an all zeros address")
 	}
 
