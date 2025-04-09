@@ -613,6 +613,9 @@ func (config *inClusterClientConfig) ClientConfig() (*restclient.Config, error) 
 	// in-cluster configs only takes a host, token, or CA file
 	// if any of them were individually provided, overwrite anything else
 	if config.overrides != nil {
+		if insecure := config.overrides.ClusterInfo.InsecureSkipTLSVerify; insecure {
+			icc.Insecure = insecure
+		}
 		if server := config.overrides.ClusterInfo.Server; len(server) > 0 {
 			icc.Host = server
 		}

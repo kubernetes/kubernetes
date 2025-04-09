@@ -850,6 +850,13 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		{
 			overrides: &ConfigOverrides{
 				ClusterInfo: clientcmdapi.Cluster{
+					InsecureSkipTLSVerify: true,
+				},
+			},
+		},
+		{
+			overrides: &ConfigOverrides{
+				ClusterInfo: clientcmdapi.Cluster{
 					Server: "https://host-from-overrides.com",
 				},
 			},
@@ -941,6 +948,7 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		expectedToken := "token-from-cluster"
 		expectedTokenFile := "tokenfile-from-cluster"
 		expectedCAFile := "/path/to/ca-from-cluster.crt"
+		expectedInsecure := false
 
 		icc := &inClusterClientConfig{
 			inClusterConfigProvider: func() (*restclient.Config, error) {
@@ -964,6 +972,10 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 		if overridenServer := tc.overrides.ClusterInfo.Server; len(overridenServer) > 0 {
 			expectedServer = overridenServer
 		}
+		if overridenInsecure := tc.overrides.ClusterInfo.InsecureSkipTLSVerify; overridenInsecure {
+			expectedInsecure = overridenInsecure
+		}
+
 		if len(tc.overrides.AuthInfo.Token) > 0 || len(tc.overrides.AuthInfo.TokenFile) > 0 {
 			expectedToken = tc.overrides.AuthInfo.Token
 			expectedTokenFile = tc.overrides.AuthInfo.TokenFile
@@ -974,6 +986,9 @@ func TestInClusterClientConfigPrecedence(t *testing.T) {
 
 		if clientConfig.Host != expectedServer {
 			t.Errorf("Expected server %v, got %v", expectedServer, clientConfig.Host)
+		}
+		if clientConfig.Insecure != expectedInsecure {
+			t.Errorf("Expected insecure %v, got %v", expectedInsecure, clientConfig.Insecure)
 		}
 		if clientConfig.BearerToken != expectedToken {
 			t.Errorf("Expected token %v, got %v", expectedToken, clientConfig.BearerToken)
