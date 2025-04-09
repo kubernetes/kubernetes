@@ -74,7 +74,7 @@ func (n *NamespaceController) Start(ctx context.Context) error {
 	discoverResourcesFn := client.Discovery().ServerPreferredNamespacedResources
 	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
 
-	nc := namespacecontroller.NewNamespaceController(
+	nc, err := namespacecontroller.NewNamespaceController(
 		ctx,
 		client,
 		metadataClient,
@@ -82,6 +82,9 @@ func (n *NamespaceController) Start(ctx context.Context) error {
 		informerFactory.Core().V1().Namespaces(),
 		ncResyncPeriod, v1.FinalizerKubernetes,
 	)
+	if err != nil {
+		return err
+	}
 	informerFactory.Start(n.stopCh)
 	go nc.Run(ctx, ncConcurrency)
 	return nil

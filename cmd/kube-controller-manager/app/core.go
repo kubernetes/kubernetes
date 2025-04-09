@@ -577,15 +577,14 @@ func startNamespaceController(ctx context.Context, controllerContext ControllerC
 }
 
 func startModifiedNamespaceController(ctx context.Context, controllerContext ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (controller.Interface, bool, error) {
-
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
-		return nil, true, err
+		return nil, false, err
 	}
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
-	namespaceController := namespacecontroller.NewNamespaceController(
+	namespaceController, err := namespacecontroller.NewNamespaceController(
 		ctx,
 		namespaceKubeClient,
 		metadataClient,
@@ -594,8 +593,11 @@ func startModifiedNamespaceController(ctx context.Context, controllerContext Con
 		controllerContext.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	go namespaceController.Run(ctx, int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs))
+	if err != nil {
+		return nil, false, err
+	}
 
+	go namespaceController.Run(ctx, int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs))
 	return nil, true, nil
 }
 

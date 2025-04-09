@@ -195,7 +195,7 @@ func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertestin
 
 	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
 	_, ctx := ktesting.NewTestContext(t)
-	controller := namespace.NewNamespaceController(
+	controller, err := namespace.NewNamespaceController(
 		ctx,
 		clientSet,
 		metadataClient,
@@ -203,6 +203,9 @@ func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertestin
 		informers.Core().V1().Namespaces(),
 		10*time.Hour,
 		corev1.FinalizerKubernetes)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	return ctx, server.TearDownFn, controller, informers, clientSet, dynamic.NewForConfigOrDie(config)
 }

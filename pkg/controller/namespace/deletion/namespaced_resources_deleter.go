@@ -48,7 +48,7 @@ type NamespacedResourcesDeleterInterface interface {
 func NewNamespacedResourcesDeleter(ctx context.Context, nsClient v1clientset.NamespaceInterface,
 	metadataClient metadata.Interface, podsGetter v1clientset.PodsGetter,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	finalizerToken v1.FinalizerName) NamespacedResourcesDeleterInterface {
+	finalizerToken v1.FinalizerName) (NamespacedResourcesDeleterInterface, error) {
 	d := &namespacedResourcesDeleter{
 		nsClient:       nsClient,
 		metadataClient: metadataClient,
@@ -59,8 +59,10 @@ func NewNamespacedResourcesDeleter(ctx context.Context, nsClient v1clientset.Nam
 		discoverResourcesFn: discoverResourcesFn,
 		finalizerToken:      finalizerToken,
 	}
-	d.initOpCache(ctx)
-	return d
+	if err := d.initOpCache(ctx); err != nil {
+		return nil, err
+	}
+	return d, nil
 }
 
 var _ NamespacedResourcesDeleterInterface = &namespacedResourcesDeleter{}
@@ -155,21 +157,19 @@ func (d *namespacedResourcesDeleter) Delete(ctx context.Context, nsName string) 
 	return nil
 }
 
-func (d *namespacedResourcesDeleter) initOpCache(ctx context.Context) {
+func (d *namespacedResourcesDeleter) initOpCache(ctx context.Context) error {
 	// pre-fill opCache with the discovery info
 	//
 	// TODO(sttts): get rid of opCache and http 405 logic around it and trust discovery info
 	resources, err := d.discoverResourcesFn()
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to get all supported resources from server: %v", err))
-		return
 	}
-	logger := klog.FromContext(ctx)
 	if len(resources) == 0 {
-		logger.Error(err, "Unable to get any supported resources from server")
-		return
+		return fmt.Errorf("unable to get any supported resources from server: %v", err)
 	}
 
+	logger := klog.FromContext(ctx)
 	for _, rl := range resources {
 		gv, err := schema.ParseGroupVersion(rl.GroupVersion)
 		if err != nil {

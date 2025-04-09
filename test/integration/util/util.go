@@ -239,7 +239,7 @@ func CreateNamespaceController(ctx context.Context, tb ktesting.TB, restConfig r
 		tb.Fatalf("Failed to create metadataClient: %v", err)
 	}
 	discoverResourcesFn := clientSet.Discovery().ServerPreferredNamespacedResources
-	controller := namespace.NewNamespaceController(
+	controller, err := namespace.NewNamespaceController(
 		ctx,
 		clientSet,
 		metadataClient,
@@ -247,6 +247,9 @@ func CreateNamespaceController(ctx context.Context, tb ktesting.TB, restConfig r
 		informerSet.Core().V1().Namespaces(),
 		10*time.Hour,
 		v1.FinalizerKubernetes)
+	if err != nil {
+		tb.Fatalf("Failed creating namespace controller: %v", err)
+	}
 	return func() {
 		go controller.Run(ctx, 5)
 	}
