@@ -694,7 +694,15 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 }
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
-func CleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
+func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
+	ipts := utiliptables.NewDualStack()
+	ipsetInterface := utilipset.New()
+	ipvsInterface := utilipvs.New()
+
+	return cleanupLeftovers(ctx, ipvsInterface, ipts, ipsetInterface)
+}
+
+func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[v1.IPFamily]utiliptables.Interface, ipset utilipset.Interface) (encounteredError bool) {
 	logger := klog.FromContext(ctx)
 	// Clear all ipvs rules
 	if ipvs != nil {
@@ -712,7 +720,9 @@ func CleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipt utilipta
 		encounteredError = true
 	}
 	// Clear iptables created by ipvs Proxier.
-	encounteredError = cleanupIptablesLeftovers(ctx, ipt) || encounteredError
+	for _, ipt := range ipts {
+		encounteredError = cleanupIptablesLeftovers(ctx, ipt) || encounteredError
+	}
 	// Destroy ip sets created by ipvs Proxier.  We should call it after cleaning up
 	// iptables since we can NOT delete ip set which is still referenced by iptables.
 	for _, set := range ipsetInfo {

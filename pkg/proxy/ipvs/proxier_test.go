@@ -229,6 +229,9 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 func TestCleanupLeftovers(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ipt := iptablestest.NewFake()
+	ipts := map[v1.IPFamily]utiliptables.Interface{
+		v1.IPv4Protocol: ipt,
+	}
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	fp := NewFakeProxier(ctx, ipt, ipvs, ipset, nil, nil, v1.IPv4Protocol)
@@ -270,7 +273,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	fp.syncProxyRules()
 
 	// test cleanup left over
-	if CleanupLeftovers(ctx, ipvs, ipt, ipset) {
+	if cleanupLeftovers(ctx, ipvs, ipts, ipset) {
 		t.Errorf("Cleanup leftovers failed")
 	}
 }

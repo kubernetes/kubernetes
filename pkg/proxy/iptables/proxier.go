@@ -405,7 +405,15 @@ var iptablesCleanupOnlyChains = []iptablesJumpChain{}
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
-func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounteredError bool) {
+func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
+	ipts := utiliptables.NewDualStack()
+	for _, ipt := range ipts {
+		encounteredError = cleanupLeftoversForFamily(ctx, ipt) || encounteredError
+	}
+	return
+}
+
+func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) (encounteredError bool) {
 	logger := klog.FromContext(ctx)
 	// Unlink our chains
 	for _, jump := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
