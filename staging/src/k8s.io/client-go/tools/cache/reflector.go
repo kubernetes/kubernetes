@@ -579,19 +579,10 @@ func (r *Reflector) list(ctx context.Context) error {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				// Basically utilruntime.HandleCrashWithContext w/o panic
-				// Didn't modify utilruntime.ReallyCrash to avoid race condition
-				logger := klog.FromContext(ctx).WithCallDepth(4)
-				ctxWithLogger := klog.NewContext(ctx, logger)
-
-				for _, fn := range utilruntime.PanicHandlers {
-					fn(ctxWithLogger, r)
-				}
-
-				// Send out the panic content for the outer goroutine to handle
 				panicCh <- r
 			}
 		}()
+		defer utilruntime.HandleCrashWithContext(ctx)
 
 		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
 		// list request will return the full response.
