@@ -74,6 +74,31 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 	return podSandBoxID, "", nil
 }
 
+func (m *kubeGenericRuntimeManager) removePodSandbox(ctx context.Context, pod *v1.Pod) error {
+	filter := &runtimeapi.PodSandboxFilter{
+		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: string(pod.UID)},
+	}
+
+	sandboxes, err := m.runtimeService.ListPodSandbox(ctx, filter)
+	if err != nil {
+		klog.ErrorS(err, "Failed to list sandboxes for pod", "podUID", pod.UID)
+		return err
+	}
+
+	for _, sandbox := range sandboxes {
+		if err := m.runtimeService.StopPodSandbox(ctx, sandbox.Id); err != nil {
+			klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandbox.Id)
+			return err
+		}
+		if err := m.runtimeService.RemovePodSandbox(ctx, sandbox.Id); err != nil {
+			klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandbox.Id)
+			return err
+		}
+	}
+
+	return nil
+}
+
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attempt uint32) (*runtimeapi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup

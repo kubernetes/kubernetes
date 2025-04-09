@@ -1245,6 +1245,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// means the PodWorker has not acked the deletion.
 			if m.podStateProvider.IsPodTerminationRequested(pod.UID) {
 				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
+				if ctx.Err() != nil {
+					klog.V(3).InfoS("The context for creating the sandbox has been canceled, and the already created sandbox will be deleted",
+						"pod", klog.KObj(pod), "podUID", pod.UID)
+					if err := m.removePodSandbox(context.Background(), pod); err != nil {
+						klog.ErrorS(err, "Remove sandbox failed", "pod", klog.KObj(pod), "podUID", pod.UID)
+					}
+				}
 				return
 			}
 			metrics.StartedPodsErrorsTotal.Inc()
@@ -1352,6 +1359,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
 			switch {
+			case ctx.Err() != nil:
+				klog.V(3).InfoS("The context for creating the container has been canceled, and the already created container will be deleted",
+					"containerType", typeName, "container", spec.container, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
+				p := kubecontainer.ConvertPodStatusToRunningPod("", podStatus)
+				if err := m.KillPod(context.Background(), pod, p, nil); err != nil {
+					utilruntime.HandleError(fmt.Errorf("failed to kill pod %q: %w; Skipping pod %q", pod.Name, err, format.Pod(pod)))
+				}
 			case err == images.ErrImagePullBackOff:
 				klog.V(3).InfoS("Container start failed in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
 			default:

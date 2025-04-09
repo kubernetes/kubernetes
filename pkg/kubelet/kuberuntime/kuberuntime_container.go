@@ -286,13 +286,18 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container: %v", container.Name)
 
 	// Step 3: start the container.
-	err = m.runtimeService.StartContainer(ctx, containerID)
+	err = m.runtimeService.StartContainer(context.Background(), containerID)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", s.Message())
 		return s.Message(), kubecontainer.ErrRunContainer
 	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, "Started container %v", container.Name)
+
+	if ctx.Err() != nil {
+		klog.InfoS("context canceled, the startup container is terminated", "pod", klog.KObj(pod), "containerName", container.Name)
+		return "", kubecontainer.ErrRunContainer
+	}
 
 	// Symlink container logs to the legacy container log location for cluster logging
 	// support.
