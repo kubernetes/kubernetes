@@ -69,7 +69,7 @@ type BasicDevice struct {
 	Attributes       map[QualifiedName]DeviceAttribute
 	Capacity         map[QualifiedName]DeviceCapacity
 	ConsumesCounters []DeviceCounterConsumption
-	NodeName         *string
+	NodeName         UniqueString
 	NodeSelector     *v1.NodeSelector
 	AllNodes         *bool
 	Taints           []resourceapi.DeviceTaint

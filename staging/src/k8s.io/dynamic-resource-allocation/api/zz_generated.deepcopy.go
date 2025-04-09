@@ -51,11 +51,7 @@ func (in *BasicDevice) DeepCopyInto(out *BasicDevice) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.NodeName != nil {
-		in, out := &in.NodeName, &out.NodeName
-		*out = new(string)
-		**out = **in
-	}
+	in.NodeName.DeepCopyInto(&out.NodeName)
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = new(v1.NodeSelector)

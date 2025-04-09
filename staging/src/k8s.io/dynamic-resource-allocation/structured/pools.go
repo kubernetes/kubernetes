@@ -73,8 +73,8 @@ func GatherPools(ctx context.Context, slices []*draapi.ResourceSlice, node *v1.N
 				}
 				var nodeName draapi.UniqueString
 				var allNodes bool
-				if device.Basic.NodeName != nil {
-					nodeName = draapi.MakeUniqueString(*device.Basic.NodeName)
+				if device.Basic.NodeName != draapi.NullUniqueString {
+					nodeName = device.Basic.NodeName
 				}
 				if device.Basic.AllNodes != nil {
 					allNodes = *device.Basic.AllNodes

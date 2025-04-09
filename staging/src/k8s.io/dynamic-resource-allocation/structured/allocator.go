@@ -890,8 +890,8 @@ func (alloc *allocator) isSelectable(r requestIndices, requestData requestData, 
 	if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
 		var nodeName draapi.UniqueString
 		var allNodes bool
-		if device.NodeName != nil {
-			nodeName = draapi.MakeUniqueString(*device.NodeName)
+		if device.NodeName != draapi.NullUniqueString {
+			nodeName = device.NodeName
 		}
 		if device.AllNodes != nil {
 			allNodes = *device.AllNodes
@@ -1149,8 +1149,8 @@ func (alloc *allocator) createNodeSelector(result []internalDeviceResult) (*v1.N
 		var nodeName draapi.UniqueString
 		var nodeSelector *v1.NodeSelector
 		if ptr.Deref(slice.Spec.PerDeviceNodeSelection, false) {
-			if result[i].basic.NodeName != nil {
-				nodeName = draapi.MakeUniqueString(*result[i].basic.NodeName)
+			if result[i].basic.NodeName != draapi.NullUniqueString {
+				nodeName = result[i].basic.NodeName
 			}
 			nodeSelector = result[i].basic.NodeSelector
 		} else {

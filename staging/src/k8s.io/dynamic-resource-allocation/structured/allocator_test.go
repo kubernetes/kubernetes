@@ -306,7 +306,7 @@ func partitionableDeviceWithNodeSelector(name string, nodeSelection any, capacit
 		} else if nodeSelection == nodeSelectionPerDevice {
 			panic("nodeSelectionPerDevice is not supported for devices")
 		} else {
-			device.Basic.NodeName = &nodeSelection
+			device.Basic.NodeName = draapi.MakeUniqueString(nodeSelection)
 		}
 	default:
 		panic(fmt.Sprintf("unexpected nodeSelection type %T: %+v", nodeSelection, nodeSelection))
