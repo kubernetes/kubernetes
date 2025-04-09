@@ -1686,7 +1686,7 @@ func TestCustomSelection(t *testing.T) {
 					gotVictims = append(gotVictims, p.Name)
 				}
 				if diff := cmp.Diff(expectVictims, gotVictims); diff != "" {
-					t.Errorf("expect victims %+v on node %s, but got pods %+v", expectVictims, selected.Name(), gotVictims)
+					t.Errorf("Unexpected victims on node %s (-want,+got):\n%s", selected.Name(), diff)
 				}
 
 				// remove selected from candidates
