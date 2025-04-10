@@ -301,6 +301,7 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			}
 			for driverName := range claimInfo.DriverState {
 				batches[driverName] = append(batches[driverName], claim)
+				// HACK: hacky way to get all the drivers -- probably not suitable long term.
 				m.driversMutex.Lock()
 				m.drivers.Insert(driverName)
 				m.driversMutex.Unlock()

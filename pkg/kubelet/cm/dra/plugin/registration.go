@@ -215,10 +215,6 @@ func (h *RegistrationHandler) validateSupportedServices(pluginName string, suppo
 		chosenService = drapbv1alpha4.NodeService
 	}
 
-	// Check for NodeHealth service (optional)
-	if slices.Contains(supportedServices, "drahealthv1alpha1.NodeHealth") {
-		klog.FromContext(h.backgroundCtx).V(4).Info("Plugin supports NodeHealth service", "pluginName", pluginName)
-	}
 	return chosenService, nil
 }
 
