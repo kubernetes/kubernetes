@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
@@ -125,6 +126,9 @@ type FileOperations struct {
 	// Pre-defined devices, with each device name mapped to
 	// the device attributes. Not used if NumDevices >= 0.
 	Devices map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+
+	// ErrorHandler is an optional callback for ResourceSlice publishing problems.
+	ErrorHandler func(ctx context.Context, err error, msg string)
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
@@ -231,6 +235,14 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 		return false
 	}
 	return status.PluginRegistered
+}
+
+func (ex *ExamplePlugin) ErrorHandler(ctx context.Context, err error, msg string) {
+	if ex.fileOps.ErrorHandler != nil {
+		ex.fileOps.ErrorHandler(ctx, err, msg)
+		return
+	}
+	utilruntime.HandleErrorWithContext(ctx, err, msg)
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
