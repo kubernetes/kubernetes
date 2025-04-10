@@ -723,11 +723,12 @@ func CleanupLeftovers(ctx context.Context) bool {
 
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
 		nft, err := knftables.New(family, kubeProxyTable)
-		if err == nil {
-			tx := nft.NewTransaction()
-			tx.Delete(&knftables.Table{})
-			err = nft.Run(ctx, tx)
+		if err != nil {
+			continue
 		}
+		tx := nft.NewTransaction()
+		tx.Delete(&knftables.Table{})
+		err = nft.Run(ctx, tx)
 		if err != nil && !knftables.IsNotFound(err) {
 			logger.Error(err, "Error cleaning up nftables rules")
 			encounteredError = true

@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -696,6 +697,15 @@ func cleanupIptablesLeftovers(ctx context.Context, ipt utiliptables.Interface) (
 
 // CleanupLeftovers clean up all ipvs and iptables rules created by ipvs Proxier.
 func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
+	// libipvs.New() will log errors if the "ip_vs" kernel module (or the "modprobe"
+	// binary) is not available. Logging an extra error is fine if we were actually
+	// trying to run the ipvs proxier, but it's confusing to see when just doing
+	// best-effort cleanup (eg, when starting the nftables proxier), so we do the same
+	// check libipvs does here, and bail out without calling libipvs if it fails.
+	if _, err := exec.Command("modprobe", "-va", "ip_vs").CombinedOutput(); err != nil {
+		return false
+	}
+
 	ipts := utiliptables.NewDualStack()
 	ipsetInterface := utilipset.New()
 	ipvsInterface := utilipvs.New()
@@ -720,21 +730,26 @@ func cleanupLeftovers(ctx context.Context, ipvs utilipvs.Interface, ipts map[v1.
 		logger.Error(err, "Error deleting dummy device created by ipvs proxier", "device", defaultDummyDevice)
 		encounteredError = true
 	}
+
 	// Clear iptables created by ipvs Proxier.
 	for _, ipt := range ipts {
 		encounteredError = cleanupIptablesLeftovers(ctx, ipt) || encounteredError
 	}
+
 	// Destroy ip sets created by ipvs Proxier.  We should call it after cleaning up
 	// iptables since we can NOT delete ip set which is still referenced by iptables.
-	for _, set := range ipsetInfo {
-		err = ipset.DestroySet(set.name)
-		if err != nil {
-			if !utilipset.IsNotFoundError(err) {
-				logger.Error(err, "Error removing ipset", "ipset", set.name)
-				encounteredError = true
+	if _, err := ipset.GetVersion(); err == nil {
+		for _, set := range ipsetInfo {
+			err = ipset.DestroySet(set.name)
+			if err != nil {
+				if !utilipset.IsNotFoundError(err) {
+					logger.Error(err, "Error removing ipset", "ipset", set.name)
+					encounteredError = true
+				}
 			}
 		}
 	}
+
 	return encounteredError
 }
 
