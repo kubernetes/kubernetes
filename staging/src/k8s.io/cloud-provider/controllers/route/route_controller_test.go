@@ -77,7 +77,8 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset()
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
-		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		rc, err := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		require.NoError(t, err)
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
@@ -457,7 +458,9 @@ func TestReconcile(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
-			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+
+			rc, err := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NoError(t, err)
 
 			recorder := record.NewBroadcaster(record.WithContext(ctx))
 			rc.recorder = recorder.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
@@ -493,7 +496,6 @@ func TestReconcile(t *testing.T) {
 				}
 			}
 			var finalRoutes []*cloudprovider.Route
-			var err error
 			timeoutChan := time.After(200 * time.Millisecond)
 			tick := time.NewTicker(10 * time.Millisecond)
 			defer tick.Stop()
@@ -588,7 +590,8 @@ func TestHandleNodeUpdate(t *testing.T) {
 			cidrs = append(cidrs, cidr)
 
 			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
-			rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			rc, err := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NoError(t, err)
 			require.NotNil(t, rc.workqueue)
 
 			rc.handleNodeUpdate(&node, &testCase.updatedNode)

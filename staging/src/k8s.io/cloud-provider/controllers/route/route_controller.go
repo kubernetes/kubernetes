@@ -75,7 +75,13 @@ type RouteController struct {
 	workqueue        workqueue.TypedRateLimitingInterface[string]
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
+func New(
+	routes cloudprovider.Routes,
+	kubeClient clientset.Interface,
+	nodeInformer coreinformers.NodeInformer,
+	clusterName string,
+	clusterCIDRs []*net.IPNet,
+) (*RouteController, error) {
 	if len(clusterCIDRs) == 0 {
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
@@ -96,7 +102,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "Routes"},
 		)
 
-		rc.nodeInformer.Informer().AddEventHandler(
+		_, err := rc.nodeInformer.Informer().AddEventHandler(
 			// It is only necessary to reconcile the routes for any events that have the potential to impact them:
 			// - Node is added
 			// - Node is removed
@@ -109,9 +115,12 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 				DeleteFunc: rc.enqueueReconcile,
 			},
 		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return rc
+	return rc, nil
 }
 
 func (rc *RouteController) enqueueReconcile(_ interface{}) {
