@@ -394,8 +394,15 @@ func TestContextHandlers(t *testing.T) {
 	go informer.RunWithContext(informerCtx)
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
-	assert.Eventually(t, listener1Reg.HasSynced, time.Second*3, time.Millisecond)
+	// wait until listener1 has synced pod1
+	assert.Eventually(t, listener1Reg.HasSynced, time.Second*1, time.Millisecond)
+	// cancel listener1
 	listener1Cancel()
+	// wait until listener1 is removed from the processor
+	assert.Eventually(t, func() bool {
+		_, ok := informer.processor.listeners[listener1Reg.(*processorListener)]
+		return !ok
+	}, time.Second*1, time.Millisecond)
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
 
