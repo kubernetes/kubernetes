@@ -400,8 +400,7 @@ func TestContextHandlers(t *testing.T) {
 	listener1Cancel()
 	// wait until listener1 is removed from the processor
 	assert.Eventually(t, func() bool {
-		_, ok := informer.processor.listeners[listener1Reg.(*processorListener)]
-		return !ok
+		return informer.processor.getListener(listener1Reg.(*processorListener)) == nil
 	}, time.Second*1, time.Millisecond)
 
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}})
