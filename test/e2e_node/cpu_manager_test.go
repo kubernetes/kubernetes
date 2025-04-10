@@ -1225,7 +1225,7 @@ func runCPUManagerTests(f *framework.Framework) {
 	})
 
 	ginkgo.It("should assign CPUs distributed across NUMA with distribute-cpus-across-numa and pcpu-only policy options enabled", func(ctx context.Context) {
-		var cpusNumPerNUMA, coresNumPerNUMA, numaNodeNum, threadsPerCore int
+		var cpusNumPerNUMA, numaNodeNum int
 
 		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
 		_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
@@ -1246,13 +1246,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		// this test is intended to be run on a multi-node NUMA system and
 		// a system with at least 4 cores per socket, hostcheck skips test
 		// if above requirements are not satisfied
-		numaNodeNum, coresNumPerNUMA, threadsPerCore = hostCheck()
-		cpusNumPerNUMA = coresNumPerNUMA * threadsPerCore
-
-		framework.Logf("numaNodes on the system %d", numaNodeNum)
-		framework.Logf("Cores per NUMA on the system %d", coresNumPerNUMA)
-		framework.Logf("Threads per Core on the system %d", threadsPerCore)
-		framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
+		numaNodeNum, _, _, cpusNumPerNUMA = hostCheck()
 
 		cpuPolicyOptions := map[string]string{
 			cpumanager.FullPCPUsOnlyOption:            "true",
