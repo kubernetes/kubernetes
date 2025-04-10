@@ -60,7 +60,7 @@ func TestHandleResizeEvents(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.TODO())
+			ctx, cancel := context.WithCancel(context.Background())
 			connCtx := connectionContext{
 				resizeStream: io.NopCloser(bytes.NewReader(testCase.resizeStreamData)),
 				resizeChan:   make(chan remotecommand.TerminalSize),
