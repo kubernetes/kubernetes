@@ -928,7 +928,7 @@ func TestPlugin(t *testing.T) {
 			classes:                  []*resourceapi.DeviceClass{deviceClass},
 			want: want{
 				prefilter: result{
-					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource, request req-1: has subrequests, but the DRAPrioritizedList feature is disabled`),
+					status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resource claim default/my-pod-my-resource, request req-1: has subrequests, but the DRAPrioritizedList feature is disabled`),
 				},
 				postfilter: result{
 					status: framework.NewStatus(framework.Unschedulable, `no new claims to deallocate`),
@@ -1003,7 +1003,9 @@ func TestPlugin(t *testing.T) {
 
 			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod, nil)
 			t.Run("prefilter", func(t *testing.T) {
-				assert.Equal(t, tc.want.preFilterResult, result)
+				if diff := cmp.Diff(tc.want.preFilterResult, result); diff != "" {
+					t.Errorf("Unexpected Prefilter result (-want,+got):\n%s", diff)
+				}
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
 			})
 			unschedulable := status.Code() != framework.Success
@@ -1094,7 +1096,9 @@ func TestPlugin(t *testing.T) {
 				initialObjects = testCtx.updateAPIServer(t, initialObjects, tc.prepare.postfilter)
 				result, status := testCtx.p.PostFilter(testCtx.ctx, testCtx.state, tc.pod, nil /* filteredNodeStatusMap not used by plugin */)
 				t.Run("postfilter", func(t *testing.T) {
-					assert.Equal(t, tc.want.postFilterResult, result)
+					if diff := cmp.Diff(tc.want.postFilterResult, result); diff != "" {
+						t.Errorf("Unexpected Postfilter result, (-want,+got):\n%s", diff)
+					}
 					testCtx.verify(t, tc.want.postfilter, initialObjects, nil, status)
 				})
 			}
@@ -1115,12 +1119,19 @@ type testContext struct {
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
 	t.Helper()
 	if expected.status == nil {
-		assert.Nil(t, status)
+		if status != nil {
+			t.Errorf("Expected nil status but got: %+v", status)
+		}
 	} else if actualErr := status.AsError(); actualErr != nil {
 		// Compare only the error strings.
-		assert.ErrorContains(t, actualErr, expected.status.AsError().Error())
+		expectedErr := expected.status.AsError()
+		if !cmp.Equal(expectedErr.Error(), actualErr.Error()) {
+			t.Errorf("Expected status error: %s, actual: %s", expectedErr, actualErr)
+		}
 	} else {
-		assert.Equal(t, expected.status, status)
+		if diff := cmp.Diff(expected.status, status); diff != "" {
+			t.Errorf("Unexpected status value, (-want,+got):\n%s", diff)
+		}
 	}
 	objects := tc.listAll(t)
 	wantObjects := update(t, initialObjects, expected.changes)
@@ -1163,7 +1174,9 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 func (tc *testContext) listAll(t *testing.T) (objects []metav1.Object) {
 	t.Helper()
 	claims, err := tc.client.ResourceV1beta1().ResourceClaims("").List(tc.ctx, metav1.ListOptions{})
-	require.NoError(t, err, "list claims")
+	if err != nil {
+		t.Errorf("unexpected error in list claims: %s", err)
+	}
 	for _, claim := range claims.Items {
 		claim := claim
 		objects = append(objects, &claim)
@@ -1266,7 +1279,9 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 		KubeClient:         tc.client,
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
-	require.NoError(t, err, "couldn't start resource slice tracker")
+	if err != nil {
+		t.Errorf("Unexpected error in starting resource slice tracker: %s", err)
+	}
 	tc.draManager = NewDRAManager(tCtx, assumecache.NewAssumeCache(tCtx.Logger(), tc.informerFactory.Resource().V1beta1().ResourceClaims().Informer(), "resource claim", "", nil), resourceSliceTracker, tc.informerFactory)
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
@@ -1288,11 +1303,15 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	// get triggered.
 	for _, claim := range claims {
 		_, err := tc.client.ResourceV1beta1().ResourceClaims(claim.Namespace).Create(tc.ctx, claim, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource claim")
+		if err != nil {
+			t.Errorf("Unexpected error in create resource claims: %s", err)
+		}
 	}
 	for _, class := range classes {
 		_, err := tc.client.ResourceV1beta1().DeviceClasses().Create(tc.ctx, class, metav1.CreateOptions{})
-		require.NoError(t, err, "create resource class")
+		if err != nil {
+			t.Errorf("Unexpected error in create resource class: %s", err)
+		}
 	}
 
 	tc.informerFactory.Start(tc.ctx.Done())
@@ -1504,7 +1523,9 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				// Eventually the assume cache will have it, too.
 				require.EventuallyWithT(t, func(t *assert.CollectT) {
 					cachedClaim, err := testCtx.draManager.resourceClaimTracker.cache.Get(claimKey)
-					require.NoError(t, err, "retrieve claim")
+					if err != nil {
+						t.Errorf("Unexpected error in retrieving cached claim: %s", err.Error())
+					}
 					if cachedClaim.(*resourceapi.ResourceClaim).ResourceVersion != claim.ResourceVersion {
 						t.Errorf("cached claim not updated yet")
 					}

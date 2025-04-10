@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -105,11 +104,17 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			}
 			actualHint, err := p.(*SchedulingGates).isSchedulableAfterUpdatePodSchedulingGatesEliminated(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Error("Expected error but got nil in isSchedulableAfterUpdatePodSchedulingGatesEliminated")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Errorf("Unexpected error in isSchedulableAfterUpdatePodSchedulingGatesEliminated: %s", err.Error())
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Unexpected hint values, (-want,+got):\n%s", diff)
+			}
 		})
 	}
 }
