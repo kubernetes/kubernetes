@@ -1079,9 +1079,9 @@ var Annotations = map[string]string{
 
 	"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to create LoadBalancer Service without NodePort and change it [Slow]": " [Skipped:alibabacloud] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:k8s]",
 
-	"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes": " [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes": " [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes": " [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on the same nodes": " [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:external] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-network] LoadBalancers [Feature:LoadBalancer] should be able to switch session affinity for LoadBalancer service with Cluster traffic policy [Slow] [LinuxOnly]": " [Skipped:alibabacloud] [Skipped:aws] [Skipped:baremetal] [Skipped:ibmcloud] [Skipped:kubevirt] [Skipped:nutanix] [Skipped:openstack] [Skipped:ovirt] [Skipped:vsphere] [Suite:k8s]",
 
