@@ -348,7 +348,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 	handler = genericapifilters.WithRequestInfo(handler, requestInfoResolver)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHTTPLogging(handler)
-	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver)
+	handler = genericfilters.WithPanicRecovery(handler, requestInfoResolver, nil)
 
 	return handler
 }
