@@ -99,7 +99,7 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 	return c.SetUpAt(c.GetPath(), mounterArgs)
 }
 
-func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) (retErr error) {
 	klog.V(4).Info(log("Mounter.SetUpAt(%s)", dir))
 
 	csi, err := c.csiClientGetter.Get()
@@ -284,7 +284,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	defer func() {
 		// Only if there was an error and volume operation was considered
 		// finished, we should remove the directory.
-		if err != nil && volumetypes.IsOperationFinishedError(err) {
+		if retErr != nil && volumetypes.IsOperationFinishedError(retErr) {
 			// attempt to cleanup volume mount dir
 			if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
 				klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
@@ -313,12 +313,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	)
 
 	if err != nil {
-		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(err) {
-			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
-				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
-			}
-		}
 		return err
 	}
 
