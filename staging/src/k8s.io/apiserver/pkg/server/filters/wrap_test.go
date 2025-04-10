@@ -18,6 +18,7 @@ package filters
 
 import (
 	"bytes"
+	klogtest "k8s.io/klog/v2/test"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,21 +30,50 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func TestPropogatingPanic(t *testing.T) {
-	var buf bytes.Buffer
-	klog.SetOutput(&buf)
-	klog.LogToStderr(false)
-	defer klog.LogToStderr(true)
-
+func TestPropogatingPanicLongRunning(t *testing.T) {
 	panicMsg := "panic as designed"
+	capturedOutput := runHandlerWithPanic(t, true, panicMsg)
+
+	if !strings.Contains(capturedOutput, panicMsg) || !strings.Contains(capturedOutput, "apiserver panic'd") {
+		t.Errorf("unexpected out captured actual = %v", capturedOutput)
+	}
+}
+
+func TestPropogatingPanicNotLongRunning(t *testing.T) {
+	panicMsg := "panic as designed"
+	capturedOutput := runHandlerWithPanic(t, false, panicMsg)
+
+	if !strings.Contains(capturedOutput, panicMsg) || !strings.Contains(capturedOutput, "apiserver panic'd") {
+		t.Errorf("unexpected out captured actual = %v", capturedOutput)
+	}
+}
+
+func TestSuppressErrAbortHandlerPanic(t *testing.T) {
+	capturedOutput := runHandlerWithPanic(t, true, http.ErrAbortHandler)
+
+	if !strings.Contains(capturedOutput, "Ignoring ErrAbortHandler") ||
+		strings.Contains(capturedOutput, "apiserver panic'd") {
+		t.Errorf("unexpected out captured actual = %v", capturedOutput)
+	}
+}
+
+func runHandlerWithPanic(t *testing.T, longRunning bool, panicVal any) string {
+	buf := captureKlog(t)
+
+	// Panic with the special sigil value http.ErrAbortHandler.  This
+	// should result in no log for a long-running request.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic(panicMsg)
+		panic(panicVal)
 	})
 	resolver := &request.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
-	ts := httptest.NewServer(routine.WithRoutine(WithPanicRecovery(handler, resolver), func(_ *http.Request, _ *request.RequestInfo) bool { return true }))
+
+	longRunningFn := func(r *http.Request, requestInfo *request.RequestInfo) bool {
+		return longRunning
+	}
+	ts := httptest.NewServer(routine.WithRoutine(WithPanicRecovery(handler, resolver, longRunningFn), longRunningFn))
 	defer ts.Close()
 	_, err := http.Get(ts.URL)
 	if err == nil {
@@ -53,8 +83,12 @@ func TestPropogatingPanic(t *testing.T) {
 	klog.Flush()
 	klog.SetOutput(&bytes.Buffer{}) // prevent further writes into buf
 	capturedOutput := buf.String()
+	return capturedOutput
+}
 
-	if !strings.Contains(capturedOutput, panicMsg) || !strings.Contains(capturedOutput, "apiserver panic'd") {
-		t.Errorf("unexpected out captured actual = %v", capturedOutput)
-	}
+func captureKlog(t *testing.T) *bytes.Buffer {
+	klogtest.InitKlog(t)
+	var buf bytes.Buffer
+	klog.SetOutput(&buf)
+	return &buf
 }
