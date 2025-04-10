@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -135,9 +136,33 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
-				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+				})
 			},
 		},
+		"v1beta1": {
+			apis: map[schema.GroupVersion]bool{
+				resourceapi.SchemeGroupVersion: true,
+			},
+			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+				})
+			},
+		},
+		// "v1beta2": {
+		// 	apis: map[schema.GroupVersion]bool{
+		// 		resourcev1beta2api.SchemeGroupVersion: true,
+		// 	},
+		// 	features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: true},
+		// 	f: func(tCtx ktesting.TContext) {
+		// 		tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
+		// 			testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+		// 		})
+		// 	},
+		// },
 		"all": {
 			apis: map[schema.GroupVersion]bool{
 				resourceapi.SchemeGroupVersion:        true,
@@ -338,9 +363,10 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	})
 }
 
-func testPublishResourceSlices(tCtx ktesting.TContext) {
+func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featuregate.Feature) {
 	tCtx.Parallel()
 
+	tCtx = ktesting.WithTimeout(tCtx, 30*time.Second, "test timed out")
 	driverName := "dra.example.com"
 	poolName := "global"
 	resources := &resourceslice.DriverResources{
@@ -353,11 +379,15 @@ func testPublishResourceSlices(tCtx ktesting.TContext) {
 								Name:  "device-simple",
 								Basic: &resourceapi.BasicDevice{},
 							},
-							// TODO: once https://github.com/kubernetes/kubernetes/pull/130764 is merged,
-							// add tests which detect dropped fields related to it.
 						},
 					},
 					{
+						SharedCounters: []resourceapi.CounterSet{{
+							Name: "gpu-0",
+							Counters: map[string]resourceapi.Counter{
+								"mem": {Value: resource.MustParse("1")},
+							},
+						}},
 						Devices: []resourceapi.Device{
 							{
 								Name: "device-tainted-default",
@@ -381,17 +411,52 @@ func testPublishResourceSlices(tCtx ktesting.TContext) {
 									}},
 								},
 							},
+							{
+								Name: "gpu",
+								Basic: &resourceapi.BasicDevice{
+									ConsumesCounters: []resourceapi.DeviceCounterConsumption{{
+										CounterSet: "gpu-0",
+										Counters: map[string]resourceapi.Counter{
+											"mem": {Value: resource.MustParse("1")},
+										},
+									}},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 	}
+	var gotDroppedFieldError atomic.Bool
+	var gotValidationError atomic.Bool
+	var validationErrorsOkay atomic.Bool
 	opts := resourceslice.Options{
 		DriverName: driverName,
 		KubeClient: tCtx.Client(),
 		SyncDelay:  ptr.To(0 * time.Second),
 		Resources:  resources,
+		ErrorHandler: func(ctx context.Context, err error, msg string) {
+			klog.FromContext(ctx).Info("ErrorHandler called", "err", err, "msg", msg)
+			if !validationErrorsOkay.Load() && len(disabledFeatures) == 0 {
+				assert.NoError(tCtx, err, msg)
+				return
+			}
+
+			var droppedFields *resourceslice.DroppedFieldsError
+			if errors.As(err, &droppedFields) {
+				var disabled []string
+				for _, feature := range disabledFeatures {
+					disabled = append(disabled, string(feature))
+				}
+				assert.ErrorContains(tCtx, err, fmt.Sprintf("pool %q, slice #1: some fields were dropped by the apiserver, probably because these features are disabled: %s", poolName, strings.Join(disabled, " ")))
+				gotDroppedFieldError.Store(true)
+			} else if validationErrorsOkay.Load() && apierrors.IsInvalid(err) {
+				gotValidationError.Store(true)
+			} else {
+				tCtx.Errorf("unexpected error: %v", err)
+			}
+		},
 	}
 	controller, err := resourceslice.StartController(tCtx, opts)
 	tCtx.ExpectNoError(err, "start controller")
@@ -408,6 +473,23 @@ func testPublishResourceSlices(tCtx ktesting.TContext) {
 
 	// No further changes necessary.
 	ktesting.Consistently(tCtx, getStats).WithTimeout(10 * time.Second).Should(gomega.Equal(expectedStats))
+
+	if len(disabledFeatures) > 0 && !gotDroppedFieldError.Load() {
+		tCtx.Error("expected dropped fields error, got none")
+	}
+
+	// Now switch to one invalid slice.
+	pool := resources.Pools[poolName]
+	pool.Slices = pool.Slices[:1]
+	pool.Slices[0].Devices[0].Basic.Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{"empty": {}}
+	resources.Pools[poolName] = pool
+	validationErrorsOkay.Store(true)
+	controller.Update(resources)
+	ktesting.Eventually(tCtx, getStats).WithTimeout(10*time.Second).Should(gomega.HaveField("NumDeletes", gomega.BeNumerically(">=", int64(1))), "Slice should have been removed.")
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
+		return gotValidationError.Load()
+	}).WithTimeout(10 * time.Second).Should(gomega.BeTrueBecause("Should have gotten another error because the slice is invalid."))
+
 }
 
 // testMaxResourceSlice creates a ResourceSlice that is as large as possible
