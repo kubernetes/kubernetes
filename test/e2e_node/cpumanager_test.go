@@ -406,14 +406,12 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 	})
 
-	// TODO full-cpus-only && strict-cpu-reservation
-
 	ginkgo.When("running with SMT Alignment", ginkgo.Label("smt-alignment"), func() {
 		var cpuDetails nodeCPUDetails
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			// strict SMT alignment is trivially verified and granted on non-SMT systems
-			if smtLevel < 2 {
+			if smtLevel < minSMTLevel {
 				e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
 			}
 
@@ -503,6 +501,128 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				siblingsCPUs := makeThreadSiblingCPUSet(cpus)
 				gomega.Expect(pod).To(HaveContainerCPUsEqualTo(cnt.Name, siblingsCPUs))
 			}
+		})
+	})
+
+	ginkgo.When("checking the compatibility between options", func() {
+		// please avoid nesting `BeforeEach` as much as possible. Ideally avoid completely.
+		ginkgo.Context("SMT Alignment and strict CPU reservation", ginkgo.Label("smt-alignment", "strict-cpu-reservation"), func() {
+			var reservedCPUs cpuset.CPUSet
+
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				// strict SMT alignment is trivially verified and granted on non-SMT systems
+				if smtLevel < minSMTLevel {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
+				}
+				reservedCPUs = cpuset.New(0)
+			})
+
+			ginkgo.It("should reject workload asking non-SMT-multiple of cpus", func(ctx context.Context) {
+				// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+				// check what we do have in the node.
+
+				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:        "true",
+						cpumanager.StrictCPUReservationOption: "true",
+					},
+				}))
+				cpuDetails := cpuDetailsFromNode(localNode)
+
+				// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
+				if cpuDetails.Allocatable < int64(smtLevel) {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since the CPU capacity < %d", cpumanager.FullPCPUsOnlyOption, smtLevel)
+				}
+
+				// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
+				pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
+					{
+						ctnName:    "gu-container-neg",
+						cpuRequest: "1000m",
+						cpuLimit:   "1000m",
+					},
+				})
+				ginkgo.By("creating the testing pod")
+				// CreateSync would wait for pod to become Ready - which will never happen if production code works as intended!
+				pod = e2epod.NewPodClient(f).Create(ctx, pod)
+				podMap[string(pod.UID)] = pod
+
+				ginkgo.By("ensuring the testing pod is in failed state")
+				err := e2epod.WaitForPodCondition(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "Failed", 30*time.Second, func(pod *v1.Pod) (bool, error) {
+					if pod.Status.Phase != v1.PodPending {
+						return true, nil
+					}
+					return false, nil
+				})
+				framework.ExpectNoError(err)
+
+				ginkgo.By("ensuring the testing pod is failed for the expected reason")
+				pod, err = e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				gomega.Expect(pod).To(BeAPodInPhase(v1.PodFailed))
+				gomega.Expect(pod).To(HaveStatusReasonMatchingRegex(`SMT.*Alignment.*Error`))
+			})
+
+			ginkgo.It("should admit workload asking SMT-multiple of cpus", func(ctx context.Context) {
+				// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+				// check what we do have in the node.
+
+				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:        "true",
+						cpumanager.StrictCPUReservationOption: "true",
+					},
+				}))
+				cpuDetails := cpuDetailsFromNode(localNode)
+
+				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
+				// 1. are core siblings
+				// 2. take a full core
+				// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+				//          this means on more-than-2-way SMT systems this test will prove nothing
+
+				if cpuDetails.Allocatable < int64(smtLevel) {
+					e2eskipper.Skipf("required %d allocatable CPUs found %d", smtLevel, cpuDetails.Allocatable)
+				}
+
+				cpuCount := smtLevel
+				cpuRequest := fmt.Sprintf("%d000m", cpuCount)
+				ginkgo.By(fmt.Sprintf("creating the testing pod cpuRequest=%v", cpuRequest))
+				pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
+					{
+						ctnName:    "gu-container-x",
+						cpuRequest: cpuRequest,
+						cpuLimit:   cpuRequest,
+					},
+				})
+				ginkgo.By("creating the testing pod")
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				podMap[string(pod.UID)] = pod
+
+				usableCPUs := onlineCPUs.Difference(reservedCPUs)
+
+				gomega.Expect(pod).To(HaveContainerCPUsCount("gu-container-x", cpuCount))
+				gomega.Expect(pod).To(HaveContainerCPUsOverlapWith("gu-container-x", usableCPUs))
+				gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-x", reservedCPUs))
+
+				ginkgo.By("validating each container in the testing pod")
+				for _, cnt := range pod.Spec.Containers {
+					ginkgo.By(fmt.Sprintf("validating the container %s on pod %s", cnt.Name, pod.Name))
+
+					gomega.Expect(pod).To(HaveContainerCPUsAlignedTo(cnt.Name, smtLevel))
+					cpus, err := getContainerAllowedCPUs(pod, cnt.Name)
+					framework.ExpectNoError(err, "cannot get cpus allocated to pod %s/%s cnt %s", pod.Namespace, pod.Name, cnt.Name)
+
+					siblingsCPUs := makeThreadSiblingCPUSet(cpus)
+					gomega.Expect(pod).To(HaveContainerCPUsEqualTo(cnt.Name, siblingsCPUs))
+				}
+			})
 		})
 	})
 
