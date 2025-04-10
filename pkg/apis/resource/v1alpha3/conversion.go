@@ -212,6 +212,10 @@ func Convert_v1alpha3_Device_To_resource_Device(in *resourcev1alpha3.Device, out
 			taints = append(taints, taint)
 		}
 		out.Taints = taints
+		out.UsageRestrictedToNode = basic.UsageRestrictedToNode
+		out.BindingConditions = basic.BindingConditions
+		out.BindingFailureConditions = basic.BindingFailureConditions
+		out.BindingTimeoutSeconds = basic.BindingTimeoutSeconds
 	}
 	return nil
 }
@@ -257,6 +261,10 @@ func Convert_resource_Device_To_v1alpha3_Device(in *resourceapi.Device, out *res
 		taints = append(taints, taint)
 	}
 	out.Basic.Taints = taints
+	out.Basic.UsageRestrictedToNode = in.UsageRestrictedToNode
+	out.Basic.BindingConditions = in.BindingConditions
+	out.Basic.BindingFailureConditions = in.BindingFailureConditions
+	out.Basic.BindingTimeoutSeconds = in.BindingTimeoutSeconds
 	return nil
 }
 
