@@ -42,7 +42,7 @@ const (
 	// across the file.
 
 	// owner: @lukasmetzner
-	// Use watch based route controller reconcilation instead of frequent periodic reconciliation.
+	// Use watch based route controller reconciliation instead of frequent periodic reconciliation.
 	CloudControllerManagerWatchBasedRoutesReconciliation featuregate.Feature = "CloudControllerManagerWatchBasedRoutesReconciliation"
 
 	// owner: @nckturner
