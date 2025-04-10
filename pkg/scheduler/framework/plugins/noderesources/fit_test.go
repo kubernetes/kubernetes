@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1418,11 +1417,17 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterPodEvent(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("Expected error, but got nil in isSchedulableAfterPodEvent")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("Unexpected error in isSchedulableAfterPodEvent: %s", err)
+			}
+			if tc.expectedHint != actualHint {
+				t.Fatalf("Queueing hint values doesn't match, expected: %d, actual: %d", tc.expectedHint, actualHint)
+			}
 		})
 	}
 }
@@ -1546,11 +1551,17 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("Expected error but got nil in isSchedulableAfterNodeChange")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("Unexpected error in isSchedulableAfterNodeChange: %s", err)
+			}
+			if tc.expectedHint != actualHint {
+				t.Fatalf("Queueing hint values doesn't match, expected: %d, actual: %d", tc.expectedHint, actualHint)
+			}
 		})
 	}
 }

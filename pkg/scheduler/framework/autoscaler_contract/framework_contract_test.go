@@ -24,8 +24,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
@@ -40,23 +38,22 @@ type frameworkContract interface {
 	RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status
 }
 
-func TestFrameworkContract(t *testing.T) {
-	var f framework.Framework
-	var c frameworkContract = f
-	assert.Nil(t, c)
-}
+var f framework.Framework
+var _ frameworkContract = f
 
 func TestNewFramework(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	var f interface{}
 	if f, _ = runtime.NewFramework(ctx, nil, nil); f != nil {
-		_, ok := f.(framework.Framework)
-		assert.True(t, ok)
+		if _, ok := f.(framework.Framework); !ok {
+			t.Errorf("f is expected to be of type framework.Framework, actual type: %T", f)
+		}
 	}
 }
 
 func TestNewCycleState(t *testing.T) {
 	var state interface{} = framework.NewCycleState()
-	_, ok := state.(*framework.CycleState)
-	assert.True(t, ok)
+	if _, ok := state.(*framework.CycleState); !ok {
+		t.Errorf("state is expected to be of type *framework.CycleState, actual type: %T", state)
+	}
 }

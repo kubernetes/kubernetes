@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -214,7 +213,9 @@ func TestBrokenLinearFunction(t *testing.T) {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			function := helper.BuildBrokenLinearFunction(test.points)
 			for _, assertion := range test.assertions {
-				assert.InDelta(t, assertion.expected, function(assertion.p), 0.1, "points=%v, p=%d", test.points, assertion.p)
+				if actual := function(assertion.p); actual != assertion.expected {
+					t.Errorf("Expected and actual points doesn't match, expected:%d, actual:%d", assertion.expected, actual)
+				}
 			}
 		})
 	}

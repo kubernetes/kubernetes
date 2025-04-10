@@ -19,8 +19,6 @@ package podtopologyspread
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -161,11 +159,17 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			p := pl.(*PodTopologySpread)
 			actualHint, err := p.isSchedulableAfterNodeChange(logger, tc.pod, tc.oldNode, tc.newNode)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("Expected error but got nil in isSchedulableAfterNodeChange")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("Unexpected error in isSchedulableAfterNodeChange: %s", err)
+			}
+			if tc.expectedHint != actualHint {
+				t.Fatalf("Queueing hint values doesn't match, expected: %d, actual: %d", tc.expectedHint, actualHint)
+			}
 		})
 	}
 }
@@ -371,11 +375,17 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 
 			actualHint, err := p.isSchedulableAfterPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatal("Expected error but got nil in isSchedulableAfterPodChange")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("Unexpected error in isSchedulableAfterPodChange: %s", err)
+			}
+			if tc.expectedHint != actualHint {
+				t.Fatalf("Queueing hint values doesn't match, expected: %d, actual: %d", tc.expectedHint, actualHint)
+			}
 		})
 	}
 }

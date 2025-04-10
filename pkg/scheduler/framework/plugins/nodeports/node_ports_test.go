@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -262,11 +261,17 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			}
 			actualHint, err := p.(*NodePorts).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatal("Expected error, but got nil in isSchedulableAfterPodDeleted")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("Unexpected error in isSchedulableAfterPodDeleted: %s", err)
+			}
+			if tc.expectedHint != actualHint {
+				t.Fatalf("Queueing hint values doesn't match, expected: %d, actual: %d", tc.expectedHint, actualHint)
+			}
 		})
 	}
 }
