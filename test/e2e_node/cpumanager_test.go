@@ -177,7 +177,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 					cpuLimit:   "200m",
 				},
 			})
-
 			ginkgo.By("creating the test pod")
 			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
 			podMap[string(pod.UID)] = pod
@@ -621,6 +620,133 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 					siblingsCPUs := makeThreadSiblingCPUSet(cpus)
 					gomega.Expect(pod).To(HaveContainerCPUsEqualTo(cnt.Name, siblingsCPUs))
+				}
+			})
+		})
+
+		// please avoid nesting `BeforeEach` as much as possible. Ideally avoid completely.
+		ginkgo.Context("SMT Alignment and distribution across NUMA", ginkgo.Label("smt-alignment", "distribute-cpus-across-numa"), func() {
+			var reservedCPUs cpuset.CPUSet
+
+			ginkgo.BeforeEach(func(ctx context.Context) {
+				// strict SMT alignment is trivially verified and granted on non-SMT systems
+				if smtLevel < minSMTLevel {
+					e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
+				}
+				reservedCPUs = cpuset.New(0)
+			})
+
+			ginkgo.It("should assign packed CPUs with distribute-cpus-across-numa disabled and pcpu-only policy options enabled", func(ctx context.Context) {
+				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:            "true",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "false",
+					},
+				}))
+				cpuDetails := cpuDetailsFromNode(localNode)
+
+				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
+				// 1. are core siblings
+				// 2. take a full core
+				// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+				//          this means on more-than-2-way SMT systems this test will prove nothing
+
+				minCPUCount := int64(smtLevel * minCPUCapacity)
+				if cpuDetails.Allocatable < minCPUCount {
+					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < %d", minCPUCount)
+				}
+
+				ctnAttrs := []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-distribute-cpus-across-numa-disabled",
+						cpuRequest: "2000m",
+						cpuLimit:   "2000m",
+					},
+				}
+				pod := makeCPUManagerPod("test-pod-distribute-cpus-across-numa-disabled", ctnAttrs)
+				ginkgo.By("creating the test pod")
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				podMap[string(pod.UID)] = pod
+
+				ginkgo.By("validating each container in the testing pod")
+				for _, cnt := range pod.Spec.Containers {
+					ginkgo.By(fmt.Sprintf("validating the container %s on pod %s", cnt.Name, pod.Name))
+
+					gomega.Expect(pod).To(HaveContainerCPUsAlignedTo(cnt.Name, smtLevel))
+					cpus, err := getContainerAllowedCPUs(pod, cnt.Name)
+					framework.ExpectNoError(err, "cannot get cpus allocated to pod %s/%s cnt %s", pod.Namespace, pod.Name, cnt.Name)
+					gomega.Expect(cpus).To(BePackedCPUs())
+
+					siblingsCPUs := makeThreadSiblingCPUSet(cpus)
+					gomega.Expect(pod).To(HaveContainerCPUsEqualTo(cnt.Name, siblingsCPUs))
+				}
+			})
+
+			ginkgo.It("should assign CPUs distributed across NUMA with distribute-cpus-across-numa and pcpu-only policy options enabled", func(ctx context.Context) {
+				reservedCPUs := cpuset.New(0)
+
+				// this test is intended to be run on a multi-node NUMA system and
+				// a system with at least 4 cores per socket, hostcheck skips test
+				// if above requirements are not satisfied
+				numaNodeNum, _, _, cpusNumPerNUMA := hostCheck()
+
+				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+					policyName:              string(cpumanager.PolicyStatic),
+					reservedSystemCPUs:      reservedCPUs,
+					enableCPUManagerOptions: true,
+					options: map[string]string{
+						cpumanager.FullPCPUsOnlyOption:            "true",
+						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
+					},
+				}))
+				cpuDetails := cpuDetailsFromNode(localNode)
+
+				// our tests want to allocate a full core, so we need at least 2*2=4 virtual cpus
+				minCPUCount := int64(smtLevel * minCPUCapacity)
+				if cpuDetails.Allocatable < minCPUCount {
+					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < %d", minCPUCount)
+				}
+
+				// 'distribute-cpus-across-numa' policy option ensures that CPU allocations are evenly distributed
+				//  across NUMA nodes in cases where more than one NUMA node is required to satisfy the allocation.
+				// So, we want to ensure that the CPU Request exceeds the number of CPUs that can fit within a single
+				// NUMA node. We have to pick cpuRequest such that:
+				// 1. CPURequest > cpusNumPerNUMA
+				// 2. Not occupy all the CPUs on the node ande leave room for reserved CPU
+				// 3. CPURequest is a multiple if number of NUMA nodes to allow equal CPU distribution across NUMA nodes
+				//
+				// In summary: cpusNumPerNUMA < CPURequest < ((cpusNumPerNuma * numaNodeNum) - reservedCPUscount)
+				// Considering all these constraints we select: CPURequest= (cpusNumPerNUMA-smtLevel)*numaNodeNum
+
+				cpuReq := (cpusNumPerNUMA - smtLevel) * numaNodeNum
+				ctnAttrs := []ctnAttribute{
+					{
+						ctnName:    "test-gu-container-distribute-cpus-across-numa",
+						cpuRequest: fmt.Sprintf("%d", cpuReq),
+						cpuLimit:   fmt.Sprintf("%d", cpuReq),
+					},
+				}
+				pod := makeCPUManagerPod("test-pod-distribute-cpus-across-numa", ctnAttrs)
+				ginkgo.By("creating the test pod")
+				pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+				podMap[string(pod.UID)] = pod
+
+				for _, cnt := range pod.Spec.Containers {
+					ginkgo.By(fmt.Sprintf("validating the container %s on pod %s", cnt.Name, pod.Name))
+
+					gomega.Expect(pod).To(HaveContainerCPUsAlignedTo(cnt.Name, smtLevel))
+					cpus, err := getContainerAllowedCPUs(pod, cnt.Name)
+					framework.ExpectNoError(err, "cannot get cpus allocated to pod %s/%s cnt %s", pod.Namespace, pod.Name, cnt.Name)
+
+					siblingsCPUs := makeThreadSiblingCPUSet(cpus)
+					gomega.Expect(pod).To(HaveContainerCPUsEqualTo(cnt.Name, siblingsCPUs))
+
+					// We expect a perfectly even spilit i.e. equal distribution across NUMA Node as the CPU Request is 4*smtLevel*numaNodeNum.
+					expectedSpread := cpus.Size() / numaNodeNum
+					gomega.Expect(cpus).To(BeDistributedCPUs(expectedSpread))
 				}
 			})
 		})
