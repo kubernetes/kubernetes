@@ -109,6 +109,19 @@ type DRAPlugin interface {
 	// The conventions for returning one overall error and several per-ResourceClaim
 	// errors are the same as in PrepareResourceClaims.
 	UnprepareResourceClaims(ctx context.Context, claims []NamespacedObject) (result map[types.UID]error, err error)
+
+	// ErrorHandler gets called for each error encountered while publishing
+	// ResourceSlices. See [resourceslice.Options.ErrorHandler] for details.
+	//
+	// A simple implementation is to only log with k8s.io/apimachinery/pkg/util/runtime.HandleErrorWithContext:
+	//    runtime.HandleErrorWithContext(ctx, err, msg)
+	//
+	// This is a mandatory method because drivers should check for errors
+	// which won't get resolved by retrying and then fail or change the
+	// slices that they are trying to publish:
+	// - dropped fields (see [resourceslice.DroppedFieldsError])
+	// - validation errors (see [apierrors.IsInvalid])
+	ErrorHandler(ctx context.Context, err error, msg string)
 }
 
 // PrepareResult contains the result of preparing one particular ResourceClaim.
@@ -620,10 +633,11 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 		var err error
 		if d.resourceSliceController, err = resourceslice.StartController(controllerCtx,
 			resourceslice.Options{
-				DriverName: d.driverName,
-				KubeClient: d.kubeClient,
-				Owner:      &owner,
-				Resources:  driverResources,
+				DriverName:   d.driverName,
+				KubeClient:   d.kubeClient,
+				Owner:        &owner,
+				Resources:    driverResources,
+				ErrorHandler: d.plugin.ErrorHandler,
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}

@@ -17,13 +17,17 @@ limitations under the License.
 package resourceslice
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -86,9 +90,10 @@ func TestControllerSyncPool(t *testing.T) {
 				}},
 			}},
 		}
-		timeAdded        = metav1.Now()
-		timeAddedLater   = metav1.Time{Time: timeAdded.Add(time.Minute)}
-		timeAddedEarlier = metav1.Time{Time: timeAdded.Add(-time.Minute)}
+		timeAdded                 = metav1.Time{Time: time.Now().Round(time.Second)}
+		timeAddedLater            = metav1.Time{Time: timeAdded.Add(time.Minute)}
+		timeAddedEarlier          = metav1.Time{Time: timeAdded.Add(-time.Minute)}
+		timeAddedEarlierSubSecond = metav1.Time{Time: timeAddedEarlier.Add(100 * time.Millisecond)}
 	)
 
 	testCases := map[string]struct {
@@ -104,6 +109,7 @@ func TestControllerSyncPool(t *testing.T) {
 		inputDriverResources   *DriverResources
 		expectedResourceSlices []resourceapi.ResourceSlice
 		expectedStats          Stats
+		expectedError          string
 	}{
 		"create-slice": {
 			nodeUID:        nodeUID,
@@ -231,7 +237,7 @@ func TestControllerSyncPool(t *testing.T) {
 									{
 										Key:       "example.com/tainted2",
 										Effect:    resourceapi.DeviceTaintEffectNoExecute,
-										TimeAdded: &timeAddedEarlier,
+										TimeAdded: &timeAddedEarlierSubSecond, // Gets rounded, both by controller and apiserver roundtripping.
 									},
 								},
 							}}},
@@ -312,6 +318,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
 					Obj(),
 			},
+			expectedError: `update ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRADeviceTaints`,
 		},
 		"remove-pool": {
 			nodeUID:   nodeUID,
@@ -926,6 +933,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).
 					Obj(),
 			},
+			expectedError: `create ResourceSlice: pool "pool", slice #0: some fields were dropped by the apiserver, probably because these features are disabled: DRAPartitionableDevices`,
 		},
 	}
 
@@ -960,6 +968,7 @@ func TestControllerSyncPool(t *testing.T) {
 			if test.noOwner {
 				owner = nil
 			}
+			var controllerErrors []error
 			ctrl, err := newController(ctx, Options{
 				DriverName: driverName,
 				KubeClient: kubeClient,
@@ -967,6 +976,9 @@ func TestControllerSyncPool(t *testing.T) {
 				Resources:  test.inputDriverResources,
 				Queue:      &queue,
 				SyncDelay:  test.syncDelay,
+				ErrorHandler: func(ctx context.Context, err error, msg string) {
+					controllerErrors = append(controllerErrors, fmt.Errorf("%s: %w", msg, err))
+				},
 			})
 			defer ctrl.Stop()
 			require.NoError(t, err, "unexpected controller creation error")
@@ -1008,8 +1020,35 @@ func TestControllerSyncPool(t *testing.T) {
 				ctrl.run(ctx)
 				assert.Equal(t, test.expectedStats, ctrl.GetStats(), "statistics after re-sync")
 			}
+
+			ctrl.Stop()
+			switch {
+			case test.expectedError != "" && len(controllerErrors) == 0:
+				t.Errorf("expected error, got none: %s", test.expectedError)
+			case test.expectedError == "" && len(controllerErrors) > 0:
+				t.Errorf("expected no error, got:\n  %s", strings.Join(formatErrors(controllerErrors), "\n  "))
+			case test.expectedError != "" && len(controllerErrors) != 1:
+				t.Errorf("expected one error %q, got:\n  %s", test.expectedError, strings.Join(formatErrors(controllerErrors), "\n  "))
+			case test.expectedError != "":
+				assert.Equal(t, test.expectedError, controllerErrors[0].Error())
+			}
 		})
 	}
+}
+
+func formatErrors(errs []error) []string {
+	var errMsgs []string
+	for _, err := range errs {
+		var droppedFields *DroppedFieldsError
+		var errMsg string
+		if errors.As(err, &droppedFields) {
+			errMsg = fmt.Sprintf("%v\n%s", err, cmp.Diff(droppedFields.DesiredSlice.Spec, droppedFields.ActualSlice.Spec))
+		} else {
+			errMsg = err.Error()
+		}
+		errMsgs = append(errMsgs, errMsg)
+	}
+	return errMsgs
 }
 
 func sortResourceSlices(slices []resourceapi.ResourceSlice) {
