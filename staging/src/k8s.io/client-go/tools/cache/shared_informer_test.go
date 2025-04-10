@@ -404,6 +404,12 @@ func TestContextHandlers(t *testing.T) {
 			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
 		}
 	}
+
+	// ensure calling `.RemoveEventHandler` on a context-cancelled
+	// handler registration does not error
+	if err := informer.RemoveEventHandler(listener1Reg); err != nil {
+		t.Fatalf("removing handler registration of context-cancelled handler failed: %s", err)
+	}
 }
 
 // verify that https://github.com/kubernetes/kubernetes/issues/59822 is fixed
