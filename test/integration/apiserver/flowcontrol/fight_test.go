@@ -26,6 +26,7 @@ import (
 	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1"
+	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	utilfc "k8s.io/apiserver/pkg/util/flowcontrol"
 	fqtesting "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/testing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
@@ -130,6 +131,7 @@ func (ft *fightTest) createController(invert bool, i int) {
 		foundToDangling = func(found bool) bool { return found }
 	}
 	ctlr := utilfc.NewTestable(utilfc.TestableConfig{
+		FeatureGate:            fcboot.LatestFeatureGate,
 		Name:                   fieldMgr,
 		FoundToDangling:        foundToDangling,
 		Clock:                  clock.RealClock{},
@@ -167,7 +169,7 @@ func (ft *fightTest) evaluate(tBeforeCreate, tAfterCreate time.Time) {
 	}
 }
 func TestConfigConsumerFight(t *testing.T) {
-	_, kubeConfig, closeFn := setup(t, 100, 100)
+	_, _, kubeConfig, closeFn := setup(t, 100, 100, true)
 	defer closeFn()
 	const teamSize = 3
 	ft := newFightTest(t, kubeConfig, teamSize)
