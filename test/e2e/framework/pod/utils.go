@@ -18,15 +18,12 @@ package pod
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	psaapi "k8s.io/pod-security-admission/api"
@@ -342,37 +339,8 @@ func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
 	if err != nil {
 		return false
 	}
-	return len(out) != 0
-}
-
-// TODO: Remove the rounded cpu limit values when https://github.com/opencontainers/runc/issues/4622
-// is fixed.
-func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity) []string {
-	var expectedCPULimits []string
-	milliCPULimit := cpuLimit.MilliValue()
-
-	cpuQuota := kubecm.MilliCPUToQuota(milliCPULimit, kubecm.QuotaPeriod)
-	if cpuLimit.IsZero() {
-		cpuQuota = -1
-	}
-	expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuota))
-
-	if milliCPULimit%10 != 0 && cpuQuota != -1 {
-		roundedCPULimit := (milliCPULimit/10 + 1) * 10
-		cpuQuotaRounded := kubecm.MilliCPUToQuota(roundedCPULimit, kubecm.QuotaPeriod)
-		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded))
-	}
-
-	return expectedCPULimits
-}
-
-func getExpectedCPULimitFromCPUQuota(cpuQuota int64) string {
-	expectedCPULimitString := strconv.FormatInt(cpuQuota, 10)
-	if *podOnCgroupv2Node {
-		if expectedCPULimitString == "-1" {
-			expectedCPULimitString = "max"
-		}
-		expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
-	}
-	return expectedCPULimitString
+	// Some tests mount host cgroup using HostPath for verifying pod cgroup values.
+	// In this case, "<mount path>/unified" is detected by "mount -t cgroup2" if cgroup hybrid mode is configured on the host.
+	// So, we need to see if "/sys/fs/cgroup" is contained in the output.
+	return strings.Contains(out, "/sys/fs/cgroup")
 }
