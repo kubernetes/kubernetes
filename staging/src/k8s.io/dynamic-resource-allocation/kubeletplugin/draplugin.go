@@ -641,11 +641,10 @@ func (d *Helper) PublishResources(_ context.Context, resources resourceslice.Dri
 			}); err != nil {
 			return fmt.Errorf("start ResourceSlice controller: %w", err)
 		}
-		return nil
+	} else {
+		// Inform running controller about new information.
+		d.resourceSliceController.Update(driverResources)
 	}
-
-	// Inform running controller about new information.
-	d.resourceSliceController.Update(driverResources)
 
 	return nil
 }
