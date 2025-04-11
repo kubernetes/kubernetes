@@ -4382,8 +4382,14 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// calculation without modifying AggregateContainerRequests method.
 	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
 
+	supportedResourceNames := resourcehelper.SupportedPodLevelResources()
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
+		// Skip validation for aggregated pod-level resource requests that are not supported, such as external resources.
+		if !supportedResourceNames.Has(resourceName) {
+			continue
+		}
+
 		key := resourceName.String()
 		podSpecRequests := spec.Resources.Requests[core.ResourceName(key)]
 
