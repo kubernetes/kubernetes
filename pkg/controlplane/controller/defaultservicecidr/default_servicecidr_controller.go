@@ -92,6 +92,7 @@ type Controller struct {
 	serviceCIDRsSynced  cache.InformerSynced
 
 	interval time.Duration
+	once     bool
 }
 
 // Start will not return until the default ServiceCIDR exists or stopCh is closed.
@@ -138,8 +139,20 @@ func (c *Controller) sync() error {
 	serviceCIDR, err := c.serviceCIDRLister.Get(DefaultServiceCIDRName)
 	// if exists
 	if err == nil {
-		c.syncStatus(serviceCIDR)
-		return nil
+		// single to dual stack upgrade
+		if len(c.cidrs) == 2 && len(serviceCIDR.Spec.CIDRs) == 1 && c.cidrs[0] == serviceCIDR.Spec.CIDRs[0] {
+			klog.Infof("Updating default ServiceCIDR from single-stack (%v) to dual-stack (%v)", serviceCIDR.Spec.CIDRs, c.cidrs)
+			serviceCIDRcopy := serviceCIDR.DeepCopy()
+			serviceCIDRcopy.Spec.CIDRs = c.cidrs
+			_, err := c.client.NetworkingV1().ServiceCIDRs().Update(context.Background(), serviceCIDRcopy, metav1.UpdateOptions{})
+			if err != nil {
+				klog.Infof("The default ServiceCIDR can not be upgraded from %s to dual stack %v", c.cidrs[0], c.cidrs)
+				c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRError", "The default ServiceCIDR can not be upgraded from %s to dual stack %v", c.cidrs[0], c.cidrs)
+			}
+		} else {
+			c.syncStatus(serviceCIDR)
+			return nil
+		}
 	}
 
 	// unknown error
@@ -199,5 +212,9 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1.ServiceCIDR) {
 			klog.Infof("error updating default ServiceCIDR status: %v", errApply)
 			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRError", "The default ServiceCIDR Status can not be set to Ready=True")
 		}
+	} else if !c.once {
+		klog.Infof("unconsistent ServiceCIDR status, global configuration: %v local configuration: %v, configure the flags to match current ServiceCIDR or manually delete the default ServiceCIDR", serviceCIDR.Spec.CIDRs, c.cidrs)
+		c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRInconsistent", "The default ServiceCIDR %v does not match the flag configurations %s", serviceCIDR.Spec.CIDRs, c.cidrs)
+		c.once = true
 	}
 }

@@ -1532,6 +1532,10 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 		},
 	}
 
+	// create a new service after upgrade that will receive both IP families
+	svcDual := svc.DeepCopy()
+	svcDual.Name = "svc-dual"
+
 	// create the service
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
 	if err != nil {
@@ -1581,6 +1585,22 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	// service should remain single stack
 	if err = validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
+	}
+	// validate that new services created with prefer dual are now dual stack
+
+	// create the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svcDual, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was created correctly
+	svcDual, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svcDual.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svcDual.Name, err)
+	}
+	// service should remain single stack
+	if err = validateServiceAndClusterIPFamily(svcDual, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svcDual.Name, err)
 	}
 }
 

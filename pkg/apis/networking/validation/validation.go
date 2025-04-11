@@ -765,6 +765,11 @@ var ValidateServiceCIDRName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cidrConfig.ObjectMeta, false, ValidateServiceCIDRName, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateServiceCIDRSpec(cidrConfig)...)
+	return allErrs
+}
+func validateServiceCIDRSpec(cidrConfig *networking.ServiceCIDR) field.ErrorList {
+	var allErrs field.ErrorList
 	fieldPath := field.NewPath("spec", "cidrs")
 
 	if len(cidrConfig.Spec.CIDRs) == 0 {
@@ -778,9 +783,10 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	}
 	// validate cidrs are dual stack, one of each IP family
 	if len(cidrConfig.Spec.CIDRs) == 2 {
+		// ignore the error since we validate later
 		isDual, err := netutils.IsDualStackCIDRStrings(cidrConfig.Spec.CIDRs)
-		if err != nil || !isDual {
-			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
+		if err == nil && !isDual {
+			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec.CIDRs, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
 			return allErrs
 		}
 	}
@@ -796,8 +802,14 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs, old.Spec.CIDRs, field.NewPath("spec").Child("cidrs"))...)
-
+	// only allow updates from Single to Dual Stack b
+	// ref: https://issues.k8s.io/131261
+	allErrs = append(allErrs, validateServiceCIDRSpec(update)...)
+	if len(old.Spec.CIDRs) == 1 && len(update.Spec.CIDRs) == 2 {
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs[0], old.Spec.CIDRs[0], field.NewPath("spec").Child("cidrs").Index(0))...)
+	} else {
+		allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs, old.Spec.CIDRs, field.NewPath("spec").Child("cidrs"))...)
+	}
 	return allErrs
 }
 
