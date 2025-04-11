@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -747,6 +748,9 @@ func updateStatefulSetAfterInvariantEstablished(
 			"statefulSet", klog.KObj(set),
 			"unavailablePods", unavailablePods,
 			"maxUnavailable", maxUnavailable)
+		if unavailablePods > maxUnavailable {
+			metrics.MaxUnavailableViolations.WithLabelValues(set.Namespace, set.Name).Inc()
+		}
 		return &status, nil
 	}
 
