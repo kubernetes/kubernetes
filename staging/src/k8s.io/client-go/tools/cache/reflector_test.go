@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -1638,6 +1639,106 @@ func getPodListItems(start int, numItems int) (string, string, *v1.PodList) {
 	}
 
 	return out.Items[0].GetName(), out.Items[exemptObjectIndex].GetName(), out
+}
+
+func TestReflectorListWatchPanicLogging(t *testing.T) {
+	type panicCase struct {
+		name         string
+		listFunc     func(options metav1.ListOptions) (runtime.Object, error)
+		watchFunc    func(options metav1.ListOptions) (watch.Interface, error)
+		expectLogSub []string // substrings expected in captured logs
+	}
+
+	tests := []panicCase{
+		{
+			name: "Panic in ListFunc",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				panic("simulated panic in ListFunc")
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+			expectLogSub: []string{"Observed a panic", "simulated panic in ListFunc", "stacktrace"},
+		},
+		{
+			name: "Panic in WatchFunc",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &unstructured.UnstructuredList{}, nil
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				panic("simulated panic in WatchFunc")
+			},
+			expectLogSub: []string{"Observed a panic", "simulated panic in WatchFunc", "stacktrace"},
+		},
+		{
+			name: "Nil Pointer in ListFunc",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				var obj *unstructured.UnstructuredList
+				return obj, nil
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+			expectLogSub: []string{"Observed a panic", "invalid memory address", "stacktrace"},
+		},
+		{
+			name: "Nil Pointer in WatchFunc",
+			listFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+				return &unstructured.UnstructuredList{}, nil
+			},
+			watchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				var iface watch.Interface
+				return iface, nil
+			},
+			expectLogSub: []string{"Observed a panic", "invalid memory address", "stacktrace"},
+		},
+	}
+
+	// Didn't modify utilruntime.ReallyCrash to avoid race condition
+	// utilruntime.ReallyCrash = false
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+			sink := logger.GetSink().(ktesting.Underlier)
+			ctx := klog.NewContext(context.Background(), logger)
+
+			store := NewStore(MetaNamespaceKeyFunc)
+			r := &Reflector{
+				name:              "test-reflector",
+				listerWatcher:     &ListWatch{ListFunc: tc.listFunc, WatchFunc: tc.watchFunc},
+				store:             store,
+				watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+				clock:             testingclock.NewFakeClock(time.Now()),
+			}
+
+			panicCh := make(chan any, 1)
+
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						panicCh <- r
+					} else {
+						panicCh <- nil
+					}
+				}()
+				_ = r.ListAndWatchWithContext(ctx)
+			}()
+
+			if recovered := <-panicCh; recovered != nil {
+				t.Logf("Recovered panic: %v", recovered)
+			}
+
+			logOutput := sink.GetBuffer().String()
+			t.Log("--- LOG ---")
+			t.Log(logOutput)
+			t.Log("-----------")
+
+			for _, substr := range tc.expectLogSub {
+				assert.Contains(t, logOutput, substr, "log should contain: %q", substr)
+			}
+		})
+	}
 }
 
 func getConfigmapListItems(start int, numItems int) (string, string, *v1.ConfigMapList) {
