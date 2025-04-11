@@ -112,6 +112,70 @@ func TestGetAllEndpointsByNetwork(t *testing.T) {
 	}
 }
 
+func TestGetAllEndpointsByNetworkWithDupEP(t *testing.T) {
+	hcnMock := getHcnMock("L2Bridge")
+	hns := hns{hcn: hcnMock}
+
+	ipv4Config := &hcn.IpConfig{
+		IpAddress: epIpAddress,
+	}
+	ipv6Config := &hcn.IpConfig{
+		IpAddress: epIpv6Address,
+	}
+	remoteEndpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipv4Config, *ipv6Config},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: hcn.EndpointFlagsRemoteEndpoint,
+	}
+	Network, _ := hcnMock.GetNetworkByName(testNetwork)
+	remoteEndpoint, err := hns.hcn.CreateEndpoint(Network, remoteEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Create a duplicate local endpoint with the same IP address
+	dupLocalEndpoint := &hcn.HostComputeEndpoint{
+		IpConfigurations: []hcn.IpConfig{*ipv4Config, *ipv6Config},
+		MacAddress:       epMacAddress,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+	}
+
+	dupLocalEndpoint, err = hns.hcn.CreateEndpoint(Network, dupLocalEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+
+	mapEndpointsInfo, err := hns.getAllEndpointsByNetwork(Network.Name)
+	if err != nil {
+		t.Error(err)
+	}
+	endpointIpv4, ipv4EpPresent := mapEndpointsInfo[ipv4Config.IpAddress]
+	assert.True(t, ipv4EpPresent, "IPV4 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv4.ip, epIpAddress, "IPV4 IP is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv4.hnsID, remoteEndpoint.Id, "HNS ID is not matching with remote endpoint")
+
+	endpointIpv6, ipv6EpPresent := mapEndpointsInfo[ipv6Config.IpAddress]
+	assert.True(t, ipv6EpPresent, "IPV6 endpoint is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv6.ip, epIpv6Address, "IPV6 IP is missing in Dualstack mode")
+	assert.Equal(t, endpointIpv6.hnsID, remoteEndpoint.Id, "HNS ID is not matching with remote endpoint")
+
+	err = hns.hcn.DeleteEndpoint(remoteEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+	err = hns.hcn.DeleteEndpoint(dupLocalEndpoint)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestGetEndpointByID(t *testing.T) {
 	// TODO: remove skip once the test has been fixed.
 	t.Skip("Skipping failing test on Windows.")
