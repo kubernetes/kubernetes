@@ -45,7 +45,7 @@ import (
 type OperationExecutor interface {
 	// RegisterPlugin registers the given plugin using a handler in the plugin handler map.
 	// It then updates the actual state of the world to reflect that.
-	RegisterPlugin(socketPath string, UUID types.UID, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater) error
+	RegisterPlugin(socketPath string, UUID types.UID, pluginHandlers map[string]cache.PluginHandler, actualStateOfWorld ActualStateOfWorldUpdater, desiredStateOfWorld cache.DesiredStateOfWorld) error
 
 	// UnregisterPlugin deregisters the given plugin using a handler in the given plugin handler map.
 	// It then updates the actual state of the world to reflect that.
@@ -96,9 +96,10 @@ func (oe *operationExecutor) RegisterPlugin(
 	socketPath string,
 	pluginUUID types.UID,
 	pluginHandlers map[string]cache.PluginHandler,
-	actualStateOfWorld ActualStateOfWorldUpdater) error {
+	actualStateOfWorld ActualStateOfWorldUpdater,
+	desiredStateOfWorld cache.DesiredStateOfWorld) error {
 	generatedOperation :=
-		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, pluginUUID, pluginHandlers, actualStateOfWorld)
+		oe.operationGenerator.GenerateRegisterPluginFunc(socketPath, pluginUUID, pluginHandlers, actualStateOfWorld, desiredStateOfWorld)
 
 	return oe.pendingOperations.Run(
 		socketPath, generatedOperation)
