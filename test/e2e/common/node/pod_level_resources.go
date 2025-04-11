@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -44,7 +45,6 @@ const (
 	cgroupv2CPULimit  string = "cpu.max"
 	cgroupv2MemLimit  string = "memory.max"
 	cgroupFsPath      string = "/sys/fs/cgroup"
-	CPUPeriod         string = "100000"
 	mountPath         string = "/sysfscgroup"
 )
 
@@ -233,7 +233,7 @@ func verifyPodCgroups(ctx context.Context, f *framework.Framework, pod *v1.Pod, 
 	}
 
 	cpuLimCgPath := fmt.Sprintf("%s/%s", podCgPath, cgroupv2CPULimit)
-	expectedCPULimits := e2epod.GetCPULimitCgroupExpectations(expectedResources.Limits.Cpu())
+	expectedCPULimits := podresize.GetCPULimitCgroupExpectations(expectedResources.Limits.Cpu())
 
 	err = e2epod.VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuLimCgPath, expectedCPULimits...)
 	if err != nil {
@@ -394,7 +394,7 @@ func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
 
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
 			container.Resources.Limits.Cpu() == nil {
-			expectedCPULimits := e2epod.GetCPULimitCgroupExpectations(pod.Spec.Resources.Limits.Cpu())
+			expectedCPULimits := podresize.GetCPULimitCgroupExpectations(pod.Spec.Resources.Limits.Cpu())
 			err := e2epod.VerifyCgroupValue(f, pod, container.Name, fmt.Sprintf("%s/%s", cgroupFsPath, cgroupv2CPULimit), expectedCPULimits...)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pod
+package podresize
 
 import (
 	"context"
@@ -33,6 +33,7 @@ import (
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
@@ -302,7 +303,7 @@ func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wan
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
 	if podOnCgroupv2Node == nil {
-		value := IsPodOnCgroupv2Node(f, pod)
+		value := e2epod.IsPodOnCgroupv2Node(f, pod)
 		podOnCgroupv2Node = &value
 	}
 	cgroupMemLimit := Cgroupv2MemLimit
@@ -344,10 +345,10 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 			}
 
 			if expectedMemLimitString != "0" {
-				errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
+				errs = append(errs, e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString))
 			}
-			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...))
-			errs = append(errs, VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
+			errs = append(errs, e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...))
+			errs = append(errs, e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)))
 			// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
 			// See https://github.com/opencontainers/runc/pull/4669
 		}
@@ -393,7 +394,7 @@ func verifyContainerRestarts(f *framework.Framework, pod *v1.Pod, gotStatuses []
 }
 
 func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string) error {
-	container := FindContainerInPod(pod, containerName)
+	container := e2epod.FindContainerInPod(pod, containerName)
 	if container == nil {
 		return fmt.Errorf("failed to find container %s in pod %s", containerName, pod.Name)
 	}
@@ -407,10 +408,10 @@ func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string
 	oomScoreAdj := kubeqos.GetContainerOOMScoreAdjust(pod, container, int64(nodeMemoryCapacity.Value()))
 	expectedOomScoreAdj := strconv.FormatInt(int64(oomScoreAdj), 10)
 
-	return VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj)
+	return e2epod.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj)
 }
 
-func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
+func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
 	ginkgo.GinkgoHelper()
 	// Wait for resize to complete.
 
@@ -534,4 +535,36 @@ func formatErrors(err error) error {
 		errStrings[i] = err.Error()
 	}
 	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
+}
+
+// TODO: Remove the rounded cpu limit values when https://github.com/opencontainers/runc/issues/4622
+// is fixed.
+func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity) []string {
+	var expectedCPULimits []string
+	milliCPULimit := cpuLimit.MilliValue()
+
+	cpuQuota := kubecm.MilliCPUToQuota(milliCPULimit, kubecm.QuotaPeriod)
+	if cpuLimit.IsZero() {
+		cpuQuota = -1
+	}
+	expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuota))
+
+	if milliCPULimit%10 != 0 && cpuQuota != -1 {
+		roundedCPULimit := (milliCPULimit/10 + 1) * 10
+		cpuQuotaRounded := kubecm.MilliCPUToQuota(roundedCPULimit, kubecm.QuotaPeriod)
+		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded))
+	}
+
+	return expectedCPULimits
+}
+
+func getExpectedCPULimitFromCPUQuota(cpuQuota int64) string {
+	expectedCPULimitString := strconv.FormatInt(cpuQuota, 10)
+	if *podOnCgroupv2Node {
+		if expectedCPULimitString == "-1" {
+			expectedCPULimitString = "max"
+		}
+		expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
+	}
+	return expectedCPULimitString
 }

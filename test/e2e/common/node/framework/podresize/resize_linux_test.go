@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pod
+package podresize
 
 import (
 	"testing"
