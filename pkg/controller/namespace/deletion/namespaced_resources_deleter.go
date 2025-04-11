@@ -310,11 +310,11 @@ func (d *namespacedResourcesDeleter) finalizeNamespace(ctx context.Context, name
 // it returns an error if the operation was supported on the server but was unable to complete.
 func (d *namespacedResourcesDeleter) deleteCollection(ctx context.Context, gvr schema.GroupVersionResource, namespace string) (bool, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Namespace controller - deleteCollection", "namespace", namespace, "resource", gvr)
+	logger.V(1).Info("Namespace controller - deleteCollection", "namespace", namespace, "resource", gvr)
 
 	key := operationKey{operation: operationDeleteCollection, gvr: gvr}
 	if !d.opCache.isSupported(key) {
-		logger.V(5).Info("Namespace controller - deleteCollection ignored since not supported", "namespace", namespace, "resource", gvr)
+		logger.V(1).Info("Namespace controller - deleteCollection ignored since not supported", "namespace", namespace, "resource", gvr)
 		return false, nil
 	}
 
@@ -325,6 +325,7 @@ func (d *namespacedResourcesDeleter) deleteCollection(ctx context.Context, gvr s
 	opts := metav1.DeleteOptions{PropagationPolicy: &background}
 	err := d.metadataClient.Resource(gvr).Namespace(namespace).DeleteCollection(ctx, opts, metav1.ListOptions{})
 	if err == nil {
+		logger.V(1).Info("Namespace controller - success returned on delete collection call from client", "namespace", namespace, "resource", gvr)
 		return true, nil
 	}
 
@@ -334,11 +335,11 @@ func (d *namespacedResourcesDeleter) deleteCollection(ctx context.Context, gvr s
 	//  /apis/extensions/v1beta1/namespaces/default/replicationcontrollers
 	// when working with this resource type, we will get a literal not found error rather than expected method not supported
 	if errors.IsMethodNotSupported(err) || errors.IsNotFound(err) {
-		logger.V(5).Info("Namespace controller - deleteCollection not supported", "namespace", namespace, "resource", gvr)
+		logger.V(1).Info("Namespace controller - deleteCollection not supported", "namespace", namespace, "resource", gvr)
 		return false, nil
 	}
 
-	logger.V(5).Info("Namespace controller - deleteCollection unexpected error", "namespace", namespace, "resource", gvr, "err", err)
+	logger.V(1).Info("Namespace controller - deleteCollection unexpected error", "namespace", namespace, "resource", gvr, "err", err)
 	return true, err
 }
 
@@ -378,7 +379,7 @@ func (d *namespacedResourcesDeleter) listCollection(ctx context.Context, gvr sch
 
 // deleteEachItem is a helper function that will list the collection of resources and delete each item 1 by 1.
 func (d *namespacedResourcesDeleter) deleteEachItem(ctx context.Context, gvr schema.GroupVersionResource, namespace string) error {
-	klog.FromContext(ctx).V(5).Info("Namespace controller - deleteEachItem", "namespace", namespace, "resource", gvr)
+	klog.FromContext(ctx).V(1).Info("Namespace controller - deleteEachItem", "namespace", namespace, "resource", gvr)
 
 	partialList, listSupported, err := d.listCollection(ctx, gvr, namespace)
 	if err != nil {
@@ -390,6 +391,7 @@ func (d *namespacedResourcesDeleter) deleteEachItem(ctx context.Context, gvr sch
 	for _, item := range partialList.Items {
 		background := metav1.DeletePropagationBackground
 		opts := metav1.DeleteOptions{PropagationPolicy: &background}
+		klog.FromContext(ctx).V(1).Info("Namespace controller - deleting item", "item", item.GetName(), "namespace", namespace, "resource", gvr)
 		if err = d.metadataClient.Resource(gvr).Namespace(namespace).Delete(ctx, item.GetName(), opts); err != nil && !errors.IsNotFound(err) && !errors.IsMethodNotSupported(err) {
 			return err
 		}
@@ -415,15 +417,15 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	gvr schema.GroupVersionResource, namespace string,
 	namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
 	logger := klog.FromContext(ctx)
-	logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource", "namespace", namespace, "resource", gvr)
+	logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource", "namespace", namespace, "resource", gvr)
 
 	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
 	estimate, err := d.estimateGracefulTermination(ctx, gvr, namespace, namespaceDeletedAt)
 	if err != nil {
-		logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - unable to estimate", "namespace", namespace, "resource", gvr, "err", err)
+		logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - unable to estimate", "namespace", namespace, "resource", gvr, "err", err)
 		return gvrDeletionMetadata{}, err
 	}
-	logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - estimate", "namespace", namespace, "resource", gvr, "estimate", estimate)
+	logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - estimate", "namespace", namespace, "resource", gvr, "estimate", estimate)
 
 	// first try to delete the entire collection
 	deleteCollectionSupported, err := d.deleteCollection(ctx, gvr, namespace)
@@ -441,16 +443,16 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 
 	// verify there are no more remaining items
 	// it is not an error condition for there to be remaining items if local estimate is non-zero
-	logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - checking for no more items in namespace", "namespace", namespace, "resource", gvr)
+	logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - checking for no more items in namespace", "namespace", namespace, "resource", gvr)
 	unstructuredList, listSupported, err := d.listCollection(ctx, gvr, namespace)
 	if err != nil {
-		logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - error verifying no items in namespace", "namespace", namespace, "resource", gvr, "err", err)
+		logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - error verifying no items in namespace", "namespace", namespace, "resource", gvr, "err", err)
 		return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, err
 	}
 	if !listSupported {
 		return gvrDeletionMetadata{finalizerEstimateSeconds: estimate}, nil
 	}
-	logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - items remaining", "namespace", namespace, "resource", gvr, "items", len(unstructuredList.Items))
+	logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - items remaining", "namespace", namespace, "resource", gvr, "items", len(unstructuredList.Items))
 	if len(unstructuredList.Items) == 0 {
 		// we're done
 		return gvrDeletionMetadata{finalizerEstimateSeconds: 0, numRemaining: 0}, nil
@@ -465,7 +467,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	}
 
 	if estimate != int64(0) {
-		logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - estimate is present", "namespace", namespace, "resource", gvr, "finalizers", finalizersToNumRemaining)
+		logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - estimate is present", "namespace", namespace, "resource", gvr, "finalizers", finalizersToNumRemaining)
 		return gvrDeletionMetadata{
 			finalizerEstimateSeconds: estimate,
 			numRemaining:             len(unstructuredList.Items),
@@ -475,7 +477,7 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 
 	// if any item has a finalizer, we treat that as a normal condition, and use a default estimation to allow for GC to complete.
 	if len(finalizersToNumRemaining) > 0 {
-		logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource - items remaining with finalizers", "namespace", namespace, "resource", gvr, "finalizers", finalizersToNumRemaining)
+		logger.V(1).Info("Namespace controller - deleteAllContentForGroupVersionResource - items remaining with finalizers", "namespace", namespace, "resource", gvr, "finalizers", finalizersToNumRemaining)
 		return gvrDeletionMetadata{
 			finalizerEstimateSeconds: finalizerEstimateSeconds,
 			numRemaining:             len(unstructuredList.Items),
@@ -531,9 +533,12 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	podsGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
 	if _, hasPods := groupVersionResources[podsGVR]; hasPods && utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) {
+		logger.V(1).Info("Namespace controller - checking to see if there are any pods left to delete while orderednamespacedeletion enabled", "namespace", namespace)
 		// Ensure all pods in the namespace are deleted first
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, podsGVR, namespace, namespaceDeletedAt)
+		logger.V(1).Info("Namespace controller -got gvrdeletionmetadata while orderednamespacedeletion enabled", "namespace", namespace)
 		if err != nil {
+			logger.V(1).Info("Namespace controller - found error deleting content for gvr while orderednamespacedeletion enabled", "namespace", namespace)
 			errs = append(errs, fmt.Errorf("failed to delete pods for namespace: %s, err: %w", namespace, err))
 			conditionUpdater.ProcessDeleteContentErr(err)
 		}
@@ -541,8 +546,10 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 			estimate = gvrDeletionMetadata.finalizerEstimateSeconds
 		}
 		if gvrDeletionMetadata.numRemaining > 0 {
+			logger.V(1).Info("Namespace controller - deletion metadata num remaining > 0 while orderednamespacedeletion enabled", "namespace", namespace)
 			numRemainingTotals.gvrToNumRemaining[podsGVR] = gvrDeletionMetadata.numRemaining
 			for finalizer, numRemaining := range gvrDeletionMetadata.finalizersToNumRemaining {
+				logger.V(1).Info("Namespace controller - found a finalizer while orderednamespacedeletion enabled", "namespace", namespace)
 				if numRemaining == 0 {
 					continue
 				}
@@ -550,9 +557,11 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 			}
 		}
 
+		logger.V(1).Info("Namespace controller - attempted to delete pods while orderednamespacedeletion enabled", "namespace", namespace)
+
 		// Check if any pods remain before proceeding to delete other resources
 		if numRemainingTotals.gvrToNumRemaining[podsGVR] > 0 {
-			logger.V(5).Info("Namespace controller - pods still remain, delaying deletion of other resources", "namespace", namespace)
+			logger.V(1).Info("Namespace controller - pods still remain, delaying deletion of other resources", "namespace", namespace)
 			if hasChanged := conditionUpdater.Update(ns); hasChanged {
 				if _, err = d.nsClient.UpdateStatus(ctx, ns, metav1.UpdateOptions{}); err != nil {
 					utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %w", namespace, err))
@@ -566,6 +575,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ctx context.Context, ns *v
 	for gvr := range groupVersionResources {
 		if utilfeature.DefaultFeatureGate.Enabled(features.OrderedNamespaceDeletion) && gvr.Group == podsGVR.Group &&
 			gvr.Version == podsGVR.Version && gvr.Resource == podsGVR.Resource {
+			logger.V(1).Info("Namespace controller - pods still remain in gvr loop while ordered delete is enabled", "namespace", namespace)
 			continue
 		}
 		gvrDeletionMetadata, err := d.deleteAllContentForGroupVersionResource(ctx, gvr, namespace, namespaceDeletedAt)
