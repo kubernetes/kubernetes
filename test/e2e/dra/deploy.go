@@ -57,6 +57,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
@@ -78,20 +79,6 @@ const (
 type Nodes struct {
 	NodeNames []string
 	tempDir   string
-}
-
-type Resources struct {
-	NodeLocal bool
-
-	// Nodes is a fixed list of node names on which resources are
-	// available. Mutually exclusive with NodeLabels.
-	Nodes []string
-
-	// Number of devices called "device-000", "device-001", ... on each node or in the cluster.
-	MaxAllocations int
-
-	// Tainted causes all devices to be published with a NoExecute taint.
-	Tainted bool
 }
 
 //go:embed test-driver/deploy/example/plugin-permissions.yaml
@@ -185,16 +172,25 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 	}
 }
 
+const (
+	networkPool = "network-pool"
+)
+
+// driverResourcesGenFunc defines the callback that will be invoked by the driver to generate the
+// DriverResources that will be used to construct the ResourceSlices.
+type driverResourcesGenFunc func(nodes *Nodes) map[string]resourceslice.DriverResources
+
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
-func NewDriver(f *framework.Framework, nodes *Nodes, configureResources func() Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *Driver {
+func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc) *Driver {
 	d := NewDriverInstance(f)
 
 	ginkgo.BeforeEach(func() {
-		d.Run(nodes, configureResources, devicesPerNode...)
+		driverResources := driverResourcesGenerator(nodes)
+		d.Run(nodes, driverResources)
 	})
 	return d
 }
@@ -214,14 +210,8 @@ func NewDriverInstance(f *framework.Framework) *Driver {
 	return d
 }
 
-func (d *Driver) Run(nodes *Nodes, configureResources func() Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
-	resources := configureResources()
-	if len(resources.Nodes) == 0 {
-		// This always has to be set because the driver might
-		// not run on all nodes.
-		resources.Nodes = nodes.NodeNames
-	}
-	d.SetUp(nodes, resources, devicesPerNode...)
+func (d *Driver) Run(nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
+	d.SetUp(nodes, driverResources)
 	ginkgo.DeferCleanup(d.TearDown)
 }
 
@@ -281,7 +271,7 @@ func (d *Driver) initName() {
 	d.Name = d.f.UniqueName + d.NameSuffix + ".k8s.io"
 }
 
-func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) {
+func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
 	d.initName()
 	ginkgo.By(fmt.Sprintf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames))
 	d.Nodes = make(map[string]KubeletPlugin)
@@ -297,66 +287,41 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, func(context.Context) { cancel() })
 
-	if !resources.NodeLocal {
-		// Publish one resource pool with "network-attached" devices.
-		slice := &resourceapi.ResourceSlice{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: d.Name, // globally unique
-			},
-			Spec: resourceapi.ResourceSliceSpec{
-				Driver: d.Name,
-				Pool: resourceapi.ResourcePool{
-					Name:               "network",
-					Generation:         1,
-					ResourceSliceCount: 1,
-				},
-				NodeSelector: &v1.NodeSelector{
-					NodeSelectorTerms: []v1.NodeSelectorTerm{{
-						// MatchExpressions allow multiple values,
-						// MatchFields don't.
-						MatchExpressions: []v1.NodeSelectorRequirement{{
-							Key:      "kubernetes.io/hostname",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   nodes.NodeNames,
-						}},
-					}},
-				},
-			},
-		}
-		maxAllocations := resources.MaxAllocations
-		if maxAllocations <= 0 {
-			// Cannot be empty, otherwise nothing runs.
-			maxAllocations = 10
-		}
-		for i := 0; i < maxAllocations; i++ {
-			device := resourceapi.Device{
-				Name: fmt.Sprintf("device-%d", i),
+	driverResource, found := driverResources[networkPool]
+	// If found, we create a network ResourcSlice, i.e. one that is not
+	// associated with a specific node.
+	if found {
+		for poolName, pool := range driverResource.Pools {
+			for i, slice := range pool.Slices {
+				// Publish one resource pool with "network-attached" devices.
+				resourceSlice := &resourceapi.ResourceSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("%s-%d", d.Name, i), // globally unique
+					},
+					Spec: resourceapi.ResourceSliceSpec{
+						Driver: d.Name,
+						Pool: resourceapi.ResourcePool{
+							Name:               poolName,
+							Generation:         pool.Generation,
+							ResourceSliceCount: int64(len(pool.Slices)),
+						},
+						NodeSelector: pool.NodeSelector,
+						Devices:      slice.Devices,
+					},
+				}
+				_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, resourceSlice, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(func(ctx context.Context) {
+					framework.ExpectNoError(d.f.ClientSet.ResourceV1beta2().ResourceSlices().Delete(ctx, resourceSlice.Name, metav1.DeleteOptions{}))
+				})
 			}
-			if resources.Tainted {
-				device.Taints = []resourceapi.DeviceTaint{{
-					Key:    "example.com/taint",
-					Value:  "tainted",
-					Effect: resourceapi.DeviceTaintEffectNoSchedule,
-				}}
-			}
-			slice.Spec.Devices = append(slice.Spec.Devices, device)
 		}
-
-		_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		ginkgo.DeferCleanup(func(ctx context.Context) {
-			framework.ExpectNoError(d.f.ClientSet.ResourceV1beta2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
-		})
 	}
 
 	manifests := []string{
 		// The code below matches the content of this manifest (ports,
 		// container names, etc.).
 		"test/e2e/testing-manifests/dra/dra-test-driver-proxy.yaml",
-	}
-	var numDevices = -1 // disabled
-	if resources.NodeLocal {
-		numDevices = resources.MaxAllocations
 	}
 
 	// Create service account and corresponding RBAC rules.
@@ -427,7 +392,7 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 	})
 
 	// Run registrar and plugin for each of the pods.
-	for i, pod := range pods.Items {
+	for _, pod := range pods.Items {
 		// Need a local variable, not the loop variable, for the anonymous
 		// callback functions below.
 		pod := pod
@@ -460,11 +425,9 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 				return d.removeFile(&pod, name)
 			},
 		}
-		if i < len(devicesPerNode) {
-			fileOps.Devices = devicesPerNode[i]
-			fileOps.NumDevices = -1
-		} else {
-			fileOps.NumDevices = numDevices
+
+		if dr, ok := driverResources[nodename]; ok {
+			fileOps.DriverResources = &dr
 		}
 		// All listeners running in this pod use a new unique local port number
 		// by atomically incrementing this variable.

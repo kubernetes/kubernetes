@@ -54,6 +54,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
+	"k8s.io/dynamic-resource-allocation/resourceslice"
 	testdriver "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 )
 
@@ -566,7 +567,22 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 		pluginName,
 		clientSet,
 		nodeName,
-		testdriver.FileOperations{},
+		testdriver.FileOperations{
+			DriverResources: &resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodeName: {
+						Slices: []resourceslice.Slice{{
+							Devices: []resourceapi.Device{
+								{
+									Name:  "device-00",
+									Basic: &resourceapi.BasicDevice{},
+								},
+							},
+						}},
+					},
+				},
+			},
+		},
 	)
 	framework.ExpectNoError(err)
 
