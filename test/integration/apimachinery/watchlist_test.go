@@ -35,15 +35,16 @@ import (
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2/ktesting"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
 func TestReflectorWatchListFallback(t *testing.T) {
-	ctx := context.TODO()
+	logger, ctx := ktesting.NewTestContext(t)
 
 	t.Log("Starting etcd that will be used by two different instances of kube-apiserver")
-	etcdURL, etcdTearDownFn, err := framework.RunCustomEtcd("etcd_watchlist", []string{"--experimental-watch-progress-notify-interval", "1s"}, nil)
+	etcdURL, etcdTearDownFn, err := framework.RunCustomEtcd(logger, "etcd_watchlist", []string{"--experimental-watch-progress-notify-interval", "1s"})
 	require.NoError(t, err)
 	defer etcdTearDownFn()
 	etcdOptions := framework.DefaultEtcdOptions()
