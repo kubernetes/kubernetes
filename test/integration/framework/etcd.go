@@ -17,7 +17,10 @@ limitations under the License.
 package framework
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -65,7 +68,7 @@ func getAvailablePort() (int, error) {
 
 // startEtcd executes an etcd instance. The returned function will signal the
 // etcd process and wait for it to exit.
-func startEtcd(output io.Writer, forceCreate bool) (func(), error) {
+func startEtcd(logger klog.Logger, forceCreate bool) (func(), error) {
 	if !forceCreate {
 		etcdURL := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 		conn, err := net.Dial("tcp", strings.TrimPrefix(etcdURL, "http://"))
@@ -74,10 +77,10 @@ func startEtcd(output io.Writer, forceCreate bool) (func(), error) {
 			_ = conn.Close()
 			return func() {}, nil
 		}
-		klog.V(1).Infof("could not connect to etcd: %v", err)
+		logger.V(1).Info("could not connect to etcd", "err", err)
 	}
 
-	currentURL, stop, err := RunCustomEtcd("integration_test_etcd_data", nil, output)
+	currentURL, stop, err := RunCustomEtcd(logger, "integration_test_etcd_data", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +101,22 @@ func init() {
 }
 
 // RunCustomEtcd starts a custom etcd instance for test purposes.
-func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url string, stopFn func(), err error) {
+func RunCustomEtcd(logger klog.Logger, dataDir string, customFlags []string) (url string, stopFn func(), err error) {
+	for i := 0; i < 100; i++ {
+		url, stop, err := runCustomEtcd(logger, i, dataDir, customFlags)
+		if errors.Is(err, errPortInUse) {
+			logger.V(0).Info("Retrying to start etcd", "attempt", i, "err", err)
+			continue
+		}
+		return url, stop, err
+	}
+	return "", nil, errors.New("no unused port found despite retries")
+}
+
+// errPortInUse is returned by runCustomEtcd if picking a free port failed.
+var errPortInUse = errors.New("bind: address already in use")
+
+func runCustomEtcd(logger klog.Logger, attempt int, dataDir string, customFlags []string) (url string, stopFn func(), err error) {
 	// TODO: Check for valid etcd version.
 	etcdPath, err := getEtcdPath()
 	if err != nil {
@@ -111,14 +129,25 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 	}
 	customURL := fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
 
-	klog.Infof("starting etcd on %s", customURL)
+	// Uncomment this to test the retry mechanism reliably with
+	//   go test ./test/integration/etcd/start
+	//
+	// if attempt == 0 {
+	// 	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", etcdPort))
+	// 	if err != nil {
+	// 		return "", nil, fmt.Errorf("fake listen on etcd port: %w", err)
+	// 	}
+	// 	if err == nil {
+	// 		defer l.Close()
+	// 	}
+	// }
 
 	etcdDataDir, err := os.MkdirTemp(os.TempDir(), dataDir)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to make temp etcd data dir %s: %v", dataDir, err)
 	}
-	klog.Infof("storing etcd data in: %v", etcdDataDir)
 
+	logger.V(2).Info("starting etcd", "url", customURL, "dataDir", etcdDataDir)
 	ctx, cancel := context.WithCancel(context.Background())
 	args := []string{
 		"--data-dir",
@@ -136,35 +165,124 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 	}
 	args = append(args, customFlags...)
 	cmd := exec.CommandContext(ctx, etcdPath, args...)
-	if output == nil {
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-	} else {
-		cmd.Stdout = output
-		cmd.Stderr = output
+
+	// Always filter the etcd output. This allows us to get rid of known harmless messages and (more importantly)
+	// to detect the "listen tcp 127.0.0.1:37803: bind: address already in use" error.
+	reader, err := cmd.StderrPipe()
+	if err != nil {
+		return "", nil, fmt.Errorf("prepared etcd command's stderr pipe: %w", err)
 	}
+	var (
+		etcdReady       = 1
+		etcdBindFailure = 2
+		etcdTerminated  = 3
+	)
+	etcdStatus := make(chan int, 2) // Large enough for initial state and final message.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer func() {
+			// If we get here, all output is processed, which means etcd must have stopped.
+			etcdStatus <- etcdTerminated
+		}()
+
+		buffer := make([]byte, 100*1024)
+		for {
+			n, err := reader.Read(buffer)
+			// Unfortunately in practice we get an untyped errors.errorString wrapped in an os.Path error,
+			// so we have to fall back to text matching.
+			if errors.Is(err, io.EOF) || err != nil && err.Error() == "read |0: file already closed" {
+				return
+			}
+			if err != nil {
+				logger.Error(err, "read etcd output")
+				return
+			}
+			if n == 0 {
+				continue
+			}
+			dec := json.NewDecoder(bytes.NewBuffer(buffer[0:n]))
+			for {
+				// Try to parse as JSON object. If we get anything that isn't JSON or an object, we just dump the remaining output.
+				var msg map[string]any
+				err := dec.Decode(&msg)
+				if err == io.EOF {
+					// all done
+					break
+				}
+				if err != nil {
+					offset := int(dec.InputOffset())
+					if offset < n {
+						logger.Info("etcd output", "msg", string(buffer[0:n]))
+					}
+					continue
+				}
+
+				// Known harmless message, no need to dump it.
+				msgStr, _ := msg["msg"].(string)
+				switch msgStr {
+				case "Running http and grpc server on single port. This is not recommended for production.":
+					// Harmless...
+					continue
+				case "simple token is not cryptographically signed":
+					// HACK! It is normal to get this warning message, but only
+					// if the server actually gets passed listening on its port.
+					// It would be much nicer to have some other, well-defined
+					// message for that.
+					//
+					// There is this:
+					//    {"level":"info","ts":"2025-04-11T15:36:34.680588+0200","caller":"embed/serve.go:103","msg":"ready to serve client requests"}
+					//
+					// But it only gets printed at info level and enabling that produced
+					// also other, undesirable output like gRPC logs:
+					//    2025/04/11 15:21:02 WARNING: [core] [Channel #3 SubChannel #4] grpc: addrConn.createTransport failed to connect to {Addr: "127.0.0.1:40239", ServerName: "127.0.0.1:40239", }. Err: connection error: desc = "error reading server preface: EOF"
+					etcdStatus <- etcdReady
+					continue
+				case "ready to serve client requests":
+					// We don't actually get here without -log-level info.
+					etcdStatus <- etcdReady
+				case "discovery failed", "failed to start etcd":
+					errStr, _ := msg["error"].(string)
+					if strings.Contains(errStr, "bind: address already in use") {
+						// Don't dump it. Will be recovered via retries.
+						etcdStatus <- etcdBindFailure
+						continue
+					}
+				}
+
+				kvs := make([]any, 0, 2*len(msg))
+				for key, value := range msg {
+					kvs = append(kvs, key, value)
+				}
+				logger.Info("etcd output", kvs...)
+			}
+		}
+	}()
+
 	stop := func() {
 		// try to exit etcd gracefully
 		defer cancel()
 		cmd.Process.Signal(syscall.SIGTERM)
-		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			select {
 			case <-ctx.Done():
-				klog.Infof("etcd exited gracefully, context cancelled")
+				logger.V(6).Info("etcd exited gracefully, context cancelled")
 			case <-time.After(5 * time.Second):
-				klog.Infof("etcd didn't exit in 5 seconds, killing it")
+				logger.Info("etcd didn't exit in 5 seconds, killing it")
 				cancel()
 			}
 		}()
 		err := cmd.Wait()
+		logger.V(2).Info("etcd exited", "err", err)
+		// Tell goroutine that we are done.
+		cancel()
 		wg.Wait()
-		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
-			klog.Warningf("error during etcd cleanup: %v", err)
+			logger.Info("Warning: error during etcd cleanup", "err", err)
 		}
 	}
 
@@ -172,26 +290,29 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 		return "", nil, fmt.Errorf("failed to run etcd: %v", err)
 	}
 
-	var i int32 = 1
-	const pollCount = int32(300)
-
-	for i <= pollCount {
-		conn, err := net.DialTimeout("tcp", strings.TrimPrefix(customURL, "http://"), 1*time.Second)
-		if err == nil {
-			conn.Close()
-			break
-		}
-
-		if i == pollCount {
+	// We need to wait until etcd is ready. Connecting to its port is not sufficient for that
+	// because something else may have grabbed the port before our etcd instance did.
+	// Instead we rely on etcd output to determine when it is ready.
+	timeout := 30 * time.Second
+	select {
+	case <-time.After(timeout):
+		stop()
+		return "", nil, fmt.Errorf("timed waiting to etcd to start after %s", timeout)
+	case status := <-etcdStatus:
+		switch status {
+		case etcdReady:
+			return customURL, stop, nil
+		case etcdTerminated:
 			stop()
-			return "", nil, fmt.Errorf("could not start etcd")
+			return "", nil, errors.New("etcd terminated unexpectedly")
+		case etcdBindFailure:
+			stop()
+			return "", nil, fmt.Errorf("etcd failed to start: %w", errPortInUse)
+		default:
+			stop()
+			return "", nil, fmt.Errorf("internal error, unexpected etcd status %d", status)
 		}
-
-		time.Sleep(100 * time.Millisecond)
-		i = i + 1
 	}
-
-	return customURL, stop, nil
 }
 
 // EtcdMain starts an etcd instance before running tests.
@@ -224,7 +345,7 @@ func EtcdMain(tests func() int) {
 		goleak.IgnoreTopFunction("github.com/moby/spdystream.(*Connection).shutdown"),
 	)
 
-	stop, err := startEtcd(nil, false)
+	stop, err := startEtcd(klog.Background(), false)
 	if err != nil {
 		klog.Fatalf("cannot run integration tests: unable to start etcd: %v", err)
 	}
@@ -247,15 +368,16 @@ func GetEtcdURL() string {
 
 // StartEtcd starts an etcd instance inside a test. It will abort the test if
 // startup fails and clean up after the test automatically. Stdout and stderr
-// of the etcd binary go to the provided writer.
+// of the etcd binary and all log output of the etcd helper code go to the
+// provided logger.
 //
 // In contrast to EtcdMain, StartEtcd will not do automatic leak checking.
 // Tests can decide if and where they want to do that.
 //
 // Starting etcd multiple times per test run instead of once with EtcdMain
 // provides better separation between different tests.
-func StartEtcd(tb testing.TB, etcdOutput io.Writer, forceCreate bool) {
-	stop, err := startEtcd(etcdOutput, forceCreate)
+func StartEtcd(logger klog.Logger, tb testing.TB, forceCreate bool) {
+	stop, err := startEtcd(logger, forceCreate)
 	if err != nil {
 		tb.Fatalf("unable to start etcd: %v", err)
 	}
