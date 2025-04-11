@@ -49,13 +49,13 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 				metrics.RecordRequestAbort(req, nil)
 			} else {
 				metrics.RecordRequestAbort(req, info)
-				if longRunning != nil && longRunning(req, info) {
-					// This was a long-running request such as a watch. Since
-					// these get ignored by WithTimeoutForNonLongRunningRequests,
-					// the only common cause is that the client closed the
-					// connection and the connection was proxied. We don't
-					// want to spam the log in that case.
-					klog.V(6).InfoS("Ignoring ErrAbortHandler panic for long-running request", "method", req.Method, "URI", req.RequestURI, "auditID", audit.GetAuditIDTruncated(req.Context()))
+				if longRunning != nil && longRunning(req, info) && req.Context().Err() != nil {
+					// Filter out long-running requests that seem to have been aborted by the
+					// client. In particular, we hit this path for proxied requests because
+					// httputil.ReverseProxy raises ErrAbortHandler when it fails to write
+					// to the client.
+					klog.V(6).InfoS("Long-running request aborted, suppressing timeout log (looks like the client closed the connection).",
+						"method", req.Method, "URI", req.RequestURI, "auditID", audit.GetAuditIDTruncated(req.Context()))
 					return
 				}
 			}
