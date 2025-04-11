@@ -265,12 +265,6 @@ type ValidateNameFuncWithErrors = apimachineryvalidation.ValidateNameFuncWithErr
 // trailing dashes are allowed.
 var ValidatePodName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidateReplicationControllerName can be used to check whether the given replication
-// controller name is valid.
-// Prefix indicates this name will be used as part of generation, in which case
-// trailing dashes are allowed.
-var ValidateReplicationControllerName = apimachineryvalidation.NameIsDNSSubdomain
-
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
