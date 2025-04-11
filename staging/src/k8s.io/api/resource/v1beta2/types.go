@@ -325,6 +325,63 @@ type Device struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,8,rep,name=taints"`
+
+	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
+	// has to be limited to exactly the node that was chosen when allocating the claim.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions
+	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,9,opt,name=usageRestrictedToNode"`
+
+	// BindingConditions defines the conditions for proceeding with binding.
+	// All of these conditions must be set in the per-device status
+	// conditions with a value of True to proceed with binding the pod to the node
+	// while scheduling the pod.
+	//
+	// The maximum number of binding conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,10,rep,name=bindingConditions"`
+
+	// BindingFailureConditions defines the conditions for binding failure.
+	// They may be set in the per-device status conditions.
+	// If any is true, a binding failure occurred.
+	//
+	// The maximum number of binding failure conditions is 4.
+	//
+	// The conditions must be a valid condition type string.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,11,rep,name=bindingFailureConditions"`
+
+	// BindingTimeoutSeconds indicates the prepare timeout period.
+	// If the timeout period is exceeded before all BindingConditions reach a True state,
+	// the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.
+	//
+	// No matter what timeouts were specified by the driver, the scheduler will not wait
+	// longer than 20 minutes. This may change.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,12,opt,name=bindingTimeoutSeconds"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -1280,6 +1337,38 @@ type DeviceRequestAllocationResult struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Tolerations []DeviceToleration `json:"tolerations,omitempty" protobuf:"bytes,6,opt,name=tolerations"`
+
+	// BindingConditions contains a copy of the BindingConditions
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
+	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
+
+	// BindingFailureConditions contains a copy of the BindingFailureConditions
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions
+	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
+
+	// BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds
+	// from the corresponding ResourceSlice at the time of allocation.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions
+	// feature gate.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions
+	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,9,opt,name=bindingTimeoutSeconds"`
 }
 
 // DeviceAllocationConfiguration gets embedded in an AllocationResult.

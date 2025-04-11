@@ -23,6 +23,8 @@ type Features struct {
 	EnableDRAPrioritizedList                     bool
 	EnableDRAAdminAccess                         bool
 	EnableDRADeviceTaints                        bool
+	EnableDRADeviceBindingConditions             bool
+	EnableDRAResourceClaimDeviceStatus           bool
 	EnableDynamicResourceAllocation              bool
 	EnableVolumeAttributesClass                  bool
 	EnableCSIMigrationPortworx                   bool
