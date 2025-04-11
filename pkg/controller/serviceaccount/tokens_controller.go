@@ -94,7 +94,7 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
-	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
+	saHandler, err := serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
 			UpdateFunc: e.queueServiceAccountUpdateSync,
@@ -102,11 +102,17 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 		},
 		options.ServiceAccountResync,
 	)
+	if err != nil {
+		return nil, err
+	}
+	e.saHandlerUnregister = func() error {
+		return serviceAccounts.Informer().RemoveEventHandler(saHandler)
+	}
 
 	secretCache := secrets.Informer().GetIndexer()
 	e.updatedSecrets = cache.NewIntegerResourceVersionMutationCache(logger, secretCache, secretCache, 60*time.Second, true)
 	e.secretSynced = secrets.Informer().HasSynced
-	secrets.Informer().AddEventHandlerWithOptions(
+	secretHandler, err := secrets.Informer().AddEventHandlerWithOptions(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -128,6 +134,12 @@ func NewTokensController(logger klog.Logger, serviceAccounts informers.ServiceAc
 			ResyncPeriod: &options.SecretResync,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
+	e.secretHandlerUnregister = func() error {
+		return secrets.Informer().RemoveEventHandler(secretHandler)
+	}
 
 	return e, nil
 }
@@ -144,6 +156,9 @@ type TokensController struct {
 	// and return our local mutations (since we're very likely to act on an updated
 	// secret before the watch reports it).
 	updatedSecrets cache.MutationCache
+
+	saHandlerUnregister     func() error
+	secretHandlerUnregister func() error
 
 	// Since we join two objects, we'll watch both of them with controllers.
 	serviceAccountSynced cache.InformerSynced
@@ -166,10 +181,8 @@ type TokensController struct {
 
 // Run runs controller blocks until stopCh is closed
 func (e *TokensController) Run(ctx context.Context, workers int) {
-	// Shut down queues
 	defer utilruntime.HandleCrash()
-	defer e.syncServiceAccountQueue.ShutDown()
-	defer e.syncSecretQueue.ShutDown()
+	defer e.ShutDown()
 
 	if !cache.WaitForNamedCacheSync("tokens", ctx.Done(), e.serviceAccountSynced, e.secretSynced) {
 		return
@@ -183,6 +196,13 @@ func (e *TokensController) Run(ctx context.Context, workers int) {
 	}
 	<-ctx.Done()
 	logger.V(1).Info("Shutting down")
+}
+
+func (e *TokensController) ShutDown() {
+	utilruntime.HandleError(e.saHandlerUnregister())
+	e.syncServiceAccountQueue.ShutDown()
+	utilruntime.HandleError(e.secretHandlerUnregister())
+	e.syncSecretQueue.ShutDown()
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
