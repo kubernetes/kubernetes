@@ -2755,17 +2755,6 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 				Name:      originalPod.Name,
 				Namespace: originalPod.Namespace,
 			}
-			setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
-				podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
-					Name:  c.Name,
-					State: kubecontainer.ContainerStateRunning,
-					Resources: &kubecontainer.ContainerResources{
-						CPURequest:  c.Resources.Requests.Cpu(),
-						CPULimit:    c.Resources.Limits.Cpu(),
-						MemoryLimit: c.Resources.Limits.Memory(),
-					},
-				}
-			}
 			podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers))
 			for i, c := range originalPod.Spec.Containers {
 				setContainerStatus(podStatus, &c, i)
@@ -3163,18 +3152,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					Namespace: originalPod.Namespace,
 				}
 
-				setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
-					podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
-						Name:  c.Name,
-						State: kubecontainer.ContainerStateRunning,
-						Resources: &kubecontainer.ContainerResources{
-							CPURequest:  c.Resources.Requests.Cpu(),
-							CPULimit:    c.Resources.Limits.Cpu(),
-							MemoryLimit: c.Resources.Limits.Memory(),
-						},
-					}
-				}
-
 				podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers)+len(originalPod.Spec.InitContainers))
 				for i, c := range originalPod.Spec.InitContainers {
 					setContainerStatus(podStatus, &c, i)
@@ -3225,6 +3202,202 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
+	}
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	cpu500m := resource.MustParse("500m")
+	cpu1000m := resource.MustParse("1")
+	cpu5000m := resource.MustParse("5000m")
+	mem500M := resource.MustParse("500Mi")
+	mem1000M := resource.MustParse("1Gi")
+	mem4500M := resource.MustParse("4500Mi")
+
+	nodes := []*v1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname},
+			Status: v1.NodeStatus{
+				Capacity: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("8"),
+					v1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("4"),
+					v1.ResourceMemory: resource.MustParse("4Gi"),
+					v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	kubelet.nodeLister = testNodeLister{nodes: nodes}
+
+	makeTestPod := func(spec *v1.PodSpec, status *v1.PodStatus) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:        "1111",
+				Name:       "pod",
+				Namespace:  "ns",
+				Generation: 1,
+			},
+			Spec:   *spec,
+			Status: *status,
+		}
+	}
+
+	testPod := makeTestPod(
+		&v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+					},
+				},
+			},
+		},
+		&v1.PodStatus{
+			Phase: v1.PodRunning,
+			ContainerStatuses: []v1.ContainerStatus{
+				{
+					Name:               "c1",
+					AllocatedResources: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
+					Resources:          &v1.ResourceRequirements{},
+				},
+			},
+		},
+	)
+
+	testKubelet.fakeKubeClient = fake.NewSimpleClientset(testPod)
+	kubelet.kubeClient = testKubelet.fakeKubeClient
+	defer testKubelet.fakeKubeClient.ClearActions()
+	kubelet.podManager.AddPod(testPod)
+	kubelet.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
+		testPod.UID: true,
+	}
+	defer kubelet.podManager.RemovePod(testPod)
+
+	require.NoError(t, kubelet.allocationManager.SetAllocatedResources(testPod))
+	t.Cleanup(func() { kubelet.allocationManager.RemovePod(testPod.UID) })
+
+	podStatus := &kubecontainer.PodStatus{
+		ID:        testPod.UID,
+		Name:      testPod.Name,
+		Namespace: testPod.Namespace,
+	}
+
+	podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(testPod.Spec.Containers)+len(testPod.Spec.InitContainers))
+	for i, c := range testPod.Spec.InitContainers {
+		setContainerStatus(podStatus, &c, i)
+	}
+	for i, c := range testPod.Spec.Containers {
+		setContainerStatus(podStatus, &c, i+len(testPod.Spec.InitContainers))
+	}
+
+	testCases := []struct {
+		name               string
+		cpu                resource.Quantity
+		mem                resource.Quantity
+		generation         int64
+		expectedConditions []*v1.PodCondition
+	}{
+		{
+			name:       "allocated != actuated, pod resize should be in progress",
+			cpu:        cpu1000m,
+			mem:        mem1000M,
+			generation: 1,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 1,
+			}},
+		},
+		{
+			name:       "desired != allocated != actuated, both conditions should be present in the pod status",
+			cpu:        cpu5000m,
+			mem:        mem4500M,
+			generation: 2,
+			expectedConditions: []*v1.PodCondition{
+				{
+					Type:               v1.PodResizePending,
+					Status:             "True",
+					Reason:             v1.PodReasonInfeasible,
+					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					ObservedGeneration: 2,
+				},
+				{
+					Type:               v1.PodResizeInProgress,
+					Status:             "True",
+					ObservedGeneration: 1,
+				},
+			},
+		},
+		{
+			name:       "revert back to the original resize request",
+			cpu:        cpu1000m,
+			mem:        mem1000M,
+			generation: 3,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 3,
+			}},
+		},
+
+		{
+			name:       "no changes except generation",
+			cpu:        cpu1000m,
+			mem:        mem1000M,
+			generation: 4,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 4,
+			}},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testPod.Generation = tc.generation
+			testPod.Spec = v1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "c1",
+					Image: "i1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceCPU: tc.cpu, v1.ResourceMemory: tc.mem},
+					}},
+				}}
+			_, err := kubelet.handlePodResourcesResize(testPod, podStatus)
+			require.NoError(t, err)
+			conditions := kubelet.statusManager.GetPodResizeConditions(testPod.UID)
+			require.Equal(t, len(tc.expectedConditions), len(conditions))
+			for _, c := range conditions {
+				c.LastProbeTime = metav1.Time{}
+				c.LastTransitionTime = metav1.Time{}
+			}
+			require.Equal(t, tc.expectedConditions, conditions)
+		})
+	}
+}
+
+func setContainerStatus(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
+	podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
+		Name:  c.Name,
+		State: kubecontainer.ContainerStateRunning,
+		Resources: &kubecontainer.ContainerResources{
+			CPURequest:  c.Resources.Requests.Cpu(),
+			CPULimit:    c.Resources.Limits.Cpu(),
+			MemoryLimit: c.Resources.Limits.Memory(),
+		},
 	}
 }
 
