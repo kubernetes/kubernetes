@@ -180,16 +180,21 @@ const (
 // DriverResources that will be used to construct the ResourceSlices.
 type driverResourcesGenFunc func(nodes *Nodes) map[string]resourceslice.DriverResources
 
+type driverResourcesMutatorFunc func(map[string]resourceslice.DriverResources)
+
 // NewDriver sets up controller (as client of the cluster) and
 // kubelet plugin (via proxy) before the test runs. It cleans
 // up after the test.
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
-func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc) *Driver {
+func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc, driverResourcesMutators ...driverResourcesMutatorFunc) *Driver {
 	d := NewDriverInstance(f)
 
 	ginkgo.BeforeEach(func() {
 		driverResources := driverResourcesGenerator(nodes)
+		for _, mutator := range driverResourcesMutators {
+			mutator(driverResources)
+		}
 		d.Run(nodes, driverResources)
 	})
 	return d
