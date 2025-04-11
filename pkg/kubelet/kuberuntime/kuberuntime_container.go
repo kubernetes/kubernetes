@@ -196,6 +196,7 @@ func (m *kubeGenericRuntimeManager) getPodRuntimeHandler(pod *v1.Pod) (podRuntim
 // * start the container
 // * run the post start lifecycle hooks (if applicable)
 func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandboxID string, podSandboxConfig *runtimeapi.PodSandboxConfig, spec *startSpec, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, podIP string, podIPs []string, imageVolumes kubecontainer.ImageVolumes) (string, error) {
+	sctx := context.WithoutCancel(ctx)
 	container := spec.container
 
 	// Step 1: pull the image.
@@ -248,7 +249,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrCreateContainerConfig
 	}
 
-	containerConfig, cleanupAction, err := m.generateContainerConfig(ctx, container, pod, restartCount, podIP, imageRef, podIPs, target, imageVolumes)
+	containerConfig, cleanupAction, err := m.generateContainerConfig(sctx, container, pod, restartCount, podIP, imageRef, podIPs, target, imageVolumes)
 	if cleanupAction != nil {
 		defer cleanupAction()
 	}
@@ -271,7 +272,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 		return s.Message(), ErrPreCreateHook
 	}
 
-	containerID, err := m.runtimeService.CreateContainer(ctx, podSandboxID, containerConfig, podSandboxConfig)
+	containerID, err := m.runtimeService.CreateContainer(sctx, podSandboxID, containerConfig, podSandboxConfig)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
@@ -286,7 +287,7 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, "Created container: %v", container.Name)
 
 	// Step 3: start the container.
-	err = m.runtimeService.StartContainer(ctx, containerID)
+	err = m.runtimeService.StartContainer(sctx, containerID)
 	if err != nil {
 		s, _ := grpcstatus.FromError(err)
 		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", s.Message())
@@ -319,13 +320,13 @@ func (m *kubeGenericRuntimeManager) startContainer(ctx context.Context, podSandb
 			Type: m.runtimeName,
 			ID:   containerID,
 		}
-		msg, handlerErr := m.runner.Run(ctx, kubeContainerID, pod, container, container.Lifecycle.PostStart)
+		msg, handlerErr := m.runner.Run(sctx, kubeContainerID, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			klog.ErrorS(handlerErr, "Failed to execute PostStartHook", "pod", klog.KObj(pod),
 				"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			// do not record the message in the event so that secrets won't leak from the server.
 			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, "PostStartHook failed")
-			if err := m.killContainer(ctx, pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil, nil); err != nil {
+			if err := m.killContainer(sctx, pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil, nil); err != nil {
 				klog.ErrorS(err, "Failed to kill container", "pod", klog.KObj(pod),
 					"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			}
