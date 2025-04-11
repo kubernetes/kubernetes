@@ -348,7 +348,7 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
-func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Skip)
 	}

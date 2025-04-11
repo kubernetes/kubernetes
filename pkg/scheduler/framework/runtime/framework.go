@@ -713,6 +713,10 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 		state.SkipFilterPlugins = skipPlugins
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PreFilter, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+	nodes, err := f.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		return nil, framework.AsStatus(fmt.Errorf("getting all nodes: %w", err)), nil
+	}
 	var result *framework.PreFilterResult
 	pluginsWithNodes := sets.New[string]()
 	logger := klog.FromContext(ctx)
@@ -727,7 +731,7 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
-		r, s := f.runPreFilterPlugin(ctx, pl, state, pod)
+		r, s := f.runPreFilterPlugin(ctx, pl, state, pod, nodes)
 		if s.IsSkip() {
 			skipPlugins.Insert(pl.Name())
 			continue
@@ -765,12 +769,12 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state *framewor
 	return result, returnStatus, pluginsWithNodes
 }
 
-func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (f *frameworkImpl) runPreFilterPlugin(ctx context.Context, pl framework.PreFilterPlugin, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !state.ShouldRecordPluginMetrics() {
-		return pl.PreFilter(ctx, state, pod)
+		return pl.PreFilter(ctx, state, pod, nodes)
 	}
 	startTime := time.Now()
-	result, status := pl.PreFilter(ctx, state, pod)
+	result, status := pl.PreFilter(ctx, state, pod, nodes)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PreFilter, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return result, status
 }
