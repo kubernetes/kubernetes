@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/utils/cpuset"
@@ -29,9 +30,6 @@ import (
 type nonePolicy struct{}
 
 var _ Policy = &nonePolicy{}
-
-// PolicyNone name of none policy
-const PolicyNone policyName = "none"
 
 // NewNonePolicy returns a cpuset manager policy that does nothing
 func NewNonePolicy(cpuPolicyOptions map[string]string) (Policy, error) {
@@ -42,7 +40,7 @@ func NewNonePolicy(cpuPolicyOptions map[string]string) (Policy, error) {
 }
 
 func (p *nonePolicy) Name() string {
-	return string(PolicyNone)
+	return kubeletconfig.NoneCPUManagerPolicy
 }
 
 func (p *nonePolicy) Start(s state.State) error {

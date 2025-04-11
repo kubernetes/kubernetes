@@ -2867,7 +2867,7 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 // otherwise.
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == kubeletconfiginternal.StaticCPUManagerPolicy {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 			return false, v1.PodReasonInfeasible, msg

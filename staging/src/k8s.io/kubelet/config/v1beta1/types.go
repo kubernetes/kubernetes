@@ -102,6 +102,18 @@ const (
 	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
 )
 
+// CPUManagerPolicy denotes the policy to use for CPU Manager.
+type CPUManagerPolicy string
+
+// Enum settings for different policies of CPU Manager.
+const (
+	// NoneCPUManagerPolicy the default policy.
+	NoneCPUManagerPolicy CPUManagerPolicy = "none"
+
+	// StaticCPUManagerPolicy allows pods with certain resource characteristics to be granted increased CPU affinity and exclusivity on the node.
+	StaticCPUManagerPolicy CPUManagerPolicy = "static"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -393,7 +405,7 @@ type KubeletConfiguration struct {
 	// cpuManagerPolicy is the name of the policy to use.
 	// Default: "None"
 	// +optional
-	CPUManagerPolicy string `json:"cpuManagerPolicy,omitempty"`
+	CPUManagerPolicy CPUManagerPolicy `json:"cpuManagerPolicy,omitempty"`
 	// singleProcessOOMKill, if true, will prevent the `memory.oom.group` flag from being set for container
 	// cgroups in cgroups v2. This causes processes in the container to be OOM killed individually instead of as
 	// a group. It means that if true, the behavior aligns with the behavior of cgroups v1.

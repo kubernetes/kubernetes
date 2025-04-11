@@ -21,6 +21,8 @@ import (
 	"time"
 	"unicode"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	imagepullmanager "k8s.io/kubernetes/pkg/kubelet/images/pullmanager"
+	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
@@ -313,12 +316,14 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		}
 	}
 
+	var reservedCPUSet cpuset.CPUSet
+	var err error
 	if kc.ReservedSystemCPUs != "" {
 		// --reserved-cpus does not support --system-reserved-cgroup or --kube-reserved-cgroup
 		if kc.SystemReservedCgroup != "" || kc.KubeReservedCgroup != "" {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: can't use reservedSystemCPUs (--reserved-cpus) with systemReservedCgroup (--system-reserved-cgroup) or kubeReservedCgroup (--kube-reserved-cgroup)"))
 		}
-		if _, err := cpuset.Parse(kc.ReservedSystemCPUs); err != nil {
+		if reservedCPUSet, err = cpuset.Parse(kc.ReservedSystemCPUs); err != nil {
 			allErrors = append(allErrors, fmt.Errorf("invalid configuration: unable to parse reservedSystemCPUs (--reserved-cpus) %v, error: %w", kc.ReservedSystemCPUs, err))
 		}
 	}
@@ -393,5 +398,61 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration, featur
 		}
 	}
 
+	kubeReserved, err := ParseResourceList(kc.KubeReserved)
+	if err != nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: unable to parse kubeReserved (--kube-reserved) %v, error: %w", kc.KubeReserved, err))
+	}
+	systemReserved, err := ParseResourceList(kc.SystemReserved)
+	if err != nil {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: unable to parse systemReserved (--system-reserved) %v, error: %w", kc.SystemReserved, err))
+	}
+
+	switch kc.CPUManagerPolicy {
+	case kubeletconfig.NoneCPUManagerPolicy:
+	case kubeletconfig.StaticCPUManagerPolicy:
+		if reservedCPUSet.Size() != 0 {
+			break
+		}
+		reservedCPUs := resource.NewQuantity(0, resource.DecimalSI)
+		if kubeReserved != nil {
+			reservedCPUs.Add(kubeReserved[corev1.ResourceCPU])
+		}
+		if systemReserved != nil {
+			reservedCPUs.Add(systemReserved[corev1.ResourceCPU])
+		}
+		if reservedCPUs.IsZero() {
+			allErrors = append(allErrors, fmt.Errorf("invalid configuration: systemreserved.cpu + kubereserved.cpu must to be greater than zero when cpuManagerPolicy (--cpu-manager-policy) is set to %q", kubeletconfig.StaticCPUManagerPolicy))
+		}
+	default:
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: option %q specified for cpuManagerPolicy (--cpu-manager-policy). Valid options are %q or %q",
+			kc.CPUManagerPolicy, kubeletconfig.NoneCPUManagerPolicy, kubeletconfig.StaticCPUManagerPolicy))
+	}
+
 	return utilerrors.NewAggregate(allErrors)
+}
+
+// ParseResourceList parses the given configuration map into an API
+// ResourceList or returns an error.
+func ParseResourceList(m map[string]string) (corev1.ResourceList, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	rl := make(corev1.ResourceList)
+	for k, v := range m {
+		switch corev1.ResourceName(k) {
+		// CPU, memory, local storage, and PID resources are supported.
+		case corev1.ResourceCPU, corev1.ResourceMemory, corev1.ResourceEphemeralStorage, pidlimit.PIDs:
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
+			}
+			if q.Sign() == -1 {
+				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+			}
+			rl[corev1.ResourceName(k)] = q
+		default:
+			return nil, fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	return rl, nil
 }
