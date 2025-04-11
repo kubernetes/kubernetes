@@ -42,7 +42,7 @@ import (
 type Manager interface {
 	lifecycle.PodAdmitHandler
 
-	Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+	Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error)
 	Start() error
 	ShutdownStatus() error
 }
@@ -68,8 +68,8 @@ type Config struct {
 type managerStub struct{}
 
 // Admit returns a fake Pod admission which always returns true
-func (managerStub) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	return lifecycle.PodAdmitResult{Admit: true}
+func (managerStub) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error) {
+	return lifecycle.PodAdmitResult{Admit: true}, nil
 }
 
 // Start is a no-op always returning nil for non linux platforms.
