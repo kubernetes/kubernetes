@@ -18,72 +18,122 @@ package filters
 
 import (
 	"bytes"
+	"context"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/routine"
+	"k8s.io/klog/v2"
 	klogtest "k8s.io/klog/v2/test"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/server/routine"
-	"k8s.io/klog/v2"
+	"time"
 )
 
-func TestPropogatingPanicLongRunning(t *testing.T) {
+func TestPropagatingPanicLongRunning(t *testing.T) {
 	panicMsg := "panic as designed"
-	capturedOutput := runHandlerWithPanic(t, true, panicMsg)
+	capturedOutput := runHandlerCaptureOutput(t, longRunning, context.Background(), func(http.ResponseWriter, *http.Request) {
+		panic(panicMsg)
+	})
 
 	if !strings.Contains(capturedOutput, panicMsg) || !strings.Contains(capturedOutput, "apiserver panic'd") {
 		t.Errorf("unexpected out captured actual = %v", capturedOutput)
 	}
 }
 
-func TestPropogatingPanicNotLongRunning(t *testing.T) {
+func TestPropagatingPanicNotLongRunning(t *testing.T) {
 	panicMsg := "panic as designed"
-	capturedOutput := runHandlerWithPanic(t, false, panicMsg)
+	capturedOutput := runHandlerCaptureOutput(t, notLongRunning, context.Background(), func(http.ResponseWriter, *http.Request) {
+		panic(panicMsg)
+	})
 
 	if !strings.Contains(capturedOutput, panicMsg) || !strings.Contains(capturedOutput, "apiserver panic'd") {
 		t.Errorf("unexpected out captured actual = %v", capturedOutput)
 	}
 }
 
-func TestSuppressErrAbortHandlerPanic(t *testing.T) {
-	capturedOutput := runHandlerWithPanic(t, true, http.ErrAbortHandler)
+func TestSuppressClientSideAbort(t *testing.T) {
+	clientCtx, cancelClientConnection := context.WithCancel(context.Background())
+	defer cancelClientConnection()
 
-	if !strings.Contains(capturedOutput, "Ignoring ErrAbortHandler") ||
+	capturedOutput := runHandlerCaptureOutput(t, longRunning, clientCtx, func(_ http.ResponseWriter, req *http.Request) {
+		// Simulate the client closing the connection.
+		cancelClientConnection()
+
+		// Wait for that cancelation to propagate to the server
+		select {
+		case <-req.Context().Done():
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for cancelation to propagate")
+		}
+
+		// Simulate (for example) ReverseProxy detecting the client closed connection.
+		panic(http.ErrAbortHandler)
+	})
+
+	if !strings.Contains(capturedOutput, "suppressing timeout log") ||
 		strings.Contains(capturedOutput, "apiserver panic'd") {
 		t.Errorf("unexpected out captured actual = %v", capturedOutput)
 	}
 }
 
-func runHandlerWithPanic(t *testing.T, longRunning bool, panicVal any) string {
-	buf := captureKlog(t)
-
-	// Panic with the special sigil value http.ErrAbortHandler.  This
-	// should result in no log for a long-running request.
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		panic(panicVal)
+func TestPropagateServerSideAbort(t *testing.T) {
+	capturedOutput := runHandlerCaptureOutput(t, longRunning, context.Background(), func(_ http.ResponseWriter, req *http.Request) {
+		// Simulate (for example) ReverseProxy detecting an upstream failure.
+		panic(http.ErrAbortHandler)
 	})
+
+	if strings.Contains(capturedOutput, "suppressing timeout log") ||
+		strings.Contains(capturedOutput, "panic'd") ||
+		!strings.Contains(capturedOutput, "Timeout or abort") {
+		t.Errorf("unexpected out captured actual = %v", capturedOutput)
+	}
+}
+
+func runHandlerCaptureOutput(t *testing.T, longRunning request.LongRunningRequestCheck, clientCtx context.Context, handler http.HandlerFunc) string {
+	logBuf := captureKlog(t)
+
 	resolver := &request.RequestInfoFactory{
 		APIPrefixes:          sets.NewString("api", "apis"),
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 
-	longRunningFn := func(r *http.Request, requestInfo *request.RequestInfo) bool {
-		return longRunning
-	}
-	ts := httptest.NewServer(routine.WithRoutine(WithPanicRecovery(handler, resolver, longRunningFn), longRunningFn))
+	ts := httptest.NewServer(
+		routine.WithRoutine(
+			WithPanicRecovery(handler, resolver, longRunning),
+			longRunning,
+		),
+	)
 	defer ts.Close()
-	_, err := http.Get(ts.URL)
+
+	req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+	if err != nil {
+		t.Fatal("Failed to create request", err)
+	}
+	req = req.Clone(clientCtx)
+	_, err = http.DefaultClient.Do(req)
 	if err == nil {
 		t.Error("expected to receive an error")
 	}
 
+	// Wait for the server-side processing to finish so that all logs must have
+	// been emitted.  Close() is idempotent.
+	ts.Close()
+
 	klog.Flush()
-	klog.SetOutput(&bytes.Buffer{}) // prevent further writes into buf
-	capturedOutput := buf.String()
+	klog.SetOutput(&bytes.Buffer{}) // prevent further writes into logBuf
+	capturedOutput := logBuf.String()
+
 	return capturedOutput
+}
+
+func longRunning(r *http.Request, requestInfo *request.RequestInfo) bool {
+	return true
+}
+
+func notLongRunning(r *http.Request, requestInfo *request.RequestInfo) bool {
+	return false
 }
 
 func captureKlog(t *testing.T) *bytes.Buffer {
