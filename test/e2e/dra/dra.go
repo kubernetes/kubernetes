@@ -1327,6 +1327,86 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		})
 	}
 
+	partitionableDevicesTests := func() {
+		nodes := NewNodes(f, 1, 1)
+		driver := NewDriver(f, nodes, toDriverResources(
+			[]resourceapi.CounterSet{
+				{
+					Name: "counter-1",
+					Counters: map[string]resourceapi.Counter{
+						"memory": {
+							Value: resource.MustParse("6Gi"),
+						},
+					},
+				},
+			},
+			[]resourceapi.Device{
+				{
+					Name: "device-1",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-1",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "device-2",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-1",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			}...,
+		))
+		b := newBuilder(f, driver)
+
+		f.It("must consume and free up counters", feature.DRAPartitionableDevices, func(ctx context.Context) {
+			// The first pod will use one of the devices. Since both devices are
+			// available, there should be sufficient counters left to allocate
+			// a device.
+			claim := b.externalClaim()
+			pod := b.podExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod)
+
+			// For the second pod, there should not be sufficient counters left, so
+			// it should not succeed. This means the pod should remain in the pending state.
+			claim2 := b.externalClaim()
+			pod2 := b.podExternal()
+			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			b.create(ctx, claim2, pod2)
+
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := b.f.ClientSet.CoreV1().Pods(pod2.Namespace).Get(ctx, pod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod2.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod2.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+
+			// Delete the first pod
+			b.deletePodAndWaitForNotFound(ctx, pod)
+
+			// There shoud not be available devices for pod2.
+			b.testPod(ctx, f, pod2)
+		})
+	}
+
 	ginkgo.Context("on single node", func() {
 		singleNodeTests()
 	})
@@ -1343,9 +1423,17 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		v1beta2Tests()
 	})
 
+	ginkgo.Context("with partitionable devices", func() {
+		partitionableDevicesTests()
+	})
+
 	framework.Context(f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, networkResources(10, true))
+		driver := NewDriver(f, nodes, networkResources(10, false), taintAllDevices(resourceapi.DeviceTaint{
+			Key:    "example.com/taint",
+			Value:  "tainted",
+			Effect: resourceapi.DeviceTaintEffectNoSchedule,
+		}))
 		b := newBuilder(f, driver)
 
 		f.It("DeviceTaint keeps pod pending", func(ctx context.Context) {
@@ -2346,6 +2434,13 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 	return createdObjs
 }
 
+func (b *builder) deletePodAndWaitForNotFound(ctx context.Context, pod *v1.Pod) {
+	err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	framework.ExpectNoErrorWithOffset(1, err, "delete %T", pod)
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, b.f.ClientSet, pod.Name, pod.Namespace, b.f.Timeouts.PodDelete)
+	framework.ExpectNoErrorWithOffset(1, err, "terminate %T", pod)
+}
+
 // testPod runs pod and checks if container logs contain expected environment variables
 func (b *builder) testPod(ctx context.Context, f *framework.Framework, pod *v1.Pod, env ...string) {
 	ginkgo.GinkgoHelper()
@@ -2483,17 +2578,30 @@ func (b *builder) listTestPods(ctx context.Context) ([]v1.Pod, error) {
 	return testPods, nil
 }
 
+func taintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFunc {
+	return func(resources map[string]resourceslice.DriverResources) {
+		for i := range resources {
+			for j := range resources[i].Pools {
+				for k := range resources[i].Pools[j].Slices {
+					for l := range resources[i].Pools[j].Slices[k].Devices {
+						resources[i].Pools[j].Slices[k].Devices[l].Taints = append(resources[i].Pools[j].Slices[k].Devices[l].Taints, taints...)
+					}
+				}
+			}
+		}
+	}
+}
+
 func networkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		driverResources := make(map[string]resourceslice.DriverResources)
 		devices := make([]resourceapi.Device, 0)
 		for i := 0; i < maxAllocations; i++ {
 			device := resourceapi.Device{
-				Name:  fmt.Sprintf("device-%d", i),
-				Basic: &resourceapi.BasicDevice{},
+				Name: fmt.Sprintf("device-%d", i),
 			}
 			if tainted {
-				device.Basic.Taints = []resourceapi.DeviceTaint{{
+				device.Taints = []resourceapi.DeviceTaint{{
 					Key:    "example.com/taint",
 					Value:  "tainted",
 					Effect: resourceapi.DeviceTaintEffectNoSchedule,
@@ -2539,8 +2647,8 @@ func driverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 			devices := make([]resourceapi.Device, 0)
 			for deviceName, attributes := range devicesPerNode[i] {
 				devices = append(devices, resourceapi.Device{
-					Name:  deviceName,
-					Basic: &resourceapi.BasicDevice{Attributes: attributes},
+					Name:       deviceName,
+					Attributes: attributes,
 				})
 			}
 			driverResources[nodename] = resourceslice.DriverResources{
@@ -2556,8 +2664,7 @@ func driverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 			devices := make([]resourceapi.Device, maxAllocations)
 			for i := 0; i < maxAllocations; i++ {
 				devices[i] = resourceapi.Device{
-					Name:  fmt.Sprintf("device-%02d", i),
-					Basic: &resourceapi.BasicDevice{},
+					Name: fmt.Sprintf("device-%02d", i),
 				}
 			}
 			driverResources[nodename] = resourceslice.DriverResources{
@@ -2572,4 +2679,24 @@ func driverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 		}
 	}
 	return driverResources
+}
+
+func toDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi.Device) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		nodename := nodes.NodeNames[0]
+		return map[string]resourceslice.DriverResources{
+			nodename: {
+				Pools: map[string]resourceslice.Pool{
+					nodename: {
+						Slices: []resourceslice.Slice{
+							{
+								SharedCounters: counters,
+								Devices:        devices,
+							},
+						},
+					},
+				},
+			},
+		}
+	}
 }
