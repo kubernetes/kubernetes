@@ -36,7 +36,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -455,7 +455,7 @@ func ensureChain(chain string, tx *knftables.Transaction, createdChains sets.Set
 
 func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	noLocalhost := "ip daddr != 127.0.0.0/8"
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
@@ -788,7 +788,6 @@ func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 // object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
-
 }
 
 // OnServiceSynced is called once all the initial event handlers were
@@ -1252,7 +1251,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
 	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
 		ipvX_addr = "ipv6_addr"
