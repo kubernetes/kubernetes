@@ -563,23 +563,28 @@ func startNamespaceController(ctx context.Context, controllerContext ControllerC
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls
 	// the ratelimiter negatively affects its speed.  Deleting 100 total items in a namespace (that's only a few of each resource
 	// including events), takes ~10 seconds by default.
-	nsKubeconfig := controllerContext.ClientBuilder.ConfigOrDie("namespace-controller")
+	nsKubeconfig, err := controllerContext.ClientBuilder.Config("namespace-controller")
+	if err != nil {
+		return nil, false, fmt.Errorf("error building client config: %v", err)
+	}
 	nsKubeconfig.QPS *= 20
 	nsKubeconfig.Burst *= 100
-	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
+	namespaceKubeClient, err := clientset.NewForConfig(nsKubeconfig)
+	if err != nil {
+		return nil, false, fmt.Errorf("error building client: %v", err)
+	}
 	return startModifiedNamespaceController(ctx, controllerContext, namespaceKubeClient, nsKubeconfig)
 }
 
 func startModifiedNamespaceController(ctx context.Context, controllerContext ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (controller.Interface, bool, error) {
-
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
-		return nil, true, err
+		return nil, false, err
 	}
 
 	discoverResourcesFn := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources
 
-	namespaceController := namespacecontroller.NewNamespaceController(
+	namespaceController, err := namespacecontroller.NewNamespaceController(
 		ctx,
 		namespaceKubeClient,
 		metadataClient,
@@ -588,8 +593,11 @@ func startModifiedNamespaceController(ctx context.Context, controllerContext Con
 		controllerContext.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	go namespaceController.Run(ctx, int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs))
+	if err != nil {
+		return nil, false, err
+	}
 
+	go namespaceController.Run(ctx, int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs))
 	return nil, true, nil
 }
 

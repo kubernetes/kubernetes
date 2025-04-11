@@ -70,7 +70,14 @@ func NewNamespaceController(
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
-	finalizerToken v1.FinalizerName) *NamespaceController {
+	finalizerToken v1.FinalizerName) (*NamespaceController, error) {
+
+	namespacedResourcesDeleter, err := deletion.NewNamespacedResourcesDeleter(ctx,
+		kubeClient.CoreV1().Namespaces(), metadataClient,
+		kubeClient.CoreV1(), discoverResourcesFn, finalizerToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create namespaced resources deleter: %w", err)
+	}
 
 	// create the controller so we can inject the enqueue function
 	namespaceController := &NamespaceController{
@@ -80,7 +87,7 @@ func NewNamespaceController(
 				Name: "namespace",
 			},
 		),
-		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(ctx, kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
+		namespacedResourcesDeleter: namespacedResourcesDeleter,
 	}
 
 	// configure the namespace informer event handlers
@@ -100,7 +107,7 @@ func NewNamespaceController(
 	namespaceController.lister = namespaceInformer.Lister()
 	namespaceController.listerSynced = namespaceInformer.Informer().HasSynced
 
-	return namespaceController
+	return namespaceController, nil
 }
 
 // nsControllerRateLimiter is tuned for a faster than normal recycle time with default backoff speed and default overall
