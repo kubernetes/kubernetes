@@ -87,7 +87,10 @@ func (p *streamProtocolV3) stream(conn streamCreator) error {
 		return err
 	}
 
-	// now that all the streams have been created, proceed with reading & copying
+	// now that all the streams have been created, start stream and proceed with reading & copying
+	if starter, ok := conn.(streamStarter); ok {
+		go starter.StartStream()
+	}
 
 	errorChan := watchErrorStream(p.errorStream, &errorDecoderV3{})
 

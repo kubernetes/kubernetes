@@ -157,12 +157,11 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 				panicChan <- p
 			}
 		}()
-		creator := newWSStreamCreator(conn)
-		go creator.readDemuxLoop(
+		creator := newWSStreamCreator(conn, &wsStreamDemuxOptions{
 			e.upgrader.DataBufferSize(),
 			e.heartbeatPeriod,
 			e.heartbeatDeadline,
-		)
+		})
 		errorChan <- streamer.stream(creator)
 	}()
 
@@ -186,13 +185,26 @@ type wsStreamCreator struct {
 	// setStreamErr holds the error to return to anyone calling setStreams.
 	// this is populated in closeAllStreamReaders
 	setStreamErr error
+	// process readDemuxLoop with given options
+	*wsStreamDemuxOptions
 }
 
-func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
+type wsStreamDemuxOptions struct {
+	dataBufferSize    int
+	heartbeatPeriod   time.Duration
+	heartbeatDeadline time.Duration
+}
+
+func newWSStreamCreator(conn *gwebsocket.Conn, wsStreamDemuxOptions *wsStreamDemuxOptions) *wsStreamCreator {
 	return &wsStreamCreator{
-		conn:    conn,
-		streams: map[byte]*stream{},
+		conn:                 conn,
+		streams:              map[byte]*stream{},
+		wsStreamDemuxOptions: wsStreamDemuxOptions,
 	}
+}
+
+func (c *wsStreamCreator) StartStream() {
+	c.readDemuxLoop(c.dataBufferSize, c.heartbeatPeriod, c.heartbeatDeadline)
 }
 
 func (c *wsStreamCreator) getStream(id byte) *stream {
