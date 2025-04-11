@@ -187,7 +187,7 @@ func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt For
 	}
 
 	if len(suffix) > 1 && (suffix[0] == 'E' || suffix[0] == 'e') {
-		parsed, err := strconv.ParseInt(string(suffix[1:]), 10, 64)
+		parsed, err := strconv.ParseInt(string(suffix[1:]), 10, 32)
 		if err != nil {
 			return 0, 0, DecimalExponent, false
 		}
