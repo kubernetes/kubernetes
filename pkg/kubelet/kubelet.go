@@ -1096,9 +1096,6 @@ type Kubelet struct {
 	rootDirectory    string
 	podLogsDirectory string
 
-	lastObservedNodeAddressesMux sync.RWMutex
-	lastObservedNodeAddresses    []v1.NodeAddress
-
 	// onRepeatedHeartbeatFailure is called when a heartbeat operation fails more than once. optional.
 	onRepeatedHeartbeatFailure func()
 
