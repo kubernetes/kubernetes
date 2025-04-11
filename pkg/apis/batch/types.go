@@ -347,8 +347,9 @@ type JobSpec struct {
 	// +optional
 	ActiveDeadlineSeconds *int64
 
-	// Optional number of retries before marking this job failed.
-	// Defaults to 6
+	// Specifies the number of retries before marking this job failed.
+	// Defaults to 6, unless backoffLimitPerIndex for  is specified (only Indexed Job).
+	// When backoffLimitPerIndex is specified, this field defaults to 2147483647 (MaxInt32).
 	// +optional
 	BackoffLimit *int32
 

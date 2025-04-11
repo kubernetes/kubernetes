@@ -347,7 +347,8 @@ type JobSpec struct {
 	SuccessPolicy *SuccessPolicy `json:"successPolicy,omitempty" protobuf:"bytes,16,opt,name=successPolicy"`
 
 	// Specifies the number of retries before marking this job failed.
-	// Defaults to 6
+	// Defaults to 6, unless backoffLimitPerIndex for  is specified (only Indexed Job).
+	// When backoffLimitPerIndex is specified, this field defaults to 2147483647 (MaxInt32).
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
 
