@@ -212,3 +212,18 @@ require (
 	mvdan.cc/gofumpt v0.7.0 // indirect
 	mvdan.cc/unparam v0.0.0-20240528143540-8a5130ca722f // indirect
 )
+
+tool (
+	github.com/aojea/sloppy-netparser
+	github.com/client9/misspell/cmd/misspell
+	github.com/golangci/golangci-lint/cmd/golangci-lint
+	github.com/jcchavezs/porto
+	honnef.co/go/tools/cmd/staticcheck
+	sigs.k8s.io/logtools/logcheck
+	github.com/cespare/prettybench
+	gotest.tools/gotestsum
+	github.com/vektra/mockery/v2
+	go.uber.org/automaxprocs
+	golang.org/x/mod/modfile
+	k8s.io/publishing-bot/cmd/publishing-bot/config
+)
