@@ -1248,6 +1248,15 @@ type AllocationResult struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
+
+	// BindingStartTime is the time when the binding was
+	// started. This is used to determine whether the allocation
+	// timed out. It is set by the scheduler when it starts
+	// allocating the claim.
+	//
+	// +optional
+	// +featureGate=DRADeviceBindingConditions
+	BindingStartTime *metav1.Time `json:"bindingStartTime,omitempty" protobuf:"bytes,5,opt,name=bindingStartTime"`
 }
 
 // DeviceAllocationResult is the result of allocating devices.
