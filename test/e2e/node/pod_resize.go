@@ -29,6 +29,7 @@ import (
 	helpers "k8s.io/component-helpers/resource"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -114,19 +115,19 @@ func doPodResizeAdmissionPluginsTests() {
 		f := framework.NewDefaultFramework(tc.name)
 
 		ginkgo.It(tc.name, func(ctx context.Context) {
-			containers := []e2epod.ResizableContainerInfo{
+			containers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &podresize.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
 				},
 			}
 			patchString := `{"spec":{"containers":[
 				{"name":"c1", "resources":{"requests":{"cpu":"400m","memory":"400Mi"},"limits":{"cpu":"400m","memory":"400Mi"}}}
 			]}}`
-			expected := []e2epod.ResizableContainerInfo{
+			expected := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &e2epod.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &podresize.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
 				},
 			}
 			patchStringExceedCPU := `{"spec":{"containers":[
@@ -139,9 +140,9 @@ func doPodResizeAdmissionPluginsTests() {
 			tc.enableAdmissionPlugin(ctx, f)
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
-			testPod1 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
+			testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
 			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
-			testPod2 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
+			testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
 			testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 
 			ginkgo.By("creating pods")
@@ -149,23 +150,23 @@ func doPodResizeAdmissionPluginsTests() {
 			newPods := podClient.CreateBatch(ctx, []*v1.Pod{testPod1, testPod2})
 
 			ginkgo.By("verifying initial pod resources, and policy are as expected")
-			e2epod.VerifyPodResources(newPods[0], containers)
+			podresize.VerifyPodResources(newPods[0], containers)
 
 			ginkgo.By("patching pod for resize within resource quota")
 			patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPods[0].Namespace).Patch(ctx, newPods[0].Name,
 				types.StrategicMergePatchType, []byte(patchString), metav1.PatchOptions{}, "resize")
 			framework.ExpectNoError(pErr, "failed to patch pod for resize")
-			expected = e2epod.UpdateExpectedContainerRestarts(ctx, patchedPod, expected)
+			expected = podresize.UpdateExpectedContainerRestarts(ctx, patchedPod, expected)
 
 			ginkgo.By("verifying pod patched for resize within resource quota")
-			e2epod.VerifyPodResources(patchedPod, expected)
+			podresize.VerifyPodResources(patchedPod, expected)
 
 			ginkgo.By("waiting for resize to be actuated")
-			resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
-			e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
+			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, newPods[0], expected)
+			podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
 			ginkgo.By("verifying pod resources after resize")
-			e2epod.VerifyPodResources(resizedPod, expected)
+			podresize.VerifyPodResources(resizedPod, expected)
 
 			ginkgo.By("patching pod for resize with memory exceeding resource quota")
 			framework.ExpectNoError(framework.Gomega().
@@ -181,8 +182,8 @@ func doPodResizeAdmissionPluginsTests() {
 			ginkgo.By("verifying pod patched for resize exceeding memory resource quota remains unchanged")
 			patchedPodExceedMemory, pErrEx2 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(pErrEx2, "failed to get pod post exceed memory resize")
-			e2epod.VerifyPodResources(patchedPodExceedMemory, expected)
-			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected))
+			podresize.VerifyPodResources(patchedPodExceedMemory, expected)
+			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPodExceedMemory, expected))
 
 			ginkgo.By(fmt.Sprintf("patching pod %s for resize with CPU exceeding resource quota", resizedPod.Name))
 			framework.ExpectNoError(framework.Gomega().
@@ -198,8 +199,8 @@ func doPodResizeAdmissionPluginsTests() {
 			ginkgo.By("verifying pod patched for resize exceeding CPU resource quota remains unchanged")
 			patchedPodExceedCPU, pErrEx1 := podClient.Get(ctx, resizedPod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(pErrEx1, "failed to get pod post exceed CPU resize")
-			e2epod.VerifyPodResources(patchedPodExceedCPU, expected)
-			framework.ExpectNoError(e2epod.VerifyPodStatusResources(patchedPodExceedMemory, expected))
+			podresize.VerifyPodResources(patchedPodExceedCPU, expected)
+			framework.ExpectNoError(podresize.VerifyPodStatusResources(patchedPodExceedMemory, expected))
 		})
 	}
 
@@ -255,16 +256,16 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		framework.Logf("TEST1: testPod2 initial CPU request is '%dm'", testPod2CPUQuantity.MilliValue())
 		framework.Logf("TEST1: testPod2 resized CPU request is '%dm'", testPod2CPUQuantityResized.MilliValue())
 
-		c1 := []e2epod.ResizableContainerInfo{
+		c1 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c1",
-				Resources: &e2epod.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Resources: &podresize.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 			},
 		}
-		c2 := []e2epod.ResizableContainerInfo{
+		c2 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c2",
-				Resources: &e2epod.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
+				Resources: &podresize.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
 			},
 		}
 		patchTestpod2ToFitNode := fmt.Sprintf(`{
@@ -279,9 +280,9 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			}`, testPod2CPUQuantityResized.MilliValue(), testPod2CPUQuantityResized.MilliValue())
 
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
-		testPod1 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, c1)
+		testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, c1)
 		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
-		testPod2 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, c2)
+		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, c2)
 		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 		e2epod.SetNodeAffinity(&testPod1.Spec, node.Name)
 		e2epod.SetNodeAffinity(&testPod2.Spec, node.Name)
@@ -319,10 +320,10 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		testPod1CPUQuantityResized := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
 		framework.Logf("TEST2: testPod1 MilliCPUs after resize '%dm'", testPod1CPUQuantityResized.MilliValue())
 
-		c3 := []e2epod.ResizableContainerInfo{
+		c3 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c3",
-				Resources: &e2epod.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
+				Resources: &podresize.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
 			},
 		}
 		patchTestpod1ToMakeSpaceForPod3 := fmt.Sprintf(`{
@@ -337,7 +338,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 			}`, testPod1CPUQuantityResized.MilliValue(), testPod1CPUQuantityResized.MilliValue())
 
 		tStamp = strconv.Itoa(time.Now().Nanosecond())
-		testPod3 := e2epod.MakePodWithResizableContainers(f.Namespace.Name, "testpod3", tStamp, c3)
+		testPod3 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod3", tStamp, c3)
 		testPod3 = e2epod.MustMixinRestrictedPodSecurity(testPod3)
 		e2epod.SetNodeAffinity(&testPod3.Spec, node.Name)
 
@@ -404,15 +405,15 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		framework.ExpectNoError(delErr3, "failed to delete pod %s", testPod3.Name)
 
 		ginkgo.By(fmt.Sprintf("TEST3: Verify pod '%s' is resized successfully after pod deletion '%s' and '%s", testPod1.Name, testPod2.Name, testPod3.Name))
-		expected := []e2epod.ResizableContainerInfo{
+		expected := []podresize.ResizableContainerInfo{
 			{
 				Name:         "c1",
-				Resources:    &e2epod.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Resources:    &podresize.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 				RestartCount: testPod1.Status.ContainerStatuses[0].RestartCount,
 			},
 		}
-		resizedPod := e2epod.WaitForPodResizeActuation(ctx, f, podClient, testPod1, expected)
-		e2epod.ExpectPodResized(ctx, f, resizedPod, expected)
+		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod1, expected)
+		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
 
 		ginkgo.By(fmt.Sprintf("TEST3: Resize pod '%s' to exceed the node capacity", testPod1.Name))
 		testPod1, p1Err = f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
