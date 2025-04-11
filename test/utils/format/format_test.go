@@ -38,20 +38,17 @@ func TestGomegaFormatObject(t *testing.T) {
 		"struct":         {value: myStruct{a: 1, b: 2}, expected: `<format_test.myStruct>: {a: 1, b: 2}`},
 		"gomegastringer": {value: typeWithGomegaStringer(2), expected: `<format_test.typeWithGomegaStringer>: my stringer 2`},
 		"pod": {value: v1.Pod{}, expected: `<v1.Pod>: 
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
     status: {}`},
 		"pod-indented": {value: v1.Pod{}, indentation: 1, expected: `    <v1.Pod>: 
-        metadata:
-          creationTimestamp: null
+        metadata: {}
         spec:
           containers: null
         status: {}`},
 		"pod-ptr": {value: &v1.Pod{}, expected: `<*v1.Pod | <hex>>: 
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
     status: {}`},

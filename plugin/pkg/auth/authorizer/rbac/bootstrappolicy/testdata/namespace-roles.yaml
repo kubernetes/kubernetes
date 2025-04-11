@@ -5,7 +5,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:bootstrap-signer
@@ -41,7 +40,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: extension-apiserver-authentication-reader
@@ -62,7 +60,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system::leader-locking-kube-controller-manager
@@ -108,7 +105,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system::leader-locking-kube-scheduler
@@ -154,7 +150,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:bootstrap-signer
@@ -173,7 +168,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:cloud-provider
@@ -193,7 +187,6 @@ items:
   metadata:
     annotations:
       rbac.authorization.kubernetes.io/autoupdate: "true"
-    creationTimestamp: null
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:token-cleaner
