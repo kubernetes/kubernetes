@@ -22,7 +22,8 @@ package kuberuntime
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -47,6 +48,8 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 		return fmt.Errorf("container has runAsNonRoot and image will run as root (pod: %q, container: %s)", format.Pod(pod), container.Name)
 	case uid == nil && len(username) > 0:
 		return fmt.Errorf("container has runAsNonRoot and image has non-numeric user (%s), cannot verify user is non-root (pod: %q, container: %s)", username, format.Pod(pod), container.Name)
+	case uid != nil && validation.IsValidUserID(*uid) != nil:
+		return fmt.Errorf("container has runAsNonRoot and image has an invalid user id (%d): %s (pod: %q, container: %s)", *uid, validation.IsValidUserID(*uid), format.Pod(pod), container.Name)
 	default:
 		return nil
 	}

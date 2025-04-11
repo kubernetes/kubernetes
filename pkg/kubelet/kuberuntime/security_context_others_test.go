@@ -50,6 +50,8 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 
 	rootUser := int64(0)
 	anyUser := int64(1000)
+	invalidUser := int64(2147483648)
+	negativeUser := int64(-1000)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
 	for _, test := range []struct {
@@ -137,6 +139,22 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
 			fail: false,
+		},
+		{
+			desc: "Fail if image's user is invalid and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			uid:  &invalidUser,
+			fail: true,
+		},
+		{
+			desc: "Fail if image's user is negative and RunAsNonRoot is true",
+			sc: &v1.SecurityContext{
+				RunAsNonRoot: &runAsNonRootTrue,
+			},
+			uid:  &negativeUser,
+			fail: true,
 		},
 	} {
 		pod.Spec.Containers[0].SecurityContext = test.sc
