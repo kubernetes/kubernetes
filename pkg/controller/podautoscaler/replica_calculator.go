@@ -401,7 +401,6 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	} else {
 		usage = int64(usageResult)
 	}
-	usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
 	return replicaCount, usage, timestamp, nil
 }
 
