@@ -24,7 +24,8 @@ read the CNCF [announcement].
 
 ----
 
-## To start using K8s
+## To start developing Kubernetes (K8s)
+
 
 See our documentation on [kubernetes.io].
 
