@@ -54,75 +54,102 @@ type handlerEvent struct {
 	newObj *resourceapi.ResourceSlice
 }
 
-type inputEventGenerator struct {
-	addResourceSlice      func(slice *resourceapi.ResourceSlice)
-	deleteResourceSlice   func(name string)
-	addDeviceTaintRule    func(taintRule *resourcealphaapi.DeviceTaintRule)
-	deleteDeviceTaintRule func(name string)
-	addDeviceClass        func(class *resourceapi.DeviceClass)
-	deleteDeviceClass     func(name string)
+func add[T any](obj *T) [2]*T {
+	return [2]*T{nil, obj}
 }
 
-func inputEventGeneratorForTest(ctx context.Context, t *testing.T, tracker *Tracker) inputEventGenerator {
-	return inputEventGenerator{
-		addResourceSlice: func(slice *resourceapi.ResourceSlice) {
-			oldObj, exists, err := tracker.resourceSlices.GetIndexer().Get(slice)
-			require.NoError(t, err)
-			err = tracker.resourceSlices.GetIndexer().Add(slice)
-			require.NoError(t, err)
-			if !exists {
-				tracker.resourceSliceAdd(ctx)(slice)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, slice) {
-				tracker.resourceSliceUpdate(ctx)(oldObj, slice)
-			}
-		},
-		deleteResourceSlice: func(name string) {
-			oldObj, exists, err := tracker.resourceSlices.GetIndexer().GetByKey(name)
-			require.NoError(t, err)
-			require.True(t, exists, "deleting resource slice that was never created")
-			err = tracker.resourceSlices.GetIndexer().Delete(oldObj)
-			require.NoError(t, err)
-			tracker.resourceSliceDelete(ctx)(oldObj)
-		},
-		addDeviceTaintRule: func(taintRule *resourcealphaapi.DeviceTaintRule) {
-			oldObj, exists, err := tracker.deviceTaints.GetIndexer().Get(taintRule)
-			require.NoError(t, err)
-			err = tracker.deviceTaints.GetIndexer().Add(taintRule)
-			require.NoError(t, err)
-			if !exists {
-				tracker.deviceTaintAdd(ctx)(taintRule)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, taintRule) {
-				tracker.deviceTaintUpdate(ctx)(oldObj, taintRule)
-			}
-		},
-		deleteDeviceTaintRule: func(name string) {
-			oldObj, exists, err := tracker.deviceTaints.GetIndexer().GetByKey(name)
-			require.NoError(t, err)
-			require.True(t, exists, "deleting DeviceTaintRule that was never created")
-			err = tracker.deviceTaints.GetIndexer().Delete(oldObj)
-			require.NoError(t, err)
-			tracker.deviceTaintDelete(ctx)(oldObj)
-		},
-		addDeviceClass: func(class *resourceapi.DeviceClass) {
-			oldObj, exists, err := tracker.deviceClasses.GetIndexer().Get(class)
-			require.NoError(t, err)
-			err = tracker.deviceClasses.GetIndexer().Add(class)
-			require.NoError(t, err)
-			if !exists {
-				tracker.deviceClassAdd(ctx)(class)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, class) {
-				tracker.deviceClassUpdate(ctx)(oldObj, class)
-			}
-		},
-		deleteDeviceClass: func(name string) {
-			oldObj, exists, err := tracker.deviceClasses.GetIndexer().GetByKey(name)
-			require.NoError(t, err)
-			require.True(t, exists, "deleting device class that was never created")
-			err = tracker.deviceClasses.GetIndexer().Delete(oldObj)
-			require.NoError(t, err)
-			tracker.deviceClassDelete(ctx)(oldObj)
-		},
+func remove[T any](obj *T) [2]*T {
+	return [2]*T{obj, nil}
+}
+
+func update[T any](oldObj, newObj *T) [2]*T {
+	return [2]*T{oldObj, newObj}
+}
+
+func runInputEvents(tCtx *testContext, events []any) {
+	for _, event := range events {
+		applyEventPair(tCtx, event)
 	}
+}
+
+func applyEventPair(tCtx *testContext, event any) {
+	switch pair := event.(type) {
+	case [2]*resourceapi.ResourceSlice:
+		slice := pair[0]
+		if pair[1] != nil {
+			slice = pair[1]
+		}
+		require.NotNil(tCtx, slice)
+
+		oldObj, exists, err := tCtx.resourceSlices.GetIndexer().Get(slice)
+		require.NoError(tCtx, err)
+		if pair[1] == nil {
+			require.True(tCtx, exists, "device taint rule that was never created cannot be deleted")
+			err = tCtx.resourceSlices.GetIndexer().Delete(oldObj)
+			require.NoError(tCtx, err)
+			tCtx.resourceSliceDelete(tCtx.Context)(oldObj)
+		} else {
+			err = tCtx.resourceSlices.GetIndexer().Add(slice)
+			require.NoError(tCtx, err)
+			if !exists {
+				tCtx.resourceSliceAdd(tCtx.Context)(slice)
+			} else if !apiequality.Semantic.DeepEqual(oldObj, slice) {
+				tCtx.resourceSliceUpdate(tCtx.Context)(oldObj, slice)
+			}
+		}
+	case [2]*resourcealphaapi.DeviceTaintRule:
+		taint := pair[0]
+		if pair[1] != nil {
+			taint = pair[1]
+		}
+		require.NotNil(tCtx, taint)
+
+		oldObj, exists, err := tCtx.deviceTaints.GetIndexer().Get(taint)
+		require.NoError(tCtx, err)
+		if pair[1] == nil {
+			require.True(tCtx, exists, "device taint rule that was never created cannot be deleted")
+			err = tCtx.deviceTaints.GetIndexer().Delete(oldObj)
+			require.NoError(tCtx, err)
+			tCtx.deviceTaintDelete(tCtx.Context)(oldObj)
+		} else {
+			err = tCtx.deviceTaints.GetIndexer().Add(taint)
+			require.NoError(tCtx, err)
+			if !exists {
+				tCtx.deviceTaintAdd(tCtx.Context)(taint)
+			} else if !apiequality.Semantic.DeepEqual(oldObj, taint) {
+				tCtx.deviceTaintUpdate(tCtx.Context)(oldObj, taint)
+			}
+		}
+	case [2]*resourceapi.DeviceClass:
+		class := pair[0]
+		if pair[1] != nil {
+			class = pair[1]
+		}
+		require.NotNil(tCtx, class)
+
+		oldObj, exists, err := tCtx.deviceClasses.GetIndexer().Get(class)
+		require.NoError(tCtx, err)
+		if pair[1] == nil {
+			require.True(tCtx, exists, "device class that was never created cannot be deleted")
+			err = tCtx.deviceClasses.GetIndexer().Delete(oldObj)
+			require.NoError(tCtx, err)
+			tCtx.deviceClassDelete(tCtx.Context)(oldObj)
+		} else {
+			err = tCtx.deviceClasses.GetIndexer().Add(class)
+			require.NoError(tCtx, err)
+			if !exists {
+				tCtx.deviceClassAdd(tCtx.Context)(class)
+			} else if !apiequality.Semantic.DeepEqual(oldObj, class) {
+				tCtx.deviceClassUpdate(tCtx.Context)(oldObj, class)
+			}
+		}
+	}
+}
+
+type testContext struct {
+	*testing.T
+	context.Context
+	*Tracker
 }
 
 var (
@@ -309,17 +336,16 @@ var (
 
 func TestListPatchedResourceSlices(t *testing.T) {
 	tests := map[string]struct {
-		deviceTaintsDisabled  bool
-		inputEvents           func(event inputEventGenerator)
+		events                []any
 		expectedPatchedSlices []*resourceapi.ResourceSlice
 		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
 	}{
 		"add-slices-no-patches": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+			events: []any{
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -337,14 +363,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"update-slices-no-patches": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(slice1NoDevices)
-				event.addResourceSlice(slice2NoDevices)
-				event.addResourceSlice(unchangedSlice)
-
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
-				event.addResourceSlice(unchangedSlice)
+			events: []any{
+				add(slice1NoDevices),
+				add(slice2NoDevices),
+				add(unchangedSlice),
+				update(slice1NoDevices, slice1),
+				update(slice2NoDevices, slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -366,12 +390,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"delete-slices": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
-				event.addResourceSlice(unchangedSlice)
-				event.deleteResourceSlice(slice1.Name)
-				event.deleteResourceSlice(slice2.Name)
+			events: []any{
+				add(slice1),
+				add(slice2),
+				add(unchangedSlice),
+				remove(slice1),
+				remove(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				unchangedSlice,
@@ -391,9 +415,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"patch-all-slices": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addResourceSlice(slice1)
-				event.addDeviceTaintRule(taintAllDevicesRule)
+			events: []any{
+				add(slice1),
+				add(taintAllDevicesRule),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -410,11 +434,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"update-patch": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintPool1DevicesRule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
-				event.addDeviceTaintRule(taintPool2DevicesRule)
+			events: []any{
+				add(taintPool1DevicesRule),
+				add(slice1),
+				add(slice2),
+				update(taintPool1DevicesRule, taintPool2DevicesRule),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -441,9 +465,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"merge-taints": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintAllDevicesRule)
-				event.addResourceSlice(slice1AlreadyTainted)
+			events: []any{
+				add(taintAllDevicesRule),
+				add(slice1AlreadyTainted),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1MergedTaints,
@@ -459,10 +483,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"add-taint-for-driver": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintDriver1DevicesRule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+			events: []any{
+				add(taintDriver1DevicesRule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -480,10 +504,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"add-taint-for-pool": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintPool1DevicesRule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+			events: []any{
+				add(taintPool1DevicesRule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -501,10 +525,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"add-taint-for-device": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintDevice1Rule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+			events: []any{
+				add(taintDevice1Rule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -522,10 +546,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"add-attribute-for-selector": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintDriver1DevicesCELRule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+			events: []any{
+				add(taintDriver1DevicesCELRule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -543,9 +567,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"selector-does-not-match": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintNoDevicesCELRule)
-				event.addResourceSlice(slice1)
+			events: []any{
+				add(taintNoDevicesCELRule),
+				add(slice1),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -561,9 +585,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"runtime-CEL-errors-skip-devices": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintNoDevicesCELRuntimeErrorRule)
-				event.addResourceSlice(slice1)
+			events: []any{
+				add(taintNoDevicesCELRuntimeErrorRule),
+				add(slice1),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -586,9 +610,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"invalid-CEL-expression-throws-error": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintNoDevicesInvalidCELRule)
-				event.addResourceSlice(slice1)
+			events: []any{
+				add(taintNoDevicesInvalidCELRule),
+				add(slice1),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
 			expectUnhandledErrors: func(t *testing.T, errs []error) {
@@ -599,11 +623,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"add-taint-for-device-class": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceClass(deviceClass1)
-				event.addDeviceTaintRule(taintDeviceClass1Rule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+			events: []any{
+				add(deviceClass1),
+				add(taintDeviceClass1Rule),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -621,9 +645,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"filter-all-criteria": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceClass(deviceClass1)
-				event.addDeviceTaintRule(
+			events: []any{
+				add(deviceClass1),
+				add(
 					taintDeviceClassRule(
 						taintDriverDevicesRule(
 							taintPoolDevicesRule(
@@ -640,9 +664,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 						),
 						deviceClass1.Name,
 					),
-				)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(slice2)
+				),
+				add(slice1),
+				add(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
@@ -660,12 +684,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			},
 		},
 		"update-patched-slice": {
-			inputEvents: func(event inputEventGenerator) {
-				event.addDeviceTaintRule(taintDevice1Rule)
-				event.addResourceSlice(slice1)
-				event.addResourceSlice(sliceWithDevices(slice1, threeDevices))
-				event.addResourceSlice(sliceWithDevices(slice2, threeDevices))
-				event.addResourceSlice(sliceWithDevices(slice2, devices))
+			events: []any{
+				add(taintDevice1Rule),
+				add(slice1),
+				update(slice1, sliceWithDevices(slice1, threeDevices)),
+				add(sliceWithDevices(slice2, threeDevices)),
+				update(sliceWithDevices(slice2, threeDevices), sliceWithDevices(slice2, devices)),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				sliceWithDevices(slice1, threeDevicesOneTainted),
@@ -707,7 +731,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			}
 
 			opts := Options{
-				EnableDeviceTaints: !test.deviceTaintsDisabled,
+				EnableDeviceTaints: true,
 				SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
 				TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
 				ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
@@ -721,9 +745,13 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			}
 			_, _ = tracker.AddEventHandler(handler)
 
-			if test.inputEvents != nil {
-				test.inputEvents(inputEventGeneratorForTest(ctx, t, tracker))
+			tCtx := &testContext{
+				T:       t,
+				Context: ctx,
+				Tracker: tracker,
 			}
+
+			runInputEvents(tCtx, test.events)
 
 			expectHandlerEvents := test.expectHandlerEvents
 			if expectHandlerEvents == nil {
