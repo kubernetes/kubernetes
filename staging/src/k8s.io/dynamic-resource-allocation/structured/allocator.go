@@ -459,9 +459,9 @@ var errStop = errors.New("stop allocation")
 
 // errAllocationResultMaxSizeExceeded is a special error that gets return by
 // allocatedOne when the number of allocated devices exceeds the max number
-// allowed. This is used by earlier invocations in the recursion to more
-// aggressive backtracking and avoid attempting allocations that we know can
-// not succeed.
+// allowed. This is checked by earlier invocations in the recursion and used
+// to do more aggressive backtracking and avoid attempting allocations that
+// we know can not succeed.
 var errAllocationResultMaxSizeExceeded = errors.New("allocation max size exceeded")
 
 // allocator is used while an [Allocator.Allocate] is running. Only a single
@@ -697,9 +697,13 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		// Done with the claim, continue with the next one.
 		success, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex + 1}, false)
 		if errors.Is(err, errAllocationResultMaxSizeExceeded) {
-			// We don't need to propagate this further, since the allocation size
-			// limit is per claim.
-			return success, nil
+			// We don't need to propagate this further because
+			// this is not a fatal error. Retrying the claim under
+			// different circumstances may succeed if it uses
+			// subrequests and changing the allocation of some
+			// prior claim enables allocating a subrequest here
+			// which needs fewer devices.
+			return false, nil
 		}
 		return success, err
 	}
@@ -787,7 +791,10 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 	// Before trying to allocate devices, check if allocating the devices
 	// in the current request will put us over the threshold.
-	numDevicesAfterAlloc := len(alloc.result[r.claimIndex].devices) + (requestData.numDevices - r.deviceIndex)
+	// We can calculate this by adding the number of already allocated devices with the number
+	// of devices in the current request, and then finally subtract the deviceIndex since we
+	// don't want to double count any devices already allocated for the current request.
+	numDevicesAfterAlloc := len(alloc.result[r.claimIndex].devices) + requestData.numDevices - r.deviceIndex
 	if numDevicesAfterAlloc > resourceapi.AllocationResultsMaxSize {
 		// Return a special error so we can identify this situation in the
 		// callers and do more aggressive backtracking.
@@ -799,7 +806,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		// For "all" devices we already know which ones we need. We
 		// just need to check whether we can use them.
 		deviceWithID := requestData.allDevices[r.deviceIndex]
-		success, _, err := alloc.allocateDevice(r, deviceWithID, true)
+		success, deallocate, err := alloc.allocateDevice(r, deviceWithID, true)
 		if err != nil {
 			return false, err
 		}
@@ -810,17 +817,18 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 			return false, nil
 		}
 		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest)
-		// No need to propagate the errAllocationResultMaxSizeExceeded error here
-		// since there are only a single way to allocated devices for a request for
-		// all devices.
+		// If we hit the allocation size limit, just release the
+		// allocated device and backtrack.
 		if errors.Is(err, errAllocationResultMaxSizeExceeded) {
-			return false, nil
+			deallocate()
+			return false, err
 		}
 		if err != nil {
 			return false, err
 		}
 		if !done {
 			// Backtrack.
+			deallocate()
 			return false, nil
 		}
 		return done, nil

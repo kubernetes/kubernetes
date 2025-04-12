@@ -3060,6 +3060,37 @@ func TestAllocator(t *testing.T) {
 				)...,
 			)},
 		},
+		"prioritized-list-max-allocation-allocation-mode-all": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						resourceapi.DeviceSubRequest{
+							Name:            subReq0,
+							AllocationMode:  resourceapi.DeviceAllocationModeAll,
+							DeviceClassName: classA,
+						},
+						subRequest(subReq1, classA, 2),
+					),
+					request(req1, classB, 2),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: objects(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize-1),
+				sliceWithMultipleDevices(slice2, node1, pool2, driverB, 2),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-0", false),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-1", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-0", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-1", false),
+			)},
+		},
 	}
 
 	for name, tc := range testcases {
