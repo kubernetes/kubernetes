@@ -1148,9 +1148,7 @@ func fixJSONOutput(b *testing.B) {
 // Also, you may want to put your plugins in PluginNames variable in this package
 // to collect metrics for them.
 func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName string, outOfTreePluginRegistry frameworkruntime.Registry, options ...SchedulerPerfOption) {
-	opts := &schedulerPerfOptions{
-		prepareFn: nil,
-	}
+	opts := &schedulerPerfOptions{}
 
 	for _, option := range options {
 		option(opts)
