@@ -338,7 +338,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		// the order in those nested lists is preserved.
 		events                []any
 		expectedPatchedSlices []*resourceapi.ResourceSlice
-		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
+		expectedHandlerEvents []handlerEvent
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
 	}
@@ -352,15 +352,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"update-slices-no-patches": {
@@ -380,18 +374,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice2,
 				unchangedSlice,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1NoDevices},
-						{event: handlerEventUpdate, oldObj: slice1NoDevices, newObj: slice1},
-						{event: handlerEventAdd, newObj: slice2NoDevices},
-						{event: handlerEventUpdate, oldObj: slice2NoDevices, newObj: slice2},
-						{event: handlerEventAdd, newObj: unchangedSlice},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1NoDevices},
+				{event: handlerEventUpdate, oldObj: slice1NoDevices, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2NoDevices},
+				{event: handlerEventUpdate, oldObj: slice2NoDevices, newObj: slice2},
+				{event: handlerEventAdd, newObj: unchangedSlice},
 			},
 		},
 		"delete-slices": {
@@ -403,18 +391,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				unchangedSlice,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1},
-						{event: handlerEventDelete, oldObj: slice1},
-						{event: handlerEventAdd, newObj: slice2},
-						{event: handlerEventDelete, oldObj: slice2},
-						{event: handlerEventAdd, newObj: unchangedSlice},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventDelete, oldObj: slice1},
+				{event: handlerEventAdd, newObj: slice2},
+				{event: handlerEventDelete, oldObj: slice2},
+				{event: handlerEventAdd, newObj: unchangedSlice},
 			},
 		},
 		"patch-all-slices": {
@@ -425,15 +407,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1Tainted,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1},
-						{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Tainted},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventUpdate, oldObj: slice1, newObj: slice1Tainted},
 			},
 		},
 		"update-patch": {
@@ -449,15 +425,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1,
 				slice2Tainted,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1},
-						{event: handlerEventAdd, newObj: slice2Tainted},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
+				{event: handlerEventAdd, newObj: slice2Tainted},
 			},
 		},
 		"merge-taints": {
@@ -468,14 +438,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1MergedTaints,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1MergedTaints},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1MergedTaints},
 			},
 		},
 		"add-taint-for-driver": {
@@ -488,15 +452,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"add-taint-for-pool": {
@@ -509,15 +467,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"add-taint-for-device": {
@@ -530,15 +482,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"add-attribute-for-selector": {
@@ -551,15 +497,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"selector-does-not-match": {
@@ -570,14 +510,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
 			},
 		},
 		"runtime-CEL-errors-skip-devices": {
@@ -595,14 +529,8 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				assert.Equal(t, taintNoDevicesCELRuntimeErrorRule.Name, events.Items[0].InvolvedObject.Name)
 				assert.Equal(t, "CELRuntimeError", events.Items[0].Reason)
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1},
 			},
 		},
 		"invalid-CEL-expression-throws-error": {
@@ -631,15 +559,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"filter-all-criteria": {
@@ -670,15 +592,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				slice1Tainted,
 				slice2,
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventAdd, newObj: slice2},
 			},
 		},
 		"update-patched-slice": {
@@ -697,17 +613,11 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				sliceWithDevices(slice1, threeDevicesOneTainted),
 				sliceWithDevices(slice2, taintedDevices),
 			},
-			expectHandlerEvents: func(t *testing.T, events []handlerEvent) {
-				assert.Equal(
-					t,
-					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventUpdate, oldObj: slice1Tainted, newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
-						{event: handlerEventAdd, newObj: sliceWithDevices(slice2, threeDevicesOneTainted)},
-						{event: handlerEventUpdate, oldObj: sliceWithDevices(slice2, threeDevicesOneTainted), newObj: sliceWithDevices(slice2, taintedDevices)},
-					},
-					events,
-				)
+			expectedHandlerEvents: []handlerEvent{
+				{event: handlerEventAdd, newObj: slice1Tainted},
+				{event: handlerEventUpdate, oldObj: slice1Tainted, newObj: sliceWithDevices(slice1, threeDevicesOneTainted)},
+				{event: handlerEventAdd, newObj: sliceWithDevices(slice2, threeDevicesOneTainted)},
+				{event: handlerEventUpdate, oldObj: sliceWithDevices(slice2, threeDevicesOneTainted), newObj: sliceWithDevices(slice2, taintedDevices)},
 			},
 		},
 	}
@@ -759,13 +669,7 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		runInputEvents(tCtx, test.events)
 
 		if testExpectedEmittedEvents {
-			expectHandlerEvents := test.expectHandlerEvents
-			if expectHandlerEvents == nil {
-				expectHandlerEvents = func(t *testing.T, events []handlerEvent) {
-					assert.Empty(tCtx, events)
-				}
-			}
-			expectHandlerEvents(t, handlerEvents)
+			assert.Equal(tCtx, test.expectedHandlerEvents, handlerEvents)
 		}
 
 		expectUnhandledErrors := test.expectUnhandledErrors
