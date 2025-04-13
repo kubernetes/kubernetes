@@ -50,6 +50,11 @@ import (
 // ResourceResyncTime defines the resync period of the garbage collector's informers.
 const ResourceResyncTime time.Duration = 0
 
+// OrphanProtectionFinalizer is a finalizer added to objects to protect them from being orphaned
+// when their owner is deleted with DeletePropagationOrphan policy. This finalizer is removed
+// once the ownerReference is removed from the dependent object.
+const OrphanProtectionFinalizer = "kubernetes.io/orphan-protection"
+
 // GarbageCollector runs reflectors to watch for changes of managed API
 // objects, funnels the results to a single-threaded dependencyGraphBuilder,
 // which builds a graph caching the dependencies among objects. Triggered by the
@@ -542,6 +547,17 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		return gc.processDeletingDependentsItem(logger, item)
 	}
 
+	// If the item has the OrphanProtectionFinalizer, we skip deletion
+	// because this finalizer is added to objects to protect them from being orphaned
+	// when their owner is deleted with DeletePropagationOrphan policy.
+	// The finalizer will be removed once the ownerReference is removed from the dependent object.
+	if hasFinalizer(latest, OrphanProtectionFinalizer) {
+		logger.V(5).Info("item has orphan protection finalizer, skipping deletion",
+			"item", item.identity,
+		)
+		return nil
+	}
+
 	// compute if we should delete the item
 	ownerReferences := latest.GetOwnerReferences()
 	if len(ownerReferences) == 0 {
@@ -666,6 +682,22 @@ func (gc *GarbageCollector) processDeletingDependentsItem(logger klog.Logger, it
 
 // dependents are copies of pointers to the owner's dependents, they don't need to be locked.
 func (gc *GarbageCollector) orphanDependents(logger klog.Logger, owner objectReference, dependents []*node) error {
+	// Add the OrphanProtectionFinalizer to each dependent object to prevent it from being
+	// garbage-collected while orphaning is in progress. This is necessary because:
+	// 1. The owner reference is being removed, which would normally make the object eligible for deletion
+	// 2. During the orphaning process, we need to ensure the dependent objects aren't deleted
+	// 3. Once orphaning is complete, this finalizer will be removed, allowing normal GC to occur if needed
+	for _, dependent := range dependents {
+		gc.addFinalizer(logger, dependent, OrphanProtectionFinalizer)
+	}
+
+	// Ensure that even if an error occurs, the finalizer is cleaned up
+	defer func() {
+		for _, dependent := range dependents {
+			gc.removeFinalizer(logger, dependent, OrphanProtectionFinalizer)
+		}
+	}()
+
 	errCh := make(chan error, len(dependents))
 	wg := sync.WaitGroup{}
 	wg.Add(len(dependents))
@@ -699,6 +731,7 @@ func (gc *GarbageCollector) orphanDependents(logger klog.Logger, owner objectRef
 	if len(errorsSlice) != 0 {
 		return fmt.Errorf("failed to orphan dependents of owner %s, got errors: %s", owner, utilerrors.NewAggregate(errorsSlice).Error())
 	}
+
 	logger.V(5).Info("successfully updated all dependents", "owner", owner)
 	return nil
 }

@@ -82,6 +82,50 @@ func (gc *GarbageCollector) patchObject(item objectReference, patch []byte, pt t
 	return gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.Namespace)).Patch(context.TODO(), item.Name, pt, patch, metav1.PatchOptions{})
 }
 
+func (gc *GarbageCollector) addFinalizer(logger klog.Logger, owner *node, finalizer string) error {
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		ownerObject, err := gc.getObject(owner.identity)
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("cannot finalize owner %s, because cannot get it: %v. The garbage collector will retry later", owner.identity, err)
+		}
+		accessor, err := meta.Accessor(ownerObject)
+		if err != nil {
+			return fmt.Errorf("cannot access the owner object %v: %v. The garbage collector will retry later", ownerObject, err)
+		}
+		finalizers := accessor.GetFinalizers()
+
+		// Check if finalizer already exists
+		for _, f := range finalizers {
+			if f == finalizer {
+				logger.V(5).Info("finalizer already added to object", "finalizer", finalizer, "object", owner.identity)
+				return nil
+			}
+		}
+
+		// Add the finalizer
+		newFinalizers := append(finalizers, finalizer)
+
+		patch, err := json.Marshal(&objectForFinalizersPatch{
+			ObjectMetaForFinalizersPatch: ObjectMetaForFinalizersPatch{
+				ResourceVersion: accessor.GetResourceVersion(),
+				Finalizers:      newFinalizers,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("unable to finalize %s due to an error serializing patch: %v", owner.identity, err)
+		}
+		_, err = gc.patchObject(owner.identity, patch, types.MergePatchType)
+		return err
+	})
+	if errors.IsConflict(err) {
+		return fmt.Errorf("updateMaxRetries(%d) has reached. The garbage collector will retry later for owner %v", retry.DefaultBackoff.Steps, owner.identity)
+	}
+	return err
+}
+
 func (gc *GarbageCollector) removeFinalizer(logger klog.Logger, owner *node, targetFinalizer string) error {
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		ownerObject, err := gc.getObject(owner.identity)
