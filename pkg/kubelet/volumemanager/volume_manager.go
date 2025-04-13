@@ -284,6 +284,7 @@ type volumeManager struct {
 }
 
 func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesReady) {
+	logger := klog.FromContext(ctx)
 	defer runtime.HandleCrash()
 
 	if vm.kubeClient != nil {
@@ -292,15 +293,15 @@ func (vm *volumeManager) Run(ctx context.Context, sourcesReady config.SourcesRea
 	}
 
 	go vm.desiredStateOfWorldPopulator.Run(ctx, sourcesReady)
-	klog.V(2).InfoS("The desired_state_of_world populator starts")
+	logger.V(2).Info("The desired_state_of_world populator starts")
 
-	klog.InfoS("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(ctx.Done())
+	logger.Info("Starting Kubelet Volume Manager")
+	go vm.reconciler.Run(logger, ctx.Done())
 
 	metrics.Register(vm.actualStateOfWorld, vm.desiredStateOfWorld, vm.volumePluginMgr)
 
 	<-ctx.Done()
-	klog.InfoS("Shutting down Kubelet Volume Manager")
+	logger.Info("Shutting down Kubelet Volume Manager")
 }
 
 func (vm *volumeManager) GetMountedVolumesForPod(podName types.UniquePodName) container.VolumeMap {
@@ -391,6 +392,7 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 }
 
 func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
+	logger := klog.FromContext(ctx)
 	if pod == nil {
 		return nil
 	}
@@ -401,7 +403,7 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 		return nil
 	}
 
-	klog.V(3).InfoS("Waiting for volumes to attach and mount for pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("Waiting for volumes to attach and mount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
 	// Some pods expect to have Setup called over and over again to update.
@@ -437,16 +439,17 @@ func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod)
 			err)
 	}
 
-	klog.V(3).InfoS("All volumes are attached and mounted for pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("All volumes are attached and mounted for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
 func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error {
+	logger := klog.FromContext(ctx)
 	if pod == nil {
 		return nil
 	}
 
-	klog.V(3).InfoS("Waiting for volumes to unmount for pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("Waiting for volumes to unmount for pod", "pod", klog.KObj(pod))
 	uniquePodName := util.GetUniquePodName(pod)
 
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
@@ -474,7 +477,7 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 			err)
 	}
 
-	klog.V(3).InfoS("All volumes are unmounted for pod", "pod", klog.KObj(pod))
+	logger.V(3).Info("All volumes are unmounted for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
