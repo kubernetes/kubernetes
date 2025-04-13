@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -75,73 +74,52 @@ func runInputEvents(tCtx *testContext, events []any) {
 func applyEventPair(tCtx *testContext, event any) {
 	switch pair := event.(type) {
 	case [2]*resourceapi.ResourceSlice:
-		slice := pair[0]
-		if pair[1] != nil {
-			slice = pair[1]
-		}
-		require.NotNil(tCtx, slice)
-
-		oldObj, exists, err := tCtx.resourceSlices.GetIndexer().Get(slice)
-		require.NoError(tCtx, err)
-		if pair[1] == nil {
-			require.True(tCtx, exists, "device taint rule that was never created cannot be deleted")
-			err = tCtx.resourceSlices.GetIndexer().Delete(oldObj)
+		store := tCtx.resourceSlices.GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			err := store.Update(pair[1])
 			require.NoError(tCtx, err)
-			tCtx.resourceSliceDelete(tCtx.Context)(oldObj)
-		} else {
-			err = tCtx.resourceSlices.GetIndexer().Add(slice)
+			tCtx.resourceSliceUpdate(tCtx.Context)(pair[0], pair[1])
+		case pair[0] != nil:
+			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			if !exists {
-				tCtx.resourceSliceAdd(tCtx.Context)(slice)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, slice) {
-				tCtx.resourceSliceUpdate(tCtx.Context)(oldObj, slice)
-			}
+			tCtx.resourceSliceDelete(tCtx.Context)(pair[0])
+		default:
+			err := store.Add(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.resourceSliceAdd(tCtx.Context)(pair[1])
 		}
 	case [2]*resourcealphaapi.DeviceTaintRule:
-		taint := pair[0]
-		if pair[1] != nil {
-			taint = pair[1]
-		}
-		require.NotNil(tCtx, taint)
-
-		oldObj, exists, err := tCtx.deviceTaints.GetIndexer().Get(taint)
-		require.NoError(tCtx, err)
-		if pair[1] == nil {
-			require.True(tCtx, exists, "device taint rule that was never created cannot be deleted")
-			err = tCtx.deviceTaints.GetIndexer().Delete(oldObj)
+		store := tCtx.deviceTaints.GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			err := store.Update(pair[1])
 			require.NoError(tCtx, err)
-			tCtx.deviceTaintDelete(tCtx.Context)(oldObj)
-		} else {
-			err = tCtx.deviceTaints.GetIndexer().Add(taint)
+			tCtx.deviceTaintUpdate(tCtx.Context)(pair[0], pair[1])
+		case pair[0] != nil:
+			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			if !exists {
-				tCtx.deviceTaintAdd(tCtx.Context)(taint)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, taint) {
-				tCtx.deviceTaintUpdate(tCtx.Context)(oldObj, taint)
-			}
+			tCtx.deviceTaintDelete(tCtx.Context)(pair[0])
+		default:
+			err := store.Add(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.deviceTaintAdd(tCtx.Context)(pair[1])
 		}
 	case [2]*resourceapi.DeviceClass:
-		class := pair[0]
-		if pair[1] != nil {
-			class = pair[1]
-		}
-		require.NotNil(tCtx, class)
-
-		oldObj, exists, err := tCtx.deviceClasses.GetIndexer().Get(class)
-		require.NoError(tCtx, err)
-		if pair[1] == nil {
-			require.True(tCtx, exists, "device class that was never created cannot be deleted")
-			err = tCtx.deviceClasses.GetIndexer().Delete(oldObj)
+		store := tCtx.deviceClasses.GetStore()
+		switch {
+		case pair[0] != nil && pair[1] != nil:
+			err := store.Update(pair[1])
 			require.NoError(tCtx, err)
-			tCtx.deviceClassDelete(tCtx.Context)(oldObj)
-		} else {
-			err = tCtx.deviceClasses.GetIndexer().Add(class)
+			tCtx.deviceClassUpdate(tCtx.Context)(pair[0], pair[1])
+		case pair[0] != nil:
+			err := store.Delete(pair[0])
 			require.NoError(tCtx, err)
-			if !exists {
-				tCtx.deviceClassAdd(tCtx.Context)(class)
-			} else if !apiequality.Semantic.DeepEqual(oldObj, class) {
-				tCtx.deviceClassUpdate(tCtx.Context)(oldObj, class)
-			}
+			tCtx.deviceClassDelete(tCtx.Context)(pair[0])
+		default:
+			err := store.Add(pair[1])
+			require.NoError(tCtx, err)
+			tCtx.deviceClassAdd(tCtx.Context)(pair[1])
 		}
 	}
 }
