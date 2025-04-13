@@ -511,7 +511,7 @@ func isSpecialSymbol(ch byte) bool {
 }
 
 // Lexer represents the Lexer struct for label selector.
-// It contains necessary informationt to tokenize the input string
+// It contains necessary information to tokenize the input string
 type Lexer struct {
 	// s stores the string to be tokenized
 	s string
@@ -598,7 +598,7 @@ func (l *Lexer) skipWhiteSpaces(ch byte) byte {
 }
 
 // Lex returns a pair of Token and the literal
-// literal is meaningfull only for IdentifierToken token
+// literal is meaningful only for IdentifierToken token
 func (l *Lexer) Lex() (tok Token, lit string) {
 	switch ch := l.skipWhiteSpaces(l.read()); {
 	case ch == 0:
