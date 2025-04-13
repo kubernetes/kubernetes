@@ -333,7 +333,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		//
 		// Alternatively, it can also contain a list of such pairs.
 		// Those will be applied in the order in which they appear
-		// in each event entry.
+		// in each event entry, but not necessarily in consecutive
+		// order. Other events may be placed in between as long as
+		// the order in those nested lists is preserved.
 		events                []any
 		expectedPatchedSlices []*resourceapi.ResourceSlice
 		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
@@ -821,6 +823,28 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				return
 			}
 
+			// flatten does one level of flattening of events. It also returns
+			// another slice of pairs of indices representing ranges which were
+			// flattened.
+			flatten := func(events []any) ([]any, [][2]int) {
+				var ret []any
+				var ranges [][2]int
+				for _, e := range events {
+					switch e := e.(type) {
+					case []any:
+						ranges = append(ranges, [2]int{len(ret), len(ret) + len(e)})
+						ret = append(ret, e...)
+					default:
+						ret = append(ret, e)
+					}
+				}
+				return ret, ranges
+			}
+
+			var constraints [][2]int
+			tc.events, constraints = flatten(tc.events)
+			numEvents = len(tc.events)
+
 			permutation := make([]int, numEvents)
 			var permutate func(depth int)
 			permutate = func(depth int) {
@@ -841,10 +865,21 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					})
 					return
 				}
+			nexti:
 				for i := range numEvents {
 					if slices.Contains(permutation[0:depth], i) {
 						// Already taken.
 						continue
+					}
+					for _, constraint := range constraints {
+						if i < constraint[0] || i > constraint[1] {
+							continue
+						}
+						for j := i + 1; j < constraint[1]; j++ {
+							if slices.Contains(permutation[0:depth], j) {
+								continue nexti
+							}
+						}
 					}
 					// Pick it for the current position in permutation,
 					// continue with next position.
