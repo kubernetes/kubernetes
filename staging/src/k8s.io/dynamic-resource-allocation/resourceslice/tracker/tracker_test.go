@@ -19,8 +19,10 @@ package tracker
 import (
 	stdcmp "cmp"
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -67,7 +69,14 @@ func update[T any](oldObj, newObj *T) [2]*T {
 
 func runInputEvents(tCtx *testContext, events []any) {
 	for _, event := range events {
-		applyEventPair(tCtx, event)
+		switch event := event.(type) {
+		case []any:
+			for _, event := range event {
+				applyEventPair(tCtx, event)
+			}
+		default:
+			applyEventPair(tCtx, event)
+		}
 	}
 }
 
@@ -128,6 +137,7 @@ type testContext struct {
 	*testing.T
 	context.Context
 	*Tracker
+	*fake.Clientset
 }
 
 var (
@@ -313,13 +323,24 @@ var (
 )
 
 func TestListPatchedResourceSlices(t *testing.T) {
-	tests := map[string]struct {
+	type test struct {
+		// events contains pairs of old and new objects which will
+		// be passed to event handler methods.
+		// Objects can be slices, device taint rules, and device
+		// classes.
+		// [add], [remove], and [update] can be used to produce
+		// such pairs.
+		//
+		// Alternatively, it can also contain a list of such pairs.
+		// Those will be applied in the order in which they appear
+		// in each event entry.
 		events                []any
 		expectedPatchedSlices []*resourceapi.ResourceSlice
 		expectHandlerEvents   func(t *testing.T, events []handlerEvent)
 		expectEvents          func(t *assert.CollectT, events *v1.EventList)
 		expectUnhandledErrors func(t *testing.T, errs []error)
-	}{
+	}
+	tests := map[string]test{
 		"add-slices-no-patches": {
 			events: []any{
 				add(slice1),
@@ -342,11 +363,15 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"update-slices-no-patches": {
 			events: []any{
-				add(slice1NoDevices),
-				add(slice2NoDevices),
+				[]any{
+					add(slice1NoDevices),
+					update(slice1NoDevices, slice1),
+				},
+				[]any{
+					add(slice2NoDevices),
+					update(slice2NoDevices, slice2),
+				},
 				add(unchangedSlice),
-				update(slice1NoDevices, slice1),
-				update(slice2NoDevices, slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -358,10 +383,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					t,
 					[]handlerEvent{
 						{event: handlerEventAdd, newObj: slice1NoDevices},
-						{event: handlerEventAdd, newObj: slice2NoDevices},
-						{event: handlerEventAdd, newObj: unchangedSlice},
 						{event: handlerEventUpdate, oldObj: slice1NoDevices, newObj: slice1},
+						{event: handlerEventAdd, newObj: slice2NoDevices},
 						{event: handlerEventUpdate, oldObj: slice2NoDevices, newObj: slice2},
+						{event: handlerEventAdd, newObj: unchangedSlice},
 					},
 					events,
 				)
@@ -369,11 +394,9 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"delete-slices": {
 			events: []any{
-				add(slice1),
-				add(slice2),
+				[]any{add(slice1), remove(slice1)},
+				[]any{add(slice2), remove(slice2)},
 				add(unchangedSlice),
-				remove(slice1),
-				remove(slice2),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				unchangedSlice,
@@ -383,10 +406,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 					t,
 					[]handlerEvent{
 						{event: handlerEventAdd, newObj: slice1},
-						{event: handlerEventAdd, newObj: slice2},
-						{event: handlerEventAdd, newObj: unchangedSlice},
 						{event: handlerEventDelete, oldObj: slice1},
+						{event: handlerEventAdd, newObj: slice2},
 						{event: handlerEventDelete, oldObj: slice2},
+						{event: handlerEventAdd, newObj: unchangedSlice},
 					},
 					events,
 				)
@@ -413,10 +436,12 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"update-patch": {
 			events: []any{
-				add(taintPool1DevicesRule),
+				[]any{
+					add(taintPool1DevicesRule),
+					update(taintPool1DevicesRule, taintPool2DevicesRule),
+				},
 				add(slice1),
 				add(slice2),
-				update(taintPool1DevicesRule, taintPool2DevicesRule),
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				slice1,
@@ -426,19 +451,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 				assert.Equal(
 					t,
 					[]handlerEvent{
-						{event: handlerEventAdd, newObj: slice1Tainted},
-						{event: handlerEventAdd, newObj: slice2},
+						{event: handlerEventAdd, newObj: slice1},
+						{event: handlerEventAdd, newObj: slice2Tainted},
 					},
-					events[:2],
-				)
-				// The remaining events may come in any order
-				assert.ElementsMatch(
-					t,
-					[]handlerEvent{
-						{event: handlerEventUpdate, oldObj: slice1Tainted, newObj: slice1},
-						{event: handlerEventUpdate, oldObj: slice2, newObj: slice2Tainted},
-					},
-					events[2:],
+					events,
 				)
 			},
 		},
@@ -589,8 +605,10 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 		"invalid-CEL-expression-throws-error": {
 			events: []any{
-				add(taintNoDevicesInvalidCELRule),
-				add(slice1),
+				[]any{
+					add(taintNoDevicesInvalidCELRule),
+					add(slice1),
+				},
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{},
 			expectUnhandledErrors: func(t *testing.T, errs []error) {
@@ -664,10 +682,14 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		"update-patched-slice": {
 			events: []any{
 				add(taintDevice1Rule),
-				add(slice1),
-				update(slice1, sliceWithDevices(slice1, threeDevices)),
-				add(sliceWithDevices(slice2, threeDevices)),
-				update(sliceWithDevices(slice2, threeDevices), sliceWithDevices(slice2, devices)),
+				[]any{
+					add(slice1),
+					update(slice1, sliceWithDevices(slice1, threeDevices)),
+				},
+				[]any{
+					add(sliceWithDevices(slice2, threeDevices)),
+					update(sliceWithDevices(slice2, threeDevices), sliceWithDevices(slice2, devices)),
+				},
 			},
 			expectedPatchedSlices: []*resourceapi.ResourceSlice{
 				sliceWithDevices(slice1, threeDevicesOneTainted),
@@ -688,93 +710,149 @@ func TestListPatchedResourceSlices(t *testing.T) {
 		},
 	}
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+	setup := func(t *testing.T) *testContext {
+		_, ctx := ktesting.NewTestContext(t)
 
-			kubeClient := fake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
+		kubeClient := fake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 10*time.Minute)
 
-			var handlerEvents []handlerEvent
-			handler := cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
-				},
-				UpdateFunc: func(oldObj, newObj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
-				},
-				DeleteFunc: func(obj interface{}) {
-					handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
-				},
-			}
+		opts := Options{
+			EnableDeviceTaints: true,
+			SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
+			TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
+			ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
+			KubeClient:         kubeClient,
+		}
+		tracker, err := newTracker(ctx, opts)
+		require.NoError(t, err)
 
-			opts := Options{
-				EnableDeviceTaints: true,
-				SliceInformer:      informerFactory.Resource().V1beta1().ResourceSlices(),
-				TaintInformer:      informerFactory.Resource().V1alpha3().DeviceTaintRules(),
-				ClassInformer:      informerFactory.Resource().V1beta1().DeviceClasses(),
-				KubeClient:         kubeClient,
-			}
-			tracker, err := newTracker(ctx, opts)
-			require.NoError(t, err)
-			var unhandledErrors []error
-			tracker.handleError = func(_ context.Context, err error, _ string, _ ...any) {
-				unhandledErrors = append(unhandledErrors, err)
-			}
-			_, _ = tracker.AddEventHandler(handler)
+		return &testContext{
+			T:         t,
+			Context:   ctx,
+			Tracker:   tracker,
+			Clientset: kubeClient,
+		}
+	}
 
-			tCtx := &testContext{
-				T:       t,
-				Context: ctx,
-				Tracker: tracker,
-			}
+	testHandlers := func(tCtx *testContext, test test, testExpectedEmittedEvents bool) {
+		var handlerEvents []handlerEvent
+		handler := cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventAdd, newObj: obj.(*resourceapi.ResourceSlice)})
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventUpdate, oldObj: oldObj.(*resourceapi.ResourceSlice), newObj: newObj.(*resourceapi.ResourceSlice)})
+			},
+			DeleteFunc: func(obj interface{}) {
+				handlerEvents = append(handlerEvents, handlerEvent{event: handlerEventDelete, oldObj: obj.(*resourceapi.ResourceSlice)})
+			},
+		}
+		_, _ = tCtx.AddEventHandler(handler)
 
-			runInputEvents(tCtx, test.events)
+		var unhandledErrors []error
+		tCtx.handleError = func(_ context.Context, err error, _ string, _ ...any) {
+			unhandledErrors = append(unhandledErrors, err)
+		}
 
+		runInputEvents(tCtx, test.events)
+
+		if testExpectedEmittedEvents {
 			expectHandlerEvents := test.expectHandlerEvents
 			if expectHandlerEvents == nil {
 				expectHandlerEvents = func(t *testing.T, events []handlerEvent) {
-					assert.Empty(t, events)
+					assert.Empty(tCtx, events)
 				}
 			}
 			expectHandlerEvents(t, handlerEvents)
+		}
 
-			expectUnhandledErrors := test.expectUnhandledErrors
-			if expectUnhandledErrors == nil {
-				expectUnhandledErrors = func(t *testing.T, errs []error) {
-					assert.Empty(t, errs)
+		expectUnhandledErrors := test.expectUnhandledErrors
+		if expectUnhandledErrors == nil {
+			expectUnhandledErrors = func(t *testing.T, errs []error) {
+				assert.Empty(t, errs)
+			}
+		}
+		expectUnhandledErrors(tCtx.T, unhandledErrors)
+
+		// Check ResourceSlices
+		patchedResourceSlices, err := tCtx.ListPatchedResourceSlices()
+		require.NoError(tCtx, err, "list patched resource slices")
+		sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
+			return stdcmp.Compare(s1.Name, s2.Name)
+		}
+		slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
+		slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
+		assert.Equal(tCtx, test.expectedPatchedSlices, patchedResourceSlices)
+		expectEvents := test.expectEvents
+		if expectEvents == nil {
+			expectEvents = func(t *assert.CollectT, events *v1.EventList) {
+				assert.Empty(t, events.Items)
+			}
+		}
+		// Events are generated asynchronously. While shutting down the event recorder will flush all
+		// pending events, it is not possible to determine when exactly that flush is complete.
+		assert.EventuallyWithT(
+			tCtx,
+			func(t *assert.CollectT) {
+				events, err := tCtx.CoreV1().Events("").List(tCtx.Context, metav1.ListOptions{})
+				require.NoError(t, err, "list events")
+				expectEvents(t, events)
+			},
+			1*time.Second,
+			10*time.Millisecond,
+			"did not observe expected events",
+		)
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			// The exact events that are emitted for a sequence of events is
+			// highly dependent on the order in which those events are received.
+			// We punt on determining a set of validation criteria for every
+			// possible sequence and only check them against the first
+			// permutation: the order in which the events are defined.
+			testExpectedEmittedEvents := true
+
+			numEvents := len(tc.events)
+			if numEvents <= 1 {
+				// No permutations.
+				tContext := setup(t)
+				testHandlers(tContext, tc, testExpectedEmittedEvents)
+				return
+			}
+
+			permutation := make([]int, numEvents)
+			var permutate func(depth int)
+			permutate = func(depth int) {
+				if depth >= numEvents {
+					// Define a sub-test which runs the current permutation of events.
+					events := make([]any, numEvents)
+					for i := range numEvents {
+						events[i] = tc.events[permutation[i]]
+					}
+					tc := tc
+					tc.events = events
+					name := strings.Trim(fmt.Sprintf("%v", permutation), "[]")
+					t.Run(name, func(t *testing.T) {
+						tContext := setup(t)
+						testHandlers(tContext, tc, testExpectedEmittedEvents)
+
+						testExpectedEmittedEvents = false
+					})
+					return
+				}
+				for i := range numEvents {
+					if slices.Contains(permutation[0:depth], i) {
+						// Already taken.
+						continue
+					}
+					// Pick it for the current position in permutation,
+					// continue with next position.
+					permutation[depth] = i
+					permutate(depth + 1)
 				}
 			}
-			expectUnhandledErrors(t, unhandledErrors)
-
-			// Check ResourceSlices
-			patchedResourceSlices, err := tracker.ListPatchedResourceSlices()
-			require.NoError(t, err, "list patched resource slices")
-			sortResourceSlicesFunc := func(s1, s2 *resourceapi.ResourceSlice) int {
-				return stdcmp.Compare(s1.Name, s2.Name)
-			}
-			slices.SortFunc(test.expectedPatchedSlices, sortResourceSlicesFunc)
-			slices.SortFunc(patchedResourceSlices, sortResourceSlicesFunc)
-			assert.Equal(t, test.expectedPatchedSlices, patchedResourceSlices)
-			expectEvents := test.expectEvents
-			if expectEvents == nil {
-				expectEvents = func(t *assert.CollectT, events *v1.EventList) {
-					assert.Empty(t, events.Items)
-				}
-			}
-			// Events are generated asynchronously. While shutting down the event recorder will flush all
-			// pending events, it is not possible to determine when exactly that flush is complete.
-			assert.EventuallyWithT(
-				t,
-				func(t *assert.CollectT) {
-					events, err := kubeClient.CoreV1().Events("").List(ctx, metav1.ListOptions{})
-					require.NoError(t, err, "list events")
-					expectEvents(t, events)
-				},
-				1*time.Second,
-				10*time.Millisecond,
-				"did not observe expected events",
-			)
+			permutate(0)
 		})
 	}
 }
