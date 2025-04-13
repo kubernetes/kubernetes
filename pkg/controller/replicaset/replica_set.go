@@ -350,6 +350,8 @@ func (rsc *ReplicaSetController) updateRS(logger klog.Logger, old, cur interface
 	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
 		logger.V(4).Info("replicaSet updated. Desired pod count change.", "replicaSet", klog.KObj(oldRS), "oldReplicas", *(oldRS.Spec.Replicas), "newReplicas", *(curRS.Spec.Replicas))
 	}
+
+	logger.V(4).Info("Updating", "replicaSet", klog.KObj(curRS))
 	rsc.enqueueRS(curRS)
 }
 
