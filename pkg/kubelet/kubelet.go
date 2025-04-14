@@ -2861,6 +2861,53 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 	}
 }
 
+func (kl *Kubelet) findPodStat(podStats []statsapi.PodStats, podName string) (*statsapi.PodStats, bool) {
+    for _, stat := range podStats {
+        if stat.PodRef.Name == podName {
+            return &stat, true
+        }
+    }
+    return nil, false
+}
+
+func (kl *Kubelet) findContainerStat(podStat *statsapi.PodStats, containerName string) (*statsapi.ContainerStats, bool) {
+    for _, cStat := range podStat.Containers {
+        if cStat.Name == containerName {
+            return &cStat, true
+        }
+    }
+    return nil, false
+}
+
+func (kl *Kubelet) getCpuUsage(pod *v1.Pod) {
+	ctx := context.Background()
+	podStats, err := kl.ListPodStats(ctx)
+	if err != nil {
+		klog.InfoS("ListPodStats error", "err", err)
+	}
+	klog.InfoS("getCpuUsage", "podStats", podStats)
+        
+    // Find Pod in podStats
+    //var podStat *statsapi.PodStats
+    podStat, podFind := kl.findPodStat(podStats, pod.Name)
+    klog.InfoS("getCpuUsage", "podStat", podStat, "podFind", podFind)
+    if podFind == false {
+        return
+    }
+
+    // Get sorted CPUs for every container in the Pod
+    for i, container := range pod.Spec.Containers {
+        // Find container in podStat
+        cStat, cFind := kl.findContainerStat(podStat, container.Name)
+        klog.InfoS("getCpuUsage", "cStat", cStat, "cFind", cFind)
+        if cFind == false || cStat.CpuInst == nil{
+            continue
+        }
+ 		pod.Spec.Containers[i].Resources.PerCpu = cStat.CpuInst.Usage.PerCpu
+ 		klog.InfoS("getCpuUsage", "pod.Spec.Containers[i].Resources.PerCpu", pod.Spec.Containers[i].Resources.PerCpu)
+ 	}
+}
+
 // canResizePod determines if the requested resize is currently feasible.
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
@@ -2881,7 +2928,7 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 			}
 		}
 	}
-
+	kl.getCpuUsage(pod)
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
 		klog.ErrorS(err, "getNodeAnyway function failed")

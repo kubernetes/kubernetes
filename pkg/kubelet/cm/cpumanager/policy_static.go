@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"strconv"
+	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -51,6 +52,11 @@ type SMTAlignmentError struct {
 	CpusPerCore           int
 	AvailablePhysicalCPUs int
 	CausedByPhysicalCPUs  bool
+}
+
+type CpuUsage struct {
+	ID    int
+	Usage uint64
 }
 
 func (e SMTAlignmentError) Error() string {
@@ -483,6 +489,12 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 					// Attempt new allocation ( reusing allocated CPUs ) according to the NUMA affinity contained in the hint
 					// Since NUMA affinity container in the hint is unmutable already allocated CPUs pass the criteria
 					if mustKeepCPUsForResize, ok := s.GetPromisedCPUSet(string(pod.UID), container.Name); ok {
+						mustKeepCPUsBasePerCpuUsage := p.GetMustKeepCPUs(container, cpuset, numCPUs)
+						if mustKeepCPUsBasePerCpuUsage != nil {
+							if mustKeepCPUsForResize.IsSubsetOf(mustKeepCPUsBasePerCpuUsage) && mustKeepCPUsBasePerCpuUsage.Size() < numCPUs {
+								mustKeepCPUsForResize = mustKeepCPUsBasePerCpuUsage
+							}
+						}
 						newallocatedcpuset, err := p.allocateCPUs(s, numCPUs, hint.NUMANodeAffinity, p.cpusToReuse[string(pod.UID)], &cpusInUseByPodContainerToResize, &mustKeepCPUsForResize)
 						if err != nil {
 							klog.ErrorS(err, "Static policy: Unable to allocate new CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "numCPUs", numCPUs)
@@ -541,6 +553,52 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 	klog.V(4).InfoS("Allocated exclusive CPUs", "pod", klog.KObj(pod), "containerName", container.Name, "cpuset", cpuAllocation.CPUs.String())
 	return nil
 }
+
+func(p *staticPolicy) GetMustKeepCPUs(container *v1.Container, oldCpuset cpuset.CPUSet, numCPUs int) *cpuset.CPUSet {
+	mustKeepCPUs := cpuset.New()
+	klog.InfoS("GetMustKeepCPUs", "container.Resources.PerCpu", container.Resources.PerCpu, "oldCpuset", oldCpuset, "numCPUs", numCPUs)
+	perCPU := container.Resources.PerCpu
+	if numCPUs <= 0 || oldCpuset.Size() == 0 || len(perCPU) == 0 {
+		 return nil
+	 }
+	
+	candidates := make([]CpuUsage, 0, oldCpuset.Size())
+	for _, cpu := range oldCpuset.UnsortedList() {
+	 //klog.InfoS("GetMustKeepCPUs", "cpu", cpu)
+		if cpu < len(perCPU) && perCPU[cpu] != 0 {
+			candidates = append(candidates, CpuUsage{
+				ID:    cpu,
+				Usage: perCPU[cpu],
+			})
+		}
+	}
+ 
+	//klog.InfoS("GetMustKeepCPUs", "candidates", candidates, "perCPU", perCPU)
+ 
+	sort.Slice(candidates, func(i, j int) bool {
+		 if candidates[i].Usage == candidates[j].Usage {
+			 return candidates[i].ID < candidates[j].ID
+		 }
+		 return candidates[i].Usage > candidates[j].Usage
+	 })
+	 //klog.InfoS("GetMustKeepCPUs", "candidates", candidates)
+ 
+	 resultCount := min(numCPUs, len(candidates))
+	 //klog.InfoS("GetMustKeepCPUs", "resultCount", resultCount)
+	 if resultCount <= 0 {
+		 return nil
+	 }
+ 
+	result := make([]int, resultCount)
+	for i := 0; i < resultCount; i++ {
+		result[i] = candidates[i].ID
+	}
+ 
+	mustKeepCPUs = cpuset.New(result...)
+ 
+	klog.InfoS("GetMustKeepCPUs", "mustKeepCPUs", mustKeepCPUs, "result", result, "resultCount", resultCount)
+	return &mustKeepCPUs
+ }
 
 // getAssignedCPUsOfSiblings returns assigned cpus of given container's siblings(all containers other than the given container) in the given pod `podUID`.
 func getAssignedCPUsOfSiblings(s state.State, podUID string, containerName string) cpuset.CPUSet {

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	//"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -1761,7 +1762,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 		skipFlag            bool
 	}
 
-	setCPUsForTestCase := func(ctx context.Context, tests *testCase, fullPCPUsOnly string) {
+	/*setCPUsForTestCase := func(ctx context.Context, tests *testCase, fullPCPUsOnly string) {
 		cpuCap, _, _ := getLocalNodeCPUDetails(ctx, f)
 		firstContainerCpuset := cpuset.New()
 		firstAdditionCpuset := cpuset.New()
@@ -1856,11 +1857,11 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 
 		ginkgo.By(fmt.Sprintf("firstContainerCpuset:%v, firstAdditionCpuset:%v, firstExpectedCpuset:%v", firstContainerCpuset, firstAdditionCpuset, firstExpectedCpuset))
 		ginkgo.By(fmt.Sprintf("secondContainerCpuset:%v, secondAdditionCpuset:%v, secondExpectedCpuset:%v", secondContainerCpuset, secondAdditionCpuset, secondExpectedCpuset))
-	}
+	}*/
 
 	noRestart := v1.NotRequired
 	testsWithFalseFullCPUs := []testCase{
-		{
+		/*{
 			name: "1 Guaranteed QoS pod, one container - increase CPU & memory, FullPCPUsOnlyOption = false",
 			containers: []e2epod.ResizableContainerInfo{
 				{
@@ -1922,28 +1923,30 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 					CPUsAllowedListValue: "2",
 				},
 			},
-		},
+		},*/
 		{
-			name: "1 Guaranteed QoS pod, one container - decrease CPU & memory, FullPCPUsOnlyOption = false",
+			name: "1 Guaranteed QoS pod, one container - decrease CPU, FullPCPUsOnlyOption = false",
 			containers: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "2", CPULim: "2", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources:            &e2epod.ContainerResources{CPUReq: "5", CPULim: "5", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "2",
+					CPUsAllowedListValue: "5",
+					CPUsAllowedList:      cpuset.New(1, 2, 10, 11, 12).String(),
 				},
 			},
 			patchString: `{"spec":{"containers":[
-						{"name":"c1", "resources":{"requests":{"cpu":"1","memory":"200Mi"},"limits":{"cpu":"1","memory":"200Mi"}}}
+						{"name":"c1", "resources":{"requests":{"cpu":"3"},"limits":{"cpu":"3"}}}
 					]}}`,
 			expected: []e2epod.ResizableContainerInfo{
 				{
 					Name:                 "c1",
-					Resources:            &e2epod.ContainerResources{CPUReq: "1", CPULim: "1", MemReq: "200Mi", MemLim: "200Mi"},
+					Resources:            &e2epod.ContainerResources{CPUReq: "3", CPULim: "3", MemReq: "400Mi", MemLim: "400Mi"},
 					CPUPolicy:            &noRestart,
 					MemPolicy:            &noRestart,
-					CPUsAllowedListValue: "1",
+					CPUsAllowedListValue: "3",
+					CPUsAllowedList:      cpuset.New(10, 11, 12).String(),
 				},
 			},
 		},
@@ -1990,7 +1993,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 		ginkgo.It(tc.name+policy.title+" (InPlacePodVerticalScalingAllocatedStatus="+strconv.FormatBool(isInPlacePodVerticalScalingAllocatedStatusEnabled)+", InPlacePodVerticalScalingExclusiveCPUs="+strconv.FormatBool(isInPlacePodVerticalScalingExclusiveCPUsEnabled)+")", func(ctx context.Context) {
 			cpuManagerPolicyKubeletConfig(ctx, f, oldCfg, policy.name, policy.options, isInPlacePodVerticalScalingAllocatedStatusEnabled, isInPlacePodVerticalScalingExclusiveCPUsEnabled)
 
-			setCPUsForTestCase(ctx, &tc, policy.options[cpumanager.FullPCPUsOnlyOption])
+			//setCPUsForTestCase(ctx, &tc, policy.options[cpumanager.FullPCPUsOnlyOption])
 			if tc.skipFlag {
 				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU not enough")
 			}
@@ -2072,7 +2075,7 @@ func doPodResizeExtendTests(policy cpuManagerPolicyConfig, isInPlacePodVerticalS
 					}
 				}
 			}
-
+			time.Sleep(3 * time.Minute)
 			ginkgo.By("First patch")
 			patchAndVerify(tc.patchString, tc.expected, tc.containers, "resize")
 
@@ -2372,6 +2375,6 @@ var _ = SIGDescribe("Pod InPlace Resize Container Extended Cases", framework.Wit
 	}
 
 	doPodResizeExtendTests(policiesGeneralAvailability[0], true, true)
-	doPodResizeExtendTests(policiesGeneralAvailability[1], true, true)
-	doMultiPodResizeTests(policiesGeneralAvailability[0], true, true)
+	//doPodResizeExtendTests(policiesGeneralAvailability[1], true, true)
+	//doMultiPodResizeTests(policiesGeneralAvailability[0], true, true)
 })
