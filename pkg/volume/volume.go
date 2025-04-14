@@ -134,6 +134,15 @@ type MounterArgs struct {
 	DesiredSize         *resource.Quantity
 	SELinuxLabel        string
 	Recorder            record.EventRecorder
+
+	// Optional interface that will be used to change the ownership of the volume, if specified.
+	// mainly used by unit tests
+	VolumeOwnershipApplicator VolumeOwnershipChanger
+}
+
+type VolumeOwnershipChanger interface {
+	AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger
+	ChangePermissions() error
 }
 
 type VolumeOwnership struct {
