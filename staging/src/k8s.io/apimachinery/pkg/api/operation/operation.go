@@ -18,6 +18,7 @@ package operation
 
 import (
 	"strings"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -45,10 +46,15 @@ type Operation struct {
 	// resource first began using the feature.
 	//
 	// Unset options are disabled/false.
-	Options sets.Set[string]
+	Options []string
 
 	// Request provides information about the request being validated.
 	Request Request
+}
+
+// HasOption returns true if the given string is in the Options slice.
+func (o Operation) HasOption(option string) bool {
+	return slices.Contains(o.Options, option)
 }
 
 // Request provides information about the request being validated.
