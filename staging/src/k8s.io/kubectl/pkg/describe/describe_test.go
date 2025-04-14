@@ -373,7 +373,19 @@ func TestDescribeSecret(t *testing.T) {
 		t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
 	}
 
-	expectedOut := "Name:         bar\nNamespace:    foo\nLabels:       <none>\nAnnotations:  <none>\n\nType:  \n\nData\n====\npassword:  16 bytes\nusername:  8 bytes\n"
+	expectedOut := `Name:         bar
+Namespace:    foo
+Labels:       <none>
+Annotations:  <none>
+
+Type:  
+
+Data
+====
+password:  16 bytes
+username:  8 bytes
+`
+
 	assert.Equal(t, expectedOut, out)
 }
 
