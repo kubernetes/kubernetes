@@ -141,8 +141,8 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
         var opts metav1.ListOptions
-        if watchActcion, ok := action.(testing.WatchActionImpl); ok {
-            opts = watchActcion.ListOptions
+        if watchAction, ok := action.(testing.WatchActionImpl); ok {
+            opts = watchAction.ListOptions
         }
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
