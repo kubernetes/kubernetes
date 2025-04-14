@@ -91,7 +91,9 @@ type Controller struct {
 	serviceCIDRLister   networkingv1listers.ServiceCIDRLister
 	serviceCIDRsSynced  cache.InformerSynced
 
-	interval time.Duration
+	interval                  time.Duration
+	reportedMismatchedCIDRs   bool
+	reportedNotReadyCondition bool
 }
 
 // Start will not return until the default ServiceCIDR exists or stopCh is closed.
@@ -138,7 +140,19 @@ func (c *Controller) sync() error {
 	serviceCIDR, err := c.serviceCIDRLister.Get(DefaultServiceCIDRName)
 	// if exists
 	if err == nil {
-		c.syncStatus(serviceCIDR)
+		// single to dual stack upgrade
+		if len(c.cidrs) == 2 && len(serviceCIDR.Spec.CIDRs) == 1 && c.cidrs[0] == serviceCIDR.Spec.CIDRs[0] {
+			klog.Infof("Updating default ServiceCIDR from single-stack (%v) to dual-stack (%v)", serviceCIDR.Spec.CIDRs, c.cidrs)
+			serviceCIDRcopy := serviceCIDR.DeepCopy()
+			serviceCIDRcopy.Spec.CIDRs = c.cidrs
+			_, err := c.client.NetworkingV1().ServiceCIDRs().Update(context.Background(), serviceCIDRcopy, metav1.UpdateOptions{})
+			if err != nil {
+				klog.Infof("The default ServiceCIDR can not be updated from %s to dual stack %v : %v", c.cidrs[0], c.cidrs, err)
+				c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRError", "The default ServiceCIDR can not be upgraded from %s to dual stack %v : %v", c.cidrs[0], c.cidrs, err)
+			}
+		} else {
+			c.syncStatus(serviceCIDR)
+		}
 		return nil
 	}
 
@@ -175,18 +189,28 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1.ServiceCIDR) {
 
 	// This controller will set the Ready condition to true if the Ready condition
 	// does not exist and the CIDR values match this controller CIDR values.
+	sameConfig := reflect.DeepEqual(c.cidrs, serviceCIDR.Spec.CIDRs)
 	for _, condition := range serviceCIDR.Status.Conditions {
 		if condition.Type == networkingapiv1.ServiceCIDRConditionReady {
 			if condition.Status == metav1.ConditionTrue {
+				// ServiceCIDR is Ready and config matches this apiserver
+				// nothing else is required
+				if sameConfig {
+					return
+				}
+			} else {
+				if !c.reportedNotReadyCondition {
+					klog.InfoS("default ServiceCIDR condition Ready is not True, please validate your cluster's network configuration for this ServiceCIDR", "status", condition.Status, "reason", condition.Reason, "message", condition.Message)
+					c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, condition.Reason, condition.Message)
+					c.reportedNotReadyCondition = true
+				}
 				return
 			}
-			klog.Infof("default ServiceCIDR condition Ready is not True: %v", condition.Status)
-			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, condition.Reason, condition.Message)
-			return
 		}
 	}
-	// set status to ready if the ServiceCIDR matches this configuration
-	if reflect.DeepEqual(c.cidrs, serviceCIDR.Spec.CIDRs) {
+	// No condition set, set status to ready if the ServiceCIDR matches this configuration
+	// otherwise, warn about it since the network configuration of the cluster is inconsistent
+	if sameConfig {
 		klog.Infof("Setting default ServiceCIDR condition Ready to True")
 		svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
 			metav1apply.Condition().
@@ -199,5 +223,9 @@ func (c *Controller) syncStatus(serviceCIDR *networkingapiv1.ServiceCIDR) {
 			klog.Infof("error updating default ServiceCIDR status: %v", errApply)
 			c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRError", "The default ServiceCIDR Status can not be set to Ready=True")
 		}
+	} else if !c.reportedMismatchedCIDRs {
+		klog.Infof("inconsistent ServiceCIDR status, global configuration: %v local configuration: %v, configure the flags to match current ServiceCIDR or manually delete the default ServiceCIDR", serviceCIDR.Spec.CIDRs, c.cidrs)
+		c.eventRecorder.Eventf(serviceCIDR, v1.EventTypeWarning, "KubernetesDefaultServiceCIDRInconsistent", "The default ServiceCIDR %v does not match the flag configurations %s", serviceCIDR.Spec.CIDRs, c.cidrs)
+		c.reportedMismatchedCIDRs = true
 	}
 }

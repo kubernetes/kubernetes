@@ -511,7 +511,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, after owned pods
   codename: '[sig-api-machinery] Garbage collector should keep the rc around until
-    all its pods are deleted if the deleteOptions says so [Conformance]'
+    all its pods are deleted if the deleteOptions says so [Serial] [Conformance]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication
@@ -528,7 +528,8 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, multiple owners
   codename: '[sig-api-machinery] Garbage collector should not delete dependents that
-    have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]'
+    have both valid owner and owner that''s waiting for dependents to be deleted [Serial]
+    [Conformance]'
   description: Create a replication controller RC1, with maximum allocatable Pods
     between 10 and 100 replicas. Create second replication controller RC2 and set
     RC2 as owner for half of those replicas. Once RC1 is created and the all Pods
@@ -549,7 +550,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan pods created by rc
-    if delete options say so [Conformance]'
+    if delete options say so [Serial] [Conformance]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller

@@ -106,8 +106,7 @@ func (serviceCIDRStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obj
 func (serviceCIDRStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newServiceCIDR := new.(*networking.ServiceCIDR)
 	oldServiceCIDR := old.(*networking.ServiceCIDR)
-	errList := validation.ValidateServiceCIDR(newServiceCIDR)
-	errList = append(errList, validation.ValidateServiceCIDRUpdate(newServiceCIDR, oldServiceCIDR)...)
+	errList := validation.ValidateServiceCIDRUpdate(newServiceCIDR, oldServiceCIDR)
 	return errList
 }
 
