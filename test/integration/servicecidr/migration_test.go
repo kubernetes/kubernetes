@@ -19,6 +19,8 @@ package servicecidr
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/controlplane/controller/defaultservicecidr"
@@ -292,4 +295,320 @@ func TestMigrateServiceCIDR(t *testing.T) {
 		t.Fatalf("waiting for the migration service cidr to be deleted: %v", err)
 	}
 
+}
+
+// TestServiceCIDRMigrationScenarios tests various migration paths for ServiceCIDRs.
+func TestServiceCIDRMigrationScenarios(t *testing.T) {
+	ipv4CIDRSmall := "10.0.0.0/29" // 6 IPs
+	ipv4CIDRBig := "10.1.0.0/16"
+	ipv6CIDRSmall := "2001:db8:1::/125" // 6 IPs
+	ipv6CIDRBig := "2001:db8:2::/112"
+
+	testCases := []struct {
+		name                          string
+		initialCIDRs                  []string
+		migratedCIDRs                 []string
+		preMigrationSvcName           string
+		postMigrationSvcName          string
+		expectedPostMigrationSvcError bool // Changing the primary IP family and retaining the old allocator
+		expectInconsistentState       bool // New Service CIDR configured by flags are not applied
+	}{
+		// --- No Change ---
+		{
+			name:                 "IPv4 -> IPv4 (no change)",
+			initialCIDRs:         []string{ipv4CIDRSmall},
+			migratedCIDRs:        []string{ipv4CIDRSmall},
+			preMigrationSvcName:  "svc-pre-v4-v4",
+			postMigrationSvcName: "svc-post-v4-v4",
+		},
+		{
+			name:                 "IPv6 -> IPv6 (no change)",
+			initialCIDRs:         []string{ipv6CIDRSmall},
+			migratedCIDRs:        []string{ipv6CIDRSmall},
+			preMigrationSvcName:  "svc-pre-v6-v6",
+			postMigrationSvcName: "svc-post-v6-v6",
+		},
+		{
+			name:                 "IPv4,IPv6 -> IPv4,IPv6 (no change)",
+			initialCIDRs:         []string{ipv4CIDRSmall, ipv6CIDRSmall},
+			migratedCIDRs:        []string{ipv4CIDRSmall, ipv6CIDRSmall},
+			preMigrationSvcName:  "svc-pre-v4v6-v4v6",
+			postMigrationSvcName: "svc-post-v4v6-v4v6",
+		},
+		{
+			name:                 "IPv6,IPv4 -> IPv6,IPv4 (no change)",
+			initialCIDRs:         []string{ipv6CIDRSmall, ipv4CIDRSmall},
+			migratedCIDRs:        []string{ipv6CIDRSmall, ipv4CIDRSmall},
+			preMigrationSvcName:  "svc-pre-v6v4-v6v4",
+			postMigrationSvcName: "svc-post-v6v4-v6v4",
+		},
+		// --- Valid Upgrades ---
+		{
+			name:                 "IPv4 -> IPv4,IPv6 (upgrade)",
+			initialCIDRs:         []string{ipv4CIDRSmall},
+			migratedCIDRs:        []string{ipv4CIDRSmall, ipv6CIDRBig},
+			preMigrationSvcName:  "svc-pre-v4-v4v6",
+			postMigrationSvcName: "svc-post-v4-v4v6",
+		},
+		{
+			name:                 "IPv6 -> IPv6,IPv4 (upgrade)",
+			initialCIDRs:         []string{ipv6CIDRSmall},
+			migratedCIDRs:        []string{ipv6CIDRSmall, ipv4CIDRBig},
+			preMigrationSvcName:  "svc-pre-v6-v6v4",
+			postMigrationSvcName: "svc-post-v6-v6v4",
+		},
+		// --- Invalid Migrations (Require manual intervention) ---
+		{
+			name:                          "IPv4,IPv6 -> IPv6,IPv4 (change primary)",
+			initialCIDRs:                  []string{ipv4CIDRSmall, ipv6CIDRSmall},
+			migratedCIDRs:                 []string{ipv6CIDRSmall, ipv4CIDRSmall},
+			preMigrationSvcName:           "svc-pre-v4v6-v6v4",
+			postMigrationSvcName:          "svc-post-v4v6-v6v4",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+		{
+			name:                          "IPv6,IPv4 -> IPv4,IPv6 (change primary)",
+			initialCIDRs:                  []string{ipv6CIDRSmall, ipv4CIDRSmall},
+			migratedCIDRs:                 []string{ipv4CIDRSmall, ipv6CIDRSmall},
+			preMigrationSvcName:           "svc-pre-v6v4-v4v6",
+			postMigrationSvcName:          "svc-post-v6v4-v4v6",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+		{
+			name:                    "IPv4,IPv6 -> IPv4 (downgrade)",
+			initialCIDRs:            []string{ipv4CIDRSmall, ipv6CIDRSmall},
+			migratedCIDRs:           []string{ipv4CIDRSmall},
+			preMigrationSvcName:     "svc-pre-v4v6-v4",
+			postMigrationSvcName:    "svc-post-v4v6-v4",
+			expectInconsistentState: true,
+		},
+		{
+			name:                          "IPv4,IPv6 -> IPv6 (downgrade)",
+			initialCIDRs:                  []string{ipv4CIDRSmall, ipv6CIDRSmall},
+			migratedCIDRs:                 []string{ipv6CIDRSmall},
+			preMigrationSvcName:           "svc-pre-v4v6-v6",
+			postMigrationSvcName:          "svc-post-v4v6-v6",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+		{
+			name:                          "IPv4 -> IPv6 (change family)",
+			initialCIDRs:                  []string{ipv4CIDRSmall},
+			migratedCIDRs:                 []string{ipv6CIDRSmall},
+			preMigrationSvcName:           "svc-pre-v4-v6",
+			postMigrationSvcName:          "svc-post-v4-v6",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+		{
+			name:                          "IPv6 -> IPv4 (change family)",
+			initialCIDRs:                  []string{ipv6CIDRSmall},
+			migratedCIDRs:                 []string{ipv4CIDRSmall},
+			preMigrationSvcName:           "svc-pre-v6-v4",
+			postMigrationSvcName:          "svc-post-v6-v4",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+		{
+			name:                          "IPv4 -> IPv6,IPv4 (upgrade, change primary)",
+			initialCIDRs:                  []string{ipv4CIDRSmall},
+			migratedCIDRs:                 []string{ipv6CIDRBig, ipv4CIDRSmall}, // Change primary during upgrade
+			preMigrationSvcName:           "svc-pre-v4-v6v4",
+			postMigrationSvcName:          "svc-post-v4-v6v4",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+		{
+			name:                          "IPv6 -> IPv4,IPv6 (upgrade, change primary)",
+			initialCIDRs:                  []string{ipv6CIDRSmall},
+			migratedCIDRs:                 []string{ipv4CIDRBig, ipv6CIDRSmall}, // Change primary during upgrade
+			preMigrationSvcName:           "svc-pre-v6-v4v6",
+			postMigrationSvcName:          "svc-post-v6-v4v6",
+			expectedPostMigrationSvcError: true,
+			expectInconsistentState:       true,
+		},
+	}
+
+	for i, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			etcdOptions := framework.SharedEtcd()
+			apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+			resyncPeriod := 12 * time.Hour
+
+			// --- Initial Setup ---
+			initialFlags := []string{
+				"--service-cluster-ip-range=" + strings.Join(tc.initialCIDRs, ","),
+				"--advertise-address=" + strings.Split(tc.initialCIDRs[0], "/")[0], // the advertise address MUST match the cluster primary ip family
+				"--disable-admission-plugins=ServiceAccount",
+				// fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
+			}
+			t.Logf("Starting API server with CIDRs: %v", tc.initialCIDRs)
+			s1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, initialFlags, etcdOptions)
+			client1, err := clientset.NewForConfig(s1.ClientConfig)
+			if err != nil {
+				s1.TearDownFn()
+				t.Fatalf("Failed to create client for initial server: %v", err)
+			}
+
+			ns := framework.CreateNamespaceOrDie(client1, fmt.Sprintf("migrate-%d", i), t)
+
+			informers1 := informers.NewSharedInformerFactory(client1, resyncPeriod)
+			controllerCtx1, cancelController1 := context.WithCancel(tCtx)
+			go servicecidrs.NewController(
+				controllerCtx1,
+				informers1.Networking().V1().ServiceCIDRs(),
+				informers1.Networking().V1().IPAddresses(),
+				client1,
+			).Run(controllerCtx1, 5)
+			informers1.Start(controllerCtx1.Done())
+			informers1.WaitForCacheSync(controllerCtx1.Done())
+
+			// Wait for default ServiceCIDR to be ready
+			if err := waitForServiceCIDRState(tCtx, client1, tc.initialCIDRs, true); err != nil {
+				s1.TearDownFn()
+				cancelController1()
+				t.Fatalf("Initial default ServiceCIDR did not become ready: %v", err)
+			}
+
+			// Create pre-migration service
+			preSvc, err := client1.CoreV1().Services(ns.Name).Create(tCtx, makeService(tc.preMigrationSvcName), metav1.CreateOptions{})
+			if err != nil {
+				s1.TearDownFn()
+				cancelController1()
+				t.Fatalf("Failed to create pre-migration service: %v", err)
+			}
+			t.Logf("Pre-migration service %s created with ClusterIPs: %v", preSvc.Name, preSvc.Spec.ClusterIPs)
+
+			// Basic verification of pre-migration service IP
+			if len(preSvc.Spec.ClusterIPs) == 0 {
+				s1.TearDownFn()
+				cancelController1()
+				t.Fatalf("Pre-migration service %s has no ClusterIPs", preSvc.Name)
+			}
+			if !cidrContainsIP(tc.initialCIDRs[0], preSvc.Spec.ClusterIPs[0]) {
+				s1.TearDownFn()
+				cancelController1()
+				t.Fatalf("Pre-migration service %s primary IP %s not in expected range %s", preSvc.Name, preSvc.Spec.ClusterIPs[0], tc.initialCIDRs[0])
+			}
+
+			// --- Migration ---
+			t.Logf("Shutting down initial API server and controller")
+			cancelController1()
+			s1.TearDownFn()
+
+			t.Logf("Starting migrated API server with CIDRs: %v", tc.migratedCIDRs)
+			migratedFlags := []string{
+				"--service-cluster-ip-range=" + strings.Join(tc.migratedCIDRs, ","),
+				"--advertise-address=" + strings.Split(tc.migratedCIDRs[0], "/")[0], // the advertise address MUST match the cluster configured primary ip family
+				"--disable-admission-plugins=ServiceAccount",
+				// fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
+			}
+			s2 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, migratedFlags, etcdOptions)
+			defer s2.TearDownFn() // Ensure cleanup even on test failure
+
+			client2, err := clientset.NewForConfig(s2.ClientConfig)
+			if err != nil {
+				t.Fatalf("Failed to create client for migrated server: %v", err)
+			}
+			defer framework.DeleteNamespaceOrDie(client2, ns, t)
+
+			informers2 := informers.NewSharedInformerFactory(client2, resyncPeriod)
+			controllerCtx2, cancelController2 := context.WithCancel(tCtx)
+			defer cancelController2() // Ensure controller context is cancelled
+			go servicecidrs.NewController(
+				controllerCtx2,
+				informers2.Networking().V1().ServiceCIDRs(),
+				informers2.Networking().V1().IPAddresses(),
+				client2,
+			).Run(controllerCtx2, 5)
+			informers2.Start(controllerCtx2.Done())
+			informers2.WaitForCacheSync(controllerCtx2.Done())
+
+			// Wait for default ServiceCIDR to reflect migrated state
+			// For inconsistent states, we expect to keep existing CIDRs.
+			expectedCIDRs := tc.migratedCIDRs
+			if tc.expectInconsistentState {
+				expectedCIDRs = tc.initialCIDRs
+			}
+			if err := waitForServiceCIDRState(tCtx, client2, expectedCIDRs, true); err != nil {
+				t.Fatalf("Migrated default ServiceCIDR did not reach expected state : %v", err)
+			}
+
+			// --- Post-Migration Verification ---
+
+			// Verify pre-migration service still exists and retains its IP(s)
+			preSvcMigrated, err := client2.CoreV1().Services(ns.Name).Get(tCtx, tc.preMigrationSvcName, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("Failed to get pre-migration service after migration: %v", err)
+			}
+			if !reflect.DeepEqual(preSvcMigrated.Spec.ClusterIPs, preSvc.Spec.ClusterIPs) {
+				t.Errorf("Pre-migration service %s ClusterIPs changed after migration. Before: %v, After: %v",
+					preSvcMigrated.Name, preSvc.Spec.ClusterIPs, preSvcMigrated.Spec.ClusterIPs)
+			}
+			// Create post-migration service
+			postSvc, err := client2.CoreV1().Services(ns.Name).Create(tCtx, makeService(tc.postMigrationSvcName), metav1.CreateOptions{})
+			if err != nil && !tc.expectedPostMigrationSvcError {
+				t.Fatalf("Failed to create post-migration service: %v", err)
+			} else if err == nil && tc.expectedPostMigrationSvcError {
+				return
+			}
+
+			t.Logf("Post-migration service %s created with ClusterIPs: %v, Families: %v", postSvc.Name, postSvc.Spec.ClusterIPs, postSvc.Spec.IPFamilies)
+			// Check if IPs are within the migrated CIDR ranges
+			if len(postSvc.Spec.ClusterIPs) > 0 && !cidrContainsIP(expectedCIDRs[0], postSvc.Spec.ClusterIPs[0]) {
+				t.Errorf("Post-migration service %s primary IP %s not in expected range %s", postSvc.Name, postSvc.Spec.ClusterIPs[0], expectedCIDRs[0])
+			}
+		})
+	}
+}
+
+// waitForServiceCIDRState waits for the named ServiceCIDR to exist, match the expected CIDRs,
+// and have the specified Ready condition status.
+func waitForServiceCIDRState(ctx context.Context, client clientset.Interface, expectedCIDRs []string, expectReady bool) error {
+	pollCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	return wait.PollUntilContextCancel(pollCtx, 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
+		cidr, err := client.NetworkingV1().ServiceCIDRs().Get(ctx, defaultservicecidr.DefaultServiceCIDRName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, fmt.Errorf("default ServiceCIDR must exist")
+			}
+			return false, nil
+		}
+
+		// Check CIDRs match
+		if !reflect.DeepEqual(cidr.Spec.CIDRs, expectedCIDRs) {
+			klog.Infof("Waiting for ServiceCIDR %s CIDRs to match %v, current: %v", defaultservicecidr.DefaultServiceCIDRName, expectedCIDRs, cidr.Spec.CIDRs)
+			return false, nil
+		}
+
+		// Check Ready condition
+		isReady := false
+		foundReadyCondition := false
+		for _, condition := range cidr.Status.Conditions {
+			if condition.Type == networkingv1.ServiceCIDRConditionReady {
+				foundReadyCondition = true
+				isReady = condition.Status == metav1.ConditionTrue
+				break
+			}
+		}
+
+		if !foundReadyCondition && expectReady {
+			klog.Infof("Waiting for ServiceCIDR %s Ready condition to be set...", defaultservicecidr.DefaultServiceCIDRName)
+			return false, nil // Ready condition not found yet
+		}
+
+		if isReady != expectReady {
+			klog.Infof("Waiting for ServiceCIDR %s Ready condition to be %v, current: %v", defaultservicecidr.DefaultServiceCIDRName, expectReady, isReady)
+			return false, nil // Ready condition doesn't match expectation
+		}
+
+		klog.Infof("ServiceCIDR %s reached desired state (Ready: %v, CIDRs: %v)", defaultservicecidr.DefaultServiceCIDRName, expectReady, expectedCIDRs)
+		return true, nil // All conditions met
+	})
 }
