@@ -355,7 +355,7 @@ func NewNodeLifecycleController(
 	}
 
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
-	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
+	nc.enterFullDisruptionFunc = nc.ReducedQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
