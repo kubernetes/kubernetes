@@ -89,7 +89,7 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		minMemoryRequest := minRegularContainerMemory(*pod)
 
 		// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
-		// we add the per-container share of unallocated pod memory requests (remainingReqPerContainer) 
+		// we add the per-container share of unallocated pod memory requests (remainingReqPerContainer)
 		// to the minimum memory request. This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
 		// calculation remains consistent with how we handle pod-level memory requests for regular containers.
 		// remainingReqPerContainer is 0 when pod-level resources are not set.
