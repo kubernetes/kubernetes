@@ -669,8 +669,8 @@ func errorDiffArguments(t *testing.T, name string, actual, expected []string) {
 	expectedShort := removeCommon(expected, actual)
 	actualShort := removeCommon(actual, expected)
 	t.Errorf(
-		"[%s] failed getAPIServerCommand:\nexpected:\n%v\nsaw:\n%v"+
-			"\nexpectedShort:\n%v\nsawShort:\n%v\n",
+		"[%s] failed getAPIServerCommand:\nexpected:\n%v\nsaw:\n%v\n"+
+			"expectedShort:\n%v\nsawShort:\n%v\n",
 		name, expected, actual,
 		expectedShort, actualShort)
 }

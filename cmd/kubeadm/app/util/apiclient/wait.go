@@ -246,8 +246,8 @@ func getControlPlaneComponents(podMap map[string]*v1.Pod, addressAPIServer strin
 
 // WaitForControlPlaneComponents waits for all control plane components to report "ok".
 func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiSeverAddress string) error {
-	_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Waiting for healthy control plane components."+
-		" This can take up to %v\n", w.timeout)
+	_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Waiting for healthy control plane components. "+
+		"This can take up to %v\n", w.timeout)
 
 	components, err := getControlPlaneComponents(podMap, apiSeverAddress)
 	if err != nil {
