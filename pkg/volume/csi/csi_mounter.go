@@ -281,23 +281,16 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	err = saveVolumeData(parentDir, volDataFileName, volData)
-	defer func() {
-		// Only if there was an error and volume operation was considered
-		// finished, we should remove the directory.
-		if err != nil && volumetypes.IsOperationFinishedError(err) {
-			// attempt to cleanup volume mount dir
-			if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
-				klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
-			}
-		}
-	}()
 	if err != nil {
 		errorMsg := log("mounter.SetUpAt failed to save volume info data: %v", err)
 		klog.Error(errorMsg)
-		return volumetypes.NewTransientOperationFailure(errorMsg)
+		if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
+			klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
+		}
+		return err
 	}
 
-	err = csi.NodePublishVolume(
+	csiRPCError := csi.NodePublishVolume(
 		ctx,
 		volumeHandle,
 		readOnly,
@@ -312,14 +305,14 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		nodePublishFSGroupArg,
 	)
 
-	if err != nil {
+	if csiRPCError != nil {
 		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(err) {
+		if volumetypes.IsOperationFinishedError(csiRPCError) {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 			}
 		}
-		return err
+		return csiRPCError
 	}
 
 	if !selinuxLabelMount {
