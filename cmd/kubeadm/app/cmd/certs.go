@@ -299,7 +299,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 					return err
 				}
 			}
-			fmt.Printf("\nDone renewing certificates. You must restart the kube-apiserver, kube-controller-manager, kube-scheduler and etcd, so that they can use the new certificates.\n")
+			fmt.Printf("\nDone renewing certificates.\n")
 			return nil
 		},
 		Args: cobra.NoArgs,
