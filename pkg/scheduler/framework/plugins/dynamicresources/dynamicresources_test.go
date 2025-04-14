@@ -1100,7 +1100,7 @@ func TestPlugin(t *testing.T) {
 						Obj(),
 				},
 				prebind: result{
-					status: framework.NewStatus(framework.Unschedulable, `context deadline exceeded`),
+					status: framework.NewStatus(framework.Unschedulable, `binding timeout`),
 					changes: change{
 						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
 							if claim.Name == claimName {
@@ -1285,7 +1285,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	}
 	sortObjects(wantObjects)
 	// Sometimes assert strips the diff too much, let's do it ourselves...
-	if diff := cmp.Diff(wantObjects, objects, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+	if diff := cmp.Diff(wantObjects, objects, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"), cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "BindingStartTime")); diff != "" {
 		t.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
 	}
 
@@ -1294,7 +1294,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		expectAssumedClaims = append(expectAssumedClaims, expected.assumedClaim)
 	}
 	actualAssumedClaims := tc.listAssumedClaims()
-	if diff := cmp.Diff(expectAssumedClaims, actualAssumedClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+	if diff := cmp.Diff(expectAssumedClaims, actualAssumedClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"), cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "BindingStartTime")); diff != "" {
 		t.Errorf("Assumed claims are different (- expected, + actual):\n%s", diff)
 	}
 
@@ -1303,7 +1303,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		expectInFlightClaims = append(expectInFlightClaims, expected.inFlightClaim)
 	}
 	actualInFlightClaims := tc.listInFlightClaims()
-	if diff := cmp.Diff(expectInFlightClaims, actualInFlightClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+	if diff := cmp.Diff(expectInFlightClaims, actualInFlightClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"), cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "BindingStartTime")); diff != "" {
 		t.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
 	}
 }

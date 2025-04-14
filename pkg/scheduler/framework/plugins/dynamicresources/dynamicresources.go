@@ -560,6 +560,9 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 		bound, err := pl.isClaimBound(claim)
 		// If the claim is not bound, assumed timeout and it need to clean up.
 		if err != nil || !bound {
+			if err == nil && !pl.isClaimTimeout(claim) {
+				continue
+			}
 			unavailableClaims = append(unavailableClaims, index)
 		}
 	}
@@ -841,13 +844,6 @@ func (pl *DynamicResources) PreBind(ctx context.Context, cs fwk.CycleState, pod 
 				timeout = deviceTimeout
 			}
 		}
-		for _, device := range claim.Status.Devices {
-			for _, cond := range device.Conditions {
-				if timeStartWaiting.Before(cond.LastTransitionTime.Time) {
-					timeStartWaiting = cond.LastTransitionTime.Time
-				}
-			}
-		}
 	}
 	if timeout > timeoutMax {
 		timeout = timeoutMax
@@ -941,6 +937,9 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
+		if pl.enableDeviceBindingConditions && pl.enableDeviceStatus && claim.Status.Allocation.BindingStartTime == nil {
+			claim.Status.Allocation.BindingStartTime = &metav1.Time{Time: time.Now()}
+		}
 		updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
 			if allocation != nil {
@@ -992,6 +991,29 @@ func (pl *DynamicResources) isClaimBound(claim *resourceapi.ResourceClaim) (bool
 	return true, nil
 }
 
+// isClaimTimeout checks whether a given resource claim has
+// reached the binding timeout.
+// It returns true if the binding timeout is reached.
+// It returns false if the binding timeout is not reached.
+func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) bool {
+	if !pl.enableDeviceBindingConditions && !pl.enableDeviceStatus {
+		return false
+	}
+	if claim.Status.Allocation == nil || claim.Status.Allocation.BindingStartTime == nil {
+		return false
+	}
+	// check if the binding timeout is reached
+	for _, deviceRequest := range claim.Status.Allocation.Devices.Results {
+		if deviceRequest.BindingTimeoutSeconds == nil {
+			continue
+		}
+		if claim.Status.Allocation.BindingStartTime.Add(time.Duration(ptr.Deref(deviceRequest.BindingTimeoutSeconds, 0)) * time.Second).Before(time.Now()) {
+			return true
+		}
+	}
+	return false
+}
+
 // hasDeviceBindingStatus checks the binding status of devices within the
 // given state claims.
 func (pl *DynamicResources) hasDeviceBindingStatus(state *stateData) (bool, error) {
@@ -1006,6 +1028,9 @@ func (pl *DynamicResources) hasDeviceBindingStatus(state *stateData) (bool, erro
 			return false, err
 		}
 		if !bound {
+			if pl.isClaimTimeout(claim) {
+				return false, fmt.Errorf("claim %s binding timeout", claim.Name)
+			}
 			return false, nil
 		}
 	}
