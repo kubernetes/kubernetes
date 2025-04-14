@@ -568,7 +568,7 @@ func TestExternalPerPodMetricReplicaOverflow(t *testing.T) {
 		metric: &metricInfo{
 			name:              "qps",
 			levels:            []int64{math.MaxInt64},
-			perPodTargetUsage: 1, // Set to a very small value to force replica count overflow
+			perPodTargetUsage: 1, // Set to 1 to test replica calculation when targeting a 1:1 ratio between metric value and number of pods
 			metricType:        externalPerPodMetric,
 			expectedUsage:     math.MaxInt64,
 			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
@@ -584,7 +584,7 @@ func TestExternalPerPodMetricUsageOverflow(t *testing.T) {
 		metric: &metricInfo{
 			name:              "qps",
 			levels:            []int64{math.MaxInt64},
-			perPodTargetUsage: math.MaxInt64, // Set to a very large value to force usage overflow
+			perPodTargetUsage: math.MaxInt64, // Set to a high value to test replica calculation when targeting a high value:1 ratio between metric value and number of pods
 			metricType:        externalPerPodMetric,
 			expectedUsage:     math.MaxInt64,
 			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
