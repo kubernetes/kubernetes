@@ -76,13 +76,11 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 	// for more details.
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
 		resourcehelper.IsPodLevelRequestsSet(pod) {
-		// TODO(ndixita): Refactor to use this formula in all cases, as
-		// remainingReqPerContainer will be 0 when pod-level resources are not set.
 		remainingReqPerContainer = remainingPodMemReqPerContainer(pod)
-		oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
-	} else {
-		oomScoreAdjust = 1000 - (1000*containerMemReq)/memoryCapacity
 	}
+
+	// remainingReqPerContainer is 0 when pod-level resources are not set.
+	oomScoreAdjust = 1000 - (1000 * (containerMemReq + remainingReqPerContainer) / memoryCapacity)
 
 	// adapt the sidecarContainer memoryRequest for OOM ADJ calculation
 	// calculate the oom score adjustment based on: max-memory( currentSideCarContainer , min-memory(regular containers) ) .
@@ -91,15 +89,11 @@ func GetContainerOOMScoreAdjust(pod *v1.Pod, container *v1.Container, memoryCapa
 		minMemoryRequest := minRegularContainerMemory(*pod)
 
 		// When calculating minMemoryOomScoreAdjust for sidecar containers with PodLevelResources enabled,
-		// we add the per-container share of unallocated pod memory requests to the minimum memory request.
-		// This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
-		// calculation remains consistent
-		//  with how we handle pod-level memory requests for regular containers.
-		if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) &&
-			resourcehelper.IsPodLevelRequestsSet(pod) {
-			minMemoryRequest += remainingReqPerContainer
-		}
-		minMemoryOomScoreAdjust := 1000 - (1000*minMemoryRequest)/memoryCapacity
+		// we add the per-container share of unallocated pod memory requests (remainingReqPerContainer) 
+		// to the minimum memory request. This ensures the OOM score adjustment i.e. minMemoryOomScoreAdjust
+		// calculation remains consistent with how we handle pod-level memory requests for regular containers.
+		// remainingReqPerContainer is 0 when pod-level resources are not set.
+		minMemoryOomScoreAdjust := 1000 - (1000 * (minMemoryRequest + remainingReqPerContainer) / memoryCapacity)
 		// the OOM adjustment for sidecar container will match
 		// or fall below the OOM score adjustment of regular containers in the Pod.
 		if oomScoreAdjust > minMemoryOomScoreAdjust {
