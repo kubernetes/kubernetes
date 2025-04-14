@@ -50,7 +50,7 @@ type testApplyOverride[T supportedTypes] struct {
 	name               string
 	nestedCmds         []fakeCmds[T]
 	args               []string
-	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
+	getPreferencesFunc func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error)
 	expectedFLags      []fakeFlag[T]
 	expectedErr        error
 }
@@ -59,7 +59,7 @@ type testApplyAlias[T supportedTypes] struct {
 	name               string
 	nestedCmds         []fakeCmds[T]
 	args               []string
-	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
+	getPreferencesFunc func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error)
 	expectedFLags      []fakeFlag[T]
 	expectedCmd        string
 	expectedArgs       []string
@@ -85,7 +85,7 @@ func TestApplyOverride(t *testing.T) {
 				"root",
 				"command1",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -133,7 +133,7 @@ func TestApplyOverride(t *testing.T) {
 				"command1",
 				"command2",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -187,7 +187,7 @@ func TestApplyOverride(t *testing.T) {
 				"--firstflag",
 				"explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -242,7 +242,7 @@ func TestApplyOverride(t *testing.T) {
 				"test-custom-kuberc-path",
 				"--firstflag=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				if kuberc != "test-custom-kuberc-path" {
 					return nil, fmt.Errorf("unexpected kuberc: %s", kuberc)
 				}
@@ -295,7 +295,7 @@ func TestApplyOverride(t *testing.T) {
 				"command2",
 				"--firstflag=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				if kuberc != "test-custom-kuberc-path" {
 					return nil, fmt.Errorf("unexpected kuberc: %s", kuberc)
 				}
@@ -348,7 +348,7 @@ func TestApplyOverride(t *testing.T) {
 				"--kuberc=test-custom-kuberc-path",
 				"--firstflag=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				if kuberc != "test-custom-kuberc-path" {
 					return nil, fmt.Errorf("unexpected kuberc: %s", kuberc)
 				}
@@ -401,7 +401,7 @@ func TestApplyOverride(t *testing.T) {
 				"--kuberc=test-custom-kuberc-path",
 				"--firstflag=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				if kuberc != "test-custom-kuberc-path" {
 					return nil, fmt.Errorf("unexpected kuberc: %s", kuberc)
 				}
@@ -454,7 +454,7 @@ func TestApplyOverride(t *testing.T) {
 				"--firstflag=explicit",
 				"--kuberc=test-custom-kuberc-path",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				if kuberc != "test-custom-kuberc-path" {
 					return nil, fmt.Errorf("unexpected kuberc: %s", kuberc)
 				}
@@ -506,7 +506,7 @@ func TestApplyOverride(t *testing.T) {
 				"command2",
 				"--firstflag=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -556,7 +556,7 @@ func TestApplyOverride(t *testing.T) {
 				"--firstflag",
 				"explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -607,7 +607,7 @@ func TestApplyOverride(t *testing.T) {
 				"-r",
 				"explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -657,7 +657,7 @@ func TestApplyOverride(t *testing.T) {
 				"command2",
 				"-r=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -712,7 +712,7 @@ func TestApplyOverride(t *testing.T) {
 				"explicit",
 				"--secondflag=changed",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -775,7 +775,7 @@ func TestApplyOverride(t *testing.T) {
 				"--firstflag",
 				"explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -818,7 +818,7 @@ func TestApplyOverride(t *testing.T) {
 				"root",
 				"alias",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -867,7 +867,7 @@ func TestApplyOverride(t *testing.T) {
 				"root",
 				"testalias",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -966,7 +966,7 @@ func TestApplOverrideBool(t *testing.T) {
 				"root",
 				"command1",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1010,7 +1010,7 @@ func TestApplOverrideBool(t *testing.T) {
 				"command1",
 				"--firstflag",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1055,7 +1055,7 @@ func TestApplOverrideBool(t *testing.T) {
 				"command1",
 				"-f",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1110,7 +1110,7 @@ func TestApplOverrideBool(t *testing.T) {
 				"command1",
 				"-dfv",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1205,7 +1205,7 @@ func TestApplyAliasBool(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1259,7 +1259,7 @@ func TestApplyAliasBool(t *testing.T) {
 				"getcmd",
 				"--firstflag",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1314,7 +1314,7 @@ func TestApplyAliasBool(t *testing.T) {
 				"getcmd",
 				"-f",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1379,7 +1379,7 @@ func TestApplyAliasBool(t *testing.T) {
 				"getcmd",
 				"-vfd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1516,7 +1516,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1569,7 +1569,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1623,7 +1623,7 @@ func TestApplyAlias(t *testing.T) {
 				"getcmd",
 				"arg1",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1677,7 +1677,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1738,7 +1738,7 @@ func TestApplyAlias(t *testing.T) {
 				"arg1",
 				"arg2",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1803,7 +1803,7 @@ func TestApplyAlias(t *testing.T) {
 				"explicit",
 				"arg2",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1864,7 +1864,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1921,7 +1921,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -1978,7 +1978,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2021,7 +2021,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"getcmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2065,7 +2065,7 @@ func TestApplyAlias(t *testing.T) {
 				"getcmd",
 				"--firstflag=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2120,7 +2120,7 @@ func TestApplyAlias(t *testing.T) {
 				"getcmd",
 				"-r=explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2176,7 +2176,7 @@ func TestApplyAlias(t *testing.T) {
 				"-r",
 				"explicit",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2235,7 +2235,7 @@ func TestApplyAlias(t *testing.T) {
 				"--firstflag=explicit",
 				"--secondflag=changed",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2292,7 +2292,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"aliascmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2346,7 +2346,7 @@ func TestApplyAlias(t *testing.T) {
 				"--kuberc=kuberc",
 				"aliascmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2400,7 +2400,7 @@ func TestApplyAlias(t *testing.T) {
 				"aliascmd",
 				"--kuberc=kuberc",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2466,7 +2466,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"aliascmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
@@ -2532,7 +2532,7 @@ func TestApplyAlias(t *testing.T) {
 				"root",
 				"aliascmd",
 			},
-			getPreferencesFunc: func(kuberc string, errOut io.Writer) (*config.Preference, error) {
+			getPreferencesFunc: func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 				return &config.Preference{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "Preference",
