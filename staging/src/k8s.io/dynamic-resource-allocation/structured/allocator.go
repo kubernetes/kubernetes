@@ -242,6 +242,10 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					attributeName: matchAttribute,
 				}
 				constraints[i] = m
+				/*
+			case constraint.MatchExpression != nil:
+				//construct a matchExpressionConstraint - it will need to know how many devices and the CEL expression
+				*/
 			default:
 				// Unknown constraint type!
 				return nil, fmt.Errorf("claim %s, constraint #%d: empty constraint (unsupported constraint type?)", klog.KObj(claim), i)
@@ -644,6 +648,108 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
+//comment start
+// matchExpressionConstraint evaluates the selected set of devices against the given cel expression.
+// The evaluation needs to be done once all devices have been added to the set.
+//
+// We need to track which devices are part of the set and we need to know how many devices are expected to be in the set.
+type matchExpressionConstraint struct {
+	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
+	requestNames  sets.Set[string]
+	expression    string
+
+	devices       []*draapi.Device
+	numDevices int
+}
+
+func (m *matchExpressionConstraint) add(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) bool {
+    if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+        m.logger.V(7).Info("Constraint does not apply to request", "request", requestName)
+        return true
+    }
+
+    // Add device to array
+    m.devices = append(m.devices, device)
+    m.numDevices++
+
+    // Only evaluate when we have all devices
+    if m.numDevices < m.expectedCount {
+        m.logger.V(7).Info("Collecting devices", "current", m.numDevices, "expected", m.expectedCount)
+        return true
+    }
+
+    // Convert devices to format expected by CEL
+    var deviceList []cel.Device
+    for _, dev := range m.devices {
+        var converted resourceapi.BasicDevice
+        if err := draapi.Convert_api_BasicDevice_To_v1beta1_BasicDevice(dev, &converted, nil); err != nil {
+            m.logger.Error(err, "Failed to convert device for CEL evaluation")
+            return false
+        }
+        deviceList = append(deviceList, cel.Device{
+            Driver:     deviceID.Driver.String(),
+            Attributes: converted.Attributes,
+            Capacity:   converted.Capacity,
+        })
+    }
+
+    // Get compiled expression from cache
+    expr := GetCompiler().CompileCELExpression(m.expression, cel.Options{})
+    if expr.Error != nil {
+        m.logger.Error(expr.Error, "Failed to compile expression")
+        return false
+    }
+
+    // Evaluate expression
+    matches, details, err := expr.DeviceMatches(context.Background(), cel.Device{
+        Driver:     deviceID.Driver.String(),
+        Attributes: deviceList[0].Attributes,
+        Capacity:   deviceList[0].Capacity,
+    })
+    if err != nil {
+        m.logger.Error(err, "Expression evaluation failed")
+        return false
+    }
+
+    if !matches {
+        m.logger.V(7).Info("Devices don't satisfy expression",
+            "actualCost", ptr.Deref(details.ActualCost(), 0))
+        return false
+    }
+
+    m.logger.V(7).Info("All devices satisfy expression")
+    return true
+}
+
+func (m **matchExpressionConstraint) remove(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) {
+	    if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+        return
+    }
+
+    // Find and remove the device from the array
+    for i, dev := range m.devices {
+        if dev == device {
+            // Remove device by slicing it out
+            m.devices = append(m.devices[:i], m.devices[i+1:]...)
+            m.numDevices--
+            m.logger.V(7).Info("Device removed from constraint set",
+                "device", deviceID,
+                "remainingDevices", m.numDevices)
+            break
+        }
+    }
+}
+
+func (m *matchExpressionConstraint) matches(requestName, subRequestName string) bool {
+    if subRequestName == "" {
+        return m.requestNames.Has(requestName)
+    } else {
+        fullSubRequestName := fmt.Sprintf("%s/%s", requestName, subRequestName)
+        return m.requestNames.Has(requestName) || m.requestNames.Has(fullSubRequestName)
+    }
+}
+
+//comment end
 func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
 	// Fully-qualified match?
 	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {
