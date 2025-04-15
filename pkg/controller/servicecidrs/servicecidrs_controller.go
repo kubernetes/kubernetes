@@ -302,6 +302,14 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 			// update the status to indicate why the ServiceCIDR can not be deleted,
 			// it will be reevaludated by an event on any ServiceCIDR or IPAddress related object
 			// that may remove this condition.
+			for _, condition := range cidr.Status.Conditions {
+				if condition.Type == networkingapiv1.ServiceCIDRConditionReady {
+					if condition.Status == metav1.ConditionStatus(metav1.ConditionFalse) &&
+						condition.Reason == networkingapiv1.ServiceCIDRReasonTerminating {
+						return nil
+					}
+				}
+			}
 			svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
 				metav1apply.Condition().
 					WithType(networkingapiv1.ServiceCIDRConditionReady).
@@ -332,7 +340,14 @@ func (c *Controller) sync(ctx context.Context, key string) error {
 		return err
 	}
 
-	// Set Ready condition to True.
+	// Set Ready condition to True if necessary
+	for _, condition := range cidr.Status.Conditions {
+		if condition.Type == networkingapiv1.ServiceCIDRConditionReady {
+			if condition.Status == metav1.ConditionStatus(metav1.ConditionTrue) {
+				return nil
+			}
+		}
+	}
 	svcApplyStatus := networkingapiv1apply.ServiceCIDRStatus().WithConditions(
 		metav1apply.Condition().
 			WithType(networkingapiv1.ServiceCIDRConditionReady).
