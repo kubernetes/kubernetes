@@ -53,28 +53,28 @@ func (c *client) RESTClient() rest.Interface {
 }
 
 func (c *client) DeviceClasses() cgoresource.DeviceClassInterface {
-	return newTypedClient(c,
+	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().DeviceClasses(),
 		c.clientSet.ResourceV1beta1().DeviceClasses(),
 	)
 }
 
 func (c *client) ResourceClaims(namespace string) cgoresource.ResourceClaimInterface {
-	return newTypedClient(c,
+	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().ResourceClaims(namespace),
 		c.clientSet.ResourceV1beta1().ResourceClaims(namespace),
 	)
 }
 
 func (c *client) ResourceClaimTemplates(namespace string) cgoresource.ResourceClaimTemplateInterface {
-	return newTypedClient(c,
+	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().ResourceClaimTemplates(namespace),
 		c.clientSet.ResourceV1beta1().ResourceClaimTemplates(namespace),
 	)
 }
 
 func (c *client) ResourceSlices() cgoresource.ResourceSliceInterface {
-	return newTypedClient(c,
+	return newConvertingClient(c,
 		c.clientSet.ResourceV1beta2().ResourceSlices(),
 		c.clientSet.ResourceV1beta1().ResourceSlices(),
 	)

@@ -31,6 +31,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -118,8 +119,12 @@ func BaseRequestRef(requestRef string) string {
 
 // ConfigForResult returns the configs that are applicable to device
 // allocated for the provided result.
-func ConfigForResult(deviceConfigurations []resourceapi.DeviceAllocationConfiguration, result resourceapi.DeviceRequestAllocationResult) []resourceapi.DeviceAllocationConfiguration {
-	var configs []resourceapi.DeviceAllocationConfiguration
+//
+// Called by DRA drivers and therefore uses the v1beta2 API.
+// The other methods are called by control plane components
+// which still use v1beta1.
+func ConfigForResult(deviceConfigurations []resourcev1beta2.DeviceAllocationConfiguration, result resourcev1beta2.DeviceRequestAllocationResult) []resourcev1beta2.DeviceAllocationConfiguration {
+	var configs []resourcev1beta2.DeviceAllocationConfiguration
 	for _, deviceConfiguration := range deviceConfigurations {
 		if deviceConfiguration.Opaque != nil &&
 			isMatch(deviceConfiguration.Requests, result.Request) {

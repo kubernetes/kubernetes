@@ -45,15 +45,15 @@ func init() {
 //
 // More legacy types will get added when reaching GA.
 
-func newTypedClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any](c *client, native funcs[N, NL, NAC], v1beta1 funcs[O, OL, OAC]) *typedClient[NP, N, NL, NAC, OP, O, OL, OAC] {
-	return &typedClient[NP, N, NL, NAC, OP, O, OL, OAC]{
+func newConvertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any](c *client, native funcs[N, NL, NAC], v1beta1 funcs[O, OL, OAC]) *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC] {
+	return &convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]{
 		c:       c,
 		native:  native,
 		v1beta1: v1beta1,
 	}
 }
 
-type typedClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any] struct {
+type convertingClient[NP objectPtr[N], N, NL, NAC any, OP objectPtr[O], O, OL, OAC any] struct {
 	c       *client
 	native  funcs[N, NL, NAC]
 	v1beta1 funcs[O, OL, OAC]
@@ -76,7 +76,7 @@ type funcsWithStatus[T, TL, TAC any] interface {
 	ApplyStatus(context.Context, *TAC, metav1.ApplyOptions) (*T, error)
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Create(ctx context.Context, obj *N, opts metav1.CreateOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Create(ctx context.Context, obj *N, opts metav1.CreateOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -90,7 +90,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Create(ctx context.Context
 	return apis.run()
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Update(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Update(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -104,7 +104,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Update(ctx context.Context
 	return apis.run()
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) UpdateStatus(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) UpdateStatus(ctx context.Context, obj *N, opts metav1.UpdateOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -118,7 +118,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) UpdateStatus(ctx context.C
 	return apis.run()
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -131,7 +131,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Delete(ctx context.Context
 	return err
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOpts metav1.ListOptions) error {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -144,7 +144,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) DeleteCollection(ctx conte
 	return err
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Get(ctx context.Context, name string, opts metav1.GetOptions) (*N, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Get(ctx context.Context, name string, opts metav1.GetOptions) (*N, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*N, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -158,7 +158,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Get(ctx context.Context, n
 	return apis.run()
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) List(ctx context.Context, opts metav1.ListOptions) (*NL, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) List(ctx context.Context, opts metav1.ListOptions) (*NL, error) {
 	apis := newCall(t.c, func(currentAPI int32) (*NL, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -172,7 +172,7 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) List(ctx context.Context, 
 	return apis.run()
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
 	apis := newCall(t.c, func(currentAPI int32) (watch.Interface, error) {
 		switch currentAPI {
 		case useV1beta1API:
@@ -186,15 +186,15 @@ func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Watch(ctx context.Context,
 	return apis.run()
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *N, err error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *N, err error) {
 	return nil, ErrNotImplemented
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) Apply(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) Apply(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
 	return nil, ErrNotImplemented
 }
 
-func (t *typedClient[NP, N, NL, NAC, OP, O, OL, OAC]) ApplyStatus(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
+func (t *convertingClient[NP, N, NL, NAC, OP, O, OL, OAC]) ApplyStatus(ctx context.Context, obj *NAC, opts metav1.ApplyOptions) (result *N, err error) {
 	return nil, ErrNotImplemented
 }
 
@@ -217,6 +217,9 @@ func (s *callSequence[N]) run() (N, error) {
 	var err error
 	for i := int32(0); i < numAPIs; i++ {
 		value, err = s.call(currentAPI)
+		// When encountering "not found", try with the next API version.
+		// We give up after having gone through all of them.
+		//
 		// This check has a false positive for genuine "not found" errors
 		// when accessing specific objects. The client will then try
 		// all API version until it arrives back at the original one - not

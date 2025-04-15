@@ -40,7 +40,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/client-go/discovery/cached/memory"
-	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta1"
+	resourceapiinformer "k8s.io/client-go/informers/resource/v1beta2"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -228,7 +228,7 @@ func (d *Driver) Run(nodes *Nodes, configureResources func() Resources, devicesP
 // NewGetSlices generates a function for gomega.Eventually/Consistently which
 // returns the ResourceSliceList.
 func (d *Driver) NewGetSlices() framework.GetFunc[*resourceapi.ResourceSliceList] {
-	return framework.ListObjects(d.f.ClientSet.ResourceV1beta1().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+	return framework.ListObjects(d.f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 }
 
 type MethodInstance struct {
@@ -330,11 +330,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 		}
 		for i := 0; i < maxAllocations; i++ {
 			device := resourceapi.Device{
-				Name:  fmt.Sprintf("device-%d", i),
-				Basic: &resourceapi.BasicDevice{},
+				Name: fmt.Sprintf("device-%d", i),
 			}
 			if resources.Tainted {
-				device.Basic.Taints = []resourceapi.DeviceTaint{{
+				device.Taints = []resourceapi.DeviceTaint{{
 					Key:    "example.com/taint",
 					Value:  "tainted",
 					Effect: resourceapi.DeviceTaintEffectNoSchedule,
@@ -343,10 +342,10 @@ func (d *Driver) SetUp(nodes *Nodes, resources Resources, devicesPerNode ...map[
 			slice.Spec.Devices = append(slice.Spec.Devices, device)
 		}
 
-		_, err := d.f.ClientSet.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+		_, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		ginkgo.DeferCleanup(func(ctx context.Context) {
-			framework.ExpectNoError(d.f.ClientSet.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
+			framework.ExpectNoError(d.f.ClientSet.ResourceV1beta2().ResourceSlices().Delete(ctx, slice.Name, metav1.DeleteOptions{}))
 		})
 	}
 
@@ -795,7 +794,7 @@ func (d *Driver) TearDown(ctx context.Context) {
 // tests...
 func (d *Driver) IsGone(ctx context.Context) {
 	gomega.Eventually(ctx, func(ctx context.Context) ([]resourceapi.ResourceSlice, error) {
-		slices, err := d.f.ClientSet.ResourceV1beta1().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
+		slices, err := d.f.ClientSet.ResourceV1beta2().ResourceSlices().List(ctx, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + d.Name})
 		if err != nil {
 			return nil, err
 		}
