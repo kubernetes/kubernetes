@@ -33,12 +33,9 @@ To use Kubernetes code as a library in other applications, see the [list of publ
 Use of the `k8s.io/kubernetes` module or `k8s.io/kubernetes/...` packages as libraries is not supported.
 
 ## To start developing K8s
+The [community repository] contains all the information you need to build Kubernetes from source, contribute code and documentation, and find the right contacts for various areas.
 
-The [community repository] hosts all information about
-building Kubernetes from source, how to contribute code
-and documentation, who to contact about what, etc.
-
-If you want to build Kubernetes right away there are two options:
+If you're ready to start building Kubernetes, there are two options:
 
 ##### You have a working [Go environment].
 
