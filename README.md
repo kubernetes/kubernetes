@@ -21,8 +21,7 @@ For details about who's involved and how Kubernetes plays a role,
 read the CNCF [announcement].
 
 ----
-
-## To start developing Kubernetes (K8s)
+developing
 
 
 See our documentation on [kubernetes.io].
