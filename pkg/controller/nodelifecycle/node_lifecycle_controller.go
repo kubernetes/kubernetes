@@ -1192,12 +1192,6 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 	return
 }
 
-// HealthyQPSFunc returns the default value for cluster eviction rate - we take
-// nodeNum for consistency with ReducedQPSFunc.
-func (nc *Controller) HealthyQPSFunc(nodeNum int) float32 {
-	return nc.evictionLimiterQPS
-}
-
 // ReducedQPSFunc returns the QPS for when the cluster is large make
 // evictions slower, if they're small stop evictions altogether.
 func (nc *Controller) ReducedQPSFunc(nodeNum int) float32 {
