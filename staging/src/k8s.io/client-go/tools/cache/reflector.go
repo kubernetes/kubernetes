@@ -960,7 +960,7 @@ loop:
 
 	watchDuration := clock.Since(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		return watchListBookmarkReceived, fmt.Errorf("very short watch: %s: Unexpected watch close - watch lasted less than a second and no items received", name)
+		return watchListBookmarkReceived, &VeryShortWatchError{Name: name}
 	}
 	klog.FromContext(ctx).V(4).Info("Watch close", "reflector", name, "type", expectedTypeName, "totalItems", eventCount)
 	return watchListBookmarkReceived, nil
@@ -1162,3 +1162,16 @@ type noopTicker struct{}
 func (t *noopTicker) C() <-chan time.Time { return nil }
 
 func (t *noopTicker) Stop() {}
+
+// VeryShortWatchError is returned when the watch result channel is closed
+// within one second, without having sent any events.
+type VeryShortWatchError struct {
+	// Name of the Reflector
+	Name string
+}
+
+// Error implements the error interface
+func (e *VeryShortWatchError) Error() string {
+	return fmt.Sprintf("very short watch: %s: Unexpected watch close - "+
+		"watch lasted less than a second and no items received", e.Name)
+}
