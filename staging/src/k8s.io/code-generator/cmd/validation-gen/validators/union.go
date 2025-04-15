@@ -55,7 +55,10 @@ func (unionTypeValidator) Name() string {
 func (utv unionTypeValidator) GetValidations(context Context) (Validations, error) {
 	result := Validations{}
 
-	if context.Type.Kind != types.Struct {
+	// Gengo does not treat struct definitions as aliases, which is
+	// inconsistent but unlikely to change. That means we don't REALLY need to
+	// handle it here, but let's be consistent with the rest of the code.
+	if realType(context.Type).Kind != types.Struct {
 		return result, nil
 	}
 

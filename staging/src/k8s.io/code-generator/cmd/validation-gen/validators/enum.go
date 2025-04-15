@@ -60,17 +60,19 @@ var (
 var setsNew = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 
 func (etv *enumTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	if context.Type != types.String {
+	// We don't support typdefs to pointers, but other validators use
+	// realType() for this sort of check, so let's be consistent.
+	if realType(context.Type) != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types")
 	}
 
 	var result Validations
 
-	if enum, ok := etv.enumContext.EnumType(context.Parent); ok {
+	if enum, ok := etv.enumContext.EnumType(context.Type); ok {
 		// TODO: Avoid the "local" here. This was added to to avoid errors caused when the package is an empty string.
 		//       The correct package would be the output package but is not known here. This does not show up in generated code.
 		// TODO: Append a consistent hash suffix to avoid generated name conflicts?
-		supportVarName := PrivateVar{Name: "SymbolsFor" + context.Parent.Name.Name, Package: "local"}
+		supportVarName := PrivateVar{Name: "SymbolsFor" + context.Type.Name.Name, Package: "local"}
 		supportVar := Variable(supportVarName, Function(enumTagName, DefaultFlags, setsNew, enum.ValueArgs()...).WithTypeArgs(enum.Name))
 		result.AddVariable(supportVar)
 		fn := Function(enumTagName, DefaultFlags, enumValidator, supportVarName)
