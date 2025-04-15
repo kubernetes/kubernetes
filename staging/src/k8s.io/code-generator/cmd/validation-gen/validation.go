@@ -461,13 +461,10 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 	// This should only ever hit Struct and Alias types, since that is the only
 	// opportunity to have type-attached comments to process.
 	context := validators.Context{
-		Scope: validators.ScopeType,
-		Type:  t,
-		Path:  fldPath,
-	}
-	if t.Kind == types.Alias {
-		context.Parent = t
-		context.Type = t.Underlying
+		Scope:  validators.ScopeType,
+		Type:   t,
+		Parent: nil,
+		Path:   fldPath,
 	}
 	if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
 		return nil, fmt.Errorf("%v: %w", fldPath, err)
