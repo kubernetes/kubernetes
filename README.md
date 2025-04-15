@@ -59,9 +59,8 @@ For the full story, head over to the [developer's documentation].
 
 If you need support, start with the [troubleshooting guide],
 and work your way through the process that we've outlined.
-
-That said, if you have questions, reach out to us
-[one way or another][communication].
+ion].
+That said, if you have questions, reach out to us [one way or another][communication].
 
 [announcement]: https://cncf.io/news/announcement/2015/07/new-cloud-native-computing-foundation-drive-alignment-among-container
 [Borg]: https://research.google.com/pubs/pub43438.html?authuser=1
