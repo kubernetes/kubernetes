@@ -46,9 +46,23 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
+func Validate_IntType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntType) (errs field.ErrorList) {
+	// type IntType
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type IntType")...)
+
+	return errs
+}
+
 func Validate_OtherStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
 	// type OtherStruct
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct")...)
+
+	return errs
+}
+
+func Validate_StringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) (errs field.ErrorList) {
+	// type StringType
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type StringType")...)
 
 	return errs
 }
@@ -75,6 +89,70 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringPtrField")...)
 			return
 		}(fldPath.Child("stringPtrField"), obj.StringPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.StringPtrField }))...)
+
+	// field Struct.StringTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *StringType) (errs field.ErrorList) {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringTypedefField")...)
+			errs = append(errs, Validate_StringType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("stringTypedefField"), &obj.StringTypedefField, safe.Field(oldObj, func(oldObj *Struct) *StringType { return &oldObj.StringTypedefField }))...)
+
+	// field Struct.StringTypedefPtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *StringType) (errs field.ErrorList) {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringTypedefPtrField")...)
+			errs = append(errs, Validate_StringType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("stringTypedefPtrField"), obj.StringTypedefPtrField, safe.Field(oldObj, func(oldObj *Struct) *StringType { return oldObj.StringTypedefPtrField }))...)
+
+	// field Struct.IntField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntField")...)
+			return
+		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *Struct) *int { return &oldObj.IntField }))...)
+
+	// field Struct.IntPtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntPtrField")...)
+			return
+		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *Struct) *int { return oldObj.IntPtrField }))...)
+
+	// field Struct.IntTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *IntType) (errs field.ErrorList) {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntTypedefField")...)
+			errs = append(errs, Validate_IntType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("intTypedefField"), &obj.IntTypedefField, safe.Field(oldObj, func(oldObj *Struct) *IntType { return &oldObj.IntTypedefField }))...)
+
+	// field Struct.IntTypedefPtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *IntType) (errs field.ErrorList) {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.IntTypedefPtrField")...)
+			errs = append(errs, Validate_IntType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("intTypedefPtrField"), obj.IntTypedefPtrField, safe.Field(oldObj, func(oldObj *Struct) *IntType { return oldObj.IntTypedefPtrField }))...)
 
 	// field Struct.OtherStructPtrField
 	errs = append(errs,

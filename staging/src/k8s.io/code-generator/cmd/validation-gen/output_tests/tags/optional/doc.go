@@ -35,6 +35,30 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.StringPtrField"
 	StringPtrField *string `json:"stringPtrField"`
 
+	// +k8s:optional
+	// +k8s:validateFalse="field Struct.StringTypedefField"
+	StringTypedefField StringType `json:"stringTypedefField"`
+
+	// +k8s:optional
+	// +k8s:validateFalse="field Struct.StringTypedefPtrField"
+	StringTypedefPtrField *StringType `json:"stringTypedefPtrField"`
+
+	// +k8s:optional
+	// +k8s:validateFalse="field Struct.IntField"
+	IntField int `json:"intField"`
+
+	// +k8s:optional
+	// +k8s:validateFalse="field Struct.IntPtrField"
+	IntPtrField *int `json:"intPtrField"`
+
+	// +k8s:optional
+	// +k8s:validateFalse="field Struct.IntTypedefField"
+	IntTypedefField IntType `json:"intTypedefField"`
+
+	// +k8s:optional
+	// +k8s:validateFalse="field Struct.IntTypedefPtrField"
+	IntTypedefPtrField *IntType `json:"intTypedefPtrField"`
+
 	// non-pointer struct fields cannot be optional
 
 	// +k8s:optional
@@ -49,6 +73,12 @@ type Struct struct {
 	// +k8s:validateFalse="field Struct.MapField"
 	MapField map[string]string `json:"mapField"`
 }
+
+// +k8s:validateFalse="type StringType"
+type StringType string
+
+// +k8s:validateFalse="type IntType"
+type IntType int
 
 // +k8s:validateFalse="type OtherStruct"
 type OtherStruct struct{}
