@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"k8s.io/externaljwt/apis/v1alpha1"
+	"k8s.io/externaljwt/apis/v1"
 	"k8s.io/klog/v2"
 )
 
@@ -80,7 +80,7 @@ func NewMockSigner(t *testing.T, socketPath string) *MockSigner {
 		t.Fatalf("failed to load keys for mock signer: %v", err)
 	}
 
-	v1alpha1.RegisterExternalJWTSignerServer(server, m)
+	v1.RegisterExternalJWTSignerServer(server, m)
 	if err := m.start(t); err != nil {
 		t.Fatalf("failed to start Mock Signer with error: %v", err)
 	}
@@ -109,7 +109,7 @@ func (m *MockSigner) WaitForSupportedKeysFetch() {
 	m.supportedKeysFetched.Wait()
 }
 
-func (m *MockSigner) Sign(ctx context.Context, req *v1alpha1.SignJWTRequest) (*v1alpha1.SignJWTResponse, error) {
+func (m *MockSigner) Sign(ctx context.Context, req *v1.SignJWTRequest) (*v1.SignJWTResponse, error) {
 
 	header := &struct {
 		Algorithm string `json:"alg,omitempty"`
@@ -135,24 +135,24 @@ func (m *MockSigner) Sign(ctx context.Context, req *v1alpha1.SignJWTRequest) (*v
 		return nil, fmt.Errorf("unable to sign payload: %w", err)
 	}
 
-	return &v1alpha1.SignJWTResponse{
+	return &v1.SignJWTResponse{
 		Header:    base64Header,
 		Signature: base64.RawURLEncoding.EncodeToString(signature),
 	}, nil
 }
 
-func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysRequest) (*v1alpha1.FetchKeysResponse, error) {
+func (m *MockSigner) FetchKeys(ctx context.Context, req *v1.FetchKeysRequest) (*v1.FetchKeysResponse, error) {
 	m.errorLock.RLocker().Lock()
 	defer m.errorLock.RLocker().Unlock()
 	if m.FetchError != nil {
 		return nil, m.FetchError
 	}
 
-	keys := []*v1alpha1.Key{}
+	keys := []*v1.Key{}
 
 	m.supportedKeysLock.RLock()
 	for id, k := range m.supportedKeys {
-		keys = append(keys, &v1alpha1.Key{
+		keys = append(keys, &v1.Key{
 			KeyId:                    id,
 			Key:                      k.Key,
 			ExcludeFromOidcDiscovery: k.ExcludeFromOidcDiscovery,
@@ -162,20 +162,20 @@ func (m *MockSigner) FetchKeys(ctx context.Context, req *v1alpha1.FetchKeysReque
 	m.supportedKeysLock.RUnlock()
 
 	now := time.Now()
-	return &v1alpha1.FetchKeysResponse{
+	return &v1.FetchKeysResponse{
 		RefreshHintSeconds: 5,
 		DataTimestamp:      &timestamppb.Timestamp{Seconds: now.Unix(), Nanos: int32(now.Nanosecond())},
 		Keys:               keys,
 	}, nil
 }
 
-func (m *MockSigner) Metadata(ctx context.Context, req *v1alpha1.MetadataRequest) (*v1alpha1.MetadataResponse, error) {
+func (m *MockSigner) Metadata(ctx context.Context, req *v1.MetadataRequest) (*v1.MetadataResponse, error) {
 	m.errorLock.RLocker().Lock()
 	defer m.errorLock.RLocker().Unlock()
 	if m.MetadataError != nil {
 		return nil, m.MetadataError
 	}
-	return &v1alpha1.MetadataResponse{
+	return &v1.MetadataResponse{
 		MaxTokenExpirationSeconds: m.MaxTokenExpirationSeconds,
 	}, nil
 }
@@ -251,7 +251,7 @@ func (m *MockSigner) waitForMockServerToStart() error {
 			return fmt.Errorf("failed to start Mock signer: %w", ctx.Err())
 		default:
 		}
-		if _, gRPCErr = m.FetchKeys(context.Background(), &v1alpha1.FetchKeysRequest{}); gRPCErr == nil {
+		if _, gRPCErr = m.FetchKeys(context.Background(), &v1.FetchKeysRequest{}); gRPCErr == nil {
 			break
 		}
 		time.Sleep(time.Second)
