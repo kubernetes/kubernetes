@@ -30,16 +30,28 @@ func Test(t *testing.T) {
 	}).ExpectValid()
 
 	st.Value(&Struct{
-		StringField:         "abc",
-		StringPtrField:      ptr.To("xyz"),
-		OtherStructPtrField: &OtherStruct{},
-		SliceField:          []string{"a", "b"},
-		MapField:            map[string]string{"a": "b", "c": "d"},
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		MapField:              map[string]string{"a": "b", "c": "d"},
 	}).ExpectValidateFalseByPath(map[string][]string{
-		"stringField":         {"field Struct.StringField"},
-		"stringPtrField":      {"field Struct.StringPtrField"},
-		"otherStructPtrField": {"type OtherStruct", "field Struct.OtherStructPtrField"},
-		"sliceField":          {"field Struct.SliceField"},
-		"mapField":            {"field Struct.MapField"},
+		"stringField":           {"field Struct.StringField"},
+		"stringPtrField":        {"field Struct.StringPtrField"},
+		"stringTypedefField":    {"field Struct.StringTypedefField", "type StringType"},
+		"stringTypedefPtrField": {"field Struct.StringTypedefPtrField", "type StringType"},
+		"intField":              {"field Struct.IntField"},
+		"intPtrField":           {"field Struct.IntPtrField"},
+		"intTypedefField":       {"field Struct.IntTypedefField", "type IntType"},
+		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
+		"otherStructPtrField":   {"type OtherStruct", "field Struct.OtherStructPtrField"},
+		"sliceField":            {"field Struct.SliceField"},
+		"mapField":              {"field Struct.MapField"},
 	})
 }

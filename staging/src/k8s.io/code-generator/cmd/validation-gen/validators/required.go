@@ -65,9 +65,6 @@ func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (rtv requirednessTagValidator) GetValidations(context Context, _ []string, _ string) (Validations, error) {
-	if context.Type.Kind == types.Alias {
-		panic("alias type should already have been unwrapped")
-	}
 	switch rtv.mode {
 	case requirednessRequired:
 		return rtv.doRequired(context)
