@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/utils/ptr"
 )
 
 func TestServiceAllocNewServiceCIDR(t *testing.T) {
@@ -47,7 +49,6 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 			"--service-cluster-ip-range=192.168.0.0/29",
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
-			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 	defer s.TearDownFn()
@@ -352,4 +353,233 @@ func cidrContainsIP(cidr, ip string) bool {
 	prefix := netip.MustParsePrefix(cidr)
 	address := netip.MustParseAddr(ip)
 	return prefix.Contains(address)
+}
+
+// TestValidationAdmissionPolicyServiceCIDR tests ServiceCIDR validation using ValidatingAdmissionPolicy
+func TestValidationAdmissionPolicyServiceCIDR(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	etcdOptions := framework.SharedEtcd()
+	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+	s := kubeapiservertesting.StartTestServerOrDie(t,
+		apiServerOptions,
+		[]string{
+			"--runtime-config=networking.k8s.io/v1=true",
+			"--service-cluster-ip-range=192.168.0.0/29", // Default range, not directly used by policy test logic but needed for server start
+			"--advertise-address=10.1.1.1",
+			"--disable-admission-plugins=ServiceAccount",
+			"--enable-admission-plugins=ValidatingAdmissionPolicy",
+		},
+		etcdOptions)
+	defer s.TearDownFn()
+
+	clientset, err := kubernetes.NewForConfig(s.ClientConfig)
+	if err != nil {
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
+
+	// Define the base policy structure to be used in test cases
+	basePolicySpec := admissionregistrationv1.ValidatingAdmissionPolicySpec{
+		FailurePolicy: ptr.To(admissionregistrationv1.Fail),
+		MatchConstraints: &admissionregistrationv1.MatchResources{
+			ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{
+				{
+					RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+						Operations: []admissionregistrationv1.OperationType{"CREATE", "UPDATE"},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{"networking.k8s.io"}, APIVersions: []string{"v1"}, Resources: []string{"servicecidrs"}},
+					},
+				},
+			},
+		},
+		MatchConditions: []admissionregistrationv1.MatchCondition{{
+			Name:       "exclude-default-servicecidr",
+			Expression: "object.metadata.name != 'kubernetes'",
+		}},
+		Variables: []admissionregistrationv1.Variable{{
+			Name:       "allowed",
+			Expression: "['10.96.0.0/16','2001:db8::/64']",
+		}},
+		Validations: []admissionregistrationv1.Validation{{
+			Expression: "object.spec.cidrs.all(currentCIDR, variables.allowed.exists(allowedCIDR, cidr(allowedCIDR).containsCIDR(currentCIDR)))",
+			Message:    "ServiceCIDR range must be within allowed ranges",
+		}},
+	}
+
+	denySpec := admissionregistrationv1.ValidatingAdmissionPolicySpec{
+		FailurePolicy: ptr.To(admissionregistrationv1.Fail),
+		MatchConstraints: &admissionregistrationv1.MatchResources{
+			ResourceRules: []admissionregistrationv1.NamedRuleWithOperations{
+				{
+					RuleWithOperations: admissionregistrationv1.RuleWithOperations{
+						Operations: []admissionregistrationv1.OperationType{"CREATE", "UPDATE"},
+						Rule:       admissionregistrationv1.Rule{APIGroups: []string{"networking.k8s.io"}, APIVersions: []string{"v1"}, Resources: []string{"servicecidrs"}},
+					},
+				},
+			},
+		},
+		Validations: []admissionregistrationv1.Validation{{
+			Expression: "object.metadata.name == 'kubernetes'",
+			Message:    "ServiceCIDR not allowed",
+		}},
+	}
+
+	testCases := []struct {
+		name          string
+		policy        *admissionregistrationv1.ValidatingAdmissionPolicy
+		serviceCIDR   *networkingv1.ServiceCIDR
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name: "allow valid IPv4 CIDR",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.valid-ipv4"},
+				Spec:       *basePolicySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("valid-ipv4", "10.96.10.0/24", ""),
+			expectError:   false,
+			errorContains: "",
+		},
+		{
+			name: "allow valid IPv6 CIDR",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.valid-ipv6"},
+				Spec:       *basePolicySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("valid-ipv6", "2001:db8::/112", ""),
+			expectError:   false,
+			errorContains: "",
+		},
+		{
+			name: "deny invalid IPv4 CIDR",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.invalid-ipv4"},
+				Spec:       *basePolicySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("invalid-ipv4", "172.16.0.0/24", ""),
+			expectError:   true,
+			errorContains: "ServiceCIDR range must be within allowed ranges",
+		},
+		{
+			name: "deny invalid IPv6 CIDR",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.invalid-ipv6"},
+				Spec:       *basePolicySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("invalid-ipv6", "2001:db9::/64", ""),
+			expectError:   true,
+			errorContains: "ServiceCIDR range must be within allowed ranges",
+		},
+		{
+			name: "deny invalid CIDR within valid dual-stack spec",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.dual-stack-invalid"},
+				Spec:       *basePolicySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("dual-stack-invalid", "10.96.10.0/24", "2001:db9::/64"),
+			expectError:   true,
+			errorContains: "ServiceCIDR range must be within allowed ranges",
+		},
+		{
+			name: "deny non default ipv4 Service CIDR",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.dual-stack-invalid"},
+				Spec:       *denySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("deny-ipv4", "10.96.10.0/24", ""),
+			expectError:   true,
+			errorContains: "ServiceCIDR not allowed",
+		},
+		{
+			name: "deny non default ipv6 Service CIDR",
+			policy: &admissionregistrationv1.ValidatingAdmissionPolicy{
+				ObjectMeta: metav1.ObjectMeta{Name: "servicecidrs.restrict.dual-stack-invalid"},
+				Spec:       *denySpec.DeepCopy(),
+			},
+			serviceCIDR:   makeServiceCIDR("deny-ipv4", "2001:db8::/112", ""),
+			expectError:   true,
+			errorContains: "ServiceCIDR not allowed",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc // Capture range variable
+		t.Run(tc.name, func(t *testing.T) {
+			// --- Setup ---
+			createdPolicy, err := clientset.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(ctx, tc.policy, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to create policy %s: %v", tc.policy.Name, err)
+			}
+
+			binding := &admissionregistrationv1.ValidatingAdmissionPolicyBinding{
+				ObjectMeta: metav1.ObjectMeta{Name: "vap-binding"},
+				Spec: admissionregistrationv1.ValidatingAdmissionPolicyBindingSpec{
+					PolicyName: createdPolicy.Name,
+					ValidationActions: []admissionregistrationv1.ValidationAction{
+						admissionregistrationv1.Deny,
+					},
+					MatchResources: &admissionregistrationv1.MatchResources{
+						NamespaceSelector: &metav1.LabelSelector{}, // Match cluster-scoped resources
+					},
+				},
+			}
+
+			createdBinding, err := clientset.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Create(ctx, binding, metav1.CreateOptions{})
+			if err != nil {
+				_ = clientset.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(context.Background(), createdPolicy.Name, metav1.DeleteOptions{})
+				t.Fatalf("Failed to create binding %s for policy %s: %v", binding.Name, createdPolicy.Name, err)
+			}
+
+			t.Cleanup(func() {
+				bgCtx := context.Background()
+
+				_ = clientset.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(bgCtx, createdBinding.Name, metav1.DeleteOptions{})
+
+				// Wait for binding deletion before deleting policy
+				waitErr := wait.PollUntilContextTimeout(bgCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					_, errGet := clientset.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(ctx, createdBinding.Name, metav1.GetOptions{})
+					return apierrors.IsNotFound(errGet), nil
+				})
+				if waitErr != nil {
+					t.Logf("Warning: Timed out waiting for binding %s deletion: %v", createdBinding.Name, waitErr)
+				}
+
+				_ = clientset.AdmissionregistrationV1().ValidatingAdmissionPolicies().Delete(bgCtx, createdPolicy.Name, metav1.DeleteOptions{})
+
+				// Wait for policy deletion
+				waitErr = wait.PollUntilContextTimeout(bgCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+					_, errGet := clientset.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, createdPolicy.Name, metav1.GetOptions{})
+					return apierrors.IsNotFound(errGet), nil
+				})
+				if waitErr != nil {
+					t.Logf("Warning: Timed out waiting for policy %s deletion: %v", createdPolicy.Name, waitErr)
+				}
+			})
+
+			// Wait for policy and binding to become active.
+			// A simple sleep is often sufficient in integration tests.
+			time.Sleep(2 * time.Second) // Adjust sleep duration if needed
+
+			createdSC, err := clientset.NetworkingV1().ServiceCIDRs().Create(ctx, tc.serviceCIDR, metav1.CreateOptions{})
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("Expected an error creating ServiceCIDR %v but got none", tc.serviceCIDR.Spec.CIDRs)
+				} else if tc.errorContains != "" && !strings.Contains(err.Error(), tc.errorContains) {
+					t.Errorf("Expected error creating ServiceCIDR %v to contain %q, but got: %v", tc.serviceCIDR.Spec.CIDRs, tc.errorContains, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("no error expected creating ServiceCIDR %v but got: %v", tc.serviceCIDR.Spec.CIDRs, err)
+				} else {
+					// Cleanup the successfully created ServiceCIDR
+					deleteErr := clientset.NetworkingV1().ServiceCIDRs().Delete(context.Background(), createdSC.Name, metav1.DeleteOptions{})
+					// Log deletion error but don't fail the test for cleanup issues
+					if deleteErr != nil && !apierrors.IsNotFound(deleteErr) {
+						t.Logf("Warning: Failed to cleanup ServiceCIDR %s: %v", createdSC.Name, deleteErr)
+					}
+				}
+			}
+		})
+	}
 }
