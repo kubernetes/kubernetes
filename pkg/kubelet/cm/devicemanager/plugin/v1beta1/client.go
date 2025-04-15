@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
@@ -51,6 +52,7 @@ type client struct {
 	grpc     *grpc.ClientConn
 	handler  ClientHandler
 	client   api.DevicePluginClient
+	backoff  wait.Backoff
 }
 
 // NewPluginClient returns an initialized device plugin client.
@@ -59,6 +61,13 @@ func NewPluginClient(r string, socketPath string, h ClientHandler) Client {
 		resource: r,
 		socket:   socketPath,
 		handler:  h,
+		backoff: wait.Backoff{
+			Duration: 1 * time.Second,
+			Factor:   2.0,
+			Jitter:   0.1,
+			Steps:    5,
+			Cap:      30 * time.Second,
+		},
 	}
 }
 
@@ -78,20 +87,40 @@ func (c *client) Connect() error {
 
 // Run is for running the device plugin gRPC client.
 func (c *client) Run() {
-	stream, err := c.client.ListAndWatch(context.Background(), &api.Empty{})
-	if err != nil {
-		klog.ErrorS(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
-		return
-	}
-
-	for {
-		response, err := stream.Recv()
+	var lastErr error
+	err := wait.ExponentialBackoff(c.backoff, func() (bool, error) {
+		stream, err := c.client.ListAndWatch(context.Background(), &api.Empty{})
 		if err != nil {
+			lastErr = err
 			klog.ErrorS(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
-			return
+			if err := c.Disconnect(); err != nil {
+				klog.ErrorS(err, "Failed to disconnect", "resource", c.resource)
+			}
+			if err := c.Connect(); err != nil {
+				klog.ErrorS(err, "Failed to reconnect", "resource", c.resource)
+				return false, nil
+			}
+			return false, nil
 		}
-		klog.V(2).InfoS("State pushed for device plugin", "resource", c.resource, "resourceCapacity", len(response.Devices))
-		c.handler.PluginListAndWatchReceiver(c.resource, response)
+		lastErr = nil
+
+		for {
+			response, err := stream.Recv()
+			if err != nil {
+				klog.ErrorS(err, "ListAndWatch ended unexpectedly for device plugin", "resource", c.resource)
+				return false, nil
+			}
+			klog.V(2).InfoS("State pushed for device plugin", "resource", c.resource, "resourceCapacity", len(response.Devices))
+			c.handler.PluginListAndWatchReceiver(c.resource, response)
+		}
+	})
+
+	if err != nil {
+		if err == wait.ErrWaitTimeout {
+			klog.ErrorS(lastErr, "Max retries reached, giving up", "resource", c.resource)
+		} else {
+			klog.ErrorS(err, "Unexpected error occurred", "resource", c.resource)
+		}
 	}
 }
 
