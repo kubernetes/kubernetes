@@ -71,8 +71,12 @@ type FakeRuntime struct {
 	// from container runtime.
 	BlockImagePulls      bool
 	imagePullTokenBucket chan bool
-	SwapBehavior         map[string]kubetypes.SwapBehavior
-	T                    TB
+	// imagePullErrBucket sends an error to a PullImage() call
+	// blocked by BlockImagePulls. This is used to simulate
+	// a failure in some of the parallel pull image calls.
+	imagePullErrBucket chan error
+	SwapBehavior       map[string]kubetypes.SwapBehavior
+	T                  TB
 }
 
 const FakeHost = "localhost:12345"
@@ -341,11 +345,16 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 	if f.imagePullTokenBucket == nil {
 		f.imagePullTokenBucket = make(chan bool, 1)
 	}
+	if f.imagePullErrBucket == nil {
+		f.imagePullErrBucket = make(chan error, 1)
+	}
 	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
 	f.Unlock()
 	select {
 	case <-ctx.Done():
 	case <-f.imagePullTokenBucket:
+	case pullImageErr := <-f.imagePullErrBucket:
+		return image.Image, retCreds, pullImageErr
 	}
 
 	return image.Image, retCreds, retErr
@@ -359,6 +368,17 @@ func (f *FakeRuntime) UnblockImagePulls(count int) {
 			case f.imagePullTokenBucket <- true:
 			default:
 			}
+		}
+	}
+}
+
+// SendImagePullError sends an error to a PullImage() call blocked by BlockImagePulls.
+// PullImage() immediately returns after receiving the error.
+func (f *FakeRuntime) SendImagePullError(err error) {
+	if f.imagePullErrBucket != nil {
+		select {
+		case f.imagePullErrBucket <- err:
+		default:
 		}
 	}
 }
