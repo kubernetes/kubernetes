@@ -12,11 +12,13 @@ The Kubernetes Community is active on Stack Overflow, you can post your question
 
   * Here are some tips for [about how to ask good questions](https://stackoverflow.com/help/how-to-ask).
   * Don't forget to check to see [what's on topic](https://stackoverflow.com/help/on-topic).
+Documentation
 
-### Documentation
+    User Documentation
 
-* [User Documentation](https://kubernetes.io/docs/)
-* [Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug/)
+    Troubleshooting Guide
+
+
 
 ### Real-time Chat
 
