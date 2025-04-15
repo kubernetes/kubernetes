@@ -295,9 +295,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
 	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
-	if err == nil {
-		t.Errorf("unexpected non-error")
-	}
+	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure the watcher methods are called exactly once in this exact order.
 	// TODO(karlkfi): Fix watchHandler to call Stop()
 	// assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -329,9 +327,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 		},
 	}
 	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
-	if err == nil {
-		t.Errorf("unexpected non-error")
-	}
+	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure the watcher methods are called exactly once in this exact order.
 	// TODO(karlkfi): Fix watchHandler to call Stop()
 	// assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
