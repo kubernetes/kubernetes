@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
+	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	externaljwtmetrics "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/metrics"
@@ -35,7 +35,7 @@ import (
 const fallbackRefreshDuration = 10 * time.Second
 
 type keyCache struct {
-	client externaljwtv1alpha1.ExternalJWTSignerClient
+	client externaljwtv1.ExternalJWTSignerClient
 
 	syncGroup     singleflight.Group
 	listenersLock sync.Mutex
@@ -45,7 +45,7 @@ type keyCache struct {
 }
 
 // newKeyCache constructs an implementation of KeyCache.
-func newKeyCache(client externaljwtv1alpha1.ExternalJWTSignerClient) *keyCache {
+func newKeyCache(client externaljwtv1.ExternalJWTSignerClient) *keyCache {
 	cache := &keyCache{
 		client: client,
 	}
@@ -203,7 +203,7 @@ func (p *keyCache) broadcastUpdate() {
 // GetTokenVerificationKeys returns a map of supported external keyIDs to keys
 // the keys are PKIX-serialized. It calls external-jwt-signer with a timeout of keySyncTimeoutSec.
 func (p *keyCache) getTokenVerificationKeys(ctx context.Context) (*VerificationKeys, error) {
-	req := &externaljwtv1alpha1.FetchKeysRequest{}
+	req := &externaljwtv1.FetchKeysRequest{}
 	resp, err := p.client.FetchKeys(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("while getting externally supported jwt signing keys: %w", err)
