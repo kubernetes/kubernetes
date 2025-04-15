@@ -28,39 +28,63 @@ func Test(t *testing.T) {
 	st.Value(&Struct{
 		// All zero-values.
 	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":         []string{"Required value"},
-		"stringPtrField":      []string{"Required value"},
-		"otherStructPtrField": []string{"Required value"},
-		"sliceField":          []string{"Required value"},
-		"mapField":            []string{"Required value"},
+		"stringField":           []string{"Required value"},
+		"stringPtrField":        []string{"Required value"},
+		"stringTypedefField":    []string{"Required value"},
+		"stringTypedefPtrField": []string{"Required value"},
+		"intField":              []string{"Required value"},
+		"intPtrField":           []string{"Required value"},
+		"intTypedefField":       []string{"Required value"},
+		"intTypedefPtrField":    []string{"Required value"},
+		"otherStructPtrField":   []string{"Required value"},
+		"sliceField":            []string{"Required value"},
+		"mapField":              []string{"Required value"},
 	})
 
 	st.Value(&Struct{
-		StringPtrField: ptr.To(""),          // satisfies required
-		SliceField:     []string{},          // does not satisfy required
-		MapField:       map[string]string{}, // does not satisfy required
+		StringPtrField:        ptr.To(""),             // satisfies required
+		StringTypedefPtrField: ptr.To(StringType("")), // satisfies required
+		IntPtrField:           ptr.To(0),              // satisfies required
+		IntTypedefPtrField:    ptr.To(IntType(0)),     // satisfies required
+		SliceField:            []string{},             // does not satisfy required
+		MapField:              map[string]string{},    // does not satisfy required
 	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":         []string{"Required value"},
-		"stringPtrField":      []string{"forced failure: field Struct.StringPtrField"},
-		"otherStructPtrField": []string{"Required value"},
-		"sliceField":          []string{"Required value"},
-		"mapField":            []string{"Required value"},
+		"stringField":           []string{"Required value"},
+		"stringPtrField":        []string{"field Struct.StringPtrField"},
+		"stringTypedefField":    []string{"Required value"},
+		"stringTypedefPtrField": []string{"field Struct.StringTypedefPtrField", "type StringType"},
+		"intField":              []string{"Required value"},
+		"intPtrField":           []string{"field Struct.IntPtrField"},
+		"intTypedefField":       []string{"Required value"},
+		"intTypedefPtrField":    []string{"field Struct.IntTypedefPtrField", "type IntType"},
+		"otherStructPtrField":   []string{"Required value"},
+		"sliceField":            []string{"Required value"},
+		"mapField":              []string{"Required value"},
 	})
 
 	st.Value(&Struct{
-		StringField:         "abc",
-		StringPtrField:      ptr.To("xyz"),
-		OtherStructPtrField: &OtherStruct{},
-		SliceField:          []string{"a", "b"},
-		MapField:            map[string]string{"a": "b", "c": "d"},
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		MapField:              map[string]string{"a": "b", "c": "d"},
 	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":    []string{"forced failure: field Struct.StringField"},
-		"stringPtrField": []string{"forced failure: field Struct.StringPtrField"},
-		"otherStructPtrField": []string{
-			"forced failure: type OtherStruct",
-			"forced failure: field Struct.OtherStructPtrField",
-		},
-		"sliceField": []string{"forced failure: field Struct.SliceField"},
-		"mapField":   []string{"forced failure: field Struct.MapField"},
+		"stringField":           []string{"field Struct.StringField"},
+		"stringPtrField":        []string{"field Struct.StringPtrField"},
+		"stringTypedefField":    []string{"field Struct.StringTypedefField", "type StringType"},
+		"stringTypedefPtrField": []string{"field Struct.StringTypedefPtrField", "type StringType"},
+		"intField":              []string{"field Struct.IntField"},
+		"intPtrField":           []string{"field Struct.IntPtrField"},
+		"intTypedefField":       []string{"field Struct.IntTypedefField", "type IntType"},
+		"intTypedefPtrField":    []string{"field Struct.IntTypedefPtrField", "type IntType"},
+		"otherStructPtrField":   []string{"field Struct.OtherStructPtrField", "type OtherStruct"},
+		"sliceField":            []string{"field Struct.SliceField"},
+		"mapField":              []string{"field Struct.MapField"},
 	})
 }
