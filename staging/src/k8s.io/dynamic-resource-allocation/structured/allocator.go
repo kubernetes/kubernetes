@@ -242,10 +242,21 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					attributeName: matchAttribute,
 				}
 				constraints[i] = m
-				/*
-					case constraint.MatchExpression != nil:
-						//construct a matchExpressionConstraint - it will need to know how many devices and the CEL expression
-				*/
+			case constraint.MatchExpression != nil:
+				logger := alloc.logger
+				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
+					logger = klog.LoggerWithName(logger, "matchExpressionConstraint")
+					logger = klog.LoggerWithValues(logger, "matchExpression", *constraint.MatchExpression)
+				}
+				m := &matchExpressionConstraint{
+					logger:       logger,
+					requestNames: sets.New(constraint.Requests...),
+					expression:   *constraint.MatchExpression,
+					devices:      make([]*draapi.BasicDevice, 0),
+					celCache:     alloc.celCache,
+					numDevices:   minDevicesPerClaim,
+				}
+				constraints[i] = m
 			default:
 				// Unknown constraint type!
 				return nil, fmt.Errorf("claim %s, constraint #%d: empty constraint (unsupported constraint type?)", klog.KObj(claim), i)

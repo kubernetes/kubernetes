@@ -976,7 +976,7 @@ type DeviceConstraint struct {
 	// accidentally ignore this additional, for them unknown match
 	// criteria.
 	//
-	// MatchExpression string
+	MatchExpression string
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.
