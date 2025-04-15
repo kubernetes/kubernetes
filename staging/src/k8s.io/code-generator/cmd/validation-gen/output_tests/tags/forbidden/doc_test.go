@@ -30,16 +30,28 @@ func Test(t *testing.T) {
 	}).ExpectValid()
 
 	st.Value(&Struct{
-		StringField:         "abc",
-		StringPtrField:      ptr.To("xyz"),
-		OtherStructPtrField: &OtherStruct{},
-		SliceField:          []string{"a", "b"},
-		MapField:            map[string]string{"a": "b", "c": "d"},
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		MapField:              map[string]string{"a": "b", "c": "d"},
 	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":         []string{"Forbidden"},
-		"stringPtrField":      []string{"Forbidden"},
-		"otherStructPtrField": []string{"Forbidden"},
-		"sliceField":          []string{"Forbidden"},
-		"mapField":            []string{"Forbidden"},
+		"stringField":           []string{"Forbidden"},
+		"stringPtrField":        []string{"Forbidden"},
+		"stringTypedefField":    []string{"Forbidden"},
+		"stringTypedefPtrField": []string{"Forbidden"},
+		"intField":              []string{"Forbidden"},
+		"intPtrField":           []string{"Forbidden"},
+		"intTypedefField":       []string{"Forbidden"},
+		"intTypedefPtrField":    []string{"Forbidden"},
+		"otherStructPtrField":   []string{"Forbidden"},
+		"sliceField":            []string{"Forbidden"},
+		"mapField":              []string{"Forbidden"},
 	})
 }
