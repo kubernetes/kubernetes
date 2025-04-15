@@ -29,19 +29,23 @@ import (
 	"github.com/google/go-cmp/cmp" //nolint:depguard
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	cgocore "k8s.io/client-go/kubernetes/typed/core/v1"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -75,11 +79,12 @@ const (
 // resources. A DRA driver for node-local resources typically runs this
 // controller as part of its kubelet plugin.
 type Controller struct {
-	cancel     func(cause error)
-	driverName string
-	owner      *Owner
-	kubeClient kubernetes.Interface
-	wg         sync.WaitGroup
+	cancel         func(cause error)
+	driverName     string
+	owner          *Owner
+	resourceClient cgoresource.ResourceV1beta2Interface
+	coreClient     cgocore.CoreV1Interface
+	wg             sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.
 	queue            workqueue.TypedRateLimitingInterface[string]
 	sliceStore       cache.MutationCache
@@ -230,7 +235,7 @@ type Options struct {
 	//    var droppedFields *resourceslice.DroppedFieldsError
 	//    if errors.As(err, &droppedFields) { ... do something with droppedFields ... }
 	//
-	// The default is [runtime.HandleErrorWithContext] which just logs
+	// The default is [utilruntime.HandleErrorWithContext] which just logs
 	// the problem.
 	ErrorHandler func(ctx context.Context, err error, msg string)
 }
@@ -259,12 +264,7 @@ func (err *DroppedFieldsError) DisabledFeatures() []string {
 
 	// Both slices should have the same number of devices, but better check it.
 	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
-		if err.DesiredSlice.Spec.Devices[i].Basic == nil ||
-			err.ActualSlice.Spec.Devices[i].Basic == nil {
-			// Should not happen.
-			continue
-		}
-		if len(err.DesiredSlice.Spec.Devices[i].Basic.Taints) > len(err.ActualSlice.Spec.Devices[i].Basic.Taints) {
+		if len(err.DesiredSlice.Spec.Devices[i].Taints) > len(err.ActualSlice.Spec.Devices[i].Taints) {
 			disabled = append(disabled, "DRADeviceTaints")
 			break
 		}
@@ -326,11 +326,9 @@ func roundTaintTimeAdded(resources *DriverResources) {
 	for _, pool := range resources.Pools {
 		for _, slice := range pool.Slices {
 			for _, device := range slice.Devices {
-				if device.Basic != nil {
-					for _, taint := range device.Basic.Taints {
-						if taint.TimeAdded != nil {
-							taint.TimeAdded.Time = taint.TimeAdded.Time.Round(time.Second)
-						}
+				for _, taint := range device.Taints {
+					if taint.TimeAdded != nil {
+						taint.TimeAdded.Time = taint.TimeAdded.Time.Round(time.Second)
 					}
 				}
 			}
@@ -370,7 +368,8 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 
 	c := &Controller{
 		cancel:           cancel,
-		kubeClient:       options.KubeClient,
+		resourceClient:   draclient.New(options.KubeClient),
+		coreClient:       options.KubeClient.CoreV1(),
 		driverName:       options.DriverName,
 		owner:            options.Owner.DeepCopy(),
 		queue:            options.Queue,
@@ -386,7 +385,7 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	}
 	if c.errorHandler == nil {
 		c.errorHandler = func(ctx context.Context, err error, msg string) {
-			runtime.HandleErrorWithContext(ctx, err, msg)
+			utilruntime.HandleErrorWithContext(ctx, err, msg)
 		}
 	}
 	if err := c.initInformer(ctx); err != nil {
@@ -410,7 +409,10 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
-	informer := resourceinformers.NewFilteredResourceSliceInformer(c.kubeClient, resyncPeriod, cache.Indexers{
+	tweakListOptions := func(options *metav1.ListOptions) {
+		options.FieldSelector = selector.String()
+	}
+	indexers := cache.Indexers{
 		poolNameIndex: func(obj interface{}) ([]string, error) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
@@ -418,9 +420,22 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			}
 			return []string{slice.Spec.Pool.Name}, nil
 		},
-	}, func(options *metav1.ListOptions) {
-		options.FieldSelector = selector.String()
-	})
+	}
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				tweakListOptions(&options)
+				return c.resourceClient.ResourceSlices().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				tweakListOptions(&options)
+				return c.resourceClient.ResourceSlices().Watch(ctx, options)
+			},
+		},
+		&resourceapi.ResourceSlice{},
+		resyncPeriod,
+		indexers,
+	)
 	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(logger, informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
 	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -553,7 +568,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		nodeName = c.owner.Name
 		if c.owner.UID == "" {
-			node, err := c.kubeClient.CoreV1().Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
+			node, err := c.coreClient.Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("retrieve node %q: %w", c.owner.Name, err)
 			}
@@ -654,7 +669,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// entries are the same.
 		if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
-			currentSlice.Spec.AllNodes != desiredAllNodes ||
+			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes ||
 			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
 			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
@@ -704,14 +719,14 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		//
 		// When adding new fields here, then also extend sliceStored.
 		slice.Spec.NodeSelector = pool.NodeSelector
-		slice.Spec.AllNodes = desiredAllNodes
+		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes)
 		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
 		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
 		// Preserve TimeAdded from existing device, if there is a matching device and taint.
 		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
 
 		logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
-		actualSlice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+		actualSlice, err := c.resourceClient.ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("update resource slice: %w", err)
 		}
@@ -750,9 +765,9 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 			Spec: resourceapi.ResourceSliceSpec{
 				Driver:                 c.driverName,
 				Pool:                   desiredPool,
-				NodeName:               nodeName,
+				NodeName:               refIfNotZero(nodeName),
 				NodeSelector:           pool.NodeSelector,
-				AllNodes:               desiredAllNodes,
+				AllNodes:               refIfNotZero(desiredAllNodes),
 				Devices:                pool.Slices[i].Devices,
 				SharedCounters:         pool.Slices[i].SharedCounters,
 				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
@@ -769,7 +784,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// Using a https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache
 		// avoids that.
 		logger.V(5).Info("Creating new resource slice")
-		actualSlice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+		actualSlice, err := c.resourceClient.ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("create resource slice: %w", err)
 		}
@@ -805,7 +820,7 @@ func (c *Controller) removeSlices(ctx context.Context, slices []*resourceapi.Res
 		// changes on the server. The only downside is the extra API
 		// call. This isn't as bad as extra creates.
 		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
-		err := c.kubeClient.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, options)
+		err := c.resourceClient.ResourceSlices().Delete(ctx, slice.Name, options)
 		switch {
 		case err == nil:
 			atomic.AddInt64(&c.numDeletes, 1)
@@ -859,16 +874,13 @@ func copyServerDefaults(desiredSlice, actualSlice *resourceapi.ResourceSlice) bo
 
 	// Should have the same length and entries in the same order.
 	for i := 0; i < len(desiredSlice.Spec.Devices) && i < len(actualSlice.Spec.Devices); i++ {
-		if desiredSlice.Spec.Devices[i].Basic == nil || actualSlice.Spec.Devices[i].Basic == nil {
-			continue
-		}
-		for e := 0; e < len(desiredSlice.Spec.Devices[i].Basic.Taints) && e < len(actualSlice.Spec.Devices[i].Basic.Taints); e++ {
-			if desiredSlice.Spec.Devices[i].Basic.Taints[e].TimeAdded == nil && actualSlice.Spec.Devices[i].Basic.Taints[e].TimeAdded != nil {
+		for e := 0; e < len(desiredSlice.Spec.Devices[i].Taints) && e < len(actualSlice.Spec.Devices[i].Taints); e++ {
+			if desiredSlice.Spec.Devices[i].Taints[e].TimeAdded == nil && actualSlice.Spec.Devices[i].Taints[e].TimeAdded != nil {
 				if !copied {
 					desiredSlice.Spec = *desiredSlice.Spec.DeepCopy()
 					copied = true
 				}
-				desiredSlice.Spec.Devices[i].Basic.Taints[e].TimeAdded = actualSlice.Spec.Devices[i].Basic.Taints[e].TimeAdded
+				desiredSlice.Spec.Devices[i].Taints[e].TimeAdded = actualSlice.Spec.Devices[i].Taints[e].TimeAdded
 			}
 		}
 	}
@@ -908,16 +920,13 @@ func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
 			continue
 		}
 		fromDevice := from[index]
-		if fromDevice.Basic == nil || toDevice.Basic == nil {
-			continue
-		}
-		for j, toTaint := range toDevice.Basic.Taints {
+		for j, toTaint := range toDevice.Taints {
 			if toTaint.TimeAdded != nil {
 				// Already set.
 				continue
 			}
 			// Preserve the old TimeAdded if all other fields are the same.
-			index := slices.IndexFunc(fromDevice.Basic.Taints, func(fromTaint resourceapi.DeviceTaint) bool {
+			index := slices.IndexFunc(fromDevice.Taints, func(fromTaint resourceapi.DeviceTaint) bool {
 				return toTaint.Key == fromTaint.Key &&
 					toTaint.Value == fromTaint.Value &&
 					toTaint.Effect == fromTaint.Effect
@@ -930,7 +939,7 @@ func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
 			// taints.  Just clone the entire device before we
 			// motify it, it's unlikely that we do this more than once.
 			to[i] = *toDevice.DeepCopy()
-			to[i].Basic.Taints[j].TimeAdded = fromDevice.Basic.Taints[index].TimeAdded
+			to[i].Taints[j].TimeAdded = fromDevice.Taints[index].TimeAdded
 		}
 	}
 	return to
@@ -963,4 +972,12 @@ func deviceTaintEqual(a, b resourceapi.DeviceTaint) bool {
 	return a.Key == b.Key &&
 		a.Value == b.Value &&
 		a.Effect == b.Effect
+}
+
+func refIfNotZero[T comparable](t T) *T {
+	var zero T
+	if t == zero {
+		return nil
+	}
+	return &t
 }

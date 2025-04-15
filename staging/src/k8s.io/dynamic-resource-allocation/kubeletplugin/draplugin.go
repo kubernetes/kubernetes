@@ -29,10 +29,12 @@ import (
 	"k8s.io/klog/v2"
 
 	"go.etcd.io/etcd/client/pkg/v3/fileutil"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -422,6 +424,7 @@ type Helper struct {
 	nodeName         string
 	nodeUID          types.UID
 	kubeClient       kubernetes.Interface
+	resourceClient   cgoresource.ResourceV1beta2Interface
 	serialize        bool
 	grpcMutex        sync.Mutex
 	grpcLockFilePath string
@@ -440,8 +443,9 @@ type Helper struct {
 // Stop also blocks. A logger can be stored in the context to add values or
 // a name to all log entries.
 //
-// If the plugin will be used to publish resources, [KubeClient] and [NodeName]
-// options are mandatory. Otherwise only [DriverName] is mandatory.
+// [KubeClient] and [DriverName] options are mandatory.
+// If the plugin will be used to publish resources, [NodeName]
+// is also mandatory.
 func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helper, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
@@ -462,6 +466,9 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.driverName == "" {
 		return nil, errors.New("driver name must be set")
 	}
+	if o.kubeClient == nil {
+		return nil, errors.New("Kubernetes client must be set")
+	}
 	if o.rollingUpdateUID != "" && o.pluginRegistrationEndpoint.file != "" {
 		return nil, errors.New("rolling updates and explicit registration socket filename are mutually exclusive")
 	}
@@ -477,12 +484,13 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	}
 
 	d := &Helper{
-		driverName: o.driverName,
-		nodeName:   o.nodeName,
-		nodeUID:    o.nodeUID,
-		kubeClient: o.kubeClient,
-		serialize:  o.serialize,
-		plugin:     plugin,
+		driverName:     o.driverName,
+		nodeName:       o.nodeName,
+		nodeUID:        o.nodeUID,
+		kubeClient:     o.kubeClient,
+		resourceClient: draclient.New(o.kubeClient),
+		serialize:      o.serialize,
+		plugin:         plugin,
 	}
 	if o.rollingUpdateUID != "" {
 		dir := o.pluginDataDirectoryPath
@@ -596,9 +604,6 @@ func (d *Helper) Stop() {
 //
 // The caller may modify the resources after this call returns.
 func (d *Helper) PublishResources(_ context.Context, resources resourceslice.DriverResources) error {
-	if d.kubeClient == nil {
-		return errors.New("no KubeClient found to publish resources")
-	}
 	if d.nodeName == "" {
 		return errors.New("no NodeName was set to publish resources")
 	}
@@ -745,7 +750,7 @@ func stripSubrequestNames(names []string) []string {
 func (d *nodePluginImplementation) getResourceClaims(ctx context.Context, claims []*drapb.Claim) ([]*resourceapi.ResourceClaim, error) {
 	var resourceClaims []*resourceapi.ResourceClaim
 	for _, claimReq := range claims {
-		claim, err := d.kubeClient.ResourceV1beta1().ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
+		claim, err := d.resourceClient.ResourceClaims(claimReq.Namespace).Get(ctx, claimReq.Name, metav1.GetOptions{})
 		if err != nil {
 			return resourceClaims, fmt.Errorf("retrieve claim %s/%s: %w", claimReq.Namespace, claimReq.Name, err)
 		}
