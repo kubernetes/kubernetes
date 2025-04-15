@@ -113,10 +113,9 @@ var (
 func (maxItemsTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// We don't support pointers to lists, but other validators use realType()
+	// for this sort of check, so let's be consistent.
+	t := realType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return result, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
@@ -168,6 +167,8 @@ var (
 func (minimumTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
 	if t := realType(context.Type); !types.IsInteger(t) {
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}

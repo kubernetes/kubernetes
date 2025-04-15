@@ -81,10 +81,9 @@ var (
 )
 
 func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// We don't support pointers to lists, but other validators use realType()
+	// for this sort of check, so let's be consistent.
+	t := realType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
@@ -93,18 +92,13 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 	case "atomic":
 		// Allowed but no special handling.
 	case "set":
-		t = t.Elem
 		// NOTE: lists of pointers are not supported, and that is enforced way before this point.
-		for t.Kind == types.Alias {
-			t = t.Underlying
-		}
-		switch {
-		case t.IsComparable():
+		if realType(t.Elem).IsComparable() {
 			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUnique)}}, nil
-		case !t.IsComparable():
-			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueNonComparable)}}, nil
 		}
+		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueNonComparable)}}, nil
 	case "map":
+		// NOTE: maps of pointers are not supported, and that is enforced way before this point.
 		if realType(t.Elem).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 		}
@@ -152,10 +146,9 @@ func (listMapKeyTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// We don't support pointers to lists, but other validators use realType()
+	// for this sort of check, so let's be consistent.
+	t := realType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
@@ -223,10 +216,9 @@ var (
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// We don't support pointers to lists, but other validators use realType()
+	// for this sort of check, so let's be consistent.
+	t := realType(context.Type)
 	switch t.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
@@ -356,10 +348,9 @@ var (
 )
 
 func (ektv eachKeyTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// We don't support pointers to lists, but other validators use realType()
+	// for this sort of check, so let's be consistent.
+	t := realType(context.Type)
 	if t.Kind != types.Map {
 		return Validations{}, fmt.Errorf("can only be used on map types")
 	}
