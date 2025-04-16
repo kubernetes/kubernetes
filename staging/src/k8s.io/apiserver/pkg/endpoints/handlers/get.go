@@ -189,6 +189,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			hasName = false
 		}
 		ctx = request.WithNamespace(ctx, namespace)
+		req = req.WithContext(ctx)
 
 		opts := metainternalversion.ListOptions{}
 		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
@@ -278,12 +279,8 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			klog.V(3).InfoS("Starting watch", "path", req.URL.Path, "resourceVersion", opts.ResourceVersion, "labels", opts.LabelSelector, "fields", opts.FieldSelector, "timeout", timeout)
 			ctx, cancel := context.WithTimeout(ctx, timeout)
 			defer func() { cancel() }()
-			watcher, err := rw.Watch(ctx, &opts)
-			if err != nil {
-				scope.err(err, w, req)
-				return
-			}
-			handler, err := serveWatchHandler(watcher, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), emptyVersionedList)
+			req = req.WithContext(ctx)
+			handler, err := serveWatchHandler(rw, &opts, scope, outputMediaType, req, w, timeout, metrics.CleanListScope(ctx, &opts), emptyVersionedList)
 			if err != nil {
 				scope.err(err, w, req)
 				return
@@ -296,7 +293,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				defer deferredCancel()
 				requestInfo, _ := request.RequestInfoFrom(ctx)
 				metrics.RecordLongRunning(req, requestInfo, metrics.APIServerComponent, func() {
-					defer watcher.Stop()
 					handler.ServeHTTP(w, req)
 				})
 			}
