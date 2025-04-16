@@ -1861,6 +1861,27 @@
     and 50s for the 90th percentile.
   release: v1.9
   file: test/e2e/network/service_latency.go
+- testname: IPAddress API
+  codename: '[sig-network] ServiceCIDR and IPAddress API should support IPAddress
+    API operations [Conformance]'
+  description: ' The networking.k8s.io API group MUST exist in the /apis discovery
+    document. The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. The ipaddresses resources MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. The ipaddresses resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection.'
+  release: v1.34
+  file: test/e2e/network/service_cidrs.go
+- testname: ServiceCIDR API
+  codename: '[sig-network] ServiceCIDR and IPAddress API should support ServiceCIDR
+    API operations [Conformance]'
+  description: ' The networking.k8s.io API group MUST exist in the /apis discovery
+    document. The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. The servicecidrs resources MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. The servicecidrs resource must support create, get, list,
+    watch, update, patch, delete, and deletecollection. The servicecidrs/status resource
+    must support update and patch'
+  release: v1.34
+  file: test/e2e/network/service_cidrs.go
 - testname: Service, change type, ClusterIP to ExternalName
   codename: '[sig-network] Services should be able to change the type from ClusterIP
     to ExternalName [Conformance]'
