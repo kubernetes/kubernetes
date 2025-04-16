@@ -1587,6 +1587,16 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req1, driverA, pool1, device3, false),
 			)},
 		},
+		"with-constraint-expression": {
+			claimsToAllocate: objects(claim(claim0, req0, classA, resourceapi.DeviceConstraint{
+				MatchExpression: "false",
+			})),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithOneDevice(slice1, node1, pool1, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: nil,
+		},
 		"with-class-device-config": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(classWithConfig(classA, driverA, "classAttribute")),
