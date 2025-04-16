@@ -815,7 +815,8 @@ func (r *Request) watchInternal(ctx context.Context) (watch.Interface, runtime.D
 					cancel = func() {}
 					return true, w, d, nil
 				}
-				// Cancel the request immediately
+				// Failed to create watcher, likely due to negotiation failure.
+				// Cancel the request to free up resources.
 				cancel()
 				// Handle stream error like a request error
 				err = streamErr

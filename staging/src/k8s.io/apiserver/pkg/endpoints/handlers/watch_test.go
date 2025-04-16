@@ -17,17 +17,15 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -66,8 +64,14 @@ func init() {
 func TestWatchHTTPErrors(t *testing.T) {
 	ctx := t.Context()
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	doneCh := make(chan struct{})
+	responseDoneCh := make(chan struct{})
+	go func() {
+		defer watcher.Stop()
+		<-responseDoneCh
+	}()
+
+	timeoutCtx, timeoutCancel := context.WithCancel(ctx)
+	defer timeoutCancel()
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -77,15 +81,15 @@ func TestWatchHTTPErrors(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &WatchServer{
-		Scope:    &RequestScope{},
-		Watching: watcher,
+		TimeoutContext: timeoutCtx,
+		Scope:          &RequestScope{},
+		Watcher:        watcher,
+		DoneChannel:    responseDoneCh,
 
 		MediaType:       "testcase/json",
 		Framer:          serializer.Framer,
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
 	s := httptest.NewServer(serveWatch(watchServer, nil))
@@ -134,11 +138,6 @@ func TestWatchHTTPErrors(t *testing.T) {
 	// Close the response body to signal the server to stop serving.
 	require.NoError(t, resp.Body.Close())
 
-	// Wait for the server to call the CancelFunc returned by
-	// TimeoutFactory.TimeoutCh, closing the done channel.
-	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
-	require.NoError(t, err)
-
 	// Wait for the server to call watcher.Stop, closing the result channel.
 	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
 	require.NoError(t, err)
@@ -150,29 +149,21 @@ func TestWatchHTTPErrors(t *testing.T) {
 
 func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	ctx := t.Context()
-	watcher := watch.NewFake()
+	responseDoneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
 		t.Fatal(info)
 	}
-	serializer := info.StreamSerializer
 
-	// Setup a new watchserver
+	// Setup a new watchserver.
+	// Most of the fields are unused for this test, because serveWatch exits before calling HandleHTTP.
 	watchServer := &WatchServer{
 		Scope: &RequestScope{
 			Serializer: runtime.NewSimpleNegotiatedSerializer(info),
 			Kind:       testGroupV1.WithKind("test"),
 		},
-		Watching: watcher,
-
-		MediaType:       "testcase/json",
-		Framer:          serializer.Framer,
-		Encoder:         testCodecV2,
-		EmbeddedEncoder: testCodecV2,
-
-		// TimeoutFactory should not be needed, because the server should error
-		// before calling TimeoutFactory.TimeoutCh.
+		DoneChannel: responseDoneCh,
 	}
 
 	statusErr := apierrors.NewInternalError(fmt.Errorf("we got an error"))
@@ -217,20 +208,22 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	// but it would be if this were the real watch server.
 	require.NoError(t, resp.Body.Close())
 
-	// Wait for the server to call watcher.Stop, closing the result channel.
-	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
+	// Wait for the server to close the DoneChannel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, responseDoneCh)
 	require.NoError(t, err)
-
-	// Confirm watcher.Stop was called by the server.
-	require.Truef(t, watcher.IsStopped(),
-		"Leaked watcher goroutine after request done")
 }
 
 func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 	ctx := t.Context()
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	doneCh := make(chan struct{})
+	responseDoneCh := make(chan struct{})
+	go func() {
+		defer watcher.Stop()
+		<-responseDoneCh
+	}()
+
+	timeoutCtx, timeoutCancel := context.WithCancel(ctx)
+	defer timeoutCancel()
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -240,15 +233,15 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &WatchServer{
-		Scope:    &RequestScope{},
-		Watching: watcher,
+		TimeoutContext: timeoutCtx,
+		Scope:          &RequestScope{},
+		Watcher:        watcher,
+		DoneChannel:    responseDoneCh,
 
 		MediaType:       "testcase/json",
 		Framer:          serializer.Framer,
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
 	s := httptest.NewServer(serveWatch(watchServer, nil))
@@ -265,11 +258,6 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 	// The client should automatically close the connection on error.
 
-	// Wait for the server to call the CancelFunc returned by
-	// TimeoutFactory.TimeoutCh, closing the done channel.
-	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
-	require.NoError(t, err)
-
 	// Wait for the server to call watcher.Stop, closing the result channel.
 	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
 	require.NoError(t, err)
@@ -282,8 +270,14 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 func TestWatchHTTPTimeout(t *testing.T) {
 	ctx := t.Context()
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	doneCh := make(chan struct{})
+	responseDoneCh := make(chan struct{})
+	go func() {
+		defer watcher.Stop()
+		<-responseDoneCh
+	}()
+
+	timeoutCtx, timeoutCancel := context.WithCancel(ctx)
+	defer timeoutCancel()
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -293,15 +287,15 @@ func TestWatchHTTPTimeout(t *testing.T) {
 
 	// Setup a new watchserver
 	watchServer := &WatchServer{
-		Scope:    &RequestScope{},
-		Watching: watcher,
+		TimeoutContext: timeoutCtx,
+		Scope:          &RequestScope{},
+		Watcher:        watcher,
+		DoneChannel:    responseDoneCh,
 
 		MediaType:       "testcase/json",
 		Framer:          serializer.Framer,
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
 	s := httptest.NewServer(serveWatch(watchServer, nil))
@@ -329,13 +323,10 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	err = decoder.Decode(&got)
 	require.NoError(t, err)
 
-	// Trigger server-side timeout.
-	close(timeoutCh)
-
-	// Wait for the server to call the CancelFunc returned by
-	// TimeoutFactory.TimeoutCh, closing the done channel.
-	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
-	require.NoError(t, err)
+	// Simulate server-side timeout.
+	// Technically, this sends Canceled, not DeadlineExceeded,
+	// but they're handled the same by the server.
+	timeoutCancel()
 
 	// Wait for the server to call watcher.Stop, closing the result channel.
 	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
@@ -345,9 +336,14 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	require.Truef(t, watcher.IsStopped(),
 		"Leaked watcher goroutine after request done")
 
-	// Make sure we can't receive any more events after the watch timeout
+	// Ensure the response receives EOF after server-side timeout
+	// TODO(karlkfi): Should this be DeadlineExceeded? Seems to be a race condition.
 	err = decoder.Decode(&got)
 	require.Equal(t, io.EOF, err)
+
+	// Close the response body. The server has already stopped, but the client
+	// should always close the response body when done reading the response.
+	require.NoError(t, resp.Body.Close())
 }
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event.
@@ -359,80 +355,16 @@ type watchJSON struct {
 	Object json.RawMessage `json:"object,omitempty"`
 }
 
-type fakeTimeoutFactory struct {
-	timeoutCh chan time.Time
-	done      chan struct{}
-}
-
-func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
-	return t.timeoutCh, func() bool {
-		defer close(t.done)
-		return true
-	}
-}
-
 // serveWatch will serve a watch response according to the watcher and watchServer.
 // Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
 func serveWatch(watchServer *WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		defer watchServer.Watching.Stop()
+		watchServer.RequestContext = req.Context()
 		if preServeErr != nil {
+			defer close(watchServer.DoneChannel)
 			responsewriters.ErrorNegotiated(preServeErr, watchServer.Scope.Serializer, watchServer.Scope.Kind.GroupVersion(), w, req)
 			return
 		}
 		watchServer.HandleHTTP(w, req)
 	}
-}
-
-// From https://github.com/golang/go/blob/go1.20/src/net/http/transport.go#L2779
-var errReadOnClosedResBody = errors.New("http: read on closed response body")
-
-// assertClosed fails the test if the ReadCloser is NOT already closed.
-// If not already closed, the ReadCloser will be drained and closed.
-// Defer when your test is expected to close the ReadCloser before ending.
-func assertClosed(t *testing.T, rc io.ReadCloser) {
-	assert.Equal(t, errReadOnClosedResBody, drainAndClose(rc))
-}
-
-// assertNotClosed fails the test if the ReadCloser is already closed.
-// If not already closed, the ReadCloser will be drained and closed.
-// Defer when your test is NOT expected to close the ReadCloser before ending.
-func assertNotClosed(t *testing.T, rc io.ReadCloser) {
-	assert.NoError(t, drainAndClose(rc))
-}
-
-// drainAndClose reads from the ReadCloser until EOF, discarding the content,
-// and closes the ReadCloser when finished or on error.
-// Returns an error when either Read or Close error. If both error, the errors
-// are joined and returned.
-//
-// In a defer from a test, use with t.Error or assert.NoError, NOT t.Fatal or
-// require.NoError.
-func drainAndClose(rc io.ReadCloser) error {
-	errCh := make(chan error)
-	go func() {
-		// Close after done reading
-		defer func() {
-			defer close(errCh)
-			if err := rc.Close(); err != nil {
-				errCh <- err
-			}
-		}()
-		// Read until EOF and discard
-		if _, err := io.Copy(io.Discard, rc); err != nil {
-			errCh <- err
-		}
-	}()
-
-	// Wait until Read and Close are both done.
-	// Combine errors, if multiple.
-	var multiErr error
-	for err := range errCh {
-		if multiErr != nil {
-			multiErr = errors.Join(multiErr, err)
-		} else {
-			multiErr = err
-		}
-	}
-	return multiErr
 }
