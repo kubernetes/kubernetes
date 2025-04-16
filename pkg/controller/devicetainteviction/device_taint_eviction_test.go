@@ -1190,7 +1190,9 @@ func applyEventPair(tContext *testContext, event any) {
 	}
 }
 
-func startTestController(tCtx ktesting.TContext, informerFactory informers.SharedInformerFactory) *Controller {
+func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Controller {
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+
 	controller := New(tCtx.Client(),
 		informerFactory.Core().V1().Pods(),
 		informerFactory.Resource().V1beta1().ResourceClaims(),
@@ -1203,7 +1205,10 @@ func startTestController(tCtx ktesting.TContext, informerFactory informers.Share
 	// Always log, not matter what the -v value is.
 	logger := klog.FromContext(tCtx)
 	controller.eventLogger = &logger
-	informerFactory.Start(tCtx.Done())
+
+	informerFactory.StartWithContext(tCtx)
+	tCtx.Cleanup(informerFactory.Shutdown)
+
 	return controller
 }
 
@@ -1347,9 +1352,7 @@ func TestEviction(t *testing.T) {
 				updatedPod = obj.(*v1.Pod)
 				return false, nil, nil
 			})
-			informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-			controller := startTestController(tCtx, informerFactory)
-			defer informerFactory.Shutdown()
+			controller := newTestController(tCtx, fakeClientset)
 
 			var wg sync.WaitGroup
 			defer func() {
@@ -1445,9 +1448,7 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	require.NoError(tCtx, err, "get pod before eviction")
 	assert.Equal(tCtx, podWithClaimName, pod, "test pod")
 
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var mutex sync.Mutex
 	podEvicting := false
@@ -1554,9 +1555,7 @@ func TestParallelPodDeletion(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -1633,9 +1632,7 @@ func TestRetry(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return false, nil, nil
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
@@ -1706,9 +1703,7 @@ func TestEvictionFailure(t *testing.T) {
 		assert.Equal(t, podWithClaimName.Name, podName, "name of deleted pod")
 		return true, nil, apierrors.NewInternalError(errors.New("fake error"))
 	})
-	informerFactory := informers.NewSharedInformerFactory(fakeClientset, 0)
-	controller := startTestController(tCtx, informerFactory)
-	defer informerFactory.Shutdown()
+	controller := newTestController(tCtx, fakeClientset)
 
 	var wg sync.WaitGroup
 	defer func() {
