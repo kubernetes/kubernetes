@@ -2693,6 +2693,16 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				// Backfill any resize conditions that may already exist on the pod.
+				for _, c := range pod.Status.Conditions {
+					switch c.Type {
+					case v1.PodResizePending:
+						kl.statusManager.SetPodResizePendingCondition(pod.UID, c.Reason, c.Message, c.ObservedGeneration)
+					case v1.PodResizeInProgress:
+						kl.statusManager.SetPodResizeInProgressCondition(pod.UID, c.Reason, c.Message, c.ObservedGeneration, true)
+					}
+				}
+
 				// To handle kubelet restarts, test pod admissibility using AllocatedResources values
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
@@ -2707,6 +2717,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 					recordAdmissionRejection(reason)
 					continue
 				}
+
 				// For new pod, checkpoint the resource values at which the Pod has been admitted
 				if err := kl.allocationManager.SetAllocatedResources(allocatedPod); err != nil {
 					//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
