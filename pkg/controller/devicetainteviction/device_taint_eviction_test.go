@@ -1253,6 +1253,12 @@ func TestEviction(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tCtx.Parallel()
 
+	do := func(tCtx ktesting.TContext, what string, action func(tCtx ktesting.TContext) error) {
+		tCtx.Log(what)
+		err := action(tCtx)
+		require.NoError(tCtx, err, what)
+	}
+
 	pod := podWithClaimName.DeepCopy()
 	for name, tt := range map[string]struct {
 		initialObjects []runtime.Object
@@ -1267,13 +1273,18 @@ func TestEviction(t *testing.T) {
 		},
 		"add": {
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-				_, err = tCtx.Client().CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create pod")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create slice")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create claim")
+				do(tCtx, "create pod", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Create(tCtx, pod, metav1.CreateOptions{})
+					return err
+				})
+				do(tCtx, "create slice", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Create(tCtx, sliceTainted, metav1.CreateOptions{})
+					return err
+				})
+				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					return err
+				})
 			},
 		},
 		"update": {
@@ -1287,13 +1298,18 @@ func TestEviction(t *testing.T) {
 				}(),
 			},
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-				_, err = tCtx.Client().CoreV1().Pods(pod.Namespace).Update(tCtx, pod, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update pod")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update slice")
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
-				require.NoError(tCtx, err, "update claim")
+				do(tCtx, "update pod", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().CoreV1().Pods(pod.Namespace).Update(tCtx, pod, metav1.UpdateOptions{})
+					return err
+				})
+				do(tCtx, "update slice", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceSlices().Update(tCtx, sliceTainted, metav1.UpdateOptions{})
+					return err
+				})
+				do(tCtx, "update claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).UpdateStatus(tCtx, inUseClaim, metav1.UpdateOptions{})
+					return err
+				})
 			},
 		},
 		"delete": {
@@ -1310,16 +1326,18 @@ func TestEviction(t *testing.T) {
 				pod,
 			},
 			afterSync: func(tCtx ktesting.TContext) {
-				var err error
-
-				err = tCtx.Client().ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
-				require.NoError(tCtx, err, "delete slice")
-				err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
-				require.NoError(tCtx, err, "delete claim")
+				do(tCtx, "delete slice", func(tCtx ktesting.TContext) error {
+					return tCtx.Client().ResourceV1beta1().ResourceSlices().Delete(tCtx, slice.Name+"-other", metav1.DeleteOptions{})
+				})
+				do(tCtx, "delete claim", func(tCtx ktesting.TContext) error {
+					return tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Delete(tCtx, inUseClaim.Name, metav1.DeleteOptions{})
+				})
 
 				// Re-create after deletion to enabled the normal flow.
-				_, err = tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
-				require.NoError(tCtx, err, "create claim")
+				do(tCtx, "create claim", func(tCtx ktesting.TContext) error {
+					_, err := tCtx.Client().ResourceV1beta1().ResourceClaims(inUseClaim.Namespace).Create(tCtx, inUseClaim, metav1.CreateOptions{})
+					return err
+				})
 			},
 		},
 	} {
