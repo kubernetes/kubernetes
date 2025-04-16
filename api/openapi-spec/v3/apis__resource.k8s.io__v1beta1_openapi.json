@@ -626,6 +626,11 @@
       "io.k8s.api.resource.v1beta1.DeviceConstraint": {
         "description": "DeviceConstraint must have exactly one field set besides Requests.",
         "properties": {
+          "MatchExpression": {
+            "default": "",
+            "description": "Potential future extension, not part of the current design: A CEL expression which compares different devices and returns true if they match.\n\nBecause it would be part of a one-of, old schedulers will not accidentally ignore this additional, for them unknown match criteria.",
+            "type": "string"
+          },
           "matchAttribute": {
             "description": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
             "type": "string"
@@ -640,6 +645,9 @@
             "x-kubernetes-list-type": "atomic"
           }
         },
+        "required": [
+          "MatchExpression"
+        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1beta1.DeviceCounterConsumption": {

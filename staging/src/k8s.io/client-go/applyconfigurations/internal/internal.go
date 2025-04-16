@@ -12801,6 +12801,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.DeviceConstraint
   map:
     fields:
+    - name: MatchExpression
+      type:
+        scalar: string
+      default: ""
     - name: matchAttribute
       type:
         scalar: string
@@ -13431,6 +13435,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.DeviceConstraint
   map:
     fields:
+    - name: MatchExpression
+      type:
+        scalar: string
+      default: ""
     - name: matchAttribute
       type:
         scalar: string
@@ -14007,6 +14015,10 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.DeviceConstraint
   map:
     fields:
+    - name: MatchExpression
+      type:
+        scalar: string
+      default: ""
     - name: matchAttribute
       type:
         scalar: string

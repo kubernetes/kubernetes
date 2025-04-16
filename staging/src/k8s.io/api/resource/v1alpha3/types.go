@@ -985,7 +985,7 @@ type DeviceConstraint struct {
 	// accidentally ignore this additional, for them unknown match
 	// criteria.
 	//
-	// MatchExpression string
+	MatchExpression string `protobuf:"bytes,3,opt,name=matchExpression"`
 }
 
 // DeviceClaimConfiguration is used for configuration parameters in DeviceClaim.

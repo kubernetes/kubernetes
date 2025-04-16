@@ -47988,7 +47988,16 @@ func schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref common.ReferenceCal
 							Format:      "",
 						},
 					},
+					"MatchExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Potential future extension, not part of the current design: A CEL expression which compares different devices and returns true if they match.\n\nBecause it would be part of a one-of, old schedulers will not accidentally ignore this additional, for them unknown match criteria.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"MatchExpression"},
 			},
 		},
 	}
@@ -50095,7 +50104,16 @@ func schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"MatchExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Potential future extension, not part of the current design: A CEL expression which compares different devices and returns true if they match.\n\nBecause it would be part of a one-of, old schedulers will not accidentally ignore this additional, for them unknown match criteria.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"MatchExpression"},
 			},
 		},
 	}
@@ -51995,7 +52013,16 @@ func schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref common.ReferenceCall
 							Format:      "",
 						},
 					},
+					"MatchExpression": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Potential future extension, not part of the current design: A CEL expression which compares different devices and returns true if they match.\n\nBecause it would be part of a one-of, old schedulers will not accidentally ignore this additional, for them unknown match criteria.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
+				Required: []string{"MatchExpression"},
 			},
 		},
 	}

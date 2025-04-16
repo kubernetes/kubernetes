@@ -242,16 +242,16 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					attributeName: matchAttribute,
 				}
 				constraints[i] = m
-			case constraint.MatchExpression != nil:
+			case constraint.MatchExpression != "":
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchExpressionConstraint")
-					logger = klog.LoggerWithValues(logger, "matchExpression", *constraint.MatchExpression)
+					logger = klog.LoggerWithValues(logger, "matchExpression", constraint.MatchExpression)
 				}
 				m := &matchExpressionConstraint{
 					logger:       logger,
 					requestNames: sets.New(constraint.Requests...),
-					expression:   *constraint.MatchExpression,
+					expression:   constraint.MatchExpression,
 					devices:      make([]*draapi.BasicDevice, 0),
 					celCache:     alloc.celCache,
 					numDevices:   minDevicesPerClaim,
