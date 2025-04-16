@@ -614,6 +614,8 @@ EOF
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
+      --kubelet-certificate-authority="${ROOT_CA_FILE}" \
+      --kubelet-validate-node-name \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --service-account-issuer="https://kubernetes.default.svc" \
@@ -1325,7 +1327,7 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # to use docker installed containerd as kubelet container runtime
   # we need to enable cri and install cni
   # install cni for docker in docker
-  install_cni 
+  install_cni
 
   # If we are running in a cgroups v2 environment
   # we need to enable nesting
