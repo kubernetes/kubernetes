@@ -301,12 +301,12 @@ func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath string
 		pod.Namespace, pod.Name, cName, expectedCgValues, cgPath)
 	cgValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to find one of the expected cgroup values %q in container cgroup %q: %w", expectedCgValues, cgPath, err)
+		return fmt.Errorf("failed to read cgroup value %q for container %q: %w", cgPath, cName, err)
 	}
 	cgValue = strings.Trim(cgValue, "\n")
 
 	if err := framework.Gomega().Expect(cgValue).To(gomega.BeElementOf(expectedCgValues)); err != nil {
-		return fmt.Errorf("value of cgroup %q for container %q should match one of the expectations: %w", cgPath, cName, err)
+		return fmt.Errorf("value of cgroup %q for container %q was %q; expected one of %q", cgPath, cName, cgValue, expectedCgValues)
 	}
 
 	return nil
