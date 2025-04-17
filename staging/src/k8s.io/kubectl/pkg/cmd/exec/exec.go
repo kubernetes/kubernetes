@@ -25,6 +25,7 @@ import (
 
 	dockerterm "github.com/moby/term"
 	"github.com/spf13/cobra"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -208,7 +209,9 @@ func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []s
 	if len(argsIn) > 0 && argsLenAtDash != 0 {
 		p.ResourceName = argsIn[0]
 	}
-	if argsLenAtDash > -1 {
+	// we expect argsLenAtDash = 1
+	if argsLenAtDash == 0 || argsLenAtDash == 1 {
+		// pflag guarantees `argsLenAtDash <= len(args)`
 		p.Command = argsIn[argsLenAtDash:]
 	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0) {
 		return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
