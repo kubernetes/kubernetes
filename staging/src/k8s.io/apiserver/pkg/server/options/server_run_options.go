@@ -398,7 +398,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"This option, if set, represents the maximum amount of grace period the apiserver will wait "+
 		"for active watch request(s) to drain during the graceful server shutdown window.")
 
-	s.ComponentGlobalsRegistry.AddFlags(fs)
+	s.ComponentGlobalsRegistry.AddFlagsWithMinCompatibility(fs)
 	fs.BoolVar(&s.EmulationForwardCompatible, "emulation-forward-compatible", s.EmulationForwardCompatible, ""+
 		"If true, for any beta+ APIs enabled by default or by --runtime-config at the emulation version, their future versions with higher priority/stability will be auto enabled even if they introduced after the emulation version. "+
 		"Can only be set to true if the emulation version is lower than the binary version.")
