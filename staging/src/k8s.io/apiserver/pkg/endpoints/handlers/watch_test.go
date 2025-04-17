@@ -264,21 +264,19 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 	require.Equal(t, runtime.NegotiateError{Stream: true, ContentType: "testcase/json"}, err)
 
 	// The client should automatically close the connection on error.
-	//TODO: Fix watch client to close the response body and stop the storage watcher after a NegotiateError
-	require.False(t, watcher.IsStopped())
 
 	// Wait for the server to call the CancelFunc returned by
 	// TimeoutFactory.TimeoutCh, closing the done channel.
-	// err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
-	// require.NoError(t, err)
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
+	require.NoError(t, err)
 
 	// Wait for the server to call watcher.Stop, closing the result channel.
-	// err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
-	// require.NoError(t, err)
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
 
 	// Confirm watcher.Stop was called by the server.
-	// require.Truef(t, watcher.IsStopped(),
-	// 	"Leaked watcher goroutine after request done")
+	require.Truef(t, watcher.IsStopped(),
+		"Leaked watcher goroutine after request done")
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {

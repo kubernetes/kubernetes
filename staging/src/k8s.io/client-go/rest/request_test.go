@@ -2131,14 +2131,7 @@ func TestWatch(t *testing.T) {
 
 			// Wait for the result channel to close
 			err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, resultCh)
-			// TODO(karlkfi): Fix race condition that causes the watch server to sometimes send an error when stopped
-			if err != nil {
-				// Extract & compare the Event so we can see  diff when it fails
-				event, unwrapErr := unwrapUnexectedWatchEvent(err)
-				require.NoError(t, unwrapErr)
-				expectedEvent := newClientWatchDecodingEvent(errReadOnClosedResBody)
-				require.Equal(t, expectedEvent, event)
-			}
+			require.NoError(t, err)
 		})
 	}
 }
@@ -2197,15 +2190,8 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 	watcher.Stop()
 
 	// Wait for the result channel to close
-	err = utiltesting.WaitForChannelToCloseWithTimeout(t.Context(), wait.ForeverTestTimeout, resultCh)
-	// TODO(karlkfi): Fix race condition that causes the watch server to sometimes send an error when stopped
-	if err != nil {
-		// Extract & compare the Event so we can see  diff when it fails
-		event, unwrapErr := unwrapUnexectedWatchEvent(err)
-		require.NoError(t, unwrapErr)
-		expectedEvent := newClientWatchDecodingEvent(errReadOnClosedResBody)
-		require.Equal(t, expectedEvent, event)
-	}
+	err = utiltesting.WaitForChannelToCloseWithTimeout(t.Context(), wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
 }
 
 func TestWatchUnknownContentType(t *testing.T) {
@@ -4261,34 +4247,4 @@ func TestRequestWarningHandler(t *testing.T) {
 		assert.Equal(t, request, request.WarningHandlerWithContext(nil))
 		assert.Nil(t, request.warningHandler)
 	})
-}
-
-// From https://github.com/golang/go/blob/go1.20/src/net/http/transport.go#L2779
-var errReadOnClosedResBody = errors.New("http: read on closed response body")
-
-// newClientWatchDecodingEvent simulates a InternalServerError of type
-// "ClientWatchDecoding", wrapped as a watch.Event. These errors come from the
-// watch client StreamWatcher.
-func newClientWatchDecodingEvent(decodeErr error) watch.Event {
-	// From Request.newStreamWatcher
-	clientErrorReporter := apierrors.NewClientErrorReporter(http.StatusInternalServerError, "GET", "ClientWatchDecoding")
-	// From StreamWatcher.receive
-	// TODO(karlkfi): Use `%w` to format errors (errorlint) in StreamWatcher.receive
-	//nolint:errorlint // StreamWatcher.receive uses `%v`
-	serverErr := fmt.Errorf("unable to decode an event from the watch stream: %v", decodeErr)
-	return watch.Event{
-		Type:   watch.Error,
-		Object: clientErrorReporter.AsObject(serverErr),
-	}
-}
-
-// unwrapUnexectedWatchEvent unwraps a utiltesting.UnexpectedEventError to
-// extract the watch.Error.
-func unwrapUnexectedWatchEvent(err error) (watch.Event, error) {
-	var expectedErr *utiltesting.UnexpectedEventError[watch.Event]
-	if !errors.As(err, &expectedErr) {
-		return watch.Event{}, fmt.Errorf("Error expected to be of type %v, but was %v",
-			reflect.TypeOf(expectedErr), reflect.TypeOf(err))
-	}
-	return expectedErr.Event, nil
 }
