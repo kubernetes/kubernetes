@@ -39,6 +39,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
@@ -49,6 +50,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+)
+
+const (
+	defaultCFSPeriod = "100000"
 )
 
 // this is ugly, but pratical
@@ -500,6 +505,144 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			}
 		})
 	})
+
+	ginkgo.When("checking the CFS quota management", ginkgo.Label("cfs-quota"), func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			if !e2enodeCgroupV2Enabled {
+				e2eskipper.Skipf("Skipping since CgroupV2 not used")
+			}
+
+			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+			//          this means on more-than-2-way SMT systems this test will prove nothing
+			reservedCPUs := cpuset.New(0)
+			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:                       string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:               reservedCPUs,
+				disableCPUQuotaWithExclusiveCPUs: true,
+			}))
+		})
+
+		ginkgo.It("should enforce for best-effort pod", func(ctx context.Context) {
+			ctnName := "be-container"
+			pod := makeCPUManagerBEPod("be-pod", []ctnAttribute{
+				{
+					ctnName:    ctnName,
+					ctnCommand: "sleep 1d",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuota("max"))
+			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
+		})
+
+		ginkgo.It("should disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
+			ctnName := "gu-container-cfsquota-disabled"
+			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
+				{
+					ctnName:    ctnName,
+					cpuRequest: "1",
+					cpuLimit:   "1",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuota("max"))
+			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "max"))
+		})
+
+		ginkgo.It("should enforce for guaranteed pod", func(ctx context.Context) {
+			ctnName := "gu-container-cfsquota-enabled"
+			pod := makeCPUManagerPod("gu-pod-cfs-quota-on", []ctnAttribute{
+				{
+					ctnName:    ctnName,
+					cpuRequest: "500m",
+					cpuLimit:   "500m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
+			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
+		})
+
+		ginkgo.It("should enforce for burstable pod", func(ctx context.Context) {
+			ctnName := "bu-container-cfsquota-enabled"
+			pod := makeCPUManagerPod("bu-pod-cfs-quota-on", []ctnAttribute{
+				{
+					ctnName:    ctnName,
+					cpuRequest: "100m",
+					cpuLimit:   "500m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuota("50000"))
+			gomega.Expect(pod).To(HaveContainerQuota(ctnName, "50000"))
+		})
+
+		ginkgo.It("should not enforce with multiple containers without exclusive CPUs", func(ctx context.Context) {
+			cpuDetails := cpuDetailsFromNode(localNode)
+			if cpuDetails.Allocatable < int64(2) {
+				e2eskipper.Skipf("Skipping because needs %d allocatable CPUs, detected %d", 2, cpuDetails.Allocatable)
+			}
+
+			pod := makeCPUManagerPod("gu-pod-multicontainer", []ctnAttribute{
+				{
+					ctnName:    "gu-container-non-int-values-1",
+					cpuRequest: "100m",
+					cpuLimit:   "500m",
+				},
+				{
+					ctnName:    "gu-container-non-int-values-2",
+					cpuRequest: "300m",
+					cpuLimit:   "1200m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuota("170000"))
+			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values-1", "50000"))
+			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values-2", "120000"))
+		})
+
+		ginkgo.It("should not enforce with multiple containers only in the container with exclusive CPUs", func(ctx context.Context) {
+			cpuDetails := cpuDetailsFromNode(localNode)
+			if cpuDetails.Allocatable < int64(2) {
+				e2eskipper.Skipf("Skipping because needs %d allocatable CPUs, detected %d", 2, cpuDetails.Allocatable)
+			}
+
+			pod := makeCPUManagerPod("gu-pod-multicontainer-mixed", []ctnAttribute{
+				{
+					ctnName:    "gu-container-non-int-values",
+					cpuRequest: "500m",
+					cpuLimit:   "500m",
+				},
+				{
+					ctnName:    "gu-container-int-values",
+					cpuRequest: "1",
+					cpuLimit:   "1",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			gomega.Expect(pod).To(HaveSandboxQuota("max"))
+			gomega.Expect(pod).To(HaveContainerQuota("gu-container-non-int-values", "50000"))
+			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "max"))
+		})
+	})
 })
 
 // Matching helpers
@@ -589,6 +732,46 @@ func HaveContainerCPUsEqualTo(ctnName string, expectedCPUs cpuset.CPUSet) types.
 	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has allowed CPUs <{{.Data.CurrentCPUs}}> not matching the expected value <{{.Data.ExpectedCPUs}}> for container {{.Data.Name}}", md)
 }
 
+func HaveSandboxQuota(expectedQuota string) types.GomegaMatcher {
+	md := &msgData{
+		ExpectedQuota: expectedQuota,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		md.Name = klog.KObj(actual).String()
+		quota, err := getSandboxCFSQuota(actual)
+		md.CurrentQuota = quota
+		if err != nil {
+			framework.Logf("getSandboxCFSQuota() failed: %v", err)
+			return false, err
+		}
+		re, err := regexp.Compile(fmt.Sprintf("^%s %s$", expectedQuota, defaultCFSPeriod))
+		if err != nil {
+			return false, err
+		}
+		return re.MatchString(quota), nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has quota <{{.Data.CurrentQuota}}> not matching expected value <{{.Data.ExpectedQuota}}>", md)
+}
+
+func HaveContainerQuota(ctnName, expectedQuota string) types.GomegaMatcher {
+	md := &msgData{
+		Name:          ctnName,
+		ExpectedQuota: expectedQuota,
+	}
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		quota, err := getContainerCFSQuota(actual, ctnName)
+		md.CurrentQuota = quota
+		if err != nil {
+			framework.Logf("getContainerCFSQuota(%s) failed: %v", ctnName, err)
+			return false, err
+		}
+		re, err := regexp.Compile(fmt.Sprintf("^%s %s$", expectedQuota, defaultCFSPeriod))
+		if err != nil {
+			return false, err
+		}
+		return re.MatchString(quota), nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has quota <{{.Data.CurrentQuota}}> not matching expected value <{{.Data.ExpectedQuota}}> for container {{.Data.Name}}", md)
+}
+
 // Other helpers
 
 func getContainerAllowedCPUs(pod *v1.Pod, ctnName string) (cpuset.CPUSet, error) {
@@ -604,6 +787,31 @@ func getContainerAllowedCPUs(pod *v1.Pod, ctnName string) (cpuset.CPUSet, error)
 	cpus := strings.TrimSpace(string(data))
 	framework.Logf("pod %s/%s cnt %s cpuset %q", pod.Namespace, pod.Name, ctnName, cpus)
 	return cpuset.Parse(cpus)
+}
+
+func getSandboxCFSQuota(pod *v1.Pod) (string, error) {
+	cgPath := filepath.Join(makeCgroupPathForPod(pod), "cpu.max")
+	data, err := os.ReadFile(cgPath)
+	if err != nil {
+		return "", err
+	}
+	quota := strings.TrimSpace(string(data))
+	framework.Logf("pod %s/%s qos=%s path %q quota %q", pod.Namespace, pod.Name, pod.Status.QOSClass, cgPath, quota)
+	return quota, nil
+}
+
+func getContainerCFSQuota(pod *v1.Pod, ctnName string) (string, error) {
+	cgPath, err := makeCgroupPathForContainer(pod, ctnName)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(filepath.Join(cgPath, "cpu.max"))
+	if err != nil {
+		return "", err
+	}
+	quota := strings.TrimSpace(string(data))
+	framework.Logf("pod %s/%s qos=%s cnt %s path %q quota %q", pod.Namespace, pod.Name, pod.Status.QOSClass, ctnName, cgPath, quota)
+	return quota, nil
 }
 
 const (
@@ -750,4 +958,60 @@ func cpuSiblingListFromSysFS(cpuID int64) cpuset.CPUSet {
 	cpus, err := cpuset.Parse(strings.TrimSpace(string(data)))
 	framework.ExpectNoError(err)
 	return cpus
+}
+
+func makeCPUManagerBEPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
+	var containers []v1.Container
+	for _, ctnAttr := range ctnAttributes {
+		ctn := v1.Container{
+			Name:    ctnAttr.ctnName,
+			Image:   busyboxImage,
+			Command: []string{"sh", "-c", ctnAttr.ctnCommand},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "sysfscgroup",
+					MountPath: "/sysfscgroup",
+				},
+				{
+					Name:      "podinfo",
+					MountPath: "/podinfo",
+				},
+			},
+		}
+		containers = append(containers, ctn)
+	}
+
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: v1.RestartPolicyNever,
+			Containers:    containers,
+			Volumes: []v1.Volume{
+				{
+					Name: "sysfscgroup",
+					VolumeSource: v1.VolumeSource{
+						HostPath: &v1.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+					},
+				},
+				{
+					Name: "podinfo",
+					VolumeSource: v1.VolumeSource{
+						DownwardAPI: &v1.DownwardAPIVolumeSource{
+							Items: []v1.DownwardAPIVolumeFile{
+								{
+									Path: "uid",
+									FieldRef: &v1.ObjectFieldSelector{
+										APIVersion: "v1",
+										FieldPath:  "metadata.uid",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
