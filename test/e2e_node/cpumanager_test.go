@@ -243,7 +243,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
-			// any full CPU is fine - we cannot nor we should predict which one, though
+			// we cannot nor we should predict which CPUs the container gets
 			gomega.Expect(podGu).To(HaveContainerCPUsCount("gu-container", cpuCount))
 			gomega.Expect(podGu).To(HaveContainerCPUsOverlapWith("gu-container", onlineCPUs))
 			gomega.Expect(podGu).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
@@ -280,12 +280,128 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 			ginkgo.By("checking if the expected cpuset was assigned")
 
-			// any full CPU is fine - we cannot nor we should predict which one, though
+			// we cannot nor we should predict which CPUs the container gets
 			gomega.Expect(pod).To(HaveContainerCPUsCount("gu-container", cpuCount))
 			gomega.Expect(pod).To(HaveContainerCPUsOverlapWith("gu-container", onlineCPUs))
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
 		})
 	})
+
+	ginkgo.When("running with strict CPU reservation", ginkgo.Label("strict-cpu-reservation"), func() {
+		var reservedCPUs cpuset.CPUSet
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+			// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
+			// check what we do have in the node.
+		})
+
+		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
+			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      cpuset.CPUSet{},
+				enableCPUManagerOptions: true,
+				options: map[string]string{
+					cpumanager.StrictCPUReservationOption: "true",
+				},
+			}))
+
+			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
+				{
+					ctnName:    "non-gu-container",
+					cpuRequest: "100m",
+					cpuLimit:   "200m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			ginkgo.By("checking if the expected cpuset was assigned")
+
+			// cpumanager will always reserve at least 1 cpu. In this case we don't set which, and if we treat the cpumanager
+			// as black box (which we very much should) we can't predict which one. So we can only assert that *A* cpu is not
+			// usable because is reserved.
+			gomega.Expect(pod).To(HaveContainerCPUsCount("non-gu-container", onlineCPUs.Size()-1))
+		})
+
+		ginkgo.It("should let the container access all the online CPUs minus the reserved CPUs set when enabled", func(ctx context.Context) {
+			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+				enableCPUManagerOptions: true,
+				options: map[string]string{
+					cpumanager.StrictCPUReservationOption: "true",
+				},
+			}))
+
+			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
+				{
+					ctnName:    "non-gu-container",
+					cpuRequest: "100m",
+					cpuLimit:   "200m",
+				},
+			})
+			ginkgo.By("creating the test pod")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			ginkgo.By("checking if the expected cpuset was assigned")
+
+			gomega.Expect(pod).To(HaveContainerCPUsEqualTo("non-gu-container", onlineCPUs.Difference(reservedCPUs)))
+		})
+
+		ginkgo.It("should let the container access all the online non-exclusively-allocated CPUs minus the reserved CPUs set when enabled", func(ctx context.Context) {
+			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:              string(cpumanager.PolicyStatic),
+				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+				enableCPUManagerOptions: true,
+				options: map[string]string{
+					cpumanager.StrictCPUReservationOption: "true",
+				},
+			}))
+
+			cpuCount := 1
+
+			podGu := makeCPUManagerPod("gu-pod", []ctnAttribute{
+				{
+					ctnName:    "gu-container",
+					cpuRequest: fmt.Sprintf("%dm", 1000*cpuCount),
+					cpuLimit:   fmt.Sprintf("%dm", 1000*cpuCount),
+				},
+			})
+			ginkgo.By("creating the guaranteed test pod")
+			podGu = e2epod.NewPodClient(f).CreateSync(ctx, podGu)
+			podMap[string(podGu.UID)] = podGu
+
+			podBu := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
+				{
+					ctnName:    "non-gu-container",
+					cpuRequest: "200m",
+					cpuLimit:   "300m",
+				},
+			})
+			ginkgo.By("creating the burstable test pod")
+			podBu = e2epod.NewPodClient(f).CreateSync(ctx, podBu)
+			podMap[string(podBu.UID)] = podBu
+
+			ginkgo.By("checking if the expected cpuset was assigned")
+
+			usableCPUs := onlineCPUs.Difference(reservedCPUs)
+
+			// any full CPU is fine - we cannot nor we should predict which one, though
+			gomega.Expect(podGu).To(HaveContainerCPUsCount("gu-container", cpuCount))
+			gomega.Expect(podGu).To(HaveContainerCPUsOverlapWith("gu-container", usableCPUs))
+			gomega.Expect(podGu).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
+
+			exclusiveCPUs, err := getContainerAllowedCPUs(podGu, "gu-container")
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", podGu.Namespace, podGu.Name)
+			expectedSharedCPUs := usableCPUs.Difference(exclusiveCPUs)
+			gomega.Expect(podBu).To(HaveContainerCPUsEqualTo("non-gu-container", expectedSharedCPUs))
+		})
+	})
+
+	// TODO full-cpus-only && strict-cpu-reservation
 
 	ginkgo.When("running with SMT Alignment", ginkgo.Label("smt-alignment"), func() {
 		var cpuDetails nodeCPUDetails
