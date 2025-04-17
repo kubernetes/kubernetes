@@ -1,3 +1,7 @@
+> ⚠️ **This is a staging repository for Kubernetes**.  
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is not for direct contributions.
+
 # cli-runtime
 
 Set of helpers for creating kubectl commands, as well as kubectl plugins.
