@@ -57,6 +57,7 @@ const (
 // Helper for makeCPUManagerPod().
 type ctnAttribute struct {
 	ctnName       string
+	ctnCommand    string
 	cpuRequest    string
 	cpuLimit      string
 	restartPolicy *v1.ContainerRestartPolicy
