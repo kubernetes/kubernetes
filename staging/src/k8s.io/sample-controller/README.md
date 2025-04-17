@@ -160,3 +160,6 @@ https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/sample-c
 Code changes are made in that location, merged into k8s.io/kubernetes and
 later synced here.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more information. Please note that [kubernetes/sample-controller](https://github.com/kubernetes/sample-controller/) is a readonly mirror repository, all development is done at [kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).
