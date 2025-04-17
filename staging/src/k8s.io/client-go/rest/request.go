@@ -786,49 +786,79 @@ func (r *Request) watchInternal(ctx context.Context) (watch.Interface, runtime.D
 	}
 	retry := r.retryFn(r.maxRetries)
 	url := r.URL().String()
+	var done bool
+	var w watch.Interface
+	var d runtime.Decoder
+	var err error
 	for {
-		if err := retry.Before(ctx, r); err != nil {
-			return nil, nil, retry.WrapPreviousError(err)
-		}
+		// TODO(karlkfi): extract this out to a Request method for readability
+		done, w, d, err = func(ctx context.Context) (bool, watch.Interface, runtime.Decoder, error) {
+			// Cleanup after each failed attempt
+			ctx, cancel := context.WithCancel(ctx)
+			defer func() { cancel() }()
 
-		req, err := r.newHTTPRequest(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		resp, err := client.Do(req)
-		retry.After(ctx, r, resp, err)
-		if err == nil && resp.StatusCode == http.StatusOK {
-			return r.newStreamWatcher(ctx, resp)
-		}
-
-		done, transformErr := func() (bool, error) {
-			defer readAndCloseResponseBody(resp)
-
-			if retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
-				return false, nil
+			if err := retry.Before(ctx, r); err != nil {
+				return true, nil, nil, retry.WrapPreviousError(err)
 			}
 
-			if resp == nil {
-				// the server must have sent us an error in 'err'
-				return true, nil
+			req, err := r.newHTTPRequest(ctx)
+			if err != nil {
+				return true, nil, nil, err
 			}
-			result := r.transformResponse(ctx, resp, req)
-			if err := result.Error(); err != nil {
-				return true, err
+
+			resp, err := client.Do(req)
+			retry.After(ctx, r, resp, err)
+			if err == nil && resp.StatusCode == http.StatusOK {
+				w, d, streamErr := r.newStreamWatcher(ctx, resp)
+				if streamErr == nil {
+					// Invalidate cancel() to defer until watcher is stopped
+					cancel = func() {}
+					return true, w, d, nil
+				}
+				// Cancel the request immediately
+				cancel()
+				// Handle stream error like a request error
+				err = streamErr
 			}
-			return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
-		}()
+
+			done, transformErr := func() (bool, error) {
+				defer readAndCloseResponseBody(resp)
+
+				if retry.IsNextRetry(ctx, r, req, resp, err, isErrRetryableFunc) {
+					return false, nil
+				}
+				if err != nil {
+					// Read the response body until closed.
+					// Skip decoding and ignore the content.
+					return true, nil
+				}
+				if resp != nil {
+					// Read the response body until closed.
+					// Decode the content and return any error.
+					result := r.transformResponse(ctx, resp, req)
+					if respErr := result.Error(); respErr != nil {
+						return true, respErr
+					}
+				}
+				// No error from client or server, but we're done retrying.
+				// Return a minimal error, to be wrapped with previous errors.
+				return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
+			}()
+			if done {
+				if isErrRetryableFunc(req, err) {
+					return true, watch.NewEmptyWatch(), nil, nil
+				}
+				if err == nil {
+					// if the server sent us an HTTP Response object,
+					// we need to return the error object from that.
+					err = transformErr
+				}
+				return true, nil, nil, retry.WrapPreviousError(err)
+			}
+			return false, nil, nil, nil
+		}(ctx)
 		if done {
-			if isErrRetryableFunc(req, err) {
-				return watch.NewEmptyWatch(), nil, nil
-			}
-			if err == nil {
-				// if the server sent us an HTTP Response object,
-				// we need to return the error object from that.
-				err = transformErr
-			}
-			return nil, nil, retry.WrapPreviousError(err)
+			return w, d, err
 		}
 	}
 }
