@@ -19,14 +19,17 @@ package crd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/utils/pointer"
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -47,9 +50,6 @@ type Option func(crd *apiextensionsv1.CustomResourceDefinition)
 
 // CreateMultiVersionTestCRD creates a new CRD specifically for the calling test.
 func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Option) (*TestCrd, error) {
-	suffix := framework.RandomSuffix()
-	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
-	kind := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 	testcrd := &TestCrd{}
 
 	// Creating a custom resource definition for use by assorted tests.
@@ -68,6 +68,56 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 		framework.Failf("failed to initialize dynamic client: %v", err)
 		return nil, err
 	}
+
+	crd := genRandomCRD(f, group, opts...)
+	// Be robust about making the crd creation call.
+	var got *apiextensionsv1.CustomResourceDefinition
+	if err := wait.PollUntilContextTimeout(context.TODO(), f.Timeouts.Poll, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		// Create CRD and waits for the resource to be recognized and available.
+		got, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+		if err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				// regenerate on conflict
+				framework.Logf("CustomResourceDefinition name %q was already taken, generate a new name and retry", crd.Name)
+				crd = genRandomCRD(f, group, opts...)
+			} else {
+				framework.Logf("Unexpected error while creating CustomResourceDefinition: %v", err)
+			}
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
+	}
+
+	resourceClients := map[string]dynamic.ResourceInterface{}
+	for _, v := range got.Spec.Versions {
+		if v.Served {
+			gvr := schema.GroupVersionResource{Group: got.Spec.Group, Version: v.Name, Resource: got.Spec.Names.Plural}
+			resourceClients[v.Name] = dynamicClient.Resource(gvr).Namespace(f.Namespace.Name)
+		}
+	}
+
+	testcrd.APIExtensionClient = apiExtensionClient
+	testcrd.Crd = got
+	testcrd.DynamicClients = resourceClients
+	testcrd.CleanUp = func(ctx context.Context) error {
+		err := fixtures.DeleteV1CustomResourceDefinition(got, apiExtensionClient)
+		if err != nil {
+			framework.Failf("failed to delete CustomResourceDefinition(%s): %v", got.Name, err)
+		}
+		return err
+	}
+	return testcrd, nil
+}
+
+// genRandomCRD generates a random CRD name and kind based on the framework's base name and a random suffix.
+// It also sets the group to the provided value and sets the scope to NamespaceScoped. If no versions are provided via
+// the opts, it will create a default version "v1" with an allow-all schema.
+func genRandomCRD(f *framework.Framework, group string, opts ...Option) *apiextensionsv1.CustomResourceDefinition {
+	suffix := framework.RandomSuffix()
+	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.UniqueName, suffix)
+	kind := fmt.Sprintf("e2e-test-%s-%s-crd", f.UniqueName, suffix)
 
 	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + group},
@@ -93,33 +143,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 			Schema:  fixtures.AllowAllSchema(),
 		}}
 	}
-
-	//create CRD and waits for the resource to be recognized and available.
-	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
-	if err != nil {
-		framework.Failf("failed to create CustomResourceDefinition: %v", err)
-		return nil, err
-	}
-
-	resourceClients := map[string]dynamic.ResourceInterface{}
-	for _, v := range crd.Spec.Versions {
-		if v.Served {
-			gvr := schema.GroupVersionResource{Group: crd.Spec.Group, Version: v.Name, Resource: crd.Spec.Names.Plural}
-			resourceClients[v.Name] = dynamicClient.Resource(gvr).Namespace(f.Namespace.Name)
-		}
-	}
-
-	testcrd.APIExtensionClient = apiExtensionClient
-	testcrd.Crd = crd
-	testcrd.DynamicClients = resourceClients
-	testcrd.CleanUp = func(ctx context.Context) error {
-		err := fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
-		if err != nil {
-			framework.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
-		}
-		return err
-	}
-	return testcrd, nil
+	return crd
 }
 
 // CreateTestCRD creates a new CRD specifically for the calling test.
