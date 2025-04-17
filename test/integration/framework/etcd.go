@@ -144,15 +144,17 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 			defer wg.Done()
 			select {
 			case <-ctx.Done():
-				klog.Infof("etcd exited gracefully, context cancelled")
+				klog.V(6).InfoS("etcd exited gracefully, context cancelled")
 			case <-time.After(5 * time.Second):
 				klog.Infof("etcd didn't exit in 5 seconds, killing it")
 				cancel()
 			}
 		}()
 		err := cmd.Wait()
+		klog.V(2).InfoS("etcd exited", "err", err)
+		// Tell goroutine that we are done.
+		cancel()
 		wg.Wait()
-		klog.Infof("etcd exit status: %v", err)
 		err = os.RemoveAll(etcdDataDir)
 		if err != nil {
 			klog.Warningf("error during etcd cleanup: %v", err)
