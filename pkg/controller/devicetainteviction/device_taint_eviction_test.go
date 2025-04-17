@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	gomegatypes "github.com/onsi/gomega/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/watch"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -1191,6 +1193,35 @@ func applyEventPair(tContext *testContext, event any) {
 }
 
 func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Controller {
+	// fake.Clientset suffers from a race condition related to informers:
+	// it does not implement resource version support in its Watch
+	// implementation and instead assumes that watches are set up
+	// before further changes are made.
+	//
+	// If a test waits for caches to be synced and then immediately
+	// adds an object, that new object will never be seen by event handlers
+	// if the race goes wrong and the Watch call hadn't completed yet
+	// (can be triggered by adding a sleep before https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/tools/cache/reflector.go#L431).
+	//
+	// To work around this, we count all watches and only proceed when
+	// all of them are in place. This replaces the normal watch reactor
+	// (https://github.com/kubernetes/kubernetes/blob/b53b9fb5573323484af9a19cf3f5bfe80760abba/staging/src/k8s.io/client-go/kubernetes/fake/clientset_generated.go#L161-L173).
+	var numWatches atomic.Int32
+	clientSet.PrependWatchReactor("*", func(action core.Action) (handled bool, ret watch.Interface, err error) {
+		var opts metav1.ListOptions
+		if watchActcion, ok := action.(core.WatchActionImpl); ok {
+			opts = watchActcion.ListOptions
+		}
+		gvr := action.GetResource()
+		ns := action.GetNamespace()
+		watch, err := clientSet.Tracker().Watch(gvr, ns, opts)
+		if err != nil {
+			return false, nil, err
+		}
+		numWatches.Add(1)
+		return true, watch, nil
+	})
+
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	controller := New(tCtx.Client(),
@@ -1206,8 +1237,12 @@ func newTestController(tCtx ktesting.TContext, clientSet *fake.Clientset) *Contr
 	logger := klog.FromContext(tCtx)
 	controller.eventLogger = &logger
 
-	informerFactory.StartWithContext(tCtx)
+	informerFactory.Start(tCtx.Done())
 	tCtx.Cleanup(informerFactory.Shutdown)
+
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) int32 {
+		return numWatches.Load()
+	}).WithTimeout(5*time.Second).Should(gomega.Equal(int32(5)), "All watches should be registered.")
 
 	return controller
 }
