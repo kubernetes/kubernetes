@@ -1553,6 +1553,10 @@ func testCancelEviction(tCtx ktesting.TContext, deletePod bool) {
 	}).WithTimeout(30 * time.Second).Should(gomega.BeFalseBecause("pod no longer pending eviction"))
 
 	// Whether we get an event depends on whether the pod still exists.
+	// If we expect an event, we need to wait for it.
+	if !deletePod {
+		ktesting.Eventually(tCtx, listEvents).WithTimeout(30 * time.Second).Should(matchCancellationEvent())
+	}
 	ktesting.Consistently(tCtx, func(tCtx ktesting.TContext) error {
 		matchEvents := matchCancellationEvent()
 		if deletePod {
