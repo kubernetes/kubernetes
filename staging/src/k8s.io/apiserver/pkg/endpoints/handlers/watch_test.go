@@ -18,6 +18,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,6 +40,7 @@ import (
 	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 // Fake API versions, similar to api/latest.go
@@ -106,7 +109,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 	watcher.Error(&errStatus)
 	watcher.Stop()
 
-	// Make sure we can actually watch an endpoint
+	// Decode error from the response
 	decoder := json.NewDecoder(resp.Body)
 	var got watchJSON
 	err = decoder.Decode(&got)
@@ -127,13 +130,27 @@ func TestWatchHTTPErrors(t *testing.T) {
 		Details: errStatus.Details,
 	}
 	require.Equal(t, expectedStatus, status)
+
+	// Close the response body to signal the server to stop serving.
+	require.NoError(t, resp.Body.Close())
+
+	// Wait for the server to call the CancelFunc returned by
+	// TimeoutFactory.TimeoutCh, closing the done channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
+	require.NoError(t, err)
+
+	// Wait for the server to call watcher.Stop, closing the result channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
+
+	// Confirm watcher.Stop was called by the server.
+	require.Truef(t, watcher.IsStopped(),
+		"Leaked watcher goroutine after request done")
 }
 
 func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	ctx := t.Context()
 	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -154,7 +171,8 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
+		// TimeoutFactory should not be needed, because the server should error
+		// before calling TimeoutFactory.TimeoutCh.
 	}
 
 	statusErr := apierrors.NewInternalError(fmt.Errorf("we got an error"))
@@ -194,9 +212,18 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	}
 	require.Equal(t, expectedStatus, status)
 
-	// check for leaks
+	// Close the response body to signal the server to stop serving.
+	// This isn't strictly necessary, since the test serveWatch doesn't block,
+	// but it would be if this were the real watch server.
+	require.NoError(t, resp.Body.Close())
+
+	// Wait for the server to call watcher.Stop, closing the result channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
+
+	// Confirm watcher.Stop was called by the server.
 	require.Truef(t, watcher.IsStopped(),
-		"Leaked watcher goruntine after request done")
+		"Leaked watcher goroutine after request done")
 }
 
 func TestWatchHTTPDynamicClientErrors(t *testing.T) {
@@ -235,6 +262,21 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 
 	_, err := client.Watch(ctx, metav1.ListOptions{})
 	require.Equal(t, runtime.NegotiateError{Stream: true, ContentType: "testcase/json"}, err)
+
+	// The client should automatically close the connection on error.
+
+	// Wait for the server to call the CancelFunc returned by
+	// TimeoutFactory.TimeoutCh, closing the done channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
+	require.NoError(t, err)
+
+	// Wait for the server to call watcher.Stop, closing the result channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
+
+	// Confirm watcher.Stop was called by the server.
+	require.Truef(t, watcher.IsStopped(),
+		"Leaked watcher goroutine after request done")
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {
@@ -287,27 +329,23 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	err = decoder.Decode(&got)
 	require.NoError(t, err)
 
-	// Timeout and check for leaks
+	// Trigger server-side timeout.
 	close(timeoutCh)
-	select {
-	case <-doneCh:
-		eventCh := watcher.ResultChan()
-		select {
-		case _, opened := <-eventCh:
-			if opened {
-				t.Errorf("Watcher received unexpected event")
-			}
-			if !watcher.IsStopped() {
-				t.Errorf("Watcher is not stopped")
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Leaked watch on timeout")
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Failed to stop watcher after %s of timeout signal", wait.ForeverTestTimeout.String())
-	}
 
-	// Make sure we can't receive any more events through the timeout watch
+	// Wait for the server to call the CancelFunc returned by
+	// TimeoutFactory.TimeoutCh, closing the done channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, doneCh)
+	require.NoError(t, err)
+
+	// Wait for the server to call watcher.Stop, closing the result channel.
+	err = utiltesting.WaitForChannelToCloseWithTimeout(ctx, wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
+
+	// Confirm watcher.Stop was called by the server.
+	require.Truef(t, watcher.IsStopped(),
+		"Leaked watcher goroutine after request done")
+
+	// Make sure we can't receive any more events after the watch timeout
 	err = decoder.Decode(&got)
 	require.Equal(t, io.EOF, err)
 }
@@ -344,4 +382,57 @@ func serveWatch(watchServer *WatchServer, preServeErr error) http.HandlerFunc {
 		}
 		watchServer.HandleHTTP(w, req)
 	}
+}
+
+// From https://github.com/golang/go/blob/go1.20/src/net/http/transport.go#L2779
+var errReadOnClosedResBody = errors.New("http: read on closed response body")
+
+// assertClosed fails the test if the ReadCloser is NOT already closed.
+// If not already closed, the ReadCloser will be drained and closed.
+// Defer when your test is expected to close the ReadCloser before ending.
+func assertClosed(t *testing.T, rc io.ReadCloser) {
+	assert.Equal(t, errReadOnClosedResBody, drainAndClose(rc))
+}
+
+// assertNotClosed fails the test if the ReadCloser is already closed.
+// If not already closed, the ReadCloser will be drained and closed.
+// Defer when your test is NOT expected to close the ReadCloser before ending.
+func assertNotClosed(t *testing.T, rc io.ReadCloser) {
+	assert.NoError(t, drainAndClose(rc))
+}
+
+// drainAndClose reads from the ReadCloser until EOF, discarding the content,
+// and closes the ReadCloser when finished or on error.
+// Returns an error when either Read or Close error. If both error, the errors
+// are joined and returned.
+//
+// In a defer from a test, use with t.Error or assert.NoError, NOT t.Fatal or
+// require.NoError.
+func drainAndClose(rc io.ReadCloser) error {
+	errCh := make(chan error)
+	go func() {
+		// Close after done reading
+		defer func() {
+			defer close(errCh)
+			if err := rc.Close(); err != nil {
+				errCh <- err
+			}
+		}()
+		// Read until EOF and discard
+		if _, err := io.Copy(io.Discard, rc); err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Wait until Read and Close are both done.
+	// Combine errors, if multiple.
+	var multiErr error
+	for err := range errCh {
+		if multiErr != nil {
+			multiErr = errors.Join(multiErr, err)
+		} else {
+			multiErr = err
+		}
+	}
+	return multiErr
 }

@@ -39,11 +39,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/google/go-cmp/cmp"
-
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -54,6 +52,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
@@ -2110,29 +2109,30 @@ func TestWatch(t *testing.T) {
 			defer testServer.Close()
 
 			s := testRESTClient(t, testServer)
-			watching, err := s.Get().Prefix("path/to/watch/thing").
-				MaxRetries(test.maxRetries).Watch(context.Background())
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			watcher, err := s.Get().Prefix("path/to/watch/thing").
+				MaxRetries(test.maxRetries).Watch(t.Context())
+			require.NoError(t, err)
+			defer watcher.Stop()
 
+			// Read the events from the result channel
+			resultCh := watcher.ResultChan()
 			for _, item := range table {
-				got, ok := <-watching.ResultChan()
+				got, ok := <-resultCh
 				if !ok {
-					t.Fatalf("Unexpected early close")
+					t.Fatal("Unexpected early close")
 				}
-				if e, a := item.t, got.Type; e != a {
-					t.Errorf("Expected %v, got %v", e, a)
-				}
-				if e, a := item.obj, got.Object; !apiequality.Semantic.DeepDerivative(e, a) {
-					t.Errorf("Expected %v, got %v", e, a)
+				assert.Equal(t, item.t, got.Type)
+				if !apiequality.Semantic.DeepDerivative(item.obj, got.Object) {
+					t.Errorf("Unexpected watch event object, diff: %s", cmp.Diff(item.obj, got.Object))
 				}
 			}
 
-			_, ok := <-watching.ResultChan()
-			if ok {
-				t.Fatal("Unexpected non-close")
-			}
+			// Stop watcher when done reading watch events
+			watcher.Stop()
+
+			// Wait for the result channel to close
+			err = utiltesting.WaitForChannelToCloseWithTimeout(t.Context(), wait.ForeverTestTimeout, resultCh)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -2173,28 +2173,27 @@ func TestWatchNonDefaultContentType(t *testing.T) {
 	contentConfig := defaultContentConfig()
 	contentConfig.ContentType = "application/vnd.kubernetes.protobuf"
 	s := testRESTClientWithConfig(t, testServer, contentConfig)
-	watching, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
-	if err != nil {
-		t.Fatalf("Unexpected error")
-	}
+	watcher, err := s.Get().Prefix("path/to/watch/thing").Watch(t.Context())
+	require.NoError(t, err)
+	defer watcher.Stop()
 
 	for _, item := range table {
-		got, ok := <-watching.ResultChan()
+		got, ok := <-watcher.ResultChan()
 		if !ok {
 			t.Fatalf("Unexpected early close")
 		}
-		if e, a := item.t, got.Type; e != a {
-			t.Errorf("Expected %v, got %v", e, a)
-		}
-		if e, a := item.obj, got.Object; !apiequality.Semantic.DeepDerivative(e, a) {
-			t.Errorf("Expected %v, got %v", e, a)
+		assert.Equal(t, item.t, got.Type)
+		if !apiequality.Semantic.DeepDerivative(item.obj, got.Object) {
+			t.Errorf("Unexpected watch event object, diff: %s", cmp.Diff(item.obj, got.Object))
 		}
 	}
 
-	_, ok := <-watching.ResultChan()
-	if ok {
-		t.Fatal("Unexpected non-close")
-	}
+	// Stop watcher when done reading watch events
+	watcher.Stop()
+
+	// Wait for the result channel to close
+	err = utiltesting.WaitForChannelToCloseWithTimeout(t.Context(), wait.ForeverTestTimeout, watcher.ResultChan())
+	require.NoError(t, err)
 }
 
 func TestWatchUnknownContentType(t *testing.T) {
@@ -2230,10 +2229,8 @@ func TestWatchUnknownContentType(t *testing.T) {
 	defer testServer.Close()
 
 	s := testRESTClient(t, testServer)
-	_, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
-	if err == nil {
-		t.Fatalf("Expected to fail due to lack of known stream serialization for content type")
-	}
+	_, err := s.Get().Prefix("path/to/watch/thing").Watch(t.Context())
+	require.Equal(t, runtime.NegotiateError{ContentType: "foobar", Stream: true}, err)
 }
 
 func TestStream(t *testing.T) {
