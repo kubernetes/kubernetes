@@ -1,3 +1,7 @@
+> ⚠️ **This is a staging repository for Kubernetes**.  
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is not for direct contributions.
+
 # api
 
 Schema of the external API types that are served by the Kubernetes API server.
