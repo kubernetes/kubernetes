@@ -65,8 +65,8 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 
 			fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
-			_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-			smtLevel = getSMTLevel()
+			_, cpuAlloc, _ := getLocalNodeCPUDetails(ctx, f)
+			smtLevel = smtLevelFromSysFS()
 
 			// strict SMT alignment is trivially verified and granted on non-SMT systems
 			if smtLevel < 2 {
@@ -456,7 +456,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			framework.Logf("Threads per Core on the system %d", threadsPerCore)
 			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
 
-			smtLevel = getSMTLevel()
+			smtLevel = smtLevelFromSysFS()
 			framework.Logf("SMT Level on the system %d", smtLevel)
 
 			ginkgo.By("Querying the podresources endpoint to get the baseline")
