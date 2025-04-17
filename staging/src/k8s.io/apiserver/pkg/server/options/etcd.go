@@ -364,7 +364,7 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	if err != nil {
 		return err
 	}
-	c.AddHealthChecks(healthz.NamedCheck("etcd", func(r *http.Request) error {
+	c.AddHealthChecks(healthz.NamedGroupedCheck("etcd", "etcd", func(r *http.Request) error {
 		return healthCheck()
 	}))
 
@@ -372,7 +372,7 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 	if err != nil {
 		return err
 	}
-	c.AddReadyzChecks(healthz.NamedCheck("etcd-readiness", func(r *http.Request) error {
+	c.AddReadyzChecks(healthz.NamedGroupedCheck("etcd-readiness", "etcd-readiness", func(r *http.Request) error {
 		return readyCheck()
 	}))
 
@@ -408,7 +408,7 @@ func (s *EtcdOptions) addOverrideEtcdHealthEndpoint(c *server.Config) error {
 				return err
 			}
 			currentIndex := len(uniqueServerSets) - 1
-			c.AddHealthChecks(healthz.NamedCheck(fmt.Sprintf("etcd-override-%d", currentIndex), func(r *http.Request) error {
+			c.AddHealthChecks(healthz.NamedGroupedCheck(fmt.Sprintf("etcd-override-%d", currentIndex), "etcd", func(r *http.Request) error {
 				return healthCheck()
 			}))
 
@@ -416,7 +416,7 @@ func (s *EtcdOptions) addOverrideEtcdHealthEndpoint(c *server.Config) error {
 			if err != nil {
 				return err
 			}
-			c.AddReadyzChecks(healthz.NamedCheck(fmt.Sprintf("etcd-override-readiness-%d", currentIndex), func(r *http.Request) error {
+			c.AddReadyzChecks(healthz.NamedGroupedCheck(fmt.Sprintf("etcd-override-readiness-%d", currentIndex), "etcd-readiness", func(r *http.Request) error {
 				return readyCheck()
 			}))
 		}
