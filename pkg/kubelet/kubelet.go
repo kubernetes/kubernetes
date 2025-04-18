@@ -2829,7 +2829,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.deleteContainersInPod("", podStatus, false)
 			}
 		}
 	}
@@ -3180,9 +3180,21 @@ func (kl *Kubelet) ListenAndServePodResources() {
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
-		// When an evicted or deleted pod has already synced, all containers can be removed.
-		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		for _, sandboxStatus := range podStatus.SandboxStatuses {
+			// If exitedContainerID is the ID of the sandbox container,
+			// we skip deleting this container to avoid duplicate RemoveContainer calls.
+			if sandboxStatus.GetId() == exitedContainerID {
+				klog.V(4).InfoS("exitedContainerID is a sandbox container, skipping container deletion", "exitedContainerID", exitedContainerID)
+				return
+			}
+		}
+
+		keepMinimContainers := true
+		if kl.podWorkers.ShouldPodContentBeRemoved(podID) {
+			keepMinimContainers = false
+		}
+
+		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, keepMinimContainers)
 	}
 }
 
