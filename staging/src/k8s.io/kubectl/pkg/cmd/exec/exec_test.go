@@ -127,6 +127,14 @@ func TestPodAndContainer(t *testing.T) {
 			name:          "cmd, container in flag",
 			obj:           execPod(),
 		},
+		{
+			p:             &ExecOptions{},
+			args:          []string{"foo", "extra1", "extra2", "--", "cmd"},
+			argsLenAtDash: 3,
+			expectError:   true,
+			name:          "extra args between pod and dash",
+			obj:           execPod(),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

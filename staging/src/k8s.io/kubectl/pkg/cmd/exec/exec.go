@@ -205,11 +205,19 @@ type ExecOptions struct {
 
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+	// If there are args before the dash, the first one is the resource name
 	if len(argsIn) > 0 && argsLenAtDash != 0 {
 		p.ResourceName = argsIn[0]
 	}
+
 	if argsLenAtDash > -1 {
+		// If there's a dash, everything after the dash is the command
 		p.Command = argsIn[argsLenAtDash:]
+		// Check if there are any arguments between the resource name and the dash
+		// that are not part of the command
+		if argsLenAtDash > 1 {
+			return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
+		}
 	} else if len(argsIn) > 1 || (len(argsIn) > 0 && len(p.FilenameOptions.Filenames) != 0) {
 		return cmdutil.UsageErrorf(cmd, "exec [POD] [COMMAND] is not supported anymore. Use exec [POD] -- [COMMAND] instead")
 	}
