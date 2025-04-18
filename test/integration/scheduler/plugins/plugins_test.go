@@ -451,7 +451,7 @@ func (rp *ReservePlugin) Name() string {
 func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	rp.numReserveCalled++
 	if rp.failReserve {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 	return nil
 }
@@ -462,7 +462,10 @@ func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleStat
 func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	rp.numUnreserveCalled++
 	if rp.pluginInvokeEventChan != nil {
-		rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}
+		select {
+		case <-ctx.Done():
+		case rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}:
+		}
 	}
 }
 
@@ -521,7 +524,10 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 
 	bp.numBindCalled++
 	if bp.pluginInvokeEventChan != nil {
-		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
+		select {
+		case <-ctx.Done():
+		case bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}:
+		}
 	}
 	if bp.bindStatus.IsSuccess() {
 		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
@@ -549,7 +555,10 @@ func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleSt
 
 	pp.numPostBindCalled++
 	if pp.pluginInvokeEventChan != nil {
-		pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}
+		select {
+		case <-ctx.Done():
+		case pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}:
+		}
 	}
 }
 
@@ -1152,7 +1161,7 @@ func TestReservePluginReserve(t *testing.T) {
 
 			if test.fail {
 				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					testutils.PodUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
 					t.Errorf("Didn't expect the pod to be scheduled. error: %v", err)
 				}
 			} else {
@@ -1423,8 +1432,8 @@ func TestUnReserveReservePlugins(t *testing.T) {
 
 			if test.fail {
 				if err = wait.PollUntilContextTimeout(testCtx.Ctx, 10*time.Millisecond, 30*time.Second, false,
-					testutils.PodSchedulingError(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
-					t.Errorf("Expected a reasons other than Unschedulable, but got: %v", err)
+					testutils.PodUnschedulable(testCtx.ClientSet, pod.Namespace, pod.Name)); err != nil {
+					t.Errorf("Expected a Pod to get Unschedulable, but got: %v", err)
 				}
 
 				for i, pl := range test.plugins {
