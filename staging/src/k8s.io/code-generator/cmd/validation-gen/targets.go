@@ -171,7 +171,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	}
 
 	var targets []generator.Target
-	var lintErrs []error
+	linter := newLinter()
 
 	// First load other "input" packages.  We do this as a single call because
 	// it is MUCH faster.
@@ -311,17 +311,13 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			}
 		}
 
-		l := newLinter()
 		for _, t := range rootTypes {
 			klog.V(4).InfoS("linting root-type", "type", t)
-			if err := l.lintType(t); err != nil {
+			if err := linter.lintType(t); err != nil {
 				klog.Fatalf("failed to lint type %q: %v", t.Name, err)
 			}
-			if len(l.lintErrors) > 0 {
-				lintErrs = append(lintErrs, l.lintErrors...)
-			}
 		}
-		if args.Lint {
+		if args.LintOnly {
 			klog.V(4).Info("Lint is set, skip appending targets")
 			continue
 		}
@@ -354,17 +350,20 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			})
 	}
 
-	if len(lintErrs) > 0 {
-		var lintErrsStr string
-		for _, err := range lintErrs {
-			lintErrsStr += fmt.Sprintf("\n%s", err.Error())
-		}
-		if args.Lint {
-			klog.Fatalf("failed to lint comments: %s", lintErrsStr)
-		} else {
-			klog.Warningf("failed to lint comments: %s", lintErrsStr)
-		}
+	if len(linter.lintErrors) > 0 {
+		buf := strings.Builder{}
 
+		for t, errs := range linter.lintErrors {
+			buf.WriteString(fmt.Sprintf("  type %v:\n", t))
+			for _, err := range errs {
+				buf.WriteString(fmt.Sprintf("    %s\n", err.Error()))
+			}
+		}
+		if args.LintOnly {
+			klog.Fatalf("lint failed:\n%s", buf.String())
+		} else {
+			klog.Warningf("lint failed:\n%s", buf.String())
+		}
 	}
 	return targets
 }
