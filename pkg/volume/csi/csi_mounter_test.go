@@ -38,6 +38,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	clitesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgauthenticationv1 "k8s.io/kubernetes/pkg/apis/authentication/v1"
 	pkgcorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -356,6 +357,132 @@ func TestMounterSetUp(t *testing.T) {
 				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 			}
 
+		})
+	}
+}
+
+type mockVolumeOwnershipChanger struct {
+	triggerError bool
+}
+
+func (m *mockVolumeOwnershipChanger) ChangePermissions() error {
+	if m.triggerError {
+		return fmt.Errorf("mock error")
+	}
+	return nil
+}
+
+func (m *mockVolumeOwnershipChanger) AddProgressNotifier(pod *corev1.Pod, recorder record.EventRecorder) volume.VolumeOwnershipChanger {
+	return m
+}
+
+func TestMounterSetupJsonFileHandling(t *testing.T) {
+	testCases := []struct {
+		name                string
+		volumeID            string
+		setupShouldFail     bool
+		errorType           error
+		failOwnershipChange bool
+		shouldRemoveFile    bool
+	}{
+		{
+			name:             "transient error should not remove json file",
+			volumeID:         fakecsi.NodePublishTimeOut_VolumeID,
+			setupShouldFail:  true,
+			shouldRemoveFile: false,
+		},
+		{
+			name:             "final error should remove json file",
+			volumeID:         fakecsi.NodePublishFinalError_VolumeID,
+			setupShouldFail:  true,
+			shouldRemoveFile: true,
+		},
+		{
+			name:                "error in fsgroup permission change, should not remove json file",
+			volumeID:            testVol,
+			failOwnershipChange: true,
+			setupShouldFail:     true,
+			shouldRemoveFile:    false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			modes := []storage.VolumeLifecycleMode{
+				storage.VolumeLifecyclePersistent,
+			}
+			csiDriver := getTestCSIDriver("file-driver", nil, nil, modes)
+			fileFsPolicy := storage.FileFSGroupPolicy
+			csiDriver.Spec.FSGroupPolicy = &fileFsPolicy
+
+			fakeClient := fakeclient.NewSimpleClientset(csiDriver)
+			plug, tmpDir := newTestPlugin(t, fakeClient)
+			defer os.RemoveAll(tmpDir)
+
+			registerFakePlugin("test-driver", "endpoint", []string{"1.0.0"}, t)
+			pv := makeTestPV("test-vol", 10, "file-driver", tc.volumeID)
+			pv.Spec.MountOptions = []string{"foo=bar", "baz=qux"}
+
+			mounter, err := plug.NewMounter(
+				volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
+				&corev1.Pod{
+					ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod},
+					Spec: corev1.PodSpec{
+						ServiceAccountName: testAccount,
+					},
+				},
+			)
+			if err != nil {
+				t.Fatalf("failed to make a new Mounter: %v", err)
+			}
+
+			if mounter == nil {
+				t.Fatal("failed to create CSI mounter")
+			}
+
+			csiMounter := mounter.(*csiMountMgr)
+			csiMounter.csiClient = setupClient(t, true)
+
+			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
+			if err != nil {
+				t.Fatalf("failed to setup VolumeAttachment: %v", err)
+			}
+
+			var mounterArgs volume.MounterArgs
+			fsGroup := int64(2000)
+			mounterArgs.FsGroup = &fsGroup
+			if tc.failOwnershipChange {
+				mounterArgs.VolumeOwnershipApplicator = &mockVolumeOwnershipChanger{triggerError: true}
+			}
+
+			dataDir := filepath.Dir(mounter.GetPath())
+
+			// Mounter.SetUp()
+			err = csiMounter.SetUp(mounterArgs)
+			if tc.setupShouldFail {
+				if err == nil {
+					t.Error("test should fail, but no error occurred")
+				}
+			} else if err != nil {
+				t.Fatal("unexpected error:", err)
+			}
+
+			// Check if the json file exists or not
+			dataFile := filepath.Join(dataDir, volDataFileName)
+			_, err = os.Stat(dataFile)
+			if tc.shouldRemoveFile {
+				if !os.IsNotExist(err) {
+					t.Errorf("Expected json file to be removed, but it still exists: %v", err)
+				}
+			} else {
+				if os.IsNotExist(err) {
+					t.Errorf("Expected json file to exist, but it was removed")
+				} else if err != nil {
+					t.Errorf("Unexpected error while checking json file: %v", err)
+				}
+			}
 		})
 	}
 }

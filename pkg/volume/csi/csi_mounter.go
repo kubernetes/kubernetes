@@ -281,23 +281,16 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	err = saveVolumeData(parentDir, volDataFileName, volData)
-	defer func() {
-		// Only if there was an error and volume operation was considered
-		// finished, we should remove the directory.
-		if err != nil && volumetypes.IsOperationFinishedError(err) {
-			// attempt to cleanup volume mount dir
-			if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
-				klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
-			}
-		}
-	}()
 	if err != nil {
 		errorMsg := log("mounter.SetUpAt failed to save volume info data: %v", err)
 		klog.Error(errorMsg)
-		return volumetypes.NewTransientOperationFailure(errorMsg)
+		if removeerr := removeMountDir(c.plugin, dir); removeerr != nil {
+			klog.Error(log("mounter.SetUpAt failed to remove mount dir after error [%s]: %v", dir, removeerr))
+		}
+		return err
 	}
 
-	err = csi.NodePublishVolume(
+	csiRPCError := csi.NodePublishVolume(
 		ctx,
 		volumeHandle,
 		readOnly,
@@ -312,14 +305,14 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		nodePublishFSGroupArg,
 	)
 
-	if err != nil {
+	if csiRPCError != nil {
 		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(err) {
+		if volumetypes.IsOperationFinishedError(csiRPCError) {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 			}
 		}
-		return err
+		return csiRPCError
 	}
 
 	if !selinuxLabelMount {
@@ -332,9 +325,13 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	if !driverSupportsCSIVolumeMountGroup && c.supportsFSGroup(fsType, mounterArgs.FsGroup, fsGroupPolicy) {
 		// Driver doesn't support applying FSGroup. Kubelet must apply it instead.
-
+		var ownershipChanger volume.VolumeOwnershipChanger
+		if mounterArgs.VolumeOwnershipApplicator != nil {
+			ownershipChanger = mounterArgs.VolumeOwnershipApplicator
+		} else {
+			ownershipChanger = volume.NewVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
+		}
 		// fullPluginName helps to distinguish different driver from csi plugin
-		ownershipChanger := volume.NewVolumeOwnership(c, dir, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(c.plugin, c.spec))
 		ownershipChanger.AddProgressNotifier(c.pod, mounterArgs.Recorder)
 		err = ownershipChanger.ChangePermissions()
 		if err != nil {
