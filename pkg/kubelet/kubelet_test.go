@@ -60,6 +60,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	critest "k8s.io/cri-api/pkg/apis/testing"
 	remote "k8s.io/cri-client/pkg"
 	fakeremote "k8s.io/cri-client/pkg/fake"
 	"k8s.io/klog/v2"
@@ -378,7 +379,7 @@ func newTestKubeletWithImageList(
 		t.Fatalf("Failed to create UserNsManager: %v", err)
 	}
 	kubelet.admitHandlers.AddPodAdmitHandler(shutdownManager)
-
+	fakeRuntimeService := critest.NewFakeRuntimeService()
 	// Add this as cleanup predicate pod admitter
 	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
 
@@ -403,6 +404,7 @@ func newTestKubeletWithImageList(
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		fakeRuntime,
+		fakeRuntimeService,
 		kubelet.mounter,
 		kubelet.hostutil,
 		kubelet.getPodsDir(),

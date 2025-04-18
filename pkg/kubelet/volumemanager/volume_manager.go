@@ -38,9 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/config" 
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
@@ -168,6 +170,7 @@ type PodStateProvider interface {
 type PodManager interface {
 	GetPodByUID(k8stypes.UID) (*v1.Pod, bool)
 	GetPods() []*v1.Pod
+	GetPodStateChannel() pod.PodStateChannel
 }
 
 // NewVolumeManager returns a new concrete instance implementing the
@@ -186,6 +189,7 @@ func NewVolumeManager(
 	kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
 	kubeContainerRuntime container.Runtime,
+	runtimeService internalapi.RuntimeService,
 	mounter mount.Interface,
 	hostutil hostutil.HostUtils,
 	kubeletPodsDir string,
@@ -218,6 +222,7 @@ func NewVolumeManager(
 		vm.desiredStateOfWorld,
 		vm.actualStateOfWorld,
 		kubeContainerRuntime,
+		runtimeService,
 		csiMigratedPluginManager,
 		intreeToCSITranslator,
 		volumePluginMgr)

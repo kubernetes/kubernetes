@@ -99,6 +99,9 @@ type Manager interface {
 	// GetUIDTranslations returns the mappings of static pod UIDs to mirror pod
 	// UIDs and mirror pod UIDs to static pod UIDs.
 	GetUIDTranslations() (podToMirror map[kubetypes.ResolvedPodUID]kubetypes.MirrorPodUID, mirrorToPod map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID)
+
+	// GetPodStateChannel returns a channel for receiving pod state changes
+	GetPodStateChannel() PodStateChannel
 }
 
 // basicManager is a functional Manager.
@@ -120,12 +123,17 @@ type basicManager struct {
 
 	// Mirror pod UID to pod UID map.
 	translationByUID map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID
+
+	// Channel for pod state changes
+	stateChannel PodStateChannel
 }
 
 // NewBasicPodManager returns a functional Manager.
 func NewBasicPodManager() Manager {
 	pm := &basicManager{}
 	pm.SetPods(nil)
+	// limit of 500 event need to be adjusted in the future
+	pm.stateChannel = make(PodStateChannel, 500)
 	return pm
 }
 
@@ -145,12 +153,22 @@ func (pm *basicManager) SetPods(newPods []*v1.Pod) {
 
 func (pm *basicManager) AddPod(pod *v1.Pod) {
 	pm.UpdatePod(pod)
+	pm.stateChannel <- PodStateEvent{
+		Type: PodAdded,
+		Pod:  pod,
+		UID:  pod.UID,
+	}
 }
 
 func (pm *basicManager) UpdatePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	pm.updatePodsInternal(pod)
+	pm.stateChannel <- PodStateEvent{
+		Type: PodUpdated,
+		Pod:  pod,
+		UID:  pod.UID,
+	}
 }
 
 // updateMetrics updates the metrics surfaced by the pod manager.
@@ -200,15 +218,24 @@ func (pm *basicManager) RemovePod(pod *v1.Pod) {
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	podFullName := kubecontainer.GetPodFullName(pod)
+	var podUID types.UID
 	// It is safe to type convert here due to the IsMirrorPod guard.
 	if kubetypes.IsMirrorPod(pod) {
 		mirrorPodUID := kubetypes.MirrorPodUID(pod.UID)
+		podUID = types.UID(mirrorPodUID)
 		delete(pm.mirrorPodByUID, mirrorPodUID)
 		delete(pm.mirrorPodByFullName, podFullName)
 		delete(pm.translationByUID, mirrorPodUID)
 	} else {
-		delete(pm.podByUID, kubetypes.ResolvedPodUID(pod.UID))
+		resolvedPodUID := kubetypes.ResolvedPodUID(pod.UID)
+		podUID = types.UID(resolvedPodUID)
+		delete(pm.podByUID, resolvedPodUID)
 		delete(pm.podByFullName, podFullName)
+	}
+	pm.stateChannel <- PodStateEvent{
+		Type: PodRemoved,
+		Pod:  pod,
+		UID:  podUID,
 	}
 }
 
@@ -313,6 +340,11 @@ func IsMirrorPodOf(mirrorPod, pod *v1.Pod) bool {
 		return false
 	}
 	return hash == getPodHash(pod)
+}
+
+// GetPodStateChannel returns the channel handling pod state events
+func (pm *basicManager) GetPodStateChannel() PodStateChannel {
+	return pm.stateChannel
 }
 
 func podsMapToPods(UIDMap map[kubetypes.ResolvedPodUID]*v1.Pod) []*v1.Pod {
