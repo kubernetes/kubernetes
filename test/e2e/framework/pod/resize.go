@@ -332,7 +332,7 @@ func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework
 				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
 			}
 
-			expectedCPULimits := GetCPULimitCgroupExpectations(cpuLimit)
+			expectedCPULimits := GetCPULimitCgroupExpectations(cpuLimit, *podOnCgroupv2Node)
 			expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
 			if *podOnCgroupv2Node {
 				if expectedMemLimitString == "0" {
