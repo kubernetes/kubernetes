@@ -77,7 +77,7 @@ func TestGetCPULimitCgroupExpectations(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			podOnCgroupv2Node = &tc.podOnCgroupv2Node
-			actual := GetCPULimitCgroupExpectations(tc.cpuLimit)
+			actual := getCPULimitCgroupExpectations(tc.cpuLimit)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
