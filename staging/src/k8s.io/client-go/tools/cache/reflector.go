@@ -483,6 +483,8 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
 
+	defer utilruntime.HandleCrashWithContext(ctx)
+
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
 		select {
@@ -580,6 +582,8 @@ func (r *Reflector) list(ctx context.Context) error {
 				panicCh <- r
 			}
 		}()
+		defer utilruntime.HandleCrashWithContext(ctx)
+
 		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
 		// list request will return the full response.
 		pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
