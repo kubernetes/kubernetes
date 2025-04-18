@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/exec"
 )
 
 func TestGetURLParts(t *testing.T) {
@@ -439,4 +441,102 @@ func TestRecordContainerEventUnknownStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStartupProbeEventType(t *testing.T) {
+	tests := []struct {
+		name      string
+		probeType probeType
+		result    probe.Result
+		expected  string
+	}{
+		{
+			name:      "startup probe failure should be Normal event",
+			probeType: startup,
+			result:    probe.Failure,
+			expected:  v1.EventTypeNormal,
+		},
+		{
+			name:      "liveness probe failure should be Warning event",
+			probeType: liveness,
+			result:    probe.Failure,
+			expected:  v1.EventTypeWarning,
+		},
+		{
+			name:      "readiness probe failure should be Warning event",
+			probeType: readiness,
+			result:    probe.Failure,
+			expected:  v1.EventTypeWarning,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up scheme
+			err := v1.AddToScheme(legacyscheme.Scheme)
+			if err != nil {
+				t.Fatalf("Failed to add v1 to scheme: %v", err)
+			}
+
+			recorder := record.NewFakeRecorder(1)
+			prober := newProber(nil, recorder)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-pod",
+					UID:  "test-uid",
+				},
+			}
+			container := v1.Container{
+				Name: "test-container",
+			}
+
+			switch tt.probeType {
+			case startup:
+				container.StartupProbe = &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{},
+					},
+				}
+			case liveness:
+				container.LivenessProbe = &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{},
+					},
+				}
+			case readiness:
+				container.ReadinessProbe = &v1.Probe{
+					ProbeHandler: v1.ProbeHandler{
+						Exec: &v1.ExecAction{},
+					},
+				}
+			}
+
+			// Mock probe execution to return failure
+			prober.exec = &execFakeProber{result: tt.result}
+
+			result, _ := prober.probe(context.Background(), tt.probeType, pod, v1.PodStatus{}, container, kubecontainer.ContainerID{Type: "test", ID: "container-id"})
+			if result != results.Failure {
+				t.Errorf("Expected probe result to be Failure, got %v", result)
+			}
+
+			// Verify event type
+			select {
+			case event := <-recorder.Events:
+				if !strings.Contains(event, tt.expected) {
+					t.Errorf("Expected event type %s, got event: %s", tt.expected, event)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("Timed out waiting for event")
+			}
+		})
+	}
+}
+
+type execFakeProber struct {
+	result probe.Result
+}
+
+func (p *execFakeProber) Probe(e exec.Cmd) (probe.Result, string, error) {
+	return p.result, "test output", nil
 }
