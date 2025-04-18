@@ -45,6 +45,7 @@ func KnownLibraries() []Library {
 		cidrsLib,
 		formatLib,
 		semverLib,
+		imageLib,
 		jsonPatchLib,
 	}
 }
