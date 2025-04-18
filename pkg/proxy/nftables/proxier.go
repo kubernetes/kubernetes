@@ -36,7 +36,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -164,7 +163,7 @@ type Proxier struct {
 	lastFullSync         time.Time
 	needFullSync         bool
 	initialized          int32
-	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncRunner           *proxyutil.WorkQueueRunner // governs calls to syncProxyRules
 	syncPeriod           time.Duration
 	flushed              bool
 
@@ -273,10 +272,9 @@ func NewProxier(ctx context.Context,
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
 	}
 
-	burstSyncs := 2
-	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner. time.Hour is arbitrary.
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, proxyutil.FullSyncPeriod, burstSyncs)
+	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod)
+	// We need to pass *some* maxInterval to WorkQueueRunner. time.Hour is arbitrary.
+	proxier.syncRunner = proxyutil.NewWorkQueueRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, proxyutil.FullSyncPeriod)
 
 	return proxier, nil
 }

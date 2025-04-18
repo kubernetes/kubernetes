@@ -49,7 +49,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	netutils "k8s.io/utils/net"
 )
 
@@ -655,7 +654,7 @@ type Proxier struct {
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	initialized          int32
-	syncRunner           *async.BoundedFrequencyRunner // governs calls to syncProxyRules
+	syncRunner           *proxyutil.WorkQueueRunner // governs calls to syncProxyRules
 	// These are effectively const and do not need the mutex to be held.
 	nodeName string
 	nodeIP   net.IP
@@ -748,9 +747,8 @@ func NewProxier(
 		return nil, err
 	}
 
-	burstSyncs := 2
-	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "burstSyncs", burstSyncs)
-	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, burstSyncs)
+	klog.V(3).InfoS("Record sync param", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod)
+	proxier.syncRunner = proxyutil.NewWorkQueueRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod)
 	return proxier, nil
 }
 
