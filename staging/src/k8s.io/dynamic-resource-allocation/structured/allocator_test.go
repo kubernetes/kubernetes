@@ -395,6 +395,14 @@ func deviceAllocationResult(request, driver, pool, device string, adminAccess bo
 	return r
 }
 
+func multipleDeviceAllocationResults(request, driver, pool string, count, startIndex int) []resourceapi.DeviceRequestAllocationResult {
+	var results []resourceapi.DeviceRequestAllocationResult
+	for i := startIndex; i < startIndex+count; i++ {
+		results = append(results, deviceAllocationResult(request, driver, pool, fmt.Sprintf("device-%d", i), false))
+	}
+	return results
+}
+
 // nodeLabelSelector creates a node selector with a label match for "key" in "values".
 func nodeLabelSelector(key string, values ...string) *v1.NodeSelector {
 	requirements := []v1.NodeSelectorRequirement{{
@@ -3022,6 +3030,65 @@ func TestAllocator(t *testing.T) {
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
+		"prioritized-list-max-allocation-limit-request": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						subRequest(subReq0, classA, resourceapi.AllocationResultsMaxSize),
+						subRequest(subReq1, classA, resourceapi.AllocationResultsMaxSize/2),
+					),
+					requestWithPrioritizedList(req1,
+						subRequest(subReq0, classA, resourceapi.AllocationResultsMaxSize),
+						subRequest(subReq1, classA, resourceapi.AllocationResultsMaxSize/2),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices:  objects(sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize*2)),
+			node:    node(node1, region1),
+
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				slices.Concat(
+					multipleDeviceAllocationResults(req0SubReq1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, 0),
+					multipleDeviceAllocationResults(req1SubReq1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, resourceapi.AllocationResultsMaxSize/2),
+				)...,
+			)},
+		},
+		"prioritized-list-max-allocation-allocation-mode-all": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						resourceapi.DeviceSubRequest{
+							Name:            subReq0,
+							AllocationMode:  resourceapi.DeviceAllocationModeAll,
+							DeviceClassName: classA,
+						},
+						subRequest(subReq1, classA, 2),
+					),
+					request(req1, classB, 2),
+				),
+			),
+			classes: objects(class(classA, driverA), class(classB, driverB)),
+			slices: objects(
+				sliceWithMultipleDevices(slice1, node1, pool1, driverA, resourceapi.AllocationResultsMaxSize-1),
+				sliceWithMultipleDevices(slice2, node1, pool2, driverB, 2),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-0", false),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, "device-1", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-0", false),
+				deviceAllocationResult(req1, driverB, pool2, "device-1", false),
 			)},
 		},
 	}
