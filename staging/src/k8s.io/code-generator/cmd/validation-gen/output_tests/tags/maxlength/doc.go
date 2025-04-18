@@ -30,20 +30,38 @@ type Struct struct {
 	// +k8s:maxLength=0
 	Max0Field string `json:"max0Field"`
 
+	// +k8s:maxLength=0
+	Max0PtrField *string `json:"max0PtrField"`
+
 	// +k8s:maxLength=10
 	Max10Field string `json:"max10Field"`
+
+	// +k8s:maxLength=10
+	Max10PtrField *string `json:"max10PtrField"`
 
 	// +k8s:maxLength=0
 	Max0UnvalidatedTypedefField UnvalidatedStringType `json:"max0UnvalidatedTypedefField"`
 
+	// +k8s:maxLength=0
+	Max0UnvalidatedTypedefPtrField *UnvalidatedStringType `json:"max0UnvalidatedTypedefPtrField"`
+
 	// +k8s:maxLength=10
 	Max10UnvalidatedTypedefField UnvalidatedStringType `json:"max10UnvalidatedTypedefField"`
+
+	// +k8s:maxLength=10
+	Max10UnvalidatedTypedefPtrField *UnvalidatedStringType `json:"max10UnvalidatedTypedefPtrField"`
 
 	// Note: no validation here
 	Max0ValidatedTypedefField Max0Type `json:"max0ValidatedTypedefField"`
 
 	// Note: no validation here
+	Max0ValidatedTypedefPtrField *Max0Type `json:"max0ValidatedTypedefPtrField"`
+
+	// Note: no validation here
 	Max10ValidatedTypedefField Max10Type `json:"max10ValidatedTypedefField"`
+
+	// Note: no validation here
+	Max10ValidatedTypedefPtrField *Max10Type `json:"max10ValidatedTypedefPtrField"`
 }
 
 // Note: no validation here
