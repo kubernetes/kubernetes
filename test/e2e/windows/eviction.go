@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -43,6 +44,9 @@ const (
 	// it and the wait for the taint to be removed so other serial/slow tests can run
 	// against the same node.
 	waitForNodeMemoryPressureTaintDelayDuration = 45 * time.Second
+
+	// eviction pod namespace base name
+	evictionPodNamespaceBaseName = "eviction-test-windows"
 )
 
 var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framework.WithSlow(), framework.WithDisruptive(), (func() {
@@ -50,7 +54,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
 
-	f := framework.NewDefaultFramework("eviction-test-windows")
+	f := framework.NewDefaultFramework(evictionPodNamespaceBaseName)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	// This test will first find a Windows node memory-pressure hard-eviction enabled.
@@ -82,24 +86,10 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 			e2eskipper.Skipf("No Windows nodes with hard memory-pressure eviction found")
 		}
 
-		// Delete img-puller pods if they exist because eviction manager keeps selecting them for eviction first
-		// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
-		// image pre-pulling was enabled.
-		nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		for _, ns := range nsList.Items {
-			if strings.Contains(ns.Name, "img-puller") {
-				framework.Logf("Deleting pods in namespace %s", ns.Name)
-				podList, err := f.ClientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
-				framework.ExpectNoError(err)
-				for _, pod := range podList.Items {
-					framework.Logf("  Deleteing pod %s", pod.Name)
-					err = f.ClientSet.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}
-				break
-			}
-		}
+		err = waitForMemoryPressureTaintRemoval(ctx, f, node.Name, waitForNodeMemoryPressureTaintDelayDuration*4)
+		framework.ExpectNoError(err, "Timed out waiting for memory-pressure taint to be removed from node %q", node.Name)
+
+		cleanupImagePullerPods(ctx, f)
 
 		ginkgo.By("Scheduling a pod that requests and consumes 500Mi of Memory")
 
@@ -187,7 +177,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 				}
 			}
 			return false
-		}, 10*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("Eviction Event was not found"))
+		}).WithTimeout(10 * time.Minute).WithPolling(10 * time.Second).Should(gomega.BeTrueBecause("Eviction Event was not found"))
 
 		ginkgo.By("Waiting for node.kubernetes.io/memory-pressure taint to be removed")
 		// ensure e2e test framework catches the memory-pressure taint
@@ -197,3 +187,42 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		framework.ExpectNoError(err)
 	})
 }))
+
+// Delete img-puller pods if they exist because eviction manager keeps selecting them for eviction first
+// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
+// image pre-pulling was enabled.
+func cleanupImagePullerPods(ctx context.Context, f *framework.Framework) {
+	nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	for _, ns := range nsList.Items {
+		if strings.Contains(ns.Name, "img-puller") {
+			framework.Logf("Deleting pods in namespace %s", ns.Name)
+			podList, err := f.ClientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			for _, pod := range podList.Items {
+				framework.Logf("  Deleteing pod %s", pod.Name)
+				err = f.ClientSet.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}
+			break
+		}
+	}
+}
+
+func waitForMemoryPressureTaintRemoval(ctx context.Context, f *framework.Framework, nodeName string, timeout time.Duration) error {
+	framework.Logf("Waiting for memory-pressure taint to be removed from node %q", nodeName)
+	return wait.PollUntilContextTimeout(ctx, 10*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, taint := range node.Spec.Taints {
+			if taint.Key == v1.TaintNodeMemoryPressure && taint.Effect == v1.TaintEffectNoSchedule {
+				framework.Logf("Node %q still has memory-pressure taint", nodeName)
+				return false, nil
+			}
+		}
+		framework.Logf("Memory-pressure taint removed from node %q", nodeName)
+		return true, nil
+	})
+}
