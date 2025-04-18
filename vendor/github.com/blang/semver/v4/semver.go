@@ -68,8 +68,6 @@ func (v Version) FinalizeVersion() string {
 	b = strconv.AppendUint(b, v.Major, 10)
 	b = append(b, '.')
 	b = strconv.AppendUint(b, v.Minor, 10)
-	b = append(b, '.')
-	b = strconv.AppendUint(b, v.Patch, 10)
 	return string(b)
 }
 
@@ -461,16 +459,24 @@ func NewBuildVersion(s string) (string, error) {
 	return s, nil
 }
 
-// FinalizeVersion returns the major, minor and patch number only and discards
-// prerelease and build number.
+// FinalizeVersion returns the major.minor[.patch] version string,
+// discarding prerelease and build metadata.
+// If patch is 0, it's omitted.
 func FinalizeVersion(s string) (string, error) {
 	v, err := Parse(s)
 	if err != nil {
 		return "", err
 	}
-	v.Pre = nil
-	v.Build = nil
 
-	finalVer := v.String()
-	return finalVer, nil
+	b := make([]byte, 0, 5)
+	b = strconv.AppendUint(b, v.Major, 10)
+	b = append(b, '.')
+	b = strconv.AppendUint(b, v.Minor, 10)
+
+	if v.Patch != 0 {
+		b = append(b, '.')
+		b = strconv.AppendUint(b, v.Patch, 10)
+	}
+
+	return string(b), nil
 }
