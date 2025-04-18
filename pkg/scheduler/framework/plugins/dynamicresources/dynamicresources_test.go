@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/events"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -190,6 +191,70 @@ var (
 		Value:  "taint-value",
 		Effect: resourceapi.DeviceTaintEffectNoSchedule,
 	}
+
+	// for DRA Device Binding Conditions
+	bindingConditions        = []string{"condition"}
+	bindingFailureConditions = []string{"failed"}
+	bindingTimeout           = int64(15)
+
+	fabricSlice = func() *resourceapi.ResourceSlice {
+		res := st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+		res.Spec.Devices[0].Basic.UsageRestrictedToNode = ptr.To(true)
+		res.Spec.Devices[0].Basic.BindingConditions = bindingConditions
+		res.Spec.Devices[0].Basic.BindingFailureConditions = bindingFailureConditions
+		res.Spec.Devices[0].Basic.BindingTimeoutSeconds = &bindingTimeout
+		res.Spec.NodeSelector = st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj()
+		return res
+	}()
+
+	allocationResultWithBindingConditions = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{{
+				Driver:                   driver,
+				Pool:                     nodeName,
+				Device:                   "instance-1",
+				Request:                  "req-1",
+				BindingConditions:        bindingConditions,
+				BindingFailureConditions: bindingFailureConditions,
+				BindingTimeoutSeconds:    &bindingTimeout,
+			}},
+		},
+		NodeSelector: st.MakeNodeSelector().In("metadata.name", []string{nodeName}, st.NodeSelectorTypeMatchFields).Obj(),
+	}
+
+	boundClaim = st.FromResourceClaim(allocatedClaim).
+			Allocation(allocationResultWithBindingConditions).
+			AllocatedDeviceStatuses([]resourceapi.AllocatedDeviceStatus{
+			{
+				Driver: driver,
+				Pool:   nodeName,
+				Device: "instance-1",
+				Conditions: []metav1.Condition{
+					{Type: "condition", Status: metav1.ConditionTrue},
+					{Type: "failed", Status: metav1.ConditionFalse},
+				},
+			},
+		}).
+		Obj()
+
+	failedBindingClaim = st.FromResourceClaim(allocatedClaim).
+				Allocation(allocationResultWithBindingConditions).
+				AllocatedDeviceStatuses([]resourceapi.AllocatedDeviceStatus{
+			{
+				Driver: driver,
+				Pool:   nodeName,
+				Device: "instance-1",
+				Conditions: []metav1.Condition{
+					{Type: "condition", Status: metav1.ConditionFalse},
+					{Type: "failed", Status: metav1.ConditionTrue},
+				},
+			},
+		}).
+		Obj()
+
+	allocatedClaimWithBindingConditions = st.FromResourceClaim(claim).
+						Allocation(allocationResultWithBindingConditions).
+						Obj()
 )
 
 func taintDevices(slice *resourceapi.ResourceSlice) *resourceapi.ResourceSlice {
@@ -353,6 +418,10 @@ func TestPlugin(t *testing.T) {
 
 		// enableDRAAdminAccess is set to true if the DRAAdminAccess feature gate is enabled.
 		enableDRAAdminAccess bool
+		// enableDRADeviceBindingConditions is set to true if the DRADeviceBindingConditions feature gate is enabled.
+		enableDRADeviceBindingConditions bool
+		// EnableDRAResourceClaimDeviceStatus is set to true if the DRAResourceClaimDeviceStatus feature gate is enabled.
+		enableDRAResourceClaimDeviceStatus bool
 		// Feature gates. False is chosen so that the uncommon case
 		// doesn't need to be set.
 		disableDRA bool
@@ -973,6 +1042,82 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"bound-claim-with-successed-binding-conditions": {
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{boundClaim},
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			want: want{
+				prebind: result{
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return st.FromResourceClaim(in).
+								ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: types.UID(podUID)}).
+								Obj()
+						},
+					},
+				},
+			},
+		},
+		"bound-claim-with-failed-binding": {
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{failedBindingClaim},
+			objs:                               []apiruntime.Object{workerNodeSlice},
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `resourceclaim not available on the node`),
+					},
+				},
+				postfilter: result{
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							return st.FromResourceClaim(in).
+								Allocation(nil).
+								AllocatedDeviceStatuses(nil).
+								Obj()
+						},
+					},
+					status: framework.NewStatus(framework.Unschedulable, `deallocation of ResourceClaim completed`),
+				},
+			},
+		},
+		"binding-conditions-with-timeout": {
+			pod:                                podWithClaimName,
+			claims:                             []*resourceapi.ResourceClaim{claim},
+			classes:                            []*resourceapi.DeviceClass{deviceClass},
+			nodes:                              []*v1.Node{workerNode},
+			objs:                               []apiruntime.Object{fabricSlice},
+			enableDRADeviceBindingConditions:   true,
+			enableDRAResourceClaimDeviceStatus: true,
+			want: want{
+				reserve: result{
+					inFlightClaim: st.FromResourceClaim(claim).
+						Allocation(allocationResultWithBindingConditions).
+						Obj(),
+				},
+				prebind: result{
+					status: framework.NewStatus(framework.Unschedulable, `binding timeout`),
+					changes: change{
+						claim: func(in *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+							if claim.Name == claimName {
+								claim = claim.DeepCopy()
+								claim.Finalizers = allocatedClaim.Finalizers
+								claim.Status.ReservedFor = []resourceapi.ResourceClaimConsumerReference{
+									{Resource: "pods", Name: podName, UID: types.UID(podUID)},
+								}
+								claim.Status.Allocation = allocatedClaim.Status.Allocation
+								claim.Status.Allocation.Devices = allocationResultWithBindingConditions.Devices
+							}
+							return claim
+						},
+					},
+					assumedClaim: reserve(allocatedClaimWithBindingConditions, podWithClaimName),
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -985,10 +1130,12 @@ func TestPlugin(t *testing.T) {
 				nodes = []*v1.Node{workerNode}
 			}
 			features := feature.Features{
-				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
-				EnableDRADeviceTaints:           tc.enableDRADeviceTaints,
-				EnableDynamicResourceAllocation: !tc.disableDRA,
-				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
+				EnableDRAAdminAccess:               tc.enableDRAAdminAccess,
+				EnableDRADeviceBindingConditions:   tc.enableDRADeviceBindingConditions,
+				EnableDRAResourceClaimDeviceStatus: tc.enableDRAResourceClaimDeviceStatus,
+				EnableDRADeviceTaints:              tc.enableDRADeviceTaints,
+				EnableDynamicResourceAllocation:    !tc.disableDRA,
+				EnableDRAPrioritizedList:           tc.enableDRAPrioritizedList,
 			}
 			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
@@ -1137,7 +1284,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 	}
 	sortObjects(wantObjects)
 	// Sometimes assert strips the diff too much, let's do it ourselves...
-	if diff := cmp.Diff(wantObjects, objects, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+	if diff := cmp.Diff(wantObjects, objects, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"), cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "BindingStartTime")); diff != "" {
 		t.Errorf("Stored objects are different (- expected, + actual):\n%s", diff)
 	}
 
@@ -1146,7 +1293,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		expectAssumedClaims = append(expectAssumedClaims, expected.assumedClaim)
 	}
 	actualAssumedClaims := tc.listAssumedClaims()
-	if diff := cmp.Diff(expectAssumedClaims, actualAssumedClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+	if diff := cmp.Diff(expectAssumedClaims, actualAssumedClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"), cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "BindingStartTime")); diff != "" {
 		t.Errorf("Assumed claims are different (- expected, + actual):\n%s", diff)
 	}
 
@@ -1155,7 +1302,7 @@ func (tc *testContext) verify(t *testing.T, expected result, initialObjects []me
 		expectInFlightClaims = append(expectInFlightClaims, expected.inFlightClaim)
 	}
 	actualInFlightClaims := tc.listInFlightClaims()
-	if diff := cmp.Diff(expectInFlightClaims, actualInFlightClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion")); diff != "" {
+	if diff := cmp.Diff(expectInFlightClaims, actualInFlightClaims, cmpopts.IgnoreFields(metav1.ObjectMeta{}, "UID", "ResourceVersion"), cmpopts.IgnoreFields(resourceapi.AllocationResult{}, "BindingStartTime")); diff != "" {
 		t.Errorf("In-flight claims are different (- expected, + actual):\n%s", diff)
 	}
 }
@@ -1271,6 +1418,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 	opts := []runtime.Option{
 		runtime.WithClientSet(tc.client),
 		runtime.WithInformerFactory(tc.informerFactory),
+		runtime.WithEventRecorder(&events.FakeRecorder{}),
 		runtime.WithSharedDRAManager(tc.draManager),
 	}
 	fh, err := runtime.NewFramework(tCtx, nil, nil, opts...)

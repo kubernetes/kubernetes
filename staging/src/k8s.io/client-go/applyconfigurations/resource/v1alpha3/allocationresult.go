@@ -19,14 +19,16 @@ limitations under the License.
 package v1alpha3
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
 )
 
 // AllocationResultApplyConfiguration represents a declarative configuration of the AllocationResult type for use
 // with apply.
 type AllocationResultApplyConfiguration struct {
-	Devices      *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
-	NodeSelector *v1.NodeSelectorApplyConfiguration        `json:"nodeSelector,omitempty"`
+	Devices          *DeviceAllocationResultApplyConfiguration `json:"devices,omitempty"`
+	NodeSelector     *v1.NodeSelectorApplyConfiguration        `json:"nodeSelector,omitempty"`
+	BindingStartTime *metav1.Time                              `json:"bindingStartTime,omitempty"`
 }
 
 // AllocationResultApplyConfiguration constructs a declarative configuration of the AllocationResult type for use with
@@ -48,5 +50,13 @@ func (b *AllocationResultApplyConfiguration) WithDevices(value *DeviceAllocation
 // If called multiple times, the NodeSelector field is set to the value of the last call.
 func (b *AllocationResultApplyConfiguration) WithNodeSelector(value *v1.NodeSelectorApplyConfiguration) *AllocationResultApplyConfiguration {
 	b.NodeSelector = value
+	return b
+}
+
+// WithBindingStartTime sets the BindingStartTime field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BindingStartTime field is set to the value of the last call.
+func (b *AllocationResultApplyConfiguration) WithBindingStartTime(value metav1.Time) *AllocationResultApplyConfiguration {
+	b.BindingStartTime = &value
 	return b
 }
