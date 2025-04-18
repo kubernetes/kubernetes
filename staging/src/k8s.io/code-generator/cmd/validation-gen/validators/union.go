@@ -120,6 +120,12 @@ func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	if realType(context.Type) != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string types")
+	}
+
 	p := &discriminatorParams{}
 	if len(payload) > 0 {
 		if err := json.Unmarshal([]byte(payload), &p); err != nil {
