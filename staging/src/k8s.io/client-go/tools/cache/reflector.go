@@ -406,6 +406,12 @@ func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	useWatchList := ptr.Deref(r.UseWatchList, false)
 	fallbackToList := !useWatchList
 
+	defer func() {
+		if w != nil {
+			w.Stop()
+		}
+	}()
+
 	if useWatchList {
 		w, err = r.watchList(ctx)
 		if w == nil && err == nil {
@@ -476,12 +482,21 @@ func (r *Reflector) watchWithResync(ctx context.Context, w watch.Interface) erro
 	return r.watch(ctx, w, resyncerrc)
 }
 
-// watch simply starts a watch request with the server.
+// watch starts a watch request with the server, consumes watch events, and
+// restarts the watch until an exit scenario is reached.
+//
+// If a watch is provided, it will be used, otherwise another will be started.
+// If the watcher has started, it will always be stopped before returning.
 func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc chan error) error {
 	stopCh := ctx.Done()
 	logger := klog.FromContext(ctx)
 	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
+	defer func() {
+		if w != nil {
+			w.Stop()
+		}
+	}()
 
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
@@ -489,9 +504,6 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 		case <-stopCh:
 			// we can only end up here when the stopCh
 			// was closed after a successful watchlist or list request
-			if w != nil {
-				w.Stop()
-			}
 			return nil
 		default:
 		}
@@ -529,8 +541,8 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 
 		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
 			r.clock, resyncerrc)
-		// Ensure that watch will not be reused across iterations.
-		w.Stop()
+		// handleWatch always stops the watcher. So we don't need to here.
+		// Just set it to nil to trigger a retry on the next loop.
 		w = nil
 		retry.After(err)
 		if err != nil {
@@ -863,6 +875,12 @@ func handleAnyWatch(
 	logger := klog.FromContext(ctx)
 	initialEventsEndBookmarkWarningTicker := newInitialEventsEndBookmarkTicker(logger, name, clock, start, exitOnWatchListBookmarkReceived)
 	defer initialEventsEndBookmarkWarningTicker.Stop()
+	stopWatcher := true
+	defer func() {
+		if stopWatcher {
+			w.Stop()
+		}
+	}()
 
 loop:
 	for {
@@ -929,6 +947,7 @@ loop:
 			}
 			eventCount++
 			if exitOnWatchListBookmarkReceived && watchListBookmarkReceived {
+				stopWatcher = false
 				watchDuration := clock.Since(start)
 				klog.FromContext(ctx).V(4).Info("Exiting watch because received the bookmark that marks the end of initial events stream", "reflector", name, "totalItems", eventCount, "duration", watchDuration)
 				return watchListBookmarkReceived, nil
