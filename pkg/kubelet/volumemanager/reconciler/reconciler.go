@@ -21,40 +21,40 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func (rc *reconciler) Run(stopCh <-chan struct{}) {
-	rc.reconstructVolumes()
-	klog.InfoS("Reconciler: start to sync state")
-	wait.Until(rc.reconcile, rc.loopSleepDuration, stopCh)
+func (rc *reconciler) Run(logger klog.Logger, stopCh <-chan struct{}) {
+	rc.reconstructVolumes(logger)
+	logger.Info("Reconciler: start to sync state")
+	wait.Until(func() { rc.reconcile(logger) }, rc.loopSleepDuration, stopCh)
 }
 
-func (rc *reconciler) reconcile() {
+func (rc *reconciler) reconcile(logger klog.Logger) {
 	readyToUnmount := rc.readyToUnmount()
 	if readyToUnmount {
 		// Unmounts are triggered before mounts so that a volume that was
 		// referenced by a pod that was deleted and is now referenced by another
 		// pod is unmounted from the first pod before being mounted to the new
 		// pod.
-		rc.unmountVolumes()
+		rc.unmountVolumes(logger)
 	}
 
 	// Next we mount required volumes. This function could also trigger
 	// attach if kubelet is responsible for attaching volumes.
 	// If underlying PVC was resized while in-use then this function also handles volume
 	// resizing.
-	rc.mountOrAttachVolumes()
+	rc.mountOrAttachVolumes(logger)
 
 	// Unmount volumes only when DSW and ASW are fully populated to prevent unmounting a volume
 	// that is still needed, but it did not reach DSW yet.
 	if readyToUnmount {
 		// Ensure devices that should be detached/unmounted are detached/unmounted.
-		rc.unmountDetachDevices()
+		rc.unmountDetachDevices(logger)
 
 		// Clean up any orphan volumes that failed reconstruction.
-		rc.cleanOrphanVolumes()
+		rc.cleanOrphanVolumes(logger)
 	}
 
 	if len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
-		rc.updateReconstructedFromNodeStatus()
+		rc.updateReconstructedFromNodeStatus(logger)
 	}
 	if len(rc.volumesNeedUpdateFromNodeStatus) == 0 {
 		// ASW is fully populated only after both devicePaths and uncertain volume attach-ability
