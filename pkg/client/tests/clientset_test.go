@@ -99,7 +99,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "application/json",
 			expectedPath:      "/api/v1/namespaces/panda/pods",
 			expectContentType: "application/json",
-			expectBody: `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"snorlax","creationTimestamp":null},"spec":{"containers":null},"status":{}}
+			expectBody: `{"kind":"Pod","apiVersion":"v1","metadata":{"name":"snorlax"},"spec":{"containers":null},"status":{}}
 `,
 		},
 		{
@@ -116,7 +116,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "application/json",
 			expectedPath:      "/apis/apps/v1/namespaces/panda/deployments/snorlax/scale",
 			expectContentType: "application/json",
-			expectBody: `{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"snorlax","creationTimestamp":null},"spec":{},"status":{"replicas":0}}
+			expectBody: `{"kind":"Scale","apiVersion":"autoscaling/v1","metadata":{"name":"snorlax"},"spec":{},"status":{"replicas":0}}
 `,
 		},
 		{
@@ -125,7 +125,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "",
 			expectedPath:      "/api/v1/namespaces/panda/examples",
 			expectContentType: "application/json",
-			expectBody: `{"metadata":{"name":"snorlax","creationTimestamp":null},"spec":{"foo":"","bar":false},"status":{}}
+			expectBody: `{"metadata":{"name":"snorlax"},"spec":{"foo":"","bar":false},"status":{}}
 `,
 		},
 		{
@@ -134,7 +134,7 @@ func TestClientContentType(t *testing.T) {
 			contentType:       "application/json",
 			expectedPath:      "/api/v1/namespaces/panda/examples",
 			expectContentType: "application/json",
-			expectBody: `{"metadata":{"name":"snorlax","creationTimestamp":null},"spec":{"foo":"","bar":false},"status":{}}
+			expectBody: `{"metadata":{"name":"snorlax"},"spec":{"foo":"","bar":false},"status":{}}
 `,
 		},
 	}

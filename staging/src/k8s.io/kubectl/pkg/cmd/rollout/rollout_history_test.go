@@ -280,15 +280,12 @@ func TestRolloutHistoryWithOutput(t *testing.T) {
     "kind": "ReplicaSet",
     "apiVersion": "apps/v1",
     "metadata": {
-        "name": "rev2",
-        "creationTimestamp": null
+        "name": "rev2"
     },
     "spec": {
         "selector": null,
         "template": {
-            "metadata": {
-                "creationTimestamp": null
-            },
+            "metadata": {},
             "spec": {
                 "containers": null
             }
@@ -305,13 +302,11 @@ func TestRolloutHistoryWithOutput(t *testing.T) {
 			expectedOutput: `apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
-  creationTimestamp: null
   name: rev2
 spec:
   selector: null
   template:
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
 status:
@@ -323,13 +318,11 @@ status:
 			expectedOutput: `apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
-  creationTimestamp: null
   name: rev1
 spec:
   selector: null
   template:
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
 status:
@@ -338,13 +331,11 @@ status:
 apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
-  creationTimestamp: null
   name: rev2
 spec:
   selector: null
   template:
-    metadata:
-      creationTimestamp: null
+    metadata: {}
     spec:
       containers: null
 status:
