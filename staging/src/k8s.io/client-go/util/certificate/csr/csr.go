@@ -78,13 +78,14 @@ func RequestCertificateWithContext(ctx context.Context, client clientset.Interfa
 		csr.Spec.ExpirationSeconds = DurationToExpirationSeconds(*requestedDuration)
 	}
 
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("creating csr")
 	reqName, reqUID, err = create(ctx, client, csr)
 	switch {
 	case err == nil:
 		return reqName, reqUID, err
 
 	case apierrors.IsAlreadyExists(err) && len(name) > 0:
-		logger := klog.FromContext(ctx)
 		logger.Info("csr for this node already exists, reusing")
 		req, err := get(ctx, client, name)
 		if err != nil {
