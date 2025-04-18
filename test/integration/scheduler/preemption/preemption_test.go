@@ -1526,14 +1526,16 @@ func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (fra
 // properly in different scenarios.
 func TestNominatedNodeCleanUp(t *testing.T) {
 	tests := []struct {
-		name         string
+		name string
+		// Initial nodes to simulate special conditions.
+		initNodes    []*v1.Node
 		nodeCapacity map[v1.ResourceName]string
 		// A slice of pods to be created in batch.
 		podsToCreate [][]*v1.Pod
 		// Each postCheck function is run after each batch of pods' creation.
 		postChecks []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error
 		// Delete the fake node or not. Optional.
-		deleteNode bool
+		deleteFakeNode bool
 		// Pods to be deleted. Optional.
 		podNamesToDelete []string
 
@@ -1600,8 +1602,39 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				testutils.WaitForPodToSchedule,
 				testutils.WaitForNominatedNodeName,
 			},
-			// Delete the node to simulate an ErrNoNodesAvailable error.
-			deleteNode:       true,
+			// Delete the fake node to simulate an ErrNoNodesAvailable error.
+			deleteFakeNode:   true,
+			podNamesToDelete: []string{"low"},
+		},
+		{
+			name: "mid-priority pod preempts low-priority pod at the beginning, but could not find candidates after the nominated node is deleted",
+			// Create a taint node to simulate the `UnschedulableAndUnresolvable` condition in `findCandidates` during preemption.
+			initNodes: []*v1.Node{
+				st.MakeNode().Name("taint-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).
+					Taints([]v1.Taint{
+						{
+							Key:    "taint-node",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).
+					Obj(),
+			},
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "1"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				testutils.WaitForNominatedNodeName,
+			},
+			// Delete the fake node to trigger the `UnschedulableAndUnresolvable` condition in `findCandidates`.
+			deleteFakeNode:   true,
 			podNamesToDelete: []string{"low"},
 		},
 		{
@@ -1648,6 +1681,12 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				)
 
 				cs, ns := testCtx.ClientSet, testCtx.NS.Name
+				for _, node := range tt.initNodes {
+					if _, err := createNode(cs, node); err != nil {
+						t.Fatalf("Error creating initial node %v: %v", node.Name, err)
+					}
+				}
+
 				// Create a node with the specified capacity.
 				nodeName := "fake-node"
 				if _, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(tt.nodeCapacity).Obj()); err != nil {
@@ -1672,8 +1711,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					}
 				}
 
-				// Delete the node if necessary.
-				if tt.deleteNode {
+				// Delete the fake node if necessary.
+				if tt.deleteFakeNode {
 					if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
 						t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
 					}

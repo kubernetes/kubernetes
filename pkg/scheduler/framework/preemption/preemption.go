@@ -315,11 +315,6 @@ func (ev *Evaluator) findCandidates(ctx context.Context, state *framework.CycleS
 	}
 	if len(potentialNodes) == 0 {
 		logger.V(3).Info("Preemption will not help schedule pod on any node", "pod", klog.KObj(pod))
-		// In this case, we should clean-up any existing nominated node name of the pod.
-		if err := util.ClearNominatedNodeName(ctx, ev.Handler.ClientSet(), pod); err != nil {
-			logger.Error(err, "Could not clear the nominatedNodeName field of pod", "pod", klog.KObj(pod))
-			// We do not return as this error is not critical.
-		}
 		return nil, framework.NewDefaultNodeToStatus(), nil
 	}
 
