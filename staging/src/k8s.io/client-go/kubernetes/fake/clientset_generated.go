@@ -137,6 +137,8 @@ import (
 	storagemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1"
 	fakestoragemigrationv1alpha1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1/fake"
 	"k8s.io/client-go/testing"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // NewSimpleClientset returns a clientset that will respond with the provided objects.
@@ -165,11 +167,47 @@ func NewSimpleClientset(objects ...runtime.Object) *Clientset {
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns, opts)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
+		
+		// Create a buffered channel to prevent blocking
+		ch := make(chan watch.Event, 100)
+		watcher := watch.NewProxyWatcher(ch)
+		
+		// Start a goroutine to handle the watch
+		go func() {
+			defer watcher.Stop()
+			
+			// Get initial list of objects
+			objs, err := o.List(gvr, schema.GroupVersionKind{}, ns, opts)
+			if err != nil {
+				ch <- watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
+				return
+			}
+			
+			// Send initial ADDED events for all objects
+			items, err := meta.ExtractList(objs)
+			if err != nil {
+				ch <- watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
+				return
+			}
+			
+			for _, item := range items {
+				ch <- watch.Event{Type: watch.Added, Object: item}
+			}
+			
+			// Watch for changes
+			w, err := o.Watch(gvr, ns, opts)
+			if err != nil {
+				ch <- watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
+				return
+			}
+			
+			// Forward events from the tracker's watch to our channel
+			for event := range w.ResultChan() {
+				ch <- event
+			}
+		}()
+		
+		return true, watcher, nil
 	})
 
 	return cs
@@ -218,11 +256,47 @@ func NewClientset(objects ...runtime.Object) *Clientset {
 		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := o.Watch(gvr, ns, opts)
-		if err != nil {
-			return false, nil, err
-		}
-		return true, watch, nil
+		
+		// Create a buffered channel to prevent blocking
+		ch := make(chan watch.Event, 100)
+		watcher := watch.NewProxyWatcher(ch)
+		
+		// Start a goroutine to handle the watch
+		go func() {
+			defer watcher.Stop()
+			
+			// Get initial list of objects
+			objs, err := o.List(gvr, schema.GroupVersionKind{}, ns, opts)
+			if err != nil {
+				ch <- watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
+				return
+			}
+			
+			// Send initial ADDED events for all objects
+			items, err := meta.ExtractList(objs)
+			if err != nil {
+				ch <- watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
+				return
+			}
+			
+			for _, item := range items {
+				ch <- watch.Event{Type: watch.Added, Object: item}
+			}
+			
+			// Watch for changes
+			w, err := o.Watch(gvr, ns, opts)
+			if err != nil {
+				ch <- watch.Event{Type: watch.Error, Object: &metav1.Status{Status: metav1.StatusFailure, Message: err.Error()}}
+				return
+			}
+			
+			// Forward events from the tracker's watch to our channel
+			for event := range w.ResultChan() {
+				ch <- event
+			}
+		}()
+		
+		return true, watcher, nil
 	})
 
 	return cs
