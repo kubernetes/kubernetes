@@ -54,7 +54,6 @@ import (
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -113,7 +112,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/server"
-	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeletutil "k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -804,11 +802,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			klog.InfoS("After cpu setting is overwritten", "kubeReserved", s.KubeReserved, "systemReserved", s.SystemReserved)
 		}
 
-		kubeReserved, err := parseResourceList(s.KubeReserved)
+		kubeReserved, err := kubeletconfigvalidation.ParseResourceList(s.KubeReserved)
 		if err != nil {
 			return fmt.Errorf("--kube-reserved value failed to parse: %w", err)
 		}
-		systemReserved, err := parseResourceList(s.SystemReserved)
+		systemReserved, err := kubeletconfigvalidation.ParseResourceList(s.SystemReserved)
 		if err != nil {
 			return fmt.Errorf("--system-reserved value failed to parse: %w", err)
 		}
@@ -1350,32 +1348,6 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 	k.StartGarbageCollection()
 
 	return k, nil
-}
-
-// parseResourceList parses the given configuration map into an API
-// ResourceList or returns an error.
-func parseResourceList(m map[string]string) (v1.ResourceList, error) {
-	if len(m) == 0 {
-		return nil, nil
-	}
-	rl := make(v1.ResourceList)
-	for k, v := range m {
-		switch v1.ResourceName(k) {
-		// CPU, memory, local storage, and PID resources are supported.
-		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse quantity %q for %q resource: %w", v, k, err)
-			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[v1.ResourceName(k)] = q
-		default:
-			return nil, fmt.Errorf("cannot reserve %q resource", k)
-		}
-	}
-	return rl, nil
 }
 
 func newTracerProvider(s *options.KubeletServer) (oteltrace.TracerProvider, error) {
