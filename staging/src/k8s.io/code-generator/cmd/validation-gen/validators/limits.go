@@ -57,10 +57,9 @@ var (
 func (maxLengthTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	t := realType(context.Type)
 	if t != types.String {
 		return result, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
