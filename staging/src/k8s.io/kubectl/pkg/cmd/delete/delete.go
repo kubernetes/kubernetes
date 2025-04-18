@@ -534,9 +534,9 @@ func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
 
 		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name)
 	}
-	fmt.Fprint(o.Out, i18n.T("Do you want to continue?")+" (y/n): ")
+	fmt.Fprint(o.Out, i18n.T("Do you want to continue?")+" (y/N): ")
 	var input string
-	_, err := fmt.Fscan(o.In, &input)
+	_, err := fmt.Fscanln(o.In, &input)
 	if err != nil {
 		return false
 	}
