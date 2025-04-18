@@ -356,9 +356,9 @@ func (o *AuditOptions) newPolicyRuleEvaluator() (audit.PolicyRuleEvaluator, erro
 
 func (o *AuditBatchOptions) AddFlags(pluginName string, fs *pflag.FlagSet) {
 	fs.StringVar(&o.Mode, fmt.Sprintf("audit-%s-mode", pluginName), o.Mode,
-		"Strategy for sending audit events. Blocking indicates sending events should block"+
-			" server responses. Batch causes the backend to buffer and write events"+
-			" asynchronously. Known modes are "+strings.Join(AllowedModes, ",")+".")
+		"Strategy for sending audit events. Blocking indicates sending events should block "+
+			"server responses. Batch causes the backend to buffer and write events "+
+			"asynchronously. Known modes are "+strings.Join(AllowedModes, ",")+".")
 	fs.IntVar(&o.BatchConfig.BufferSize, fmt.Sprintf("audit-%s-batch-buffer-size", pluginName),
 		o.BatchConfig.BufferSize, "The size of the buffer to store events before "+
 			"batching and writing. Only used in batch mode.")
@@ -442,8 +442,8 @@ func (o *AuditLogOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&o.MaxSize, "audit-log-maxsize", o.MaxSize,
 		"The maximum size in megabytes of the audit log file before it gets rotated.")
 	fs.StringVar(&o.Format, "audit-log-format", o.Format,
-		"Format of saved audits. \"legacy\" indicates 1-line text format for each event."+
-			" \"json\" indicates structured json format. Known formats are "+
+		"Format of saved audits. \"legacy\" indicates 1-line text format for each event. "+
+			"\"json\" indicates structured json format. Known formats are "+
 			strings.Join(pluginlog.AllowedFormats, ",")+".")
 	fs.StringVar(&o.GroupVersionString, "audit-log-version", o.GroupVersionString,
 		"API group and version used for serializing audit events written to log.")

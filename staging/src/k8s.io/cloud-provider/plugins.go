@@ -83,7 +83,7 @@ func IsExternal(name string) bool {
 // DisableWarningForProvider logs information about disabled cloud provider state
 func DisableWarningForProvider(providerName string) {
 	if !IsExternal(providerName) {
-		klog.Infof("INFO: Please make sure you are running an external cloud controller manager binary for provider %q."+
+		klog.Infof("INFO: Please make sure you are running an external cloud controller manager binary for provider %q. "+
 			"In-tree cloud providers are disabled. Refer to https://github.com/kubernetes/kubernetes/tree/master/staging/src/k8s.io/cloud-provider/sample "+
 			"for an example implementation.", providerName)
 		klog.Warningf("WARNING: built-in cloud providers are disabled. Please set \"--cloud-provider=external\" and migrate to an external cloud controller manager for provider %q", providerName)

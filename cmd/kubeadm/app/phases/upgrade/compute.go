@@ -90,8 +90,8 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 		for version, nodes := range kubeAPIServerVersions {
 			verMsg = append(verMsg, fmt.Sprintf("%s on nodes %v", version, nodes))
 		}
-		klog.Warningf("Different API server versions in the cluster were discovered: %v. Please upgrade your control plane"+
-			" nodes to the same version of Kubernetes", strings.Join(verMsg, ", "))
+		klog.Warningf("Different API server versions in the cluster were discovered: %v. Please upgrade your control plane "+
+			"nodes to the same version of Kubernetes", strings.Join(verMsg, ", "))
 	}
 
 	// Get the latest cluster version

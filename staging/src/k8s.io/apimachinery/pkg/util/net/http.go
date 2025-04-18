@@ -148,8 +148,8 @@ func readIdleTimeoutSeconds() int {
 	if s := os.Getenv("HTTP2_READ_IDLE_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			klog.Warningf("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS(%q): %v."+
-				" Default value %d is used", s, err, ret)
+			klog.Warningf("Illegal HTTP2_READ_IDLE_TIMEOUT_SECONDS(%q): %v. "+
+				"Default value %d is used", s, err, ret)
 			return ret
 		}
 		ret = i
@@ -162,8 +162,8 @@ func pingTimeoutSeconds() int {
 	if s := os.Getenv("HTTP2_PING_TIMEOUT_SECONDS"); len(s) > 0 {
 		i, err := strconv.Atoi(s)
 		if err != nil {
-			klog.Warningf("Illegal HTTP2_PING_TIMEOUT_SECONDS(%q): %v."+
-				" Default value %d is used", s, err, ret)
+			klog.Warningf("Illegal HTTP2_PING_TIMEOUT_SECONDS(%q): %v. "+
+				"Default value %d is used", s, err, ret)
 			return ret
 		}
 		ret = i

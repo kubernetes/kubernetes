@@ -429,9 +429,9 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.StringVar(&o.ServiceAccounts.JWKSURI, "service-account-jwks-uri", o.ServiceAccounts.JWKSURI, ""+
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
-			"/.well-known/openid-configuration. This flag is useful if the discovery doc"+
+			"/.well-known/openid-configuration. This flag is useful if the discovery doc "+
 			"and key set are served to relying parties from a URL other than the "+
-			"API server's external (as auto-detected or overridden with external-hostname). ")
+			"API server's external (as auto-detected or overridden with external-hostname).")
 
 		fs.DurationVar(&o.ServiceAccounts.MaxExpiration, "service-account-max-token-expiration", o.ServiceAccounts.MaxExpiration, ""+
 			"The maximum validity duration of a token created by the service account token issuer. If an otherwise valid "+

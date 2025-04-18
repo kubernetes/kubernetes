@@ -264,9 +264,9 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	}
 
 	if len(nodeSnapshot.nodeInfoList) != cache.nodeTree.numNodes {
-		errMsg := fmt.Sprintf("snapshot state is not consistent, length of NodeInfoList=%v not equal to length of nodes in tree=%v "+
-			", length of NodeInfoMap=%v, length of nodes in cache=%v"+
-			", trying to recover",
+		errMsg := fmt.Sprintf("snapshot state is not consistent, length of NodeInfoList=%v not equal to length of nodes in tree=%v, "+
+			"length of NodeInfoMap=%v, length of nodes in cache=%v, "+
+			"trying to recover",
 			len(nodeSnapshot.nodeInfoList), cache.nodeTree.numNodes,
 			len(nodeSnapshot.nodeInfoMap), len(cache.nodes))
 		logger.Error(nil, errMsg)

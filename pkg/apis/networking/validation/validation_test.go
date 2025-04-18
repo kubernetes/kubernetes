@@ -1652,9 +1652,9 @@ func TestValidateIngressClass(t *testing.T) {
 				setParams(makeIngressClassParams(nil, "foo", "bar", utilpointer.String("Namespace"), utilpointer.String("foo_ns"))),
 			),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec.parameters.namespace"), "foo_ns",
-				"a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-',"+
-					" and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', "+
-					"regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')")},
+				"a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', "+
+				"and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', "+
+				"regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')")},
 		},
 		"valid name, valid controller, valid Cluster scope": {
 			ingressClass: makeValidIngressClass("test123", "foo.co/bar",

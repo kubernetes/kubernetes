@@ -66,9 +66,9 @@ func createGCESecrets(client clientset.Interface, ns string) {
 
 	premadeSAFile, ok := os.LookupEnv(saEnv)
 	if !ok {
-		framework.Logf("Could not find env var %v, please either create cloud-sa"+
-			" secret manually or rerun test after setting %v to the filepath of"+
-			" the GCP Service Account to give to the GCE Persistent Disk CSI Driver", saEnv, saEnv)
+		framework.Logf("Could not find env var %v, please either create cloud-sa "+
+			"secret manually or rerun test after setting %v to the filepath of "+
+			"the GCP Service Account to give to the GCE Persistent Disk CSI Driver", saEnv, saEnv)
 		return
 	}
 

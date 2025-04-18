@@ -169,8 +169,8 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 			for _, scheduledPod := range volumeToAttach.ScheduledPods {
 				podUID := volutil.GetUniquePodName(scheduledPod)
 				dswp.desiredStateOfWorld.DeletePod(podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
-				logger.V(4).Info("Removing podUID and volume on node from desired state of world"+
-					" because of the change of volume attachability", "node", klog.KRef("", string(volumeToAttach.NodeName)), "podUID", podUID, "volumeName", volumeToAttach.VolumeName)
+				logger.V(4).Info("Removing podUID and volume on node from desired state of world "+
+					"because of the change of volume attachability", "node", klog.KRef("", string(volumeToAttach.NodeName)), "podUID", podUID, "volumeName", volumeToAttach.VolumeName)
 			}
 		}
 	}

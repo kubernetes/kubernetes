@@ -80,7 +80,7 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 			"Disclaimer: disabling metrics is higher in precedence than showing hidden metrics.")
 	fs.StringToStringVar(&o.AllowListMapping, "allow-metric-labels", o.AllowListMapping,
 		"The map from metric-label to value allow-list of this label. The key's format is <MetricName>,<LabelName>. "+
-			"The value's format is <allowed_value>,<allowed_value>..."+
+			"The value's format is <allowed_value>,<allowed_value>... "+
 			"e.g. metric1,label1='v1,v2,v3', metric1,label2='v1,v2,v3' metric2,label1='v1,v2,v3'.")
 	fs.StringVar(&o.AllowListMappingManifest, "allow-metric-labels-manifest", o.AllowListMappingManifest,
 		"The path to the manifest file that contains the allow-list mapping. "+

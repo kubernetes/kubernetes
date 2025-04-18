@@ -70,8 +70,8 @@ func (args *Args) AddFlags(fs *pflag.FlagSet, inputBase string) {
 	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.Var(NewExternalApplyConfigurationValue(&args.ExternalApplyConfigurations, nil), "external-applyconfigurations",
-		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form."+
-			"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
+		"list of comma separated external apply configurations locations in <type-package>.<type-name>:<applyconfiguration-package> form. "+
+		"For example: k8s.io/api/apps/v1.Deployment:k8s.io/client-go/applyconfigurations/apps/v1")
 	fs.StringVar(&args.OpenAPISchemaFilePath, "openapi-schema", "",
 		"path to the openapi schema containing all the types that apply configurations will be generated for")
 }

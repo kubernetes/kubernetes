@@ -46,8 +46,8 @@ var _ = Describe("admin", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	ginkgo.It("kubeadm:cluster-admins CRB must exist and be binding the cluster-admin ClusterRole"+
-		" to the kubeadm:cluster-admins Group", func(ctx context.Context) {
+	ginkgo.It("kubeadm:cluster-admins CRB must exist and be binding the cluster-admin ClusterRole "+
+		"to the kubeadm:cluster-admins Group", func(ctx context.Context) {
 
 		// Use the ClusterConfiguration.kubernetesVersion to decide whether to look for the CRB.
 		// It was added in kubeadm v1.29-pre, but kubeadm supports a maximum skew of N-1

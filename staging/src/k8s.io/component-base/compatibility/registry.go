@@ -241,7 +241,7 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 		r.featureGatesConfigFlags = cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig)
 	}
 	fs.Var(r.featureGatesConfigFlags, "feature-gates", "Comma-separated list of component:key=value pairs that describe feature gates for alpha/experimental features of different components.\n"+
-		"If the component is not specified, defaults to \"kube\". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true'"+
+		"If the component is not specified, defaults to \"kube\". This flag can be repeatedly invoked. For example: --feature-gates 'wardle:featureA=true,wardle:featureB=false' --feature-gates 'kube:featureC=true' "+
 		"Options are:\n"+strings.Join(r.unsafeKnownFeatures(), "\n"))
 }
 

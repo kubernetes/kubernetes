@@ -227,8 +227,8 @@ func getClusterInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, inter
 				return true, lastError
 			}
 
-			klog.V(1).Infof("[discovery] Waiting for the cluster-info ConfigMap to receive a JWS signature"+
-				" for token ID %q", token.ID)
+			klog.V(1).Infof("[discovery] Waiting for the cluster-info ConfigMap to receive a JWS signature "+
+				"for token ID %q", token.ID)
 
 			cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).
 				Get(context.Background(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
@@ -239,8 +239,8 @@ func getClusterInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, inter
 			}
 			// Even if the ConfigMap is available the JWS signature is patched-in a bit later.
 			if _, ok := cm.Data[bootstrapapi.JWSSignatureKeyPrefix+token.ID]; !ok {
-				lastError = errors.Errorf("could not find a JWS signature in the cluster-info ConfigMap"+
-					" for token ID %q", token.ID)
+				lastError = errors.Errorf("could not find a JWS signature in the cluster-info ConfigMap "+
+					"for token ID %q", token.ID)
 				if dryRun {
 					// Assume the user is dry-running with a token that will never appear in the cluster-info
 					// ConfigMap. Use the default dry-run token and CA cert hash.

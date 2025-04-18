@@ -114,9 +114,9 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 		// error, but continue on. We don't return the error because the
 		// metadata responses require additional, backwards incompatible
 		// validation of command-line options.
-		msg := fmt.Sprintf("Could not construct pre-rendered responses for"+
-			" ServiceAccountIssuerDiscovery endpoints. Endpoints will not be"+
-			" enabled. Error: %v", err)
+		msg := fmt.Sprintf("Could not construct pre-rendered responses for "+
+			"ServiceAccountIssuerDiscovery endpoints. Endpoints will not be "+
+			"enabled. Error: %v", err)
 		if c.ServiceAccountIssuerURL != "" {
 			// The user likely expects this feature to be enabled if issuer URL is
 			// set and the feature gate is enabled. In the future, if there is no
