@@ -2116,6 +2116,7 @@ func runningStateWithStartedAt(cName string, startedAt time.Time) v1.ContainerSt
 		State: v1.ContainerState{
 			Running: &v1.ContainerStateRunning{StartedAt: metav1.Time{Time: startedAt}},
 		},
+		Started: ptr.To(true),
 	}
 }
 func stoppedState(cName string) v1.ContainerStatus {
@@ -3797,6 +3798,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					ready(waitingStateWithReason("containerA", "ContainerCreating")),
 					withResources(ready(withID(runningStateWithStartedAt("containerB", time.Unix(1, 0).UTC()), "://foo"))),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
 				Type:   v1.PodReadyToStartContainers,
@@ -3856,6 +3859,8 @@ func Test_generateAPIPodStatus(t *testing.T) {
 					withResources(ready(withID(runningStateWithStartedAt("containerA", time.Unix(1, 0).UTC()), "://c1"))),
 					withResources(ready(withID(runningStateWithStartedAt("containerB", time.Unix(2, 0).UTC()), "://c2"))),
 				},
+				EphemeralContainerStatuses: []v1.ContainerStatus{},
+				InitContainerStatuses:      []v1.ContainerStatus{},
 			},
 			expectedPodReadyToStartContainersCondition: v1.PodCondition{
 				Type:   v1.PodReadyToStartContainers,
@@ -4816,6 +4821,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU1AndMem1G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+				Started:            ptr.To(true),
 			},
 		},
 		"BurstableQoSPod with CPU and memory CRI status": {
@@ -4835,6 +4841,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU1AndMem1G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1G, Requests: CPU1AndMem1G},
+				Started:            ptr.To(true),
 			},
 		},
 		"BurstableQoSPod without CPU": {
@@ -4865,6 +4872,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceMemory: resource.MustParse("100M"),
 				}},
+				Started: ptr.To(true),
 			},
 		},
 		"BurstableQoSPod with below min CPU": {
@@ -4915,6 +4923,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 						v1.ResourceCPU: resource.MustParse("5m"),
 					},
 				},
+				Started: ptr.To(true),
 			},
 		},
 		"GuaranteedQoSPod with CPU and memory CRI status, with ephemeral storage": {
@@ -4934,6 +4943,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU1AndMem1GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+				Started:            ptr.To(true),
 			},
 		},
 		"BurstableQoSPod with CPU and memory CRI status, with ephemeral storage": {
@@ -4953,6 +4963,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU1AndMem1GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+				Started:            ptr.To(true),
 			},
 		},
 		"BurstableQoSPod with CPU and memory CRI status, with ephemeral storage, nil resources in OldStatus": {
@@ -4971,6 +4982,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU1AndMem1GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+				Started:            ptr.To(true),
 			},
 		},
 		"BestEffortQoSPod": {
@@ -4988,6 +5000,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				ImageID:     "img1234",
 				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				Resources:   &v1.ResourceRequirements{},
+				Started:     ptr.To(true),
 			},
 		},
 		"BestEffort QoSPod with extended resources": {
@@ -5007,6 +5020,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: addExtendedResource(v1.ResourceList{}),
 				Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(v1.ResourceList{})},
+				Started:            ptr.To(true),
 			},
 		},
 		"BurstableQoSPod with extended resources": {
@@ -5026,6 +5040,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: addExtendedResource(CPU1AndMem1G),
 				Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1G)},
+				Started:            ptr.To(true),
 			},
 		},
 		"BurstableQoSPod with storage, ephemeral storage and extended resources": {
@@ -5045,6 +5060,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: addExtendedResource(CPU1AndMem1GAndStorage2G),
 				Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1GAndStorage2G)},
+				Started:            ptr.To(true),
 			},
 		},
 		"GuaranteedQoSPod with extended resources": {
@@ -5064,6 +5080,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: addExtendedResource(CPU1AndMem1G),
 				Resources:          &v1.ResourceRequirements{Requests: addExtendedResource(CPU1AndMem1G), Limits: addExtendedResource(CPU1AndMem1G)},
+				Started:            ptr.To(true),
 			},
 		},
 		"newly created Pod": {
@@ -5078,6 +5095,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}},
 				AllocatedResources: CPU1AndMem1GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+				Started:            ptr.To(false),
 			},
 		},
 		"newly running Pod": {
@@ -5096,6 +5114,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU1AndMem1GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem1GAndStorage2G},
+				Started:            ptr.To(true),
 			},
 		},
 		"newly terminated Pod": {
@@ -5122,6 +5141,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				}},
 				AllocatedResources: CPU2AndMem2GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU2AndMem2GAndStorage2G, Requests: CPU2AndMem2GAndStorage2G},
+				Started:            ptr.To(false),
 			},
 		},
 		"resizing Pod": {
@@ -5142,6 +5162,7 @@ func TestConvertToAPIContainerStatusesForResources(t *testing.T) {
 				State:              v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				AllocatedResources: CPU2AndMem2GAndStorage2G,
 				Resources:          &v1.ResourceRequirements{Limits: CPU1AndMem1GAndStorage2G, Requests: CPU1AndMem2GAndStorage2G},
+				Started:            ptr.To(true),
 			},
 		},
 	} {
@@ -5225,6 +5246,7 @@ func TestConvertToAPIContainerStatusesForUser(t *testing.T) {
 				State:       v1.ContainerState{Running: &v1.ContainerStateRunning{StartedAt: metav1.NewTime(nowTime)}},
 				Resources:   &v1.ResourceRequirements{},
 				User:        user,
+				Started:     ptr.To(true),
 			},
 		}
 	}
