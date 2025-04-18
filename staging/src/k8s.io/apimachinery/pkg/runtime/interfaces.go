@@ -225,7 +225,7 @@ type StorageSerializer interface {
 	// EncoderForVersion returns an encoder that ensures objects being written to the provided
 	// serializer are in the provided group version.
 	EncoderForVersion(serializer Encoder, gv GroupVersioner) Encoder
-	// DecoderForVersion returns a decoder that ensures objects being read by the provided
+	// DecoderToVersion returns a decoder that ensures objects being read by the provided
 	// serializer are in the provided group version by default.
 	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
 }
