@@ -163,7 +163,7 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 
 // AccumulateUniqueHostPorts checks all the containers for duplicates ports. Any
 // duplicate port will be returned in the ErrorList.
-func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.Set[string], fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	for ci, ctr := range containers {
