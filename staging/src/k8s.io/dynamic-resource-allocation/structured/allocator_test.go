@@ -426,6 +426,16 @@ func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRe
 	})
 }
 
+func emptyAllocationResult() types.GomegaMatcher {
+	return gstruct.MatchFields(0, gstruct.Fields{
+		"Devices": gstruct.MatchFields(0, gstruct.Fields{
+			"Results": gomega.BeEmpty(),
+			"Config":  gomega.BeNil(),
+		}),
+		"NodeSelector": gomega.BeNil(),
+	})
+}
+
 // matchNodeSelector returns a matcher for a node selector. The order
 // of terms, requirements, and values is irrelevant.
 func matchNodeSelector(selector *v1.NodeSelector) types.GomegaMatcher {
@@ -2250,6 +2260,19 @@ func TestAllocator(t *testing.T) {
 				localNodeSelector(node1),
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
 			)},
+		},
+		"prioritized-list-last-subrequest-count-zero": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(claimWithRequests(claim0, nil, requestWithPrioritizedList(req0,
+				subRequest(subReq0, classA, 500),
+				subRequest(subReq1, classA, 0),
+			))),
+			classes: objects(class(classA, driverA)),
+			node:    node(node1, region1),
+
+			expectResults: []any{emptyAllocationResult()},
 		},
 		"partitionable-devices-single-device": {
 			features: Features{
