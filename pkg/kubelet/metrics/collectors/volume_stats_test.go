@@ -32,7 +32,7 @@ func newUint64Pointer(i uint64) *uint64 {
 }
 
 func TestVolumeStatsCollector(t *testing.T) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
@@ -151,7 +151,7 @@ func TestVolumeStatsCollector(t *testing.T) {
 }
 
 func TestVolumeStatsCollectorWithNullVolumeStatus(t *testing.T) {
-	ctx := context.Background()
+	ctx := context.TODO()
 	// Fixed metadata on type and help text. We prepend this to every expected
 	// output so we only have to modify a single place when doing adjustments.
 	const metadata = `
