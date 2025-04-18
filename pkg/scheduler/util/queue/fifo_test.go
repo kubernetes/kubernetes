@@ -18,20 +18,24 @@ package queue
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func verifyPop(t *testing.T, expectedValue int, expectedOk bool, queue *FIFO[int]) {
 	t.Helper()
 	actual, ok := queue.Pop()
-	require.Equal(t, expectedOk, ok)
-	require.Equal(t, expectedValue, actual)
+	if ok != expectedOk {
+		t.Errorf("Expected queue.Pop() status: %t, actual status: %t", expectedOk, ok)
+	}
+	if actual != expectedValue {
+		t.Errorf("Expected queue.Pop() value: %d, actual status: %d", expectedValue, actual)
+	}
 }
 
 func verifyEmpty(t *testing.T, queue *FIFO[int]) {
 	t.Helper()
-	require.Equal(t, 0, queue.Len())
+	if queue.Len() != 0 {
+		t.Errorf("Expected empty queue, actual Len: %d", queue.Len())
+	}
 	verifyPop(t, 0, false, queue)
 }
 
@@ -45,7 +49,9 @@ func TestOnePushPop(t *testing.T) {
 
 	expected := 10
 	queue.Push(10)
-	require.Equal(t, 1, queue.Len())
+	if queue.Len() != 1 {
+		t.Errorf("Expected queue length as 1, actual len: %d", queue.Len())
+	}
 	verifyPop(t, expected, true, &queue)
 	verifyEmpty(t, &queue)
 }
@@ -57,7 +63,9 @@ func TestWrapAroundEmpty(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		queue.Push(i)
 	}
-	require.Equal(t, 5, queue.Len())
+	if queue.Len() != 5 {
+		t.Errorf("Expected queue len as 5, actual len: %d", queue.Len())
+	}
 	for i := 0; i < 5; i++ {
 		verifyPop(t, i, true, &queue)
 	}
@@ -79,7 +87,9 @@ func TestWrapAroundPartial(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		queue.Push(i)
 	}
-	require.Equal(t, 5, queue.Len())
+	if queue.Len() != 5 {
+		t.Errorf("Expected queue len as 5, actual len: %d", queue.Len())
+	}
 	verifyPop(t, 0, true, &queue)
 
 	for i := 5; i < 10; i++ {
@@ -99,19 +109,31 @@ func TestShrink(t *testing.T) {
 	for i := 0; i < normalSize*2; i++ {
 		queue.Push(i)
 	}
-	require.Equal(t, normalSize*2, queue.Len())
-	require.LessOrEqual(t, 2*normalSize, len(queue.elements))
+	if queue.Len() != normalSize*2 {
+		t.Errorf("Expected queue len as %d, actual len: %d", normalSize*2, queue.Len())
+	}
+	if len(queue.elements) < 2*normalSize {
+		t.Errorf("Expected queue elements len as %d, actual len: %d", 2*normalSize, len(queue.elements))
+	}
 
 	// Pop all, should be shrunken when done.
 	for i := 0; i < normalSize*2; i++ {
 		verifyPop(t, i, true, &queue)
 	}
-	require.Equal(t, 0, queue.Len())
-	require.Len(t, queue.elements, normalSize)
+	if queue.Len() != 0 {
+		t.Errorf("Expected queue len as 0, actual len: %d", queue.Len())
+	}
+	if len(queue.elements) != normalSize {
+		t.Errorf("Expected queue elements len as %d, actual len: %d", normalSize, len(queue.elements))
+	}
 
 	// Still usable after shrinking?
 	queue.Push(42)
 	verifyPop(t, 42, true, &queue)
-	require.Equal(t, 0, queue.Len())
-	require.Len(t, queue.elements, normalSize)
+	if queue.Len() != 0 {
+		t.Errorf("Expected queue len as 0, actual len: %d", queue.Len())
+	}
+	if len(queue.elements) != normalSize {
+		t.Errorf("Expected queue elements len as %d, actual len: %d", normalSize, len(queue.elements))
+	}
 }
