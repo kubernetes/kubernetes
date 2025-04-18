@@ -210,6 +210,11 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletEnsureSecretPulledImages) {
 			msg := fmt.Sprintf("Container image %q already present on machine", requestedImage)
 			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+
+			// we need to stop recording if it is still in progress, as the image
+			// has already been pulled by another pod.
+			m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
+
 			return imageRef, msg, nil
 		}
 
@@ -231,6 +236,11 @@ func (m *imageManager) EnsureImageExists(ctx context.Context, objRef *v1.ObjectR
 		if !pullRequired {
 			msg := fmt.Sprintf("Container image %q already present on machine and can be accessed by the pod", requestedImage)
 			m.logIt(objRef, v1.EventTypeNormal, events.PulledImage, logPrefix, msg, klog.Info)
+
+			// we need to stop recording if it is still in progress, as the image
+			// has already been pulled by another pod.
+			m.podPullingTimeRecorder.RecordImageFinishedPulling(pod.UID)
+
 			return imageRef, msg, nil
 		}
 	}
@@ -380,3 +390,4 @@ func trackedToImagePullCreds(trackedCreds *credentialprovider.TrackedAuthConfig)
 
 	return ret
 }
+

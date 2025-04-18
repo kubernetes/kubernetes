@@ -146,7 +146,9 @@ func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.
 		return
 	}
 
-	state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
+	if !state.firstStartedPulling.IsZero() {
+		state.lastFinishedPulling = p.clock.Now() // Now is always grater than values from the past.
+	}
 }
 
 func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
@@ -194,3 +196,4 @@ func (p *basicPodStartupLatencyTracker) DeletePodStartupState(podUID types.UID) 
 
 	delete(p.pods, podUID)
 }
+

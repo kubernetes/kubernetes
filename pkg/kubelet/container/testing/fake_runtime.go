@@ -66,6 +66,10 @@ type FakeRuntime struct {
 	Err               error
 	InspectErr        error
 	StatusErr         error
+	// if PullImageErr is set, the PullImage() call will return error
+	// after being blocked by BlockImagePulls. This is used to simulate
+	// a failure in some of the parallel pull image calls.
+	PullImageErr error
 	// If BlockImagePulls is true, then all PullImage() calls will be blocked until
 	// UnblockImagePulls() is called. This is used to simulate image pull latency
 	// from container runtime.
@@ -348,6 +352,10 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 	case <-f.imagePullTokenBucket:
 	}
 
+	if f.PullImageErr != nil {
+		return image.Image, retCreds, f.PullImageErr
+	}
+
 	return image.Image, retCreds, retErr
 }
 
@@ -545,3 +553,4 @@ func (f *FakeRuntime) GetContainerSwapBehavior(pod *v1.Pod, container *v1.Contai
 	}
 	return kubetypes.NoSwap
 }
+
