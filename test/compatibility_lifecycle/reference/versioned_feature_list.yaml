@@ -1687,6 +1687,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: WindowsCPUAndMemoryAffinity
   versionedSpecs:
   - default: false
