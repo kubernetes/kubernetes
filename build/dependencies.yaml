@@ -117,8 +117,6 @@ dependencies:
     - path: .go-version
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
-    - path: test/images/Makefile
-      match: GOLANG_VERSION=\d+.\d+(alpha|beta|rc)?\.?\d+
 
   # This should ideally be updated to match the golang version
   # but we can dynamically fetch go if the base image is out of date.
