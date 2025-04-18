@@ -445,8 +445,10 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeStatusMaxImages int32,
 	seccompDefault bool,
 ) (*Kubelet, error) {
-	ctx := context.Background()
-	logger := klog.TODO()
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
+	logger := klog.FromContext(ctx)
 
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -1064,7 +1066,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		// NewHealthChecker returns an error indicating that the watchdog is configured but the configuration is incorrect,
 		// the kubelet will not be started.
 		checkers := klet.containerManager.GetHealthCheckers()
-		klet.healthChecker, err = watchdog.NewHealthChecker(klet, watchdog.WithExtendedCheckers(checkers))
+		klet.healthChecker, err = watchdog.NewHealthChecker(logger, klet, watchdog.WithExtendedCheckers(checkers))
 		if err != nil {
 			return nil, fmt.Errorf("create health checker: %w", err)
 		}
@@ -1826,7 +1828,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
-		kl.healthChecker.Start()
+		kl.healthChecker.Start(ctx)
 	}
 
 	kl.syncLoop(ctx, updates, kl)
