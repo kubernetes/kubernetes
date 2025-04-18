@@ -115,6 +115,7 @@ dependencies:
       match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   # Golang
+  # TODO: this should really be eliminated and controlled by .go-version
   - name: "golang: upstream version"
     version: 1.24.2
     refPaths:
