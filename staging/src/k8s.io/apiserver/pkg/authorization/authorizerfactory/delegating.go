@@ -42,6 +42,9 @@ type DelegatingAuthorizerConfig struct {
 	// You generally want more responsive, "deny, try again" flows.
 	DenyCacheTTL time.Duration
 
+	// ResponseCacheSize is the size of the cache for saving the responses from authorizer webhook.
+	ResponseCacheSize int
+
 	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
@@ -61,6 +64,7 @@ func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
 		c.SubjectAccessReviewClient,
 		c.AllowCacheTTL,
 		c.DenyCacheTTL,
+		c.ResponseCacheSize,
 		*c.WebhookRetryBackoff,
 		authorizer.DecisionNoOpinion,
 		NewDelegatingAuthorizerMetrics(),

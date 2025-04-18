@@ -343,6 +343,11 @@ type WebhookConfiguration struct {
 	// Maximum allowed value is 30s.
 	// Required, no default value.
 	Timeout metav1.Duration
+	// ResponseCacheSize for the response LRU cache.
+	// The value should be a positive integer.
+	// Same as setting `--authorization-webhook-cache-size` flag
+	// Default: 8192
+	ResponseCacheSize int
 	// The API version of the authorization.k8s.io SubjectAccessReview to
 	// send to and expect from the webhook.
 	// Same as setting `--authorization-webhook-version` flag

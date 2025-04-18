@@ -55,6 +55,9 @@ type DelegatingAuthorizationOptions struct {
 	// You generally want more responsive, "deny, try again" flows.
 	DenyCacheTTL time.Duration
 
+	// CacheSize is the size of the response cache for authorizer webhook.
+	CacheSize int
+
 	// AlwaysAllowPaths are HTTP paths which are excluded from authorization. They can be plain
 	// paths or end in * in which case prefix-match is applied. A leading / is optional.
 	AlwaysAllowPaths []string
@@ -80,6 +83,7 @@ func NewDelegatingAuthorizationOptions() *DelegatingAuthorizationOptions {
 		// very low for responsiveness, but high enough to handle storms
 		AllowCacheTTL:       10 * time.Second,
 		DenyCacheTTL:        10 * time.Second,
+		CacheSize:           8192,
 		ClientTimeout:       10 * time.Second,
 		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
 		// This allows the kubelet to always get health and readiness without causing an authorization check.
@@ -153,6 +157,10 @@ func (s *DelegatingAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.DenyCacheTTL,
 		"authorization-webhook-cache-unauthorized-ttl", s.DenyCacheTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
+
+	fs.IntVar(&s.CacheSize,
+		"authorization-webhook-cache-size", s.CacheSize,
+		"The size of the cache for saving responses from webhook authorizer.")
 
 	fs.StringSliceVar(&s.AlwaysAllowPaths, "authorization-always-allow-paths", s.AlwaysAllowPaths,
 		"A list of HTTP paths to skip during authorization, i.e. these are authorized without "+

@@ -44,6 +44,7 @@ const (
 	authorizationWebhookConfigFileFlag      = "authorization-webhook-config-file"
 	authorizationWebhookVersionFlag         = "authorization-webhook-version"
 	authorizationWebhookAuthorizedTTLFlag   = "authorization-webhook-cache-authorized-ttl"
+	authorizationWebhookCacheSizeFlag       = "authorization-webhook-cache-size"
 	authorizationWebhookUnauthorizedTTLFlag = "authorization-webhook-cache-unauthorized-ttl"
 	authorizationPolicyFileFlag             = "authorization-policy-file"
 	authorizationConfigFlag                 = "authorization-config"
@@ -57,6 +58,7 @@ type BuiltInAuthorizationOptions struct {
 	WebhookVersion              string
 	WebhookCacheAuthorizedTTL   time.Duration
 	WebhookCacheUnauthorizedTTL time.Duration
+	WebhookCacheSize            int
 	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
@@ -80,6 +82,7 @@ func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 		WebhookVersion:              "v1beta1",
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
+		WebhookCacheSize:            8192,
 		WebhookRetryBackoff:         genericoptions.DefaultAuthWebhookRetryBackoff(),
 	}
 }
@@ -191,6 +194,10 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&o.WebhookCacheUnauthorizedTTL,
 		authorizationWebhookUnauthorizedTTLFlag, o.WebhookCacheUnauthorizedTTL,
 		"The duration to cache 'unauthorized' responses from the webhook authorizer.")
+
+	fs.IntVar(&o.WebhookCacheSize,
+		authorizationWebhookCacheSizeFlag, o.WebhookCacheSize,
+		"The size of cache for saving the responses from the webhook authorizer.")
 
 	fs.StringVar(&o.AuthorizationConfigurationFile, authorizationConfigFlag, o.AuthorizationConfigurationFile, ""+
 		"File with Authorization Configuration to configure the authorizer chain. "+
