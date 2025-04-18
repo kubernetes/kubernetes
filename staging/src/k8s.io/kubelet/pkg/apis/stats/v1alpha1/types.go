@@ -162,6 +162,8 @@ type ContainerStats struct {
 	// Stats pertaining to CPU resources.
 	// +optional
 	CPU *CPUStats `json:"cpu,omitempty"`
+	// In nanocores per second (instantaneous)
+	CpuInst *CpuInstStats `json:"cpu_inst,omitempty"`
 	// Stats pertaining to memory (RAM) resources.
 	// +optional
 	Memory *MemoryStats `json:"memory,omitempty"`
@@ -430,4 +432,28 @@ type UserDefinedMetric struct {
 	// Value of the metric. Float64s have 53 bit precision.
 	// We do not foresee any metrics exceeding that value.
 	Value float64 `json:"value"`
+}
+
+// Instantaneous CPU stats
+type CpuInstStats struct {
+	Usage CpuInstUsage `json:"usage"`
+}
+
+// CPU usage time statistics.
+type CpuInstUsage struct {
+	// Total CPU usage.
+	// Units: nanocores per second
+	Total uint64 `json:"total"`
+
+	// Per CPU/core usage of the container.
+	// Unit: nanocores per second
+	PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
+
+	// Time spent in user space.
+	// Unit: nanocores per second
+	User uint64 `json:"user"`
+
+	// Time spent in kernel space.
+	// Unit: nanocores per second
+	System uint64 `json:"system"`
 }
