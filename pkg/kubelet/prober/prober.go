@@ -118,7 +118,12 @@ func (pb *prober) probe(ctx context.Context, probeType probeType, pod *v1.Pod, s
 
 	case probe.Failure:
 		klog.V(1).InfoS("Probe failed", "probeType", probeType, "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "probeResult", result, "output", output)
-		pb.recordContainerEvent(pod, &container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+		// For startup probes, failures during startup are expected and should be Normal events
+		eventType := v1.EventTypeWarning
+		if probeType == startup {
+			eventType = v1.EventTypeNormal
+		}
+		pb.recordContainerEvent(pod, &container, eventType, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 		return results.Failure, nil
 
 	case probe.Unknown:
