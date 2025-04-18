@@ -50,6 +50,8 @@ func isNilableType(t *types.Type) bool {
 	return false
 }
 
+// realType returns the underlying type of a type, unwrapping aliases and
+// dropping pointerness.
 func realType(t *types.Type) *types.Type {
 	for {
 		if t.Kind == types.Alias {
