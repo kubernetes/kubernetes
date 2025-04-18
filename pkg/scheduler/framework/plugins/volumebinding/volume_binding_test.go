@@ -1071,7 +1071,7 @@ func TestVolumeBinding(t *testing.T) {
 			state := framework.NewCycleState()
 
 			t.Logf("Verify: call PreFilter and check status")
-			gotPreFilterResult, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod)
+			gotPreFilterResult, gotPreFilterStatus := p.PreFilter(ctx, state, item.pod, nil)
 			assert.Equal(t, item.wantPreFilterStatus, gotPreFilterStatus)
 			assert.Equal(t, item.wantPreFilterResult, gotPreFilterResult)
 

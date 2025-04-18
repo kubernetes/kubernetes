@@ -1001,7 +1001,7 @@ func TestPlugin(t *testing.T) {
 				return
 			}
 
-			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod)
+			result, status := testCtx.p.PreFilter(testCtx.ctx, testCtx.state, tc.pod, nil)
 			t.Run("prefilter", func(t *testing.T) {
 				assert.Equal(t, tc.want.preFilterResult, result)
 				testCtx.verify(t, tc.want.prefilter, initialObjects, result, status)
