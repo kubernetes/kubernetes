@@ -62,7 +62,9 @@ const (
 // able to inject a policy-specific holder
 type admissionTestExpectationHolder interface {
 	reset(t *testing.T)
+	resetForV1Beta1(t *testing.T)
 	expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool)
+	expectForV1Beta1(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool)
 	verify(t *testing.T)
 }
 
@@ -224,7 +226,7 @@ type holder struct {
 	recorded map[webhookOptions]*admissionRequest
 }
 
-func (h *holder) reset(t *testing.T) {
+func (h *holder) resetHelper(t *testing.T, version string) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.t = t
@@ -244,13 +246,19 @@ func (h *holder) reset(t *testing.T) {
 	h.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{mutation, validation} {
 		for _, converted := range []bool{true, false} {
-			for _, version := range []string{"v1", "v1beta1"} {
-				h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
-			}
+			h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
 		}
 	}
 }
-func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
+
+func (h *holder) reset(t *testing.T) {
+	h.resetHelper(t, "v1")
+}
+func (h *holder) resetForV1Beta1(t *testing.T) {
+	h.resetHelper(t, "v1beta1")
+}
+
+func (h *holder) expectHelper(version string, gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
 	// Special-case namespaces, since the object name shows up in request attributes
 	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
 		namespace = name
@@ -274,11 +282,16 @@ func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.
 	h.recorded = map[webhookOptions]*admissionRequest{}
 	for _, phase := range []string{mutation, validation} {
 		for _, converted := range []bool{true, false} {
-			for _, version := range []string{"v1", "v1beta1"} {
-				h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
-			}
+			h.recorded[webhookOptions{version: version, phase: phase, converted: converted}] = nil
 		}
 	}
+}
+
+func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
+	h.expectHelper("v1", gvr, gvk, optionsGVK, operation, name, namespace, object, oldObject, options)
+}
+func (h *holder) expectForV1Beta1(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1beta1.Operation, name, namespace string, object, oldObject, options bool) {
+	h.expectHelper("v1beta1", gvr, gvk, optionsGVK, operation, name, namespace, object, oldObject, options)
 }
 
 type admissionRequest struct {
