@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func NewTestBitMask(sockets ...int) bitmask.BitMask {
@@ -258,6 +259,7 @@ func TestAddHintProvider(t *testing.T) {
 }
 
 func TestAdmit(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	numaInfo := &NUMAInfo{
 		Nodes: []int{0, 1},
 		NUMADistances: NUMADistances{
@@ -563,7 +565,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Container scope Admit
-		ctnActual := ctnScopeManager.Admit(&podAttr)
+		ctnActual := ctnScopeManager.Admit(tCtx, &podAttr)
 		if ctnActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
 		}
@@ -572,7 +574,7 @@ func TestAdmit(t *testing.T) {
 		}
 
 		// Pod scope Admit
-		podActual := podScopeManager.Admit(&podAttr)
+		podActual := podScopeManager.Admit(tCtx, &podAttr)
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
 		}
