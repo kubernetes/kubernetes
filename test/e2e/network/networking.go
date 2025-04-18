@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // checkConnectivityToHost launches a pod to test connectivity to the specified
@@ -331,6 +333,26 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 			ginkgo.By("Deleting a pod which, will be replaced with a new endpoint")
 			config.DeleteNetProxyPod(ctx)
+
+			// Add wait for endpoints to be updated
+			ginkgo.By("Waiting for endpoints to be updated")
+			if err := wait.PollWithContext(ctx, 1*time.Second, 30*time.Second, func(ctx context.Context) (bool, error) {
+				eps, err := config.GetEndpointsFromTestContainer(ctx, "http", config.ClusterIP, e2enetwork.ClusterHTTPPort, 1)
+				if err != nil {
+					// Log error but keep polling
+					framework.Logf("error getting endpoints: %v", err)
+					return false, nil
+				}
+				// Check if endpoints match expected
+				expected := config.EndpointHostnames()
+				if eps.Equal(expected) {
+					return true, nil
+				}
+				framework.Logf("endpoints not yet updated, got: %v, want: %v", eps.List(), expected.List())
+				return false, nil
+			}); err != nil {
+				framework.Failf("failed waiting for endpoints to be updated: %v", err)
+			}
 
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP) (endpoint recovery)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
 			err = config.DialFromTestContainer(ctx, "http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, config.MaxTries, config.EndpointHostnames())
