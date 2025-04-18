@@ -1078,8 +1078,9 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
-					Image: busyboxImage,
-					Name:  fmt.Sprintf("%s-container", name),
+					Image:           busyboxImage,
+					ImagePullPolicy: v1.PullAlways, // Dont prepull images for eviction tests as disk pressure from eviction tests could trigger gc to clean up the image. ref: https://github.com/kubernetes/kubernetes/issues/131142
+					Name:            fmt.Sprintf("%s-container", name),
 					Command: []string{
 						"sh",
 						"-c",
