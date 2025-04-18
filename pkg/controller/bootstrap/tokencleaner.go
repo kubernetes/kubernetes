@@ -65,6 +65,8 @@ type TokenCleaner struct {
 	// secretLister is able to list/get secrets and is populated by the shared informer passed to NewTokenCleaner.
 	secretLister corelisters.SecretLister
 
+	secretHandlerUnregister func() error
+
 	// secretSynced returns true if the secret shared informer has been synced at least once.
 	secretSynced cache.InformerSynced
 
@@ -86,7 +88,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		),
 	}
 
-	secrets.Informer().AddEventHandlerWithResyncPeriod(
+	secretHandlerUnregister, err := secrets.Informer().AddEventHandlerWithResyncPeriod(
 		cache.FilteringResourceEventHandler{
 			FilterFunc: func(obj interface{}) bool {
 				switch t := obj.(type) {
@@ -104,6 +106,12 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 		},
 		options.SecretResync,
 	)
+	if err != nil {
+		return nil, err
+	}
+	e.secretHandlerUnregister = func() error {
+		return secrets.Informer().RemoveEventHandler(secretHandlerUnregister)
+	}
 
 	return e, nil
 }
@@ -111,7 +119,7 @@ func NewTokenCleaner(cl clientset.Interface, secrets coreinformers.SecretInforme
 // Run runs controller loops and returns when they are done
 func (tc *TokenCleaner) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
-	defer tc.queue.ShutDown()
+	defer tc.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting token cleaner controller")
@@ -124,6 +132,11 @@ func (tc *TokenCleaner) Run(ctx context.Context) {
 	go wait.UntilWithContext(ctx, tc.worker, 10*time.Second)
 
 	<-ctx.Done()
+}
+
+func (tc *TokenCleaner) ShutDown() {
+	tc.queue.ShutDown()
+	utilruntime.HandleError(tc.secretHandlerUnregister())
 }
 
 func (tc *TokenCleaner) enqueueSecrets(obj interface{}) {
