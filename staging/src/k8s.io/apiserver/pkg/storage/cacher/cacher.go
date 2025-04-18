@@ -467,11 +467,13 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	c.watchCache.SetOnReplace(func() {
 		c.ready.setReady()
 		klog.V(1).Infof("cacher (%v): initialized", c.groupResource.String())
+		metrics.WatchCacheReady.WithLabelValues(c.groupResource.String()).Set(1)
 		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.String()).Inc()
 	})
 	var err error
 	defer func() {
 		c.ready.setError(err)
+		metrics.WatchCacheReady.WithLabelValues(c.groupResource.String()).Set(0)
 	}()
 
 	c.terminateAllWatchers()

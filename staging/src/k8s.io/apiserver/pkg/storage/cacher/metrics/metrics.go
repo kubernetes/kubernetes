@@ -35,6 +35,8 @@ const (
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
  * the metric stability policy.
+ *
+ * Most metrics here use a "resource" label. The number of unique values for this label is limited by the number of watch caches the apiserver creates.
  */
 var (
 	listCacheCount = compbasemetrics.NewCounterVec(
@@ -147,6 +149,17 @@ var (
 		[]string{"resource"},
 	)
 
+	WatchCacheReady = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "ready",
+			Help:           "Readiness of the watch cache broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+
 	WatchCacheInitializations = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -203,6 +216,7 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityIncreaseTotal)
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
+		legacyregistry.MustRegister(WatchCacheReady)
 		legacyregistry.MustRegister(WatchCacheInitializations)
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
