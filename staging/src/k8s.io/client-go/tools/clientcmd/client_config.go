@@ -25,6 +25,7 @@ import (
 	"strings"
 	"unicode"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	clientauth "k8s.io/client-go/tools/auth"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -415,7 +416,7 @@ func (config *DirectClientConfig) Namespace() (string, bool, error) {
 	}
 
 	if len(configContext.Namespace) == 0 {
-		return "default", false, nil
+		return metav1.NamespaceDefault, false, nil
 	}
 
 	return configContext.Namespace, false, nil
@@ -642,7 +643,7 @@ func (config *inClusterClientConfig) Namespace() (string, bool, error) {
 		}
 	}
 
-	return "default", false, nil
+	return metav1.NamespaceDefault, false, nil
 }
 
 func (config *inClusterClientConfig) ConfigAccess() ConfigAccess {
