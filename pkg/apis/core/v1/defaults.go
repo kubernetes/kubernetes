@@ -363,7 +363,6 @@ func SetDefaults_ObjectFieldSelector(obj *v1.ObjectFieldSelector) {
 func SetDefaults_LimitRangeItem(obj *v1.LimitRangeItem) {
 	// for container limits, we apply default values
 	if obj.Type == v1.LimitTypeContainer {
-
 		if obj.Default == nil {
 			obj.Default = make(v1.ResourceList)
 		}
