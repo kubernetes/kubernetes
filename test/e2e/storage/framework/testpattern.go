@@ -311,6 +311,15 @@ var (
 		AllowExpansion: true,
 	}
 
+	// Deginition for snapshot metadata
+	SnapshotMetadata = TestPattern{
+		Name:                   "SnapshotMetadata",
+		VolType:                DynamicPV,
+		VolMode:                v1.PersistentVolumeBlock,
+		SnapshotType:           DynamicCreatedSnapshot,
+		SnapshotDeletionPolicy: DeleteSnapshot,
+	}
+
 	// Definitions for snapshot case
 
 	// DynamicSnapshotDelete is TestPattern for "Dynamic snapshot"
