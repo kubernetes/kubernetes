@@ -30,12 +30,15 @@ import (
 
 	"google.golang.org/grpc"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -43,11 +46,11 @@ import (
 )
 
 type ExamplePlugin struct {
-	stopCh     <-chan struct{}
-	logger     klog.Logger
-	kubeClient kubernetes.Interface
-	d          *kubeletplugin.Helper
-	fileOps    FileOperations
+	stopCh         <-chan struct{}
+	logger         klog.Logger
+	resourceClient cgoresource.ResourceV1beta2Interface
+	d              *kubeletplugin.Helper
+	fileOps        FileOperations
 
 	cdiDir      string
 	driverName  string
@@ -125,6 +128,9 @@ type FileOperations struct {
 	// Pre-defined devices, with each device name mapped to
 	// the device attributes. Not used if NumDevices >= 0.
 	Devices map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+
+	// ErrorHandler is an optional callback for ResourceSlice publishing problems.
+	ErrorHandler func(ctx context.Context, err error, msg string)
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
@@ -145,15 +151,15 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		}
 	}
 	ex := &ExamplePlugin{
-		stopCh:      ctx.Done(),
-		logger:      logger,
-		kubeClient:  kubeClient,
-		fileOps:     fileOps,
-		cdiDir:      cdiDir,
-		driverName:  driverName,
-		nodeName:    nodeName,
-		prepared:    make(map[ClaimID][]kubeletplugin.Device),
-		deviceNames: sets.New[string](),
+		stopCh:         ctx.Done(),
+		logger:         logger,
+		resourceClient: draclient.New(kubeClient),
+		fileOps:        fileOps,
+		cdiDir:         cdiDir,
+		driverName:     driverName,
+		nodeName:       nodeName,
+		prepared:       make(map[ClaimID][]kubeletplugin.Device),
+		deviceNames:    sets.New[string](),
 	}
 
 	for i := 0; i < ex.fileOps.NumDevices; i++ {
@@ -179,8 +185,7 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		devices := make([]resourceapi.Device, ex.fileOps.NumDevices)
 		for i := 0; i < ex.fileOps.NumDevices; i++ {
 			devices[i] = resourceapi.Device{
-				Name:  fmt.Sprintf("device-%02d", i),
-				Basic: &resourceapi.BasicDevice{},
+				Name: fmt.Sprintf("device-%02d", i),
 			}
 		}
 		driverResources := resourceslice.DriverResources{
@@ -199,8 +204,8 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		devices := make([]resourceapi.Device, len(ex.fileOps.Devices))
 		for i, deviceName := range sets.List(ex.deviceNames) {
 			devices[i] = resourceapi.Device{
-				Name:  deviceName,
-				Basic: &resourceapi.BasicDevice{Attributes: ex.fileOps.Devices[deviceName]},
+				Name:       deviceName,
+				Attributes: ex.fileOps.Devices[deviceName],
 			}
 		}
 		driverResources := resourceslice.DriverResources{
@@ -231,6 +236,14 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 		return false
 	}
 	return status.PluginRegistered
+}
+
+func (ex *ExamplePlugin) ErrorHandler(ctx context.Context, err error, msg string) {
+	if ex.fileOps.ErrorHandler != nil {
+		ex.fileOps.ErrorHandler(ctx, err, msg)
+		return
+	}
+	utilruntime.HandleErrorWithContext(ctx, err, msg)
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
@@ -552,5 +565,5 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 }
 
 func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
-	return ex.kubeClient.ResourceV1beta1().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+	return ex.resourceClient.ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
 }
