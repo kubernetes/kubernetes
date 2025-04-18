@@ -38,6 +38,13 @@ func Test(t *testing.T) {
 		ImmutableField:              "fff",
 		ImmutablePtrField:           ptr.To(ImmutableType("fff")),
 	}
+
+	structA2 := structA // dup of A but with different pointer values
+	structA2.StringPtrField = ptr.To(*structA2.StringPtrField)
+	structA2.StructPtrField = ptr.To(*structA2.StructPtrField)
+	structA2.NonComparableStructPtrField = ptr.To(*structA2.NonComparableStructPtrField)
+	structA2.ImmutablePtrField = ptr.To(*structA2.ImmutablePtrField)
+
 	structB := Struct{
 		StringField:                 "uuu",
 		StringPtrField:              ptr.To("uuu"),
@@ -52,6 +59,8 @@ func Test(t *testing.T) {
 	}
 
 	st.Value(&structA).OldValue(&structA).ExpectValid()
+	st.Value(&structA).OldValue(&structA2).ExpectValid()
+	st.Value(&structA2).OldValue(&structA).ExpectValid()
 
 	st.Value(&structA).OldValue(&structB).ExpectInvalid(
 		field.Forbidden(field.NewPath("stringField"), "field is immutable"),

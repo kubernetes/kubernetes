@@ -51,15 +51,8 @@ var (
 func (immutableTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
-	t := context.Type
-	for t.Kind == types.Pointer || t.Kind == types.Alias {
-		if t.Kind == types.Pointer {
-			t = t.Elem
-		} else if t.Kind == types.Alias {
-			t = t.Underlying
-		}
-	}
-	if t.IsComparable() {
+	if realType(context.Type).IsComparable() {
+		// Note: This compares the pointee, not the pointer itself.
 		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableValidator))
 	} else {
 		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableNonComparableValidator))
