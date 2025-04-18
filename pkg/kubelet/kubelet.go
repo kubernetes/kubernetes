@@ -3180,6 +3180,14 @@ func (kl *Kubelet) ListenAndServePodResources() {
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID string) {
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
+		for _, sandboxStatus := range podStatus.SandboxStatuses {
+			// If exitedContainerID is the ID of the sandbox container,
+			// we skip deleting this container to avoid duplicate RemoveContainer calls.
+			if sandboxStatus.GetId() == exitedContainerID {
+				klog.V(4).InfoS("exitedContainerID is a sandbox container, skipping container deletion", "exitedContainerID", exitedContainerID)
+				return
+			}
+		}
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
 		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
