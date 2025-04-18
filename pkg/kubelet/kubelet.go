@@ -2829,7 +2829,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.deleteContainersInPod("", podStatus, false)
 			}
 		}
 	}
@@ -3188,9 +3188,13 @@ func (kl *Kubelet) cleanUpContainersInPod(podID types.UID, exitedContainerID str
 				return
 			}
 		}
-		// When an evicted or deleted pod has already synced, all containers can be removed.
-		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+
+		keepMinimContainers := true
+		if kl.podWorkers.ShouldPodContentBeRemoved(podID) {
+			keepMinimContainers = false
+		}
+
+		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, keepMinimContainers)
 	}
 }
 

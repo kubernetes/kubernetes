@@ -100,11 +100,16 @@ func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontain
 }
 
 // deleteContainersInPod issues container deletion requests for containers selected by getContainersToDeleteInPod.
-func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, podStatus *kubecontainer.PodStatus, removeAll bool) {
-	containersToKeep := p.containersToKeep
-	if removeAll {
-		containersToKeep = 0
-		filterContainerID = ""
+// If filterContainerID is an empty string,
+// all containers in the exited state within the Pod will be deleted (but a minimum number of containers, usually 1, will be retained).
+// If keepMinimContainers is false, the minimum number of containers will not be retained in the Pod.
+// filterContainerID and keepMinimContainers are not mutually exclusive; both parameters take effect independently.
+// If both filterContainerID is set to an empty string and keepMinimContainers is set to false,
+// all containers in the exited state within the Pod will be deleted, and no containers will be retained.
+func (p *podContainerDeletor) deleteContainersInPod(filterContainerID string, podStatus *kubecontainer.PodStatus, keepMinimContainers bool) {
+	var containersToKeep int
+	if keepMinimContainers {
+		containersToKeep = p.containersToKeep
 	}
 
 	for _, candidate := range getContainersToDeleteInPod(filterContainerID, podStatus, containersToKeep) {
