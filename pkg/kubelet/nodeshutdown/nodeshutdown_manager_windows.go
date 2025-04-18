@@ -108,7 +108,7 @@ func NewManager(conf *Config) Manager {
 }
 
 // Admit rejects all pods if node is shutting
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error) {
 	nodeShuttingDown := m.ShutdownStatus() != nil
 
 	if nodeShuttingDown {
@@ -116,9 +116,9 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 			Admit:   false,
 			Reason:  NodeShutdownNotAdmittedReason,
 			Message: nodeShutdownNotAdmittedMessage,
-		}
+		}, nil
 	}
-	return lifecycle.PodAdmitResult{Admit: true}
+	return lifecycle.PodAdmitResult{Admit: true}, nil
 }
 
 // setMetrics sets the metrics for the node shutdown manager.

@@ -113,7 +113,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 	}
 }
 
-func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) (PodAdmitResult, error) {
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
 		klog.ErrorS(err, "Cannot get Node info")
@@ -121,7 +121,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   false,
 			Reason:  InvalidNodeInfo,
 			Message: "Kubelet cannot get node info.",
-		}
+		}, nil
 	}
 	admitPod := attrs.Pod
 
@@ -131,14 +131,14 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   false,
 			Reason:  PodOSSelectorNodeLabelDoesNotMatch,
 			Message: "Failed to admit pod as the `kubernetes.io/os` label doesn't match node label",
-		}
+		}, nil
 	}
 	if rejectPodAdmissionBasedOnOSField(admitPod) {
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  PodOSNotSupported,
 			Message: "Failed to admit pod as the OS field doesn't match node OS",
-		}
+		}, nil
 	}
 
 	if rejectPodAdmissionBasedOnSupplementalGroupsPolicy(admitPod, node) {
@@ -148,7 +148,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   false,
 			Reason:  SupplementalGroupsPolicyNotSupported,
 			Message: message,
-		}
+		}, nil
 	}
 
 	pods := attrs.OtherPods
@@ -163,7 +163,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   false,
 			Reason:  UnexpectedAdmissionError,
 			Message: message,
-		}
+		}, nil
 	}
 
 	// Remove the requests of the extended resources that are missing in the
@@ -188,7 +188,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 				Admit:   fit,
 				Reason:  UnexpectedAdmissionError,
 				Message: message,
-			}
+			}, nil
 		}
 	}
 	if !fit {
@@ -201,7 +201,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 				Admit:   fit,
 				Reason:  UnknownReason,
 				Message: message,
-			}
+			}, nil
 		}
 		// If there are failed predicates, we only return the first one as a reason.
 		r := reasons[0]
@@ -234,11 +234,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Admit:   fit,
 			Reason:  reason,
 			Message: message,
-		}
+		}, nil
 	}
 	return PodAdmitResult{
 		Admit: true,
-	}
+	}, nil
 }
 
 // rejectPodAdmissionBasedOnOSSelector rejects pod if it's nodeSelector doesn't match
