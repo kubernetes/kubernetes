@@ -51,6 +51,10 @@ spec:
         counters:
           countersKey:
             value: "0"
+        includes:
+        - name: nameValue
+      includes:
+      - name: nameValue
       nodeName: nodeNameValue
       nodeSelector:
         nodeSelectorTerms:
@@ -71,6 +75,28 @@ spec:
         value: valueValue
     name: nameValue
   driver: driverValue
+  mixins:
+    counterSet:
+    - counters:
+        countersKey:
+          value: "0"
+      name: nameValue
+    device:
+    - attributes:
+        attributesKey:
+          bool: true
+          int: 2
+          string: stringValue
+          version: versionValue
+      capacity:
+        capacityKey:
+          value: "0"
+      name: nameValue
+    deviceCounterConsumption:
+    - counters:
+        countersKey:
+          value: "0"
+      name: nameValue
   nodeName: nodeNameValue
   nodeSelector:
     nodeSelectorTerms:
@@ -93,4 +119,6 @@ spec:
   - counters:
       countersKey:
         value: "0"
+    includes:
+    - name: nameValue
     name: nameValue

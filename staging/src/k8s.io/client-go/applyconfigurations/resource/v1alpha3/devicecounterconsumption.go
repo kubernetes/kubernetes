@@ -21,8 +21,9 @@ package v1alpha3
 // DeviceCounterConsumptionApplyConfiguration represents a declarative configuration of the DeviceCounterConsumption type for use
 // with apply.
 type DeviceCounterConsumptionApplyConfiguration struct {
-	CounterSet *string                              `json:"counterSet,omitempty"`
-	Counters   map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	CounterSet *string                                              `json:"counterSet,omitempty"`
+	Counters   map[string]CounterApplyConfiguration                 `json:"counters,omitempty"`
+	Includes   []DeviceCounterConsumptionMixinRefApplyConfiguration `json:"includes,omitempty"`
 }
 
 // DeviceCounterConsumptionApplyConfiguration constructs a declarative configuration of the DeviceCounterConsumption type for use with
@@ -49,6 +50,19 @@ func (b *DeviceCounterConsumptionApplyConfiguration) WithCounters(entries map[st
 	}
 	for k, v := range entries {
 		b.Counters[k] = v
+	}
+	return b
+}
+
+// WithIncludes adds the given value to the Includes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Includes field.
+func (b *DeviceCounterConsumptionApplyConfiguration) WithIncludes(values ...*DeviceCounterConsumptionMixinRefApplyConfiguration) *DeviceCounterConsumptionApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithIncludes")
+		}
+		b.Includes = append(b.Includes, *values[i])
 	}
 	return b
 }

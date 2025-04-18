@@ -463,6 +463,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: DRAResourceSliceMixins
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: DynamicResourceAllocation
   versionedSpecs:
   - default: false

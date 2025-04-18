@@ -99,7 +99,12 @@
               "countersKey": {
                 "value": "0"
               }
-            }
+            },
+            "includes": [
+              {
+                "name": "nameValue"
+              }
+            ]
           }
         ],
         "nodeName": "nodeNameValue",
@@ -135,6 +140,11 @@
             "effect": "effectValue",
             "timeAdded": "2004-01-01T01:01:01Z"
           }
+        ],
+        "includes": [
+          {
+            "name": "nameValue"
+          }
         ]
       }
     ],
@@ -146,8 +156,53 @@
           "countersKey": {
             "value": "0"
           }
-        }
+        },
+        "includes": [
+          {
+            "name": "nameValue"
+          }
+        ]
       }
-    ]
+    ],
+    "mixins": {
+      "device": [
+        {
+          "name": "nameValue",
+          "attributes": {
+            "attributesKey": {
+              "int": 2,
+              "bool": true,
+              "string": "stringValue",
+              "version": "versionValue"
+            }
+          },
+          "capacity": {
+            "capacityKey": {
+              "value": "0"
+            }
+          }
+        }
+      ],
+      "deviceCounterConsumption": [
+        {
+          "name": "nameValue",
+          "counters": {
+            "countersKey": {
+              "value": "0"
+            }
+          }
+        }
+      ],
+      "counterSet": [
+        {
+          "name": "nameValue",
+          "counters": {
+            "countersKey": {
+              "value": "0"
+            }
+          }
+        }
+      ]
+    }
   }
 }

@@ -167,6 +167,13 @@ type ResourceSliceSpec struct {
 	// +listType=atomic
 	// +featureGate=DRAPartitionableDevices
 	SharedCounters []CounterSet `json:"sharedCounters,omitempty" protobuf:"bytes,8,name=sharedCounters"`
+
+	// Mixins defines the mixins available for devices and counter sets
+	// in the ResourceSlice.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +optional
+	Mixins *ResourceSliceMixins `json:"mixins,omitempty" protobuf:"bytes,9,name=mixins"`
 }
 
 // CounterSet defines a named set of counters
@@ -190,6 +197,150 @@ type CounterSet struct {
 	// To ensure this uniqueness, capacities defined by the vendor
 	// must be listed without the driver name as domain prefix in
 	// their name. All others must be listed with their domain prefix.
+	//
+	// At least one of counters and includes must be specified.
+	//
+	// The maximum number of counters is 32.
+	//
+	// +optional
+	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
+
+	// Includes defines a list of references to CounterSetMixin.
+	// The counters listed in the mixins will be added to the counters
+	// available in this CounterSet.
+	//
+	// The counters of each included mixin are applied to this counter set in
+	// order. Conflicting counters from multiple mixins are taken from the
+	// last mixin listed. Counters set on the CounterSet will always override
+	// counters from mixins.
+	//
+	// At least one of counters and includes must be specified.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of includes is 8.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +listType=atomic
+	// +optional
+	Includes []CounterSetMixinRef `json:"includes,omitempty" protobuf:"bytes,3,name=includes"`
+}
+
+// CounterSetMixinRef defines a reference to a CounterSetMixin.
+type CounterSetMixinRef struct {
+	// Name refers to a CounterSetMixin defined in the same
+	// ResourceSlice.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+}
+
+// ResourceSliceMixins defines mixins for the ResourceSlice.
+//
+// The main purposes of these mixins is to reduce the memory footprint
+// of devices since they can reference the mixins provided here rather
+// than duplicate them.
+type ResourceSliceMixins struct {
+	// Device represents a list of device mixins, i.e. a collection of
+	// shared attributes and capacities that an actual device can "include"
+	// to extend the set of attributes and capacities it already defines.
+	//
+	// The maximum number of attributes, capacity, and counters across all
+	// mixins is 256.
+	//
+	// +optional
+	// +listType=atomic
+	Device []DeviceMixin `json:"device,omitempty" protobuf:"bytes,1,name=device"`
+
+	// DeviceCounterConsumption represents a list of counter
+	// consumption mixins, each of which contains a set of counters
+	// that a device will consume from a counter set.
+	//
+	// The maximum number of attributes, capacity, and counters across all
+	// mixins is 256.
+	//
+	// +optional
+	// +listType=atomic
+	DeviceCounterConsumption []DeviceCounterConsumptionMixin `json:"deviceCounterConsumption,omitempty" protobuf:"bytes,2,name=deviceCounterConsumption"`
+
+	// CounterSet represents a list of counter set mixins, i.e.
+	// a collection of counters that a CounterSet can "include"
+	// to extend the set of counters it already defines.
+	//
+	// The maximum number of attributes, capacity, and counters across all
+	// mixins is 256.
+	//
+	// +optional
+	// +listType=atomic
+	CounterSet []CounterSetMixin `json:"counterSet,omitempty" protobuf:"bytes,3,name=counterSet"`
+}
+
+// DeviceMixin defines a mixin that can be referenced from a device.
+type DeviceMixin struct {
+	// Name is a unique identifier among all device mixins in the ResourceSlice.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Attributes defines the set of attributes for this mixin.
+	// The name of each attribute must be unique in that set.
+	//
+	// To ensure this uniqueness, attributes defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// The maximum number of attributes, capacity, and counters across all
+	// mixins is 256.
+	//
+	// +optional
+	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty" protobuf:"bytes,2,name=attributes"`
+
+	// Capacity defines the set of capacities for this mixin.
+	// The name of each capacity must be unique in that set.
+	//
+	// To ensure this uniqueness, capacities defined by the vendor
+	// must be listed without the driver name as domain prefix in
+	// their name. All others must be listed with their domain prefix.
+	//
+	// The maximum number of attributes, capacity, and counters across all
+	// mixins is 256.
+	//
+	// +optional
+	Capacity map[QualifiedName]resource.Quantity `json:"capacity,omitempty" protobuf:"bytes,3,name=capacity"`
+}
+
+// DeviceCounterConsumptionMixin defines a mixin that
+// devices can include to extend or override the set of counters
+// that a device consumes from a counter set.
+type DeviceCounterConsumptionMixin struct {
+	// Name is a unique identifier among all device counter consumption
+	// mixins in the ResourceSlice. It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Counters defines a set of counters
+	// that a device will consume from a counter set.
+	//
+	// The maximum number of attributes, capacity, and counters across all
+	// mixins is 256.
+	//
+	// +required
+	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
+}
+
+// CounterSetMixin defines a mixin that a capacity pool can include.
+type CounterSetMixin struct {
+	// Name is a unique identifier among all capacity pool mixins in the ResourceSlice.
+	// It must be a DNS label.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
+
+	// Counters defines the set of counters for this mixin.
+	// The name of each counter must be unique in that set and must be a DNS label.
 	//
 	// The maximum number of counters is 32.
 	//
@@ -249,6 +400,17 @@ type ResourcePool struct {
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
+
+// Defines the max number of shared counters that can be specified
+// in a ResourceSlice. The number is summed up across all sets.
+const ResourceSliceMaxSharedCounters = 32
+
+// Defines the maximum number of includes entries allowed.
+const ResourceSliceMaxIncludes = 8
+
+// Defines the maximum number of attributes, capacity, and counters allowed
+// across all mixins in a ResourceSlice.
+const ResourceSliceMaxMixins = 256
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
@@ -341,6 +503,33 @@ type BasicDevice struct {
 	// +listType=atomic
 	// +featureGate=DRADeviceTaints
 	Taints []DeviceTaint `json:"taints,omitempty" protobuf:"bytes,7,rep,name=taints"`
+
+	// Includes defines a list of references to DeviceMixin. The attributes
+	// and capacity listed in the mixins will be added to the device.
+	//
+	// The attributes and capacity of each included mixin are applied in
+	// order. Conflicting attributes/capacity from multiple mixins are taken from the
+	// last mixin listed. Attributes and capacity set on the device will
+	// always override those from mixins.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of includes is 8.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +optional
+	// +listType=atomic
+	Includes []DeviceMixinRef `json:"includes,omitempty" protobuf:"bytes,9,rep,name=includes"`
+}
+
+// DeviceMixinRef defines a reference to a DeviceMixin.
+type DeviceMixinRef struct {
+	// Name refers to a DeviceMixin defined in the same
+	// ResourceSlice.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -360,8 +549,41 @@ type DeviceCounterConsumption struct {
 	// in all devices is 1024 (for example, 64 devices with
 	// 16 counters each).
 	//
-	// +required
+	// At least one of counters and includes must be specified.
+	//
+	// +optional
 	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
+
+	// Includes defines a list of references to DeviceCounterConsumptionMixin.
+	// The counters listed in the mixins will be added to the
+	// counters that will be consumed by the device.
+	//
+	// The counters of each included mixin are applied in
+	// order. Conflicting counters from multiple mixins are taken from the
+	// last mixin listed. Counters set on the DeviceCounterConsumption will
+	// always override counters from mixins.
+	//
+	// At least one of counters and includes must be specified.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
+	//
+	// The maximum number of includes is 8.
+	//
+	// +featureGate=DRAResourceSliceMixins
+	// +optional
+	// +listType=atomic
+	Includes []DeviceCounterConsumptionMixinRef `json:"includes,omitempty" protobuf:"bytes,3,opt,name=includes"`
+}
+
+// DeviceCapacityConsumptionMixinRef defines a reference to a
+// DeviceCapacityConsumptionMixin.
+type DeviceCounterConsumptionMixinRef struct {
+	// Name refers to a DeviceCounterConsumptionMixin defined in the same
+	// ResourceSlice.
+	//
+	// +required
+	Name string `json:"name" protobuf:"bytes,1,name=name"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.

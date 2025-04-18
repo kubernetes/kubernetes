@@ -21,8 +21,9 @@ package v1beta1
 // CounterSetApplyConfiguration represents a declarative configuration of the CounterSet type for use
 // with apply.
 type CounterSetApplyConfiguration struct {
-	Name     *string                              `json:"name,omitempty"`
-	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	Name     *string                                `json:"name,omitempty"`
+	Counters map[string]CounterApplyConfiguration   `json:"counters,omitempty"`
+	Includes []CounterSetMixinRefApplyConfiguration `json:"includes,omitempty"`
 }
 
 // CounterSetApplyConfiguration constructs a declarative configuration of the CounterSet type for use with
@@ -49,6 +50,19 @@ func (b *CounterSetApplyConfiguration) WithCounters(entries map[string]CounterAp
 	}
 	for k, v := range entries {
 		b.Counters[k] = v
+	}
+	return b
+}
+
+// WithIncludes adds the given value to the Includes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Includes field.
+func (b *CounterSetApplyConfiguration) WithIncludes(values ...*CounterSetMixinRefApplyConfiguration) *CounterSetApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithIncludes")
+		}
+		b.Includes = append(b.Includes, *values[i])
 	}
 	return b
 }

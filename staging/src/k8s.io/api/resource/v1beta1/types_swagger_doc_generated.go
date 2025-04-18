@@ -60,6 +60,7 @@ var map_BasicDevice = map[string]string{
 	"nodeSelector":     "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"allNodes":         "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"taints":           "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
+	"includes":         "Includes defines a list of references to DeviceMixin. The attributes and capacity listed in the mixins will be added to the device.\n\nThe attributes and capacity of each included mixin are applied in order. Conflicting attributes/capacity from multiple mixins are taken from the last mixin listed. Attributes and capacity set on the device will always override those from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
 }
 
 func (BasicDevice) SwaggerDoc() map[string]string {
@@ -87,11 +88,31 @@ func (Counter) SwaggerDoc() map[string]string {
 var map_CounterSet = map[string]string{
 	"":         "CounterSet defines a named set of counters that are available to be used by devices defined in the ResourceSlice.\n\nThe counters are not allocatable by themselves, but can be referenced by devices. When a device is allocated, the portion of counters it uses will no longer be available for use by other devices.",
 	"name":     "Name defines the name of the counter set. It must be a DNS label.",
-	"counters": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
+	"counters": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nAt least one of counters and includes must be specified.\n\nThe maximum number of counters is 32.",
+	"includes": "Includes defines a list of references to CounterSetMixin. The counters listed in the mixins will be added to the counters available in this CounterSet.\n\nThe counters of each included mixin are applied to this counter set in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the CounterSet will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
 }
 
 func (CounterSet) SwaggerDoc() map[string]string {
 	return map_CounterSet
+}
+
+var map_CounterSetMixin = map[string]string{
+	"":         "CounterSetMixin defines a mixin that a capacity pool can include.",
+	"name":     "Name is a unique identifier among all capacity pool mixins in the ResourceSlice. It must be a DNS label.",
+	"counters": "Counters defines the set of counters for this mixin. The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
+}
+
+func (CounterSetMixin) SwaggerDoc() map[string]string {
+	return map_CounterSetMixin
+}
+
+var map_CounterSetMixinRef = map[string]string{
+	"":     "CounterSetMixinRef defines a reference to a CounterSetMixin.",
+	"name": "Name refers to a CounterSetMixin defined in the same ResourceSlice.",
+}
+
+func (CounterSetMixinRef) SwaggerDoc() map[string]string {
+	return map_CounterSetMixinRef
 }
 
 var map_Device = map[string]string{
@@ -225,11 +246,51 @@ func (DeviceConstraint) SwaggerDoc() map[string]string {
 var map_DeviceCounterConsumption = map[string]string{
 	"":           "DeviceCounterConsumption defines a set of counters that a device will consume from a CounterSet.",
 	"counterSet": "CounterSet is the name of the set from which the counters defined will be consumed.",
-	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).",
+	"counters":   "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).\n\nAt least one of counters and includes must be specified.",
+	"includes":   "Includes defines a list of references to DeviceCounterConsumptionMixin. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
 }
 
 func (DeviceCounterConsumption) SwaggerDoc() map[string]string {
 	return map_DeviceCounterConsumption
+}
+
+var map_DeviceCounterConsumptionMixin = map[string]string{
+	"":         "DeviceCounterConsumptionMixin defines a mixin that devices can include to extend or override the set of counters that a device consumes from a counter set.",
+	"name":     "Name is a unique identifier among all device counter consumption mixins in the ResourceSlice. It must be a DNS label.",
+	"counters": "Counters defines a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+}
+
+func (DeviceCounterConsumptionMixin) SwaggerDoc() map[string]string {
+	return map_DeviceCounterConsumptionMixin
+}
+
+var map_DeviceCounterConsumptionMixinRef = map[string]string{
+	"":     "DeviceCapacityConsumptionMixinRef defines a reference to a DeviceCapacityConsumptionMixin.",
+	"name": "Name refers to a DeviceCounterConsumptionMixin defined in the same ResourceSlice.",
+}
+
+func (DeviceCounterConsumptionMixinRef) SwaggerDoc() map[string]string {
+	return map_DeviceCounterConsumptionMixinRef
+}
+
+var map_DeviceMixin = map[string]string{
+	"":           "DeviceMixin defines a mixin that can be referenced from a device.",
+	"name":       "Name is a unique identifier among all device mixins in the ResourceSlice. It must be a DNS label.",
+	"attributes": "Attributes defines the set of attributes for this mixin. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+	"capacity":   "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+}
+
+func (DeviceMixin) SwaggerDoc() map[string]string {
+	return map_DeviceMixin
+}
+
+var map_DeviceMixinRef = map[string]string{
+	"":     "DeviceMixinRef defines a reference to a DeviceMixin.",
+	"name": "Name refers to a DeviceMixin defined in the same ResourceSlice.",
+}
+
+func (DeviceMixinRef) SwaggerDoc() map[string]string {
+	return map_DeviceMixinRef
 }
 
 var map_DeviceRequest = map[string]string{
@@ -445,6 +506,17 @@ func (ResourceSliceList) SwaggerDoc() map[string]string {
 	return map_ResourceSliceList
 }
 
+var map_ResourceSliceMixins = map[string]string{
+	"":                         "ResourceSliceMixins defines mixins for the ResourceSlice.\n\nThe main purposes of these mixins is to reduce the memory footprint of devices since they can reference the mixins provided here rather than duplicate them.",
+	"device":                   "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+	"deviceCounterConsumption": "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+	"counterSet":               "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+}
+
+func (ResourceSliceMixins) SwaggerDoc() map[string]string {
+	return map_ResourceSliceMixins
+}
+
 var map_ResourceSliceSpec = map[string]string{
 	"":                       "ResourceSliceSpec contains the information published by the driver in one ResourceSlice.",
 	"driver":                 "Driver identifies the DRA driver providing the capacity information. A field selector can be used to list only ResourceSlice objects with a certain driver name.\n\nMust be a DNS subdomain and should end with a DNS domain owned by the vendor of the driver. This field is immutable.",
@@ -455,6 +527,7 @@ var map_ResourceSliceSpec = map[string]string{
 	"devices":                "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries.",
 	"perDeviceNodeSelection": "PerDeviceNodeSelection defines whether the access from nodes to resources in the pool is set on the ResourceSlice level or on each device. If it is set to true, every device defined the ResourceSlice must specify this individually.\n\nExactly one of NodeName, NodeSelector, AllNodes, and PerDeviceNodeSelection must be set.",
 	"sharedCounters":         "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the SharedCounters must be unique in the ResourceSlice.\n\nThe maximum number of SharedCounters is 32.",
+	"mixins":                 "Mixins defines the mixins available for devices and counter sets in the ResourceSlice.",
 }
 
 func (ResourceSliceSpec) SwaggerDoc() map[string]string {

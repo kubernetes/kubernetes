@@ -923,6 +923,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.CELDeviceSelector":                                                        schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref),
 		"k8s.io/api/resource/v1alpha3.Counter":                                                                  schema_k8sio_api_resource_v1alpha3_Counter(ref),
 		"k8s.io/api/resource/v1alpha3.CounterSet":                                                               schema_k8sio_api_resource_v1alpha3_CounterSet(ref),
+		"k8s.io/api/resource/v1alpha3.CounterSetMixin":                                                          schema_k8sio_api_resource_v1alpha3_CounterSetMixin(ref),
+		"k8s.io/api/resource/v1alpha3.CounterSetMixinRef":                                                       schema_k8sio_api_resource_v1alpha3_CounterSetMixinRef(ref),
 		"k8s.io/api/resource/v1alpha3.Device":                                                                   schema_k8sio_api_resource_v1alpha3_Device(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceAllocationConfiguration":                                            schema_k8sio_api_resource_v1alpha3_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceAllocationResult":                                                   schema_k8sio_api_resource_v1alpha3_DeviceAllocationResult(ref),
@@ -936,6 +938,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.DeviceConfiguration":                                                      schema_k8sio_api_resource_v1alpha3_DeviceConfiguration(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceConstraint":                                                         schema_k8sio_api_resource_v1alpha3_DeviceConstraint(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceCounterConsumption":                                                 schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceCounterConsumptionMixin":                                            schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumptionMixin(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceCounterConsumptionMixinRef":                                         schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumptionMixinRef(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceMixin":                                                              schema_k8sio_api_resource_v1alpha3_DeviceMixin(ref),
+		"k8s.io/api/resource/v1alpha3.DeviceMixinRef":                                                           schema_k8sio_api_resource_v1alpha3_DeviceMixinRef(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequest":                                                            schema_k8sio_api_resource_v1alpha3_DeviceRequest(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceRequestAllocationResult":                                            schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1alpha3.DeviceSelector":                                                           schema_k8sio_api_resource_v1alpha3_DeviceSelector(ref),
@@ -959,6 +965,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1alpha3.ResourcePool":                                                             schema_k8sio_api_resource_v1alpha3_ResourcePool(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSlice":                                                            schema_k8sio_api_resource_v1alpha3_ResourceSlice(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSliceList":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref),
+		"k8s.io/api/resource/v1alpha3.ResourceSliceMixins":                                                      schema_k8sio_api_resource_v1alpha3_ResourceSliceMixins(ref),
 		"k8s.io/api/resource/v1alpha3.ResourceSliceSpec":                                                        schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref),
 		"k8s.io/api/resource/v1beta1.AllocatedDeviceStatus":                                                     schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		"k8s.io/api/resource/v1beta1.AllocationResult":                                                          schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
@@ -966,6 +973,8 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.CELDeviceSelector":                                                         schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref),
 		"k8s.io/api/resource/v1beta1.Counter":                                                                   schema_k8sio_api_resource_v1beta1_Counter(ref),
 		"k8s.io/api/resource/v1beta1.CounterSet":                                                                schema_k8sio_api_resource_v1beta1_CounterSet(ref),
+		"k8s.io/api/resource/v1beta1.CounterSetMixin":                                                           schema_k8sio_api_resource_v1beta1_CounterSetMixin(ref),
+		"k8s.io/api/resource/v1beta1.CounterSetMixinRef":                                                        schema_k8sio_api_resource_v1beta1_CounterSetMixinRef(ref),
 		"k8s.io/api/resource/v1beta1.Device":                                                                    schema_k8sio_api_resource_v1beta1_Device(ref),
 		"k8s.io/api/resource/v1beta1.DeviceAllocationConfiguration":                                             schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.DeviceAllocationResult":                                                    schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref),
@@ -980,6 +989,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.DeviceConfiguration":                                                       schema_k8sio_api_resource_v1beta1_DeviceConfiguration(ref),
 		"k8s.io/api/resource/v1beta1.DeviceConstraint":                                                          schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref),
 		"k8s.io/api/resource/v1beta1.DeviceCounterConsumption":                                                  schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref),
+		"k8s.io/api/resource/v1beta1.DeviceCounterConsumptionMixin":                                             schema_k8sio_api_resource_v1beta1_DeviceCounterConsumptionMixin(ref),
+		"k8s.io/api/resource/v1beta1.DeviceCounterConsumptionMixinRef":                                          schema_k8sio_api_resource_v1beta1_DeviceCounterConsumptionMixinRef(ref),
+		"k8s.io/api/resource/v1beta1.DeviceMixin":                                                               schema_k8sio_api_resource_v1beta1_DeviceMixin(ref),
+		"k8s.io/api/resource/v1beta1.DeviceMixinRef":                                                            schema_k8sio_api_resource_v1beta1_DeviceMixinRef(ref),
 		"k8s.io/api/resource/v1beta1.DeviceRequest":                                                             schema_k8sio_api_resource_v1beta1_DeviceRequest(ref),
 		"k8s.io/api/resource/v1beta1.DeviceRequestAllocationResult":                                             schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1beta1.DeviceSelector":                                                            schema_k8sio_api_resource_v1beta1_DeviceSelector(ref),
@@ -999,12 +1012,15 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta1.ResourcePool":                                                              schema_k8sio_api_resource_v1beta1_ResourcePool(ref),
 		"k8s.io/api/resource/v1beta1.ResourceSlice":                                                             schema_k8sio_api_resource_v1beta1_ResourceSlice(ref),
 		"k8s.io/api/resource/v1beta1.ResourceSliceList":                                                         schema_k8sio_api_resource_v1beta1_ResourceSliceList(ref),
+		"k8s.io/api/resource/v1beta1.ResourceSliceMixins":                                                       schema_k8sio_api_resource_v1beta1_ResourceSliceMixins(ref),
 		"k8s.io/api/resource/v1beta1.ResourceSliceSpec":                                                         schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref),
 		"k8s.io/api/resource/v1beta2.AllocatedDeviceStatus":                                                     schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref),
 		"k8s.io/api/resource/v1beta2.AllocationResult":                                                          schema_k8sio_api_resource_v1beta2_AllocationResult(ref),
 		"k8s.io/api/resource/v1beta2.CELDeviceSelector":                                                         schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref),
 		"k8s.io/api/resource/v1beta2.Counter":                                                                   schema_k8sio_api_resource_v1beta2_Counter(ref),
 		"k8s.io/api/resource/v1beta2.CounterSet":                                                                schema_k8sio_api_resource_v1beta2_CounterSet(ref),
+		"k8s.io/api/resource/v1beta2.CounterSetMixin":                                                           schema_k8sio_api_resource_v1beta2_CounterSetMixin(ref),
+		"k8s.io/api/resource/v1beta2.CounterSetMixinRef":                                                        schema_k8sio_api_resource_v1beta2_CounterSetMixinRef(ref),
 		"k8s.io/api/resource/v1beta2.Device":                                                                    schema_k8sio_api_resource_v1beta2_Device(ref),
 		"k8s.io/api/resource/v1beta2.DeviceAllocationConfiguration":                                             schema_k8sio_api_resource_v1beta2_DeviceAllocationConfiguration(ref),
 		"k8s.io/api/resource/v1beta2.DeviceAllocationResult":                                                    schema_k8sio_api_resource_v1beta2_DeviceAllocationResult(ref),
@@ -1019,6 +1035,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta2.DeviceConfiguration":                                                       schema_k8sio_api_resource_v1beta2_DeviceConfiguration(ref),
 		"k8s.io/api/resource/v1beta2.DeviceConstraint":                                                          schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref),
 		"k8s.io/api/resource/v1beta2.DeviceCounterConsumption":                                                  schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref),
+		"k8s.io/api/resource/v1beta2.DeviceCounterConsumptionMixin":                                             schema_k8sio_api_resource_v1beta2_DeviceCounterConsumptionMixin(ref),
+		"k8s.io/api/resource/v1beta2.DeviceCounterConsumptionMixinRef":                                          schema_k8sio_api_resource_v1beta2_DeviceCounterConsumptionMixinRef(ref),
+		"k8s.io/api/resource/v1beta2.DeviceMixin":                                                               schema_k8sio_api_resource_v1beta2_DeviceMixin(ref),
+		"k8s.io/api/resource/v1beta2.DeviceMixinRef":                                                            schema_k8sio_api_resource_v1beta2_DeviceMixinRef(ref),
 		"k8s.io/api/resource/v1beta2.DeviceRequest":                                                             schema_k8sio_api_resource_v1beta2_DeviceRequest(ref),
 		"k8s.io/api/resource/v1beta2.DeviceRequestAllocationResult":                                             schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref),
 		"k8s.io/api/resource/v1beta2.DeviceSelector":                                                            schema_k8sio_api_resource_v1beta2_DeviceSelector(ref),
@@ -1039,6 +1059,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/api/resource/v1beta2.ResourcePool":                                                              schema_k8sio_api_resource_v1beta2_ResourcePool(ref),
 		"k8s.io/api/resource/v1beta2.ResourceSlice":                                                             schema_k8sio_api_resource_v1beta2_ResourceSlice(ref),
 		"k8s.io/api/resource/v1beta2.ResourceSliceList":                                                         schema_k8sio_api_resource_v1beta2_ResourceSliceList(ref),
+		"k8s.io/api/resource/v1beta2.ResourceSliceMixins":                                                       schema_k8sio_api_resource_v1beta2_ResourceSliceMixins(ref),
 		"k8s.io/api/resource/v1beta2.ResourceSliceSpec":                                                         schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
 		"k8s.io/api/scheduling/v1.PriorityClass":                                                                schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		"k8s.io/api/scheduling/v1.PriorityClassList":                                                            schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
@@ -47386,11 +47407,30 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to DeviceMixin. The attributes and capacity listed in the mixins will be added to the device.\n\nThe attributes and capacity of each included mixin are applied in order. Conflicting attributes/capacity from multiple mixins are taken from the last mixin listed. Attributes and capacity set on the device will always override those from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceMixinRef"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceCounterConsumption", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/api/resource/v1alpha3.DeviceCounterConsumption", "k8s.io/api/resource/v1alpha3.DeviceMixinRef", "k8s.io/api/resource/v1alpha3.DeviceTaint", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
 	}
 }
 
@@ -47455,7 +47495,65 @@ func schema_k8sio_api_resource_v1alpha3_CounterSet(ref common.ReferenceCallback)
 					},
 					"counters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the counters that will be consumed by the device. The name of each counter must be unique in that set and must be a DNS label.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of counters is 32.",
+							Description: "Counters defines the counters that will be consumed by the device. The name of each counter must be unique in that set and must be a DNS label.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nAt least one of counters and includes must be specified.\n\nThe maximum number of counters is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.Counter"),
+									},
+								},
+							},
+						},
+					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to CounterSetMixin. The counters listed in the mixins will be added to the counters available in this CounterSet.\n\nThe counters of each included mixin are applied to this counter set in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the CounterSet will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.CounterSetMixinRef"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.Counter", "k8s.io/api/resource/v1alpha3.CounterSetMixinRef"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_CounterSetMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetMixin defines a mixin that a capacity pool can include.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all capacity pool mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the set of counters for this mixin. The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -47474,6 +47572,28 @@ func schema_k8sio_api_resource_v1alpha3_CounterSet(ref common.ReferenceCallback)
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha3.Counter"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_CounterSetMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetMixinRef defines a reference to a CounterSetMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a CounterSetMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -48011,7 +48131,65 @@ func schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref common.Refe
 					},
 					"counters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the Counter that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).",
+							Description: "Counters defines the Counter that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).\n\nAt least one of counters and includes must be specified.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.Counter"),
+									},
+								},
+							},
+						},
+					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to DeviceCounterConsumptionMixin. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceCounterConsumptionMixinRef"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.Counter", "k8s.io/api/resource/v1alpha3.DeviceCounterConsumptionMixinRef"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumptionMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCounterConsumptionMixin defines a mixin that devices can include to extend or override the set of counters that a device consumes from a counter set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all device counter consumption mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -48025,11 +48203,108 @@ func schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumption(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"counterSet", "counters"},
+				Required: []string{"name", "counters"},
 			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1alpha3.Counter"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceCounterConsumptionMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCapacityConsumptionMixinRef defines a reference to a DeviceCapacityConsumptionMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a DeviceCounterConsumptionMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceMixin defines a mixin that can be referenced from a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all device mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"attributes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Attributes defines the set of attributes for this mixin. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceAttribute"),
+									},
+								},
+							},
+						},
+					},
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref("k8s.io/apimachinery/pkg/api/resource.Quantity"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.DeviceAttribute", "k8s.io/apimachinery/pkg/api/resource.Quantity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_DeviceMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceMixinRef defines a reference to a DeviceMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a DeviceMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -49178,6 +49453,78 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceList(ref common.ReferenceCa
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_ResourceSliceMixins(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSliceMixins defines mixins for the ResourceSlice.\n\nThe main purposes of these mixins is to reduce the memory footprint of devices since they can reference the mixins provided here rather than duplicate them.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"device": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceMixin"),
+									},
+								},
+							},
+						},
+					},
+					"deviceCounterConsumption": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.DeviceCounterConsumptionMixin"),
+									},
+								},
+							},
+						},
+					},
+					"counterSet": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1alpha3.CounterSetMixin"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1alpha3.CounterSetMixin", "k8s.io/api/resource/v1alpha3.DeviceCounterConsumptionMixin", "k8s.io/api/resource/v1alpha3.DeviceMixin"},
+	}
+}
+
 func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -49265,12 +49612,18 @@ func schema_k8sio_api_resource_v1alpha3_ResourceSliceSpec(ref common.ReferenceCa
 							},
 						},
 					},
+					"mixins": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mixins defines the mixins available for devices and counter sets in the ResourceSlice.",
+							Ref:         ref("k8s.io/api/resource/v1alpha3.ResourceSliceMixins"),
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.CounterSet", "k8s.io/api/resource/v1alpha3.Device", "k8s.io/api/resource/v1alpha3.ResourcePool"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.CounterSet", "k8s.io/api/resource/v1alpha3.Device", "k8s.io/api/resource/v1alpha3.ResourcePool", "k8s.io/api/resource/v1alpha3.ResourceSliceMixins"},
 	}
 }
 
@@ -49471,11 +49824,30 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to DeviceMixin. The attributes and capacity listed in the mixins will be added to the device.\n\nThe attributes and capacity of each included mixin are applied in order. Conflicting attributes/capacity from multiple mixins are taken from the last mixin listed. Attributes and capacity set on the device will always override those from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceMixinRef"),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/api/resource/v1beta1.DeviceCounterConsumption", "k8s.io/api/resource/v1beta1.DeviceTaint"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity", "k8s.io/api/resource/v1beta1.DeviceCounterConsumption", "k8s.io/api/resource/v1beta1.DeviceMixinRef", "k8s.io/api/resource/v1beta1.DeviceTaint"},
 	}
 }
 
@@ -49540,7 +49912,65 @@ func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) 
 					},
 					"counters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
+							Description: "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nAt least one of counters and includes must be specified.\n\nThe maximum number of counters is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.Counter"),
+									},
+								},
+							},
+						},
+					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to CounterSetMixin. The counters listed in the mixins will be added to the counters available in this CounterSet.\n\nThe counters of each included mixin are applied to this counter set in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the CounterSet will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.CounterSetMixinRef"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.Counter", "k8s.io/api/resource/v1beta1.CounterSetMixinRef"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterSetMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetMixin defines a mixin that a capacity pool can include.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all capacity pool mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the set of counters for this mixin. The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -49559,6 +49989,28 @@ func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1beta1.Counter"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_CounterSetMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetMixinRef defines a reference to a CounterSetMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a CounterSetMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -50118,7 +50570,65 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 					},
 					"counters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).",
+							Description: "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).\n\nAt least one of counters and includes must be specified.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.Counter"),
+									},
+								},
+							},
+						},
+					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to DeviceCounterConsumptionMixin. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceCounterConsumptionMixinRef"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.Counter", "k8s.io/api/resource/v1beta1.DeviceCounterConsumptionMixinRef"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumptionMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCounterConsumptionMixin defines a mixin that devices can include to extend or override the set of counters that a device consumes from a counter set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all device counter consumption mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -50132,11 +50642,109 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"counterSet", "counters"},
+				Required: []string{"name", "counters"},
 			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1beta1.Counter"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumptionMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCapacityConsumptionMixinRef defines a reference to a DeviceCapacityConsumptionMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a DeviceCounterConsumptionMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceMixin defines a mixin that can be referenced from a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all device mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"attributes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Attributes defines the set of attributes for this mixin. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceAttribute"),
+									},
+								},
+							},
+						},
+					},
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceCapacity"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.DeviceAttribute", "k8s.io/api/resource/v1beta1.DeviceCapacity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta1_DeviceMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceMixinRef defines a reference to a DeviceMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a DeviceMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -51099,6 +51707,78 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceList(ref common.ReferenceCal
 	}
 }
 
+func schema_k8sio_api_resource_v1beta1_ResourceSliceMixins(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSliceMixins defines mixins for the ResourceSlice.\n\nThe main purposes of these mixins is to reduce the memory footprint of devices since they can reference the mixins provided here rather than duplicate them.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"device": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceMixin"),
+									},
+								},
+							},
+						},
+					},
+					"deviceCounterConsumption": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.DeviceCounterConsumptionMixin"),
+									},
+								},
+							},
+						},
+					},
+					"counterSet": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta1.CounterSetMixin"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta1.CounterSetMixin", "k8s.io/api/resource/v1beta1.DeviceCounterConsumptionMixin", "k8s.io/api/resource/v1beta1.DeviceMixin"},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -51186,12 +51866,18 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"mixins": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mixins defines the mixins available for devices and counter sets in the ResourceSlice.",
+							Ref:         ref("k8s.io/api/resource/v1beta1.ResourceSliceMixins"),
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.CounterSet", "k8s.io/api/resource/v1beta1.Device", "k8s.io/api/resource/v1beta1.ResourcePool"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.CounterSet", "k8s.io/api/resource/v1beta1.Device", "k8s.io/api/resource/v1beta1.ResourcePool", "k8s.io/api/resource/v1beta1.ResourceSliceMixins"},
 	}
 }
 
@@ -51358,7 +52044,65 @@ func schema_k8sio_api_resource_v1beta2_CounterSet(ref common.ReferenceCallback) 
 					},
 					"counters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters in all sets is 32.",
+							Description: "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nAt least one of counters and includes must be specified.\n\nThe maximum number of counters in all sets is 32.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.Counter"),
+									},
+								},
+							},
+						},
+					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to CounterSetMixin. The counters listed in the mixins will be added to the counters available in this CounterSet.\n\nThe counters of each included mixin are applied to this counter set in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the CounterSet will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.CounterSetMixinRef"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta2.Counter", "k8s.io/api/resource/v1beta2.CounterSetMixinRef"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterSetMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetMixin defines a mixin that a capacity pool can include.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all capacity pool mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines the set of counters for this mixin. The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -51377,6 +52121,28 @@ func schema_k8sio_api_resource_v1beta2_CounterSet(ref common.ReferenceCallback) 
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1beta2.Counter"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_CounterSetMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CounterSetMixinRef defines a reference to a CounterSetMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a CounterSetMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -51483,12 +52249,31 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to DeviceMixin. The attributes and capacity listed in the mixins will be added to the device.\n\nThe attributes and capacity of each included mixin are applied in order. Conflicting attributes/capacity from multiple mixins are taken from the last mixin listed. Attributes and capacity set on the device will always override those from mixins.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.DeviceMixinRef"),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.DeviceAttribute", "k8s.io/api/resource/v1beta2.DeviceCapacity", "k8s.io/api/resource/v1beta2.DeviceCounterConsumption", "k8s.io/api/resource/v1beta2.DeviceTaint"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.DeviceAttribute", "k8s.io/api/resource/v1beta2.DeviceCapacity", "k8s.io/api/resource/v1beta2.DeviceCounterConsumption", "k8s.io/api/resource/v1beta2.DeviceMixinRef", "k8s.io/api/resource/v1beta2.DeviceTaint"},
 	}
 }
 
@@ -52018,7 +52803,65 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 					},
 					"counters": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).",
+							Description: "Counters defines the counters that will be consumed by the device.\n\nThe maximum number counters in a device is 32. In addition, the maximum number of all counters in all devices is 1024 (for example, 64 devices with 16 counters each).\n\nAt least one of counters and includes must be specified.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.Counter"),
+									},
+								},
+							},
+						},
+					},
+					"includes": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Includes defines a list of references to DeviceCounterConsumptionMixin. The counters listed in the mixins will be added to the counters that will be consumed by the device.\n\nThe counters of each included mixin are applied in order. Conflicting counters from multiple mixins are taken from the last mixin listed. Counters set on the DeviceCounterConsumption will always override counters from mixins.\n\nAt least one of counters and includes must be specified.\n\nThe mixins referenced here must be defined in the same ResourceSlice.\n\nThe maximum number of includes is 8.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.DeviceCounterConsumptionMixinRef"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"counterSet"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta2.Counter", "k8s.io/api/resource/v1beta2.DeviceCounterConsumptionMixinRef"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumptionMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCounterConsumptionMixin defines a mixin that devices can include to extend or override the set of counters that a device consumes from a counter set.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all device counter consumption mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"counters": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Counters defines a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
 							Type:        []string{"object"},
 							AdditionalProperties: &spec.SchemaOrBool{
 								Allows: true,
@@ -52032,11 +52875,109 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 						},
 					},
 				},
-				Required: []string{"counterSet", "counters"},
+				Required: []string{"name", "counters"},
 			},
 		},
 		Dependencies: []string{
 			"k8s.io/api/resource/v1beta2.Counter"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumptionMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceCapacityConsumptionMixinRef defines a reference to a DeviceCapacityConsumptionMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a DeviceCounterConsumptionMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_DeviceMixin(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceMixin defines a mixin that can be referenced from a device.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier among all device mixins in the ResourceSlice. It must be a DNS label.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"attributes": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Attributes defines the set of attributes for this mixin. The name of each attribute must be unique in that set.\n\nTo ensure this uniqueness, attributes defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.DeviceAttribute"),
+									},
+								},
+							},
+						},
+					},
+					"capacity": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Capacity defines the set of capacities for this mixin. The name of each capacity must be unique in that set.\n\nTo ensure this uniqueness, capacities defined by the vendor must be listed without the driver name as domain prefix in their name. All others must be listed with their domain prefix.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.DeviceCapacity"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta2.DeviceAttribute", "k8s.io/api/resource/v1beta2.DeviceCapacity"},
+	}
+}
+
+func schema_k8sio_api_resource_v1beta2_DeviceMixinRef(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DeviceMixinRef defines a reference to a DeviceMixin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name refers to a DeviceMixin defined in the same ResourceSlice.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
 	}
 }
 
@@ -53021,6 +53962,78 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceList(ref common.ReferenceCal
 	}
 }
 
+func schema_k8sio_api_resource_v1beta2_ResourceSliceMixins(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourceSliceMixins defines mixins for the ResourceSlice.\n\nThe main purposes of these mixins is to reduce the memory footprint of devices since they can reference the mixins provided here rather than duplicate them.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"device": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Device represents a list of device mixins, i.e. a collection of shared attributes and capacities that an actual device can \"include\" to extend the set of attributes and capacities it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.DeviceMixin"),
+									},
+								},
+							},
+						},
+					},
+					"deviceCounterConsumption": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "DeviceCounterConsumption represents a list of counter consumption mixins, each of which contains a set of counters that a device will consume from a counter set.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.DeviceCounterConsumptionMixin"),
+									},
+								},
+							},
+						},
+					},
+					"counterSet": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CounterSet represents a list of counter set mixins, i.e. a collection of counters that a CounterSet can \"include\" to extend the set of counters it already defines.\n\nThe maximum number of attributes, capacity, and counters across all mixins is 256.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref("k8s.io/api/resource/v1beta2.CounterSetMixin"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/resource/v1beta2.CounterSetMixin", "k8s.io/api/resource/v1beta2.DeviceCounterConsumptionMixin", "k8s.io/api/resource/v1beta2.DeviceMixin"},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -53108,12 +54121,18 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							},
 						},
 					},
+					"mixins": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Mixins defines the mixins available for devices and counter sets in the ResourceSlice.",
+							Ref:         ref("k8s.io/api/resource/v1beta2.ResourceSliceMixins"),
+						},
+					},
 				},
 				Required: []string{"driver", "pool"},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.CounterSet", "k8s.io/api/resource/v1beta2.Device", "k8s.io/api/resource/v1beta2.ResourcePool"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.CounterSet", "k8s.io/api/resource/v1beta2.Device", "k8s.io/api/resource/v1beta2.ResourcePool", "k8s.io/api/resource/v1beta2.ResourceSliceMixins"},
 	}
 }
 

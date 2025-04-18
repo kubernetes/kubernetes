@@ -320,94 +320,6 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"bad-attribute": {
-			wantFailures: field.ErrorList{
-				field.TypeInvalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(badName), "exactly one value must be specified"),
-				field.Invalid(field.NewPath("spec", "devices").Index(2).Child("attributes").Key(goodName), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified"),
-				field.Invalid(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), "must be a string compatible with semver.org spec 2.0.0"),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(3).Child("attributes").Key(goodName).Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(4).Child("attributes").Key(goodName).Child("string"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 5)
-				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(badName): {},
-				}
-				slice.Spec.Devices[2].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")},
-				}
-				slice.Spec.Devices[3].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {VersionValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
-				}
-				slice.Spec.Devices[4].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(goodName): {StringValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
-				}
-				return slice
-			}(),
-		},
-		"good-attribute-names": {
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxIDLength)):                                                                {StringValue: ptr.To("y")},
-					resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength)): {StringValue: ptr.To("z")},
-				}
-				return slice
-			}(),
-		},
-		"bad-attribute-c-identifier": {
-			wantFailures: field.ErrorList{
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
-				field.TypeInvalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)): {StringValue: ptr.To("y")},
-				}
-				return slice
-			}(),
-		},
-		"bad-attribute-domain": {
-			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.Invalid(field.NewPath("spec", "devices").Index(1).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1) + "/y"): {StringValue: ptr.To("z")},
-				}
-				return slice
-			}(),
-		},
-		"bad-key-too-long": {
-			wantFailures: field.ErrorList{
-				field.TooLong(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
-				field.TooLongMaxLength(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength+1)): {StringValue: ptr.To("z")},
-				}
-				return slice
-			}(),
-		},
-		"bad-attribute-empty-domain-and-c-identifier": {
-			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "the domain must not be empty"),
-				field.Required(field.NewPath("spec", "devices").Index(1).Child("attributes").Key("/"), "the name must not be empty"),
-			},
-			slice: func() *resourceapi.ResourceSlice {
-				slice := testResourceSlice(goodName, goodName, goodName, 2)
-				slice.Spec.Devices[1].Attributes = map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
-					resourceapi.QualifiedName("/"): {StringValue: ptr.To("z")},
-				}
-				return slice
-			}(),
-		},
 		"combined-attributes-capacity-length": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(3), resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice+1, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice)),
@@ -614,13 +526,27 @@ func TestValidateResourceSlice(t *testing.T) {
 		"bad-name-shared-counters": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
-				field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), ""),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
 				slice.Spec.SharedCounters = []resourceapi.CounterSet{
 					{
-						Name: badName,
+						Name:     badName,
+						Counters: testCounters(),
+					},
+				}
+				return slice
+			}(),
+		},
+		"shared-counters-no-counters-or-includes": {
+			wantFailures: field.ErrorList{
+				field.Required(field.NewPath("spec", "sharedCounters").Index(0), "at least one of `counters` or `includes` must be specified"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name: goodName,
 					},
 				}
 				return slice
@@ -702,9 +628,9 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
-		"missing-counter-consumes-counter": {
+		"missing-counter-consumes-counter-or-includes": {
 			wantFailures: field.ErrorList{
-				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), ""),
+				field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0), "at least one of `counters` or `includes` must be specified"),
 			},
 			slice: func() *resourceapi.ResourceSlice {
 				slice := testResourceSlice(goodName, goodName, driverName, 1)
@@ -751,6 +677,36 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"counterref-consumes-counter-from-mixin": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: []resourceapi.CounterSetMixin{
+						{
+							Name: "counterset-mixin",
+							Counters: map[string]resourceapi.Counter{
+								"from-counter-set-mixin": {Value: resource.MustParse("1Gi")},
+							},
+						},
+					},
+				}
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     "counterset-0",
+						Includes: []resourceapi.CounterSetMixinRef{{Name: "counterset-mixin"}},
+					},
+				}
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						Counters: map[string]resourceapi.Counter{
+							"from-counter-set-mixin": {Value: resource.MustParse("1Gi")},
+						},
+						CounterSet: slice.Spec.SharedCounters[0].Name,
+					},
+				}
+				return slice
+			}(),
+		},
 		"too-large-consumes-counter": {
 			wantFailures: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "devices").Index(0), resourceapi.ResourceSliceMaxCountersPerDevice+1, fmt.Sprintf("the total number of counters must not exceed %d", resourceapi.ResourceSliceMaxCountersPerDevice)),
@@ -779,6 +735,270 @@ func TestValidateResourceSlice(t *testing.T) {
 				return slice
 			}(),
 		},
+		"empty-device-mixin-name": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "mixins", "device").Index(0).Child("name"), "")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device: createDeviceMixin(1),
+				}
+				slice.Spec.Mixins.Device[0].Name = ""
+				return slice
+			}(),
+		},
+		"bad-device-mixin-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "mixins", "device").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device: createDeviceMixin(1),
+				}
+				slice.Spec.Mixins.Device[0].Name = badName
+				return slice
+			}(),
+		},
+		"too-many-device-mixin-refs": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("includes"), resourceapi.ResourceSliceMaxIncludes+1, resourceapi.ResourceSliceMaxIncludes),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device: createDeviceMixin(resourceapi.ResourceSliceMaxIncludes + 1),
+				}
+				slice.Spec.Devices[0].Includes = createDeviceMixinRefs(slice.Spec.Mixins.Device)
+				return slice
+			}(),
+		},
+		"unknown-device-mixin-ref": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("includes").Index(0), "does-not-exist", "must reference a device mixin defined in the ResourceSlice"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Devices[0].Includes = []resourceapi.DeviceMixinRef{
+					{
+						Name: "does-not-exist",
+					},
+				}
+				return slice
+			}(),
+		},
+		"empty-counter-set-mixin-name": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "mixins", "counterSet").Index(0).Child("name"), "")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: createCounterSetMixin(1),
+				}
+				slice.Spec.Mixins.CounterSet[0].Name = ""
+				return slice
+			}(),
+		},
+		"bad-counter-set-mixin-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "mixins", "counterSet").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: createCounterSetMixin(1),
+				}
+				slice.Spec.Mixins.CounterSet[0].Name = badName
+				return slice
+			}(),
+		},
+		"too-many-counter-set-mixin-refs": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "sharedCounters").Index(0).Child("includes"), resourceapi.ResourceSliceMaxIncludes+1, resourceapi.ResourceSliceMaxIncludes),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: createCounterSetMixin(resourceapi.ResourceSliceMaxIncludes + 1),
+				}
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     "counterset-0",
+						Counters: testCounters(),
+						Includes: createCounterSetMixinRefs(slice.Spec.Mixins.CounterSet),
+					},
+				}
+				return slice
+			}(),
+		},
+		"unknown-counter-set-mixin-ref": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "sharedCounters").Index(0).Child("includes").Index(0), "does-not-exist", "must reference a counter set mixin defined in the ResourceSlice"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     "counterset",
+						Counters: testCounters(),
+						Includes: []resourceapi.CounterSetMixinRef{
+							{
+								Name: "does-not-exist",
+							},
+						},
+					},
+				}
+				return slice
+			}(),
+		},
+		"empty-device-counter-consumption-mixin-name": {
+			wantFailures: field.ErrorList{field.Required(field.NewPath("spec", "mixins", "deviceCounterConsumption").Index(0).Child("name"), "")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin(1),
+				}
+				slice.Spec.Mixins.DeviceCounterConsumption[0].Name = ""
+				return slice
+			}(),
+		},
+		"bad-device-counter-consumption-mixin-name": {
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "mixins", "deviceCounterConsumption").Index(0).Child("name"), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')")},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin(1),
+				}
+				slice.Spec.Mixins.DeviceCounterConsumption[0].Name = badName
+				return slice
+			}(),
+		},
+		"too-many-device-counter-consumption-mixin-refs": {
+			wantFailures: field.ErrorList{
+				field.TooMany(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes"), resourceapi.ResourceSliceMaxIncludes+1, resourceapi.ResourceSliceMaxIncludes),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin(resourceapi.ResourceSliceMaxIncludes + 1),
+				}
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.Devices[0].ConsumesCounters[0].Includes = createDeviceCounterConsumptionMixinRefs(slice.Spec.Mixins.DeviceCounterConsumption)
+				return slice
+			}(),
+		},
+		"unknown-device-counter-consumption-mixin-ref": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes").Index(0), "does-not-exist", "must reference a device counter consumption mixin defined in the ResourceSlice"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].ConsumesCounters = createConsumesCounters(1)
+				slice.Spec.Devices[0].ConsumesCounters[0].Includes = []resourceapi.DeviceCounterConsumptionMixinRef{
+					{
+						Name: "does-not-exist",
+					},
+				}
+				return slice
+			}(),
+		},
+		"device-counter-consumption-mixin-ref-unknown-counters": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes").Index(0), "", "mixin references counters does-not-exist, does-not-exist-2 that do not exist in counter set counterset-0"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin(1),
+				}
+				slice.Spec.Mixins.DeviceCounterConsumption[0].Counters = map[string]resourceapi.Counter{
+					"does-not-exist":   {Value: resource.MustParse("1Gi")},
+					"does-not-exist-2": {Value: resource.MustParse("1Gi")},
+				}
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: slice.Spec.SharedCounters[0].Name,
+						Includes:   createDeviceCounterConsumptionMixinRefs(slice.Spec.Mixins.DeviceCounterConsumption),
+					},
+				}
+				return slice
+			}(),
+		},
+		"device-counter-consumption-multiple-mixin-refs-unknown-counter": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes").Index(0), "", "mixin references counters does-not-exist that do not exist in counter set counterset-0"),
+				field.Invalid(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("includes").Index(1), "", "mixin references counters does-not-exist that do not exist in counter set counterset-0"),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin(2),
+				}
+				slice.Spec.Mixins.DeviceCounterConsumption[0].Counters = map[string]resourceapi.Counter{
+					"does-not-exist": {Value: resource.MustParse("1Gi")},
+				}
+				slice.Spec.Mixins.DeviceCounterConsumption[1].Counters = map[string]resourceapi.Counter{
+					"does-not-exist": {Value: resource.MustParse("1Gi")},
+				}
+				slice.Spec.SharedCounters = createSharedCounters(1)
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: slice.Spec.SharedCounters[0].Name,
+						Includes:   createDeviceCounterConsumptionMixinRefs(slice.Spec.Mixins.DeviceCounterConsumption),
+					},
+				}
+				return slice
+			}(),
+		},
+		"device-counter-consumption-through-mixin-from-counterset-mixin": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet:               createCounterSetMixin(1),
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin(1),
+				}
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     "counterset-0",
+						Includes: createCounterSetMixinRefs(slice.Spec.Mixins.CounterSet),
+					},
+				}
+				slice.Spec.Devices[0].ConsumesCounters = []resourceapi.DeviceCounterConsumption{
+					{
+						CounterSet: slice.Spec.SharedCounters[0].Name,
+						Includes:   createDeviceCounterConsumptionMixinRefs(slice.Spec.Mixins.DeviceCounterConsumption),
+					},
+				}
+				return slice
+			}(),
+		},
+		"max-number-of-mixins": {
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device:                   createDeviceMixin(20), // Each mixin has 4 attributes and 1 capacity, so total is 20 * 5 = 100
+					CounterSet:               createCounterSetMixin((resourceapi.ResourceSliceMaxMixins - 100) / 2),
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin((resourceapi.ResourceSliceMaxMixins - 100) / 2),
+				}
+				return slice
+			}(),
+		},
+		"more-than-max-number-of-mixins": {
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "mixins"), resourceapi.ResourceSliceMaxMixins+1, fmt.Sprintf("the total number of attributes, capacity and counters across all mixins must not exceed %d", resourceapi.ResourceSliceMaxMixins)),
+			},
+			slice: func() *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, driverName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device:                   createDeviceMixin(20), // Each mixin has 4 attributes and 1 capacity, so total is 20 * 5 = 100
+					CounterSet:               createCounterSetMixin((resourceapi.ResourceSliceMaxMixins - 100) / 2),
+					DeviceCounterConsumption: createDeviceCounterConsumptionMixin((resourceapi.ResourceSliceMaxMixins - 100) / 2),
+				}
+				// Add one more which puts us over the limit.
+				slice.Spec.Mixins.CounterSet = append(slice.Spec.Mixins.CounterSet, resourceapi.CounterSetMixin{
+					Name:     "counterset-too-many",
+					Counters: testCounters(),
+				})
+				return slice
+			}(),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -786,6 +1006,273 @@ func TestValidateResourceSlice(t *testing.T) {
 			errs := ValidateResourceSlice(scenario.slice)
 			assertFailures(t, scenario.wantFailures, errs)
 		})
+	}
+}
+
+func TestResourceSliceCapacityAndAttributesFields(t *testing.T) {
+	testCases := map[string]struct {
+		attributes           map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+		capacity             map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+		expectedFailuresFunc func(basePath *field.Path) field.ErrorList
+	}{
+		"bad-name": {
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				resourceapi.QualifiedName(badName): {},
+			},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName(badName): {},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.TypeInvalid(basePath.Index(0).Child("attributes").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+					field.Required(basePath.Index(0).Child("attributes").Key(badName), "exactly one value must be specified"),
+					field.TypeInvalid(basePath.Index(0).Child("capacity").Key(badName), badName, "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				}
+			},
+		},
+		"good-names": {
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxIDLength)): {
+					Value: resource.MustParse("40Gi"),
+				},
+				resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength)): {
+					Value: resource.MustParse("20Gi"),
+				},
+			},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxIDLength)):                                                                {StringValue: ptr.To("y")},
+				resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength)): {StringValue: ptr.To("z")},
+			},
+		},
+		"bad-c-identifier": {
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				resourceapi.QualifiedName(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)): {
+					Value: resource.MustParse("40Gi"),
+				},
+			},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)): {StringValue: ptr.To("y")},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.TooLongMaxLength(basePath.Index(0).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+					field.TypeInvalid(basePath.Index(0).Child("attributes").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+					field.TooLongMaxLength(basePath.Index(0).Child("capacity").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+					field.TypeInvalid(basePath.Index(0).Child("capacity").Key(strings.Repeat(".", resourceapi.DeviceMaxIDLength+1)), strings.Repeat(".", resourceapi.DeviceMaxIDLength+1), "a valid C identifier must start with alphabetic character or '_', followed by a string of alphanumeric characters or '_' (e.g. 'my_name',  or 'MY_NAME',  or 'MyName', regex used for validation is '[A-Za-z_][A-Za-z0-9_]*')"),
+				}
+			},
+		},
+		"bad-domain": {
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				resourceapi.QualifiedName(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1) + "/y"): {
+					Value: resource.MustParse("50Gi"),
+				},
+			},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1) + "/y"): {StringValue: ptr.To("z")},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.TooLong(basePath.Index(0).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+					field.Invalid(basePath.Index(0).Child("attributes").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+					field.TooLong(basePath.Index(0).Child("capacity").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+					field.Invalid(basePath.Index(0).Child("capacity").Key(strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1)+"/y"), strings.Repeat("_", resourceapi.DeviceMaxDomainLength+1), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+				}
+			},
+		},
+		"bad-key-too-long": {
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength+1)): {
+					Value: resource.MustParse("10Gi"),
+				},
+			},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName(strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1) + "/" + strings.Repeat("y", resourceapi.DeviceMaxIDLength+1)): {StringValue: ptr.To("z")},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.TooLong(basePath.Index(0).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+					field.TooLongMaxLength(basePath.Index(0).Child("attributes").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+					field.TooLong(basePath.Index(0).Child("capacity").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("x", resourceapi.DeviceMaxDomainLength+1), resourceapi.DeviceMaxDomainLength),
+					field.TooLongMaxLength(basePath.Index(0).Child("capacity").Key("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxx/yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"), strings.Repeat("y", resourceapi.DeviceMaxIDLength+1), resourceapi.DeviceMaxIDLength),
+				}
+			},
+		},
+		"bad-empty-domain-and-c-identifier": {
+			capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
+				resourceapi.QualifiedName("/"): {
+					Value: resource.MustParse("30Gi"),
+				},
+			},
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName("/"): {StringValue: ptr.To("z")},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.Required(basePath.Index(0).Child("attributes").Key("/"), "the domain must not be empty"),
+					field.Required(basePath.Index(0).Child("attributes").Key("/"), "the name must not be empty"),
+					field.Required(basePath.Index(0).Child("capacity").Key("/"), "the domain must not be empty"),
+					field.Required(basePath.Index(0).Child("capacity").Key("/"), "the name must not be empty"),
+				}
+			},
+		},
+		"multiple-attribute-values": {
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName("attribute1"): {StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.Invalid(basePath.Index(0).Child("attributes").Key("attribute1"), resourceapi.DeviceAttribute{StringValue: ptr.To("x"), VersionValue: ptr.To("1.2.3")}, "exactly one value must be specified"),
+				}
+			},
+		},
+		"version-attribute-must-be-semver": {
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName("attribute2"): {VersionValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.Invalid(basePath.Index(0).Child("attributes").Key("attribute2").Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), "must be a string compatible with semver.org spec 2.0.0"),
+					field.TooLongMaxLength(basePath.Index(0).Child("attributes").Key("attribute2").Child("version"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
+				}
+			},
+		},
+		"string-attribute-value-too-long": {
+			attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+				resourceapi.QualifiedName("attribute3"): {StringValue: ptr.To(strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1))},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.TooLongMaxLength(basePath.Index(0).Child("attributes").Key("attribute3").Child("string"), strings.Repeat("x", resourceapi.DeviceAttributeMaxValueLength+1), resourceapi.DeviceAttributeMaxValueLength),
+				}
+			},
+		},
+	}
+
+	fieldConfigs := map[string]struct {
+		sliceCreateFunc func(capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *resourceapi.ResourceSlice
+		basePath        *field.Path
+	}{
+		"device": {
+			sliceCreateFunc: func(capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 1)
+				slice.Spec.Devices[0].Attributes = attributes
+				slice.Spec.Devices[0].Capacity = capacity
+				return slice
+			},
+			basePath: field.NewPath("spec", "devices"),
+		},
+		"device-mixin": {
+			sliceCreateFunc: func(capacity map[resourceapi.QualifiedName]resourceapi.DeviceCapacity, attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					Device: []resourceapi.DeviceMixin{
+						{
+							Name:       "device-mixin-1",
+							Attributes: attributes,
+							Capacity:   capacity,
+						},
+					},
+				}
+				return slice
+			},
+			basePath: field.NewPath("spec", "mixins", "device"),
+		},
+	}
+
+	for fieldName, fieldConfig := range fieldConfigs {
+		for name, tc := range testCases {
+			t.Run(fmt.Sprintf("%s/%s", fieldName, name), func(t *testing.T) {
+				slice := fieldConfig.sliceCreateFunc(tc.capacity, tc.attributes)
+				errs := ValidateResourceSlice(slice)
+				var expectedFailures field.ErrorList
+				if tc.expectedFailuresFunc != nil {
+					expectedFailures = tc.expectedFailuresFunc(fieldConfig.basePath)
+				}
+				assertFailures(t, expectedFailures, errs)
+			})
+		}
+	}
+}
+
+func TestResourceSliceCounterFields(t *testing.T) {
+	testCases := map[string]struct {
+		counters             map[string]resourceapi.Counter
+		expectedFailuresFunc func(basePath *field.Path) field.ErrorList
+	}{
+		"bad-name": {
+			counters: map[string]resourceapi.Counter{
+				badName: {},
+			},
+			expectedFailuresFunc: func(basePath *field.Path) field.ErrorList {
+				return field.ErrorList{
+					field.Invalid(basePath.Index(0).Child("counters").Key(badName), badName, "a lowercase RFC 1123 label must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?')"),
+				}
+			},
+		},
+	}
+
+	fieldConfigs := map[string]struct {
+		sliceCreateFunc func(counters map[string]resourceapi.Counter) *resourceapi.ResourceSlice
+		basePath        *field.Path
+	}{
+		"counter-set": {
+			sliceCreateFunc: func(counters map[string]resourceapi.Counter) *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 1)
+				slice.Spec.SharedCounters = []resourceapi.CounterSet{
+					{
+						Name:     goodName,
+						Counters: counters,
+					},
+				}
+				return slice
+			},
+			basePath: field.NewPath("spec", "sharedCounters"),
+		},
+		"counter-set-mixin": {
+			sliceCreateFunc: func(counters map[string]resourceapi.Counter) *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					CounterSet: []resourceapi.CounterSetMixin{
+						{
+							Name:     goodName,
+							Counters: counters,
+						},
+					},
+				}
+				return slice
+			},
+			basePath: field.NewPath("spec", "mixins", "counterSet"),
+		},
+		"device-counter-consumption-mixin": {
+			sliceCreateFunc: func(counters map[string]resourceapi.Counter) *resourceapi.ResourceSlice {
+				slice := testResourceSlice(goodName, goodName, goodName, 1)
+				slice.Spec.Mixins = &resourceapi.ResourceSliceMixins{
+					DeviceCounterConsumption: []resourceapi.DeviceCounterConsumptionMixin{
+						{
+							Name:     goodName,
+							Counters: counters,
+						},
+					},
+				}
+				return slice
+			},
+			basePath: field.NewPath("spec", "mixins", "deviceCounterConsumption"),
+		},
+	}
+
+	for fieldName, fieldConfig := range fieldConfigs {
+		for name, tc := range testCases {
+			t.Run(fmt.Sprintf("%s/%s", fieldName, name), func(t *testing.T) {
+				slice := fieldConfig.sliceCreateFunc(tc.counters)
+				errs := ValidateResourceSlice(slice)
+				var expectedFailures field.ErrorList
+				if tc.expectedFailuresFunc != nil {
+					expectedFailures = tc.expectedFailuresFunc(fieldConfig.basePath)
+				}
+				assertFailures(t, expectedFailures, errs)
+			})
+		}
 	}
 }
 
@@ -894,4 +1381,68 @@ func createConsumesCounters(count int) []resourceapi.DeviceCounterConsumption {
 		}
 	}
 	return consumeCapacity
+}
+
+func createDeviceMixin(count int) []resourceapi.DeviceMixin {
+	deviceMixins := make([]resourceapi.DeviceMixin, count)
+	for i := 0; i < count; i++ {
+		deviceMixins[i] = resourceapi.DeviceMixin{
+			Name:       fmt.Sprintf("device-mixin-%d", i),
+			Attributes: testAttributes(),
+			Capacity:   testCapacity(),
+		}
+	}
+	return deviceMixins
+}
+
+func createDeviceMixinRefs(mixins []resourceapi.DeviceMixin) []resourceapi.DeviceMixinRef {
+	deviceMixinRefs := make([]resourceapi.DeviceMixinRef, len(mixins))
+	for i, mixin := range mixins {
+		deviceMixinRefs[i] = resourceapi.DeviceMixinRef{
+			Name: mixin.Name,
+		}
+	}
+	return deviceMixinRefs
+}
+
+func createCounterSetMixin(count int) []resourceapi.CounterSetMixin {
+	counterSetMixins := make([]resourceapi.CounterSetMixin, count)
+	for i := 0; i < count; i++ {
+		counterSetMixins[i] = resourceapi.CounterSetMixin{
+			Name:     fmt.Sprintf("coumter-set-mixin-%d", i),
+			Counters: testCounters(),
+		}
+	}
+	return counterSetMixins
+}
+
+func createCounterSetMixinRefs(mixins []resourceapi.CounterSetMixin) []resourceapi.CounterSetMixinRef {
+	counterSetMixinRefs := make([]resourceapi.CounterSetMixinRef, len(mixins))
+	for i, mixin := range mixins {
+		counterSetMixinRefs[i] = resourceapi.CounterSetMixinRef{
+			Name: mixin.Name,
+		}
+	}
+	return counterSetMixinRefs
+}
+
+func createDeviceCounterConsumptionMixin(count int) []resourceapi.DeviceCounterConsumptionMixin {
+	deviceCounterConsumptionMixins := make([]resourceapi.DeviceCounterConsumptionMixin, count)
+	for i := 0; i < count; i++ {
+		deviceCounterConsumptionMixins[i] = resourceapi.DeviceCounterConsumptionMixin{
+			Name:     fmt.Sprintf("device-counter-consumption-mixin-%d", i),
+			Counters: testCounters(),
+		}
+	}
+	return deviceCounterConsumptionMixins
+}
+
+func createDeviceCounterConsumptionMixinRefs(mixins []resourceapi.DeviceCounterConsumptionMixin) []resourceapi.DeviceCounterConsumptionMixinRef {
+	deviceCounterConsumptionMixinRefs := make([]resourceapi.DeviceCounterConsumptionMixinRef, len(mixins))
+	for i, mixin := range mixins {
+		deviceCounterConsumptionMixinRefs[i] = resourceapi.DeviceCounterConsumptionMixinRef{
+			Name: mixin.Name,
+		}
+	}
+	return deviceCounterConsumptionMixinRefs
 }

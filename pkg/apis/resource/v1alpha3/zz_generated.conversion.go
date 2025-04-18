@@ -92,6 +92,26 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.CounterSetMixin)(nil), (*resource.CounterSetMixin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_CounterSetMixin_To_resource_CounterSetMixin(a.(*resourcev1alpha3.CounterSetMixin), b.(*resource.CounterSetMixin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.CounterSetMixin)(nil), (*resourcev1alpha3.CounterSetMixin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_CounterSetMixin_To_v1alpha3_CounterSetMixin(a.(*resource.CounterSetMixin), b.(*resourcev1alpha3.CounterSetMixin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.CounterSetMixinRef)(nil), (*resource.CounterSetMixinRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_CounterSetMixinRef_To_resource_CounterSetMixinRef(a.(*resourcev1alpha3.CounterSetMixinRef), b.(*resource.CounterSetMixinRef), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.CounterSetMixinRef)(nil), (*resourcev1alpha3.CounterSetMixinRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_CounterSetMixinRef_To_v1alpha3_CounterSetMixinRef(a.(*resource.CounterSetMixinRef), b.(*resourcev1alpha3.CounterSetMixinRef), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceAllocationConfiguration)(nil), (*resource.DeviceAllocationConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha3_DeviceAllocationConfiguration_To_resource_DeviceAllocationConfiguration(a.(*resourcev1alpha3.DeviceAllocationConfiguration), b.(*resource.DeviceAllocationConfiguration), scope)
 	}); err != nil {
@@ -209,6 +229,46 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*resource.DeviceCounterConsumption)(nil), (*resourcev1alpha3.DeviceCounterConsumption)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_DeviceCounterConsumption_To_v1alpha3_DeviceCounterConsumption(a.(*resource.DeviceCounterConsumption), b.(*resourcev1alpha3.DeviceCounterConsumption), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceCounterConsumptionMixin)(nil), (*resource.DeviceCounterConsumptionMixin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceCounterConsumptionMixin_To_resource_DeviceCounterConsumptionMixin(a.(*resourcev1alpha3.DeviceCounterConsumptionMixin), b.(*resource.DeviceCounterConsumptionMixin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceCounterConsumptionMixin)(nil), (*resourcev1alpha3.DeviceCounterConsumptionMixin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceCounterConsumptionMixin_To_v1alpha3_DeviceCounterConsumptionMixin(a.(*resource.DeviceCounterConsumptionMixin), b.(*resourcev1alpha3.DeviceCounterConsumptionMixin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceCounterConsumptionMixinRef)(nil), (*resource.DeviceCounterConsumptionMixinRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceCounterConsumptionMixinRef_To_resource_DeviceCounterConsumptionMixinRef(a.(*resourcev1alpha3.DeviceCounterConsumptionMixinRef), b.(*resource.DeviceCounterConsumptionMixinRef), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceCounterConsumptionMixinRef)(nil), (*resourcev1alpha3.DeviceCounterConsumptionMixinRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceCounterConsumptionMixinRef_To_v1alpha3_DeviceCounterConsumptionMixinRef(a.(*resource.DeviceCounterConsumptionMixinRef), b.(*resourcev1alpha3.DeviceCounterConsumptionMixinRef), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceMixin)(nil), (*resource.DeviceMixin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceMixin_To_resource_DeviceMixin(a.(*resourcev1alpha3.DeviceMixin), b.(*resource.DeviceMixin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceMixin)(nil), (*resourcev1alpha3.DeviceMixin)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceMixin_To_v1alpha3_DeviceMixin(a.(*resource.DeviceMixin), b.(*resourcev1alpha3.DeviceMixin), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.DeviceMixinRef)(nil), (*resource.DeviceMixinRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_DeviceMixinRef_To_resource_DeviceMixinRef(a.(*resourcev1alpha3.DeviceMixinRef), b.(*resource.DeviceMixinRef), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.DeviceMixinRef)(nil), (*resourcev1alpha3.DeviceMixinRef)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_DeviceMixinRef_To_v1alpha3_DeviceMixinRef(a.(*resource.DeviceMixinRef), b.(*resourcev1alpha3.DeviceMixinRef), scope)
 	}); err != nil {
 		return err
 	}
@@ -432,6 +492,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*resourcev1alpha3.ResourceSliceMixins)(nil), (*resource.ResourceSliceMixins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha3_ResourceSliceMixins_To_resource_ResourceSliceMixins(a.(*resourcev1alpha3.ResourceSliceMixins), b.(*resource.ResourceSliceMixins), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*resource.ResourceSliceMixins)(nil), (*resourcev1alpha3.ResourceSliceMixins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_resource_ResourceSliceMixins_To_v1alpha3_ResourceSliceMixins(a.(*resource.ResourceSliceMixins), b.(*resourcev1alpha3.ResourceSliceMixins), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*resource.DeviceCapacity)(nil), (*apiresource.Quantity)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_resource_DeviceCapacity_To_resource_Quantity(a.(*resource.DeviceCapacity), b.(*apiresource.Quantity), scope)
 	}); err != nil {
@@ -574,6 +644,7 @@ func Convert_resource_Counter_To_v1alpha3_Counter(in *resource.Counter, out *res
 func autoConvert_v1alpha3_CounterSet_To_resource_CounterSet(in *resourcev1alpha3.CounterSet, out *resource.CounterSet, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Counters = *(*map[string]resource.Counter)(unsafe.Pointer(&in.Counters))
+	out.Includes = *(*[]resource.CounterSetMixinRef)(unsafe.Pointer(&in.Includes))
 	return nil
 }
 
@@ -585,12 +656,55 @@ func Convert_v1alpha3_CounterSet_To_resource_CounterSet(in *resourcev1alpha3.Cou
 func autoConvert_resource_CounterSet_To_v1alpha3_CounterSet(in *resource.CounterSet, out *resourcev1alpha3.CounterSet, s conversion.Scope) error {
 	out.Name = in.Name
 	out.Counters = *(*map[string]resourcev1alpha3.Counter)(unsafe.Pointer(&in.Counters))
+	out.Includes = *(*[]resourcev1alpha3.CounterSetMixinRef)(unsafe.Pointer(&in.Includes))
 	return nil
 }
 
 // Convert_resource_CounterSet_To_v1alpha3_CounterSet is an autogenerated conversion function.
 func Convert_resource_CounterSet_To_v1alpha3_CounterSet(in *resource.CounterSet, out *resourcev1alpha3.CounterSet, s conversion.Scope) error {
 	return autoConvert_resource_CounterSet_To_v1alpha3_CounterSet(in, out, s)
+}
+
+func autoConvert_v1alpha3_CounterSetMixin_To_resource_CounterSetMixin(in *resourcev1alpha3.CounterSetMixin, out *resource.CounterSetMixin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Counters = *(*map[string]resource.Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_v1alpha3_CounterSetMixin_To_resource_CounterSetMixin is an autogenerated conversion function.
+func Convert_v1alpha3_CounterSetMixin_To_resource_CounterSetMixin(in *resourcev1alpha3.CounterSetMixin, out *resource.CounterSetMixin, s conversion.Scope) error {
+	return autoConvert_v1alpha3_CounterSetMixin_To_resource_CounterSetMixin(in, out, s)
+}
+
+func autoConvert_resource_CounterSetMixin_To_v1alpha3_CounterSetMixin(in *resource.CounterSetMixin, out *resourcev1alpha3.CounterSetMixin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Counters = *(*map[string]resourcev1alpha3.Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_resource_CounterSetMixin_To_v1alpha3_CounterSetMixin is an autogenerated conversion function.
+func Convert_resource_CounterSetMixin_To_v1alpha3_CounterSetMixin(in *resource.CounterSetMixin, out *resourcev1alpha3.CounterSetMixin, s conversion.Scope) error {
+	return autoConvert_resource_CounterSetMixin_To_v1alpha3_CounterSetMixin(in, out, s)
+}
+
+func autoConvert_v1alpha3_CounterSetMixinRef_To_resource_CounterSetMixinRef(in *resourcev1alpha3.CounterSetMixinRef, out *resource.CounterSetMixinRef, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_v1alpha3_CounterSetMixinRef_To_resource_CounterSetMixinRef is an autogenerated conversion function.
+func Convert_v1alpha3_CounterSetMixinRef_To_resource_CounterSetMixinRef(in *resourcev1alpha3.CounterSetMixinRef, out *resource.CounterSetMixinRef, s conversion.Scope) error {
+	return autoConvert_v1alpha3_CounterSetMixinRef_To_resource_CounterSetMixinRef(in, out, s)
+}
+
+func autoConvert_resource_CounterSetMixinRef_To_v1alpha3_CounterSetMixinRef(in *resource.CounterSetMixinRef, out *resourcev1alpha3.CounterSetMixinRef, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_resource_CounterSetMixinRef_To_v1alpha3_CounterSetMixinRef is an autogenerated conversion function.
+func Convert_resource_CounterSetMixinRef_To_v1alpha3_CounterSetMixinRef(in *resource.CounterSetMixinRef, out *resourcev1alpha3.CounterSetMixinRef, s conversion.Scope) error {
+	return autoConvert_resource_CounterSetMixinRef_To_v1alpha3_CounterSetMixinRef(in, out, s)
 }
 
 func autoConvert_v1alpha3_Device_To_resource_Device(in *resourcev1alpha3.Device, out *resource.Device, s conversion.Scope) error {
@@ -608,6 +722,7 @@ func autoConvert_resource_Device_To_v1alpha3_Device(in *resource.Device, out *re
 	// WARNING: in.NodeSelector requires manual conversion: does not exist in peer-type
 	// WARNING: in.AllNodes requires manual conversion: does not exist in peer-type
 	// WARNING: in.Taints requires manual conversion: does not exist in peer-type
+	// WARNING: in.Includes requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -896,6 +1011,7 @@ func Convert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource
 func autoConvert_v1alpha3_DeviceCounterConsumption_To_resource_DeviceCounterConsumption(in *resourcev1alpha3.DeviceCounterConsumption, out *resource.DeviceCounterConsumption, s conversion.Scope) error {
 	out.CounterSet = in.CounterSet
 	out.Counters = *(*map[string]resource.Counter)(unsafe.Pointer(&in.Counters))
+	out.Includes = *(*[]resource.DeviceCounterConsumptionMixinRef)(unsafe.Pointer(&in.Includes))
 	return nil
 }
 
@@ -907,12 +1023,123 @@ func Convert_v1alpha3_DeviceCounterConsumption_To_resource_DeviceCounterConsumpt
 func autoConvert_resource_DeviceCounterConsumption_To_v1alpha3_DeviceCounterConsumption(in *resource.DeviceCounterConsumption, out *resourcev1alpha3.DeviceCounterConsumption, s conversion.Scope) error {
 	out.CounterSet = in.CounterSet
 	out.Counters = *(*map[string]resourcev1alpha3.Counter)(unsafe.Pointer(&in.Counters))
+	out.Includes = *(*[]resourcev1alpha3.DeviceCounterConsumptionMixinRef)(unsafe.Pointer(&in.Includes))
 	return nil
 }
 
 // Convert_resource_DeviceCounterConsumption_To_v1alpha3_DeviceCounterConsumption is an autogenerated conversion function.
 func Convert_resource_DeviceCounterConsumption_To_v1alpha3_DeviceCounterConsumption(in *resource.DeviceCounterConsumption, out *resourcev1alpha3.DeviceCounterConsumption, s conversion.Scope) error {
 	return autoConvert_resource_DeviceCounterConsumption_To_v1alpha3_DeviceCounterConsumption(in, out, s)
+}
+
+func autoConvert_v1alpha3_DeviceCounterConsumptionMixin_To_resource_DeviceCounterConsumptionMixin(in *resourcev1alpha3.DeviceCounterConsumptionMixin, out *resource.DeviceCounterConsumptionMixin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Counters = *(*map[string]resource.Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_v1alpha3_DeviceCounterConsumptionMixin_To_resource_DeviceCounterConsumptionMixin is an autogenerated conversion function.
+func Convert_v1alpha3_DeviceCounterConsumptionMixin_To_resource_DeviceCounterConsumptionMixin(in *resourcev1alpha3.DeviceCounterConsumptionMixin, out *resource.DeviceCounterConsumptionMixin, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DeviceCounterConsumptionMixin_To_resource_DeviceCounterConsumptionMixin(in, out, s)
+}
+
+func autoConvert_resource_DeviceCounterConsumptionMixin_To_v1alpha3_DeviceCounterConsumptionMixin(in *resource.DeviceCounterConsumptionMixin, out *resourcev1alpha3.DeviceCounterConsumptionMixin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Counters = *(*map[string]resourcev1alpha3.Counter)(unsafe.Pointer(&in.Counters))
+	return nil
+}
+
+// Convert_resource_DeviceCounterConsumptionMixin_To_v1alpha3_DeviceCounterConsumptionMixin is an autogenerated conversion function.
+func Convert_resource_DeviceCounterConsumptionMixin_To_v1alpha3_DeviceCounterConsumptionMixin(in *resource.DeviceCounterConsumptionMixin, out *resourcev1alpha3.DeviceCounterConsumptionMixin, s conversion.Scope) error {
+	return autoConvert_resource_DeviceCounterConsumptionMixin_To_v1alpha3_DeviceCounterConsumptionMixin(in, out, s)
+}
+
+func autoConvert_v1alpha3_DeviceCounterConsumptionMixinRef_To_resource_DeviceCounterConsumptionMixinRef(in *resourcev1alpha3.DeviceCounterConsumptionMixinRef, out *resource.DeviceCounterConsumptionMixinRef, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_v1alpha3_DeviceCounterConsumptionMixinRef_To_resource_DeviceCounterConsumptionMixinRef is an autogenerated conversion function.
+func Convert_v1alpha3_DeviceCounterConsumptionMixinRef_To_resource_DeviceCounterConsumptionMixinRef(in *resourcev1alpha3.DeviceCounterConsumptionMixinRef, out *resource.DeviceCounterConsumptionMixinRef, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DeviceCounterConsumptionMixinRef_To_resource_DeviceCounterConsumptionMixinRef(in, out, s)
+}
+
+func autoConvert_resource_DeviceCounterConsumptionMixinRef_To_v1alpha3_DeviceCounterConsumptionMixinRef(in *resource.DeviceCounterConsumptionMixinRef, out *resourcev1alpha3.DeviceCounterConsumptionMixinRef, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_resource_DeviceCounterConsumptionMixinRef_To_v1alpha3_DeviceCounterConsumptionMixinRef is an autogenerated conversion function.
+func Convert_resource_DeviceCounterConsumptionMixinRef_To_v1alpha3_DeviceCounterConsumptionMixinRef(in *resource.DeviceCounterConsumptionMixinRef, out *resourcev1alpha3.DeviceCounterConsumptionMixinRef, s conversion.Scope) error {
+	return autoConvert_resource_DeviceCounterConsumptionMixinRef_To_v1alpha3_DeviceCounterConsumptionMixinRef(in, out, s)
+}
+
+func autoConvert_v1alpha3_DeviceMixin_To_resource_DeviceMixin(in *resourcev1alpha3.DeviceMixin, out *resource.DeviceMixin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Attributes = *(*map[resource.QualifiedName]resource.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(map[resource.QualifiedName]resource.DeviceCapacity, len(*in))
+		for key, val := range *in {
+			newVal := new(resource.DeviceCapacity)
+			if err := Convert_resource_Quantity_To_resource_DeviceCapacity(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[resource.QualifiedName(key)] = *newVal
+		}
+	} else {
+		out.Capacity = nil
+	}
+	return nil
+}
+
+// Convert_v1alpha3_DeviceMixin_To_resource_DeviceMixin is an autogenerated conversion function.
+func Convert_v1alpha3_DeviceMixin_To_resource_DeviceMixin(in *resourcev1alpha3.DeviceMixin, out *resource.DeviceMixin, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DeviceMixin_To_resource_DeviceMixin(in, out, s)
+}
+
+func autoConvert_resource_DeviceMixin_To_v1alpha3_DeviceMixin(in *resource.DeviceMixin, out *resourcev1alpha3.DeviceMixin, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Attributes = *(*map[resourcev1alpha3.QualifiedName]resourcev1alpha3.DeviceAttribute)(unsafe.Pointer(&in.Attributes))
+	if in.Capacity != nil {
+		in, out := &in.Capacity, &out.Capacity
+		*out = make(map[resourcev1alpha3.QualifiedName]apiresource.Quantity, len(*in))
+		for key, val := range *in {
+			newVal := new(apiresource.Quantity)
+			if err := Convert_resource_DeviceCapacity_To_resource_Quantity(&val, newVal, s); err != nil {
+				return err
+			}
+			(*out)[resourcev1alpha3.QualifiedName(key)] = *newVal
+		}
+	} else {
+		out.Capacity = nil
+	}
+	return nil
+}
+
+// Convert_resource_DeviceMixin_To_v1alpha3_DeviceMixin is an autogenerated conversion function.
+func Convert_resource_DeviceMixin_To_v1alpha3_DeviceMixin(in *resource.DeviceMixin, out *resourcev1alpha3.DeviceMixin, s conversion.Scope) error {
+	return autoConvert_resource_DeviceMixin_To_v1alpha3_DeviceMixin(in, out, s)
+}
+
+func autoConvert_v1alpha3_DeviceMixinRef_To_resource_DeviceMixinRef(in *resourcev1alpha3.DeviceMixinRef, out *resource.DeviceMixinRef, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_v1alpha3_DeviceMixinRef_To_resource_DeviceMixinRef is an autogenerated conversion function.
+func Convert_v1alpha3_DeviceMixinRef_To_resource_DeviceMixinRef(in *resourcev1alpha3.DeviceMixinRef, out *resource.DeviceMixinRef, s conversion.Scope) error {
+	return autoConvert_v1alpha3_DeviceMixinRef_To_resource_DeviceMixinRef(in, out, s)
+}
+
+func autoConvert_resource_DeviceMixinRef_To_v1alpha3_DeviceMixinRef(in *resource.DeviceMixinRef, out *resourcev1alpha3.DeviceMixinRef, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_resource_DeviceMixinRef_To_v1alpha3_DeviceMixinRef is an autogenerated conversion function.
+func Convert_resource_DeviceMixinRef_To_v1alpha3_DeviceMixinRef(in *resource.DeviceMixinRef, out *resourcev1alpha3.DeviceMixinRef, s conversion.Scope) error {
+	return autoConvert_resource_DeviceMixinRef_To_v1alpha3_DeviceMixinRef(in, out, s)
 }
 
 func autoConvert_v1alpha3_DeviceRequest_To_resource_DeviceRequest(in *resourcev1alpha3.DeviceRequest, out *resource.DeviceRequest, s conversion.Scope) error {
@@ -1550,6 +1777,50 @@ func Convert_resource_ResourceSliceList_To_v1alpha3_ResourceSliceList(in *resour
 	return autoConvert_resource_ResourceSliceList_To_v1alpha3_ResourceSliceList(in, out, s)
 }
 
+func autoConvert_v1alpha3_ResourceSliceMixins_To_resource_ResourceSliceMixins(in *resourcev1alpha3.ResourceSliceMixins, out *resource.ResourceSliceMixins, s conversion.Scope) error {
+	if in.Device != nil {
+		in, out := &in.Device, &out.Device
+		*out = make([]resource.DeviceMixin, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha3_DeviceMixin_To_resource_DeviceMixin(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Device = nil
+	}
+	out.DeviceCounterConsumption = *(*[]resource.DeviceCounterConsumptionMixin)(unsafe.Pointer(&in.DeviceCounterConsumption))
+	out.CounterSet = *(*[]resource.CounterSetMixin)(unsafe.Pointer(&in.CounterSet))
+	return nil
+}
+
+// Convert_v1alpha3_ResourceSliceMixins_To_resource_ResourceSliceMixins is an autogenerated conversion function.
+func Convert_v1alpha3_ResourceSliceMixins_To_resource_ResourceSliceMixins(in *resourcev1alpha3.ResourceSliceMixins, out *resource.ResourceSliceMixins, s conversion.Scope) error {
+	return autoConvert_v1alpha3_ResourceSliceMixins_To_resource_ResourceSliceMixins(in, out, s)
+}
+
+func autoConvert_resource_ResourceSliceMixins_To_v1alpha3_ResourceSliceMixins(in *resource.ResourceSliceMixins, out *resourcev1alpha3.ResourceSliceMixins, s conversion.Scope) error {
+	if in.Device != nil {
+		in, out := &in.Device, &out.Device
+		*out = make([]resourcev1alpha3.DeviceMixin, len(*in))
+		for i := range *in {
+			if err := Convert_resource_DeviceMixin_To_v1alpha3_DeviceMixin(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Device = nil
+	}
+	out.DeviceCounterConsumption = *(*[]resourcev1alpha3.DeviceCounterConsumptionMixin)(unsafe.Pointer(&in.DeviceCounterConsumption))
+	out.CounterSet = *(*[]resourcev1alpha3.CounterSetMixin)(unsafe.Pointer(&in.CounterSet))
+	return nil
+}
+
+// Convert_resource_ResourceSliceMixins_To_v1alpha3_ResourceSliceMixins is an autogenerated conversion function.
+func Convert_resource_ResourceSliceMixins_To_v1alpha3_ResourceSliceMixins(in *resource.ResourceSliceMixins, out *resourcev1alpha3.ResourceSliceMixins, s conversion.Scope) error {
+	return autoConvert_resource_ResourceSliceMixins_To_v1alpha3_ResourceSliceMixins(in, out, s)
+}
+
 func autoConvert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *resourcev1alpha3.ResourceSliceSpec, out *resource.ResourceSliceSpec, s conversion.Scope) error {
 	out.Driver = in.Driver
 	if err := Convert_v1alpha3_ResourcePool_To_resource_ResourcePool(&in.Pool, &out.Pool, s); err != nil {
@@ -1575,6 +1846,15 @@ func autoConvert_v1alpha3_ResourceSliceSpec_To_resource_ResourceSliceSpec(in *re
 	}
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]resource.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	if in.Mixins != nil {
+		in, out := &in.Mixins, &out.Mixins
+		*out = new(resource.ResourceSliceMixins)
+		if err := Convert_v1alpha3_ResourceSliceMixins_To_resource_ResourceSliceMixins(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Mixins = nil
+	}
 	return nil
 }
 
@@ -1603,5 +1883,14 @@ func autoConvert_resource_ResourceSliceSpec_To_v1alpha3_ResourceSliceSpec(in *re
 	}
 	out.PerDeviceNodeSelection = (*bool)(unsafe.Pointer(in.PerDeviceNodeSelection))
 	out.SharedCounters = *(*[]resourcev1alpha3.CounterSet)(unsafe.Pointer(&in.SharedCounters))
+	if in.Mixins != nil {
+		in, out := &in.Mixins, &out.Mixins
+		*out = new(resourcev1alpha3.ResourceSliceMixins)
+		if err := Convert_resource_ResourceSliceMixins_To_v1alpha3_ResourceSliceMixins(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Mixins = nil
+	}
 	return nil
 }
