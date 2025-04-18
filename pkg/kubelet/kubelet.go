@@ -2861,6 +2861,31 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 	}
 }
 
+func (kl *Kubelet) getMustKeepCPUs(pod *v1.Pod) error {
+	for i, container := range pod.Spec.Containers {
+		Command := strings.Split("cat /tmp/mustKeepCPUs", " ")
+		ctx := context.Background()
+		output, er := kl.RunInContainer(
+			ctx,
+			kubecontainer.GetPodFullName(pod),
+			pod.UID,
+			container.Name,
+			Command)
+		if er != nil {
+			klog.InfoS("Allocate: RunInContainer run error", "err", er)
+			continue
+		}
+		str := string(output)
+		str = strings.ReplaceAll(str, "&lt;", "")
+		str = strings.ReplaceAll(str, "&gt;", "")
+		str = strings.ReplaceAll(str, "\t", " ")
+		str = strings.ReplaceAll(str, "\n", "")
+		pod.Spec.Containers[i].Resources.MustKeepCPUs = str
+		klog.InfoS("RunInContainer", "kubecontainer.GetPodFullName(pod)", kubecontainer.GetPodFullName(pod), "container.Name", container.Name, "output:%s", output, "container.Resources.MustKeepCPUs", container.Resources.MustKeepCPUs)
+	}
+	return nil
+}
+
 // canResizePod determines if the requested resize is currently feasible.
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
@@ -2879,6 +2904,12 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 				return false, v1.PodReasonInfeasible, msg
 
 			}
+		}
+	}
+
+	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
+		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+			kl.getMustKeepCPUs(pod)
 		}
 	}
 
