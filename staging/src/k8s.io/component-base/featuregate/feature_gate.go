@@ -137,6 +137,8 @@ type MutableFeatureGate interface {
 	Add(features map[Feature]FeatureSpec) error
 	// GetAll returns a copy of the map of known feature names to feature specs.
 	GetAll() map[Feature]FeatureSpec
+	// GetVersionedSpecs gets the VersionedSpecs information for a feature.
+	GetVersionedSpecs(key Feature) (VersionedSpecs, error)
 	// AddMetrics adds feature enablement metrics
 	AddMetrics()
 	// OverrideDefault sets a local override for the registered default value of a named
@@ -540,6 +542,16 @@ func (f *featureGate) GetAllVersioned() map[Feature]VersionedSpecs {
 		retval[k] = vCopy
 	}
 	return retval
+}
+
+// GetVersionedSpecs gets the VersionedSpecs information for a feature.
+func (f *featureGate) GetVersionedSpecs(key Feature) (VersionedSpecs, error) {
+	allVersioned := f.GetAllVersioned()
+	specs, ok := allVersioned[key]
+	if ok {
+		return specs, nil
+	}
+	return nil, fmt.Errorf("feature %q is not registered in FeatureGate", key)
 }
 
 func (f *featureGate) SetEmulationVersion(emulationVersion *version.Version) error {
