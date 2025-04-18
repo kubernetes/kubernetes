@@ -17,6 +17,7 @@ limitations under the License.
 package prober
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -71,7 +72,7 @@ var ProberDuration = metrics.NewHistogramVec(
 type Manager interface {
 	// AddPod creates new probe workers for every container probe. This should be called for every
 	// pod created.
-	AddPod(pod *v1.Pod)
+	AddPod(ctx context.Context, pod *v1.Pod)
 
 	// StopLivenessAndStartup handles stopping liveness and startup probes during termination.
 	StopLivenessAndStartup(pod *v1.Pod)
@@ -86,7 +87,7 @@ type Manager interface {
 
 	// UpdatePodStatus modifies the given PodStatus with the appropriate Ready state for each
 	// container based on container running status, cached probe results and worker states.
-	UpdatePodStatus(*v1.Pod, *v1.PodStatus)
+	UpdatePodStatus(context.Context, *v1.Pod, *v1.PodStatus)
 }
 
 type manager struct {
@@ -178,10 +179,11 @@ func getRestartableInitContainers(pod *v1.Pod) []v1.Container {
 	return restartableInitContainers
 }
 
-func (m *manager) AddPod(pod *v1.Pod) {
+func (m *manager) AddPod(ctx context.Context, pod *v1.Pod) {
 	m.workerLock.Lock()
 	defer m.workerLock.Unlock()
 
+	logger := klog.FromContext(ctx)
 	key := probeKey{podUID: pod.UID}
 	for _, c := range append(pod.Spec.Containers, getRestartableInitContainers(pod)...) {
 		key.containerName = c.Name
@@ -189,37 +191,37 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				klog.V(8).ErrorS(nil, "Startup probe already exists for container",
+				logger.V(8).Error(nil, "Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, startup, pod, c)
 			m.workers[key] = w
-			go w.run()
+			go w.run(ctx)
 		}
 
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				klog.V(8).ErrorS(nil, "Readiness probe already exists for container",
+				logger.V(8).Error(nil, "Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, readiness, pod, c)
 			m.workers[key] = w
-			go w.run()
+			go w.run(ctx)
 		}
 
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				klog.V(8).ErrorS(nil, "Liveness probe already exists for container",
+				logger.V(8).Error(nil, "Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
 			m.workers[key] = w
-			go w.run()
+			go w.run(ctx)
 		}
 	}
 }
@@ -286,7 +288,8 @@ func (m *manager) isContainerStarted(pod *v1.Pod, containerStatus *v1.ContainerS
 	return true
 }
 
-func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
+func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v1.PodStatus) {
+	logger := klog.FromContext(ctx)
 	for i, c := range podStatus.ContainerStatuses {
 		started := m.isContainerStarted(pod, &podStatus.ContainerStatuses[i])
 		podStatus.ContainerStatuses[i].Started = &started
@@ -309,7 +312,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 				select {
 				case w.manualTriggerCh <- struct{}{}:
 				default: // Non-blocking.
-					klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
+					logger.Info("Failed to trigger a manual run", "probe", w.probeType.String())
 				}
 			}
 		}
@@ -322,7 +325,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 
 		initContainer, ok := kubeutil.GetContainerByIndex(pod.Spec.InitContainers, podStatus.InitContainerStatuses, i)
 		if !ok {
-			klog.V(4).InfoS("Mismatch between pod spec and status, likely programmer error", "pod", klog.KObj(pod), "containerName", c.Name)
+			logger.V(4).Info("Mismatch between pod spec and status, likely programmer error", "pod", klog.KObj(pod), "containerName", c.Name)
 			continue
 		}
 		if !podutil.IsRestartableInitContainer(&initContainer) {
@@ -350,7 +353,7 @@ func (m *manager) UpdatePodStatus(pod *v1.Pod, podStatus *v1.PodStatus) {
 				select {
 				case w.manualTriggerCh <- struct{}{}:
 				default: // Non-blocking.
-					klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
+					logger.Info("Failed to trigger a manual run", "probe", w.probeType.String())
 				}
 			}
 		}
