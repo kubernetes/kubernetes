@@ -340,13 +340,14 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 	}
 
 	err := gc.attemptToDeleteItem(ctx, n)
-	if err == enqueuedVirtualDeleteEventErr {
+	switch {
+	case err == enqueuedVirtualDeleteEventErr:
 		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
 		return forgetItem
-	} else if err == namespacedOwnerOfClusterScopedObjectErr {
+	case err == namespacedOwnerOfClusterScopedObjectErr:
 		// a cluster-scoped object referring to a namespaced owner is an error that will not resolve on retry, no need to requeue this node
 		return forgetItem
-	} else if err != nil {
+	case err != nil:
 		if _, ok := err.(*restMappingError); ok {
 			// There are at least two ways this can happen:
 			// 1. The reference is to an object of a custom type that has not yet been
@@ -361,7 +362,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		}
 		// retry if garbage collection of an object failed.
 		return requeueItem
-	} else if !n.isObserved() {
+	case !n.isObserved():
 		// requeue if item hasn't been observed via an informer event yet.
 		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
 		// see https://issue.k8s.io/56121
