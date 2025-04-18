@@ -66159,11 +66159,6 @@ func schema_k8sio_kube_scheduler_config_v1_ExtenderTLSConfig(ref common.Referenc
 						},
 					},
 					"certData": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "CertData holds PEM-encoded bytes (typically read from a client certificate file). CertData takes precedence over CertFile",
 							Type:        []string{"string"},
@@ -66171,11 +66166,6 @@ func schema_k8sio_kube_scheduler_config_v1_ExtenderTLSConfig(ref common.Referenc
 						},
 					},
 					"keyData": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "KeyData holds PEM-encoded bytes (typically read from a client certificate key file). KeyData takes precedence over KeyFile",
 							Type:        []string{"string"},
@@ -66183,11 +66173,6 @@ func schema_k8sio_kube_scheduler_config_v1_ExtenderTLSConfig(ref common.Referenc
 						},
 					},
 					"caData": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "CAData holds PEM-encoded bytes (typically read from a root certificates bundle). CAData takes precedence over CAFile",
 							Type:        []string{"string"},
