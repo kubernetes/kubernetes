@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
@@ -113,10 +114,11 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 	}
 }
 
-func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
+	logger := klog.FromContext(ctx)
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
-		klog.ErrorS(err, "Cannot get Node info")
+		logger.Error(err, "Cannot get Node info")
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  InvalidNodeInfo,
@@ -143,7 +145,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 	if rejectPodAdmissionBasedOnSupplementalGroupsPolicy(admitPod, node) {
 		message := fmt.Sprintf("SupplementalGroupsPolicy=%s is not supported in this node", v1.SupplementalGroupsPolicyStrict)
-		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
+		logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  SupplementalGroupsPolicyNotSupported,
@@ -158,7 +160,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
-		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
+		logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  UnexpectedAdmissionError,
@@ -183,7 +185,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
-			klog.InfoS("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
+			logger.Info("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  UnexpectedAdmissionError,
@@ -196,7 +198,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		var message string
 		if len(reasons) == 0 {
 			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
-			klog.InfoS("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
+			logger.Info("Failed to admit pod: GeneralPredicates failed due to unknown reason, which is unexpected", "pod", klog.KObj(admitPod))
 			return PodAdmitResult{
 				Admit:   fit,
 				Reason:  UnknownReason,
@@ -209,7 +211,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		case *PredicateFailureError:
 			reason = re.PredicateName
 			message = re.Error()
-			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
+			logger.V(2).Info("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		case *InsufficientResourceError:
 			switch re.ResourceName {
 			case v1.ResourceCPU:
@@ -224,11 +226,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 				reason = fmt.Sprintf("%s%s", InsufficientResourcePrefix, re.ResourceName)
 			}
 			message = re.Error()
-			klog.V(2).InfoS("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
+			logger.V(2).Info("Predicate failed on Pod", "pod", klog.KObj(admitPod), "err", message)
 		default:
 			reason = UnexpectedPredicateFailureType
 			message = fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-			klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
+			logger.Info("Failed to admit pod", "pod", klog.KObj(admitPod), "err", message)
 		}
 		return PodAdmitResult{
 			Admit:   fit,

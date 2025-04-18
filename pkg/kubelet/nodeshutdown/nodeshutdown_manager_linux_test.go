@@ -304,7 +304,7 @@ func TestManager(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, tCtx := ktesting.NewTestContext(t)
 
 			activePodsFunc := func() []*v1.Pod {
 				return tc.activePods
@@ -367,7 +367,7 @@ func TestManager(t *testing.T) {
 				assert.NoError(t, err, "expected manager.Start() to not return error")
 				assert.True(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
 				assert.NoError(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
-				assert.True(t, manager.Admit(nil).Admit)
+				assert.True(t, manager.Admit(tCtx, nil).Admit)
 
 				// Send fake shutdown event
 				select {
@@ -389,7 +389,7 @@ func TestManager(t *testing.T) {
 				}
 
 				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
-				assert.False(t, manager.Admit(nil).Admit)
+				assert.False(t, manager.Admit(tCtx, nil).Admit)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
 				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 				if tc.expectedPodStatuses != nil {

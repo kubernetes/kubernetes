@@ -42,7 +42,7 @@ import (
 type Manager interface {
 	lifecycle.PodAdmitHandler
 
-	Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
+	Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult
 	Start() error
 	ShutdownStatus() error
 }
@@ -68,7 +68,7 @@ type Config struct {
 type managerStub struct{}
 
 // Admit returns a fake Pod admission which always returns true
-func (managerStub) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (managerStub) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{Admit: true}
 }
 
