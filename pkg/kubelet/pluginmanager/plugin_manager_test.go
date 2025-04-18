@@ -33,6 +33,7 @@ import (
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 
 	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
 )
 
@@ -59,7 +60,7 @@ func (f *fakePluginHandler) ValidatePlugin(pluginName string, endpoint string, v
 }
 
 // RegisterPlugin is a fake method
-func (f *fakePluginHandler) RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration) error {
+func (f *fakePluginHandler) RegisterPlugin(pluginName, endpoint string, versions []string, pluginClientTimeout *time.Duration, desiredStateOfWorld cache.DesiredStateOfWorld) error {
 	f.Lock()
 	defer f.Unlock()
 	f.events = append(f.events, "register "+pluginName+" "+endpoint)
