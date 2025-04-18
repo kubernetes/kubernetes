@@ -31,10 +31,6 @@ import (
 
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 
-	"go.etcd.io/etcd/client/pkg/v3/transport"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
-
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -416,35 +412,13 @@ func findCRDCondition(crd *apiextensionsv1.CustomResourceDefinition, conditionTy
 // apply falls back to non-schema behavior
 func TestApplyCRDUnhandledSchema(t *testing.T) {
 	storageConfig := framework.SharedEtcd()
-	tlsInfo := transport.TLSInfo{
-		CertFile:      storageConfig.Transport.CertFile,
-		KeyFile:       storageConfig.Transport.KeyFile,
-		TrustedCAFile: storageConfig.Transport.TrustedCAFile,
-	}
-	tlsConfig, err := tlsInfo.ClientConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	etcdConfig := clientv3.Config{
-		Endpoints:   storageConfig.Transport.ServerList,
-		DialTimeout: 20 * time.Second,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-		},
-		TLS: tlsConfig,
-	}
-	etcdclient, err := clientv3.New(etcdConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer etcdclient.Close()
-
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, storageConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer server.TearDownFn()
 	config := server.ClientConfig
+	etcdclient := server.EtcdClient
 
 	apiExtensionClient, err := clientset.NewForConfig(config)
 	if err != nil {
