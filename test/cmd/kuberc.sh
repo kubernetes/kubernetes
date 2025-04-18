@@ -184,6 +184,18 @@ EOF
   # assure that warning message is also printed for the notexist kuberc version
   kube::test::if_has_string "${output_message}" "strict decoding error" "unknown"
 
+  touch "${TMPDIR:-/tmp}"/empty_kuberc_file
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_not_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file -v=5)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 -v 5 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --v=5 --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get --v 5 namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+
   # explicitly overwriting the value that is also defaulted in kuberc and
   # assure that explicit value supersedes
   output_message=$(kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file)

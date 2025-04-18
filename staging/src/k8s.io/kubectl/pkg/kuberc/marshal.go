@@ -24,8 +24,6 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 
@@ -34,7 +32,7 @@ import (
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
 // Once it finds, it returns the compatible kuberc object as well as accumulated errors during the iteration.
-func decodePreference(kubercFile string) (*config.Preference, error) {
+func decodePreference(kubercFile string, verbosity uint64, errOut io.Writer) (*config.Preference, error) {
 	kubercBytes, err := os.ReadFile(kubercFile)
 	if err != nil {
 		return nil, err
@@ -65,7 +63,9 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 			if lenientDecodeErr != nil {
 				// both strict and lenient failed
 				// verbose log the error with the most information about this item and continue
-				klog.V(5).Infof("kuberc: strict decoding error for entry %d in %s: %v", attemptedItems, kubercFile, strictDecodeErr)
+				if verbosity >= 5 {
+					_, _ = fmt.Fprintf(errOut, "kuberc: strict decoding error for entry %d in %s: %v\n", attemptedItems, kubercFile, strictDecodeErr)
+				}
 				continue
 			}
 		}
@@ -76,19 +76,25 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 			Kind:  "Preference",
 		}
 		if gvk.GroupKind() != expectedGK {
-			klog.V(5).Infof("kuberc: unexpected GroupVersionKind for entry %d in %s: %v", attemptedItems, kubercFile, gvk)
+			if verbosity >= 5 {
+				_, _ = fmt.Fprintf(errOut, "kuberc: unexpected GroupVersionKind for entry %d in %s: %v\n", attemptedItems, kubercFile, gvk)
+			}
 			continue
 		}
 
 		// check expected go type, if bad, verbose log and continue
 		preferences, ok := pref.(*config.Preference)
 		if !ok {
-			klog.V(5).Infof("kuberc: unexpected object type %T for entry %d in %s", pref, attemptedItems, kubercFile)
+			if verbosity >= 5 {
+				_, _ = fmt.Fprintf(errOut, "kuberc: unexpected object type %T for entry %d in %s\n", pref, attemptedItems, kubercFile)
+			}
 			continue
 		}
 
 		// we have a usable preferences to return
-		klog.V(5).Infof("kuberc: successfully decoded entry %d in %s", attemptedItems, kubercFile)
+		if verbosity >= 5 {
+			_, _ = fmt.Fprintf(errOut, "kuberc: successfully decoded entry %d in %s\n", attemptedItems, kubercFile)
+		}
 		return preferences, strictDecodeErr
 
 	}
@@ -96,6 +102,8 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		return nil, fmt.Errorf("no valid preferences found in %s, use --v=5 to see details", kubercFile)
 	}
 	// empty doc
-	klog.V(5).Infof("kuberc: no preferences found in %s", kubercFile)
+	if verbosity >= 5 {
+		_, _ = fmt.Fprintf(errOut, "kuberc: no preferences found in %s\n", kubercFile)
+	}
 	return nil, nil
 }

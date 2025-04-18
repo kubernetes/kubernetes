@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/kubectl/pkg/config"
@@ -64,7 +65,7 @@ type PreferencesHandler interface {
 // Preferences stores the kuberc file coming either from environment variable
 // or file from set in flag or the default kuberc path.
 type Preferences struct {
-	getPreferencesFunc func(kuberc string, errOut io.Writer) (*config.Preference, error)
+	getPreferencesFunc func(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error)
 
 	aliases map[string]struct{}
 }
@@ -96,11 +97,16 @@ func (p *Preferences) Apply(rootCmd *cobra.Command, args []string, errOut io.Wri
 		return args, nil
 	}
 
+	verbosity, err := getLogVerbosity(args)
+	if err != nil {
+		return args, err
+	}
+
 	kubercPath, err := getExplicitKuberc(args)
 	if err != nil {
 		return args, err
 	}
-	kuberc, err := p.getPreferencesFunc(kubercPath, errOut)
+	kuberc, err := p.getPreferencesFunc(kubercPath, verbosity, errOut)
 	if err != nil {
 		return args, fmt.Errorf("kuberc error %w", err)
 	}
@@ -297,7 +303,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 // If KUBERC is also not set, it falls back to default .kuberc file at the same location
 // where kubeconfig's defaults are residing in.
 // If KUBERC is set to "off", kuberc will be turned off and original behaviors in kubectl will be applied.
-func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference, error) {
+func DefaultGetPreferences(kuberc string, logVerbosity uint64, errOut io.Writer) (*config.Preference, error) {
 	if val := os.Getenv("KUBERC"); val == "off" {
 		if kuberc != "" {
 			return nil, fmt.Errorf("disabling kuberc via KUBERC=off and passing kuberc flag are mutually exclusive")
@@ -316,7 +322,7 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 		explicitly = true
 	}
 
-	preference, err := decodePreference(kubeRCFile)
+	preference, err := decodePreference(kubeRCFile, logVerbosity, errOut)
 	switch {
 	case explicitly && preference != nil && runtime.IsStrictDecodingError(err):
 		// if explicitly requested, just warn about strict decoding errors if we got a usable Preference object back
@@ -339,6 +345,42 @@ func DefaultGetPreferences(kuberc string, errOut io.Writer) (*config.Preference,
 	default:
 		return preference, nil
 	}
+}
+
+func getLogVerbosity(args []string) (uint64, error) {
+	verbosity := uint64(0)
+	for i, arg := range args {
+		if arg == "--" {
+			// flags after "--" does not represent any flag of
+			// the command. We should short cut the iteration in here.
+			break
+		}
+
+		if arg == "--v" || arg == "-v" {
+			if i+1 < len(args) {
+				val, err := strconv.ParseUint(args[i+1], 10, 32)
+				if err != nil {
+					return 0, fmt.Errorf("log verbosity value is invalid %w", err)
+				}
+				verbosity = val
+				break
+			}
+			return 0, fmt.Errorf("log verbosity value is invalid")
+		} else if strings.Contains(arg, "--v=") || strings.Contains(arg, "-v=") {
+			parg := strings.Split(arg, "=")
+			if len(parg) > 1 && parg[1] != "" {
+				val, err := strconv.ParseUint(parg[1], 10, 32)
+				if err != nil {
+					return 0, fmt.Errorf("log verbosity value is invalid %w", err)
+				}
+				verbosity = val
+				break
+			}
+			return 0, fmt.Errorf("log verbosity value is invalid")
+		}
+	}
+
+	return verbosity, nil
 }
 
 // Normally, we should extract this value directly from kuberc flag.
