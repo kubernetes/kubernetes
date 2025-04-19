@@ -558,9 +558,6 @@ var (
 	Vsphere = framework.WithFeature(framework.ValidFeatures.Add("vsphere"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	WatchList = framework.WithFeature(framework.ValidFeatures.Add("WatchList"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Windows = framework.WithFeature(framework.ValidFeatures.Add("Windows"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
