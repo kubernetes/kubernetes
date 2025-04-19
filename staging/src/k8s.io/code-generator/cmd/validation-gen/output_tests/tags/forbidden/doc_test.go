@@ -40,7 +40,9 @@ func Test(t *testing.T) {
 		IntTypedefPtrField:    ptr.To(IntType(456)),
 		OtherStructPtrField:   &OtherStruct{},
 		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
 		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
 	}).ExpectRegexpsByPath(map[string][]string{
 		"stringField":           []string{"Forbidden"},
 		"stringPtrField":        []string{"Forbidden"},
@@ -52,6 +54,8 @@ func Test(t *testing.T) {
 		"intTypedefPtrField":    []string{"Forbidden"},
 		"otherStructPtrField":   []string{"Forbidden"},
 		"sliceField":            []string{"Forbidden"},
+		"sliceTypedefField":     []string{"Forbidden"},
 		"mapField":              []string{"Forbidden"},
+		"mapTypedefField":       []string{"Forbidden"},
 	})
 }

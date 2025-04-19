@@ -71,8 +71,16 @@ type Struct struct {
 	SliceField []string `json:"sliceField"`
 
 	// +k8s:forbidden
+	// +k8s:validateFalse="field Struct.SliceTypedefField"
+	SliceTypedefField SliceType `json:"sliceTypedefField"`
+
+	// +k8s:forbidden
 	// +k8s:validateFalse="field Struct.MapField"
 	MapField map[string]string `json:"mapField"`
+
+	// +k8s:forbidden
+	// +k8s:validateFalse="field Struct.MapTypedefField"
+	MapTypedefField MapType `json:"mapTypedefField"`
 }
 
 // +k8s:validateFalse="type StringType"
@@ -83,3 +91,9 @@ type IntType int
 
 // +k8s:validateFalse="type OtherStruct"
 type OtherStruct struct{}
+
+// +k8s:validateFalse="type SliceType"
+type SliceType []string
+
+// +k8s:validateFalse="type MapType"
+type MapType map[string]string
