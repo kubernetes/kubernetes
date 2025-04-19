@@ -40,7 +40,9 @@ func Test(t *testing.T) {
 		IntTypedefPtrField:    ptr.To(IntType(456)),
 		OtherStructPtrField:   &OtherStruct{},
 		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
 		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"stringField":           {"field Struct.StringField"},
 		"stringPtrField":        {"field Struct.StringPtrField"},
@@ -52,6 +54,8 @@ func Test(t *testing.T) {
 		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
 		"otherStructPtrField":   {"type OtherStruct", "field Struct.OtherStructPtrField"},
 		"sliceField":            {"field Struct.SliceField"},
+		"sliceTypedefField":     {"field Struct.SliceTypedefField", "type SliceType"},
 		"mapField":              {"field Struct.MapField"},
+		"mapTypedefField":       {"field Struct.MapTypedefField", "type MapType"},
 	})
 }

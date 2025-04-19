@@ -38,7 +38,9 @@ func Test(t *testing.T) {
 		"intTypedefPtrField":    []string{"Required value"},
 		"otherStructPtrField":   []string{"Required value"},
 		"sliceField":            []string{"Required value"},
+		"sliceTypedefField":     []string{"Required value"},
 		"mapField":              []string{"Required value"},
+		"mapTypedefField":       []string{"Required value"},
 	})
 
 	st.Value(&Struct{
@@ -47,7 +49,9 @@ func Test(t *testing.T) {
 		IntPtrField:           ptr.To(0),              // satisfies required
 		IntTypedefPtrField:    ptr.To(IntType(0)),     // satisfies required
 		SliceField:            []string{},             // does not satisfy required
+		SliceTypedefField:     []string{},             // does not satisfy required
 		MapField:              map[string]string{},    // does not satisfy required
+		MapTypedefField:       map[string]string{},    // does not satisfy required
 	}).ExpectRegexpsByPath(map[string][]string{
 		"stringField":           []string{"Required value"},
 		"stringPtrField":        []string{"field Struct.StringPtrField"},
@@ -59,7 +63,9 @@ func Test(t *testing.T) {
 		"intTypedefPtrField":    []string{"field Struct.IntTypedefPtrField", "type IntType"},
 		"otherStructPtrField":   []string{"Required value"},
 		"sliceField":            []string{"Required value"},
+		"sliceTypedefField":     []string{"Required value"},
 		"mapField":              []string{"Required value"},
+		"mapTypedefField":       []string{"Required value"},
 	})
 
 	st.Value(&Struct{
@@ -73,7 +79,9 @@ func Test(t *testing.T) {
 		IntTypedefPtrField:    ptr.To(IntType(456)),
 		OtherStructPtrField:   &OtherStruct{},
 		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
 		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
 	}).ExpectRegexpsByPath(map[string][]string{
 		"stringField":           []string{"field Struct.StringField"},
 		"stringPtrField":        []string{"field Struct.StringPtrField"},
@@ -85,6 +93,8 @@ func Test(t *testing.T) {
 		"intTypedefPtrField":    []string{"field Struct.IntTypedefPtrField", "type IntType"},
 		"otherStructPtrField":   []string{"field Struct.OtherStructPtrField", "type OtherStruct"},
 		"sliceField":            []string{"field Struct.SliceField"},
+		"sliceTypedefField":     []string{"field Struct.SliceTypedefField", "type SliceType"},
 		"mapField":              []string{"field Struct.MapField"},
+		"mapTypedefField":       []string{"field Struct.MapTypedefField", "type MapType"},
 	})
 }

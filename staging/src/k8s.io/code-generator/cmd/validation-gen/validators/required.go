@@ -90,7 +90,7 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
-	switch context.Type.Kind {
+	switch unaliasType(context.Type).Kind {
 	case types.Slice:
 		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredSliceValidator)}}, nil
 	case types.Map:
@@ -161,7 +161,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
-	switch context.Type.Kind {
+	switch unaliasType(context.Type).Kind {
 	case types.Slice:
 		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalSliceValidator)}}, nil
 	case types.Map:
@@ -261,7 +261,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 	// optional check and short-circuit (but without error).  Why?  For
 	// example, this prevents any further validation from trying to run on a
 	// nil pointer.
-	switch context.Type.Kind {
+	switch unaliasType(context.Type).Kind {
 	case types.Slice:
 		return Validations{
 			Functions: []FunctionGen{
