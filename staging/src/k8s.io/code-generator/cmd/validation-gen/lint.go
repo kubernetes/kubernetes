@@ -156,3 +156,39 @@ func conflictingTagsRule(msg string, tags ...string) lintRule {
 		return "", nil
 	}
 }
+
+// dependentTagsRule creates a lintRule which checks that one or more dependent
+// tags is specified whenever a given tag is.
+func dependentTagsRule(msg string, mainTag string, depTags ...string) lintRule {
+	if len(depTags) < 1 {
+		panic("dependentTagsRule: at least 1 dependent tag must be specified")
+	}
+
+	return func(comments []string) (string, error) {
+		need := make(map[string]bool)
+		for _, dep := range depTags {
+			need[dep] = true
+		}
+		found := false
+		for _, comment := range comments {
+			if strings.HasPrefix(comment, mainTag) {
+				found = true
+				continue
+			}
+			for _, tag := range depTags {
+				if strings.HasPrefix(comment, tag) {
+					delete(need, tag)
+				}
+			}
+		}
+		if found && len(need) > 0 {
+			keys := make([]string, 0, len(need))
+			for k := range need {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			return fmt.Sprintf("dependent tags: %s -> (%s}: %s", strings.Join(keys, ", "), mainTag, msg), nil
+		}
+		return "", nil
+	}
+}
