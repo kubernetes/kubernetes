@@ -51,6 +51,12 @@ var (
 )
 
 func (formatTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	if realType(context.Type) != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string types")
+	}
+
 	var result Validations
 	if formatFunction, err := getFormatValidationFunction(payload); err != nil {
 		return result, err
