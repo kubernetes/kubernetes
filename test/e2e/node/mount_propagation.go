@@ -197,7 +197,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Higher pids are more likely to be created after the first one
 		kubeletPids := strings.Split(strings.TrimSuffix(kubeletPid, "\n"), " ")
 		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPids[len(kubeletPids)-1])
-		framework.Logf(enterKubeletMountNS)
+		framework.Logf("%s", enterKubeletMountNS)
 
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
 		for _, mountName := range []string{"host", master.Name} {
