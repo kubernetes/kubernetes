@@ -21,10 +21,15 @@ var ruleOptionalAndRequired = conflictingTagsRule(
 	"+k8s:optional", "+k8s:required")
 
 var ruleRequiredAndDefault = conflictingTagsRule(
-	"fields with default values are always optional",
+	"fields with default values must be optional",
 	"+k8s:required", "+default")
+
+var ruleUnionMemberAndOptional = dependentTagsRule(
+	"fields which are union members must be optional",
+	"+k8s:unionMember", "+k8s:optional")
 
 var defaultLintRules = []lintRule{
 	ruleOptionalAndRequired,
 	ruleRequiredAndDefault,
+	ruleUnionMemberAndOptional,
 }
