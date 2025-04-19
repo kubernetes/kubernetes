@@ -53,9 +53,23 @@ func Validate_IntType(ctx context.Context, op operation.Operation, fldPath *fiel
 	return errs
 }
 
+func Validate_MapType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj MapType) (errs field.ErrorList) {
+	// type MapType
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapType")...)
+
+	return errs
+}
+
 func Validate_OtherStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) (errs field.ErrorList) {
 	// type OtherStruct
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct")...)
+
+	return errs
+}
+
+func Validate_SliceType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj SliceType) (errs field.ErrorList) {
+	// type SliceType
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type SliceType")...)
 
 	return errs
 }
@@ -175,6 +189,17 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }))...)
 
+	// field Struct.SliceTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj SliceType) (errs field.ErrorList) {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceTypedefField")...)
+			errs = append(errs, Validate_SliceType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("sliceTypedefField"), obj.SliceTypedefField, safe.Field(oldObj, func(oldObj *Struct) SliceType { return oldObj.SliceTypedefField }))...)
+
 	// field Struct.MapField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[string]string) (errs field.ErrorList) {
@@ -184,6 +209,17 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapField")...)
 			return
 		}(fldPath.Child("mapField"), obj.MapField, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.MapField }))...)
+
+	// field Struct.MapTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj MapType) (errs field.ErrorList) {
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				return // do not proceed
+			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapTypedefField")...)
+			errs = append(errs, Validate_MapType(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("mapTypedefField"), obj.MapTypedefField, safe.Field(oldObj, func(oldObj *Struct) MapType { return oldObj.MapTypedefField }))...)
 
 	return errs
 }
