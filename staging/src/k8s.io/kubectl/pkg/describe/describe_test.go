@@ -358,15 +358,15 @@ func TestDescribeSecret(t *testing.T) {
 	}{
 		{
 			description: "alphabetical ordering",
-			data: map[string][]byte {
+			data: map[string][]byte{
 				"username": []byte("YWRtaW4="),
 				"password": []byte("MWYyZDFlMmU2N2Rm"),
 			},
-			expected:    []string{"password", "username"},
-		}, 
+			expected: []string{"password", "username"},
+		},
 		{
 			description: "uppercase comes first",
-			data: map[string][]byte {
+			data: map[string][]byte{
 				"text": []byte("a3ViZXJuZXRlcwo="),
 				"Text": []byte("dGhpcyBpcyBhIHRlc3QK"),
 				"tExt": []byte("d2VpcmQgY2FzaW5nCg=="),
