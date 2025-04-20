@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	goflag "flag"
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -33,6 +33,7 @@ import (
 )
 
 func main() {
+	// random seed
 	rand.Seed(time.Now().UnixNano())
 
 	command := app.NewProxyCommand()
@@ -40,9 +41,16 @@ func main() {
 	// TODO: once we switch everything over to Cobra commands, we can go back to calling
 	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
 	// normalize func and add the go flag set by hand.
+
+	// Go flags parse added
+	flag.Parse()
+	
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	// utilflag.InitFlags()
+	pflag.Parse()
+
+	// initialized logs
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
