@@ -1540,7 +1540,7 @@ func TestStalePodDisruption(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			dc, _ := newFakeDisruptionControllerWithTime(tCtx, now)
-			go dc.Run(tCtx)
+			go dc.Run(tCtx, 1, 1)
 			if _, err := dc.coreClient.CoreV1().Pods(tc.pod.Namespace).Create(tCtx, tc.pod, metav1.CreateOptions{}); err != nil {
 				t.Fatalf("Failed to create pod: %v", err)
 			}
