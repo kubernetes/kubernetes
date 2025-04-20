@@ -19,6 +19,7 @@ package describe
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -350,30 +351,46 @@ func TestDescribeTopologySpreadConstraints(t *testing.T) {
 }
 
 func TestDescribeSecret(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+	testCases := []struct {
+		description string
+		data        map[string][]byte // secret key -> secret in bytes
+		expected    []string
+	}{
+		{
+			description: "alphabetical ordering",
+			data: map[string][]byte {
+				"username": []byte("YWRtaW4="),
+				"password": []byte("MWYyZDFlMmU2N2Rm"),
+			},
+			expected:    []string{"password", "username"},
 		},
-		Data: map[string][]byte{
-			"username": []byte("YWRtaW4="),
-			"password": []byte("MWYyZDFlMmU2N2Rm"),
-		},
-	})
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := SecretDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "username") || !strings.Contains(out, "8 bytes") || !strings.Contains(out, "password") || !strings.Contains(out, "16 bytes") {
-		t.Errorf("unexpected out: %s", out)
-	}
-	if strings.Contains(out, "YWRtaW4=") || strings.Contains(out, "MWYyZDFlMmU2N2Rm") {
-		t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
 	}
 
-	expectedOut := `Name:         bar
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Data: testCase.data,
+			}
+			fake := fake.NewSimpleClientset(secret)
+			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+			d := SecretDescriber{c}
+
+			out, err := d.Describe("foo", "bar", DescriberSettings{})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for value := range maps.Values(testCase.data) {
+				if strings.Contains(out, string(value)) {
+					t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
+				}
+			}
+
+			expectedOut := `Name:         bar
 Namespace:    foo
 Labels:       <none>
 Annotations:  <none>
@@ -381,12 +398,16 @@ Annotations:  <none>
 Type:  
 
 Data
-====
-password:  16 bytes
-username:  8 bytes
-`
+====`
 
-	assert.Equal(t, expectedOut, out)
+			for _, expectedKey := range testCase.expected {
+				expectedOut = fmt.Sprintf("%s\n%s:  %d bytes", expectedOut, expectedKey, len(testCase.data[expectedKey]))
+			}
+			expectedOut = fmt.Sprintf("%s\n", expectedOut)
+
+			assert.Equal(t, expectedOut, out)
+		})
+	}
 }
 
 func TestDescribeNamespace(t *testing.T) {
