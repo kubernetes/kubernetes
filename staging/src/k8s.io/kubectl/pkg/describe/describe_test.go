@@ -365,13 +365,21 @@ func TestDescribeSecret(t *testing.T) {
 			expected: []string{"password", "username"},
 		},
 		{
-			description: "uppercase comes first",
+			description: "uppercase takes precedence",
 			data: map[string][]byte{
 				"text": []byte("a3ViZXJuZXRlcwo="),
 				"Text": []byte("dGhpcyBpcyBhIHRlc3QK"),
 				"tExt": []byte("d2VpcmQgY2FzaW5nCg=="),
 			},
 			expected: []string{"Text", "tExt", "text"},
+		},
+		{
+			description: "numbers take precedence",
+			data: map[string][]byte{
+				"key_1": []byte("c29tZV9zZWNyZXQK"),
+				"1_key": []byte("c29tZV90ZXh0Cg=="),
+			},
+			expected: []string{"1_key", "key_1"},
 		},
 	}
 
