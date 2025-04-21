@@ -39,9 +39,11 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -61,6 +63,14 @@ type fakeDRADriverGRPCServer struct {
 	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
 	watchResourcesError        error
+}
+
+func (s *fakeDRADriverGRPCServer) WatchResources(req *drahealthv1alpha1.WatchResourcesRequest, srv drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	if s.watchResourcesError != nil {
+		return s.watchResourcesError
+	}
+	<-srv.Context().Done()
+	return srv.Context().Err()
 }
 
 func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
@@ -132,14 +142,18 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 	}
 
 	socketName := filepath.Join(socketDir, "server.sock")
+	teardownDir := func() {
+		os.RemoveAll(socketDir)
+	}
+
 	stopCh := make(chan struct{})
 
 	teardown := func() {
 		close(stopCh)
-		if err := os.Remove(socketName); err != nil {
-			logger := klog.FromContext(ctx)
-			logger.Error(err, "failed to remove socket file", "path", socketName)
+		if err := os.Remove(socketName); err != nil && !os.IsNotExist(err) {
+			klog.FromContext(ctx).Error(err, "failed to remove socket file", "path", socketName)
 		}
+		teardownDir()
 	}
 
 	l, err := net.Listen("unix", socketName)
@@ -163,7 +177,8 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
-	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
+	drapb.RegisterDRAPluginServer(s, fakeDRAServer)
+	drahealthv1alpha1.RegisterNodeHealthServer(s, fakeDRAServer)
 
 	go func(ctx context.Context) {
 		go func() {
@@ -557,8 +572,10 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			manager := &ManagerImpl{
-				kubeClient: fakeKubeClient,
-				cache:      cache,
+				kubeClient:      fakeKubeClient,
+				cache:           cache,
+				healthInfoCache: &healthInfoCache{HealthInfo: &state.DevicesHealthMap{}},
+				update:          make(chan resourceupdates.Update, 1),
 			}
 
 			if test.claim != nil {
@@ -582,7 +599,8 @@ func TestPrepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
+			var streamHandler plugin.StreamHandler = manager
+			plg = plugin.NewRegistrationHandler(tCtx, nil, getFakeNode, streamHandler)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -707,6 +725,13 @@ func TestUnprepareResources(t *testing.T) {
 				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
 			}
 
+			managerForHandler := &ManagerImpl{
+				cache:           cache,
+				healthInfoCache: &healthInfoCache{HealthInfo: &state.DevicesHealthMap{}},
+				update:          make(chan resourceupdates.Update, 1),
+			}
+			var streamHandler plugin.StreamHandler = managerForHandler
+
 			var pluginClientTimeout *time.Duration
 			if test.wantTimeout {
 				timeout := time.Millisecond * 20
@@ -719,16 +744,11 @@ func TestUnprepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode)
+			plg := plugin.NewRegistrationHandler(tCtx, nil, getFakeNode, streamHandler)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
-
-			manager := &ManagerImpl{
-				kubeClient: fakeKubeClient,
-				cache:      cache,
-			}
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -889,7 +909,17 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	}
 	defer draServerInfo.teardownFn()
 
-	plg := plugin.NewRegistrationHandler(nil, getFakeNode)
+	cacheForHandler, cacheErrH := newClaimInfoCache(t.TempDir(), draManagerStateFileName+"_handler")
+	require.NoError(t, cacheErrH)
+	fakeKubeClientH := fake.NewSimpleClientset()
+	managerForHandler := &ManagerImpl{
+		kubeClient:      fakeKubeClientH,
+		cache:           cacheForHandler,
+		healthInfoCache: &healthInfoCache{HealthInfo: &state.DevicesHealthMap{}},
+		update:          make(chan resourceupdates.Update, 1),
+	}
+
+	plg := plugin.NewRegistrationHandler(tCtx, nil, getFakeNode, managerForHandler)
 	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}

@@ -19,7 +19,7 @@ package plugin
 
 import (
 	"context"
-	// Make sure the import path is correct for your project structure
+
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 )
 

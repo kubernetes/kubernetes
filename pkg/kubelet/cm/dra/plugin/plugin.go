@@ -233,5 +233,12 @@ func (p *Plugin) WatchResources(ctx context.Context) (drahealthv1alpha1.NodeHeal
 	}
 	logger := klog.FromContext(ctx).V(4).WithValues("pluginName", p.name)
 	logger.Info("Starting WatchResources stream")
-	return p.healthClient.WatchResources(ctx, &drahealthv1alpha1.WatchResourcesRequest{})
+	stream, err := p.healthClient.WatchResources(ctx, &drahealthv1alpha1.WatchResourcesRequest{})
+	if err != nil {
+		logger.Error(err, "WatchResources RPC call failed")
+		return nil, err // Return original gRPC error
+	}
+
+	logger.V(4).Info("WatchResources stream initiated successfully")
+	return stream, nil
 }

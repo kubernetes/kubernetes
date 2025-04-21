@@ -183,6 +183,8 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		clientCallTimeout: timeout,
 	}
 
+	// --- Start Health Stream Logic ---
+	// Create a separate context derived from the plugin's context for the stream attempt/lifecycle
 	streamCtx, streamAttemptCancel := context.WithCancel(ctx)
 	stream, err := pluginInstance.WatchResources(streamCtx)
 	if err != nil {
@@ -262,6 +264,11 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 		if healthCancel != nil {
 			logger.V(4).Info("Canceling health stream during deregistration")
 			healthCancel()
+		}
+
+		if p.cancel != nil {
+			logger.V(4).Info("Canceling main plugin context during deregistration")
+			p.cancel(errors.New("plugin deregistered"))
 		}
 
 		// Clean up the ResourceSlices for the deleted Plugin since it

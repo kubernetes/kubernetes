@@ -36,6 +36,7 @@ import (
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -85,10 +86,7 @@ type ManagerImpl struct {
 	// healthInfoMutex protects the healthInfoCache and lastHealthUpdate.
 	healthInfoMutex sync.Mutex
 
-	// drivers tracks known drivers.
-	drivers sets.Set[string]
-
-	driversMutex sync.Mutex
+	update chan resourceupdates.Update
 }
 
 // NewManagerImpl creates a new manager.
@@ -116,8 +114,7 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 		healthInfoCache:  healthInfoCache,
 		lastHealthUpdate: time.Time{},
 		healthInfoMutex:  sync.Mutex{},
-		drivers:          sets.New[string](),
-		driversMutex:     sync.Mutex{},
+		update:           make(chan resourceupdates.Update, 100),
 	}
 
 	return manager, nil
@@ -136,24 +133,6 @@ func (m *ManagerImpl) Start(ctx context.Context, activePods ActivePodsFunc, getN
 	m.sourcesReady = sourcesReady
 
 	logger.Info("Starting DRA manager")
-
-	// Start health monitoring for known drivers
-	m.driversMutex.Lock()
-	// Snapshot to avoid holding lock during monitoring
-	drivers := m.drivers.Clone()
-	m.driversMutex.Unlock()
-	for driverName := range drivers {
-		go func(name string) {
-			plugin, err := dra.NewDRAPluginClient(name)
-			if err != nil {
-				logger.Error(err, "Failed to get plugin client for health monitoring", "driverName", name)
-				return
-			}
-			if err := m.watchResources(ctx, name, plugin); err != nil {
-				logger.Error(err, "Health monitoring stopped", "driverName", name)
-			}
-		}(driverName)
-	}
 
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
 	return nil
@@ -302,10 +281,6 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			}
 			for driverName := range claimInfo.DriverState {
 				batches[driverName] = append(batches[driverName], claim)
-				// HACK: hacky way to get all the drivers -- probably not suitable long term.
-				m.driversMutex.Lock()
-				m.drivers.Insert(driverName)
-				m.driversMutex.Unlock()
 			}
 
 			return nil
@@ -606,31 +581,31 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 }
 
 // watchResources starts a health monitoring stream for a DRA plugin.
-func (m *ManagerImpl) watchResources(ctx context.Context, resourceName string, p *dra.Plugin) error {
+func (m *ManagerImpl) watchResources(ctx context.Context, pluginName string, p *dra.Plugin) error {
 	logger := klog.FromContext(ctx)
-	logger.V(4).Info("Starting to watch resources for plugin", "resourceName", resourceName)
+	logger.V(4).Info("Starting to watch resources for plugin", "pluginName", pluginName)
 
 	stream, err := p.WatchResources(ctx)
 	if err != nil {
-		logger.Error(err, "Failed to establish WatchResources stream", "resourceName", resourceName)
+		logger.Error(err, "Failed to establish WatchResources stream", "pluginName", pluginName)
 		return err
 	}
-	return m.HandleWatchResourcesStream(ctx, stream, resourceName)
+	return m.HandleWatchResourcesStream(ctx, stream, pluginName)
 }
 
 // HandleWatchResourcesStream processes health updates from the DRA plugin.
-func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.NodeHealth_WatchResourcesClient, resourceName string) error {
+func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.NodeHealth_WatchResourcesClient, pluginName string) error {
 	logger := klog.FromContext(ctx)
 	go func() {
 		for {
 			select {
 			case <-ctx.Done():
-				logger.Info("Stopping health monitoring", "resourceName", resourceName)
+				logger.Info("Stopping health monitoring", "pluginName", pluginName)
 				return
 			default:
 				resp, err := stream.Recv()
 				if err != nil {
-					logger.Error(err, "Error receiving from WatchResources stream", "resourceName", resourceName)
+					logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
 					return
 				}
 				// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
@@ -643,11 +618,46 @@ func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream dra
 						LastUpdated: time.Unix(d.LastUpdated, 0),
 					}
 				}
-				if changed, err := m.healthInfoCache.updateHealthInfo(resourceName, devices); err != nil {
-					logger.Error(err, "Failed to update health info cache", "resourceName", resourceName)
-				} else if changed {
-					logger.V(5).Info("Health info cache updated", "resourceName", resourceName, "devices", devices)
+
+				changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+				if updateErr != nil {
+					logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
 				}
+				if changed && len(changedDevices) > 0 {
+					logger.V(5).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+
+					podsToUpdate := sets.New[string]()
+
+					m.cache.RLock()
+					for _, dev := range changedDevices {
+						for _, cInfo := range m.cache.claimInfo {
+							if driverState, ok := cInfo.DriverState[pluginName]; ok {
+								for _, allocatedDevice := range driverState.Devices {
+									if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
+										podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+										break
+									}
+								}
+							}
+						}
+					}
+					m.cache.RUnlock()
+
+					if podsToUpdate.Len() > 0 {
+						podUIDs := podsToUpdate.UnsortedList()
+						logger.V(4).Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+						select {
+						case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+						default:
+							logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
+						}
+					} else {
+						logger.V(5).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+					}
+				} else if changed {
+					logger.V(5).Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
+				}
+
 			}
 		}
 	}()
