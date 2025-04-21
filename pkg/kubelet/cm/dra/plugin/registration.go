@@ -53,6 +53,7 @@ type RegistrationHandler struct {
 	backgroundCtx context.Context
 	kubeClient    kubernetes.Interface
 	getNode       func() (*v1.Node, error)
+	streamHandler StreamHandler
 }
 
 var _ cache.PluginHandler = &RegistrationHandler{}
@@ -62,12 +63,17 @@ var _ cache.PluginHandler = &RegistrationHandler{}
 // Must only be called once per process because it manages global state.
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
-func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error)) *RegistrationHandler {
+func NewRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), streamHandler StreamHandler) *RegistrationHandler {
+	baseLogger := klog.FromContext(ctx)
+	handlerLogger := baseLogger.WithName("DRARegistrationHandler")
+	handlerCtx := klog.NewContext(ctx, handlerLogger)
+
 	handler := &RegistrationHandler{
 		// The context and thus logger should come from the caller.
-		backgroundCtx: klog.NewContext(context.TODO(), klog.LoggerWithName(klog.TODO(), "DRA registration handler")),
+		backgroundCtx: handlerCtx,
 		kubeClient:    kubeClient,
 		getNode:       getNode,
+		streamHandler: streamHandler,
 	}
 
 	// When kubelet starts up, no DRA driver has registered yet. None of
@@ -177,11 +183,38 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		clientCallTimeout: timeout,
 	}
 
+	streamCtx, streamAttemptCancel := context.WithCancel(ctx)
+	stream, err := pluginInstance.WatchResources(streamCtx)
+	if err != nil {
+		streamAttemptCancel()
+		logger.Error(err, "Failed to start WatchResources stream")
+		// Log and continue without health monitoring.
+		pluginInstance.SetHealthStream(nil, nil)
+
+	} else {
+		// Stream started successfully!
+		logger.Info("Successfully started WatchResources health stream")
+		// Store the stream's specific context and its cancel function
+		pluginInstance.SetHealthStream(streamCtx, streamAttemptCancel)
+
+		// Start handling the stream messages using the draManager
+		go h.streamHandler.HandleWatchResourcesStream(streamCtx, stream, pluginName)
+	}
+
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
 
 	if oldPlugin, replaced := draPlugins.add(pluginInstance); replaced {
-		logger.V(1).Info("DRA plugin already registered, the old plugin was replaced and will be forgotten by the kubelet till the next kubelet restart", "oldEndpoint", oldPlugin.endpoint)
+		logger.V(1).Info("DRA plugin already registered, replacing existing instance", "oldEndpoint", oldPlugin.endpoint)
+
+		// Cancel the *old* plugin's health stream if it existed
+		if oldPlugin != nil {
+			oldCancelFunc := oldPlugin.HealthStreamCancel()
+			if oldCancelFunc != nil {
+				logger.Info("Canceling health stream for replaced plugin instance", "pluginName", pluginName)
+				oldCancelFunc()
+			}
+		}
 	}
 
 	return nil
@@ -224,6 +257,12 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 	if p := draPlugins.delete(pluginName); p != nil {
 		logger := klog.FromContext(p.backgroundCtx)
 		logger.V(3).Info("Deregister DRA plugin", "endpoint", p.endpoint)
+
+		healthCancel := p.HealthStreamCancel()
+		if healthCancel != nil {
+			logger.V(4).Info("Canceling health stream during deregistration")
+			healthCancel()
+		}
 
 		// Clean up the ResourceSlices for the deleted Plugin since it
 		// may have died without doing so itself and might never come

@@ -53,12 +53,14 @@ const (
 
 type fakeDRADriverGRPCServer struct {
 	drapb.UnimplementedDRAPluginServer
+	drahealthv1alpha1.UnimplementedNodeHealthServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
 	unprepareResourceCalls     atomic.Uint32
 	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
+	watchResourcesError        error
 }
 
 func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {

@@ -114,8 +114,9 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 }
 
 // updateHealthInfo updates the cache with a list of devices for driver, reconciling the full state.
-func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []state.DeviceHealth) (bool, error) {
+func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, bool, error) {
 	var changed bool
+	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
 		now := time.Now()
 		currentDriver, exists := (*cache.HealthInfo)[driverName]
@@ -140,6 +141,7 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 			if updated, ok := reported[key]; ok {
 				if existing.Health != updated.Health {
 					changed = true
+					changedDevices = append(changedDevices, updated)
 				}
 				// Add  device to new device health status list
 				newDevices = append(newDevices, updated)
@@ -159,7 +161,9 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 		// Add remaining new devices
 		for _, dev := range reported {
+			dev.LastUpdated = now
 			newDevices = append(newDevices, dev)
+			changedDevices = append(changedDevices, dev)
 			changed = true
 		}
 
@@ -168,14 +172,14 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 		return nil
 	})
 	if err != nil {
-		return changed, err
+		return changedDevices, changed, err
 	}
 	if changed {
 		if err := cache.saveToCheckpoint(); err != nil {
-			return changed, err
+			return changedDevices, changed, err
 		}
 	}
-	return changed, nil
+	return changedDevices, changed, nil
 }
 
 // clearDriver clears all health data for a specific driver.

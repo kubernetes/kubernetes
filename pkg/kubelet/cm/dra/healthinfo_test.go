@@ -75,6 +75,29 @@ func TestNewHealthInfoCache(t *testing.T) {
 	}
 }
 
+// Helper function to compare DeviceHealth slices ignoring LastUpdated time
+func assertDeviceHealthElementsMatchIgnoreTime(t *testing.T, expected, actual []state.DeviceHealth) {
+	require.Equal(t, len(expected), len(actual), "Number of changed devices mismatch")
+
+	// Create comparable versions without LastUpdated
+	normalize := func(dh state.DeviceHealth) state.DeviceHealth {
+		dh.LastUpdated = time.Time{} // Zero out time for comparison
+		return dh
+	}
+
+	expectedNormalized := make([]state.DeviceHealth, len(expected))
+	actualNormalized := make([]state.DeviceHealth, len(actual))
+
+	for i := range expected {
+		expectedNormalized[i] = normalize(expected[i])
+	}
+	for i := range actual {
+		actualNormalized[i] = normalize(actual[i])
+	}
+
+	assert.ElementsMatch(t, expectedNormalized, actualNormalized, "Changed device elements mismatch (ignoring time)")
+}
+
 // TestWithLock tests the withLock method’s behavior.
 func TestWithLock(t *testing.T) {
 	cache, err := newHealthInfoCache("")
@@ -306,41 +329,50 @@ func TestUpdateHealthInfo(t *testing.T) {
 	cache, err := newHealthInfoCache(tmpFile)
 	require.NoError(t, err)
 
-	// Add new device
-	changed, err := cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
+	// 1 -- Add new device
+	deviceToAdd := testDeviceHealth
+	expectedChanged1 := []state.DeviceHealth{deviceToAdd}
+	changedDevices, changed, err := cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
 	assert.NoError(t, err)
 	assert.True(t, changed)
+	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged1, changedDevices)
 	assert.Equal(t, state.DeviceHealthString("Healthy"), cache.getHealthInfo(testDriver, testPool, testDevice))
 
-	// Update with no change
-	changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
+	// 2 -- Update with no change
+	changedDevices, changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{testDeviceHealth})
 	assert.NoError(t, err)
+	assert.Len(t, changedDevices, 0, "Scenario 2: Changed devices list should be empty")
 	assert.False(t, changed)
 
-	// Update with new health
+	// 3 -- Update with new health
 	newHealth := testDeviceHealth
 	newHealth.Health = "Unhealthy"
-	changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{newHealth})
+	expectedChanged3 := []state.DeviceHealth{newHealth}
+	changedDevices, changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{newHealth})
 	assert.NoError(t, err)
 	assert.True(t, changed)
+	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged3, changedDevices)
 	assert.Equal(t, state.DeviceHealthString("Unhealthy"), cache.getHealthInfo(testDriver, testPool, testDevice))
 
-	// Add second device, omit first
+	// 4 -- Add second device, omit first
 	secondDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "device2", Health: "Healthy"}
-	changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{secondDevice})
+	expectedChanged4 := []state.DeviceHealth{secondDevice}
+	changedDevices, changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{secondDevice})
 	assert.NoError(t, err)
 	assert.True(t, changed)
+	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged4, changedDevices)
 	assert.Equal(t, state.DeviceHealthString("Healthy"), cache.getHealthInfo(testDriver, testPool, "device2"))
+	// First device wasn't reported, but should still be Unhealthy (within timeout)
 	assert.Equal(t, state.DeviceHealthString("Unhealthy"), cache.getHealthInfo(testDriver, testPool, testDevice))
 
-	// Test persistence
+	// 5 -- Test persistence
 	cache2, err := newHealthInfoCache(tmpFile)
 	assert.NoError(t, err)
 	assert.Equal(t, state.DeviceHealthString("Healthy"), cache2.getHealthInfo(testDriver, testPool, "device2"))
 
-	// Test how updateHealthInfo handles device timeouts
+	// 6 -- Test how updateHealthInfo handles device timeouts
 	timeoutDevice := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: "Unhealthy"}
-	changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{timeoutDevice})
+	changedDevices, changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{timeoutDevice})
 	assert.NoError(t, err)
 	assert.True(t, changed)
 
@@ -348,9 +380,12 @@ func TestUpdateHealthInfo(t *testing.T) {
 	// This bypassed manually waiting.
 	(*cache.HealthInfo)[testDriver].Devices[2].LastUpdated = time.Now().Add((-healthTimeout) - time.Second)
 
-	changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{})
+	expectedTimeoutDeviceUnknown := state.DeviceHealth{PoolName: testPool, DeviceName: "timeoutDevice", Health: "Unknown"}
+	expectedChanged6 := []state.DeviceHealth{expectedTimeoutDeviceUnknown}
+	changedDevices, changed, err = cache.updateHealthInfo(testDriver, []state.DeviceHealth{})
 	assert.NoError(t, err)
 	assert.True(t, changed)
+	assertDeviceHealthElementsMatchIgnoreTime(t, expectedChanged6, changedDevices)
 	assert.Equal(t, state.DeviceHealthString("Unknown"), (*cache.HealthInfo)[testDriver].Devices[2].Health, "Health status should be Unknown after timeout in updateHealthInfo")
 
 }

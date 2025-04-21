@@ -124,7 +124,8 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 }
 
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
-	return cache.PluginHandler(dra.NewRegistrationHandler(m.kubeClient, m.getNode))
+	rootCtx := context.Background()
+	return dra.NewRegistrationHandler(rootCtx, m.kubeClient, m.getNode, m)
 }
 
 // Start starts the reconcile loop of the manager.
@@ -636,11 +637,10 @@ func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream dra
 				devices := make([]state.DeviceHealth, len(resp.GetDevices()))
 				for i, d := range resp.GetDevices() {
 					devices[i] = state.DeviceHealth{
-						ResourceName: d.ResourceName,
-						PoolName:     d.PoolName,
-						DeviceName:   d.DeviceName,
-						Health:       state.DeviceHealthString(d.Health),
-						LastUpdated:  time.Unix(d.LastUpdated, 0),
+						PoolName:    d.PoolName,
+						DeviceName:  d.DeviceName,
+						Health:      state.DeviceHealthString(d.Health),
+						LastUpdated: time.Unix(d.LastUpdated, 0),
 					}
 				}
 				if changed, err := m.healthInfoCache.updateHealthInfo(resourceName, devices); err != nil {
