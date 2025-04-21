@@ -71,7 +71,8 @@ func main() {
 
 func checkFieldNameAndDoc(structName, fieldName, doc string, typesMap kubeTypesMap) bool {
 	rc := false
-	visited := sets.Set[string]{}
+	// sets.Set[string]() immediately opens a map and resets map and sometimes empty map go to panic, change to New
+	visited := sets.New[string]() 
 
 	// The rule is:
 	// 1. Get all back-tick quoted names in the doc
