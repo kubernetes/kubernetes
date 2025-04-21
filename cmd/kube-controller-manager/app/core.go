@@ -198,6 +198,7 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 		controllerContext.ComponentConfig.NodeLifecycleController.SecondaryNodeEvictionRate,
 		controllerContext.ComponentConfig.NodeLifecycleController.LargeClusterSizeThreshold,
 		controllerContext.ComponentConfig.NodeLifecycleController.UnhealthyZoneThreshold,
+		controllerContext.ComponentConfig.NodeLifecycleController.PauseEvictionOnFullDisruption,
 	)
 	if err != nil {
 		return nil, true, err

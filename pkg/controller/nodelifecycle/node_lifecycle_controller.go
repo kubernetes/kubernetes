@@ -298,6 +298,9 @@ type Controller struct {
 	largeClusterThreshold       int32
 	unhealthyZoneThreshold      float32
 
+	// This flag when set pauses all pod evictions in a zone when there is full zonal disruption
+	pauseEvictionOnFullDisruption bool
+
 	nodeUpdateQueue workqueue.TypedInterface[string]
 	podUpdateQueue  workqueue.TypedRateLimitingInterface[podUpdateItem]
 }
@@ -317,6 +320,7 @@ func NewNodeLifecycleController(
 	secondaryEvictionLimiterQPS float32,
 	largeClusterThreshold int32,
 	unhealthyZoneThreshold float32,
+	pauseEvictionOnFullDisruption bool,
 ) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 	if kubeClient == nil {
@@ -328,24 +332,25 @@ func NewNodeLifecycleController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 
 	nc := &Controller{
-		kubeClient:                  kubeClient,
-		now:                         metav1.Now,
-		knownNodeSet:                make(map[string]*v1.Node),
-		nodeHealthMap:               newNodeHealthMap(),
-		broadcaster:                 eventBroadcaster,
-		recorder:                    recorder,
-		nodeMonitorPeriod:           nodeMonitorPeriod,
-		nodeStartupGracePeriod:      nodeStartupGracePeriod,
-		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
-		nodeUpdateWorkerSize:        nodeUpdateWorkerSize,
-		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
-		nodesToRetry:                sync.Map{},
-		zoneStates:                  make(map[string]ZoneState),
-		evictionLimiterQPS:          evictionLimiterQPS,
-		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
-		largeClusterThreshold:       largeClusterThreshold,
-		unhealthyZoneThreshold:      unhealthyZoneThreshold,
-		nodeUpdateQueue:             workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
+		kubeClient:                    kubeClient,
+		now:                           metav1.Now,
+		knownNodeSet:                  make(map[string]*v1.Node),
+		nodeHealthMap:                 newNodeHealthMap(),
+		broadcaster:                   eventBroadcaster,
+		recorder:                      recorder,
+		nodeMonitorPeriod:             nodeMonitorPeriod,
+		nodeStartupGracePeriod:        nodeStartupGracePeriod,
+		nodeMonitorGracePeriod:        nodeMonitorGracePeriod,
+		nodeUpdateWorkerSize:          nodeUpdateWorkerSize,
+		zoneNoExecuteTainter:          make(map[string]*scheduler.RateLimitedTimedQueue),
+		nodesToRetry:                  sync.Map{},
+		zoneStates:                    make(map[string]ZoneState),
+		evictionLimiterQPS:            evictionLimiterQPS,
+		secondaryEvictionLimiterQPS:   secondaryEvictionLimiterQPS,
+		largeClusterThreshold:         largeClusterThreshold,
+		unhealthyZoneThreshold:        unhealthyZoneThreshold,
+		pauseEvictionOnFullDisruption: pauseEvictionOnFullDisruption,
+		nodeUpdateQueue:               workqueue.NewTypedWithConfig(workqueue.TypedQueueConfig[string]{Name: "node_lifecycle_controller"}),
 		podUpdateQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[podUpdateItem](),
 			workqueue.TypedRateLimitingQueueConfig[podUpdateItem]{
@@ -355,8 +360,8 @@ func NewNodeLifecycleController(
 	}
 
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
-	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
 	nc.computeZoneStateFunc = nc.ComputeZoneState
+	nc.enterFullDisruptionFunc = nc.getFullDisruptionQPSFunc()
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -1196,6 +1201,14 @@ func (nc *Controller) classifyNodes(allNodes []*v1.Node) (added, deleted, newZon
 // nodeNum for consistency with ReducedQPSFunc.
 func (nc *Controller) HealthyQPSFunc(nodeNum int) float32 {
 	return nc.evictionLimiterQPS
+}
+
+func (nc *Controller) getFullDisruptionQPSFunc() func(nodeNum int) float32 {
+	if nc.pauseEvictionOnFullDisruption {
+		return nc.ReducedQPSFunc
+	} else {
+		return nc.HealthyQPSFunc
+	}
 }
 
 // ReducedQPSFunc returns the QPS for when the cluster is large make
