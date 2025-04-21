@@ -566,6 +566,9 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 // list simply lists all items and records a resource version obtained from the server at the moment of the call.
 // the resource version can be used for further progress notification (aka. watch).
 func (r *Reflector) list(ctx context.Context) error {
+	// Catch panics and log them via Kubernetes crash handlers
+	defer utilruntime.HandleCrashWithContext(ctx)
+
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
@@ -574,63 +577,44 @@ func (r *Reflector) list(ctx context.Context) error {
 	var list runtime.Object
 	var paginatedResult bool
 	var err error
-	listCh := make(chan struct{}, 1)
-	panicCh := make(chan interface{}, 1)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				panicCh <- r
-			}
-		}()
-		defer utilruntime.HandleCrashWithContext(ctx)
+	// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
+	// list request will return the full response.
+	pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
+		return r.listerWatcher.ListWithContext(ctx, opts)
+	}))
+	switch {
+	case r.WatchListPageSize != 0:
+		pager.PageSize = r.WatchListPageSize
+	case r.paginatedResult:
+		// We got a paginated result initially. Assume this resource and server honor
+		// paging requests (i.e. watch cache is probably disabled) and leave the default
+		// pager size set.
+	case options.ResourceVersion != "" && options.ResourceVersion != "0":
+		// User didn't explicitly request pagination.
+		//
+		// With ResourceVersion != "", we have a possibility to list from watch cache,
+		// but we do that (for ResourceVersion != "0") only if Limit is unset.
+		// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
+		// switch off pagination to force listing from watch cache (if enabled).
+		// With the existing semantic of RV (result is at least as fresh as provided RV),
+		// this is correct and doesn't lead to going back in time.
+		//
+		// We also don't turn off pagination for ResourceVersion="0", since watch cache
+		// is ignoring Limit in that case anyway, and if watch cache is not enabled
+		// we don't introduce regression.
+		pager.PageSize = 0
+	}
 
-		// Attempt to gather list in chunks, if supported by listerWatcher, if not, the first
-		// list request will return the full response.
-		pager := pager.New(pager.SimplePageFunc(func(opts metav1.ListOptions) (runtime.Object, error) {
-			return r.listerWatcher.ListWithContext(ctx, opts)
-		}))
-		switch {
-		case r.WatchListPageSize != 0:
-			pager.PageSize = r.WatchListPageSize
-		case r.paginatedResult:
-			// We got a paginated result initially. Assume this resource and server honor
-			// paging requests (i.e. watch cache is probably disabled) and leave the default
-			// pager size set.
-		case options.ResourceVersion != "" && options.ResourceVersion != "0":
-			// User didn't explicitly request pagination.
-			//
-			// With ResourceVersion != "", we have a possibility to list from watch cache,
-			// but we do that (for ResourceVersion != "0") only if Limit is unset.
-			// To avoid thundering herd on etcd (e.g. on master upgrades), we explicitly
-			// switch off pagination to force listing from watch cache (if enabled).
-			// With the existing semantic of RV (result is at least as fresh as provided RV),
-			// this is correct and doesn't lead to going back in time.
-			//
-			// We also don't turn off pagination for ResourceVersion="0", since watch cache
-			// is ignoring Limit in that case anyway, and if watch cache is not enabled
-			// we don't introduce regression.
-			pager.PageSize = 0
-		}
-
-		list, paginatedResult, err = pager.ListWithAlloc(context.Background(), options)
-		if isExpiredError(err) || isTooLargeResourceVersionError(err) {
-			r.setIsLastSyncResourceVersionUnavailable(true)
-			// Retry immediately if the resource version used to list is unavailable.
-			// The pager already falls back to full list if paginated list calls fail due to an "Expired" error on
-			// continuation pages, but the pager might not be enabled, the full list might fail because the
-			// resource version it is listing at is expired or the cache may not yet be synced to the provided
-			// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
-			// the reflector makes forward progress.
-			list, paginatedResult, err = pager.ListWithAlloc(context.Background(), metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
-		}
-		close(listCh)
-	}()
-	select {
-	case <-ctx.Done():
-		return nil
-	case r := <-panicCh:
-		panic(r)
-	case <-listCh:
+	list, paginatedResult, err = pager.ListWithAlloc(ctx, options)
+	if isExpiredError(err) || isTooLargeResourceVersionError(err) {
+		r.setIsLastSyncResourceVersionUnavailable(true)
+		// Retry immediately if the resource version used to list is unavailable.
+		// The pager already falls back to full list if paginated list calls fail due to an "Expired" error on
+		// continuation pages, but the pager might not be enabled, the full list might fail because the
+		// resource version it is listing at is expired or the cache may not yet be synced to the provided
+		// resource version. So we need to fallback to resourceVersion="" in all to recover and ensure
+		// the reflector makes forward progress.
+		list, paginatedResult, err = pager.ListWithAlloc(ctx, metav1.ListOptions{ResourceVersion: r.relistResourceVersion()})
 	}
 	initTrace.Step("Objects listed", trace.Field{Key: "error", Value: err})
 	if err != nil {

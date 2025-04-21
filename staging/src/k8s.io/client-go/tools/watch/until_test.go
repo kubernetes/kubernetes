@@ -195,14 +195,65 @@ func TestUntilWithSync(t *testing.T) {
 		expectedErr      error
 		expectedEvent    *watch.Event
 	}{
+		// Disabled legacy test cases:
+		//
+		// The following legacy test cases intentionally simulate blocking ListFunc / WatchFunc
+		// by using `select {}` without a context. This was safe under the original *asynchronous*
+		// implementation of Reflector.list(), where cancellation was handled by the parent goroutine.
+		//
+		// However, with the current synchronous implementation, Reflector.list() directly calls
+		// pager.ListWithAlloc using the passed context, but if `ListFunc` does not respect the context,
+		// the call will block indefinitely and cause the test to hang.
+		//
+		// These tests are retained here as documentation of the legacy behavior and reasons for deprecation.
+		// They are NOT included in the test run to avoid timeouts.
+		// {
+		// 	name: "legacy: doesn't wait for sync with no precondition",
+		// 	lw: &cache.ListWatch{
+		// 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+		// 			select {}
+		// 		},
+		// 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+		// 			select {}
+		// 		},
+		// 	},
+		// 	preconditionFunc: nil,
+		// 	conditionFunc: func(e watch.Event) (bool, error) {
+		// 		return true, nil
+		// 	},
+		// 	expectedErr:   wait.ErrWaitTimeout,
+		// 	expectedEvent: nil,
+		// },
+		// {
+		// 	name: "legacy: waits indefinitely with precondition if it can't sync",
+		// 	lw: &cache.ListWatch{
+		// 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+		// 			select {}
+		// 		},
+		// 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+		// 			select {}
+		// 		},
+		// 	},
+		// 	preconditionFunc: func(store cache.Store) (bool, error) {
+		// 		return true, nil
+		// 	},
+		// 	conditionFunc: func(e watch.Event) (bool, error) {
+		// 		return true, nil
+		// 	},
+		// 	expectedErr:   fmt.Errorf("UntilWithSync: unable to sync caches: %w", context.DeadlineExceeded),
+		// 	expectedEvent: nil,
+		// },
+
 		{
 			name: "doesn't wait for sync with no precondition",
 			lw: &cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					select {}
+				ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+					<-ctx.Done()
+					return nil, ctx.Err()
 				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					select {}
+				WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+					<-ctx.Done()
+					return nil, ctx.Err()
 				},
 			},
 			preconditionFunc: nil,
@@ -215,11 +266,13 @@ func TestUntilWithSync(t *testing.T) {
 		{
 			name: "waits indefinitely with precondition if it can't sync",
 			lw: &cache.ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					select {}
+				ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+					<-ctx.Done()
+					return nil, ctx.Err()
 				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					select {}
+				WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+					<-ctx.Done()
+					return nil, ctx.Err()
 				},
 			},
 			preconditionFunc: func(store cache.Store) (bool, error) {

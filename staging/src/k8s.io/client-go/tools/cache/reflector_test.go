@@ -1694,9 +1694,6 @@ func TestReflectorListWatchPanicLogging(t *testing.T) {
 		},
 	}
 
-	// Didn't modify utilruntime.ReallyCrash to avoid race condition
-	// utilruntime.ReallyCrash = false
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
@@ -1736,6 +1733,126 @@ func TestReflectorListWatchPanicLogging(t *testing.T) {
 
 			for _, substr := range tc.expectLogSub {
 				assert.Contains(t, logOutput, substr, "log should contain: %q", substr)
+			}
+		})
+	}
+}
+
+func TestReflectorListWatchPanicLoggingWithContext(t *testing.T) {
+	type panicCase struct {
+		name                string
+		listWithCtxFunc     func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error)
+		watchWithCtxFunc    func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error)
+		expectLogSubstrings []string // substrings expected in captured logs
+	}
+
+	tests := []panicCase{
+		{
+			name: "Panic in ListWithContextFunc",
+			listWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				panic("simulated panic in ListWithContextFunc")
+			},
+			watchWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+			expectLogSubstrings: []string{
+				"Observed a panic",
+				"simulated panic in ListWithContextFunc",
+				"stacktrace",
+			},
+		},
+		{
+			name: "Panic in WatchFuncWithContext",
+			listWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				return &unstructured.UnstructuredList{}, nil
+			},
+			watchWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				panic("simulated panic in WatchFuncWithContext")
+			},
+			expectLogSubstrings: []string{
+				"Observed a panic",
+				"simulated panic in WatchFuncWithContext",
+				"stacktrace",
+			},
+		},
+		{
+			name: "Nil Pointer in ListWithContextFunc",
+			listWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				var obj *unstructured.UnstructuredList
+				return obj, nil
+			},
+			watchWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				return watch.NewFake(), nil
+			},
+			expectLogSubstrings: []string{
+				"Observed a panic",
+				"invalid memory address",
+				"stacktrace",
+			},
+		},
+		{
+			name: "Nil Pointer in WatchFuncWithContext",
+			listWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				return &unstructured.UnstructuredList{}, nil
+			},
+			watchWithCtxFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				var iw watch.Interface
+				return iw, nil
+			},
+			expectLogSubstrings: []string{
+				"Observed a panic",
+				"invalid memory address",
+				"stacktrace",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// prepare a klog logger that buffers output
+			logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
+			sink := logger.GetSink().(ktesting.Underlier)
+			ctx := klog.NewContext(context.Background(), logger)
+
+			// build a Reflector that uses the new context-aware funcs
+			store := NewStore(MetaNamespaceKeyFunc)
+			r := &Reflector{
+				name: "test-reflector-with-ctx",
+				listerWatcher: &ListWatch{
+					ListWithContextFunc:  tc.listWithCtxFunc,
+					WatchFuncWithContext: tc.watchWithCtxFunc,
+				},
+				store:             store,
+				watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
+				clock:             testingclock.NewFakeClock(time.Now()),
+			}
+
+			// run in a goroutine to catch panics
+			panicCh := make(chan any, 1)
+			go func() {
+				defer func() {
+					if rec := recover(); rec != nil {
+						panicCh <- rec
+					} else {
+						panicCh <- nil
+					}
+				}()
+				_ = r.ListAndWatchWithContext(ctx)
+			}()
+
+			if rec := <-panicCh; rec != nil {
+				t.Logf("Recovered panic: %v", rec)
+			}
+
+			// inspect logs
+			logOutput := sink.GetBuffer().String()
+			t.Log("--- LOG ---")
+			t.Log(logOutput)
+			t.Log("-----------")
+
+			// assert expected substrings present
+			for _, substr := range tc.expectLogSubstrings {
+				assert.Contains(t, logOutput, substr, "log should contain %q", substr)
 			}
 		})
 	}
