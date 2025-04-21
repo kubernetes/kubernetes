@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/klog/v2"
 )
 
@@ -162,6 +163,8 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	VersionInfo basecompatibility.EffectiveVersion
 }
 
 var _ fmt.Stringer = new(Config)
@@ -484,7 +487,11 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
-		config.UserAgent = DefaultKubernetesUserAgent()
+		var v string
+		if config.VersionInfo != nil {
+			v = config.VersionInfo.String()
+		}
+		config.UserAgent = DefaultKubernetesUserAgent(v)
 	}
 	return nil
 }
@@ -500,13 +507,45 @@ func adjustCommit(c string) string {
 	return c
 }
 
-// adjustVersion strips "alpha", "beta", etc. from version in form
-// major.minor.patch-[alpha|beta|etc].
-func adjustVersion(v string) string {
-	if len(v) == 0 {
-		return "unknown"
+// adjustVersion processes a combined options string from versionOpts
+// or strips the suffix from a single version string 'v'.
+func adjustVersion(v string, versionOpts ...string) string {
+	if len(versionOpts) > 0 {
+		combinedOptionsString := versionOpts[0]
+		individualPairs := strings.Split(combinedOptionsString, ", ")
+		var processedPairs []string
+		for _, pair := range individualPairs {
+			processedPairs = append(processedPairs, processBinaryVersion(pair))
+		}
+
+		return strings.Join(processedPairs, ", ")
 	}
-	seg := strings.SplitN(v, "-", 2)
+
+	if len(v) > 0 {
+		return stripVersionSuffix(v)
+	}
+
+	return "unknown"
+}
+
+// processBinaryVersion takes a raw "BinaryVersion: X.Y.Z-suffix" string
+// and returns "BinaryVersion: X.Y.Z" after stripping the suffix.
+func processBinaryVersion(binaryVersionOpt string) string {
+	if !strings.HasPrefix(binaryVersionOpt, "BinaryVersion:") {
+		return binaryVersionOpt
+	}
+
+	versionPart := strings.TrimPrefix(binaryVersionOpt, "BinaryVersion: ")
+	strippedVersion := stripVersionSuffix(versionPart)
+	return "BinaryVersion: " + strippedVersion
+}
+
+// stripVersionSuffix removes the "-alpha", "-beta", etc. suffix from a version string.
+func stripVersionSuffix(version string) string {
+	if len(version) == 0 {
+		return "" // Or "unknown" if that's the desired default for a stripped empty string
+	}
+	seg := strings.SplitN(version, "-", 2)
 	return seg[0]
 }
 
@@ -527,10 +566,10 @@ func buildUserAgent(command, version, os, arch, commit string) string {
 }
 
 // DefaultKubernetesUserAgent returns a User-Agent string built from static global vars.
-func DefaultKubernetesUserAgent() string {
+func DefaultKubernetesUserAgent(versionOpts ...string) string {
 	return buildUserAgent(
 		adjustCommand(os.Args[0]),
-		adjustVersion(version.Get().GitVersion),
+		adjustVersion(version.Get().GitVersion, versionOpts...),
 		gruntime.GOOS,
 		gruntime.GOARCH,
 		adjustCommit(version.Get().GitCommit))
@@ -624,7 +663,13 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 }
 
 func AddUserAgent(config *Config, userAgent string) *Config {
-	fullUserAgent := DefaultKubernetesUserAgent() + "/" + userAgent
+	var v string
+	if config.VersionInfo != nil {
+		v = config.VersionInfo.String()
+		v = strings.TrimPrefix(v, "{")
+		v = strings.TrimSuffix(v, "}")
+	}
+	fullUserAgent := DefaultKubernetesUserAgent(v) + "/" + userAgent
 	config.UserAgent = fullUserAgent
 	return config
 }
