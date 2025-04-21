@@ -321,6 +321,12 @@ github.com/gregjones/httpcache
 # github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 ## explicit; go 1.14
 github.com/grpc-ecosystem/go-grpc-middleware
+# github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
+## explicit; go 1.19
+github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus
+# github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
+## explicit; go 1.19
+github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
@@ -960,6 +966,10 @@ google.golang.org/grpc/keepalive
 google.golang.org/grpc/mem
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer
+google.golang.org/grpc/reflection
+google.golang.org/grpc/reflection/grpc_reflection_v1
+google.golang.org/grpc/reflection/grpc_reflection_v1alpha
+google.golang.org/grpc/reflection/internal
 google.golang.org/grpc/resolver
 google.golang.org/grpc/resolver/dns
 google.golang.org/grpc/resolver/manual

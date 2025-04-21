@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpcprom "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus"
 	"go.etcd.io/etcd/client/pkg/v3/logutil"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -84,7 +84,7 @@ func init() {
 	// using the global prometheus registry and using our own wrapped global registry,
 	// we need to explicitly register these metrics to our global registry here.
 	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
-	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
+	legacyregistry.RawMustRegister(grpcprom.NewClientMetrics())
 	dbMetricsMonitors = make(map[string]struct{})
 
 	l, err := logutil.CreateDefaultZapLogger(etcdClientDebugLevel())
