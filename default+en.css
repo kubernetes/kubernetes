@@ -1,0 +1,2182 @@
+/** Copyright 2005 Google Inc. All rights reserved. */
+
+/* the GSearchControl CSS Classes
+ * .gsc-control: the primary class of the control
+ */
+.gsc-control {
+  width: 300px;
+}
+
+.gsc-control div {
+  position: static;
+}
+
+/* Slight reset to make the preview have ample padding. */
+.gsc-control-cse {
+  padding: 1em;
+}
+
+.gsc-control-cse,
+.gsc-control-cse .gsc-table-result {
+  width: auto;
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+}
+
+.gsc-control-wrapper-cse {
+  width: 100%;
+}
+
+/* control inputs
+ * .gsc-search-box: the container that hosts the text input area
+ * .gsc-input: the text input area
+ * .gsc-keeper: the save link below savable results
+ */
+form.gsc-search-box {
+  font-size: 13px;
+  margin-top: 0;
+  margin-right: 0;
+  margin-bottom: 4px;
+  margin-left: 0;
+  width: 100%;
+}
+
+/*
+ * This table contains the input element as well as the search button
+ * Note that the search button column is fixed width, designed to hold the
+ * button div's background image
+ */
+table.gsc-search-box {
+  border-style: none;
+  border-width: 0;
+  border-spacing: 0 0;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+table.gsc-search-box td {
+  vertical-align: middle;
+}
+
+table.gsc-search-box td.gsc-input {
+  padding-right: 12px;
+}
+
+.gsc-search-button {
+  width: 1%;
+}
+
+.gsc-search-button-v2 svg {
+  fill: #fff;
+}
+
+/* Firefox button fix */
+button::-moz-focus-inner {
+  padding: 0;
+  border: 0;
+}
+
+.gsc-clear-button {
+  width: 14px;
+}
+
+.gsc-branding,
+.gcsc-branding {
+  display: -ms-flexbox;
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px;
+}
+
+.gsc-branding-text,
+.gcsc-branding-text {
+  vertical-align: top;
+  padding-bottom: 2px;
+  text-align: right;
+  font-size: 11px;
+  margin-right: 2px;
+  color: #666;
+}
+
+.gsc-branding-text:first-child,
+.gcsc-branding-text:first-child {
+  flex-grow: 1;
+}
+
+.gsc-branding-img-noclear,
+.gcsc-branding-img-noclear {
+  width: 51px;
+  vertical-align: bottom;
+}
+
+.gsc-branding-img,
+.gcsc-branding-img {
+  width: 65px;
+  vertical-align: bottom;
+}
+
+.gsc-branding-youtube .gsc-branding-img-noclear {
+  width: 55px;
+}
+
+.gsc-branding-youtube .gsc-branding-img {
+  width: 69px;
+}
+
+.gsc-branding-vertical .gsc-branding-text .gsc-branding-text {
+  margin-right: 0;
+  text-align: center;
+}
+
+.gsc-branding-vertical .gsc-branding-img-noclear {
+  text-align: center;
+}
+
+.gsc-branding-img,
+.gsc-branding-img-noclear,
+.gcsc-branding-img,
+.gcsc-branding-img-noclear {
+  position: relative;
+  top: -1px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.gsc-branding-img,
+.gsc-branding-img-noclear,
+.gcsc-branding-img,
+.gcsc-branding-img-noclear {
+  margin: 0 0 0 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border: none;
+  display: inline;
+}
+
+.gcsc-branding-text {
+  white-space: nowrap;
+}
+
+.gcsc-branding-text {
+  margin: 0 2px;
+}
+
+.gcsc-branding-img-noclear {
+  width: auto;
+}
+
+.gsc-branding-clickable {
+  cursor: pointer;
+}
+
+.gsc-search-button {
+  margin-left: 2px;
+}
+
+.gsc-clear-button {
+  display: inline;
+  text-align: right;
+  margin-left: 4px;
+  margin-right: 4px;
+  padding-left: 10px;
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-image: url('//www.google.com/cse/static/css/v2/clear.png');
+  cursor: pointer;
+}
+
+.gsc-clear-button:hover {
+  background-image: url('//www.google.com/cse/static/css/v2/clear-hover.png');
+}
+
+.gsc-search-box-tools .gsc-clear-button {
+  display: none;
+}
+
+.gsc-results-close-btn {
+  background-image: url("//www.google.com/images/nav_logo114.png");
+  background-repeat: no-repeat;
+  background-position: -140px -230px;
+  float: right;
+  display: none;
+  opacity: 0;
+  height: 12px;
+  width: 12px;
+  position: absolute !important;
+  top: 20px;
+  right: 20px;
+  cursor: pointer;
+}
+
+.gsc-results-close-btn-visible {
+  display: block;
+  opacity: 1;
+}
+
+.gsc-results-wrapper-overlay {
+  border: none;
+  margin: auto;
+  border-radius: 1px;
+  overflow: auto;
+  height: 80%;
+  -webkit-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -moz-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -ms-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -o-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  border-collapse: separate;
+  background: white;
+  padding: 30px;
+  width: 70%;
+  position: fixed !important;
+  top: 5%;
+  left: 12%;
+  opacity: 0;
+  z-index: 100002;
+  visibility: hidden;
+  -webkit-transition: all 0.25s linear;
+  -moz-transition: all 0.25s linear;
+  -ms-transition: all 0.25s linear;
+  -o-transition: all 0.25s linear;
+  transition: all 0.25s linear;
+  /* For IE 8 */
+  -ms-filter: "progid:DXImageTransform.Microsoft.Shadow(Strength=7, Direction=135, Color='#888888')";
+  /* For IE 5.5 - 7 */
+  filter: progid:DXImageTransform.Microsoft.Shadow(Strength=7, Direction=135, Color='#888888');
+
+}
+
+.gsc-results-wrapper-visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+.gsc-modal-background-image {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  height: 130%;
+  width: 100%;
+  z-index: 100001;
+  background-color: white;
+  opacity: 0;
+  -ms-filter: "alpha(opacity=0)";
+  filter: alpha(opacity=0);
+  display: none;
+  -webkit-transition: all 0.25s linear;
+  -moz-transition: all 0.25s linear;
+  -ms-transition: all 0.25s linear;
+  -o-transition: all 0.25s linear;
+  transition: all 0.25s linear;
+}
+
+.gsc-modal-background-image-visible {
+  opacity: 0.8;
+  -ms-filter: "alpha(opacity=80)";
+  filter: alpha(opacity=80);
+  display: block;
+}
+
+.gsc-overflow-hidden {
+  overflow: hidden;
+}
+
+/*
+ * Given that this is sitting in a variable width table cell, the idea is
+ * for it to consume the entire cell. The adjacent cell contains the search
+ * button and that is a fixed width cell.
+ */
+input.gsc-input {
+  padding: 1px 6px;
+  border: 1px solid #ddd;
+  width: 99%;
+}
+
+.gsc-search-box .gsc-input>input:hover,
+.gsc-input-box-hover {
+  border: 1px solid #b9b9b9;
+  border-top-color: #a0a0a0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .1);
+  outline: none;
+}
+
+.gsc-keeper {
+  color: #36c;
+  text-decoration: underline;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: normal;
+
+  padding-left: 16px;
+  background-repeat: no-repeat;
+  background-position: 1px 3px;
+  background-image: url('//www.google.com/cse/static/css/blue_check.gif');
+}
+
+/* tabbed mode of search control
+ * .gsc-positioningWrapper: wrapper for absolute positioning of gradient
+ * .gsc-tabsArea: the box containing all of the tabs
+ * .gsc-tabsAreaInvisible: same as above, but this is the state when search has been cleared
+ * .gsc-tabHeader: an individual tab
+ * .gsc-tabHeader.gsc-tabhActive: the active tab
+ * .gsc-tabHeader.gsc-tabhInactive: an inactive tab
+ * .gsc-tabData: the data area/box containing results and header data for each tab
+ * .gsc-tabData.gsc-tabdActive: the data area for the active tab
+ * .gsc-tabData.gsc-tabdInactive: the data area for inactive tabs
+ */
+.gsc-positioningWrapper {
+  position: relative;
+}
+
+.gsc-tabsArea {
+  clear: both;
+  margin-top: 6px;
+  border-bottom: 1px solid #dfe1e5;
+}
+
+.gsc-tabsArea .gs-spacer,
+.gsc-refinementsArea .gs-spacer {
+  display: none;
+}
+
+.gsc-tabsAreaInvisible,
+.gsc-refinementsAreaInvisible,
+.gsc-refinementBlockInvisible {
+  display: none;
+}
+
+.gsc-tabHeader {
+  border: none;
+  font-size: 13px;
+  font-weight: bold;
+  line-height: 27px;
+  min-width: 54px;
+  padding: 0 8px 1px 8px;
+  text-align: center;
+}
+
+.gsc-tabHeader.gsc-tabhInactive {
+  cursor: pointer;
+}
+
+.gsc-tabData.gsc-tabdActive {
+  display: block;
+}
+
+.gsc-tabData.gsc-tabdInactive {
+  display: none;
+}
+
+/* gsc-resultsbox-invisible is preferred over gsc-tabdActive */
+.gsc-tabData.gsc-tabdActive.gsc-resultsbox-invisible {
+  display: none;
+}
+
+.gsc-refinementsArea {
+  border-bottom: 1px solid #dfe1e5;
+  clear: both;
+  margin: 6px 0 4px 0;
+}
+
+.gsc-refinementHeader {
+  position: static;
+  margin-right: 2px;
+  padding: 2px 8px 0 8px;
+}
+
+.gsc-refinementHeader.gsc-refinementhInactive {
+  cursor: pointer;
+  padding-bottom: 2px;
+}
+
+/* tab specific results header suppression
+ * - no twiddle, tabbed mode runs in full expand mode
+ * - no title
+ * - no stats
+ */
+.gsc-tabData .gsc-resultsHeader .gsc-title {
+  display: none;
+}
+
+.gsc-tabData .gsc-resultsHeader .gsc-stats {
+  display: none;
+}
+
+.gsc-tabData .gsc-resultsHeader .gsc-results-selector {
+  display: none;
+}
+
+/* style for auto-completion table
+ * .gsc-completion-selected: highlighted completions.
+ * .gsc-completion-container: styling for the table which contains the completions
+ * .gsc-completion-promotion-selected: highlighted promotions
+ */
+.gsc-completion-selected {
+  background: #eee;
+  cursor: default;
+}
+
+.gsc-completion-selected .gsc-completion-promotion-table {
+  cursor: pointer;
+}
+
+.gsc-completion-container {
+  font-family: Arial, sans-serif;
+  font-size: 13px;
+  background: white;
+  border: 1px solid #ddd;
+  border-top-color: #d9d9d9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  -moz-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  -webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  margin: 0;
+}
+
+.gsc-completion-title {
+  color: #00c;
+  line-height: normal;
+  white-space: normal;
+}
+
+.gsc-completion-snippet {
+  line-height: normal;
+  white-space: normal;
+}
+
+.gsc-completion-container .gsc-completion-icon-cell {
+  width: 42px;
+  height: 42px;
+  padding-right: 10px;
+}
+
+.gsc-completion-icon {
+  /* place image in the middle */
+  margin-left: auto;
+  margin-right: auto;
+  display: block;
+  border: 1px solid #ddd;
+}
+
+.gsc-completion-container .gsc-completion-promotion-table {
+  font-size: inherit;
+  background: inherit;
+  margin: 5px 0;
+  width: 100%;
+}
+
+/* the results for each section
+ * .gsc-resultsbox-{visible,invisible}: a complete-collection of results including headers
+ * .gsc-results: the collection of results for a given searcher
+ * .gsc-result: a generic result within the control. each result has this class, as well as .gsc-xxxResult where xxx is web, image, local, blog, etc.
+ */
+.gsc-resultsbox-visible {
+  display: block;
+}
+
+.gsc-resultsbox-invisible {
+  display: none;
+}
+
+.gsc-results {
+  padding-bottom: 2px;
+  width: 99%;
+}
+
+.gsc-result {
+  margin-bottom: 10px;
+}
+
+.gsc-result .gs-title {
+  height: auto;
+  overflow: hidden;
+}
+
+/* Ads */
+.gsc-results .gsc-result .gs-ad-marker {
+  display: none;
+}
+
+.gsc-wrapper {
+  position: relative;
+  display: block;
+}
+
+.gsc-adBlock {
+  position: relative;
+  display: block;
+  border-bottom: 1px solid #e9e9e9;
+  margin-bottom: 4px;
+  padding-bottom: 5px;
+}
+
+.gsc-adBlock h2 {
+  float: right;
+  margin: 3px 5px 0;
+  font-weight: normal;
+  font-size: .9em;
+  color: #676767;
+}
+
+.gsc-adBlock .gsc-ad {
+  padding-left: 8px;
+  padding-top: 5px;
+  padding-right: 3px;
+}
+
+.gsc-adBlock .gsc-ad a {
+  font-weight: bolder;
+  color: #00c;
+  line-height: 1.4em;
+}
+
+.gsc-adBlock .gsc-ad cite {
+  font-style: normal;
+  color: green;
+}
+
+.gsc-adBlock .gsc-ad span {
+  padding-left: 8px;
+}
+
+.gsc-adBlockNoHeight {
+  height: 0;
+}
+
+.gsc-adBlockInvisible {
+  display: none;
+}
+
+.gsc-adBlockVertical {
+  position: relative;
+  display: block;
+  float: right;
+  clear: right;
+  width: 30%;
+}
+
+.gsc-adBlockBottom {
+  position: relative;
+  display: block;
+  border-bottom: 1px solid #e9e9e9;
+  border-top: 1px solid #e9e9e9;
+  margin-bottom: 4px;
+}
+
+.gsc-thinWrapper {
+  width: 69%;
+  float: left;
+  overflow: hidden;
+}
+
+.gsc-wrapper.gsc-thinWrapper {
+  border-right: 1px solid #e9e9e9;
+}
+
+.gsc-adBlockVertical h2 {
+  text-align: center;
+  font-weight: normal;
+  font-size: .9em;
+  color: #676767;
+  margin-top: 6px;
+}
+
+.gsc-adBlockVertical .gsc-ad {
+  padding-left: 8px;
+  padding-top: 5px;
+}
+
+.gsc-adBlockVertical .gsc-ad a {
+  font-weight: bolder;
+  color: #00c;
+  line-height: 1.4em;
+}
+
+.gsc-adBlockVertical .gsc-ad cite {
+  font-style: normal;
+  color: green;
+  display: block;
+}
+
+/* Standard configuration div/form */
+.gsc-config {
+  border: 1px solid #e9e9e9;
+  margin-top: 0;
+  margin-bottom: 10px;
+  padding-top: 2px;
+  padding-left: 6px;
+  padding-right: 6px;
+  padding-bottom: 6px;
+}
+
+.gsc-config {
+  margin-bottom: 0;
+}
+
+.gsc-configSetting {
+  margin-top: 6px;
+}
+
+.gsc-configSetting_Label {
+  color: #676767;
+}
+
+.gsc-configSettingInput {
+  color: #676767;
+  border: 1px solid #e9e9e9;
+  width: 75%;
+}
+
+.gsc-configSettingCheckbox {
+  color: #676767;
+  margin-right: 6px;
+}
+
+.gsc-configSettingCheckboxLabel {
+  display: inline;
+  color: #676767;
+}
+
+.gsc-configSettingSubmit {
+  margin-top: 8px;
+  text-align: right;
+}
+
+.gsc-configSettingSubmit {
+  display: inline;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+/* Added so elements inside a result are properly cleared by the container. */
+.gsc-webResult:after {
+  content: ".";
+  display: block;
+  height: 0;
+  clear: both;
+  visibility: hidden;
+}
+
+.gsc-webResult {
+  zoom: 1;  /* IE-specific hack to get the layout clearing right. */
+}
+
+/* Wrapper for a result. */
+.gsc-webResult.gsc-result {
+  margin: 0;
+  padding: 10px 0;
+  border: 1px solid #fff;
+}
+
+.gs-webResult .gs-visibleUrl {
+  color: #008000;
+  text-decoration: none;
+}
+
+.gsc-above-wrapper-area {
+  border-bottom: 1px solid #e9e9e9;
+  padding: 5px 0 5px 0;
+}
+
+.gsc-above-wrapper-area-invisible {
+  display: none;
+}
+
+.gsc-above-wrapper-area-container {
+  width: 100%;
+}
+
+.gsc-result-info {
+  color: #676767;
+  font-size: 13px;
+  margin: 0;
+  padding: 4px 4px 10px 4px;
+  text-align: left;
+}
+
+.gsc-result-info-container {
+  text-align: left;
+}
+
+.gsc-result-info-invisible {
+  display: none;
+}
+
+.gsc-orderby-container {
+  text-align: right;
+  background: transparent;
+}
+
+.gsc-orderby-invisible {
+  display: none;
+}
+
+.gsc-orderby-label {
+  color: #676767;
+  padding: 5px 5px 6px 0;
+}
+
+.gsc-selected-option-container {
+  background-color: whiteSmoke;
+  background-image: linear-gradient(top, whiteSmoke, #f1f1f1);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 2px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+  color: #444;
+  cursor: default;
+  font-size: 11px;
+  font-weight: bold;
+  height: 27px;
+  line-height: 27px;
+  max-width: 90%;
+  min-width: 54px;
+  outline: 0;
+  padding: 0 28px 0 6px;
+  position: relative;
+  text-align: center;
+}
+
+.gsc-selected-option {
+  position: relative;
+  width: 100%;
+}
+
+.gsc-control-cse .gsc-option-selector {
+  border: none;
+  height: 11px;
+  margin-top: -4px;
+  position: absolute;
+  right: 5px;
+  top: 12px;
+  width: 7px;
+  padding: 0 5px 0 5px;
+  background: url(//ssl.gstatic.com/ui/v1/disclosure/small-grey-disclosure-arrow-down.png) center no-repeat
+}
+
+.gsc-option-menu-invisible {
+  display: none;
+}
+
+.gsc-control-cse .gsc-option-menu-container {
+  color: #000;
+  font-size: 80%;
+  position: relative;
+}
+
+.gsc-control-cse .gsc-option-menu {
+  background: #fff;
+  border: 1px solid #eee;
+  border: 1px solid rgba(0, 0, 0, .2);
+  box-shadow: 0 2px 4px #eee;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: default;
+  font-size: 13px;
+  margin: 0;
+  max-height: 360px;
+  outline: none;
+  padding: 6px 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 7;
+}
+
+.gsc-option-menu-item {
+  color: #777;
+  cursor: pointer;
+  list-style: none;
+  margin: 0;
+  padding: 0 30px 0 30px;
+  white-space: nowrap;
+}
+
+.gsc-option-menu-item-highlighted {
+  background-color: #eee;
+  border-color: #eee;
+  border-width: 1px 0;
+  color: #333;
+}
+
+.gsc-option {
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+  line-height: 27px;
+  text-align: left;
+}
+
+.gs-web-image-box,
+.gs-promotion-image-box {
+  float: left;
+  padding: 2px 8px 2px 0;
+  margin-right: 0;
+  margin-left: 0;
+  text-align: center;
+  width: 62px; /* default width + 1px border */
+}
+
+.gs-web-image-box .gs-image,
+.gs-promotion-image-box .gs-promotion-image {
+  border: 1px solid #e2e2e2;
+  max-width: 60px; /* Small icons width. */
+  max-height: 120px;  /* Limit height too. */
+  /* IE-specific hack to simulate max-width and max-height. */
+  /* For IE, image size will be 105 because various default
+   * values for margins and borders are different.
+   */
+  width: expression(this.width > 64 ? '64px': true);
+  height: expression(this.height > 120 ? '120px': true);
+}
+
+.gs-action {
+  display: inline;
+  margin-right: 0.6em;
+}
+
+.gs-action .gs-action {
+  color: #77c;
+}
+
+.gs-action.cart .gs-action,
+.gs-action.star .gs-action,
+.gs-action.rss .gs-action,
+.gs-action.download .gs-action,
+.gs-action.email .gs-action,
+.gs-action.mobile .gs-action,
+.gs-action.share .gs-action,
+.gs-action.fullscreen .gs-action,
+.gs-action.generic .gs-action,
+.gs-action.link .gs-action {
+  padding-left: 18px;
+  background: transparent url('//www.google.com/cse/images/action_icons_sprite.gif') no-repeat;
+}
+
+.gs-action.cart .gs-action {
+  background-position: 0 0;
+}
+
+.gs-action.star .gs-action {
+  background-position: -16px -34px;
+}
+
+.gs-action.rss .gs-action {
+  background-position: -48px -98px;
+}
+
+.gs-action.download .gs-action {
+  background-position: -64px -128px;
+}
+
+.gs-action.email .gs-action {
+  background-position: -112px -224px;
+}
+
+.gs-action.mobile .gs-action {
+  background-position: -131px -257px;
+}
+
+.gs-action.share .gs-action {
+  background-position: -32px -64px;
+}
+
+.gs-action.fullscreen .gs-action {
+  background-position: -79px -162px;
+}
+
+.gs-action.generic .gs-action {
+  background-position: -144px -290px;
+}
+
+.gs-action.link .gs-action {
+  background-position: -159px -321px;
+}
+
+/* Image Search */
+.gs-ellipsis {
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  -o-text-overflow: ellipsis;
+  -ms-text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gsc-imageResult-column {
+  margin-right: 70px;
+}
+
+.gs-imageResult {
+  break-inside: avoid;
+  overflow: hidden;
+}
+
+.gs-imageResult .gs-image-box {
+  position: relative;
+}
+
+.gs-imageResult .gs-text-box {
+  color: #999;
+  height: 4em;
+}
+
+/* No padding for image result */
+.gs-imageResult .gs-title,
+.gs-imageResult .gs-snippet,
+.gs-imageResult .gs-visibleUrl,
+.gs-imageResult .gs-visibleUrl-short,
+.gs-imageResult .gs-spelling {
+  padding: 0;
+}
+
+/* Color hover text, but not no results text */
+.gs-imageResult:not(.gs-no-results-result) .gs-snippet {
+  overflow: hidden;
+  white-space: nowrap;
+  color: #eee;
+}
+
+.gs-imageResult .gs-size {
+  display: inline;
+}
+
+.gs-imageResult .gs-image-box {
+  text-align: center; /* center align image in image box */
+}
+
+.gs-imageResult .gs-image-box .gs-image {
+  border: none;
+}
+
+.gs-image-scalable {
+  height: 180px;
+}
+
+.gs-selectedImageResult {
+  /* 180px (gs-image-scalable height) + 2*5px (gs-image-thumbnail-box padding) +
+   * 350px (gs-imagePreviewArea height)
+   */
+  height: 540px;
+}
+
+.gs-imagePreview {
+  display: block;
+  max-height: 100%;
+  max-width: 100%;
+}
+
+/* Avoid auto dimensions for SVGs, lest they be hidden */
+.gs-imagePreview:not([src$=".svg"]) {
+  height: auto;
+  width: auto;
+}
+
+.gs-imagePreviewArea {
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-pack: distribute;
+  justify-content: center;
+  -ms-flex-align: center;
+  align-items: center;
+  position: absolute;
+  background: #222;
+  width: 100%;
+  height: 350px;
+  left: 0;
+  z-index: 100000;
+}
+
+.gs-imagePreviewArea-invisible {
+  display: none;
+}
+
+.gs-previewSnippet {
+  margin: 30px;
+}
+
+.gs-previewLink {
+  color: #eee;
+  font-size: 18px;
+  text-decoration: none;
+}
+
+.gs-imagePreviewArea>.gs-previewLink {
+  -ms-flex-align: center;
+  align-items: center;
+  display: -ms-flexbox;
+  display: flex;
+  height: 100%;
+}
+
+.gs-previewTitle,
+.gs-previewUrl,
+.gs-previewSize {
+  margin: 10px 0;
+  color: #eee;
+}
+
+.gs-previewDescription {
+  margin: 20px 0;
+  color: #ccc;
+}
+
+/* Popup layout related styles */
+
+.gsc-imageResult .gs-imageResult-popup {
+  border: 0;
+  margin: 0;
+  width: auto; /* Override the default image result width */
+  overflow: visible; /* popup box may overflow and should be visible */
+  position: relative;
+}
+
+/* Instead put margin bottom and right on searcher image thumbnail. */
+.gs-imageResult-popup .gs-image-thumbnail-box {
+  padding: 5px;
+}
+
+.gs-imageResult-popup .gs-image-box {
+  width: auto;
+}
+
+.gs-imageResult-popup .gs-image-popup-box {
+  width: calc(100% - 20px);
+  position: absolute;
+  padding: 5px;
+  margin: 5px;
+  left: 0;
+  bottom: 0;
+  background: rgba(51, 51, 51, 0.8);
+  display: none;
+}
+
+.gs-imageResult-popup .gs-image-popup-box .gs-image-box {
+  display: none;
+}
+
+.gs-imageResult-popup .gs-image-popup-box .gs-text-box {
+  height: auto;
+  width: auto;
+}
+
+/* Do not show title for compact layout such as classic and popup */
+.gs-imageResult-popup .gs-text-box .gs-title {
+  display: none;
+}
+
+
+/* Video Search
+ * - single line title
+ */
+
+.gsc-videoResult .gs-videoResult .gs-title {
+  line-height: 1.3em;
+  height: 1.3em;
+  overflow: hidden;
+}
+
+.gsc-videoResult .gs-videoResult .gs-snippet {
+  line-height: 1.3em;
+  max-height: 2.6em;
+  overflow: hidden;
+}
+
+/* trailing more link at the bottom of a collection of results */
+.gsc-imageResult .gsc-trailing-more-results {
+  clear: both;
+}
+
+.gsc-results .gsc-trailing-more-results {
+  margin-bottom: 10px;
+}
+
+.gsc-results .gsc-trailing-more-results,
+.gsc-results .gsc-trailing-more-results * {
+  color: #00c;
+  text-decoration: underline;
+}
+
+/* trailing cursor section */
+.gsc-imageResult .gsc-cursor-box {
+  clear: both;
+}
+
+.gsc-results .gsc-cursor-box .gsc-trailing-more-results {
+  margin-bottom: 0;
+  display: inline;
+}
+
+.gsc-results .gsc-cursor {
+  color: #333;
+  display: inline;
+  fill: #333;
+}
+
+.gsc-results .gsc-cursor-box {
+  margin-bottom: 10px;
+}
+
+.gsc-results .gsc-cursor-box .gsc-cursor-page {
+  cursor: pointer;
+  color: #000;
+  margin-right: 8px;
+  display: inline;
+}
+
+.gsc-results .gsc-cursor-box .gsc-cursor-current-page {
+  cursor: default;
+  color: #a90a08;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+/*** End of Control, Begin Results ***/
+
+/* generic, cross cutting result style
+ * - in the form of .gs-result .gs-xxx where xxx is the generic style
+ * .gs-title: typically the first line of a result, typically a link, image results over ride this, since for image results, the image is the link
+ * .gs-divider: typically separates results from ads
+ * .gs-visibleUrl: typically the last line of a result, displayed in green. sometimes a link (like in blog search)
+ * .gs-clusterUrl: for news, and other similar services, this is a cluster of additional results
+ * .gs-image: an actual image in a result
+ * .gs-phone: a phone number
+ * .gs-address: an address (includes street, city, region, country)
+ * .gs-streetAddress: a street (including #)
+ * .gs-city: a city
+ * .gs-region: a region (zip code, area, etc.)
+ * .gs-country: a country
+ * .gs-snippet: snippetized content
+ * .gs-watermark: indicator that user selected this result
+ * .gs-metadata: generic metadata, e.g.,
+ * .gs-image-box: generic container for a result's image (within a table)
+ * .gs-text-box: generic container for a result's text content (within a table). Note that this class, and image-box are only used in video
+ */
+.gs-result .gs-title,
+.gs-result .gs-title * {
+  color: #00c;
+  text-decoration: none;
+}
+
+a .gs-captcha-info-link{
+  color: #00c;
+  text-decoration: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gsc-control-cse .gs-spelling,
+.gsc-control-cse .gs-result .gs-title,
+.gsc-control-cse .gs-result .gs-title * {
+  font-size: 16px;
+}
+
+.gsc-control-cse .gs-result .gs-spelling-original {
+  font-size: 13px;
+}
+
+.gs-divider {
+  padding-bottom: 8px;
+  text-align: center;
+  color: #676767;
+}
+
+/* relative and absolute dates, note, news/books inlines these */
+.gs-relativePublishedDate,
+.gs-publishedDate {
+  color: #6f6f6f;
+  text-decoration: none;
+}
+
+.gs-result .gs-clusterUrl {
+  color: #008000;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gs-newsResult .gs-publisher {
+  color: #6f6f6f;
+  display: inline;
+  text-decoration: none;
+}
+
+/*
+ * For news results there are two dates...
+ * The relative date is visible while in the
+ * search control and the published date
+ * is visible when clipped. Why? It doesn't
+ * make sense to say 4 hours ago for a clipped
+ * result...
+ */
+
+/* establish the base style */
+.gs-newsResult .gs-relativePublishedDate,
+.gs-newsResult .gs-publishedDate {
+  display: inline;
+  margin-left: 4px;
+}
+
+/* base styling for relative date is none */
+.gs-blogResult .gs-relativePublishedDate,
+.gs-newsResult .gs-relativePublishedDate {
+  display: none;
+}
+
+/* suppress publishedDate while in the control */
+.gsc-blogResult .gs-blogResult .gs-publishedDate,
+.gsc-newsResult .gs-newsResult .gs-publishedDate {
+  display: none;
+}
+
+/* enable relativePublishedDate while in the control */
+.gsc-blogResult .gs-blogResult .gs-relativePublishedDate,
+.gsc-newsResult .gs-newsResult .gs-relativePublishedDate {
+  display: inline;
+}
+
+.gs-newsResult .gs-location {
+  color: #6f6f6f;
+  display: inline;
+  text-decoration: none;
+}
+
+.gs-promotion .gs-title,
+.gs-promotion .gs-title * {
+  text-decoration: none;
+}
+
+.gs-title .gs-promotion-title-right {
+  color: #000;
+}
+
+.gsc-webResult.gsc-result.gsc-promotion {
+  background-color: #fff;
+}
+
+.gs-fileFormat {
+  color: #666;
+  font-size: 12px;
+}
+
+.gs-fileFormatType {
+  font-size: 12px;
+}
+
+.gs-promotion table {
+  border: none;
+  border-style: none;
+  border-width: 0;
+  border-spacing: 0 0;
+  margin: 0 0 0 0;
+  padding: 0 0 0 0;
+}
+
+.gs-promotion table .gs-snippet a .gs-title,
+.gs-promotion table .gs-snippet a .gs-title * {
+  font-size: 13px;
+}
+
+.gs-promotion em {
+  font-style: normal;
+  font-weight: bold;
+}
+
+.gs-promotion .gs-title em {
+  color: inherit;
+  text-decoration: inherit;
+}
+
+.gs-result .gs-image,
+.gs-result .gs-promotion-image {
+  vertical-align: middle;
+  border: 1px solid #e2e2e2;
+}
+
+.gs-result .gs-directions,
+.gs-result .gs-directions * {
+  color: #77c;
+  font-weight: normal;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gs-secondary-link,
+.gs-secondary-link * {
+  color: #77c;
+  font-weight: normal;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* wrapper around user supplied to/from mode directions
+ * normally this is disabled by default, and gs-directions is enabled
+ * apps can easily switch this by setting display:block on the rule below,
+ * and display:none on the rule above
+ * e.g., add these two rules to switch local results into
+ * alternate style driving directions
+ * .gs-localResult .gs-directions-to-from { display: block; }
+ * .gs-localResult .gs-directions { display: none; }
+ */
+.gs-result .gs-directions-to-from {
+  display: none;
+  margin-top: 4px;
+}
+
+.gs-result .gs-directions-to-from .gs-label {
+  display: inline;
+  margin-right: 4px;
+}
+
+.gs-result .gs-directions-to-from .gs-secondary-link {
+  display: inline;
+}
+
+.gs-result .gs-directions-to-from .gs-spacer {
+  display: inline;
+  margin-right: 3px;
+  margin-left: 3px;
+}
+
+.gs-videoResult .gs-publisher {
+  color: #008000;
+  text-decoration: none;
+}
+
+.gs-result a {
+  cursor: pointer;
+}
+
+.gsc-loading-fade .gsc-result-info,
+.gsc-loading-fade .gsc-loading-resultsRoot,
+.gsc-loading-resultsRoot, /* customized root */
+.gsc-loading-fade .gsc-loading-refinementsArea,
+.gsc-loading-fade .gsc-adBlock,
+.gsc-loading-fade .gsc-adBlockVertical,
+.gsc-loading-fade .gsc-adBlockNoHeight {
+  -ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=33.3)";
+  filter: alpha(opacity=33.3);
+  opacity: 0.333;
+}
+
+.gs-no-results-result .gs-snippet,
+.gs-error-result .gs-snippet {
+  background-color: rgb(255, 244, 194);
+  border: 1px solid rgb(255, 204, 51);
+  display: inline-block;
+  margin: 5px;
+  padding: 5px;
+}
+
+.gs-backfill-message {
+  padding: 8px 4px;
+}
+
+.gs-captcha-wrapper {
+  margin-top: 12px;
+}
+
+span .gs-captcha-msg {
+  color: #333;
+  margin-top: 1px;
+}
+
+#recaptcha-wrapper {
+  display: inline-block;
+  margin-top: 30px;
+}
+
+.gs-stylized-error-result {
+  text-align: center;
+}
+
+.gs-stylized-error-message {
+  font-size: 24px;
+  margin: 0 0 20px 0;
+}
+
+.gs-stylized-error-submessage {
+  margin: 0 0 20px 0;
+}
+
+.gs-stylized-error-link {
+  background: #1a73e8;
+  border-radius: 15px;
+  color: #fff;
+  display: inline-block;
+  padding: 5px 10px;
+  text-decoration: none;
+}
+
+.gs-stylized-error-link {
+  text-decoration: none;
+}
+
+.gs-result .gs-watermark {
+  font-size: 10px;
+  color: #77c;
+}
+
+.gs-results-attribution {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.gs-results-attribution,
+.gs-results-attribution * {
+  font-size: 10px;
+  color: #676767;
+  text-decoration: none;
+}
+
+.gs-results-attribution a {
+  color: #00c;
+  cursor: pointer;
+}
+
+.gs-results-attribution a:hover {
+  text-decoration: underline;
+}
+
+.gs-result .gs-metadata{
+  color: #676767;
+}
+
+/* searcher specific styling for
+ * - web ad
+ * - web
+ * - local
+ * - image (none)
+ * - blog (none)
+ * - video (none)
+ */
+
+/* webAd search specific over rides
+ * .gs-ad-marker: disabled in control, but on in green to indicate clipped result is an ad
+ */
+.gs-localAd .gs-ad-marker,
+.gs-webAd .gs-ad-marker {
+  padding-left: 4px;
+}
+
+.gs-webResult .gs-visibleUrl-short,
+.gs-promotion .gs-visibleUrl-short {
+  display: none;
+}
+
+.gs-webResult .gs-visibleUrl-long,
+.gs-promotion .gs-visibleUrl-long {
+  overflow: hidden;
+}
+
+.gs-webResult .gs-visibleUrl-long {
+  display: none;
+}
+
+/* Per result labels */
+.gs-webResult .gs-per-result-labels .gs-label {
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 3px;
+  color: black;
+}
+
+.gs-webResult .gs-per-result-labels .gs-label.gs-labelActive {
+  cursor: default;
+  text-decoration: none;
+}
+
+/* local search specific over rides
+ * - city, region displayed inline
+ * - country suppressed
+ * - small font size for info window's
+ */
+
+.gs-localAd .gs-address * {
+  color: #676767;
+}
+
+.gs-localAd .gs-street {
+  display: inline;
+}
+
+.gs-city {
+  display: inline;
+}
+
+.gs-region {
+  display: inline;
+}
+
+.gs-country {
+  display: none;
+}
+
+.gs-infoWindow * {
+  font-size: 11px;
+}
+
+/* video search specific over rides
+ * - align the table data
+ * - default image width garuntee
+ * - appropriate cell seperation
+ */
+
+/* todo(markl): workaround until gre in gmail fixes his styles */
+.gs-videoResult * {
+  font-size: 13px;
+}
+
+.gs-videoResult td .gs-image-box {
+  width: 110px;
+  height: 78px;
+}
+
+.gs-videoResult td .gs-text-box {
+  vertical-align: top;
+  margin-left: 4px;
+}
+
+
+/* book search specific over rides
+ * - default image width garuntee
+ * - appropriate cell seperation
+ */
+
+.gs-book-image-box td,
+.gs-bookResult td {
+  vertical-align: top;
+}
+
+.gs-book-image-box,
+.gs-book-image-box div {
+  position: static;
+  text-align: start;
+}
+
+.gs-book-image-box {
+  width: 75px;
+  height: 90px;
+}
+
+.gs-bookResult td .gs-text-box {
+  vertical-align: top;
+  margin-left: 4px;
+}
+
+.gs-book-image-box img {
+  border-spacing: 0 0;
+  border: none;
+}
+
+.gs-book-image-box .gs-row-1 {
+  line-height: 7px;
+}
+
+.gs-book-image-box .gs-pages {
+  height: 7px;
+  width: 45px;
+}
+
+.gs-book-image-box .gs-page-edge {
+  height: 7px;
+  width: 11px;
+}
+
+.gs-book-image-box .gs-image {
+  height: 80px;
+  border: 1px solid #a0a0a0;
+}
+
+.gs-bookResult .gs-author {
+  display: inline;
+  color: #6f6f6f;
+}
+
+.gs-bookResult .gs-publishedDate {
+  display: inline;
+}
+
+.gs-bookResult .gs-pageCount {
+  display: inline;
+  color: #6f6f6f;
+  margin-left: 4px;
+}
+
+/* book search specific over rides
+ * - default image width garuntee
+ * - appropriate cell seperation
+ */
+
+.gs-patentResult td {
+  vertical-align: top;
+}
+
+.gs-patentResult .gs-patent-number,
+.gs-patentResult .gs-publishedDate,
+.gs-patentResult .gs-author {
+  display: inline;
+}
+
+.gs-patentResult .gs-image-box {
+  padding-right: 8px;
+}
+
+.gs-patentResult .gs-image {
+  border: 1px solid #77c;
+}
+
+.gs-spelling {
+  color: #333;
+  padding-left: 7px;
+  padding-right: 7px;
+}
+
+.gs-spelling a {
+  color: #00c;
+  cursor: pointer;
+}
+
+.gsc-control-cse:after {
+  content: ".";
+  display: block;
+  height: 0;
+  clear: both;
+  visibility: hidden;
+}
+
+.gs-bidi-start-align {
+  text-align: left;
+}
+
+.gs-bidi-end-align {
+  text-align: right;
+}
+
+.gs-snippet {
+  color: #333;
+  margin-top: 1px;
+}
+
+.gsc-control-cse-zh_CN .gs-snippet b,
+.gsc-control-cse-zh_CN .gs-promotion em,
+.gsc-control-cse-zh_TW .gs-snippet b,
+.gsc-control-cse-zh_TW .gs-promotion em {
+  color: #c03;
+  font-style: normal;
+  font-weight: normal;
+}
+
+.gsc-snippet-metadata {
+  vertical-align: top;
+}
+
+.gsc-snippet-metadata,
+.gsc-role,
+.gsc-tel,
+.gsc-org,
+.gsc-location,
+.gsc-reviewer,
+.gsc-author {
+  color: #666;
+}
+
+.gsc-rating-bar {
+  vertical-align: top;
+  display: inline-block;
+  width: 64px;
+  height: 12px;
+  background: transparent url(/cse/static/css/cse_snippets_stars.png) -65px 0 no-repeat;
+  overflow: hidden;
+  margin: 3px 0 0 0;
+}
+
+.gsc-rating-bar span {
+  vertical-align: top;
+  display: inline-block;
+  height: 12px;
+  background: transparent url(/cse/static/css/cse_snippets_stars.png) 0 0 no-repeat;
+}
+
+.gsc-review-agregate-first-line {
+  margin: 0 40px 0 0;
+  padding: 6px 0;
+}
+
+.gsc-review-agregate-odd-lines,
+.gsc-review-agregate-even-lines {
+  margin: 0 40px 0 0;
+  padding: 6px 0;
+  border-top: 1px solid #ebebeb;
+}
+
+.gsc-table-result,
+.gs-promotion-table {
+  border-spacing: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.gsc-thumbnail-inside,
+.gsc-url-top {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.gsc-table-cell-thumbnail,
+.gs-promotion-image-cell {
+  vertical-align: top;
+}
+
+.gsc-table-cell-snippet-close {
+  padding: 1px 0;
+}
+
+.gsc-table-cell-snippet-close,
+.gs-promotion-text-cell {
+  vertical-align: top;
+  width: 100%;
+}
+
+.gs-promotion-text-cell {
+  margin-left: 8px;
+  margin-right: 8px;
+}
+
+.gs-promotion-text-cell .gs-visibleUrl,
+.gs-promotion-text-cell .gs-snippet {
+  font-size: 13px;
+}
+
+.gsc-table-cell-snippet-open {
+  vertical-align: top;
+  width: 100%;
+  padding: 1px 0;
+}
+
+.gsc-preview-reviews {
+  color: #333;
+}
+
+.gsc-preview-reviews ul {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.gsc-preview-reviews li {
+  list-style: none;
+  width: 90%;
+}
+
+.gsc-zippy {
+  margin: 2px 8px 0 0;
+  float: right;
+  outline: none;
+  overflow: hidden;
+  height: 14px;
+  width: 14px;
+  background-position: -19px -5px;
+  position: relative;
+  top: -6px;
+}
+
+.gsc-table-cell-snippet-close .gsc-preview-reviews {
+  display: none;
+}
+
+.gsc-table-cell-snippet-close .gsc-zippy {
+  background: transparent url(/cse/static/css/plus_icons.png) -19px -5px no-repeat;
+}
+
+.gsc-table-cell-snippet-open .gsc-zippy {
+  background: transparent url(/cse/static/css/minus_icons.png) -19px -5px no-repeat;
+}
+
+/*
+ * Cross-browser implementation of the "display: inline-block" CSS property.
+ * See http://www.w3.org/TR/CSS21/visuren.html#propdef-display for details.
+ */
+/* Gecko hack */
+html>body .gsc-inline-block {
+  display: -moz-inline-box;
+  display: inline-block;
+}
+
+/* Default rule */
+.gsc-inline-block {
+  display: inline-block;
+}
+
+/* Show url at the top of the web result snippet */
+.gsc-webResult .gsc-url-top {
+  display: block;
+}
+
+.gsc-webResult .gsc-url-bottom {
+  display: none;
+}
+
+/* Show url at the bottom of the image result snippet */
+.gsc-imageResult .gsc-url-top {
+  display: none;
+}
+
+.gsc-imageResult .gsc-url-bottom {
+  display: inline;
+}
+
+.gsc-thumbnail-left {
+  display: none;
+}
+
+/* CSS for labeling search results feature. */
+.gsc-label-result-main-box-visible {
+  position: fixed !important;
+  z-index: 100003;
+  background-color: rgba(255, 255, 255, 1);
+  width: 400px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0 4px 16px 0;
+  opacity: 1;
+  display: block;
+  border: none;
+  margin: auto;
+  -webkit-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -moz-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -ms-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -o-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  border-collapse: separate;
+  background: white;
+  padding: 30px;
+  width: 28%;
+  top: 30%;
+  left: 35%;
+  border: 1px solid rgba(0, 0, 0, .333);
+}
+
+.gsc-label-result-main-box-invisible {
+  display: none;
+  opacity: 0;
+  -webkit-transition: all 0.25s linear;
+  -moz-transition: all 0.25s linear;
+  -ms-transition: all 0.25s linear;
+  -o-transition: all 0.25s linear;
+  transition: all 0.25s linear;
+  -ms-filter: "progid:DXImageTransform.Microsoft.Shadow(Strength=7, Direction=135, Color='#888888')";
+  filter: progid:DXImageTransform.Microsoft.Shadow(Strength=7, Direction=135, Color='#888888');
+}
+
+.gsc-label-result-url {
+  padding-bottom: 5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  width: 100%;
+  color: #008000;
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.gsc-label-result-url-title {
+  white-space: nowrap;
+  margin-top: 10px;
+  font-size: 15px;
+  color: #00c;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  display: block;
+}
+
+.gsc-label-result-url-heading {
+  margin-bottom: 15px;
+}
+
+.gsc-label-result-labels {
+  vertical-align: text-top;
+  font-size: 13px;
+  color: #000;
+}
+
+.gsc-label-box {
+  margin-top: 5px;
+}
+
+.gsc-labels-box {
+  margin-top: 15px;
+}
+
+.gsc-label-result-buttons {
+  margin-top: 20px;
+}
+
+.gsc-labels-no-label-div-visible {
+  margin-top: 20px;
+}
+
+.gsc-labels-no-label-div-invisible {
+  display: none;
+}
+
+.gsc-labels-label-div-visible {
+  margin-top: 10px;
+}
+
+.gsc-labels-label-div-invisible {
+  display: none;
+}
+
+.gsc-label-result-form-label {
+  margin-right: 20px;
+  margin-left: 2px;
+  font-size: 13px;
+  color: #000;
+  vertical-align: text-top;
+}
+
+.gsc-label-result-form-div {
+  margin-top: 5px;
+}
+
+.gsc-label-result-label-prefix-visible {
+  width: 90%;
+  height: 20px;
+  margin-top: 10px;
+}
+
+.gsc-label-result-label-prefix-invisible {
+  display: none;
+}
+
+.gsc-label-result-label-prefix-error {
+  color: red;
+  margin-top: 10px;
+}
+
+.gsc-label-result-label-prefix-error-invisible {
+  display: none;
+}
+
+.gsc-label-result-heading {
+  font-size: 17px;
+  color: black;
+}
+
+.gsc-result-label-button {
+  background-color: #f5f5f5;
+  font-weight: bold;
+  border-radius: 2px;
+  text-align: center;
+  padding: 0 8px;
+  background-image: -webkit-linear-gradient(top, #f5f5f5, #f1f1f1);
+  height: 29px;
+  border: 1px solid #dcdcdc;
+  border-color: rgba(0, 0, 0, .1);
+  color: #444;
+  margin-right: 10px;
+  width: 72px;
+}
+
+.gsc-result-label-save-button {
+  color: #fff;
+  background-image: -webkit-linear-gradient(top, #4d90fe, #357ae8);
+  background-image: -moz-linear-gradient(top, #4d90fe, #357ae8);
+  background-image: -ms-linear-gradient(top, #4d90fe, #357ae8);
+  background-image: -o-linear-gradient(top, #4d90fe, #357ae8);
+  background-image: linear-gradient(top, #4d90fe, #357ae8);
+}
+
+.gsc-add-label-error {
+  color: red;
+  padding-top: 20px;
+}
+
+.gsc-add-label-error-invisible {
+  display: none;
+}
+
+.gsc-label-results-close-btn-visible {
+  display: block;
+  opacity: 0.7;
+}
+
+.gsc-label-result-saving-popup {
+  font-size: 13px;
+  -webkit-transition: opacity 218ms;
+  -moz-transition: opacity 218ms;
+  -o-transition: opacity 218ms;
+  transition: opacity 218ms;
+  border-width: 1px;
+  height: 14px;
+  opacity: 1;
+  padding: 6px 16px;
+  background-color: #f9edbe;
+  border-color: #f0c36d;
+  color: #333;
+  position: fixed !important;
+  top: 10%;
+  left: 45%;
+  border-style: solid;
+  border-radius: 2px;
+}
+
+.gsc-label-result-saving-popup-invisible {
+  display: none;
+}
+
+/* CSS for richsnippets feature. */
+.gsc-richsnippet-popup-box {
+  position: fixed !important;
+  z-index: 100003;
+  background-color: rgba(255, 255, 255, 1);
+  width: 400px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0 4px 16px 0;
+  opacity: 1;
+  display: block;
+  border: none;
+  margin: auto;
+  -webkit-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -moz-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -ms-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  -o-box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  box-shadow: 0 3px 10px rgba(34, 25, 25, 0.4);
+  border-collapse: separate;
+  background: white;
+  padding: 30px;
+  width: 25%;
+  top: 15%;
+  left: 25%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: 65%;
+  width: 50%;
+  padding: 30px;
+  padding-bottom: 10px;
+ }
+
+.gsc-richsnippet-popup-box-invisible {
+  display: none;
+}
+
+.gsc-richsnippet-showsnippet-label {
+  color: #009;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.gsc-richsnippet-individual-snippet-box {
+  border: 1px solid #ebebeb;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.gsc-richsnippet-individual-snippet-key {
+  font-size: 14px;
+  padding: 1px 0 6px;
+  color: #009;
+}
+
+.gsc-richsnippet-individual-snippet-data {
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-direction: column;
+  flex-direction: column;
+}
+
+.gsc-richsnippet-popup-box-title {
+ padding-bottom: 20px;
+ font-size: 15px;
+}
+
+.gsc-richsnippet-popup-box-title-text {
+  color: #404040;
+  display: inline;
+}
+
+.gsc-richsnippet-popup-box-title-url {
+  font-weight: bold;
+  color: black;
+  display: inline;
+}
+
+.gsc-richsnippet-individual-snippet-keyvalue {
+  display: -ms-flexbox;
+  display: flex;
+  margin-bottom: 6px;
+}
+
+.gsc-richsnippet-individual-snippet-keyelem {
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.gsc-richsnippet-individual-snippet-valueelem {
+  margin-left: 6px;
+}
+
+.gsc-richsnippet-popup-close-button {
+  background-image: url("//www.google.com/images/nav_logo114.png");
+  background-repeat: no-repeat;
+  background-position: -140px -230px;
+  float: right;
+  height: 12px;
+  width: 12px;
+  top: 20px;
+  right: 20px;
+  cursor: pointer;
+}
+
+.gsc-richsnippet-popup-box-contents {
+  overflow-x: hidden;
+  overflow-y: auto;
+  height: 88%;
+}
+
+.gcsc-find-more-on-google {
+  display: inline-block;
+  margin-left: 10px;
+  padding-top: 2px;
+}
+
+.gcsc-find-more-on-google-magnifier {
+  margin-right: 10px;
+  vertical-align: middle;
+}
+
+.gcsc-find-more-on-google-text {
+  vertical-align: middle;
+}
+
+.gcsc-find-more-on-google-query {
+  max-width: 200px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
+  font-weight: bold;
+}
+
+.gcsc-find-more-on-google-branding {
+  display: inline-block;
+  float: right;
+}
+
+.gsc-imageResult>.gsc-expansionArea {
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  -ms-flex-pack: distribute;
+  justify-content: space-around;
+}
+
+/* Facet box */
+.gsc-context-box {
+  font-size: 83%;
+  margin-top: 3px;
+  border-collapse: collapse;
+}
+
+.gsc-context-box .gsc-col {
+  padding: 1px 0;
+  white-space: nowrap;
+  vertical-align: middle;
+}
