@@ -44,18 +44,12 @@ type ComponentGlobals struct {
 	effectiveVersion MutableEffectiveVersion
 	featureGate      featuregate.MutableVersionedFeatureGate
 
-	// emulationVersionMapping contains the mapping from the emulation version of this component
-	// to the emulation version of another component.
-	emulationVersionMapping map[string]VersionMapping
-	// dependentEmulationVersion stores whether or not this component's EmulationVersion is dependent through mapping on another component.
-	// If true, the emulation version cannot be set from the flag, or version mapping from another component.
-	dependentEmulationVersion bool
-	// minCompatibilityVersionMapping contains the mapping from the min compatibility version of this component
-	// to the min compatibility version of another component.
-	minCompatibilityVersionMapping map[string]VersionMapping
-	// dependentMinCompatibilityVersion stores whether or not this component's MinCompatibilityVersion is dependent through mapping on another component
-	// If true, the min compatibility version cannot be set from the flag, or version mapping from another component.
-	dependentMinCompatibilityVersion bool
+	// componentVersionMapping contains the mapping from the version of this component
+	// to the version of another component.
+	componentVersionMapping map[string]VersionMapping
+	// dependentComponentVersion stores whether or not this component's version is dependent through mapping on another component.
+	// If true, the emulation/minCompatibility version cannot be set from the flag, or version mapping from another component.
+	dependentComponentVersion bool
 }
 
 // ComponentGlobalsRegistry stores the global variables for different components for easy access, including feature gate and effective version of each component.
@@ -72,7 +66,7 @@ type ComponentGlobalsRegistry interface {
 	// ComponentGlobalsOrRegister would return the registered global variables for the component if it already exists in the registry.
 	// Otherwise, the provided variables would be registered under the component, and the same variables would be returned.
 	ComponentGlobalsOrRegister(component string, effectiveVersion MutableEffectiveVersion, featureGate featuregate.MutableVersionedFeatureGate) (MutableEffectiveVersion, featuregate.MutableVersionedFeatureGate)
-	// AddFlags adds flags of "--emulated-version" and "--feature-gates"
+	// AddFlags adds flags of "--emulated-version", "--min-compatibility-version" and "--feature-gates"
 	AddFlags(fs *pflag.FlagSet)
 	// Set sets the flags for all global variables for all components registered.
 	// A component's feature gate and effective version would not be updated until Set() is called.
@@ -83,12 +77,12 @@ type ComponentGlobalsRegistry interface {
 	Validate() []error
 	// Reset removes all stored ComponentGlobals, configurations, and version mappings.
 	Reset()
-	// SetEmulationVersionMapping sets the mapping from the emulation version of one component
-	// to the emulation version of another component.
-	// Once set, the emulation version of the toComponent will be determined by the emulation version of the fromComponent,
+	// SetVersionMapping sets the mapping from the emulation/minCompatibility version of one component
+	// to the emulation/minCompatibility version of another component.
+	// Once set, the emulation/minCompatibility version of the toComponent will be determined by the emulation/minCompatibility version of the fromComponent,
 	// and cannot be set from cmd flags anymore.
-	// For a given component, its emulation version can only depend on one other component, no multiple dependency is allowed.
-	SetEmulationVersionMapping(fromComponent, toComponent string, f VersionMapping) error
+	// For a given component, its emulation/minCompatibility version can only depend on one other component, no multiple dependency is allowed.
+	SetVersionMapping(fromComponent, toComponent string, f VersionMapping) error
 }
 
 type componentGlobalsRegistry struct {
@@ -98,6 +92,8 @@ type componentGlobalsRegistry struct {
 	// When the `--emulated-version` flag is parsed, it would not take effect until Set() is called,
 	// because the emulation version needs to be set before the feature gate is set.
 	emulationVersionConfig []string
+
+	minCompatibilityVersionConfig []string
 	// featureGatesConfig stores the map of component name to the list of feature gates set from the flag.
 	// When the `--feature-gates` flag is parsed, it would not take effect until Set() is called,
 	// because the emulation version needs to be set before the feature gate is set.
@@ -111,9 +107,10 @@ type componentGlobalsRegistry struct {
 
 func NewComponentGlobalsRegistry() *componentGlobalsRegistry {
 	return &componentGlobalsRegistry{
-		componentGlobals:       make(map[string]*ComponentGlobals),
-		emulationVersionConfig: nil,
-		featureGatesConfig:     nil,
+		componentGlobals:              make(map[string]*ComponentGlobals),
+		emulationVersionConfig:        nil,
+		minCompatibilityVersionConfig: nil,
+		featureGatesConfig:            nil,
 	}
 }
 
@@ -122,6 +119,7 @@ func (r *componentGlobalsRegistry) Reset() {
 	defer r.mutex.Unlock()
 	r.componentGlobals = make(map[string]*ComponentGlobals)
 	r.emulationVersionConfig = nil
+	r.minCompatibilityVersionConfig = nil
 	r.featureGatesConfig = nil
 	r.featureGatesConfigFlags = nil
 	r.set = false
@@ -152,15 +150,15 @@ func (r *componentGlobalsRegistry) unsafeRegister(component string, effectiveVer
 		return fmt.Errorf("component globals of %s already registered", component)
 	}
 	if featureGate != nil {
-		if err := featureGate.SetEmulationVersion(effectiveVersion.EmulationVersion()); err != nil {
+		if err := featureGate.SetEmulationVersionAndMinCompatibilityVersion(
+			effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion()); err != nil {
 			return err
 		}
 	}
 	c := ComponentGlobals{
-		effectiveVersion:               effectiveVersion,
-		featureGate:                    featureGate,
-		emulationVersionMapping:        make(map[string]VersionMapping),
-		minCompatibilityVersionMapping: make(map[string]VersionMapping),
+		effectiveVersion:        effectiveVersion,
+		featureGate:             featureGate,
+		componentVersionMapping: make(map[string]VersionMapping),
 	}
 	r.componentGlobals[component] = &c
 	return nil
@@ -203,15 +201,12 @@ func (r *componentGlobalsRegistry) unsafeKnownFeatures() []string {
 func (r *componentGlobalsRegistry) unsafeVersionFlagOptions(isEmulation bool) []string {
 	var vs []string
 	for component, globals := range r.componentGlobals {
+		if globals.dependentComponentVersion {
+			continue
+		}
 		if isEmulation {
-			if globals.dependentEmulationVersion {
-				continue
-			}
 			vs = append(vs, fmt.Sprintf("%s=%s", component, globals.effectiveVersion.AllowedEmulationVersionRange()))
 		} else {
-			if globals.dependentMinCompatibilityVersion {
-				continue
-			}
 			vs = append(vs, fmt.Sprintf("%s=%s", component, globals.effectiveVersion.AllowedMinCompatibilityVersionRange()))
 		}
 	}
@@ -237,6 +232,14 @@ func (r *componentGlobalsRegistry) AddFlags(fs *pflag.FlagSet) {
 		"Version format could only be major.minor, for example: '--emulated-version=wardle=1.2,kube=1.31'.\nOptions are: "+strings.Join(r.unsafeVersionFlagOptions(true), ",")+
 		"\nIf the component is not specified, defaults to \"kube\"")
 
+	fs.StringSliceVar(&r.minCompatibilityVersionConfig, "min-compatibility-version", r.minCompatibilityVersionConfig, ""+
+		"This flag sets the min version of control plane components the api server should be compatible with.\n"+
+		"If set to smaller than the binary/emulated version, the newest CEL features/libraries/parameters introduced after the min compatibility version would not be turned on, "+
+		"and the resource storage version will be set based on the min compatibility version.\n"+
+		"If set to equal than the binary/emulated version, rollback would not be supported, while the newest CEL features/libraries/parameters would turned on.\n"+
+		"Version format could only be major.minor, for example: '--min-compatibility-version=wardle=1.2,kube=1.31'.\nOptions are: "+strings.Join(r.unsafeVersionFlagOptions(false), ",")+
+		"\nIf the component is not specified, defaults to \"kube\"")
+
 	if r.featureGatesConfigFlags == nil {
 		r.featureGatesConfigFlags = cliflag.NewColonSeparatedMultimapStringStringAllowDefaultEmptyKey(&r.featureGatesConfig)
 	}
@@ -250,9 +253,9 @@ type componentVersion struct {
 	ver       *version.Version
 }
 
-// getFullEmulationVersionConfig expands the given version config with version registered version mapping,
+// getFullVersionConfig expands the given version config with registered version mapping,
 // and returns the map of component to Version.
-func (r *componentGlobalsRegistry) getFullEmulationVersionConfig(
+func (r *componentGlobalsRegistry) getFullVersionConfig(
 	versionConfigMap map[string]*version.Version) (map[string]*version.Version, error) {
 	result := map[string]*version.Version{}
 	setQueue := []componentVersion{}
@@ -270,7 +273,7 @@ func (r *componentGlobalsRegistry) getFullEmulationVersionConfig(
 		}
 		setQueue = setQueue[1:]
 		result[cv.component] = cv.ver
-		for toComp, f := range r.componentGlobals[cv.component].emulationVersionMapping {
+		for toComp, f := range r.componentGlobals[cv.component].componentVersionMapping {
 			toVer := f(cv.ver)
 			if toVer == nil {
 				return result, fmt.Errorf("got nil version from mapping of %s=%s to component:%s", cv.component, cv.ver.String(), toComp)
@@ -336,15 +339,36 @@ func (r *componentGlobalsRegistry) Set() error {
 			return fmt.Errorf("component not registered: %s", comp)
 		}
 		// only components without any dependencies can be set from the flag.
-		if r.componentGlobals[comp].dependentEmulationVersion {
+		if r.componentGlobals[comp].dependentComponentVersion {
 			return fmt.Errorf("EmulationVersion of %s is set by mapping, cannot set it by flag", comp)
 		}
 	}
-	if emulationVersions, err := r.getFullEmulationVersionConfig(emulationVersionConfigMap); err != nil {
+	if emulationVersions, err := r.getFullVersionConfig(emulationVersionConfigMap); err != nil {
 		return err
 	} else {
 		for comp, ver := range emulationVersions {
 			r.componentGlobals[comp].effectiveVersion.SetEmulationVersion(ver)
+		}
+	}
+
+	minCompatibilityVersionConfigMap, err := toVersionMap(r.minCompatibilityVersionConfig)
+	if err != nil {
+		return err
+	}
+	for comp := range minCompatibilityVersionConfigMap {
+		if _, ok := r.componentGlobals[comp]; !ok {
+			return fmt.Errorf("component not registered: %s", comp)
+		}
+		// only components without any dependencies can be set from the flag.
+		if r.componentGlobals[comp].dependentComponentVersion {
+			return fmt.Errorf("EmulationVersion of %s is set by mapping, cannot set it by flag", comp)
+		}
+	}
+	if minCompatibilityVersions, err := r.getFullVersionConfig(minCompatibilityVersionConfigMap); err != nil {
+		return err
+	} else {
+		for comp, ver := range minCompatibilityVersions {
+			r.componentGlobals[comp].effectiveVersion.SetMinCompatibilityVersion(ver)
 		}
 	}
 	// Set feature gate emulation version before setting feature gate flag values.
@@ -352,8 +376,8 @@ func (r *componentGlobalsRegistry) Set() error {
 		if globals.featureGate == nil {
 			continue
 		}
-		klog.V(klogLevel).Infof("setting %s:feature gate emulation version to %s", comp, globals.effectiveVersion.EmulationVersion().String())
-		if err := globals.featureGate.SetEmulationVersion(globals.effectiveVersion.EmulationVersion()); err != nil {
+		klog.V(klogLevel).Infof("setting %s:feature gate emulation version to %s, min compatibility version to %s", comp, globals.effectiveVersion.EmulationVersion().String(), globals.effectiveVersion.MinCompatibilityVersion().String())
+		if err := globals.featureGate.SetEmulationVersionAndMinCompatibilityVersion(globals.effectiveVersion.EmulationVersion(), globals.effectiveVersion.MinCompatibilityVersion()); err != nil {
 			return err
 		}
 	}
@@ -393,7 +417,7 @@ func (r *componentGlobalsRegistry) Validate() []error {
 	return errs
 }
 
-func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toComponent string, f VersionMapping) error {
+func (r *componentGlobalsRegistry) SetVersionMapping(fromComponent, toComponent string, f VersionMapping) error {
 	if f == nil {
 		return nil
 	}
@@ -407,19 +431,19 @@ func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toC
 		return fmt.Errorf("component not registered: %s", toComponent)
 	}
 	// check multiple dependency
-	if r.componentGlobals[toComponent].dependentEmulationVersion {
+	if r.componentGlobals[toComponent].dependentComponentVersion {
 		return fmt.Errorf("mapping of %s already exists from another component", toComponent)
 	}
-	r.componentGlobals[toComponent].dependentEmulationVersion = true
+	r.componentGlobals[toComponent].dependentComponentVersion = true
 
-	versionMapping := r.componentGlobals[fromComponent].emulationVersionMapping
+	versionMapping := r.componentGlobals[fromComponent].componentVersionMapping
 	if _, ok := versionMapping[toComponent]; ok {
 		return fmt.Errorf("EmulationVersion from %s to %s already exists", fromComponent, toComponent)
 	}
 	versionMapping[toComponent] = f
 	klog.V(klogLevel).Infof("setting the default EmulationVersion of %s based on mapping from the default EmulationVersion of %s", toComponent, fromComponent)
 	defaultFromVersion := r.componentGlobals[fromComponent].effectiveVersion.EmulationVersion()
-	emulationVersions, err := r.getFullEmulationVersionConfig(map[string]*version.Version{fromComponent: defaultFromVersion})
+	emulationVersions, err := r.getFullVersionConfig(map[string]*version.Version{fromComponent: defaultFromVersion})
 	if err != nil {
 		return err
 	}

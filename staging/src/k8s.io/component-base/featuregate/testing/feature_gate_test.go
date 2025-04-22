@@ -161,7 +161,7 @@ func TestSetFeatureGateInTest(t *gotest.T) {
 
 func TestSpecialGatesVersioned(t *gotest.T) {
 	originalEmulationVersion := version.MustParse("1.31")
-	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion)
+	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion, originalEmulationVersion.SubtractMinor(1))
 
 	err := gate.AddVersioned(map[featuregate.Feature]featuregate.VersionedSpecs{
 		"alpha_default_on": {
@@ -363,7 +363,7 @@ func TestDetectEmulationVersionLeakToMainTest(t *gotest.T) {
 	t.Cleanup(cleanup)
 	originalEmulationVersion := version.MustParse("1.31")
 	newEmulationVersion := version.MustParse("1.30")
-	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion)
+	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion, originalEmulationVersion.SubtractMinor(1))
 	assert.True(t, gate.EmulationVersion().EqualTo(originalEmulationVersion))
 
 	// Subtest setting feature gate and calling parallel will leak it out
@@ -386,7 +386,7 @@ func TestNoLeakFromSameEmulationVersionToMainTest(t *gotest.T) {
 	t.Cleanup(cleanup)
 	originalEmulationVersion := version.MustParse("1.31")
 	newEmulationVersion := version.MustParse("1.31")
-	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion)
+	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion, originalEmulationVersion.SubtractMinor(1))
 	assert.True(t, gate.EmulationVersion().EqualTo(originalEmulationVersion))
 
 	// Subtest setting feature gate and calling parallel will leak it out
@@ -406,7 +406,7 @@ func TestDetectEmulationVersionLeakToOtherSubtest(t *gotest.T) {
 	t.Cleanup(cleanup)
 	originalEmulationVersion := version.MustParse("1.31")
 	newEmulationVersion := version.MustParse("1.30")
-	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion)
+	gate := featuregate.NewVersionedFeatureGate(originalEmulationVersion, originalEmulationVersion.SubtractMinor(1))
 	assert.True(t, gate.EmulationVersion().EqualTo(originalEmulationVersion))
 
 	subtestName := "Subtest"
