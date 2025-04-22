@@ -89,6 +89,7 @@ func autoConvert_v1alpha1_NodeLifecycleControllerConfiguration_To_config_NodeLif
 	// WARNING: in.PodEvictionTimeout requires manual conversion: does not exist in peer-type
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+	out.PauseEvictionOnFullDisruption = in.PauseEvictionOnFullDisruption
 	return nil
 }
 
@@ -99,5 +100,6 @@ func autoConvert_config_NodeLifecycleControllerConfiguration_To_v1alpha1_NodeLif
 	out.NodeMonitorGracePeriod = in.NodeMonitorGracePeriod
 	out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
 	out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
+	out.PauseEvictionOnFullDisruption = in.PauseEvictionOnFullDisruption
 	return nil
 }
