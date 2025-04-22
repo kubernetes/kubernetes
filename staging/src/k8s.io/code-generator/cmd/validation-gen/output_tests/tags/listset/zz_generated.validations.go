@@ -36,10 +36,49 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
+	scheme.AddValidationFunc((*ImmutableStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		return Validate_ImmutableStruct(ctx, op, nil /* fldPath */, obj.(*ImmutableStruct), safe.Cast[*ImmutableStruct](oldObj))
+	})
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
 		return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
 	})
 	return nil
+}
+
+func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ImmutableStruct) (errs field.ErrorList) {
+	// field ImmutableStruct.TypeMeta has no validation
+
+	// field ImmutableStruct.SliceComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ComparableStruct) (errs field.ErrorList) {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, validate.ImmutableByReflect)...)
+			return
+		}(fldPath.Child("sliceComparableField"), obj.SliceComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []ComparableStruct { return oldObj.SliceComparableField }))...)
+
+	// field ImmutableStruct.SliceSetComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ComparableStruct) (errs field.ErrorList) {
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a ComparableStruct, b ComparableStruct) bool { return a == b }, validate.ImmutableByReflect)...)
+			return
+		}(fldPath.Child("sliceSetComparableField"), obj.SliceSetComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []ComparableStruct { return oldObj.SliceSetComparableField }))...)
+
+	// field ImmutableStruct.SliceNonComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []NonComparableStruct) (errs field.ErrorList) {
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, validate.ImmutableByReflect)...)
+			return
+		}(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []NonComparableStruct { return oldObj.SliceNonComparableField }))...)
+
+	// field ImmutableStruct.SliceSetNonComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []NonComparableStruct) (errs field.ErrorList) {
+			errs = append(errs, validate.UniqueNonComparable(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.ImmutableByReflect)...)
+			return
+		}(fldPath.Child("sliceSetNonComparableField"), obj.SliceSetNonComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []NonComparableStruct { return oldObj.SliceSetNonComparableField }))...)
+
+	return errs
 }
 
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {

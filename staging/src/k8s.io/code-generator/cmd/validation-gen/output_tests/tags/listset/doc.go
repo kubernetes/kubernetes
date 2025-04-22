@@ -40,6 +40,24 @@ type Struct struct {
 	SliceNonComparableField []NonComparableStruct `json:"sliceNonComparableField"`
 }
 
+type ImmutableStruct struct {
+	TypeMeta int
+
+	// +k8s:eachVal=+k8s:immutable
+	SliceComparableField []ComparableStruct `json:"sliceComparableField"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:immutable
+	SliceSetComparableField []ComparableStruct `json:"sliceSetComparableField"`
+
+	// +k8s:eachVal=+k8s:immutable
+	SliceNonComparableField []NonComparableStruct `json:"sliceNonComparableField"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:immutable
+	SliceSetNonComparableField []NonComparableStruct `json:"sliceSetNonComparableField"`
+}
+
 type ComparableStruct struct {
 	StringField string `json:"stringField"`
 }

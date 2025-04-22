@@ -95,7 +95,7 @@ func Unique[T comparable](_ context.Context, op operation.Operation, fldPath *fi
 // Unique, this function can be used with types that are not directly
 // comparable, at the cost of performance.
 func UniqueNonComparable[T any](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
-	return unique(fldPath, newSlice, func(a, b T) bool { return equality.Semantic.DeepEqual(a, b) })
+	return unique(fldPath, newSlice, SemanticDeepEqual)
 }
 
 // unique compares every element of the slice with every other element and
@@ -122,4 +122,15 @@ func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.Er
 		errs = append(errs, field.Duplicate(fldPath.Index(i), slice[i]))
 	}
 	return errs
+}
+
+// SemanticDeepEqual is a CompareFunc that uses equality.Semantic.DeepEqual to
+// compare two values.
+// This wrapper is needed because CompareFunc requires a function that takes two
+// arguments of specific type T, while equality.Semantic.DeepEqual takes arguments
+// of type interface{}/any. The wrapper satisfies the type constraints of CompareFunc
+// while leveraging the underlying semantic equality logic.
+// It can be used by any other function that needs to call DeepEqual.
+func SemanticDeepEqual[T any](a, b T) bool {
+	return equality.Semantic.DeepEqual(a, b)
 }
