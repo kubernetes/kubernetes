@@ -1918,10 +1918,8 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		if resizeDone {
 			return volumetypes.NewOperationContext(nil, nil, migrated)
 		}
-		// This is a placeholder error - we should NEVER reach here.
-		err = fmt.Errorf("volume resizing failed for unknown reason")
-		eventErr, detailedErr = volumeToMount.GenerateError("NodeExpandVolume.NodeExpandVolume failed to resize volume", err)
-		return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
+		klog.InfoS("Waiting for volume to be expandable on the node", "volumeName", volumeToMount.VolumeName)
+		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
 
 	eventRecorderFunc := func(err *error) {
