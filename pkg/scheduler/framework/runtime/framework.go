@@ -895,6 +895,7 @@ func (f *frameworkImpl) RunFilterPlugins(
 			ctx = klog.NewContext(ctx, logger)
 		}
 		if status := f.runFilterPlugin(ctx, pl, state, pod, nodeInfo); !status.IsSuccess() {
+			logger.V(3).Info("Filter plugin unsuccessfull on node", "plugin", pl.Name(), "pod", pod.Name, "node", nodeInfo.Node().Name, "status", status.Code().String())
 			if !status.IsRejected() {
 				// Filter plugins are not supposed to return any status other than
 				// Success or Unschedulable.
