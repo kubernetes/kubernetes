@@ -35,6 +35,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			if obj.Generic.LeaderElection.ResourceLock == "" {
 				obj.Generic.LeaderElection.ResourceLock = "endpoints"
 			}
+			obj.NodeLifecycleController.PauseEvictionOnFullDisruption = false
 			obj.Generic.Controllers = []string{c.String(0)}
 			if obj.KubeCloudShared.ClusterName == "" {
 				obj.KubeCloudShared.ClusterName = "kubernetes"

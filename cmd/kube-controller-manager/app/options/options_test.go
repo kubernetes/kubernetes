@@ -153,6 +153,7 @@ var args = []string{
 	"--node-monitor-grace-period=30s",
 	"--node-monitor-period=10s",
 	"--node-startup-grace-period=30s",
+	"--pause-eviction-on-fulldisruption=false",
 	"--profiling=false",
 	"--pv-recycler-increment-timeout-nfs=45",
 	"--pv-recycler-minimum-timeout-hostpath=45",
@@ -354,7 +355,7 @@ func TestAddFlags(t *testing.T) {
 				NodeStartupGracePeriod:        metav1.Duration{Duration: 30 * time.Second},
 				LargeClusterSizeThreshold:     100,
 				UnhealthyZoneThreshold:        0.6,
-				PauseEvictionOnFullDisruption: true,
+				PauseEvictionOnFullDisruption: false,
 			},
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
