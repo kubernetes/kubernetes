@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -49,7 +50,7 @@ type Reconciler interface {
 	// If attach/detach management is enabled, the manager will also check if
 	// volumes that should be attached are attached and volumes that should
 	// be detached are detached and trigger attach/detach operations as needed.
-	Run(logger klog.Logger, stopCh <-chan struct{})
+	Run(ctx context.Context, stopCh <-chan struct{})
 
 	// StatesHasBeenSynced returns true only after syncStates process starts to sync
 	// states at least once after kubelet starts

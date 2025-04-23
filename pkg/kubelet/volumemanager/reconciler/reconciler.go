@@ -17,17 +17,21 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
 
-func (rc *reconciler) Run(logger klog.Logger, stopCh <-chan struct{}) {
+func (rc *reconciler) Run(ctx context.Context, stopCh <-chan struct{}) {
+	logger := klog.FromContext(ctx)
 	rc.reconstructVolumes(logger)
 	logger.Info("Reconciler: start to sync state")
-	wait.Until(func() { rc.reconcile(logger) }, rc.loopSleepDuration, stopCh)
+	wait.Until(func() { rc.reconcile(ctx) }, rc.loopSleepDuration, stopCh)
 }
 
-func (rc *reconciler) reconcile(logger klog.Logger) {
+func (rc *reconciler) reconcile(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	readyToUnmount := rc.readyToUnmount()
 	if readyToUnmount {
 		// Unmounts are triggered before mounts so that a volume that was
@@ -54,7 +58,7 @@ func (rc *reconciler) reconcile(logger klog.Logger) {
 	}
 
 	if len(rc.volumesNeedUpdateFromNodeStatus) != 0 {
-		rc.updateReconstructedFromNodeStatus(logger)
+		rc.updateReconstructedFromNodeStatus(ctx)
 	}
 	if len(rc.volumesNeedUpdateFromNodeStatus) == 0 {
 		// ASW is fully populated only after both devicePaths and uncertain volume attach-ability

@@ -735,6 +735,7 @@ func TestFindAndAddNewPods_FindAndRemoveDeletedPods_Valid_Block_VolumeDevices(t 
 }
 
 func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -770,11 +771,10 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
-	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -783,6 +783,7 @@ func TestCreateVolumeSpec_Valid_File_VolumeMounts(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// create dswp
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
@@ -817,11 +818,10 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
-	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -830,6 +830,7 @@ func TestCreateVolumeSpec_Valid_Nil_VolumeMounts(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// create dswp
 	mode := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
@@ -864,11 +865,10 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
-	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec == nil || err != nil {
@@ -877,6 +877,7 @@ func TestCreateVolumeSpec_Valid_Block_VolumeDevices(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// create dswp
 	mode := v1.PersistentVolumeFilesystem
 	pv := &v1.PersistentVolume{
@@ -911,11 +912,10 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "file-bound", containers)
 
-	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
@@ -924,6 +924,7 @@ func TestCreateVolumeSpec_Invalid_File_VolumeDevices(t *testing.T) {
 }
 
 func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	// create dswp
 	mode := v1.PersistentVolumeBlock
 	pv := &v1.PersistentVolume{
@@ -958,11 +959,10 @@ func TestCreateVolumeSpec_Invalid_Block_VolumeMounts(t *testing.T) {
 	}
 	pod := createPodWithVolume("dswp-test-pod", "dswp-test-volume-name", "block-bound", containers)
 
-	logger, _ := ktesting.NewTestContext(t)
 	fakePodManager.AddPod(pod)
 	mountsMap, devicesMap, _ := util.GetPodVolumeNames(pod, false /* collectSELinuxOptions */)
 	_, volumeSpec, _, err :=
-		dswp.createVolumeSpec(logger, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
+		dswp.createVolumeSpec(ctx, pod.Spec.Volumes[0], pod, mountsMap, devicesMap)
 
 	// Assert
 	if volumeSpec != nil || err == nil {
