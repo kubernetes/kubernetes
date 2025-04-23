@@ -482,7 +482,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 				proxyLogs.Reset()
 				ginkgo.By("Running kubectl via an HTTP proxy using " + proxyVar)
 				output := e2ekubectl.NewKubectlCommand(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", "running", "in", "container").
-					AppendEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
+					AppendEnv([]string{fmt.Sprintf("%s=%s", proxyVar, proxyAddr)}).
 					ExecOrDie(ns)
 
 				// Verify we got the normal output captured by the exec server
