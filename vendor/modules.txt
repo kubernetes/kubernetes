@@ -1147,7 +1147,7 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/system-validators v1.9.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+# k8s.io/utils v0.0.0-20250321185631-1f6e0b77f77e
 ## explicit; go 1.18
 k8s.io/utils/buffer
 k8s.io/utils/clock
