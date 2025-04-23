@@ -82,16 +82,6 @@ func TestSelectorImmutability(t *testing.T) {
 				},
 			},
 		},
-		{
-			genericapirequest.RequestInfo{
-				APIGroup:   "extensions",
-				APIVersion: "v1beta1",
-				Resource:   "daemonsets",
-			},
-			map[string]string{"a": "b"},
-			map[string]string{"c": "d"},
-			nil,
-		},
 	}
 
 	for _, test := range tests {
