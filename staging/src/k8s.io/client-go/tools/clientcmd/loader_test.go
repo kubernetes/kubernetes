@@ -511,6 +511,81 @@ extensions:
 	}
 }
 
+func TestLoadingRulesPrecedences(t *testing.T) {
+	oldConfig := clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"update-user-1": {Username: "user-1", Password: "user-1"},
+			"keep-user-2":   {Username: "user-2", Password: "user-2"},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"server-1": {Server: "http://server-1"},
+			"server-2": {Server: "http://server-2"},
+		},
+	}
+	newConfig := clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"update-user-1": {Username: "new-username", Password: "new-password"},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"server-1": {Server: "http://new-server-1"},
+		},
+	}
+
+	oldConfigDir, _ := os.MkdirTemp("", "")
+	defer os.RemoveAll(oldConfigDir)
+	oldConfigFile := filepath.Join(oldConfigDir, ".kubeconfig")
+	oldConfigDir, _ = filepath.Abs(oldConfigDir)
+
+	newConfigDir, _ := os.MkdirTemp("", "")
+	defer os.RemoveAll(newConfigDir)
+	newConfigDir, _ = os.MkdirTemp(newConfigDir, "")
+	newConfigFile := filepath.Join(newConfigDir, ".kubeconfig")
+	newConfigDir, _ = filepath.Abs(newConfigDir)
+
+	WriteToFile(oldConfig, oldConfigFile)
+	WriteToFile(newConfig, newConfigFile)
+
+	loadingRules := ClientConfigLoadingRules{
+		Precedence: []string{newConfigFile, oldConfigFile},
+	}
+
+	mergedConfig, err := loadingRules.Load()
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	foundClusterCount := 0
+	for key, cluster := range mergedConfig.Clusters {
+		if key == "server-1" {
+			foundClusterCount++
+			matchStringArg(newConfig.Clusters["server-1"].Server, cluster.Server, t)
+		}
+		if key == "server-2" {
+			foundClusterCount++
+			matchStringArg(oldConfig.Clusters["server-2"].Server, cluster.Server, t)
+		}
+	}
+	if foundClusterCount != 2 {
+		t.Errorf("Expected 2 clusters, found %v: %v", foundClusterCount, mergedConfig.Clusters)
+	}
+
+	foundAuthInfoCount := 0
+	for key, authInfo := range mergedConfig.AuthInfos {
+		if key == "update-user-1" {
+			foundAuthInfoCount++
+			matchStringArg(newConfig.AuthInfos["update-user-1"].Username, authInfo.Username, t)
+			matchStringArg(newConfig.AuthInfos["update-user-1"].Password, authInfo.Password, t)
+		}
+		if key == "keep-user-2" {
+			foundAuthInfoCount++
+			matchStringArg(oldConfig.AuthInfos["keep-user-2"].Username, authInfo.Username, t)
+			matchStringArg(oldConfig.AuthInfos["keep-user-2"].Password, authInfo.Password, t)
+		}
+	}
+	if foundAuthInfoCount != 2 {
+		t.Errorf("Expected 2 users, found %v: %v", foundAuthInfoCount, mergedConfig.AuthInfos)
+	}
+}
+
 func TestResolveRelativePaths(t *testing.T) {
 	pathResolutionConfig1 := clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
