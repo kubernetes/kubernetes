@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/component-base/metrics/legacyregistry"
+	// "k8s.io/component-base/metrics/legacyregistry"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -47,12 +47,12 @@ func TestAPIServerTransportMetrics(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
 	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
 
-	// reset default registry metrics
-	legacyregistry.Reset()
-
 	flags := framework.DefaultTestServerFlags()
 	flags = append(flags, "--runtime-config=api/all=true,api/beta=true")
-	result := kubeapiservertesting.StartTestServerOrDie(t, nil, flags, framework.SharedEtcd())
+	options := kubeapiservertesting.NewDefaultTestServerOptions()
+	// reset default registry metrics
+	options.ResetMetrics = true
+	result := kubeapiservertesting.StartTestServerOrDie(t, options, flags, framework.SharedEtcd())
 	defer result.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(result.ClientConfig)
