@@ -246,7 +246,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 	// Since the volume is reconstructed, it must be marked as uncertain
 	// even after a final SetUp error, see https://github.com/kubernetes/kubernetes/issues/96635
 	// and https://github.com/kubernetes/kubernetes/pull/110670.
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 
 	tests := []struct {
 		name            string
@@ -335,7 +335,7 @@ func TestReconstructVolumesMount(t *testing.T) {
 			rcInstance.volumesNeedUpdateFromNodeStatus = nil
 
 			// Act 2 - reconcile once
-			rcInstance.reconcile(logger)
+			rcInstance.reconcile(ctx)
 
 			// Assert 2
 			// MountDevice was attempted

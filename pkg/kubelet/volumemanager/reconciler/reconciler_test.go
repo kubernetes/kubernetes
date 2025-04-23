@@ -17,6 +17,7 @@ limitations under the License.
 package reconciler
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"path/filepath"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
@@ -69,7 +69,7 @@ func hasAddedPods() bool { return true }
 // Calls Run()
 // Verifies there are no calls to attach, detach, mount, unmount, etc.
 func Test_Run_Positive_DoNothing(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -100,7 +100,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		kubeletPodsDir)
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 
 	// Assert
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
@@ -115,7 +115,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 // Calls Run()
 // Verifies there is are attach/mount/etc calls and no detach/unmount calls.
 func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -173,7 +173,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -193,7 +193,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 // Verifies there is are attach/mount/etc calls and no detach/unmount calls.
 func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 	// Arrange
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	intreeToCSITranslator := csitrans.New()
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -283,7 +283,7 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
@@ -302,7 +302,7 @@ func Test_Run_Positive_VolumeAttachAndMountMigrationEnabled(t *testing.T) {
 // Verifies there is one mount call and no unmount calls.
 // Verifies there are no attach/detach calls.
 func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -374,7 +374,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -391,12 +391,12 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 
 // Populates desiredStateOfWorld cache with one volume/pod.
 // Enables controllerAttachDetachEnabled.
-// volume is not repored-in-use
+// volume is not reported-in-use
 // Calls Run()
 // Verifies that there is not wait-for-mount call
 // Verifies that there is no exponential-backoff triggered
 func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -454,7 +454,7 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	time.Sleep(reconcilerSyncWaitDuration)
 
 	ok := oex.IsOperationSafeToRetry(generatedVolumeName, podName, nodeName, operationexecutor.VerifyControllerAttachedVolumeOpName)
@@ -476,7 +476,7 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 // Deletes volume/pod from desired state of world.
 // Verifies detach/unmount calls are issued.
 func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	seLinuxTranslator := util.NewFakeSELinuxLabelTranslator()
@@ -534,7 +534,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -567,7 +567,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 // Verifies one unmount call is made.
 // Verifies there are no attach/detach calls made.
 func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -638,7 +638,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
@@ -669,7 +669,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 // Verifies there are attach/get map paths/setupDevice calls and
 // no detach/teardownDevice calls.
 func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod1",
@@ -747,7 +747,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -767,7 +767,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 // and no teardownDevice call.
 // Verifies there are no attach/detach calls.
 func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod1",
@@ -862,7 +862,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 
 	// Assert
@@ -882,7 +882,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 // Deletes volume/pod from desired state of world.
 // Verifies one detach/teardownDevice calls are issued.
 func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod1",
@@ -960,7 +960,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
 	// Assert
 	assert.NoError(t, volumetesting.VerifyAttachCallCount(
@@ -991,7 +991,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 // Verifies one teardownDevice call is made.
 // Verifies there are no attach/detach calls made.
 func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod1",
@@ -1086,7 +1086,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	}
 
 	// Act
-	runReconciler(logger, reconciler)
+	runReconciler(ctx, reconciler)
 
 	dsw.MarkVolumesReportedInUse([]v1.UniqueVolumeName{generatedVolumeName})
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
@@ -1250,7 +1250,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 // Mark volume as fsResizeRequired in ASW.
 // Verifies volume's fsResizeRequired flag is cleared later.
 func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	blockMode := v1.PersistentVolumeBlock
 	fsMode := v1.PersistentVolumeFilesystem
 
@@ -1372,7 +1372,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 			stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
 			go func() {
 				defer close(stoppedChan)
-				reconciler.Run(logger, stopChan)
+				reconciler.Run(ctx, stopChan)
 			}()
 			waitForMount(t, fakePlugin, volumeName, asw)
 			// Stop the reconciler.
@@ -1400,7 +1400,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				if !cache.IsFSResizeRequiredError(podExistErr) {
 					t.Fatalf("Volume should be marked as fsResizeRequired, but receive unexpected error: %v", podExistErr)
 				}
-				go reconciler.Run(logger, wait.NeverStop)
+				go reconciler.Run(ctx, wait.NeverStop)
 
 				waitErr := retryWithExponentialBackOff(testOperationBackOffDuration, func() (done bool, err error) {
 					mounted, _, err := asw.PodExistsInVolume(logger, podName, volumeName, newSize, "" /* SELinuxContext */)
@@ -1479,7 +1479,7 @@ func getTestPod(claimName string) *v1.Pod {
 }
 
 func Test_UncertainDeviceGlobalMounts(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	var tests = []struct {
 		name                   string
 		deviceState            operationexecutor.DeviceMountState
@@ -1630,7 +1630,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 				// Start the reconciler to fill ASW.
 				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
 				go func() {
-					reconciler.Run(logger, stopChan)
+					reconciler.Run(ctx, stopChan)
 					close(stoppedChan)
 				}()
 				waitForVolumeToExistInASW(t, volumeName, asw)
@@ -1675,7 +1675,7 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 }
 
 func Test_UncertainVolumeMountState(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	var tests = []struct {
 		name                   string
 		volumeState            operationexecutor.VolumeMountState
@@ -1854,7 +1854,7 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 				// Start the reconciler to fill ASW.
 				stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
 				go func() {
-					reconciler.Run(logger, stopChan)
+					reconciler.Run(ctx, stopChan)
 					close(stoppedChan)
 				}()
 				waitForVolumeToExistInASW(t, volumeName, asw)
@@ -2076,8 +2076,8 @@ func createTestClient(attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
 	return fakeClient
 }
 
-func runReconciler(logger klog.Logger, reconciler Reconciler) {
-	go reconciler.Run(logger, wait.NeverStop)
+func runReconciler(ctx context.Context, reconciler Reconciler) {
+	go reconciler.Run(ctx, wait.NeverStop)
 }
 
 func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, attachedVolumes ...v1.AttachedVolume) *fake.Clientset {
@@ -2116,7 +2116,7 @@ func createtestClientWithPVPVC(pv *v1.PersistentVolume, pvc *v1.PersistentVolume
 }
 
 func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Arrange
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2194,7 +2194,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	// Start the reconciler to fill ASW.
 	stopChan, stoppedChan := make(chan struct{}), make(chan struct{})
 	go func() {
-		reconciler.Run(logger, stopChan)
+		reconciler.Run(ctx, stopChan)
 		close(stoppedChan)
 	}()
 	waitForMount(t, fakePlugin, generatedVolumeName, asw)
@@ -2232,7 +2232,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 	fakePlugin.Unlock()
 
 	// Start the reconciler again.
-	go reconciler.Run(logger, wait.NeverStop)
+	go reconciler.Run(ctx, wait.NeverStop)
 
 	// 2. Delete the volume from DSW (and wait for callbacks)
 	dsw.DeletePodFromVolume(podName, generatedVolumeName)
@@ -2320,7 +2320,7 @@ func getReconciler(kubeletDir string, t *testing.T, volumePaths []string, kubeCl
 }
 
 func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
+	logger, ctx := ktesting.NewTestContext(t)
 	// Calls Run() with two reconstructed volumes.
 	// Verifies the devicePaths + volume attachability are reconstructed from node.status.
 
@@ -2409,7 +2409,7 @@ func TestReconcileWithUpdateReconstructedFromAPIServer(t *testing.T) {
 	reconciler.volumesNeedUpdateFromNodeStatus = append(reconciler.volumesNeedUpdateFromNodeStatus, volumeName1, volumeName2)
 	// Act - run reconcile loop just once.
 	// "volumesNeedUpdateFromNodeStatus" is not empty, so no unmount will be triggered.
-	reconciler.reconcile(logger)
+	reconciler.reconcile(ctx)
 
 	// Assert
 	assert.True(t, reconciler.StatesHasBeenSynced())

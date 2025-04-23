@@ -171,7 +171,8 @@ func (rc *reconciler) cleanOrphanVolumes(logger klog.Logger) {
 // updateReconstructedFromNodeStatus tries to file devicePaths of reconstructed volumes from
 // node.Status.VolumesAttached. This can be done only after connection to the API
 // server is established, i.e. it can't be part of reconstructVolumes().
-func (rc *reconciler) updateReconstructedFromNodeStatus(logger klog.Logger) {
+func (rc *reconciler) updateReconstructedFromNodeStatus(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Updating reconstructed devicePaths")
 
 	if rc.kubeClient == nil {
@@ -182,7 +183,7 @@ func (rc *reconciler) updateReconstructedFromNodeStatus(logger klog.Logger) {
 		return
 	}
 
-	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
+	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(ctx, string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		// This may repeat few times per second until kubelet is able to read its own status for the first time.
 		logger.V(4).Error(fetchErr, "Failed to get Node status to reconstruct device paths")

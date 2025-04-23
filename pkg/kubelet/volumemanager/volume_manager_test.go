@@ -52,6 +52,7 @@ const (
 )
 
 func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tests := []struct {
 		name            string
 		pvMode, podMode v1.PersistentVolumeMode
@@ -112,7 +113,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				tCtx.Done(),
 				manager)
 
-			err = manager.WaitForAttachAndMount(context.Background(), pod)
+			err = manager.WaitForAttachAndMount(ctx, pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
 			}
@@ -145,6 +146,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestWaitForAttachAndMountError(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -232,7 +234,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 
 	podManager.SetPods([]*v1.Pod{pod})
 
-	err = manager.WaitForAttachAndMount(context.Background(), pod)
+	err = manager.WaitForAttachAndMount(ctx, pod)
 	if err == nil {
 		t.Errorf("Expected error, got none")
 	}
@@ -243,6 +245,7 @@ func TestWaitForAttachAndMountError(t *testing.T) {
 }
 
 func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -273,10 +276,10 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		manager)
 
 	// delayed claim binding
-	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
+	go delayClaimBecomesBound(ctx, kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
 	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
-		err = manager.WaitForAttachAndMount(context.Background(), pod)
+		err = manager.WaitForAttachAndMount(ctx, pod)
 		if err != nil {
 			// Few "PVC not bound" errors are expected
 			return false, nil
@@ -290,6 +293,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 }
 
 func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	if err != nil {
 		t.Fatalf("can't make a temp dir: %v", err)
@@ -362,7 +366,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			tCtx.Done(),
 			manager)
 
-		err = manager.WaitForAttachAndMount(context.Background(), pod)
+		err = manager.WaitForAttachAndMount(ctx, pod)
 		if err != nil {
 			t.Errorf("Expected success: %v", err)
 			continue
@@ -539,19 +543,21 @@ func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan str
 }
 
 func delayClaimBecomesBound(
+	ctx context.Context,
 	kubeClient clientset.Interface,
 	namespace, claimName string,
 ) {
 	time.Sleep(500 * time.Millisecond)
 	volumeClaim, _ :=
-		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
 	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimBound,
 	}
-	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(context.TODO(), volumeClaim, metav1.UpdateOptions{})
+	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(ctx, volumeClaim, metav1.UpdateOptions{})
 }
 
 func TestWaitForAllPodsUnmount(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
 	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
 	require.NoError(t, err, "Failed to create temp directory")
 	defer func() {
@@ -586,7 +592,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 			manager := newTestVolumeManager(t, tmpDir, podManager, kubeClient, node)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 			defer cancel()
 			sourcesReady := config.NewSourcesReady(func(_ sets.Set[string]) bool { return true })
 			go manager.Run(ctx, sourcesReady)
@@ -598,7 +604,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 				ctx.Done(),
 				manager)
 
-			err := manager.WaitForAttachAndMount(context.Background(), pod)
+			err := manager.WaitForAttachAndMount(ctx, pod)
 			require.NoError(t, err, "Failed to wait for attach and mount")
 
 			err = manager.WaitForAllPodsUnmount(ctx, []*v1.Pod{pod})

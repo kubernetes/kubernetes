@@ -301,7 +301,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(ctx context.Context,
 		}
 
 		pvc, volumeSpec, volumeGIDValue, err :=
-			dswp.createVolumeSpec(logger, podVolume, pod, mounts, devices)
+			dswp.createVolumeSpec(ctx, podVolume, pod, mounts, devices)
 		if err != nil {
 			logger.Error(err, "Error processing volume", "pod", klog.KObj(pod), "volumeName", podVolume.Name)
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
@@ -428,7 +428,8 @@ func (dswp *desiredStateOfWorldPopulator) deleteProcessedPod(
 // specified volume. It dereference any PVC to get PV objects, if needed.
 // Returns an error if unable to obtain the volume at this time.
 func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
-	logger klog.Logger, podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.Set[string]) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
+	ctx context.Context, podVolume v1.Volume, pod *v1.Pod, mounts, devices sets.Set[string]) (*v1.PersistentVolumeClaim, *volume.Spec, string, error) {
+	logger := klog.FromContext(ctx)
 	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
 	isEphemeral := pvcSource == nil && podVolume.VolumeSource.Ephemeral != nil
 	if isEphemeral {
@@ -444,7 +445,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		logger.V(5).Info("Found PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName))
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvc, err := dswp.getPVCExtractPV(
-			pod.Namespace, pvcSource.ClaimName)
+			ctx, pod.Namespace, pvcSource.ClaimName)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
 				"error processing PVC %s/%s: %v",
@@ -461,7 +462,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 		logger.V(5).Info("Found bound PV for PVC", "PVC", klog.KRef(pod.Namespace, pvcSource.ClaimName), "PVCUID", pvcUID, "PVName", pvName)
 		// Fetch actual PV object
 		volumeSpec, volumeGIDValue, err :=
-			dswp.getPVSpec(pvName, pvcSource.ReadOnly, pvcUID)
+			dswp.getPVSpec(ctx, pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
 				"error processing PVC %s/%s: %v",
@@ -524,9 +525,9 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 // it is pointing to and returns it.
 // An error is returned if the PVC object's phase is not "Bound".
 func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
-	namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
+	ctx context.Context, namespace string, claimName string) (*v1.PersistentVolumeClaim, error) {
 	pvc, err :=
-		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(context.TODO(), claimName, metav1.GetOptions{})
+		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
 		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}
@@ -563,10 +564,11 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 // and returns a volume.Spec representing it.
 // An error is returned if the call to fetch the PV object fails.
 func (dswp *desiredStateOfWorldPopulator) getPVSpec(
+	ctx context.Context,
 	name string,
 	pvcReadOnly bool,
 	expectedClaimUID types.UID) (*volume.Spec, string, error) {
-	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), name, metav1.GetOptions{})
+	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(
 			"failed to fetch PV %s from API server: %v", name, err)
