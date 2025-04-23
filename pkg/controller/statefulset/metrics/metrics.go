@@ -27,7 +27,7 @@ const StatefulSetControllerSubsystem = "statefulset_controller"
 
 var (
 	// MaxUnavailableViolations tracks the number of times that
-	// spec.replicas - availableReplicas > maxUnavailable.
+	// .spec.replicas - .status.availableReplicas > .spec.updateStrategy.rollingUpdate.maxUnavailable.
 	MaxUnavailableViolations = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      StatefulSetControllerSubsystem,
