@@ -304,7 +304,7 @@ func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath string
 		pod.Namespace, pod.Name, cName, expectedCgValues, cgPath)
 	cgValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
 	if err != nil {
-		return fmt.Errorf("failed to find one of the expected cgroup values %q in container cgroup %q", expectedCgValues, cgPath)
+		return fmt.Errorf("failed to find one of the expected cgroup values %q in container cgroup %q: %w", expectedCgValues, cgPath, err)
 	}
 	cgValue = strings.Trim(cgValue, "\n")
 
