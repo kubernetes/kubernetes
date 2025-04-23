@@ -28741,7 +28741,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 					},
 					"hostNetwork": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Host networking requested for this pod. Use the host's network namespace. If this option is set, the ports that will be used must be specified. Default to false.",
+							Description: "Host networking requested for this pod. Use the host's network namespace. Default to false.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
