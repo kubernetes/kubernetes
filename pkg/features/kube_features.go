@@ -337,6 +337,13 @@ const (
 	// CPU Manager Static Policy option set.
 	InPlacePodVerticalScalingExclusiveCPUs featuregate.Feature = "InPlacePodVerticalScalingExclusiveCPUs"
 
+	// owner: @pkrishn @tallclair
+	//
+	// Allow resource resize for containers in Guaranteed pods (default false).
+	// Applies only in nodes with InPlacePodVerticalScaling and Memory Manager features enabled, and
+	// Memory Manager Static Policy option set.
+	InPlacePodVerticalScalingStaticMemoryPolicy featuregate.Feature = "InPlacePodVerticalScalingStaticMemoryPolicy"
+
 	// owner: @trierra
 	//
 	// Disables the Portworx in-tree driver.
@@ -1380,6 +1387,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	InPlacePodVerticalScalingExclusiveCPUs: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	InPlacePodVerticalScalingStaticMemoryPolicy: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Alpha},
 	},
 
 	InTreePluginPortworxUnregister: {
