@@ -151,6 +151,8 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, 
 		return Validations{}, fmt.Errorf("no field for JSON name %q", payload)
 	} else if k := realType(memb.Type).Kind; k != types.Builtin {
 		return Validations{}, fmt.Errorf("only primitive types can be list-map keys, not %s", k)
+	} else if isPointer(memb.Type) {
+		return Validations{}, fmt.Errorf("pointer types cannot be list-map keys")
 	} else {
 		fieldName = memb.Name
 	}
@@ -164,6 +166,16 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, 
 	// This tag doesn't generate any validations.  It just accumulates
 	// information for other tags to use.
 	return Validations{}, nil
+}
+
+func isPointer(t *types.Type) bool {
+	if t.Kind == types.Pointer {
+		return true
+	}
+	if t.Kind == types.Alias {
+		return isPointer(t.Underlying)
+	}
+	return false
 }
 
 func (lmktv listMapKeyTagValidator) Docs() TagDoc {
@@ -277,6 +289,8 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			}
 			buf := strings.Builder{}
 			buf.WriteString("return ")
+			// Note: this does not handle pointer fields, which are not
+			// supposed to be used as listMap keys.
 			for i, fld := range listMap.keyFields {
 				if i > 0 {
 					buf.WriteString(" && ")
