@@ -144,7 +144,7 @@ func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 	return pl
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
@@ -1430,15 +1430,15 @@ func TestSelectBestCandidate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			nodeInfos, err := fwk.SnapshotSharedLister().NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			state := framework.NewCycleState()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
 			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
-			}
-			nodeInfos, err := snapshot.NodeInfos().List()
-			if err != nil {
-				t.Fatal(err)
 			}
 
 			pl := &DefaultPreemption{

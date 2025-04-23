@@ -3131,6 +3131,7 @@ func TestFindFitAllError(t *testing.T) {
 		},
 		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+		frameworkruntime.WithSnapshotSharedLister(scheduler.nodeInfoSnapshot),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3175,6 +3176,7 @@ func TestFindFitSomeError(t *testing.T) {
 		},
 		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+		frameworkruntime.WithSnapshotSharedLister(scheduler.nodeInfoSnapshot),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -3252,20 +3254,20 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error adding pod to podInformer: %s", err)
 			}
-
+			scheduler := makeScheduler(ctx, nodes)
+			if err := scheduler.Cache.UpdateSnapshot(logger, scheduler.nodeInfoSnapshot); err != nil {
+				t.Fatal(err)
+			}
 			fwk, err := tf.NewFramework(
 				ctx,
 				registerPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(scheduler.nodeInfoSnapshot),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			scheduler := makeScheduler(ctx, nodes)
-			if err := scheduler.Cache.UpdateSnapshot(logger, scheduler.nodeInfoSnapshot); err != nil {
-				t.Fatal(err)
-			}
 			podinfo, err := framework.NewPodInfo(st.MakePod().UID("nominated").Priority(midPriority).Obj())
 			if err != nil {
 				t.Fatal(err)
@@ -3934,6 +3936,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		},
 		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewTestQueue(ctx, nil)),
+		frameworkruntime.WithSnapshotSharedLister(sched.nodeInfoSnapshot),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -4011,16 +4014,17 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				tf.RegisterScorePlugin("EqualPrioritizerPlugin", tf.NewEqualPrioritizerPlugin(), 1),
 				tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
 			fwk, err := tf.NewFramework(
 				ctx,
 				registerPlugins, "",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
-			snapshot := internalcache.NewSnapshot(nil, nodes)
 
 			sched := &Scheduler{
 				Cache:                    cache,
@@ -4165,6 +4169,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 	}
 	schedulingQueue := internalqueue.NewTestQueueWithInformerFactory(ctx, nil, informerFactory)
 	waitingPods := frameworkruntime.NewWaitingPodsMap()
+	snapshot := internalcache.NewEmptySnapshot()
 
 	fwk, _ := tf.NewFramework(
 		ctx,
@@ -4175,13 +4180,14 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		frameworkruntime.WithInformerFactory(informerFactory),
 		frameworkruntime.WithPodNominator(schedulingQueue),
 		frameworkruntime.WithWaitingPods(waitingPods),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
 	)
 
 	errChan := make(chan error, 1)
 	sched := &Scheduler{
 		Cache:                    cache,
 		client:                   client,
-		nodeInfoSnapshot:         internalcache.NewEmptySnapshot(),
+		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 		NextPod: func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}, nil

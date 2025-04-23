@@ -105,7 +105,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -180,7 +180,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -261,7 +261,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -342,7 +342,7 @@ func TestISCSIDiskConflicts(t *testing.T) {
 			defer cancel()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
@@ -470,7 +470,7 @@ func TestAccessModeConflicts(t *testing.T) {
 			defer cancel()
 			p := newPluginWithListers(ctx, t, test.existingPods, test.existingNodes, test.existingPVCs)
 			cycleState := framework.NewCycleState()
-			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod)
+			_, preFilterGotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
 			if diff := cmp.Diff(test.preFilterWantStatus, preFilterGotStatus); diff != "" {
 				t.Errorf("Unexpected PreFilter status (-want, +got): %s", diff)
 			}
