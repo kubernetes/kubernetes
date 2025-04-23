@@ -40,17 +40,17 @@ func pause(cmd *cobra.Command, args []string) {
 	done := make(chan int, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
 	signal.Notify(sigCh, syscall.SIGTERM)
+	fmt.Println("Signals registered")
 	go func() {
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGINT:
 			done <- 1
-			os.Exit(1)
 		case syscall.SIGTERM:
 			done <- 2
-			os.Exit(2)
 		}
 	}()
 	result := <-done
 	fmt.Printf("exiting %d\n", result)
+	os.Exit(result)
 }
