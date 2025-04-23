@@ -311,7 +311,9 @@ aliases:
 
   sig-autoscaling-maintainers:
     - gjtempleton
-    - MaciekPytel
+    - jackfrancis
+    - raywainman
+    - towca
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
