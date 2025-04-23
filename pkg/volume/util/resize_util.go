@@ -244,7 +244,6 @@ func MarkNodeExpansionFinishedWithRecovery(
 
 	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
 
-	// if RecoverVolumeExpansionFailure is enabled, we need to reset ResizeStatus back to nil
 	allocatedResourceStatusMap := newPVC.Status.AllocatedResourceStatuses
 	delete(allocatedResourceStatusMap, v1.ResourceStorage)
 	if len(allocatedResourceStatusMap) == 0 {
