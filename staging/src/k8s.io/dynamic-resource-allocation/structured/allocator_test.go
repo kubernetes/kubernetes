@@ -1597,6 +1597,28 @@ func TestAllocator(t *testing.T) {
 
 			expectResults: nil,
 		},
+		"with-constraint-expression-single-device": {
+			claimsToAllocate: objects(claimWithRequests(
+				claim0,
+				nil,
+				request(req0, classA, 1, resourceapi.DeviceSelector{
+					CEL: &resourceapi.CELDeviceSelector{
+						Expression: fmt.Sprintf(`device.attributes["%s"].deviceId == 0`, driverA),
+					}},
+				),
+			)),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+					driverA + "/deviceId": {IntValue: ptr.To(int64(0))},
+				}),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+			)},
+		},
 		"with-class-device-config": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(classWithConfig(classA, driverA, "classAttribute")),
