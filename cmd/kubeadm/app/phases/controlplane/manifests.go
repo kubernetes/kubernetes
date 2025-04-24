@@ -176,6 +176,7 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 		{Name: "tls-private-key-file", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName)},
 		{Name: "kubelet-client-certificate", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientCertName)},
 		{Name: "kubelet-client-key", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName)},
+		{Name: "kubelet-certificate-authority", Value: filepath.Join(cfg.CertificatesDir, kubeadmconstants.CACertName)},
 		{Name: "enable-bootstrap-token-auth", Value: "true"},
 		{Name: "secure-port", Value: fmt.Sprintf("%d", localAPIEndpoint.BindPort)},
 		{Name: "allow-privileged", Value: "true"},
