@@ -619,7 +619,7 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		status.Reason = Reason
 		status.Message = evictMsg
 		if condition != nil {
-			condition.ObservedGeneration = podutil.GetPodObservedGenerationIfEnabledOnCondition(status, pod.Generation, v1.DisruptionTarget)
+			condition.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget)
 			podutil.UpdatePodCondition(status, condition)
 		}
 	})
