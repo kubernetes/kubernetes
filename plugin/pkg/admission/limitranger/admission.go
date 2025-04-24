@@ -236,7 +236,7 @@ func defaultResourceRequirements(limitRange *corev1.LimitRange, limitType corev1
 	return requirements
 }
 
-// mergeResources handles defaulting all of the resources on a container.
+// mergeResources handles defaulting all of the resources specified.
 func mergeResources(name string, resources *api.ResourceRequirements, defaultRequirements *api.ResourceRequirements, annotationPrefix string, annotations []string) []string {
 	setRequests := []string{}
 	setLimits := []string{}
@@ -283,11 +283,38 @@ func mergePodResourceRequirements(pod *api.Pod, defaultResources defaultResource
 
 	// Check if defaultResources contains pod type
 	if podDefaultRequirements, exists := defaultResources[corev1.LimitTypePod]; exists {
-		if pod.Spec.Resources == nil {
-			pod.Spec.Resources = &api.ResourceRequirements{}
+		// Limit ranger pod default and defaultRequest will be applied conditionally
+		// per resource type, when:
+		// - limit: None of the containers from the pod spec specify a limit for that corresponding resource
+		// - request: None of the containers from the pod spec specify a request for that corresponding resource
+		filteredPodDefaultRequirements := api.ResourceRequirements{
+			Limits: podDefaultRequirements.Limits,
+			Requests: podDefaultRequirements.Requests,
 		}
 
-		annotations = mergeResources(pod.Name, pod.Spec.Resources, &podDefaultRequirements, "pod", annotations)
+		for i := range pod.Spec.Containers {
+			for k := range filteredPodDefaultRequirements.Limits {
+				// Resource is removed from the pod default limits when any of the containers specifies it
+				if _, exists := pod.Spec.Containers[i].Resources.Limits[k]; exists {
+					delete(filteredPodDefaultRequirements.Limits, k)
+				}
+			}
+
+			for k := range filteredPodDefaultRequirements.Requests {
+				// Resource is removed from the pod default requests when any of the containers specifies it
+				if _, exists := pod.Spec.Containers[i].Resources.Requests[k]; exists {
+					delete(filteredPodDefaultRequirements.Requests, k)
+				}
+			}
+		}
+
+		if len(filteredPodDefaultRequirements.Requests) > 0 || len(filteredPodDefaultRequirements.Limits) > 0 {
+			if pod.Spec.Resources == nil {
+				pod.Spec.Resources = &api.ResourceRequirements{}
+			}
+
+			annotations = mergeResources(pod.Name, pod.Spec.Resources, &filteredPodDefaultRequirements, "pod", annotations)
+		}
 	}
 
 	containerDefaultRequirements := defaultResources[corev1.LimitTypeContainer]
