@@ -8,7 +8,7 @@ godebug default=go1.24
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
 	go.opentelemetry.io/otel/sdk v1.33.0

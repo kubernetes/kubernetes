@@ -1,8 +1,69 @@
 # Changelog
 
-Unreleased
-----------
-Nothing yet.
+1.9.0 2024-04-04
+----------------
+
+### Changes and fixes
+
+- all: make BufferedWatcher buffered again ([#657])
+
+- inotify: fix race when adding/removing watches while a watched path is being
+  deleted ([#678], [#686])
+
+- inotify: don't send empty event if a watched path is unmounted ([#655])
+
+- inotify: don't register duplicate watches when watching both a symlink and its
+  target; previously that would get "half-added" and removing the second would
+  panic ([#679])
+
+- kqueue: fix watching relative symlinks ([#681])
+
+- kqueue: correctly mark pre-existing entries when watching a link to a dir on
+  kqueue ([#682])
+
+- illumos: don't send error if changed file is deleted while processing the
+  event ([#678])
+
+
+[#657]: https://github.com/fsnotify/fsnotify/pull/657
+[#678]: https://github.com/fsnotify/fsnotify/pull/678
+[#686]: https://github.com/fsnotify/fsnotify/pull/686
+[#655]: https://github.com/fsnotify/fsnotify/pull/655
+[#681]: https://github.com/fsnotify/fsnotify/pull/681
+[#679]: https://github.com/fsnotify/fsnotify/pull/679
+[#682]: https://github.com/fsnotify/fsnotify/pull/682
+
+1.8.0 2024-10-31
+----------------
+
+### Additions
+
+- all: add `FSNOTIFY_DEBUG` to print debug logs to stderr ([#619])
+
+### Changes and fixes
+
+- windows: fix behaviour of `WatchList()` to be consistent with other platforms ([#610])
+
+- kqueue: ignore events with Ident=0 ([#590])
+
+- kqueue: set O_CLOEXEC to prevent passing file descriptors to children ([#617])
+
+- kqueue: emit events as "/path/dir/file" instead of "path/link/file" when watching a symlink ([#625])
+
+- inotify: don't send event for IN_DELETE_SELF when also watching the parent ([#620])
+
+- inotify: fix panic when calling Remove() in a goroutine ([#650])
+
+- fen: allow watching subdirectories of watched directories ([#621])
+
+[#590]: https://github.com/fsnotify/fsnotify/pull/590
+[#610]: https://github.com/fsnotify/fsnotify/pull/610
+[#617]: https://github.com/fsnotify/fsnotify/pull/617
+[#619]: https://github.com/fsnotify/fsnotify/pull/619
+[#620]: https://github.com/fsnotify/fsnotify/pull/620
+[#621]: https://github.com/fsnotify/fsnotify/pull/621
+[#625]: https://github.com/fsnotify/fsnotify/pull/625
+[#650]: https://github.com/fsnotify/fsnotify/pull/650
 
 1.7.0 - 2023-10-22
 ------------------
