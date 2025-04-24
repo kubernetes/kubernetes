@@ -166,8 +166,9 @@ func DriverName(driverName string) Option {
 	}
 }
 
-// GRPCVerbosity sets the verbosity for logging gRPC calls. Default is 4. A negative
-// value disables logging.
+// GRPCVerbosity sets the verbosity for logging gRPC calls.
+// Default is 6, which includes gRPC calls and their responses.
+// A negative value disables logging.
 func GRPCVerbosity(level int) Option {
 	return func(o *options) error {
 		o.grpcVerbosity = level
