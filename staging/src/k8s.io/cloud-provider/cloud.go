@@ -65,6 +65,21 @@ type Interface interface {
 	// ProviderName returns the cloud provider ID.
 	ProviderName() string
 	// HasClusterID returns true if a ClusterID is required and set
+	// ClusterID is an identifier used by cloud providers to distinguish resources
+	// belonging to different clusters. It is particularly important when managing
+	// multiple Kubernetes clusters within the same account, region, VPC, or subnet.
+	//
+	// Some cloud providers (e.g., AWS) require ClusterID for resource tagging, load balancer
+	// naming, routing table management, etc. These cloud providers use the ClusterID to
+	// disambiguate resources when running multiple clusters within the same VPC or account.
+	//
+	// Cloud providers that don't utilize cluster IDs still need to implement this interface,
+	// and can simply implement it as 'return true' for compatibility purposes.
+	//
+	// This method is called during cloud-controller-manager initialization to verify
+	// that the current cluster is properly identified. If it returns false and the
+	// --allow-untagged-cloud flag is not set, the controller may log warnings
+	// or terminate execution to prevent resource conflicts.
 	HasClusterID() bool
 }
 
