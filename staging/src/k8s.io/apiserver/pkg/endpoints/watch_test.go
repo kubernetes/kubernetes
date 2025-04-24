@@ -18,7 +18,6 @@ package endpoints
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -27,7 +26,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,22 +33,16 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/websocket"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
-	"k8s.io/apiserver/pkg/endpoints/handlers"
-	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/client-go/dynamic"
-	restclient "k8s.io/client-go/rest"
 )
 
 // watchJSON defines the expected JSON wire equivalent of watch.Event
@@ -597,272 +589,6 @@ func TestWatchProtocolSelection(t *testing.T) {
 		}
 	}
 
-}
-
-type fakeTimeoutFactory struct {
-	timeoutCh chan time.Time
-	done      chan struct{}
-}
-
-func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
-	return t.timeoutCh, func() bool {
-		defer close(t.done)
-		return true
-	}
-}
-
-// serveWatch will serve a watch response according to the watcher and watchServer.
-// Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
-func serveWatch(watcher watch.Interface, watchServer *handlers.WatchServer, preServeErr error) http.HandlerFunc {
-	return func(w http.ResponseWriter, req *http.Request) {
-		defer watcher.Stop()
-
-		if preServeErr != nil {
-			responsewriters.ErrorNegotiated(preServeErr, watchServer.Scope.Serializer, watchServer.Scope.Kind.GroupVersion(), w, req)
-			return
-		}
-
-		watchServer.HandleHTTP(w, req)
-	}
-}
-
-func TestWatchHTTPErrors(t *testing.T) {
-	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
-
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok || info.StreamSerializer == nil {
-		t.Fatal(info)
-	}
-	serializer := info.StreamSerializer
-
-	// Setup a new watchserver
-	watchServer := &handlers.WatchServer{
-		Scope:    &handlers.RequestScope{},
-		Watching: watcher,
-
-		MediaType:       "testcase/json",
-		Framer:          serializer.Framer,
-		Encoder:         newCodec,
-		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
-	}
-
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
-	defer s.Close()
-
-	// Setup a client
-	dest, _ := url.Parse(s.URL)
-	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
-	dest.RawQuery = "watch=true"
-
-	req, _ := http.NewRequest("GET", dest.String(), nil)
-	client := http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
-	watcher.Error(&errStatus)
-	watcher.Stop()
-
-	// Make sure we can actually watch an endpoint
-	decoder := json.NewDecoder(resp.Body)
-	var got watchJSON
-	err = decoder.Decode(&got)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if got.Type != watch.Error {
-		t.Fatalf("unexpected watch type: %#v", got)
-	}
-	status := &metav1.Status{}
-	if err := json.Unmarshal(got.Object, status); err != nil {
-		t.Fatal(err)
-	}
-	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
-		t.Fatalf("error: %#v", status)
-	}
-}
-
-func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
-	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
-
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok || info.StreamSerializer == nil {
-		t.Fatal(info)
-	}
-	serializer := info.StreamSerializer
-
-	// Setup a new watchserver
-	watchServer := &handlers.WatchServer{
-		Scope: &handlers.RequestScope{
-			Serializer: runtime.NewSimpleNegotiatedSerializer(info),
-			Kind:       testGroupVersion.WithKind("test"),
-		},
-		Watching: watcher,
-
-		MediaType:       "testcase/json",
-		Framer:          serializer.Framer,
-		Encoder:         newCodec,
-		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
-	}
-
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error"))
-
-	s := httptest.NewServer(serveWatch(watcher, watchServer, errStatus))
-	defer s.Close()
-
-	// Setup a client
-	dest, _ := url.Parse(s.URL)
-	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
-	dest.RawQuery = "watch=true"
-
-	req, _ := http.NewRequest("GET", dest.String(), nil)
-	client := http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	// We had already got an error before watch serve started
-	decoder := json.NewDecoder(resp.Body)
-	var status *metav1.Status
-	err = decoder.Decode(&status)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if status.Kind != "Status" || status.APIVersion != "v1" || status.Code != 500 || status.Status != "Failure" || !strings.Contains(status.Message, "we got an error") {
-		t.Fatalf("error: %#v", status)
-	}
-
-	// check for leaks
-	if !watcher.IsStopped() {
-		t.Errorf("Leaked watcher goruntine after request done")
-	}
-}
-
-func TestWatchHTTPDynamicClientErrors(t *testing.T) {
-	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
-
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok || info.StreamSerializer == nil {
-		t.Fatal(info)
-	}
-	serializer := info.StreamSerializer
-
-	// Setup a new watchserver
-	watchServer := &handlers.WatchServer{
-		Scope:    &handlers.RequestScope{},
-		Watching: watcher,
-
-		MediaType:       "testcase/json",
-		Framer:          serializer.Framer,
-		Encoder:         newCodec,
-		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
-	}
-
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
-	defer s.Close()
-	defer s.CloseClientConnections()
-
-	client := dynamic.NewForConfigOrDie(&restclient.Config{
-		Host:    s.URL,
-		APIPath: "/" + prefix,
-	}).Resource(newGroupVersion.WithResource("simple"))
-
-	_, err := client.Watch(context.TODO(), metav1.ListOptions{})
-	if err == nil {
-		t.Fatal(err)
-	}
-	if err.Error() != "no stream serializers registered for testcase/json" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestWatchHTTPTimeout(t *testing.T) {
-	watcher := watch.NewFake()
-	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
-
-	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok || info.StreamSerializer == nil {
-		t.Fatal(info)
-	}
-	serializer := info.StreamSerializer
-
-	// Setup a new watchserver
-	watchServer := &handlers.WatchServer{
-		Scope:    &handlers.RequestScope{},
-		Watching: watcher,
-
-		MediaType:       "testcase/json",
-		Framer:          serializer.Framer,
-		Encoder:         newCodec,
-		EmbeddedEncoder: newCodec,
-
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
-	}
-
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
-	defer s.Close()
-
-	// Setup a client
-	dest, _ := url.Parse(s.URL)
-	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/simple"
-	dest.RawQuery = "watch=true"
-
-	req, _ := http.NewRequest("GET", dest.String(), nil)
-	client := http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	watcher.Add(&apitesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: newGroupVersion.String()}})
-
-	// Make sure we can actually watch an endpoint
-	decoder := json.NewDecoder(resp.Body)
-	var got watchJSON
-	err = decoder.Decode(&got)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	// Timeout and check for leaks
-	close(timeoutCh)
-	select {
-	case <-done:
-		eventCh := watcher.ResultChan()
-		select {
-		case _, opened := <-eventCh:
-			if opened {
-				t.Errorf("Watcher received unexpected event")
-			}
-			if !watcher.IsStopped() {
-				t.Errorf("Watcher is not stopped")
-			}
-		case <-time.After(wait.ForeverTestTimeout):
-			t.Errorf("Leaked watch on timeout")
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Failed to stop watcher after %s of timeout signal", wait.ForeverTestTimeout.String())
-	}
-
-	// Make sure we can't receive any more events through the timeout watch
-	err = decoder.Decode(&got)
-	if err != io.EOF {
-		t.Errorf("Unexpected non-error")
-	}
 }
 
 // BenchmarkWatchHTTP measures the cost of serving a watch.
