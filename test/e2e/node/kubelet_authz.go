@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/test/e2e/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eauth "k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -36,7 +36,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe(feature.KubeletFineGrainedAuthz, func() {
+var _ = SIGDescribe(framework.WithFeatureGate(features.KubeletFineGrainedAuthz), func() {
 	f := framework.NewDefaultFramework("kubelet-authz-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
