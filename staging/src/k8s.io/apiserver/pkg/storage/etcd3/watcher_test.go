@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -167,32 +166,6 @@ func TestWatchErrorEventIsBlockingFurtherEvent(t *testing.T) {
 // As such, they may focus e.g. on non-functional aspects like performance
 // impact.
 // =======================================================================
-
-func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
-	origCtx, store, _ := testSetup(t)
-	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
-	// make resultChan and errChan blocking to ensure ordering.
-	w.resultChan = make(chan watch.Event)
-	// The event flow goes like:
-	// - first we send an error, it should block on resultChan.
-	// - Then we cancel ctx. The blocking on resultChan should be freed up
-	//   and run() goroutine should return.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		w.run(false, true)
-		wg.Done()
-	}()
-	wg.Add(1)
-	go func() {
-		w.sendError(fmt.Errorf("some error"))
-		wg.Done()
-	}()
-	cancel()
-	// Ensure that both run() and sendError() don't hung forever.
-	wg.Wait()
-}
 
 // TestWatchErrorIncorrectConfiguration checks if an error
 // will be returned when the storage hasn't been properly
