@@ -2830,6 +2830,11 @@ type Container struct {
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	// +listType=atomic
+	// ResizePolicy defines how resources allocated to a container (such as CPU and memory)
+	// can be resized while the container is running. This is an optional field that specifies
+	// one or more policies that control if and how container resource requests can be updated
+	// dynamically.
+	// +optional
 	ResizePolicy []ContainerResizePolicy `json:"resizePolicy,omitempty" protobuf:"bytes,23,rep,name=resizePolicy"`
 	// RestartPolicy defines the restart behavior of individual containers in a pod.
 	// This field may only be set for init containers, and the only allowed value is "Always".
