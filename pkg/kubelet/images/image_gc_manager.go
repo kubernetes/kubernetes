@@ -521,7 +521,10 @@ func (im *realImageGCManager) freeImage(ctx context.Context, image evictionInfo,
 	if isRuntimeClassInImageCriAPIEnabled {
 		imageKey = getImageTuple(image.id, image.runtimeHandlerUsedToPullImage)
 	}
+
+	im.imageRecordsLock.Lock()
 	delete(im.imageRecords, imageKey)
+	im.imageRecordsLock.Unlock()
 
 	metrics.ImageGarbageCollectedTotal.WithLabelValues(reason).Inc()
 	return err
