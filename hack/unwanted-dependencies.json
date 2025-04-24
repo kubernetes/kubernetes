@@ -77,9 +77,10 @@
       "google.golang.org/api": "cloud dependency",
       "google.golang.org/appengine": "cloud dependency",
       "google.golang.org/genproto": "refer to #113366",
-      "gopkg.in/square/go-jose.v2":"obsolete, use gopkg.in/go-jose/go-jose.v2",
+      "gopkg.in/square/go-jose.v2": "obsolete, use gopkg.in/go-jose/go-jose.v2",
       "gopkg.in/fsnotify.v1": "obsolete, use github.com/fsnotify/fsnotify",
       "gopkg.in/yaml.v2": "prefer sigs.k8s.io/yaml",
+      "gopkg.in/yaml.v3": "prefer sigs.k8s.io/yaml/goyaml.v3",
       "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
       "rsc.io/quote": "refer to #102833",
       "rsc.io/sampler": "refer to #102833"
@@ -268,6 +269,44 @@
         "go.etcd.io/etcd/api/v3",
         "go.etcd.io/etcd/client/v3",
         "go.etcd.io/etcd/server/v3"
+      ],
+      "gopkg.in/yaml.v3": [
+        "github.com/coreos/go-semver",
+        "github.com/cyphar/filepath-securejoin",
+        "github.com/go-logr/zapr",
+        "github.com/go-openapi/jsonpointer",
+        "github.com/go-openapi/swag",
+        "github.com/go-task/slim-sprig/v3",
+        "github.com/google/cadvisor",
+        "github.com/google/gnostic-models",
+        "github.com/grpc-ecosystem/grpc-gateway/v2",
+        "github.com/onsi/ginkgo/v2",
+        "github.com/onsi/gomega",
+        "github.com/prometheus/common",
+        "github.com/spf13/cobra",
+        "github.com/stretchr/objx",
+        "github.com/stretchr/testify",
+        "go.etcd.io/bbolt",
+        "go.etcd.io/etcd/client/pkg/v3",
+        "go.etcd.io/etcd/pkg/v3",
+        "go.etcd.io/etcd/server/v3",
+        "go.opentelemetry.io/auto/sdk",
+        "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful",
+        "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+        "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+        "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc",
+        "go.opentelemetry.io/otel/metric",
+        "go.opentelemetry.io/otel/sdk",
+        "go.opentelemetry.io/otel/trace",
+        "go.uber.org/goleak",
+        "go.uber.org/multierr",
+        "go.uber.org/zap",
+        "k8s.io/kube-openapi",
+        "sigs.k8s.io/kustomize/api",
+        "sigs.k8s.io/kustomize/kustomize/v5",
+        "sigs.k8s.io/kustomize/kyaml"
       ]
     },
     "unwantedVendored": [
@@ -284,7 +323,8 @@
       "github.com/modern-go/reflect2",
       "github.com/pkg/errors",
       "golang.org/x/exp",
-      "google.golang.org/genproto"
+      "google.golang.org/genproto",
+      "gopkg.in/yaml.v3"
     ]
   }
 }
