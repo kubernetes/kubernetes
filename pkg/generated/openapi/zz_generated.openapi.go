@@ -17798,7 +17798,7 @@ func schema_k8sio_api_batch_v1_JobSpec(ref common.ReferenceCallback) common.Open
 					},
 					"backoffLimit": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Specifies the number of retries before marking this job failed. Defaults to 6",
+							Description: "Specifies the number of retries before marking this job failed. Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified. When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
