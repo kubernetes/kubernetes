@@ -301,7 +301,6 @@ func (r *validateNodeNameRoundTripper) RoundTrip(req *http.Request) (*http.Respo
 	if req.URL.Scheme != "https" {
 		return nil, fmt.Errorf(`%q must use scheme "https", got %q`, r.hostRewrite.commonName, req.URL.Scheme)
 	}
-	// TODO these checks enforce that proxy URL is not set, does that make sense?
 	if req.URL.Host != r.hostRewrite.tcpDialAddr {
 		return nil, fmt.Errorf("%q must use host %q, got %q", r.hostRewrite.commonName, r.hostRewrite.tcpDialAddr, req.URL.Host)
 	}
@@ -347,8 +346,10 @@ func mutateTransportToValidateNodeName(baseRT http.RoundTripper) error {
 		if !ok {
 			return nil, fmt.Errorf("failed to get dial rewrite from context")
 		}
+		// TODO this check enforces that proxy URL is not set, does that make sense?
+		// TODO maybe we should overwrite the proxy func to always return nil?  http.ProxyURL(nil)
 		if address != hostRewrite.connCacheKey {
-			return nil, fmt.Errorf("rewrite of %q->%q failed, got unexpected address %q", hostRewrite.connCacheKey, hostRewrite.tcpDialAddr, address)
+			return nil, fmt.Errorf("rewrite of %q->%q failed, got unexpected address %q (possibly caused by unsupported HTTPS_PROXY)", hostRewrite.connCacheKey, hostRewrite.tcpDialAddr, address)
 		}
 		plainConn, err := rt.DialContext(ctx, "tcp", hostRewrite.tcpDialAddr) // make the TCP connection to the original host
 		if err != nil {
