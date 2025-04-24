@@ -24,6 +24,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,18 +50,6 @@ You can use 'hack/install-etcd.sh' to install a copy in third_party/.
 // getEtcdPath returns a path to an etcd executable.
 func getEtcdPath() (string, error) {
 	return exec.LookPath("etcd")
-}
-
-// getAvailablePort returns a TCP port that is available for binding.
-func getAvailablePort() (int, error) {
-	l, err := net.Listen("tcp", ":0")
-	if err != nil {
-		return 0, fmt.Errorf("could not bind to a port: %v", err)
-	}
-	// It is possible but unlikely that someone else will bind this port before we
-	// get a chance to use it.
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
 // startEtcd executes an etcd instance. The returned function will signal the
@@ -105,28 +94,30 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 		fmt.Fprint(os.Stderr, installEtcd)
 		return "", nil, fmt.Errorf("could not find etcd in PATH: %v", err)
 	}
-	etcdPort, err := getAvailablePort()
-	if err != nil {
-		return "", nil, fmt.Errorf("could not get a port: %v", err)
-	}
-	customURL := fmt.Sprintf("http://127.0.0.1:%d", etcdPort)
-
-	klog.Infof("starting etcd on %s", customURL)
-
 	etcdDataDir, err := os.MkdirTemp(os.TempDir(), dataDir)
 	if err != nil {
 		return "", nil, fmt.Errorf("unable to make temp etcd data dir %s: %v", dataDir, err)
 	}
-	klog.Infof("storing etcd data in: %v", etcdDataDir)
+	etcdSocketPath := path.Join(etcdDataDir, "etcd.sock")
+	customURL := "unix://" + etcdSocketPath
 
+	klog.V(2).InfoS("starting etcd", "url", customURL, "dataDir", etcdDataDir)
 	ctx, cancel := context.WithCancel(context.Background())
 	args := []string{
 		"--data-dir",
 		etcdDataDir,
 		"--listen-client-urls",
 		customURL,
+		// This should be how clients connect to etcd, but https://github.com/etcd-io/etcd/pull/12469
+		// apparently was incomplete: trying to pass a Unix Domain URL here is rejected by ectd 3.15.13 with
+		//    --advertise-client-urls "unix:///tmp/etcd.sock" must be "host:port" (missing port in address)
+		//
+		// We don't need to advertise the correct address. To prevent connecting to the default URL
+		// in the unlikely case that something does use this URL after all, an invalid URL is set here.
 		"--advertise-client-urls",
-		customURL,
+		"http://127.0.0.111:0",
+		// With :0 we let the kernel pick a unique port. We don't care which port this will be,
+		// no other peer is going to connect.
 		"--listen-peer-urls",
 		"http://127.0.0.1:0",
 		"-log-level",
@@ -176,7 +167,7 @@ func RunCustomEtcd(dataDir string, customFlags []string, output io.Writer) (url 
 	const pollCount = int32(300)
 
 	for i <= pollCount {
-		conn, err := net.DialTimeout("tcp", strings.TrimPrefix(customURL, "http://"), 1*time.Second)
+		conn, err := net.DialTimeout("unix", etcdSocketPath, 1*time.Second)
 		if err == nil {
 			conn.Close()
 			break
