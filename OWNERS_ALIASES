@@ -158,7 +158,6 @@ aliases:
   # - rootfs
   # - verult
   sig-scheduling-maintainers:
-    - alculquicondor
     - ahg-g
     - dom4ha
     - Huang-Wei
@@ -166,6 +165,7 @@ aliases:
     - macsko
     - sanposhiho
   # emeritus:
+  # - alculquicondor
   # - damemi
   # - bsalamat
   # - k82cn
