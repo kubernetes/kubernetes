@@ -18,6 +18,7 @@ go_library(
         "int.go",
         "iterator.go",
         "json_value.go",
+        "format.go",
         "list.go",
         "map.go",
         "null.go",

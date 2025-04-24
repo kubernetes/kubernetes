@@ -19,6 +19,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"reflect"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/google/cel-go/common/types/ref"
@@ -137,4 +138,18 @@ func (b Bytes) Type() ref.Type {
 // Value implements the ref.Val interface method.
 func (b Bytes) Value() any {
 	return []byte(b)
+}
+
+func (b Bytes) format(sb *strings.Builder) {
+	fmt.Fprintf(sb, "b\"%s\"", bytesToOctets([]byte(b)))
+}
+
+// bytesToOctets converts byte sequences to a string using a three digit octal encoded value
+// per byte.
+func bytesToOctets(byteVal []byte) string {
+	var b strings.Builder
+	for _, c := range byteVal {
+		fmt.Fprintf(&b, "\\%03o", c)
+	}
+	return b.String()
 }

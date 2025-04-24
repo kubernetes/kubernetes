@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"github.com/google/cel-go/common/types/ref"
 
@@ -126,6 +127,14 @@ func (b Bool) Type() ref.Type {
 // Value implements the ref.Val interface method.
 func (b Bool) Value() any {
 	return bool(b)
+}
+
+func (b Bool) format(sb *strings.Builder) {
+	if b {
+		sb.WriteString("true")
+	} else {
+		sb.WriteString("false")
+	}
 }
 
 // IsBool returns whether the input ref.Val or ref.Type is equal to BoolType.

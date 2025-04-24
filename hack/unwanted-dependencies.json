@@ -278,6 +278,7 @@
         "github.com/go-openapi/swag",
         "github.com/go-task/slim-sprig/v3",
         "github.com/google/cadvisor",
+        "github.com/google/cel-go",
         "github.com/google/gnostic-models",
         "github.com/grpc-ecosystem/grpc-gateway/v2",
         "github.com/onsi/ginkgo/v2",

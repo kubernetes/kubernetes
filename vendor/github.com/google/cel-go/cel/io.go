@@ -99,7 +99,13 @@ func AstToParsedExpr(a *Ast) (*exprpb.ParsedExpr, error) {
 // Note, the conversion may not be an exact replica of the original expression, but will produce
 // a string that is semantically equivalent and whose textual representation is stable.
 func AstToString(a *Ast) (string, error) {
-	return parser.Unparse(a.NativeRep().Expr(), a.NativeRep().SourceInfo())
+	return ExprToString(a.NativeRep().Expr(), a.NativeRep().SourceInfo())
+}
+
+// ExprToString converts an AST Expr node back to a string using macro call tracking metadata from
+// source info if any macros are encountered within the expression.
+func ExprToString(e ast.Expr, info *ast.SourceInfo) (string, error) {
+	return parser.Unparse(e, info)
 }
 
 // RefValueToValue converts between ref.Val and google.api.expr.v1alpha1.Value.
