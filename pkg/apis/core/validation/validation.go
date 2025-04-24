@@ -2539,7 +2539,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *core.PersistentVo
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
 	}
 	if validationOpts.EnableRecoverFromExpansionFailure {
-		resizeStatusPath := field.NewPath("status", "allocatedResourceStatus")
+		resizeStatusPath := field.NewPath("status", "allocatedResourceStatuses")
 		if newPvc.Status.AllocatedResourceStatuses != nil {
 			resizeStatus := newPvc.Status.AllocatedResourceStatuses
 			for k, v := range resizeStatus {
