@@ -226,9 +226,13 @@ func isCancelError(err error) bool {
 
 func (wc *watchChan) run(initialEventsEndBookmarkRequired, forceInitialEvents bool) {
 	watchClosedCh := make(chan struct{})
-	go wc.startWatching(watchClosedCh, initialEventsEndBookmarkRequired, forceInitialEvents)
-
 	var resultChanWG sync.WaitGroup
+
+	resultChanWG.Add(1)
+	go func() {
+		defer resultChanWG.Done()
+		wc.startWatching(watchClosedCh, initialEventsEndBookmarkRequired, forceInitialEvents)
+	}()
 	wc.processEvents(&resultChanWG)
 
 	select {
