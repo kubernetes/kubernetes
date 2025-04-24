@@ -29,8 +29,8 @@ func Test(t *testing.T) {
 	structA := Struct{
 		StringField:                 "aaa",
 		StringPtrField:              ptr.To("aaa"),
-		StructField:                 ComparableStruct{"bbb"},
-		StructPtrField:              ptr.To(ComparableStruct{"bbb"}),
+		StructField:                 ComparableStruct{"bbb", ptr.To("BBB")},
+		StructPtrField:              ptr.To(ComparableStruct{"bbb", ptr.To("BBB")}),
 		NonComparableStructField:    NonComparableStruct{[]string{"ccc"}},
 		NonComparableStructPtrField: ptr.To(NonComparableStruct{[]string{"ccc"}}),
 		SliceField:                  []string{"ddd"},
@@ -41,15 +41,17 @@ func Test(t *testing.T) {
 
 	structA2 := structA // dup of A but with different pointer values
 	structA2.StringPtrField = ptr.To(*structA2.StringPtrField)
+	structA2.StructField.StringPtrField = ptr.To("BBB")
 	structA2.StructPtrField = ptr.To(*structA2.StructPtrField)
+	structA2.StructPtrField.StringPtrField = ptr.To("BBB")
 	structA2.NonComparableStructPtrField = ptr.To(*structA2.NonComparableStructPtrField)
 	structA2.ImmutablePtrField = ptr.To(*structA2.ImmutablePtrField)
 
 	structB := Struct{
 		StringField:                 "uuu",
 		StringPtrField:              ptr.To("uuu"),
-		StructField:                 ComparableStruct{"vvv"},
-		StructPtrField:              ptr.To(ComparableStruct{"vvv"}),
+		StructField:                 ComparableStruct{"vvv", ptr.To("VVV")},
+		StructPtrField:              ptr.To(ComparableStruct{"vvv", ptr.To("VVV")}),
 		NonComparableStructField:    NonComparableStruct{[]string{"www"}},
 		NonComparableStructPtrField: ptr.To(NonComparableStruct{[]string{"www"}}),
 		SliceField:                  []string{"xxx"},
