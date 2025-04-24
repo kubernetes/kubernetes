@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+REPO_ROOT:=${CURDIR}/../..
 REGISTRY ?= registry.k8s.io/e2e-test-images
 GOARM ?= 7
 DOCKER_CERT_BASE_PATH ?=
 QEMUVERSION=v5.1.0-2
-GOLANG_VERSION=1.24.2
+GOLANG_VERSION=$(shell cat $(REPO_ROOT)/.go-version)
 export
 
 ifndef WHAT
