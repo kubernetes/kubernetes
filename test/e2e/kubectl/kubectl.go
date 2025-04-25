@@ -27,6 +27,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -251,6 +253,23 @@ func runKubectlRetryOrDie(ns string, args ...string) string {
 	return output
 }
 
+// matches localhost / loopback skip from
+// https://pkg.go.dev/golang.org/x/net/http/httpproxy#Config.ProxyFunc
+func hostIsLocal(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	nip, err := netip.ParseAddr(host)
+	var ip net.IP
+	if err == nil {
+		ip = net.IP(nip.AsSlice())
+		if ip.IsLoopback() {
+			return true
+		}
+	}
+	return false
+}
+
 var _ = SIGDescribe("Kubectl client", func() {
 	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
@@ -467,7 +486,19 @@ var _ = SIGDescribe("Kubectl client", func() {
 		})
 
 		ginkgo.It("should support exec through an HTTP proxy", func(ctx context.Context) {
+			// testContextHost is a KUBECONFIG URL
 			testContextHost := getTestContextHost()
+
+			// check if testContextHost is on localhost and skip the tests
+			// proxy env vars are always ignored on localhost and loopback IPs
+			// https://pkg.go.dev/golang.org/x/net/http/httpproxy#Config.ProxyFunc
+			// TODO: consider if we can test proxying some other way with local clusters
+			// https://github.com/kubernetes/kubectl/issues/1655#issuecomment-2829408755
+			u, err := url.Parse(testContextHost)
+			framework.ExpectNoError(err, "parsing test context host: %s", testContextHost)
+			if hostIsLocal(u.Hostname()) {
+				e2eskipper.Skipf("Test host %q is on localhost and would not be proxied by HTTP_PROXY, skipping test", testContextHost)
+			}
 
 			ginkgo.By("Starting http_proxy")
 			var proxyLogs bytes.Buffer
