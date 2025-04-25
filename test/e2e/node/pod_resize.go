@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
@@ -65,6 +66,12 @@ func doPodResizeAdmissionPluginsTests() {
 				ginkgo.By("Creating a ResourceQuota")
 				_, rqErr := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, &resourceQuota, metav1.CreateOptions{})
 				framework.ExpectNoError(rqErr, "failed to create resource quota")
+				// pod creation using this quota will fail until the quota status is populated, so we need to wait to
+				// prevent races with the resourcequota controller
+				ginkgo.By("Waiting for ResourceQuota status to populate")
+				quotaStatusErr := waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota.Name)
+				framework.ExpectNoError(quotaStatusErr, "resource quota status failed to populate")
+
 			},
 			wantMemoryError: "exceeded quota: resize-resource-quota, requested: memory=350Mi, used: memory=700Mi, limited: memory=800Mi",
 			wantCPUError:    "exceeded quota: resize-resource-quota, requested: cpu=200m, used: cpu=700m, limited: cpu=800m",
@@ -454,3 +461,13 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 	})
 	doPodResizeAdmissionPluginsTests()
 })
+
+func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string) error {
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (v1.ResourceList, error) {
+		quota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return quota.Status.Used, nil
+	})).WithTimeout(framework.PollShortTimeout).ShouldNot(gomega.BeEmpty())
+}
