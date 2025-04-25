@@ -155,7 +155,7 @@ if [ "${golangci_config}" ]; then
      [ "${GOBIN}" != "${KUBE_ROOT}/_output/local/bin" ]; then
     kube::util::ensure-temp-dir
     patched_golangci_config="${KUBE_TEMP}/$(basename "${golangci_config}")"
-    sed -e "s;path: ../_output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
+    sed -e "s;path: _output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
     golangci_config="${patched_golangci_config}"
   fi
   golangci+=(--config="${golangci_config}")

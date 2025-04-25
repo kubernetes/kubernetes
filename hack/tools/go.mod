@@ -8,7 +8,7 @@ require (
 	github.com/aojea/sloppy-netparser v0.0.0-20210819225411-1b3bd8b3b975
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
 	github.com/client9/misspell v0.3.4
-	github.com/golangci/golangci-lint/v2 v2.1.2
+	github.com/golangci/golangci-lint/v2 v2.1.5
 	github.com/jcchavezs/porto v0.6.0
 	github.com/vektra/mockery/v2 v2.53.3
 	go.uber.org/automaxprocs v1.6.0
@@ -29,7 +29,6 @@ require (
 	github.com/Antonboom/nilnil v1.1.0 // indirect
 	github.com/Antonboom/testifylint v1.6.1 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
-	github.com/Crocmagnon/fatcontext v0.7.2 // indirect
 	github.com/Djarvur/go-err113 v0.0.0-20210108212216-aea10b59be24 // indirect
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.3.1 // indirect
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
@@ -208,6 +207,7 @@ require (
 	gitlab.com/bosi/decorder v0.4.2 // indirect
 	go-simpler.org/musttag v0.13.0 // indirect
 	go-simpler.org/sloglint v0.11.0 // indirect
+	go.augendre.info/fatcontext v0.8.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.24.0 // indirect
