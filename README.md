@@ -18,7 +18,7 @@ Kubernetes is hosted by the Cloud Native Computing Foundation ([CNCF]).
 If your company wants to help shape the evolution of
 technologies that are container-packaged, dynamically scheduled,
 and microservices-oriented, consider joining the CNCF.
-For details about who's involved and how Kubernetes plays a role,
+For details about who's involved and how Kubernetes plays a roles,
 read the CNCF [announcement].
 
 ----
