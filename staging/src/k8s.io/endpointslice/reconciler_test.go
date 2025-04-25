@@ -700,7 +700,7 @@ func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
 	// start with 50 pods, 1/3 not ready
 	pods := []*corev1.Pod{}
 	for i := 0; i < 50; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -734,7 +734,7 @@ func TestReconcileManyPods(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -767,7 +767,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -823,7 +823,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	// start with 300 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -869,7 +869,7 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -902,7 +902,7 @@ func TestReconcileEndpointSlicesServicesLabelsUpdating(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -946,7 +946,7 @@ func TestReconcileEndpointSlicesServicesReservedLabels(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -980,7 +980,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	// start with 300 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
@@ -1227,7 +1227,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	// start with 300 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 300; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		portOffset := i % 5
 		pod := newPod(i, namespace, ready, 1, false)
 		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
@@ -1277,7 +1277,7 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	// start with 250 pods
 	pods := []*corev1.Pod{}
 	for i := 0; i < 250; i++ {
-		ready := !(i%3 == 0)
+		ready := i%3 != 0
 		pods = append(pods, newPod(i, namespace, ready, 1, false))
 	}
 
