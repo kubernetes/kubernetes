@@ -8,7 +8,7 @@ godebug default=go1.24
 
 require (
 	github.com/blang/semver/v4 v4.0.0
-	github.com/google/cel-go v0.23.2
+	github.com/google/cel-go v0.25.0
 	github.com/google/go-cmp v0.7.0
 	github.com/onsi/gomega v1.35.1
 	github.com/stretchr/testify v1.10.0
@@ -25,7 +25,7 @@ require (
 )
 
 require (
-	cel.dev/expr v0.19.1 // indirect
+	cel.dev/expr v0.23.1 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

@@ -33,7 +33,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/cadvisor v0.52.1
-	github.com/google/cel-go v0.23.2
+	github.com/google/cel-go v0.25.0
 	github.com/google/gnostic-models v0.6.9
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
@@ -125,7 +125,7 @@ require (
 )
 
 require (
-	cel.dev/expr v0.19.1 // indirect
+	cel.dev/expr v0.23.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect

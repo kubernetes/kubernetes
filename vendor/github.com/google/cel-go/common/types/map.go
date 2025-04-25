@@ -17,6 +17,7 @@ package types
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/stoewer/go-strcase"
@@ -316,6 +317,41 @@ func (m *baseMap) String() string {
 	}
 	sb.WriteString("}")
 	return sb.String()
+}
+
+type baseMapEntry struct {
+	key string
+	val string
+}
+
+func formatMap(m traits.Mapper, sb *strings.Builder) {
+	it := m.Iterator()
+	var ents []baseMapEntry
+	if s, ok := m.Size().(Int); ok {
+		ents = make([]baseMapEntry, 0, int(s))
+	}
+	for it.HasNext() == True {
+		k := it.Next()
+		v, _ := m.Find(k)
+		ents = append(ents, baseMapEntry{Format(k), Format(v)})
+	}
+	sort.SliceStable(ents, func(i, j int) bool {
+		return ents[i].key < ents[j].key
+	})
+	sb.WriteString("{")
+	for i, ent := range ents {
+		if i > 0 {
+			sb.WriteString(", ")
+		}
+		sb.WriteString(ent.key)
+		sb.WriteString(": ")
+		sb.WriteString(ent.val)
+	}
+	sb.WriteString("}")
+}
+
+func (m *baseMap) format(sb *strings.Builder) {
+	formatMap(m, sb)
 }
 
 // Type implements the ref.Val interface method.
