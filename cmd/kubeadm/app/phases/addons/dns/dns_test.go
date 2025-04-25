@@ -1442,7 +1442,7 @@ func TestDeployedDNSAddon(t *testing.T) {
 		},
 		{
 			name:           "with digest",
-			image:          "registry.k8s.io/coredns/coredns:v1.12.0@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
+			image:          "registry.k8s.io/coredns/coredns:v1.12.1@sha256:a0ead06651cf580044aeb0a0feba63591858fb2e43ade8c9dea45a6a89ae7e5e",
 			deploymentSize: 1,
 			wantVersion:    kubeadmconstants.CoreDNSVersion,
 		},
