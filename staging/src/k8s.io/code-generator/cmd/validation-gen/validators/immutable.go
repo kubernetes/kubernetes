@@ -51,7 +51,7 @@ var (
 func (immutableTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
-	if realType(context.Type).Kind == types.Builtin {
+	if nonPointer(nativeType(context.Type)).Kind == types.Builtin {
 		// This is a minor optimization to just compare primitive values when
 		// possible. Slices and maps are not comparable, and structs might hold
 		// pointer fields, which are directly comparable but not what we need.

@@ -56,7 +56,7 @@ var (
 func (stv subfieldTagValidator) GetValidations(context Context, args []string, payload string) (Validations, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	t := realType(context.Type)
+	t := nonPointer(nativeType(context.Type))
 	if t.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on struct types")
 	}
