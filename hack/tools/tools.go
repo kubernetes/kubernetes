@@ -40,4 +40,7 @@ import (
 	// for publishing bot
 	_ "golang.org/x/mod/modfile"
 	_ "k8s.io/publishing-bot/cmd/publishing-bot/config"
+
+	// used by go-to-protobuf
+	_ "golang.org/x/tools/cmd/goimports"
 )
