@@ -101,19 +101,20 @@ function kube::protoc::diff() {
 }
 
 function kube::protoc::install() {
+  local os
+  local arch
+  local download_folder
+  local download_file
+  local third_party_dir
+
+  os=$(kube::util::host_os)
+  arch=$(kube::util::host_arch)
+  download_folder="protoc-v${PROTOC_VERSION}-${os}-${arch}"
+  download_file="${download_folder}.zip"
+  third_party_dir="${KUBE_ROOT}/third_party"
   # run in a subshell to isolate caller from directory changes
   (
-    local os
-    local arch
-    local download_folder
-    local download_file
-
-    os=$(kube::util::host_os)
-    arch=$(kube::util::host_arch)
-    download_folder="protoc-v${PROTOC_VERSION}-${os}-${arch}"
-    download_file="${download_folder}.zip"
-
-    cd "${KUBE_ROOT}/third_party" || return 1
+    cd "${third_party_dir}" || return 1
     if [[ $(readlink protoc) != "${download_folder}" ]]; then
       local url
       if [[ ${os} == "darwin" ]]; then
@@ -136,8 +137,12 @@ function kube::protoc::install() {
       rm "${download_file}"
     fi
     kube::log::info "protoc v${PROTOC_VERSION} installed. To use:"
-    kube::log::info "export PATH=\"$(pwd)/protoc:\${PATH}\""
+    kube::log::info "export PATH=\"${third_party_dir}/protoc:\${PATH}\""
   )
+  # export updated PATH so install-protoc.sh can be sourced
+  # CLI callers will need to use the export indicated above
+  PATH="${third_party_dir}/protoc:${PATH}"
+  export PATH
 }
 
 # Marker function to indicate protoc.sh has been fully sourced

@@ -52,6 +52,8 @@ fi
 echo "installing goimports from hack/tools"
 go -C "${KUBE_ROOT}/hack/tools" install golang.org/x/tools/cmd/goimports
 
+kube::protoc::install
+
 # Generate a list of directories we don't want to play in.
 DIRS_TO_AVOID=()
 kube::util::read-array DIRS_TO_AVOID < <(
