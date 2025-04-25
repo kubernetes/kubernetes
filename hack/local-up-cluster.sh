@@ -734,6 +734,19 @@ function start_cloud_controller_manager {
     export CLOUD_CTLRMGR_PID=$!
 }
 
+function wait_node_csr() {
+  local interval_time=2
+  local csr_approved_time=300
+  local newline='"\n"'
+  local unapproved_csr_names="-o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{${newline}}}{{end}}{{end}}"
+  local csr_approved="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get csr ${unapproved_csr_names}' | xargs --no-run-if-empty ${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' certificate approve | grep csr"
+  kube::util::wait_for_success "$csr_approved_time" "$interval_time" "$csr_approved"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for CSR approval"
+    exit 1
+  fi
+}
+
 function wait_node_ready(){
   # check the nodes information after kubelet daemon start
   local nodes_stats="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get nodes"
@@ -876,6 +889,7 @@ failSwapOn: ${FAIL_SWAP_ON}
 port: ${KUBELET_PORT}
 readOnlyPort: ${KUBELET_READ_ONLY_PORT}
 rotateCertificates: true
+serverTLSBootstrap: true
 runtimeRequestTimeout: "${RUNTIME_REQUEST_TIMEOUT}"
 staticPodPath: "${POD_MANIFEST_PATH}"
 resolvConf: "${KUBELET_RESOLV_CONF}"
@@ -1413,6 +1427,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
       Linux)
         install_cni_if_needed
         start_kubelet
+        wait_node_csr
         ;;
       *)
         print_color "Unsupported host OS.  Must be Linux or Mac OS X, kubelet aborted."
