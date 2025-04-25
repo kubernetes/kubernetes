@@ -345,7 +345,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 
 			calls := kubeletPlugin.CountCalls("/NodePrepareResources")
 			ginkgo.By("make sure NodePrepareResources is not called again")
-			gomega.Consistently(kubeletPlugin.CountCalls("/NodePrepareResources")).WithTimeout(retryTestTimeout).Should(gomega.Equal(calls))
+			gomega.Consistently(func() int {
+				return kubeletPlugin.CountCalls("/NodePrepareResources")
+			}).WithTimeout(retryTestTimeout).Should(gomega.Equal(calls))
 		})
 	})
 
