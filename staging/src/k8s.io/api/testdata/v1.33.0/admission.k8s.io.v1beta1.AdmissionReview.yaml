@@ -1,0 +1,84 @@
+apiVersion: admission.k8s.io/v1beta1
+kind: AdmissionReview
+request:
+  dryRun: true
+  kind:
+    group: groupValue
+    kind: kindValue
+    version: versionValue
+  name: nameValue
+  namespace: namespaceValue
+  object:
+    apiVersion: example.com/v1
+    kind: CustomType
+    spec:
+      replicas: 1
+    status:
+      available: 1
+  oldObject:
+    apiVersion: example.com/v1
+    kind: CustomType
+    spec:
+      replicas: 1
+    status:
+      available: 1
+  operation: operationValue
+  options:
+    apiVersion: example.com/v1
+    kind: CustomType
+    spec:
+      replicas: 1
+    status:
+      available: 1
+  requestKind:
+    group: groupValue
+    kind: kindValue
+    version: versionValue
+  requestResource:
+    group: groupValue
+    resource: resourceValue
+    version: versionValue
+  requestSubResource: requestSubResourceValue
+  resource:
+    group: groupValue
+    resource: resourceValue
+    version: versionValue
+  subResource: subResourceValue
+  uid: uidValue
+  userInfo:
+    extra:
+      extraKey:
+      - extraValue
+    groups:
+    - groupsValue
+    uid: uidValue
+    username: usernameValue
+response:
+  allowed: true
+  auditAnnotations:
+    auditAnnotationsKey: auditAnnotationsValue
+  patch: BA==
+  patchType: patchTypeValue
+  status:
+    code: 6
+    details:
+      causes:
+      - field: fieldValue
+        message: messageValue
+        reason: reasonValue
+      group: groupValue
+      kind: kindValue
+      name: nameValue
+      retryAfterSeconds: 5
+      uid: uidValue
+    message: messageValue
+    metadata:
+      continue: continueValue
+      remainingItemCount: 4
+      resourceVersion: resourceVersionValue
+      selfLink: selfLinkValue
+    reason: reasonValue
+    status: statusValue
+  uid: uidValue
+  warnings:
+  - warningsValue

@@ -1,0 +1,3 @@
+apiVersion: v1
+kind: NodeProxyOptions
+path: pathValue
