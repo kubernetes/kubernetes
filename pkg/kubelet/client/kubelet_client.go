@@ -327,6 +327,8 @@ func (r *validateNodeNameRoundTripper) RoundTrip(req *http.Request) (*http.Respo
 	return r.delegate.RoundTrip(req)
 }
 
+var nodeOrganization = []string{user.NodesGroup}
+
 func mutateTransportToValidateNodeName(baseRT http.RoundTripper) error {
 	rt, err := httpTransportFor(baseRT)
 	if err != nil {
@@ -356,13 +358,13 @@ func mutateTransportToValidateNodeName(baseRT http.RoundTripper) error {
 		}
 		tlsConfig := rt.TLSClientConfig.Clone()                           // shallow clone so we can mutate it per connection
 		tlsConfig.ServerName = hostRewrite.tlsServerName                  // maintain the existing SAN check via *x509.Certificate.VerifyHostname
-		tlsConfig.VerifyConnection = func(cs tls.ConnectionState) error { // add the extra kubelet common name check
+		tlsConfig.VerifyConnection = func(cs tls.ConnectionState) error { // add the extra kubelet common name check based on ValidateKubeletServingCSR
 			leaf := cs.PeerCertificates[0]
 			if leaf.Subject.CommonName != hostRewrite.commonName {
-				return fmt.Errorf("invalid node name; expected %q, got %q", hostRewrite.commonName, leaf.Subject.CommonName)
+				return fmt.Errorf("invalid node serving cert common name; expected %q, got %q", hostRewrite.commonName, leaf.Subject.CommonName)
 			}
-			if !slices.Contains(leaf.Subject.Organization, user.NodesGroup) {
-				return fmt.Errorf("invalid node groups; expected to include %q, got %q", user.NodesGroup, leaf.Subject.Organization)
+			if !slices.Equal(leaf.Subject.Organization, nodeOrganization) {
+				return fmt.Errorf("invalid node serving cert organization; expected %q, got %q", nodeOrganization, leaf.Subject.Organization)
 			}
 			return nil
 		}

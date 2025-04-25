@@ -202,7 +202,7 @@ func TestValidateNodeName(t *testing.T) {
 			name:                 "invalid cert with validation",
 			nodeName:             "my-node-2",
 			connectionInfoGetter: nodeConnectionInfoGetterWithValidateNodeName,
-			expectErr:            `invalid node name; expected "system:node:my-node-2", got "system:node:my-node-1"`,
+			expectErr:            `invalid node serving cert common name; expected "system:node:my-node-2", got "system:node:my-node-1"`,
 		},
 	}
 	for _, tc := range testCases {
