@@ -57,8 +57,9 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 
 	// Gengo does not treat struct definitions as aliases, which is
 	// inconsistent but unlikely to change. That means we don't REALLY need to
-	// handle it here, but let's be consistent with the rest of the code.
-	if realType(context.Type).Kind != types.Struct {
+	// handle it here, but let's be extra careful and extract the most concrete
+	// type possible.
+	if nonPointer(nativeType(context.Type)).Kind != types.Struct {
 		return result, nil
 	}
 
@@ -125,8 +126,8 @@ func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if realType(context.Type) != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types")
+	if t := nonPointer(nativeType(context.Type)); t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	p := &discriminatorParams{}

@@ -59,9 +59,8 @@ func (maxLengthTagValidator) GetValidations(context Context, _ []string, payload
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	t := realType(context.Type)
-	if t != types.String {
-		return result, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
+	if t := nonPointer(nativeType(context.Type)); t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := strconv.Atoi(payload)
@@ -113,12 +112,9 @@ var (
 func (maxItemsTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
-	if t.Kind != types.Slice && t.Kind != types.Array {
-		return result, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	if t := nativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
+		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
 
 	intVal, err := strconv.Atoi(payload)

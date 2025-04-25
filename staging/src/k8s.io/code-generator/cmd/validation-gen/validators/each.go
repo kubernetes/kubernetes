@@ -92,16 +92,11 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 		// Allowed but no special handling.
 	case "set":
 		t = t.Elem
-		// NOTE: lists of pointers are not supported, and that is enforced way before this point.
-		for t.Kind == types.Alias {
-			t = t.Underlying
-		}
-		switch {
-		case t.IsComparable():
+		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
+		if nativeType(t.Elem).IsComparable() {
 			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUnique)}}, nil
-		case !t.IsComparable():
-			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueNonComparable)}}, nil
 		}
+		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueNonComparable)}}, nil
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
 		if nativeType(t.Elem).Kind != types.Struct {

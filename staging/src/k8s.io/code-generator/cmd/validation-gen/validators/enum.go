@@ -60,10 +60,9 @@ var (
 var setsNew = types.Name{Package: "k8s.io/apimachinery/pkg/util/sets", Name: "New"}
 
 func (etv *enumTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	// We don't support typdefs to pointers, but other validators use
-	// realType() for this sort of check, so let's be consistent.
-	if realType(context.Type) != types.String {
-		return Validations{}, fmt.Errorf("can only be used on string types")
+	// NOTE: typedefs to pointers are not supported, so we should never see a pointer here.
+	if t := nativeType(context.Type); t != types.String {
+		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
 	var result Validations
