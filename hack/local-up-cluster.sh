@@ -614,7 +614,7 @@ EOF
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \
       --kubelet-client-key="${CERT_DIR}/client-kube-apiserver.key" \
-      --kubelet-certificate-authority="${ROOT_CA_FILE}" \
+      --kubelet-certificate-authority="${CLUSTER_SIGNING_CERT_FILE}" \
       --kubelet-validate-node-name \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
@@ -738,13 +738,14 @@ function wait_node_csr() {
   local interval_time=2
   local csr_approved_time=300
   local newline='"\n"'
-  local unapproved_csr_names="-o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{${newline}}}{{end}}{{end}}"
+  local unapproved_csr_names="--field-selector='spec.signerName=kubernetes.io/kubelet-serving' -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{${newline}}}{{end}}{{end}}"
   local csr_approved="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get csr ${unapproved_csr_names}' | xargs --no-run-if-empty ${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' certificate approve | grep csr"
   kube::util::wait_for_success "$csr_approved_time" "$interval_time" "$csr_approved"
   if [ $? == "1" ]; then
     echo "time out on waiting for CSR approval"
     exit 1
   fi
+  echo "kubelet CSR approved"
 }
 
 function wait_node_ready(){
