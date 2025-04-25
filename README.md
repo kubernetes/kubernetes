@@ -44,3 +44,17 @@ To build Kubernetes:
 git clone https://github.com/kubernetes/kubernetes
 cd kubernetes
 make
+ACKNOWLEDGEMENT:
+## Acknowledgements
+
+We would like to express our deep gratitude to the following:
+
+- **The Kubernetes Community** – For building and maintaining a powerful, open-source container orchestration system.
+- **The Cloud Native Computing Foundation (CNCF)** – For hosting Kubernetes and supporting its ecosystem and contributors.
+- **Google** – For the original internal system (Borg) that inspired Kubernetes and for open-sourcing their work.
+- **Open Source Contributors** – To all the contributors across the world who continuously improve the Kubernetes codebase, documentation, and ecosystem.
+- **Documentation and Educational Platforms** – Including [kubernetes.io](https://kubernetes.io), Udacity, and others that provide free resources to learn and use Kubernetes.
+- **Users and Adopters** – Whose real-world use cases help drive innovation and practical improvements.
+
+This project would not be possible without the support, code, ideas, and passion of the global open-source community.
+
