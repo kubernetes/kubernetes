@@ -39,7 +39,10 @@ import (
 
 	"github.com/emicklei/go-restful/v3"
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -303,31 +306,19 @@ func testRequestInfoResolver() *request.RequestInfoFactory {
 func TestSimpleSetupRight(t *testing.T) {
 	s := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "aName"}}
 	wire, err := runtime.Encode(codec, s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s2, err := runtime.Decode(codec, wire)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(s, s2) {
-		t.Fatalf("encode/decode broken:\n%#v\n%#v\n", s, s2)
-	}
+	require.NoError(t, err)
+	require.Equal(t, s, s2)
 }
 
 func TestSimpleOptionsSetupRight(t *testing.T) {
 	s := &genericapitesting.SimpleGetOptions{}
 	wire, err := runtime.Encode(codec, s)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	s2, err := runtime.Decode(codec, wire)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(s, s2) {
-		t.Fatalf("encode/decode broken:\n%#v\n%#v\n", s, s2)
-	}
+	require.NoError(t, err)
+	require.Equal(t, s, s2)
 }
 
 type SimpleRESTStorage struct {
@@ -567,7 +558,7 @@ func (s *ConnecterRESTStorage) Connect(ctx context.Context, id string, options r
 }
 
 func (s *ConnecterRESTStorage) ConnectMethods() []string {
-	return []string{"GET", "POST", "PUT", "DELETE"}
+	return []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete}
 }
 
 func (s *ConnecterRESTStorage) NewConnectOptions() (runtime.Object, bool, string) {
@@ -701,22 +692,12 @@ func (storage *SimpleTypedStorage) GetSingularName() string {
 	return "simple"
 }
 
-func bodyOrDie(response *http.Response) string {
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-	return string(body)
-}
-
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	return extractBodyDecoder(response, object, codec)
 }
 
 func extractBodyDecoder(response *http.Response, object runtime.Object, decoder runtime.Decoder) (string, error) {
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := apitesting.ReadAndCloseBody(response.Body)
 	if err != nil {
 		return string(body), err
 	}
@@ -724,8 +705,7 @@ func extractBodyDecoder(response *http.Response, object runtime.Object, decoder 
 }
 
 func extractBodyObject(response *http.Response, decoder runtime.Decoder) (runtime.Object, string, error) {
-	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := apitesting.ReadAndCloseBody(response.Body)
 	if err != nil {
 		return nil, string(body), err
 	}
@@ -741,64 +721,64 @@ func TestNotFound(t *testing.T) {
 	}
 	cases := map[string]T{
 		// Positive checks to make sure everything is wired correctly
-		"groupless GET root":       {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusOK},
-		"groupless GET namespaced": {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
+		"groupless GET root":       {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusOK},
+		"groupless GET namespaced": {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
 
-		"groupless GET long prefix": {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
+		"groupless GET long prefix": {http.MethodGet, "/" + grouplessPrefix + "/", http.StatusNotFound},
 
-		"groupless root PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
-		"groupless root GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/blah", http.StatusNotFound},
-		"groupless root GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
-		"groupless root DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
-		"groupless root PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"groupless root watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusInternalServerError},
+		"groupless root PATCH method":                 {http.MethodPatch, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root GET missing storage":          {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/blah", http.StatusNotFound},
+		"groupless root GET with extra segment":       {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root DELETE without extra segment": {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root DELETE with extra segment":    {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root PUT without extra segment":    {http.MethodPut, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"groupless root PUT with extra segment":       {http.MethodPut, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"groupless root watch missing storage":        {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusInternalServerError},
 
-		"groupless namespaced PATCH method":                 {"PATCH", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"groupless namespaced GET long prefix":              {"GET", "/" + grouplessPrefix + "/", http.StatusNotFound},
-		"groupless namespaced GET missing storage":          {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/blah", http.StatusNotFound},
-		"groupless namespaced GET with extra segment":       {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced POST with extra segment":      {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
-		"groupless namespaced DELETE without extra segment": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"groupless namespaced DELETE with extra segment":    {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced PUT without extra segment":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"groupless namespaced PUT with extra segment":       {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"groupless namespaced watch missing storage":        {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusInternalServerError},
-		"groupless namespaced watch with bad method":        {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
-		"groupless namespaced watch param with bad method":  {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
+		"groupless namespaced PATCH method":                 {http.MethodPatch, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced GET long prefix":              {http.MethodGet, "/" + grouplessPrefix + "/", http.StatusNotFound},
+		"groupless namespaced GET missing storage":          {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/blah", http.StatusNotFound},
+		"groupless namespaced GET with extra segment":       {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced POST with extra segment":      {http.MethodPost, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE without extra segment": {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced DELETE with extra segment":    {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced PUT without extra segment":    {http.MethodPut, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"groupless namespaced PUT with extra segment":       {http.MethodPut, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"groupless namespaced watch missing storage":        {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/", http.StatusInternalServerError},
+		"groupless namespaced watch with bad method":        {http.MethodPost, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"groupless namespaced watch param with bad method":  {http.MethodPost, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
 
 		// Positive checks to make sure everything is wired correctly
-		"GET root": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
-		// TODO: JTL: "GET root item":       {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusOK},
-		"GET namespaced": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
-		// TODO: JTL: "GET namespaced item": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusOK},
+		"GET root": {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusOK},
+		// TODO: JTL: "GET root item":       {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusOK},
+		"GET namespaced": {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusOK},
+		// TODO: JTL: "GET namespaced item": {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusOK},
 
-		"GET long prefix": {"GET", "/" + prefix + "/", http.StatusNotFound},
+		"GET long prefix": {http.MethodGet, "/" + prefix + "/", http.StatusNotFound},
 
-		"root PATCH method":           {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
-		"root GET missing storage":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
-		"root GET with extra segment": {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		// TODO: JTL: "root POST with extra segment":      {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusMethodNotAllowed},
-		"root DELETE without extra segment": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
-		"root DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"root PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
-		"root PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
-		"root watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusInternalServerError},
-		// TODO: JTL: "root watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simpleroot/bar", http.StatusMethodNotAllowed},
+		"root PATCH method":           {http.MethodPatch, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"root GET missing storage":    {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
+		"root GET with extra segment": {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		// TODO: JTL: "root POST with extra segment":      {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar", http.StatusMethodNotAllowed},
+		"root DELETE without extra segment": {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"root DELETE with extra segment":    {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"root PUT without extra segment":    {http.MethodPut, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots", http.StatusMethodNotAllowed},
+		"root PUT with extra segment":       {http.MethodPut, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simpleroots/bar/baz", http.StatusNotFound},
+		"root watch missing storage":        {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusInternalServerError},
+		// TODO: JTL: "root watch with bad method":        {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simpleroot/bar", http.StatusMethodNotAllowed},
 
-		"namespaced PATCH method":                 {"PATCH", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"namespaced GET long prefix":              {"GET", "/" + prefix + "/", http.StatusNotFound},
-		"namespaced GET missing storage":          {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
-		"namespaced GET with extra segment":       {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced POST with extra segment":      {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
-		"namespaced DELETE without extra segment": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"namespaced DELETE with extra segment":    {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced PUT without extra segment":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
-		"namespaced PUT with extra segment":       {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
-		"namespaced watch missing storage":        {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusInternalServerError},
-		"namespaced watch with bad method":        {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
-		"namespaced watch param with bad method":  {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
+		"namespaced PATCH method":                 {http.MethodPatch, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced GET long prefix":              {http.MethodGet, "/" + prefix + "/", http.StatusNotFound},
+		"namespaced GET missing storage":          {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/blah", http.StatusNotFound},
+		"namespaced GET with extra segment":       {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced POST with extra segment":      {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"namespaced DELETE without extra segment": {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced DELETE with extra segment":    {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced PUT without extra segment":    {http.MethodPut, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples", http.StatusMethodNotAllowed},
+		"namespaced PUT with extra segment":       {http.MethodPut, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar/baz", http.StatusNotFound},
+		"namespaced watch missing storage":        {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/", http.StatusInternalServerError},
+		"namespaced watch with bad method":        {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/namespaces/ns/simples/bar", http.StatusMethodNotAllowed},
+		"namespaced watch param with bad method":  {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/ns/simples/bar?watch=true", http.StatusMethodNotAllowed},
 	}
 	handler := handle(map[string]rest.Storage{
 		"simples":     &SimpleRESTStorage{},
@@ -808,19 +788,16 @@ func TestNotFound(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 	for k, v := range cases {
-		request, err := http.NewRequest(v.Method, server.URL+v.Path, nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		t.Run(k, func(t *testing.T) {
+			ctx := t.Context()
+			request, err := http.NewRequestWithContext(ctx, v.Method, server.URL+v.Path, nil)
+			require.NoError(t, err)
 
-		response, err := client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		if response.StatusCode != v.Status {
-			t.Errorf("Expected %d for %s (%s), Got %#v", v.Status, v.Method, k, response)
-		}
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
+			require.Equal(t, v.Status, response.StatusCode)
+		})
 	}
 }
 
@@ -853,23 +830,23 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 		ErrCode int
 	}
 	cases := map[string]T{
-		"groupless GET object":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless GET list":      {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
-		"groupless POST list":     {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
-		"groupless PUT object":    {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless DELETE object": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"groupless watch list":    {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
-		"groupless watch object":  {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
-		"groupless proxy object":  {"GET", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
+		"groupless GET object":    {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless GET list":      {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless POST list":     {http.MethodPost, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo", http.StatusNotFound},
+		"groupless PUT object":    {http.MethodPut, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless DELETE object": {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"groupless watch list":    {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"groupless watch object":  {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"groupless proxy object":  {http.MethodGet, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
 
-		"GET object":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"GET list":      {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
-		"POST list":     {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
-		"PUT object":    {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"DELETE object": {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
-		"watch list":    {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
-		"watch object":  {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
-		"proxy object":  {"GET", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
+		"GET object":    {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"GET list":      {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"POST list":     {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo", http.StatusNotFound},
+		"PUT object":    {http.MethodPut, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"DELETE object": {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/foo/bar", http.StatusNotFound},
+		"watch list":    {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo", http.StatusNotFound},
+		"watch object":  {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/foo/bar", http.StatusNotFound},
+		"proxy object":  {http.MethodGet, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/proxy/foo/bar", http.StatusNotFound},
 	}
 	handler := handle(map[string]rest.Storage{
 		"foo": UnimplementedRESTStorage{},
@@ -878,24 +855,16 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 	for k, v := range cases {
-		request, err := http.NewRequest(v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		t.Run(k, func(t *testing.T) {
+			ctx := t.Context()
+			request, err := http.NewRequestWithContext(ctx, v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
+			require.NoError(t, err)
 
-		response, err := client.Do(request)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		defer response.Body.Close()
-		data, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if response.StatusCode != v.ErrCode {
-			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
-			continue
-		}
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
+			require.Equal(t, v.ErrCode, response.StatusCode)
+		})
 	}
 }
 
@@ -931,14 +900,14 @@ func TestSomeUnimplementedRESTStorage(t *testing.T) {
 	}
 
 	cases := map[string]T{
-		"groupless POST list":         {"POST", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
-		"groupless PUT object":        {"PUT", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
-		"groupless DELETE object":     {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
-		"groupless DELETE collection": {"DELETE", "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
-		"POST list":                   {"POST", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
-		"PUT object":                  {"PUT", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
-		"DELETE object":               {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
-		"DELETE collection":           {"DELETE", "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"groupless POST list":         {http.MethodPost, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"groupless PUT object":        {http.MethodPut, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"groupless DELETE object":     {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"groupless DELETE collection": {http.MethodDelete, "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"POST list":                   {http.MethodPost, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
+		"PUT object":                  {http.MethodPut, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE object":               {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo/bar", http.StatusMethodNotAllowed},
+		"DELETE collection":           {http.MethodDelete, "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo", http.StatusMethodNotAllowed},
 	}
 	handler := handle(map[string]rest.Storage{
 		"foo": OnlyGetRESTStorage{},
@@ -947,24 +916,16 @@ func TestSomeUnimplementedRESTStorage(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 	for k, v := range cases {
-		request, err := http.NewRequest(v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		t.Run(k, func(t *testing.T) {
+			ctx := t.Context()
+			request, err := http.NewRequestWithContext(ctx, v.Method, server.URL+v.Path, bytes.NewReader([]byte(`{"kind":"Simple","apiVersion":"version"}`)))
+			require.NoError(t, err)
 
-		response, err := client.Do(request)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		defer response.Body.Close()
-		data, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if response.StatusCode != v.ErrCode {
-			t.Errorf("%s: expected %d for %s, Got %s", k, v.ErrCode, v.Method, string(data))
-			continue
-		}
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
+			require.Equal(t, v.ErrCode, response.StatusCode)
+		})
 	}
 }
 
@@ -1107,40 +1068,41 @@ func TestList(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		storage := map[string]rest.Storage{}
-		simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
-		storage["simple"] = &simpleStorage
-		var handler = handleInternal(storage, admissionControl, nil)
-		server := httptest.NewServer(handler)
-		defer server.Close()
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			ctx := t.Context()
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{expectedResourceNamespace: testCase.namespace}
+			storage["simple"] = &simpleStorage
+			var handler = handleInternal(storage, admissionControl, nil)
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		resp, err := http.Get(server.URL + testCase.url)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Errorf("%d: unexpected error: %v", i, err)
-				continue
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+testCase.url, nil)
+			require.NoError(t, err)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer apitesting.AssertBodyClosed(t, resp.Body)
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, testCase.url, http.StatusOK, resp)
+				body, err := apitesting.ReadAndCloseBody(resp.Body)
+				require.NoError(t, err)
+				t.Logf("body: %s", string(body))
+				return
 			}
-			t.Logf("%d: body: %s", i, string(body))
-			continue
-		}
-		if !simpleStorage.namespacePresent {
-			t.Errorf("%d: namespace not set", i)
-		} else if simpleStorage.actualNamespace != testCase.namespace {
-			t.Errorf("%d: %q unexpected resource namespace: %s", i, testCase.url, simpleStorage.actualNamespace)
-		}
-		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
-			t.Errorf("%d: unexpected label selector: expected=%v got=%v", i, testCase.label, simpleStorage.requestedLabelSelector)
-		}
-		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
-			t.Errorf("%d: unexpected field selector: expected=%v got=%v", i, testCase.field, simpleStorage.requestedFieldSelector)
-		}
+			err = apitesting.DrainAndCloseBody(resp.Body)
+			require.NoError(t, err)
+			if !simpleStorage.namespacePresent {
+				t.Error("namespace not set")
+			} else if simpleStorage.actualNamespace != testCase.namespace {
+				t.Errorf("%q unexpected resource namespace: %s", testCase.url, simpleStorage.actualNamespace)
+			}
+			if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
+				t.Errorf("unexpected label selector: expected=%v got=%v", testCase.label, simpleStorage.requestedLabelSelector)
+			}
+			if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+				t.Errorf("unexpected field selector: expected=%v got=%v", testCase.field, simpleStorage.requestedFieldSelector)
+			}
+		})
 	}
 }
 
@@ -1165,28 +1127,24 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 		// {"/simple/foo?resourceVersion=<invalid>", http.MethodGet}, TODO: there is no invalid resourceVersion. Should we be more strict?
 		// {"/withoptions?labelSelector=<invalid>", http.MethodGet}, TODO: SimpleGetOptions is always valid. Add more validation that can fail.
 	} {
-		baseURL := server.URL + "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default"
-		url := baseURL + test.postfix
-		r, err := http.NewRequest(test.method, url, nil)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		resp, err := http.DefaultClient.Do(r)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, url, http.StatusBadRequest, resp)
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Errorf("%d: unexpected error: %v", i, err)
-				continue
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			ctx := t.Context()
+			baseURL := server.URL + "/" + grouplessPrefix + "/" + grouplessGroupVersion.Version + "/namespaces/default"
+			url := baseURL + test.postfix
+			r, err := http.NewRequestWithContext(ctx, test.method, url, nil)
+			require.NoError(t, err)
+			resp, err := http.DefaultClient.Do(r)
+			require.NoError(t, err)
+			defer apitesting.AssertBodyClosed(t, resp.Body)
+			if resp.StatusCode != http.StatusBadRequest {
+				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, url, http.StatusBadRequest, resp)
+				body, err := apitesting.ReadAndCloseBody(resp.Body)
+				require.NoError(t, err)
+				t.Logf("body: %s", string(body))
 			}
-			t.Logf("%d: body: %s", i, string(body))
-		}
+			err = apitesting.DrainAndCloseBody(resp.Body)
+			require.NoError(t, err)
+		})
 	}
 }
 
@@ -1212,101 +1170,88 @@ func TestListCompression(t *testing.T) {
 		},
 	}
 	for i, testCase := range testCases {
-		storage := map[string]rest.Storage{}
-		simpleStorage := SimpleRESTStorage{
-			expectedResourceNamespace: testCase.namespace,
-			list: []genericapitesting.Simple{
-				{Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1)},
-			},
-		}
-		storage["simple"] = &simpleStorage
-		var handler = handleInternal(storage, admissionControl, nil)
-
-		handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
-
-		server := httptest.NewServer(handler)
-
-		defer server.Close()
-
-		req, err := http.NewRequest("GET", server.URL+testCase.url, nil)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		// It's necessary to manually set Accept-Encoding here
-		// to prevent http.DefaultClient from automatically
-		// decoding responses
-		req.Header.Set("Accept-Encoding", testCase.acceptEncoding)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Errorf("%d: unexpected error: %v", i, err)
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: unexpected status: %d from url %s, Expected: %d, %#v", i, resp.StatusCode, testCase.url, http.StatusOK, resp)
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Errorf("%d: unexpected error: %v", i, err)
-				continue
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			ctx := t.Context()
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{
+				expectedResourceNamespace: testCase.namespace,
+				list: []genericapitesting.Simple{
+					{Other: strings.Repeat("0123456789abcdef", (128*1024/16)+1)},
+				},
 			}
-			t.Logf("%d: body: %s", i, string(body))
-			continue
-		}
-		if !simpleStorage.namespacePresent {
-			t.Errorf("%d: namespace not set", i)
-		} else if simpleStorage.actualNamespace != testCase.namespace {
-			t.Errorf("%d: %q unexpected resource namespace: %s", i, testCase.url, simpleStorage.actualNamespace)
-		}
-		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
-			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
-		}
-		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
-			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
-		}
+			storage["simple"] = &simpleStorage
+			var handler = handleInternal(storage, admissionControl, nil)
 
-		var decoder *json.Decoder
-		if testCase.acceptEncoding == "gzip" {
-			gzipReader, err := gzip.NewReader(resp.Body)
-			if err != nil {
-				t.Fatalf("unexpected error creating gzip reader: %v", err)
+			handler = genericapifilters.WithRequestInfo(handler, newTestRequestInfoResolver())
+
+			server := httptest.NewServer(handler)
+
+			defer server.Close()
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+testCase.url, nil)
+			require.NoError(t, err)
+			// It's necessary to manually set Accept-Encoding here
+			// to prevent http.DefaultClient from automatically
+			// decoding responses
+			req.Header.Set("Accept-Encoding", testCase.acceptEncoding)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, testCase.url, http.StatusOK, resp)
+				body, err := apitesting.ReadAndCloseBody(resp.Body)
+				require.NoError(t, err)
+				t.Logf("body: %s", string(body))
+				return
 			}
-			decoder = json.NewDecoder(gzipReader)
-		} else {
-			decoder = json.NewDecoder(resp.Body)
-		}
-		var itemOut genericapitesting.SimpleList
-		err = decoder.Decode(&itemOut)
-		if err != nil {
-			t.Errorf("failed to read response body as SimpleList: %v", err)
-		}
+			if !simpleStorage.namespacePresent {
+				t.Error("namespace not set")
+			} else if simpleStorage.actualNamespace != testCase.namespace {
+				t.Errorf("%q unexpected resource namespace: %s", testCase.url, simpleStorage.actualNamespace)
+			}
+			if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
+				t.Errorf("unexpected label selector: %v", simpleStorage.requestedLabelSelector)
+			}
+			if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+				t.Errorf("unexpected field selector: %v", simpleStorage.requestedFieldSelector)
+			}
+
+			var decoder *json.Decoder
+			if testCase.acceptEncoding == "gzip" {
+				gzipReader, err := gzip.NewReader(resp.Body)
+				require.NoError(t, err)
+				decoder = json.NewDecoder(gzipReader)
+			} else {
+				decoder = json.NewDecoder(resp.Body)
+			}
+			var itemOut genericapitesting.SimpleList
+			err = decoder.Decode(&itemOut)
+			require.NoError(t, err)
+		})
 	}
 }
 
 func TestLogs(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
 
-	request, err := http.NewRequest("GET", server.URL+"/logs", nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/logs", nil)
+	require.NoError(t, err)
 
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
 	t.Logf("Data: %s", string(body))
 }
 
 func TestErrorList(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		errors: map[string]error{"list": fmt.Errorf("test Error")},
@@ -1316,17 +1261,18 @@ func TestErrorList(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
 
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusInternalServerError, resp)
-	}
+	defer apitesting.Close(t, resp.Body)
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
 func TestNonEmptyList(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		list: []genericapitesting.Simple{
@@ -1341,43 +1287,34 @@ func TestNonEmptyList(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simple"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
 		t.Logf("Data: %s", string(body))
 	}
 
 	var listOut genericapitesting.SimpleList
 	body, err := extractBody(resp, &listOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	t.Log(body)
 
-	if len(listOut.Items) != 1 {
-		t.Errorf("Unexpected response: %#v", listOut)
-		return
-	}
-	if listOut.Items[0].Other != simpleStorage.list[0].Other {
-		t.Errorf("Unexpected data: %#v, %s", listOut.Items[0], string(body))
-	}
+	require.Len(t, listOut.Items, 1, listOut)
+	require.Equal(t, simpleStorage.list[0].Other, listOut.Items[0].Other, listOut.Items[0])
 }
 
 func TestMetadata(t *testing.T) {
 	simpleStorage := &MetadataRESTStorage{&SimpleRESTStorage{}, []string{"text/plain"}}
 	h := handle(map[string]rest.Storage{"simple": simpleStorage})
 	ws := h.(*defaultAPIServer).container.RegisteredWebServices()
-	if len(ws) == 0 {
-		t.Fatal("no web services registered")
-	}
+	require.NotEmpty(t, ws, "no web services registered")
 	matches := map[string]int{}
 	for _, w := range ws {
 		for _, r := range w.Routes() {
@@ -1409,6 +1346,7 @@ func TestMetadata(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
@@ -1420,18 +1358,16 @@ func TestGet(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	if itemOut.Name != simpleStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
@@ -1439,6 +1375,7 @@ func TestGet(t *testing.T) {
 }
 
 func BenchmarkGet(b *testing.B) {
+	ctx := b.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
@@ -1450,25 +1387,26 @@ func BenchmarkGet(b *testing.B) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	u := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := http.Get(u)
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			b.Fatalf("unexpected response: %#v", resp)
-		}
-		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
-			b.Fatalf("unable to read body")
-		}
+		func() {
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			require.NoError(b, err)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(b, err)
+			defer apitesting.Close(b, resp.Body)
+			require.Equal(b, http.StatusOK, resp.StatusCode)
+			_, err = io.Copy(ioutil.Discard, resp.Body)
+			require.NoError(b, err)
+		}()
 	}
 	b.StopTimer()
 }
 
 func BenchmarkGetNoCompression(b *testing.B) {
+	ctx := b.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		item: genericapitesting.Simple{
@@ -1486,20 +1424,18 @@ func BenchmarkGetNoCompression(b *testing.B) {
 		},
 	}
 
-	u := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		resp, err := client.Get(u)
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			b.Fatalf("unexpected response: %#v", resp)
-		}
-		if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
-			b.Fatalf("unable to read body")
-		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		require.NoError(b, err)
+		resp, err := client.Do(req)
+		require.NoError(b, err)
+		defer apitesting.Close(b, resp.Body)
+		require.Equal(b, http.StatusOK, resp.StatusCode)
+		_, err = io.Copy(ioutil.Discard, resp.Body)
+		require.NoError(b, err)
 	}
 	b.StopTimer()
 }
@@ -1525,45 +1461,37 @@ func TestGetCompression(t *testing.T) {
 		{acceptEncoding: "gzip"},
 	}
 
-	for _, test := range tests {
-		req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
-		if err != nil {
-			t.Fatalf("unexpected error creating request: %v", err)
-		}
-		// It's necessary to manually set Accept-Encoding here
-		// to prevent http.DefaultClient from automatically
-		// decoding responses
-		req.Header.Set("Accept-Encoding", test.acceptEncoding)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("unexpected response: %#v", resp)
-		}
-		var decoder *json.Decoder
-		if test.acceptEncoding == "gzip" {
-			gzipReader, err := gzip.NewReader(resp.Body)
-			if err != nil {
-				t.Fatalf("unexpected error creating gzip reader: %v", err)
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			ctx := t.Context()
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/id", nil)
+			require.NoError(t, err)
+			// It's necessary to manually set Accept-Encoding here
+			// to prevent http.DefaultClient from automatically
+			// decoding responses
+			req.Header.Set("Accept-Encoding", test.acceptEncoding)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var decoder *json.Decoder
+			if test.acceptEncoding == "gzip" {
+				gzipReader, err := gzip.NewReader(resp.Body)
+				require.NoError(t, err)
+				decoder = json.NewDecoder(gzipReader)
+			} else {
+				decoder = json.NewDecoder(resp.Body)
 			}
-			decoder = json.NewDecoder(gzipReader)
-		} else {
-			decoder = json.NewDecoder(resp.Body)
-		}
-		var itemOut genericapitesting.Simple
-		err = decoder.Decode(&itemOut)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		body, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			t.Errorf("unexpected error reading body: %v", err)
-		}
+			var itemOut genericapitesting.Simple
+			err = decoder.Decode(&itemOut)
+			require.NoError(t, err)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
 
-		if itemOut.Name != simpleStorage.item.Name {
-			t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
-		}
+			if itemOut.Name != simpleStorage.item.Name {
+				t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+			}
+		})
 	}
 }
 
@@ -1598,49 +1526,38 @@ func TestGetPretty(t *testing.T) {
 		{pretty: true, accept: runtime.ContentTypeJSON, params: url.Values{"pretty": {"true"}}},
 	}
 	for i, test := range tests {
-		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
-		if err != nil {
-			t.Fatal(err)
-		}
-		u.RawQuery = test.params.Encode()
-		req := &http.Request{Method: "GET", URL: u}
-		req.Header = http.Header{}
-		req.Header.Set("Accept", test.accept)
-		req.Header.Set("User-Agent", test.userAgent)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Fatal(err)
-		}
-		var itemOut genericapitesting.Simple
-		body, err := extractBody(resp, &itemOut)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// to get stable ordering we need to use a go type
-		unstructured := genericapitesting.Simple{}
-		if err := json.Unmarshal([]byte(body), &unstructured); err != nil {
-			t.Fatal(err)
-		}
-		var expect string
-		if test.pretty {
-			out, err := json.MarshalIndent(unstructured, "", "  ")
-			if err != nil {
-				t.Fatal(err)
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
+			require.NoError(t, err)
+			u.RawQuery = test.params.Encode()
+			req := &http.Request{Method: http.MethodGet, URL: u}
+			req.Header = http.Header{}
+			req.Header.Set("Accept", test.accept)
+			req.Header.Set("User-Agent", test.userAgent)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			var itemOut genericapitesting.Simple
+			body, err := extractBody(resp, &itemOut)
+			require.NoError(t, err)
+			// to get stable ordering we need to use a go type
+			unstructured := genericapitesting.Simple{}
+			err = json.Unmarshal([]byte(body), &unstructured)
+			require.NoError(t, err)
+			var expect string
+			if test.pretty {
+				out, err := json.MarshalIndent(unstructured, "", "  ")
+				require.NoError(t, err)
+				expect = string(out)
+			} else {
+				out, err := json.Marshal(unstructured)
+				require.NoError(t, err)
+				expect = string(out) + "\n"
 			}
-			expect = string(out)
-		} else {
-			out, err := json.Marshal(unstructured)
-			if err != nil {
-				t.Fatal(err)
+			if expect != body {
+				t.Errorf("body did not match expected:\n%s\n%s", body, expect)
 			}
-			expect = string(out) + "\n"
-		}
-		if expect != body {
-			t.Errorf("%d: body did not match expected:\n%s\n%s", i, body, expect)
-		}
+		})
 	}
 }
 
@@ -1652,17 +1569,13 @@ func TestGetTable(t *testing.T) {
 	}
 
 	m, err := meta.Accessor(&obj)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var encodedV1Beta1Body []byte
 	{
 		partial := meta.AsPartialObjectMetadata(m)
 		partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 		encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		// the codec includes a trailing newline that is not present during decode
 		encodedV1Beta1Body = bytes.TrimSpace(encodedBody)
 	}
@@ -1671,9 +1584,7 @@ func TestGetTable(t *testing.T) {
 		partial := meta.AsPartialObjectMetadata(m)
 		partial.GetObjectKind().SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 		encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		// the codec includes a trailing newline that is not present during decode
 		encodedV1Body = bytes.TrimSpace(encodedBody)
 	}
@@ -1798,42 +1709,28 @@ func TestGetTable(t *testing.T) {
 				id = "/id"
 			}
 			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple" + id)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			u.RawQuery = test.params.Encode()
-			req := &http.Request{Method: "GET", URL: u}
+			req := &http.Request{Method: http.MethodGet, URL: u}
 			req.Header = http.Header{}
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Errorf("%d: unexpected response: %#v", i, resp)
-				}
+				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
-				if err != nil {
-					t.Fatalf("%d: unexpected body read error: %v", i, err)
-				}
-				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Fatalf("%d: unexpected error body: %#v", i, obj)
-				}
+				require.NoError(t, err)
+				expectedGVK := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				require.Equal(t, expectedGVK, obj.GetObjectKind().GroupVersionKind())
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Errorf("%d: unexpected response: %#v", i, resp)
-			}
+			require.Equal(t, http.StatusOK, resp.StatusCode)
 			var itemOut metav1.Table
 			body, err := extractBody(resp, &itemOut)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if !reflect.DeepEqual(test.expected, &itemOut) {
 				t.Log(body)
-				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, &itemOut))
+				t.Errorf("did not match: %s", cmp.Diff(test.expected, &itemOut))
 			}
 		})
 	}
@@ -1846,22 +1743,16 @@ func TestWatchTable(t *testing.T) {
 	}
 
 	m, err := meta.Accessor(&obj)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	partial := meta.AsPartialObjectMetadata(m)
 	partial.GetObjectKind().SetGroupVersionKind(metav1beta1.SchemeGroupVersion.WithKind("PartialObjectMetadata"))
 	encodedBody, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion), partial)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// the codec includes a trailing newline that is not present during decode
 	encodedBody = bytes.TrimSpace(encodedBody)
 
 	encodedBodyV1, err := runtime.Encode(metainternalversionscheme.Codecs.LegacyCodec(metav1.SchemeGroupVersion), partial)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	// the codec includes a trailing newline that is not present during decode
 	encodedBodyV1 = bytes.TrimSpace(encodedBodyV1)
 
@@ -2000,9 +1891,7 @@ func TestWatchTable(t *testing.T) {
 				id = "/id"
 			}
 			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple")
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if test.params == nil {
 				test.params = url.Values{}
 			}
@@ -2012,43 +1901,37 @@ func TestWatchTable(t *testing.T) {
 			test.params["watch"] = []string{"1"}
 
 			u.RawQuery = test.params.Encode()
-			req := &http.Request{Method: "GET", URL: u}
+			req := &http.Request{Method: http.MethodGet, URL: u}
 			req.Header = http.Header{}
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer resp.Body.Close()
+			require.NoError(t, err)
+			defer apitesting.AssertBodyClosed(t, resp.Body)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Fatalf("%d: unexpected response: %#v", i, resp)
-				}
+				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
-				if err != nil {
-					t.Fatalf("%d: unexpected body read error: %v", i, err)
-				}
-				gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-				if obj.GetObjectKind().GroupVersionKind() != gvk {
-					t.Fatalf("%d: unexpected error body: %#v", i, obj)
-				}
+				require.NoError(t, err)
+				expectedGVK := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				require.Equal(t, expectedGVK, obj.GetObjectKind().GroupVersionKind())
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("%d: unexpected response: %#v", i, resp)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var watcher *watch.FakeWatcher
+			for watcher == nil {
+				watcher = simpleStorage.Watcher()
+				time.Sleep(time.Millisecond)
 			}
 
 			go func() {
-				defer simpleStorage.fakeWatch.Stop()
-				test.send(simpleStorage.fakeWatch)
+				defer watcher.Stop()
+				test.send(watcher)
 			}()
 
-			body, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
+			body, err := apitesting.ReadAndCloseBody(resp.Body)
+			require.NoError(t, err)
 			t.Logf("Body:\n%s", string(body))
-			d := watcher(resp.Header.Get("Content-Type"), ioutil.NopCloser(bytes.NewReader(body)))
+			d := newDecoder(resp.Header.Get("Content-Type"), io.NopCloser(bytes.NewReader(body)))
 			var actual []*metav1.WatchEvent
 			for {
 				var event metav1.WatchEvent
@@ -2056,19 +1939,15 @@ func TestWatchTable(t *testing.T) {
 				if err == io.EOF {
 					break
 				}
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				actual = append(actual, &event)
 			}
-			if !reflect.DeepEqual(test.expected, actual) {
-				t.Fatalf("unexpected: %s", cmp.Diff(test.expected, actual))
-			}
+			require.Equal(t, test.expected, actual)
 		})
 	}
 }
 
-func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
+func newDecoder(mediaType string, r io.ReadCloser) streaming.Decoder {
 	info, ok := runtime.SerializerInfoForMediaType(metainternalversionscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok || info.StreamSerializer == nil {
 		panic(info)
@@ -2198,69 +2077,50 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 		},
 	}
 	for i, test := range tests {
-		suffix := "/namespaces/default/simple/id"
-		if test.list {
-			suffix = "/namespaces/default/simple"
-		}
-		u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + suffix)
-		if err != nil {
-			t.Fatal(err)
-		}
-		u.RawQuery = test.params.Encode()
-		req := &http.Request{Method: "GET", URL: u}
-		req.Header = http.Header{}
-		req.Header.Set("Accept", test.accept)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if test.statusCode != 0 {
-			if resp.StatusCode != test.statusCode {
-				t.Errorf("%d: unexpected response: %#v", i, resp)
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			suffix := "/namespaces/default/simple/id"
+			if test.list {
+				suffix = "/namespaces/default/simple"
 			}
-			obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
-			if err != nil {
-				t.Errorf("%d: unexpected body read error: %v", i, err)
-				continue
+			u, err := url.Parse(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + suffix)
+			require.NoError(t, err)
+			u.RawQuery = test.params.Encode()
+			req := &http.Request{Method: http.MethodGet, URL: u}
+			req.Header = http.Header{}
+			req.Header.Set("Accept", test.accept)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
+			if test.statusCode != 0 {
+				assert.Equal(t, test.statusCode, resp.StatusCode)
+				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
+				require.NoError(t, err)
+				expectedGVK := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
+				require.Equal(t, expectedGVK, obj.GetObjectKind().GroupVersionKind())
+				return
 			}
-			gvk := schema.GroupVersionKind{Version: "v1", Kind: "Status"}
-			if obj.GetObjectKind().GroupVersionKind() != gvk {
-				t.Errorf("%d: unexpected error body: %#v", i, obj)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+			body := ""
+			if test.expected != nil {
+				itemOut, d, err := extractBodyObject(resp, metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
+				require.NoError(t, err)
+				require.Equal(t, test.expected, itemOut)
+				body = d
+			} else {
+				d, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				body = string(d)
 			}
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%d: invalid status: %#v\n%s", i, resp, bodyOrDie(resp))
-			continue
-		}
-		body := ""
-		if test.expected != nil {
-			itemOut, d, err := extractBodyObject(resp, metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(test.expected, itemOut) {
-				t.Errorf("%d: did not match: %s", i, cmp.Diff(test.expected, itemOut))
-			}
-			body = d
-		} else {
-			d, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				t.Fatal(err)
-			}
-			body = string(d)
-		}
-		obj := &unstructured.Unstructured{}
-		if err := json.Unmarshal([]byte(body), obj); err != nil {
-			t.Fatal(err)
-		}
-		if obj.GetObjectKind().GroupVersionKind() != test.expectKind {
-			t.Errorf("%d: unexpected kind: %#v", i, obj.GetObjectKind().GroupVersionKind())
-		}
+			obj := &unstructured.Unstructured{}
+			err = json.Unmarshal([]byte(body), obj)
+			require.NoError(t, err)
+			require.Equal(t, test.expectKind, obj.GetObjectKind().GroupVersionKind())
+		})
 	}
 }
 
 func TestGetBinary(t *testing.T) {
+	ctx := t.Context()
 	simpleStorage := SimpleRESTStorage{
 		stream: &SimpleStream{
 			contentType: "text/plain",
@@ -2271,22 +2131,16 @@ func TestGetBinary(t *testing.T) {
 	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
 	defer server.Close()
 
-	req, err := http.NewRequest("GET", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/binary", nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/binary"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
 	req.Header.Add("Accept", "text/other, */*")
 	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
 	if !stream.closed || stream.version != testGroupVersion.String() || stream.accept != "text/other, */*" ||
 		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
 		t.Errorf("unexpected stream: %#v", stream)
@@ -2322,12 +2176,10 @@ func TestGetWithOptionsRouteParams(t *testing.T) {
 	storage["simple"] = &simpleStorage
 	handler := handle(storage)
 	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
-	if len(ws) == 0 {
-		t.Fatal("no web services registered")
-	}
+	require.NotEmpty(t, ws, "no web services registered")
 	routes := ws[0].Routes()
 	for i := range routes {
-		if routes[i].Method == "GET" && routes[i].Operation == "readNamespacedSimple" {
+		if routes[i].Method == http.MethodGet && routes[i].Operation == "readNamespacedSimple" {
 			validateSimpleGetOptionsParams(t, &routes[i])
 			break
 		}
@@ -2388,90 +2240,75 @@ func TestGetWithOptions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		simpleStorage := GetWithOptionsRESTStorage{
-			SimpleRESTStorage: &SimpleRESTStorage{
-				item: genericapitesting.Simple{
-					Other: "foo",
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+			simpleStorage := GetWithOptionsRESTStorage{
+				SimpleRESTStorage: &SimpleRESTStorage{
+					item: genericapitesting.Simple{
+						Other: "foo",
+					},
 				},
-			},
-			takesPath: "atAPath",
-		}
-		simpleRootStorage := GetWithOptionsRootRESTStorage{
-			SimpleTypedStorage: &SimpleTypedStorage{
-				baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
-				item: &genericapitesting.SimpleRoot{
-					Other: "foo",
-				},
-			},
-			takesPath: "atAPath",
-		}
-
-		storage := map[string]rest.Storage{}
-		if test.rootScoped {
-			storage["simple"] = &simpleRootStorage
-			storage["simple/subresource"] = &simpleRootStorage
-		} else {
-			storage["simple"] = &simpleStorage
-			storage["simple/subresource"] = &simpleStorage
-		}
-		handler := handle(storage)
-		server := httptest.NewServer(handler)
-		defer server.Close()
-
-		resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + test.requestURL)
-		if err != nil {
-			t.Errorf("%s: %v", test.name, err)
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("%s: unexpected response: %#v", test.name, resp)
-			continue
-		}
-
-		var itemOut runtime.Object
-		if test.rootScoped {
-			itemOut = &genericapitesting.SimpleRoot{}
-		} else {
-			itemOut = &genericapitesting.Simple{}
-		}
-		body, err := extractBody(resp, itemOut)
-		if err != nil {
-			t.Errorf("%s: %v", test.name, err)
-			continue
-		}
-		if metadata, err := meta.Accessor(itemOut); err == nil {
-			if metadata.GetName() != simpleStorage.item.Name {
-				t.Errorf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
-				continue
+				takesPath: "atAPath",
 			}
-		} else {
-			t.Errorf("%s: Couldn't get name from %#v: %v", test.name, itemOut, err)
-		}
+			simpleRootStorage := GetWithOptionsRootRESTStorage{
+				SimpleTypedStorage: &SimpleTypedStorage{
+					baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
+					item: &genericapitesting.SimpleRoot{
+						Other: "foo",
+					},
+				},
+				takesPath: "atAPath",
+			}
 
-		var opts *genericapitesting.SimpleGetOptions
-		var ok bool
-		if test.rootScoped {
-			opts, ok = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
-		} else {
-			opts, ok = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+			storage := map[string]rest.Storage{}
+			if test.rootScoped {
+				storage["simple"] = &simpleRootStorage
+				storage["simple/subresource"] = &simpleRootStorage
+			} else {
+				storage["simple"] = &simpleStorage
+				storage["simple/subresource"] = &simpleStorage
+			}
+			handler := handle(storage)
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		}
-		if !ok {
-			t.Errorf("%s: Unexpected options object received: %#v", test.name, simpleStorage.optionsReceived)
-			continue
-		}
-		if opts.Param1 != "test1" || opts.Param2 != "test2" {
-			t.Errorf("%s: Did not receive expected options: %#v", test.name, opts)
-			continue
-		}
-		if opts.Path != test.expectedPath {
-			t.Errorf("%s: Unexpected path value. Expected: %s. Actual: %s.", test.name, test.expectedPath, opts.Path)
-			continue
-		}
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + test.requestURL
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+			require.NoError(t, err)
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
+			require.Equal(t, http.StatusOK, resp.StatusCode)
+
+			var itemOut runtime.Object
+			if test.rootScoped {
+				itemOut = &genericapitesting.SimpleRoot{}
+			} else {
+				itemOut = &genericapitesting.Simple{}
+			}
+			body, err := extractBody(resp, itemOut)
+			require.NoError(t, err)
+			metadata, err := meta.Accessor(itemOut)
+			require.NoError(t, err)
+			require.Equal(t, simpleStorage.item.Name, metadata.GetName(), string(body))
+
+			var opts *genericapitesting.SimpleGetOptions
+			if test.rootScoped {
+				require.IsType(t, &genericapitesting.SimpleGetOptions{}, simpleRootStorage.optionsReceived)
+				opts = simpleRootStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+			} else {
+				require.IsType(t, &genericapitesting.SimpleGetOptions{}, simpleStorage.optionsReceived)
+				opts = simpleStorage.optionsReceived.(*genericapitesting.SimpleGetOptions)
+			}
+			assert.Equal(t, "test1", opts.Param1)
+			assert.Equal(t, "test2", opts.Param2)
+			assert.Equal(t, test.expectedPath, opts.Path)
+		})
 	}
 }
 
 func TestGetMissing(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		errors: map[string]error{"get": apierrors.NewNotFound(schema.GroupResource{Resource: "simples"}, "id")},
@@ -2481,17 +2318,17 @@ func TestGetMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", resp)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 func TestGetRetryAfter(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
 		errors: map[string]error{"get": apierrors.NewServerTimeout(schema.GroupResource{Resource: "simples"}, "id", 2)},
@@ -2501,19 +2338,20 @@ func TestGetRetryAfter(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected response %#v", resp)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/id"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	if resp.Header.Get("Retry-After") != "2" {
 		t.Errorf("Unexpected Retry-After header: %v", resp.Header)
 	}
 }
 
 func TestConnect(t *testing.T) {
+	ctx := t.Context()
 	responseText := "Hello World"
 	itemID := "theID"
 	connectStorage := &ConnecterRESTStorage{
@@ -2529,19 +2367,15 @@ func TestConnect(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.AssertBodyClosed(t, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := apitesting.ReadAndCloseBody(resp.Body)
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
@@ -2551,6 +2385,7 @@ func TestConnect(t *testing.T) {
 }
 
 func TestConnectResponderObject(t *testing.T) {
+	ctx := t.Context()
 	itemID := "theID"
 	simple := &genericapitesting.Simple{Other: "foo"}
 	connectStorage := &ConnecterRESTStorage{}
@@ -2567,32 +2402,27 @@ func TestConnectResponderObject(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("unexpected response: %#v", resp)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.AssertBodyClosed(t, resp.Body)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	body, err := apitesting.ReadAndCloseBody(resp.Body)
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
 	obj, err := runtime.Decode(codec, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if !apiequality.Semantic.DeepEqual(obj, simple) {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
 }
 
 func TestConnectResponderError(t *testing.T) {
+	ctx := t.Context()
 	itemID := "theID"
 	connectStorage := &ConnecterRESTStorage{}
 	connectStorage.handlerFunc = func() http.Handler {
@@ -2608,26 +2438,20 @@ func TestConnectResponderError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect")
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("unexpected response: %#v", resp)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.AssertBodyClosed(t, resp.Body)
+	require.Equal(t, http.StatusForbidden, resp.StatusCode)
+	body, err := apitesting.ReadAndCloseBody(resp.Body)
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
 	obj, err := runtime.Decode(codec, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if obj.(*metav1.Status).Code != http.StatusForbidden {
 		t.Errorf("Unexpected response: %#v", obj)
 	}
@@ -2644,9 +2468,7 @@ func TestConnectWithOptionsRouteParams(t *testing.T) {
 	}
 	handler := handle(storage)
 	ws := handler.(*defaultAPIServer).container.RegisteredWebServices()
-	if len(ws) == 0 {
-		t.Fatal("no web services registered")
-	}
+	require.NotEmpty(t, ws, "no web services registered")
 	routes := ws[0].Routes()
 	for i := range routes {
 		switch routes[i].Operation {
@@ -2655,12 +2477,12 @@ func TestConnectWithOptionsRouteParams(t *testing.T) {
 		case "connectPutNamespacedSimpleConnect":
 		case "connectDeleteNamespacedSimpleConnect":
 			validateSimpleGetOptionsParams(t, &routes[i])
-
 		}
 	}
 }
 
 func TestConnectWithOptions(t *testing.T) {
+	ctx := t.Context()
 	responseText := "Hello World"
 	itemID := "theID"
 	connectStorage := &ConnecterRESTStorage{
@@ -2677,19 +2499,15 @@ func TestConnectWithOptions(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2")
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect?param1=value1&param2=value2"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.AssertBodyClosed(t, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := apitesting.ReadAndCloseBody(resp.Body)
+	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
 		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
 	}
@@ -2699,16 +2517,14 @@ func TestConnectWithOptions(t *testing.T) {
 	if connectStorage.receivedResponder == nil {
 		t.Errorf("Unexpected responder")
 	}
-	opts, ok := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
-	if !ok {
-		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
-	}
-	if opts.Param1 != "value1" && opts.Param2 != "value2" {
-		t.Errorf("Unexpected options value: %#v", opts)
-	}
+	require.IsType(t, &genericapitesting.SimpleGetOptions{}, connectStorage.receivedConnectOptions)
+	opts := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
+	assert.Equal(t, "value1", opts.Param1)
+	assert.Equal(t, "value2", opts.Param2)
 }
 
 func TestConnectWithOptionsAndPath(t *testing.T) {
+	ctx := t.Context()
 	responseText := "Hello World"
 	itemID := "theID"
 	testPath := "/a/b/c/def"
@@ -2727,38 +2543,26 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect" + testPath + "?param1=value1&param2=value2")
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if connectStorage.receivedID != itemID {
-		t.Errorf("Unexpected item id. Expected: %s. Actual: %s.", itemID, connectStorage.receivedID)
-	}
-	if string(body) != responseText {
-		t.Errorf("Unexpected response. Expected: %s. Actual: %s.", responseText, string(body))
-	}
-	opts, ok := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
-	if !ok {
-		t.Fatalf("Unexpected options type: %#v", connectStorage.receivedConnectOptions)
-	}
-	if opts.Param1 != "value1" && opts.Param2 != "value2" {
-		t.Errorf("Unexpected options value: %#v", opts)
-	}
-	if opts.Path != testPath {
-		t.Errorf("Unexpected path value. Expected: %s. Actual: %s.", testPath, opts.Path)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/connect" + testPath + "?param1=value1&param2=value2"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.AssertBodyClosed(t, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := apitesting.ReadAndCloseBody(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, itemID, connectStorage.receivedID)
+	assert.Equal(t, responseText, string(body))
+	require.IsType(t, &genericapitesting.SimpleGetOptions{}, connectStorage.receivedConnectOptions)
+	opts := connectStorage.receivedConnectOptions.(*genericapitesting.SimpleGetOptions)
+	assert.Equal(t, "value1", opts.Param1)
+	assert.Equal(t, "value2", opts.Param2)
+	assert.Equal(t, testPath, opts.Path)
 }
 
 func TestDelete(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -2767,24 +2571,19 @@ func TestDelete(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", res)
-	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, ID, simpleStorage.deleted)
 }
 
 func TestDeleteWithOptions(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -2798,37 +2597,28 @@ func TestDeleteWithOptions(t *testing.T) {
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		s, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
 		t.Log(string(s))
 	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	assert.Equal(t, ID, simpleStorage.deleted)
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
-	}
+	assert.Equal(t, item, simpleStorage.deleteOptions)
 }
 
 func TestDeleteWithOptionsQuery(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -2842,33 +2632,26 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 		GracePeriodSeconds: &grace,
 	}
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID + "?gracePeriodSeconds=" + strconv.FormatInt(grace, 10)
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace, 10), nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		s, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
 		t.Log(string(s))
 	}
-	if simpleStorage.deleted != ID {
-		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	require.Equal(t, ID, simpleStorage.deleted)
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
-	}
+	require.Equal(t, item, simpleStorage.deleteOptions)
 }
 
 func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -2882,64 +2665,52 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 		GracePeriodSeconds: &grace,
 	}
 	body, err := runtime.Encode(codec, item)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID + "?gracePeriodSeconds=" + strconv.FormatInt(grace+10, 10)
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?gracePeriodSeconds="+strconv.FormatInt(grace+10, 10), bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	res, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		s, err := io.ReadAll(res.Body)
+		require.NoError(t, err)
 		t.Log(string(s))
 	}
-	if simpleStorage.deleted != ID {
-		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
-	}
+	require.Equal(t, ID, simpleStorage.deleted)
 	simpleStorage.deleteOptions.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
-	if !apiequality.Semantic.DeepEqual(simpleStorage.deleteOptions, item) {
-		t.Errorf("unexpected delete options: %s", cmp.Diff(simpleStorage.deleteOptions, item))
-	}
+	require.Equal(t, item, simpleStorage.deleteOptions)
 }
 
 func TestDeleteInvokesAdmissionControl(t *testing.T) {
 	// TODO: remove mutating deny when we removed it from the endpoint implementation and ported all plugins
 	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {
-		t.Logf("Testing %T", admit)
+		t.Run(fmt.Sprintf("%T", admit), func(t *testing.T) {
+			ctx := t.Context()
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{}
+			ID := "id"
+			storage["simple"] = &simpleStorage
+			handler := handleInternal(storage, admit, nil)
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		storage := map[string]rest.Storage{}
-		simpleStorage := SimpleRESTStorage{}
-		ID := "id"
-		storage["simple"] = &simpleStorage
-		handler := handleInternal(storage, admit, nil)
-		server := httptest.NewServer(handler)
-		defer server.Close()
-
-		client := http.Client{}
-		request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		response, err := client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if response.StatusCode != http.StatusForbidden {
-			t.Errorf("Unexpected response %#v", response)
-		}
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
+			client := http.Client{}
+			request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+			require.NoError(t, err)
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
+			require.Equal(t, http.StatusForbidden, response.StatusCode)
+		})
 	}
 }
 
 func TestDeleteMissing(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
@@ -2950,22 +2721,18 @@ func TestDeleteMissing(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestUpdate(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -2982,72 +2749,62 @@ func TestUpdate(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	dump, _ := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	dump, err := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
 	t.Log(string(dump))
 
-	if simpleStorage.updated == nil || simpleStorage.updated.Name != item.Name {
-		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
-	}
+	require.NotNil(t, simpleStorage.updated)
+	require.Equal(t, item.Name, simpleStorage.updated.Name)
 }
 
 func TestUpdateInvokesAdmissionControl(t *testing.T) {
 	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {
-		t.Logf("Testing %T", admit)
+		t.Run(fmt.Sprintf("%T", admit), func(t *testing.T) {
+			ctx := t.Context()
+			storage := map[string]rest.Storage{}
+			simpleStorage := SimpleRESTStorage{}
+			ID := "id"
+			storage["simple"] = &simpleStorage
+			handler := handleInternal(storage, admit, nil)
+			server := httptest.NewServer(handler)
+			defer server.Close()
 
-		storage := map[string]rest.Storage{}
-		simpleStorage := SimpleRESTStorage{}
-		ID := "id"
-		storage["simple"] = &simpleStorage
-		handler := handleInternal(storage, admit, nil)
-		server := httptest.NewServer(handler)
-		defer server.Close()
+			item := &genericapitesting.Simple{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      ID,
+					Namespace: metav1.NamespaceDefault,
+				},
+				Other: "bar",
+			}
+			body, err := runtime.Encode(testCodec, item)
+			require.NoError(t, err)
 
-		item := &genericapitesting.Simple{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      ID,
-				Namespace: metav1.NamespaceDefault,
-			},
-			Other: "bar",
-		}
-		body, err := runtime.Encode(testCodec, item)
-		if err != nil {
-			// The following cases will fail, so die now
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		client := http.Client{}
-		request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		response, err := client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		dump, _ := httputil.DumpResponse(response, true)
-		t.Log(string(dump))
-
-		if response.StatusCode != http.StatusForbidden {
-			t.Errorf("Unexpected response %#v", response)
-		}
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
+			client := http.Client{}
+			request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+			require.NoError(t, err)
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
+			dump, err := httputil.DumpResponse(response, true)
+			require.NoError(t, err)
+			t.Log(string(dump))
+			require.Equal(t, http.StatusForbidden, response.StatusCode)
+		})
 	}
 }
 
 func TestUpdateRequiresMatchingName(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -3060,28 +2817,25 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	if response.StatusCode != http.StatusBadRequest {
-		dump, _ := httputil.DumpResponse(response, true)
+		dump, err := httputil.DumpResponse(response, true)
+		require.NoError(t, err)
 		t.Log(string(dump))
 		t.Errorf("Unexpected response %#v", response)
 	}
 }
 
 func TestUpdateAllowsMissingNamespace(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -3097,30 +2851,24 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	dump, _ := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	dump, err := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
 	t.Log(string(dump))
-
-	if response.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusOK, response.StatusCode)
 }
 
 // when the object name and namespace can't be retrieved, don't update.  It isn't safe.
 func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -3137,29 +2885,24 @@ func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	dump, _ := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	dump, err := httputil.DumpResponse(response, true)
+	require.NoError(t, err)
 	t.Log(string(dump))
 
-	if simpleStorage.updated != nil {
-		t.Errorf("Unexpected update value %#v.", simpleStorage.updated)
-	}
+	require.Nil(t, simpleStorage.updated)
 }
 
 func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{}
 	ID := "id"
@@ -3176,26 +2919,20 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		// The following cases will fail, so die now
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 func TestUpdateMissing(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	simpleStorage := SimpleRESTStorage{
@@ -3214,25 +2951,20 @@ func TestUpdateMissing(t *testing.T) {
 		Other: "bar",
 	}
 	body, err := runtime.Encode(testCodec, item)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + ID
 	client := http.Client{}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader(body))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestCreateNotFound(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
@@ -3246,25 +2978,19 @@ func TestCreateNotFound(t *testing.T) {
 
 	simple := &genericapitesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
 func TestCreateChecksDecode(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -3272,26 +2998,17 @@ func TestCreateChecksDecode(t *testing.T) {
 
 	simple := &example.Pod{}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	b, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Contains(t, string(b), "cannot be handled as a Simple")
 }
 
 func TestParentResourceIsRequired(t *testing.T) {
@@ -3322,9 +3039,8 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container := restful.NewContainer()
-	if _, _, err := group.InstallREST(container); err == nil {
-		t.Fatal("expected error")
-	}
+	_, _, err := group.InstallREST(container)
+	require.Error(t, err)
 
 	storage = &SimpleTypedStorage{
 		baseType: &genericapitesting.SimpleRoot{}, // a root scoped type
@@ -3355,31 +3071,25 @@ func TestParentResourceIsRequired(t *testing.T) {
 		ParameterCodec: parameterCodec,
 	}
 	container = restful.NewContainer()
-	if _, _, err := group.InstallREST(container); err != nil {
-		t.Fatal(err)
-	}
+	_, _, err = group.InstallREST(container)
+	require.NoError(t, err)
 
 	handler := genericapifilters.WithRequestInfo(container, newTestRequestInfoResolver())
 
 	// resource is NOT registered in the root scope
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/simple/test/sub"}})
-	if w.Code != http.StatusNotFound {
-		t.Errorf("expected not found: %#v", w)
-	}
+	handler.ServeHTTP(w, &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/" + prefix + "/simple/test/sub"}})
+	assert.Equal(t, http.StatusNotFound, w.Code)
 
 	// resource is registered in the namespace scope
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, &http.Request{Method: "GET", URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/simple/test/sub"}})
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected OK: %#v", w)
-	}
-	if storage.actualNamespace != "test" {
-		t.Errorf("namespace should be set %#v", storage)
-	}
+	handler.ServeHTTP(w, &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/test/simple/test/sub"}})
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "test", storage.actualNamespace)
 }
 
 func TestNamedCreaterWithName(t *testing.T) {
+	ctx := t.Context()
 	pathName := "helloworld"
 	storage := &NamedCreaterRESTStorage{SimpleRESTStorage: &SimpleRESTStorage{}}
 	handler := handle(map[string]rest.Storage{
@@ -3392,26 +3102,19 @@ func TestNamedCreaterWithName(t *testing.T) {
 
 	simple := &genericapitesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+pathName+"/sub", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + pathName + "/sub"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected response %#v", response)
-	}
-	if storage.createdName != pathName {
-		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	assert.Equal(t, http.StatusCreated, response.StatusCode)
+	assert.Equal(t, pathName, storage.createdName)
 }
 
 func TestNamedCreaterWithoutName(t *testing.T) {
+	ctx := t.Context()
 	storage := &NamedCreaterRESTStorage{
 		SimpleRESTStorage: &SimpleRESTStorage{
 			injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
@@ -3430,29 +3133,16 @@ func TestNamedCreaterWithoutName(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	// empty name is not allowed for NamedCreater
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
 type namePopulatorAdmissionControl struct {
@@ -3474,6 +3164,7 @@ func (npac *namePopulatorAdmissionControl) Handles(operation admission.Operation
 var _ admission.ValidationInterface = &namePopulatorAdmissionControl{}
 
 func TestNamedCreaterWithGenerateName(t *testing.T) {
+	ctx := t.Context()
 	populateName := "bar"
 	storage := &SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
@@ -3504,46 +3195,30 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v %#v", err, response)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
 	itemOut.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 	simple.Name = populateName
 	simple.Namespace = "default" // populated by create handler to match request URL
-	if !reflect.DeepEqual(&itemOut, simple) {
-		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
-	}
+	require.Equal(t, simple, &itemOut, body)
 }
 
 func TestUpdateChecksDecode(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -3551,29 +3226,21 @@ func TestUpdateChecksDecode(t *testing.T) {
 
 	simple := &example.Pod{}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/bar"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v\n%s", response, readBodyOrDie(response.Body))
-	}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "cannot be handled as a Simple") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+	b, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Contains(t, string(b), "cannot be handled as a Simple")
 }
 
 func TestCreate(t *testing.T) {
+	ctx := t.Context()
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			time.Sleep(5 * time.Millisecond)
@@ -3589,31 +3256,18 @@ func TestCreate(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v %#v", err, response)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
@@ -3622,12 +3276,11 @@ func TestCreate(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestCreateYAML(t *testing.T) {
+	ctx := t.Context()
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			time.Sleep(5 * time.Millisecond)
@@ -3651,33 +3304,20 @@ func TestCreateYAML(t *testing.T) {
 	decoder := codecs.DecoderToVersion(info.Serializer, testInternalGroupVersion)
 
 	data, err := runtime.Encode(encoder, simple)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/foo"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	request.Header.Set("Accept", "application/yaml, application/json")
 	request.Header.Set("Content-Type", "application/yaml")
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBodyDecoder(response, &itemOut, decoder)
-	if err != nil {
-		t.Fatalf("unexpected error: %v %#v", err, response)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
@@ -3686,12 +3326,11 @@ func TestCreateYAML(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestCreateInNamespace(t *testing.T) {
+	ctx := t.Context()
 	storage := SimpleRESTStorage{
 		injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
 			time.Sleep(5 * time.Millisecond)
@@ -3707,31 +3346,18 @@ func TestCreateInNamespace(t *testing.T) {
 		Other: "bar",
 	}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var response *http.Response
-	go func() {
-		response, err = client.Do(request)
-		wg.Done()
-	}()
-	wg.Wait()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %v\n%s", err, data)
-	}
+	require.NoError(t, err)
 
 	// Avoid comparing managed fields in expected result
 	itemOut.ManagedFields = nil
@@ -3740,71 +3366,55 @@ func TestCreateInNamespace(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestCreateInvokeAdmissionControl(t *testing.T) {
 	for _, admit := range []admission.Interface{alwaysMutatingDeny{}, alwaysValidatingDeny{}} {
-		t.Logf("Testing %T", admit)
+		t.Run(fmt.Sprintf("%T", admit), func(t *testing.T) {
+			ctx := t.Context()
+			storage := SimpleRESTStorage{
+				injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
+					time.Sleep(5 * time.Millisecond)
+					return obj, nil
+				},
+			}
+			handler := handleInternal(map[string]rest.Storage{"foo": &storage}, admit, nil)
+			server := httptest.NewServer(handler)
+			defer server.Close()
+			client := http.Client{}
 
-		storage := SimpleRESTStorage{
-			injectedFunction: func(obj runtime.Object) (runtime.Object, error) {
-				time.Sleep(5 * time.Millisecond)
-				return obj, nil
-			},
-		}
-		handler := handleInternal(map[string]rest.Storage{"foo": &storage}, admit, nil)
-		server := httptest.NewServer(handler)
-		defer server.Close()
-		client := http.Client{}
+			simple := &genericapitesting.Simple{
+				Other: "bar",
+			}
+			data, err := runtime.Encode(testCodec, simple)
+			require.NoError(t, err)
+			url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/other/foo"
+			request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+			require.NoError(t, err)
 
-		simple := &genericapitesting.Simple{
-			Other: "bar",
-		}
-		data, err := runtime.Encode(testCodec, simple)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/other/foo", bytes.NewBuffer(data))
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		var response *http.Response
-		response, err = client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if response.StatusCode != http.StatusForbidden {
-			t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusForbidden, response)
-		}
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
+			require.Equal(t, http.StatusForbidden, response.StatusCode)
+		})
 	}
 }
 
 func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *metav1.Status {
 	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
 	client := http.Client{}
-	request, err := http.NewRequest(method, url, bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error %#v", err)
-		return nil
-	}
+	request, err := http.NewRequestWithContext(ctx, method, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error on %s %s: %v", method, url, err)
-		return nil
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	var status metav1.Status
 	body, err := extractBody(response, &status)
-	if err != nil {
-		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
-		return nil
-	}
-	if code != response.StatusCode {
-		t.Fatalf("Expected %s %s to return %d, Got %d: %v", method, url, code, response.StatusCode, body)
-	}
+	require.NoError(t, err)
+	require.Equalf(t, code, response.StatusCode, "method: %s, url: %s, body: %s", method, url, body)
 	return &status
 }
 
@@ -3818,7 +3428,8 @@ func TestDelayReturnsError(t *testing.T) {
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	status := expectAPIStatus(t, "DELETE", fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL), nil, http.StatusConflict)
+	url := fmt.Sprintf("%s/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo/bar", server.URL)
+	status := expectAPIStatus(t, http.MethodDelete, url, nil, http.StatusConflict)
 	if status.Status != metav1.StatusFailure || status.Message == "" || status.Details == nil || status.Reason != metav1.StatusReasonAlreadyExists {
 		t.Errorf("Unexpected status %#v", status)
 	}
@@ -3849,7 +3460,7 @@ func TestWriteJSONDecodeError(t *testing.T) {
 	// Unless specific metav1.Status() parameters are implemented for the particular error in question, such that
 	// the status code is defined, metav1 errors where error.status == metav1.StatusFailure
 	// will throw a '500 Internal Server Error'. Non-metav1 type errors will always throw a '500 Internal Server Error'.
-	status := expectAPIStatus(t, "GET", server.URL, nil, http.StatusInternalServerError)
+	status := expectAPIStatus(t, http.MethodGet, server.URL, nil, http.StatusInternalServerError)
 	if status.Reason != metav1.StatusReasonUnknown {
 		t.Errorf("unexpected reason %#v", status)
 	}
@@ -3873,13 +3484,8 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	defer server.Close()
 	client := http.Client{}
 	resp, err := client.Get(server.URL)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("unexpected status code %d", resp.StatusCode)
-	}
+	require.NoError(t, err)
+	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
 func TestCreateTimeout(t *testing.T) {
@@ -3900,16 +3506,15 @@ func TestCreateTimeout(t *testing.T) {
 
 	simple := &genericapitesting.Simple{Other: "foo"}
 	data, err := runtime.Encode(testCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	itemOut := expectAPIStatus(t, "POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
+	require.NoError(t, err)
+	itemOut := expectAPIStatus(t, http.MethodPost, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/foo?timeout=4ms", data, http.StatusGatewayTimeout)
 	if itemOut.Status != metav1.StatusFailure || itemOut.Reason != metav1.StatusReasonTimeout {
 		t.Errorf("Unexpected status %#v", itemOut)
 	}
 }
 
 func TestCreateChecksAPIVersion(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -3918,29 +3523,21 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	simple := &genericapitesting.Simple{}
 	//using newCodec and send the request to testVersion URL shall cause a discrepancy in apiVersion
 	data, err := runtime.Encode(newCodec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "does not match the expected API version") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusBadRequest, response.StatusCode)
+	b, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Contains(t, string(b), "does not match the expected API version")
 }
 
 func TestCreateDefaultsAPIVersion(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -3948,34 +3545,26 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 
 	simple := &genericapitesting.Simple{}
 	data, err := runtime.Encode(codec, simple)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	m := make(map[string]interface{})
-	if err := json.Unmarshal(data, &m); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	err = json.Unmarshal(data, &m)
+	require.NoError(t, err)
 	delete(m, "apiVersion")
 	data, err = json.Marshal(m)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	request, err := http.NewRequest("POST", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple", bytes.NewBuffer(data))
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusCreated, response)
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
 func TestUpdateChecksAPIVersion(t *testing.T) {
+	ctx := t.Context()
 	handler := handle(map[string]rest.Storage{"simple": &SimpleRESTStorage{}})
 	server := httptest.NewServer(handler)
 	defer server.Close()
@@ -3983,42 +3572,30 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 
 	simple := &genericapitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
 	data, err := runtime.Encode(newCodec, simple)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	request, err := http.NewRequest("PUT", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/bar", bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/bar"
+	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	response, err := client.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
-	b, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	} else if !strings.Contains(string(b), "does not match the expected API version") {
-		t.Errorf("unexpected response: %s", string(b))
-	}
+	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
+	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
+	b, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Contains(t, string(b), "does not match the expected API version")
 }
 
 // runRequest is used by TestDryRun since it runs the test twice in a
 // row with a slightly different URL (one has ?dryRun, one doesn't).
 func runRequest(t testing.TB, path, verb string, data []byte, contentType string) *http.Response {
-	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	ctx := t.Context()
+	request, err := http.NewRequestWithContext(ctx, verb, path, bytes.NewBuffer(data))
+	require.NoError(t, err)
 	if contentType != "" {
 		request.Header.Set("Content-Type", contentType)
 	}
 	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	return response
 }
 
@@ -4096,37 +3673,37 @@ unknown: baz`)
 			expectedStatusCode int
 		}{
 			// Create
-			{name: "post-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
-			{name: "post-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarns},
-			{name: "post-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: invalidJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
+			{name: "post-strict-validation", path: "/namespaces/default/simples", verb: http.MethodPost, data: invalidJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+			{name: "post-warn-validation", path: "/namespaces/default/simples", verb: http.MethodPost, data: invalidJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarns},
+			{name: "post-ignore-validation", path: "/namespaces/default/simples", verb: http.MethodPost, data: invalidJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
 
-			{name: "post-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAML},
-			{name: "post-warn-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarnsYAML},
-			{name: "post-ignore-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: invalidYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+			{name: "post-strict-validation-yaml", path: "/namespaces/default/simples", verb: http.MethodPost, data: invalidYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAML},
+			{name: "post-warn-validation-yaml", path: "/namespaces/default/simples", verb: http.MethodPost, data: invalidYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated, expectedWarns: strictDecodingWarnsYAML},
+			{name: "post-ignore-validation-yaml", path: "/namespaces/default/simples", verb: http.MethodPost, data: invalidYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
 
 			// Update
-			{name: "put-strict-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
-			{name: "put-warn-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
-			{name: "put-ignore-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
+			{name: "put-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: invalidJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErr},
+			{name: "put-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: invalidJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+			{name: "put-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: invalidJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
 
-			{name: "put-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAMLPut},
-			{name: "put-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarnsYAMLPut},
-			{name: "put-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: invalidYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+			{name: "put-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: invalidYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusBadRequest, expectedErr: strictDecodingErrYAMLPut},
+			{name: "put-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: invalidYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarnsYAMLPut},
+			{name: "put-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: invalidYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
 
 			// MergePatch
-			{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
-			{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
-			{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
+			{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+			{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 
 			// JSON Patch
-			{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: jsonPatchStrictDecodingErr},
-			{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: jsonPatchStrictDecodingWarns},
-			{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: jsonPatchStrictDecodingErr},
+			{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: jsonPatchStrictDecodingWarns},
+			{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 
 			// SMP
-			{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
-			{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
-			{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: invalidSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusUnprocessableEntity, expectedErr: strictDecodingErr},
+			{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK, expectedWarns: strictDecodingWarns},
+			{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: invalidSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 		}
 	)
 
@@ -4155,23 +3732,23 @@ unknown: baz`)
 		t.Run(test.name, func(t *testing.T) {
 			baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 			response := runRequest(t, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+			defer apitesting.Close(t, response.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(response.Body)
 
-			if response.StatusCode != test.expectedStatusCode || !strings.Contains(buf.String(), test.expectedErr) {
-				t.Fatalf("unexpected response: %#v, expected err: %#v", response, test.expectedErr)
-			}
+			require.Equal(t, test.expectedStatusCode, response.StatusCode)
+			require.Contains(t, buf.String(), test.expectedErr)
 
-			warnings, _ := net.ParseWarningHeaders(response.Header["Warning"])
-			if len(warnings) != len(test.expectedWarns) {
-				t.Fatalf("unexpected number of warnings. Got count %d, expected %d. Got warnings %#v, expected %#v", len(warnings), len(test.expectedWarns), warnings, test.expectedWarns)
-
-			}
-			for i, warn := range warnings {
-				if warn.Text != test.expectedWarns[i] {
-					t.Fatalf("unexpected warning: %#v, expected warning: %#v", warn.Text, test.expectedWarns[i])
+			warnings, errs := net.ParseWarningHeaders(response.Header["Warning"])
+			require.Nil(t, errs)
+			var warningTexts []string
+			if len(warnings) > 0 {
+				warningTexts = make([]string, len(warnings))
+				for i, warn := range warnings {
+					warningTexts[i] = warn.Text
 				}
 			}
+			require.Equal(t, test.expectedWarns, warningTexts)
 		})
 	}
 }
@@ -4213,37 +3790,37 @@ other: bar`)
 			expectedStatusCode int
 		}{
 			// Create
-			{name: "post-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: validJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusCreated},
-			{name: "post-warn-validation", path: "/namespaces/default/simples", verb: "POST", data: validJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated},
-			{name: "post-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: validJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
+			{name: "post-strict-validation", path: "/namespaces/default/simples", verb: http.MethodPost, data: validJSONDataPost, queryParams: strictFieldValidation, expectedStatusCode: http.StatusCreated},
+			{name: "post-warn-validation", path: "/namespaces/default/simples", verb: http.MethodPost, data: validJSONDataPost, queryParams: warnFieldValidation, expectedStatusCode: http.StatusCreated},
+			{name: "post-ignore-validation", path: "/namespaces/default/simples", verb: http.MethodPost, data: validJSONDataPost, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusCreated},
 
-			{name: "post-strict-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: validYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
-			{name: "post-warn-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: validYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
-			{name: "post-ignore-validation-yaml", path: "/namespaces/default/simples", verb: "POST", data: validYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+			{name: "post-strict-validation-yaml", path: "/namespaces/default/simples", verb: http.MethodPost, data: validYAMLDataPost, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+			{name: "post-warn-validation-yaml", path: "/namespaces/default/simples", verb: http.MethodPost, data: validYAMLDataPost, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
+			{name: "post-ignore-validation-yaml", path: "/namespaces/default/simples", verb: http.MethodPost, data: validYAMLDataPost, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusCreated},
 
 			// Update
-			{name: "put-strict-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: validJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusOK},
-			{name: "put-warn-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: validJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK},
-			{name: "put-ignore-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: validJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
+			{name: "put-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: validJSONDataPut, queryParams: strictFieldValidation, expectedStatusCode: http.StatusOK},
+			{name: "put-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: validJSONDataPut, queryParams: warnFieldValidation, expectedStatusCode: http.StatusOK},
+			{name: "put-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: validJSONDataPut, queryParams: ignoreFieldValidation, expectedStatusCode: http.StatusOK},
 
-			{name: "put-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: validYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
-			{name: "put-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: validYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
-			{name: "put-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: "PUT", data: validYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+			{name: "put-strict-validation-yaml", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: validYAMLDataPut, queryParams: strictFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+			{name: "put-warn-validation-yaml", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: validYAMLDataPut, queryParams: warnFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
+			{name: "put-ignore-validation-yaml", path: "/namespaces/default/simples/id", verb: http.MethodPut, data: validYAMLDataPut, queryParams: ignoreFieldValidation, contentType: "application/yaml", expectedStatusCode: http.StatusOK},
 
 			// MergePatch
-			{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
-			{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
-			{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validMergePatch, queryParams: strictFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validMergePatch, queryParams: warnFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validMergePatch, queryParams: ignoreFieldValidation, contentType: "application/merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 
 			// JSON Patch
-			{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
-			{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
-			{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "json-patch-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validJSONPatch, queryParams: strictFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "json-patch-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validJSONPatch, queryParams: warnFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "json-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validJSONPatch, queryParams: ignoreFieldValidation, contentType: "application/json-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 
 			// SMP
-			{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
-			{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
-			{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: "PATCH", data: validSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "strategic-merge-patch-strict-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validSMP, queryParams: strictFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "strategic-merge-patch-warn-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validSMP, queryParams: warnFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
+			{name: "strategic-merge-patch-ignore-validation", path: "/namespaces/default/simples/id", verb: http.MethodPatch, data: validSMP, queryParams: ignoreFieldValidation, contentType: "application/strategic-merge-patch+json; charset=UTF-8", expectedStatusCode: http.StatusOK},
 		}
 	)
 
@@ -4273,9 +3850,8 @@ other: bar`)
 			for n := 0; n < b.N; n++ {
 				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 				response := runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
-				if response.StatusCode != test.expectedStatusCode {
-					b.Fatalf("unexpected status code: %d, expected: %d", response.StatusCode, test.expectedStatusCode)
-				}
+				defer apitesting.Close(b, response.Body)
+				require.Equal(b, test.expectedStatusCode, response.StatusCode)
 			}
 		})
 	}
@@ -4312,6 +3888,7 @@ func (storage *SimpleXGSubresourceRESTStorage) GetSingularName() string {
 }
 
 func TestXGSubresource(t *testing.T) {
+	ctx := t.Context()
 	container := restful.NewContainer()
 	container.Router(restful.CurlyRouter{})
 	mux := container.ServeMux
@@ -4351,25 +3928,22 @@ func TestXGSubresource(t *testing.T) {
 		Serializer:             codecs,
 	}
 
-	if _, _, err := (&group).InstallREST(container); err != nil {
-		panic(fmt.Sprintf("unable to install container %s: %v", group.GroupVersion, err))
-	}
+	_, _, err := (&group).InstallREST(container)
+	require.NoError(t, err)
 
 	server := newTestServer(defaultAPIServer{mux, container})
 	defer server.Close()
 
-	resp, err := http.Get(server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/subsimple")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	url := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/namespaces/default/simple/" + itemID + "/subsimple"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var itemOut genericapitesting.SimpleXGSubresource
 	body, err := extractBody(resp, &itemOut)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Test if the returned object has the expected group, version and kind
 	// We are directly unmarshaling JSON here because TypeMeta cannot be decoded through the
@@ -4379,9 +3953,7 @@ func TestXGSubresource(t *testing.T) {
 	decoder := json.NewDecoder(strings.NewReader(body))
 	var itemFromBody genericapitesting.SimpleXGSubresource
 	err = decoder.Decode(&itemFromBody)
-	if err != nil {
-		t.Errorf("unexpected JSON decoding error: %v", err)
-	}
+	require.NoError(t, err)
 	if want := fmt.Sprintf("%s/%s", testGroup2Version.Group, testGroup2Version.Version); itemFromBody.APIVersion != want {
 		t.Errorf("unexpected APIVersion got: %+v want: %+v", itemFromBody.APIVersion, want)
 	}
@@ -4394,16 +3966,9 @@ func TestXGSubresource(t *testing.T) {
 	}
 }
 
-func readBodyOrDie(r io.Reader) []byte {
-	body, err := ioutil.ReadAll(r)
-	if err != nil {
-		panic(err)
-	}
-	return body
-}
-
 // BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
 func BenchmarkUpdateProtobuf(b *testing.B) {
+	ctx := b.Context()
 	items := benchmarkItems(b)
 
 	simpleStorage := &SimpleRESTStorage{}
@@ -4412,35 +3977,34 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	defer server.Close()
 	client := http.Client{}
 
-	dest, _ := url.Parse(server.URL)
+	dest, err := url.Parse(server.URL)
+	require.NoError(b, err)
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/namespaces/foo/simples/bar"
 	dest.RawQuery = ""
 
 	info, _ := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), "application/vnd.kubernetes.protobuf")
 	e := codecs.EncoderForVersion(info.Serializer, newGroupVersion)
 	data, err := runtime.Encode(e, &items[0])
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		request, err := http.NewRequest("PUT", dest.String(), bytes.NewReader(data))
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-		request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
-		request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
-		response, err := client.Do(request)
-		if err != nil {
-			b.Fatalf("unexpected error: %v", err)
-		}
-		if response.StatusCode != http.StatusBadRequest {
-			body, _ := ioutil.ReadAll(response.Body)
-			b.Fatalf("Unexpected response %#v\n%s", response, body)
-		}
-		_, _ = ioutil.ReadAll(response.Body)
-		response.Body.Close()
+		func() {
+			request, err := http.NewRequestWithContext(ctx, http.MethodPut, dest.String(), bytes.NewReader(data))
+			require.NoError(b, err)
+			request.Header.Set("Accept", "application/vnd.kubernetes.protobuf")
+			request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
+			response, err := client.Do(request)
+			require.NoError(b, err)
+			defer apitesting.AssertBodyClosed(b, response.Body)
+			if response.StatusCode != http.StatusBadRequest {
+				body, err := apitesting.ReadAndCloseBody(response.Body)
+				require.NoError(b, err)
+				b.Fatalf("Unexpected response %#v\n%s", response, body)
+			}
+			err = apitesting.DrainAndCloseBody(response.Body)
+			require.NoError(b, err)
+		}()
 	}
 	b.StopTimer()
 }

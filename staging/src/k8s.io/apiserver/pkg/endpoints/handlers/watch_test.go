@@ -17,7 +17,6 @@ limitations under the License.
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,14 +27,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/apitesting"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 )
@@ -50,8 +50,8 @@ var testCodecV2 = codecs.LegacyCodec(testGroupV2)
 
 func addTestTypesV2() {
 	scheme.AddKnownTypes(testGroupV2,
-		&apitesting.Simple{},
-		&apitesting.SimpleList{},
+		&endpointstesting.Simple{},
+		&endpointstesting.SimpleList{},
 	)
 	metav1.AddToGroupVersion(scheme, testGroupV2)
 }
@@ -61,6 +61,7 @@ func init() {
 }
 
 func TestWatchHTTPErrors(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	doneCh := make(chan struct{})
@@ -84,19 +85,24 @@ func TestWatchHTTPErrors(t *testing.T) {
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	s := httptest.NewServer(serveWatch(watchServer, nil))
 	defer s.Close()
 
 	// Setup a client
-	dest, _ := url.Parse(s.URL)
+	dest, err := url.Parse(s.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest(http.MethodGet, dest.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
+	require.NoError(t, err)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
+	defer apitesting.Close(t, resp.Body)
+
+	// Send error to server from storage
+	errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 	watcher.Error(&errStatus)
 	watcher.Stop()
 
@@ -124,6 +130,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 }
 
 func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	doneCh := make(chan struct{})
@@ -147,24 +154,27 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, doneCh},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	statusErr := errors.NewInternalError(fmt.Errorf("we got an error"))
+	statusErr := apierrors.NewInternalError(fmt.Errorf("we got an error"))
 	errStatus := statusErr.Status()
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, statusErr))
+	s := httptest.NewServer(serveWatch(watchServer, statusErr))
 	defer s.Close()
 
 	// Setup a client
-	dest, _ := url.Parse(s.URL)
+	dest, err := url.Parse(s.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest(http.MethodGet, dest.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
+	require.NoError(t, err)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 
 	// We had already got an error before watch serve started
 	decoder := json.NewDecoder(resp.Body)
@@ -190,9 +200,10 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 }
 
 func TestWatchHTTPDynamicClientErrors(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
+	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -210,10 +221,10 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	s := httptest.NewServer(serveWatch(watchServer, nil))
 	defer s.Close()
 	defer s.CloseClientConnections()
 
@@ -222,14 +233,15 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		APIPath: "/" + namedGroupPrefix,
 	}).Resource(testGroupV2.WithResource("simple"))
 
-	_, err := client.Watch(context.TODO(), metav1.ListOptions{})
+	_, err := client.Watch(ctx, metav1.ListOptions{})
 	require.Equal(t, runtime.NegotiateError{Stream: true, ContentType: "testcase/json"}, err)
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
-	done := make(chan struct{})
+	doneCh := make(chan struct{})
 
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
 	if !ok || info.StreamSerializer == nil {
@@ -247,22 +259,27 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         testCodecV2,
 		EmbeddedEncoder: testCodecV2,
 
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	s := httptest.NewServer(serveWatch(watchServer, nil))
 	defer s.Close()
 
 	// Setup a client
-	dest, _ := url.Parse(s.URL)
+	dest, err := url.Parse(s.URL)
+	require.NoError(t, err)
 	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest(http.MethodGet, dest.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
+	require.NoError(t, err)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	watcher.Add(&apitesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: testGroupV2.String()}})
+	defer apitesting.Close(t, resp.Body)
+
+	// Send object added event to server from storage
+	watcher.Add(&endpointstesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: testGroupV2.String()}})
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)
@@ -273,7 +290,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	// Timeout and check for leaks
 	close(timeoutCh)
 	select {
-	case <-done:
+	case <-doneCh:
 		eventCh := watcher.ResultChan()
 		select {
 		case _, opened := <-eventCh:
@@ -318,15 +335,13 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch will serve a watch response according to the watcher and watchServer.
 // Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
-func serveWatch(watcher watch.Interface, watchServer *WatchServer, preServeErr error) http.HandlerFunc {
+func serveWatch(watchServer *WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		defer watcher.Stop()
-
+		defer watchServer.Watching.Stop()
 		if preServeErr != nil {
 			responsewriters.ErrorNegotiated(preServeErr, watchServer.Scope.Serializer, watchServer.Scope.Kind.GroupVersion(), w, req)
 			return
 		}
-
 		watchServer.HandleHTTP(w, req)
 	}
 }
