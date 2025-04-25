@@ -1161,6 +1161,13 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 			UID:             "bar1",
 			ResourceVersion: "42",
 		}}
+	pod1SandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod1.Name,
+			Namespace: pod1.Namespace,
+			Uid:       string(pod1.UID),
+		},
+	}
 
 	pod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1169,8 +1176,16 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 			UID:             "bar2",
 			ResourceVersion: "42",
 		}}
+	pod2SandboxConfig := &runtimeapi.PodSandboxConfig{
+		Metadata: &runtimeapi.PodSandboxMetadata{
+			Name:      pod2.Name,
+			Namespace: pod2.Namespace,
+			Uid:       string(pod2.UID),
+		},
+	}
 
 	pods := [2]*v1.Pod{pod1, pod2}
+	podSandboxes := [2]*runtimeapi.PodSandboxConfig{pod1SandboxConfig, pod2SandboxConfig}
 
 	testCase := &pullerTestCase{
 		containerImage: "missing_image",
@@ -1196,7 +1211,7 @@ func TestParallelPodPullingTimeRecorderWithErr(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func(i int) {
-			_, _, _ = puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, nil, "", container.ImagePullPolicy)
+			_, _, _ = puller.EnsureImageExists(ctx, nil, pods[i], container.Image, testCase.pullSecrets, podSandboxes[i], "", container.ImagePullPolicy)
 			wg.Done()
 		}(i)
 	}
@@ -1437,7 +1452,10 @@ func TestEnsureImageExistsWithServiceAccountCoordinates(t *testing.T) {
 			fakeClock := testingclock.NewFakeClock(time.Now())
 			fakeRuntime := &ctest.FakeRuntime{T: t}
 			fakeRecorder := testutil.NewFakeRecorder()
-			fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
+			fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{
+				startedPullingRecorded:  make(map[types.UID]bool),
+				finishedPullingRecorded: make(map[types.UID]bool),
+			}
 
 			fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 
@@ -1525,7 +1543,10 @@ func TestEnsureImageExistsWithNodeCredentialsOnly(t *testing.T) {
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	fakeRuntime := &ctest.FakeRuntime{T: t}
 	fakeRecorder := testutil.NewFakeRecorder()
-	fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{}
+	fakePodPullingTimeRecorder := &mockPodPullingTimeRecorder{
+		startedPullingRecorded:  make(map[types.UID]bool),
+		finishedPullingRecorded: make(map[types.UID]bool),
+	}
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 

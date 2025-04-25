@@ -322,6 +322,30 @@ func (f *FakeRuntime) GetContainerLogs(_ context.Context, pod *v1.Pod, container
 func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSpec, creds []credentialprovider.TrackedAuthConfig, podSandboxConfig *runtimeapi.PodSandboxConfig) (string, *credentialprovider.TrackedAuthConfig, error) {
 	f.Lock()
 	f.CalledFunctions = append(f.CalledFunctions, "PullImage")
+
+	if f.imagePullTokenBucket == nil {
+		f.imagePullTokenBucket = make(chan bool, 1)
+	}
+	if f.imagePullErrBucket == nil {
+		f.imagePullErrBucket = make(chan error, 1)
+	}
+
+	blockImagePulls := f.BlockImagePulls
+	f.Unlock()
+
+	if blockImagePulls {
+		// Block the function before adding the image to f.ImageList
+		select {
+		case <-ctx.Done():
+		case <-f.imagePullTokenBucket:
+		case pullImageErr := <-f.imagePullErrBucket:
+			return "", nil, pullImageErr
+		}
+	}
+
+	f.Lock()
+	defer f.Unlock()
+
 	if f.Err == nil {
 		i := kubecontainer.Image{
 			ID:   image.Image,
@@ -336,28 +360,7 @@ func (f *FakeRuntime) PullImage(ctx context.Context, image kubecontainer.ImageSp
 		retCreds = &creds[0]
 	}
 
-	if !f.BlockImagePulls {
-		f.Unlock()
-		return image.Image, retCreds, f.Err
-	}
-
-	retErr := f.Err
-	if f.imagePullTokenBucket == nil {
-		f.imagePullTokenBucket = make(chan bool, 1)
-	}
-	if f.imagePullErrBucket == nil {
-		f.imagePullErrBucket = make(chan error, 1)
-	}
-	// Unlock before waiting for UnblockImagePulls calls, to avoid deadlock.
-	f.Unlock()
-	select {
-	case <-ctx.Done():
-	case <-f.imagePullTokenBucket:
-	case pullImageErr := <-f.imagePullErrBucket:
-		return image.Image, retCreds, pullImageErr
-	}
-
-	return image.Image, retCreds, retErr
+	return image.Image, retCreds, f.Err
 }
 
 // UnblockImagePulls unblocks a certain number of image pulls, if BlockImagePulls is true.
