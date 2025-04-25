@@ -261,7 +261,7 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 	defer m.podStatusesLock.Unlock()
 
 	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizePending:    updatedPodResizeCondition(v1.PodResizePending, m.podResizeConditions[podUID].PodResizePending, reason, message),
+		PodResizePending:    newPodResizeCondition(v1.PodResizePending, reason, message),
 		PodResizeInProgress: m.podResizeConditions[podUID].PodResizeInProgress,
 	}
 }
@@ -284,7 +284,7 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 	}
 
 	m.podResizeConditions[podUID] = podResizeConditions{
-		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message),
+		PodResizeInProgress: newPodResizeCondition(v1.PodResizeInProgress, reason, message),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 	}
 }
@@ -681,6 +681,12 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	// Set DisruptionTarget.LastTransitionTime.
 	updateLastTransitionTime(&status, &oldStatus, v1.DisruptionTarget)
+
+	// Set PodResizeInProgress.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, v1.PodResizeInProgress)
+
+	// Set PodResizePending.LastTransitionTime.
+	updateLastTransitionTime(&status, &oldStatus, v1.PodResizePending)
 
 	// ensure that the start time does not change across updates.
 	if oldStatus.StartTime != nil && !oldStatus.StartTime.IsZero() {
@@ -1177,21 +1183,12 @@ func NeedToReconcilePodReadiness(pod *v1.Pod) bool {
 	return false
 }
 
-func updatedPodResizeCondition(conditionType v1.PodConditionType, oldCondition *v1.PodCondition, reason, message string) *v1.PodCondition {
-	now := metav1.NewTime(time.Now())
-	var lastTransitionTime metav1.Time
-	if oldCondition == nil || oldCondition.Reason != reason {
-		lastTransitionTime = now
-	} else {
-		lastTransitionTime = oldCondition.LastTransitionTime
-	}
-
+func newPodResizeCondition(conditionType v1.PodConditionType, reason, message string) *v1.PodCondition {
 	return &v1.PodCondition{
-		Type:               conditionType,
-		Status:             v1.ConditionTrue,
-		LastProbeTime:      now,
-		LastTransitionTime: lastTransitionTime,
-		Reason:             reason,
-		Message:            message,
+		Type:          conditionType,
+		Status:        v1.ConditionTrue,
+		LastProbeTime: metav1.NewTime(time.Now()),
+		Reason:        reason,
+		Message:       message,
 	}
 }
