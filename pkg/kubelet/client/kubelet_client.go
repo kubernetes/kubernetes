@@ -304,16 +304,15 @@ func (r *validateNodeNameRoundTripper) RoundTrip(req *http.Request) (*http.Respo
 	if req.URL.Host != r.hostRewrite.tcpDialAddr {
 		return nil, fmt.Errorf("%q must use host %q, got %q", r.hostRewrite.commonName, r.hostRewrite.tcpDialAddr, req.URL.Host)
 	}
-	if len(req.Host) > 0 && req.Host != r.hostRewrite.tcpDialAddr {
-		return nil, fmt.Errorf("%q must use host %q, got %q", r.hostRewrite.commonName, r.hostRewrite.tcpDialAddr, req.Host)
-	}
 
 	onlyH1 := wsstream.IsWebSocketRequest(req) // matches *http.Request.requiresHTTP1
 	ctx := withReqHostRewrite(req.Context(), r.hostRewrite, onlyH1)
 	req = req.Clone(ctx) // so we can mutate the request URL
-	// set the "Host" header / ":authority" pseudo-header field so that servers
-	// can correctly perform host based routing based on the original value.
-	req.Host = r.hostRewrite.tcpDialAddr
+	// make sure the "Host" header / ":authority" pseudo-header field
+	// is set so that servers can correctly perform host based routing.
+	if len(req.Host) == 0 {
+		req.Host = r.hostRewrite.tcpDialAddr
+	}
 	// override targetAddr used by *http.Transport.connectMethodForRequest which directly
 	// controls the cache key used by *http.Transport.getConn and *http.Transport.dialConn.
 	// we undo this rewrite in *http.Transport.DialTLSContext by passing in the original
