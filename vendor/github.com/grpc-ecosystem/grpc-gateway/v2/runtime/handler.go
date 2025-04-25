@@ -153,11 +153,9 @@ type responseBody interface {
 // ForwardResponseMessage forwards the message "resp" from gRPC server to REST client.
 func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marshaler, w http.ResponseWriter, req *http.Request, resp proto.Message, opts ...func(context.Context, http.ResponseWriter, proto.Message) error) {
 	md, ok := ServerMetadataFromContext(ctx)
-	if !ok {
-		grpclog.Error("Failed to extract ServerMetadata from context")
+	if ok {
+		handleForwardResponseServerMetadata(w, mux, md)
 	}
-
-	handleForwardResponseServerMetadata(w, mux, md)
 
 	// RFC 7230 https://tools.ietf.org/html/rfc7230#section-4.1.2
 	// Unless the request includes a TE header field indicating "trailers"
@@ -166,7 +164,7 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 	// agent to receive.
 	doForwardTrailers := requestAcceptsTrailers(req)
 
-	if doForwardTrailers {
+	if ok && doForwardTrailers {
 		handleForwardResponseTrailerHeader(w, mux, md)
 		w.Header().Set("Transfer-Encoding", "chunked")
 	}
@@ -196,7 +194,7 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 		return
 	}
 
-	if !doForwardTrailers {
+	if !doForwardTrailers && mux.writeContentLength {
 		w.Header().Set("Content-Length", strconv.Itoa(len(buf)))
 	}
 
@@ -204,7 +202,7 @@ func ForwardResponseMessage(ctx context.Context, mux *ServeMux, marshaler Marsha
 		grpclog.Errorf("Failed to write response: %v", err)
 	}
 
-	if doForwardTrailers {
+	if ok && doForwardTrailers {
 		handleForwardResponseTrailer(w, mux, md)
 	}
 }
