@@ -48,7 +48,6 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutosca
 	}
 	if behavior.ScaleUp != nil && behavior.ScaleUp.Tolerance != nil {
 		if !copiedAnnotations {
-			copiedAnnotations = true
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
 		out.Annotations[autoscaling.ToleranceScaleUpAnnotation] = behavior.ScaleUp.Tolerance.String()
