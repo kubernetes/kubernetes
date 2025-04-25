@@ -471,12 +471,16 @@ aliases:
   sig-scalability-approvers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
