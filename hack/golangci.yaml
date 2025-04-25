@@ -14,8 +14,12 @@
 run:
   timeout: 30m
 
-output:
-  show-stats: false
+  # The default is relative to the configuration, which is confusing because
+  # then all paths start with ../ to move out of the "hack" directory.
+  # `gomod` mirrors the current behavior of `golangci-lint.sh` changing into
+  # the root of the repository. Because we are operating in a workspace,
+  # the module picked by `gomod` is the main one
+  relative-path-mode: gomod
 
 version: "2"
 
@@ -23,6 +27,11 @@ formatters:
   exclusions:
     paths:
       - third_party
+
+output:
+  formats:
+    text:
+      path: stderr
 
 issues:
   max-issues-per-linter: 0
@@ -33,68 +42,17 @@ linters:
     paths:
       - third_party
 
-    # Excluding configuration per-path, per-linter, per-text and per-source
+    # Log a warning if an exclusion rule is unused.
+    #
+    # Uncomment when investigating whether the configuration can be simplified,
+    # but beware that golangci-lint then needs to be invoked for the entire
+    # repository. Invoking it for individual packages may trigger these warning
+    # when the rules are only needed elsewhere.
+    #
+    # warn-unused: true
+
+    # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
-      - path: (.+)\.go$
-        # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
-        text: ineffective break statement. Did you mean to break out of the outer loop
-
-      # exclude ineffassign linter for generated files for conversion
-      - path: conversion\.go
-        linters:
-          - ineffassign
-
-      # SSA Extract calls are allowed in tests.
-      - linters:
-          - forbidigo
-        text: should not be used because managedFields was removed
-        path: _test.go$
-
-      # Adding unversioned feature gates is allowed in tests
-      - linters:
-          - forbidigo
-        text: should not use Add, use AddVersioned instead
-        path: _test.go$
-
-      # TODO(oscr) Remove these excluded directories and fix findings. Due to large amount of findings in different components
-      # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
-      - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
-        linters:
-          - gocritic
-
-      # The Kubernetes naming convention for conversion functions uses underscores
-      # and intentionally deviates from normal Go conventions to make those function
-      # names more readable. Same for SetDefaults_*.
-      #
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
-      - linters:
-          - staticcheck
-          - revive
-        text: "(ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
-
-      # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
-      - linters:
-          - ginkgolinter
-        text: use a function call in (Eventually|Consistently)
-
-      # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
-
-      - linters:
-          - govet
-        text: "lostcancel|printf"
-
-      - linters:
-          - ginkgolinter
-        text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
-
-      - linters:
-          - testifylint
-        text: "encoded-compare|error-nil|formatter"
-
-      - linters:
-          - gocritic
-        text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
 
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
       - linters:
@@ -121,52 +79,43 @@ linters:
           - unused
         path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
 
-      # The following issues were deemed "might be worth fixing, needs to be
-      # decided on a case-by-case basis".  This was initially decided by a
-      # majority of the developers who voted in
-      # https://github.com/kubernetes/kubernetes/issues/117288 and may evolve
-      # over time.
+      # SSA Extract calls are allowed in tests.
+      - linters:
+          - forbidigo
+        text: should not be used because managedFields was removed
+        path: _test.go$
+
+      # Adding unversioned feature gates is allowed in tests
+      - linters:
+          - forbidigo
+        text: should not use Add, use AddVersioned instead
+        path: _test.go$
+
+      # TODO(https://github.com/kubernetes/kubernetes/issues/131475): Remove these excluded directories and fix findings. Due to large amount of findings in different components
+      # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
+      - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
+        linters:
+          - gocritic
+
+      # Some of these seem legitimate, maybe better fix code (https://github.com/kubernetes/kubernetes/issues/130449).
+
+      - linters:
+          - govet
+        text: "lostcancel|printf"
+
+      - linters:
+          - ginkgolinter
+        text: "wrong error assertion. Consider using `gomega.(Eventually|Consistently)|wrong comparison assertion|wrong length assertion"
+
+      - linters:
+          - gocritic
+        text: "append result not assigned to the same slice|put a space between `//` and comment text|sloppyLen|elseif|should rewrite switch statement to if statement|regexpMust|wrapperFunc: use strings.ReplaceAll|singleCaseSwitch|deprecatedComment|exitAfterDefer|captLocal|unlambda|underef|unslice|valSwap|typeSwitchVar"
 
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507008918
       - linters:
           - gocritic
         text: "assignOp:"
 
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507016854
-      - linters:
-          - staticcheck
-        text: "S1002: should omit comparison to bool constant"
-
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507023980
-      - linters:
-          - staticcheck
-        text: "S1016: should convert opts .* instead of using struct literal"
-
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507026758
-      - linters:
-          - staticcheck
-        text: "S1033: unnecessary guard around call to delete"
-
-      # Didn't make it into https://github.com/kubernetes/kubernetes/issues/117288.
-      # Discussion on Slack concluded that "it's hard to have a universal policy for all
-      # functions marked deprecated" and thus this can only be a hint which must
-      # be considered on a case-by-case basis.
-      - linters:
-          - staticcheck
-        text: "SA1019: .*is deprecated"
-
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507030071
-      - linters:
-          - staticcheck
-        text: "ST1012: error var .* should have name of the form ErrFoo"
-
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507031224
-      - linters:
-          - staticcheck
-        text: "ST1023: should omit type .* from declaration; it will be inferred from the right-hand side"
-
-    # Log a warning if an exclusion rule is unused.
-    warn-unused: true
 
   default: none
   enable: # please keep this alphabetized
@@ -186,7 +135,7 @@ linters:
     custom:
       logcheck:
         # Installed there by hack/verify-golangci-lint.sh.
-        path: ../_output/local/bin/logcheck.so
+        path: _output/local/bin/logcheck.so
         description: structured logging checker
         original-url: k8s.io/logtools/logcheck
         settings:
@@ -291,61 +240,62 @@ linters:
     staticcheck:
       checks:
         - "all"
-        - "-QF1001"  # TODO(fix) Apply De Morgan’s law
-        - "-QF1002"  # TODO(fix) Convert untagged switch to tagged switch
-        - "-QF1003"  # TODO(fix) Convert if/else-if chain to tagged switch
-        - "-QF1004"  # TODO(fix) Use strings.ReplaceAll instead of strings.Replace with n == -1
-        - "-QF1006"  # TODO(fix) Lift if+break into loop condition
-        - "-QF1007"  # TODO(fix) Merge conditional assignment into variable declaration
-        - "-QF1008"  # TODO(fix) Omit embedded fields from selector expression
-        - "-QF1009"  # TODO(fix) Use time.Time.Equal instead of == operator
-        - "-QF1011"  # TODO(fix) Omit redundant type from variable declaration
-        - "-QF1012"  # TODO(fix) Use fmt.Fprintf(x, ...) instead of x.Write(fmt.Sprintf(...))
-        - "-S1000"   # TODO(fix) Use plain channel send or receive instead of single-case select
-        - "-S1002"   # TODO(fix) Omit comparison with boolean constant
-        - "-S1003"   # TODO(fix) Replace call to strings.Index with strings.Contains
-        - "-S1004"   # TODO(fix) Replace call to bytes.Compare with bytes.Equal
-        - "-S1005"   # TODO(fix) Drop unnecessary use of the blank identifier
-        - "-S1006"   # TODO(fix) Use for { ... } for infinite loops
-        - "-S1007"   # TODO(fix) Simplify regular expression by using raw string literal
-        - "-S1008"   # TODO(fix) Simplify returning boolean expression
-        - "-S1009"   # TODO(fix) Omit redundant nil check on slices, maps, and channels
-        - "-S1011"   # TODO(fix) Use a single append to concatenate two slices
-        - "-S1012"   # TODO(fix) Replace time.Now().Sub(x) with time.Since(x)
-        - "-S1016"   # TODO(fix) Use a type conversion instead of manually copying struct fields
-        - "-S1017"   # TODO(fix) Replace manual trimming with strings.TrimPrefix
-        - "-S1019"   # TODO(fix) Simplify make call by omitting redundant arguments
-        - "-S1021"   # TODO(fix) Merge variable declaration and assignment
-        - "-S1023"   # TODO(fix) Omit redundant control flow
-        - "-S1024"   # TODO(fix) Replace x.Sub(time.Now()) with time.Until(x)
-        - "-S1025"   # TODO(fix) Don’t use fmt.Sprintf("%s", x) unnecessarily
-        - "-S1028"   # TODO(fix) Simplify error construction with fmt.Errorf
-        - "-S1030"   # TODO(fix) Use bytes.Buffer.String or bytes.Buffer.Bytes
-        - "-S1034"   # TODO(fix) Use result of type assertion to simplify cases
-        - "-S1036"   # TODO(fix) Unnecessary guard around map access
-        - "-S1038"   # TODO(fix) Unnecessarily complex way of printing formatted string
-        - "-S1039"   # TODO(fix) Unnecessary use of fmt.Sprint
-        - "-S1040"   # TODO(fix) Type assertion to current type
-        - "-SA1006"  # TODO(fix) Printf with dynamic first argument and no further arguments
-        - "-SA1019"  # TODO(fix) Using a deprecated function, variable, constant or field
-        - "-SA2002"  # TODO(fix) Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
-        - "-SA4006"  # TODO(fix) A value assigned to a variable is never read before being overwritten. Forgotten error check or dead code?
-        - "-ST1000"  # TODO(fix) Incorrect or missing package comment
-        - "-ST1001"  # TODO(fix) Dot imports are discouraged
-        - "-ST1003"  # TODO(fix) Poorly chosen identifier
-        - "-ST1005"  # TODO(fix) Incorrectly formatted error string
-        - "-ST1006"  # TODO(fix) Poorly chosen receiver name
-        - "-ST1008"  # TODO(fix) A function’s error value should be its last return value
-        - "-ST1011"  # TODO(fix) Poorly chosen name for variable of type time.Duration
-        - "-ST1012"  # TODO(fix) Poorly chosen name for error variable
-        - "-ST1013"  # TODO(fix) Should use constants for HTTP error codes, not magic numbers
-        - "-ST1016"  # TODO(fix) Use consistent method receiver names
-        - "-ST1017"  # TODO(fix) Don’t use Yoda conditions
-        - "-ST1020"  # TODO(fix) The documentation of an exported function should start with the function’s name
-        - "-ST1023"  # TODO(fix) Redundant type in variable declaration
+        - "-QF1001"  # Apply De Morgan’s law
+        - "-QF1002"  # Convert untagged switch to tagged switch
+        - "-QF1003"  # Convert if/else-if chain to tagged switch
+        - "-QF1004"  # Use strings.ReplaceAll instead of strings.Replace with n == -1
+        - "-QF1006"  # Lift if+break into loop condition
+        - "-QF1007"  # Merge conditional assignment into variable declaration
+        - "-QF1008"  # Omit embedded fields from selector expression
+        - "-QF1009"  # Use time.Time.Equal instead of == operator
+        - "-QF1011"  # Omit redundant type from variable declaration
+        - "-QF1012"  # Use fmt.Fprintf(x, ...) instead of x.Write(fmt.Sprintf(...))
+        - "-S1000"   # Use plain channel send or receive instead of single-case select
+        - "-S1002"   # Omit comparison with boolean constant
+        - "-S1003"   # Replace call to strings.Index with strings.Contains
+        - "-S1004"   # Replace call to bytes.Compare with bytes.Equal
+        - "-S1005"   # Drop unnecessary use of the blank identifier
+        - "-S1006"   # Use for { ... } for infinite loops
+        - "-S1007"   # Simplify regular expression by using raw string literal
+        - "-S1008"   # Simplify returning boolean expression
+        - "-S1009"   # Omit redundant nil check on slices, maps, and channels
+        - "-S1011"   # Use a single append to concatenate two slices
+        - "-S1012"   # Replace time.Now().Sub(x) with time.Since(x)
+        - "-S1016"   # Use a type conversion instead of manually copying struct fields
+        - "-S1017"   # Replace manual trimming with strings.TrimPrefix
+        - "-S1019"   # Simplify make call by omitting redundant arguments
+        - "-S1021"   # Merge variable declaration and assignment
+        - "-S1023"   # Omit redundant control flow
+        - "-S1024"   # Replace x.Sub(time.Now()) with time.Until(x)
+        - "-S1025"   # Don’t use fmt.Sprintf("%s", x) unnecessarily
+        - "-S1028"   # Simplify error construction with fmt.Errorf
+        - "-S1030"   # Use bytes.Buffer.String or bytes.Buffer.Bytes
+        - "-S1034"   # Use result of type assertion to simplify cases
+        - "-S1036"   # Unnecessary guard around map access
+        - "-S1038"   # Unnecessarily complex way of printing formatted string
+        - "-S1039"   # Unnecessary use of fmt.Sprint
+        - "-S1040"   # Type assertion to current type
+        - "-SA1006"  # Printf with dynamic first argument and no further arguments
+        - "-SA1019"  # Using a deprecated function, variable, constant or field
+        - "-SA2002"  # Called testing.T.FailNow or SkipNow in a goroutine, which isn’t allowed
+        - "-SA4006"  # A value assigned to a variable is never read before being overwritten. Forgotten error check or dead code?
+        - "-SA4011"  # ineffective break statement. Did you mean to break out of the outer loop?
+        - "-ST1000"  # Incorrect or missing package comment
+        - "-ST1001"  # Dot imports are discouraged
+        - "-ST1003"  # Poorly chosen identifier
+        - "-ST1005"  # Incorrectly formatted error string
+        - "-ST1006"  # Poorly chosen receiver name
+        - "-ST1008"  # A function’s error value should be its last return value
+        - "-ST1011"  # Poorly chosen name for variable of type time.Duration
+        - "-ST1012"  # Poorly chosen name for error variable
+        - "-ST1013"  # Should use constants for HTTP error codes, not magic numbers
+        - "-ST1016"  # Use consistent method receiver names
+        - "-ST1017"  # Don’t use Yoda conditions
+        - "-ST1020"  # The documentation of an exported function should start with the function’s name
+        - "-ST1023"  # Redundant type in variable declaration
     testifylint:
       enable-all: true
-      disable:  # TODO: remove each disabled rule and fix it
+      disable:
         - empty
         - encoded-compare
         - equal-values

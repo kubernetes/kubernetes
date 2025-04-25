@@ -14,8 +14,12 @@
 run:
   timeout: 30m
 
-output:
-  show-stats: false
+  # The default is relative to the configuration, which is confusing because
+  # then all paths start with ../ to move out of the "hack" directory.
+  # `gomod` mirrors the current behavior of `golangci-lint.sh` changing into
+  # the root of the repository. Because we are operating in a workspace,
+  # the module picked by `gomod` is the main one
+  relative-path-mode: gomod
 
 version: "2"
 
@@ -23,6 +27,11 @@ formatters:
   exclusions:
     paths:
       - third_party
+
+output:
+  formats:
+    text:
+      path: stderr
 
 issues:
   max-issues-per-linter: 0
@@ -33,44 +42,17 @@ linters:
     paths:
       - third_party
 
-    # Excluding configuration per-path, per-linter, per-text and per-source
+    # Log a warning if an exclusion rule is unused.
+    #
+    # Uncomment when investigating whether the configuration can be simplified,
+    # but beware that golangci-lint then needs to be invoked for the entire
+    # repository. Invoking it for individual packages may trigger these warning
+    # when the rules are only needed elsewhere.
+    #
+    # warn-unused: true
+
+    # Excluding configuration per-path, per-linter, per-text and per-source.
     rules:
-      - path: (.+)\.go$
-        # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
-        text: ineffective break statement. Did you mean to break out of the outer loop
-
-      # exclude ineffassign linter for generated files for conversion
-      - path: conversion\.go
-        linters:
-          - ineffassign
-
-      # SSA Extract calls are allowed in tests.
-      - linters:
-          - forbidigo
-        text: should not be used because managedFields was removed
-        path: _test.go$
-
-      # Adding unversioned feature gates is allowed in tests
-      - linters:
-          - forbidigo
-        text: should not use Add, use AddVersioned instead
-        path: _test.go$
-
-      # The Kubernetes naming convention for conversion functions uses underscores
-      # and intentionally deviates from normal Go conventions to make those function
-      # names more readable. Same for SetDefaults_*.
-      #
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
-      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
-      - linters:
-          - staticcheck
-          - revive
-        text: "(ST1003: should not use underscores in Go names; func (Convert_.*_To_.*|SetDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
-
-      # This check currently has some false positives (https://github.com/nunnatsa/ginkgolinter/issues/91).
-      - linters:
-          - ginkgolinter
-        text: use a function call in (Eventually|Consistently)
 
       # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507012435
       - linters:
@@ -97,8 +79,27 @@ linters:
           - unused
         path: staging/src/k8s.io/client-go/util/workqueue/metrics.go
 
-    # Log a warning if an exclusion rule is unused.
-    warn-unused: true
+      # SSA Extract calls are allowed in tests.
+      - linters:
+          - forbidigo
+        text: should not be used because managedFields was removed
+        path: _test.go$
+
+      # Adding unversioned feature gates is allowed in tests
+      - linters:
+          - forbidigo
+        text: should not use Add, use AddVersioned instead
+        path: _test.go$
+
+      - path: (.+)\.go$
+        # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
+        text: ineffective break statement. Did you mean to break out of the outer loop
+
+      # exclude ineffassign linter for generated files for conversion
+      - path: conversion\.go
+        linters:
+          - ineffassign
+
 
   default: standard
   enable: # please keep this alphabetized
@@ -120,7 +121,7 @@ linters:
     custom:
       logcheck:
         # Installed there by hack/verify-golangci-lint.sh.
-        path: ../_output/local/bin/logcheck.so
+        path: _output/local/bin/logcheck.so
         description: structured logging checker
         original-url: k8s.io/logtools/logcheck
         settings:
