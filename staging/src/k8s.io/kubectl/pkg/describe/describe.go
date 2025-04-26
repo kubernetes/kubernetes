@@ -3157,6 +3157,9 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
 			w.Write(LEVEL_0, "LoadBalancer Source Ranges:\t%v\n", strings.Join(service.Spec.LoadBalancerSourceRanges, ","))
 		}
+		if service.Spec.TrafficDistribution != nil {
+			w.Write(LEVEL_0, "Traffic Distribution:\t%s\n", *service.Spec.TrafficDistribution)
+		}
 		if events != nil {
 			DescribeEvents(events, w)
 		}
