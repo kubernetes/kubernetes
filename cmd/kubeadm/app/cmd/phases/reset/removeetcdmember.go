@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +50,7 @@ func NewRemoveETCDMemberPhase() workflow.Phase {
 	}
 }
 
-func runRemoveETCDMemberPhase(c workflow.RunData) error {
+func runRemoveETCDMemberPhase(ctx context.Context, c workflow.RunData) error {
 	r, ok := c.(resetData)
 	if !ok {
 		return errors.New("remove-etcd-member-phase phase invoked with an invalid data struct")
@@ -63,7 +64,7 @@ func runRemoveETCDMemberPhase(c workflow.RunData) error {
 	if err == nil {
 		if cfg != nil {
 			if !r.DryRun() {
-				err := etcdphase.RemoveStackedEtcdMemberFromCluster(r.Client(), cfg)
+				err := etcdphase.RemoveStackedEtcdMemberFromCluster(ctx, r.Client(), cfg)
 				if err != nil {
 					klog.Warningf("[reset] Failed to remove etcd member: %v, please manually remove this etcd member using etcdctl", err)
 				} else {

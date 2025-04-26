@@ -19,13 +19,17 @@ limitations under the License.
 
 package preflight
 
-import utilsexec "k8s.io/utils/exec"
+import (
+	"context"
+
+	utilsexec "k8s.io/utils/exec"
+)
 
 // This is a MacOS stub
 
 // Check number of memory required by kubeadm
 // No-op for Darwin (MacOS).
-func (mc MemCheck) Check() (warnings, errorList []error) {
+func (mc MemCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	return nil, nil
 }
 

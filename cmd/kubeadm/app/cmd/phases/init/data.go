@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -46,8 +47,8 @@ type InitData interface {
 	KubeletDir() string
 	ExternalCA() bool
 	OutputWriter() io.Writer
-	Client() (clientset.Interface, error)
-	ClientWithoutBootstrap() (clientset.Interface, error)
+	Client(ctx context.Context) (clientset.Interface, error)
+	ClientWithoutBootstrap(ctx context.Context) (clientset.Interface, error)
 	Tokens() []string
 	PatchesDir() string
 }

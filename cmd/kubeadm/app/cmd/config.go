@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -374,7 +375,7 @@ func newCmdConfigImagesPull() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull",
 		Short: "Pull images used by kubeadm",
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			externalClusterCfg.FeatureGates, err = features.NewFeatureGate(&features.InitFeatureGates, featureGatesString)
 			if err != nil {
 				return err
@@ -387,7 +388,7 @@ func newCmdConfigImagesPull() *cobra.Command {
 			if err := containerRuntime.Connect(); err != nil {
 				return err
 			}
-			return PullControlPlaneImages(containerRuntime, &internalcfg.ClusterConfiguration)
+			return PullControlPlaneImages(cmd.Context(), containerRuntime, &internalcfg.ClusterConfiguration)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -398,10 +399,10 @@ func newCmdConfigImagesPull() *cobra.Command {
 }
 
 // PullControlPlaneImages pulls all images that the ImagesPull knows about
-func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
+func PullControlPlaneImages(ctx context.Context, runtime utilruntime.ContainerRuntime, cfg *kubeadmapi.ClusterConfiguration) error {
 	images := images.GetControlPlaneImages(cfg)
 	for _, image := range images {
-		if err := runtime.PullImage(image); err != nil {
+		if err := runtime.PullImage(ctx, image); err != nil {
 			return errors.Wrapf(err, "failed to pull image %q", image)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)

@@ -17,7 +17,6 @@ limitations under the License.
 package apiclient
 
 import (
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -57,7 +56,7 @@ func TestNewDryRunWithKubeConfigFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	d := NewDryRun()
+	d := NewDryRun(t.Context())
 	if err := d.WithKubeConfigFile(path); err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +77,7 @@ func TestPrependAppendReactor(t *testing.T) {
 	baz := &clienttesting.SimpleReactor{Verb: "baz"}
 	qux := &clienttesting.SimpleReactor{Verb: "qux"}
 
-	d := NewDryRun()
+	d := NewDryRun(t.Context())
 	lenBefore := len(d.fakeClient.Fake.ReactionChain)
 	d.PrependReactor(foo).PrependReactor(bar).
 		AppendReactor(baz).AppendReactor(qux)
@@ -120,7 +119,7 @@ func TestReactors(t *testing.T) {
 		namespace     string
 		expectedError bool
 	}
-	ctx := context.Background()
+	ctx := t.Context()
 	tests := []struct {
 		name         string
 		setup        func(d *DryRun)
@@ -456,7 +455,7 @@ func TestReactors(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			d := NewDryRun().WithDefaultMarshalFunction().WithWriter(io.Discard)
+			d := NewDryRun(t.Context()).WithDefaultMarshalFunction().WithWriter(io.Discard)
 			tc.setup(d)
 			for _, ac := range tc.apiCallCases {
 				if err := tc.apiCall(d, ac.namespace, ac.name); (err != nil) != ac.expectedError {
@@ -535,7 +534,7 @@ func TestDecodeUnstructuredIntoAPIObject(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			d := NewDryRun().WithDefaultMarshalFunction().WithWriter(io.Discard)
+			d := NewDryRun(t.Context()).WithDefaultMarshalFunction().WithWriter(io.Discard)
 			obj, err := d.decodeUnstructuredIntoAPIObject(tc.action, tc.unstructured)
 			if (err != nil) != tc.expectedError {
 				t.Errorf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)

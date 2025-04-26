@@ -80,7 +80,7 @@ func (f *fakeVersionGetter) VersionFromCILabel(ciVersionLabel, _ string) (string
 }
 
 // KubeletVersions should return a map with a version and a list of node names that describes how many kubelets there are for that version
-func (f *fakeVersionGetter) KubeletVersions() (map[string][]string, error) {
+func (f *fakeVersionGetter) KubeletVersions(ctx context.Context) (map[string][]string, error) {
 	if f.kubeletVersion == "" {
 		return nil, errors.New("get kubelet version failed")
 	}
@@ -90,7 +90,7 @@ func (f *fakeVersionGetter) KubeletVersions() (map[string][]string, error) {
 }
 
 // ComponentVersions should return a map with a version and a list of node names that describes how many a given control-plane components there are for that version
-func (f *fakeVersionGetter) ComponentVersions(name string) (map[string][]string, error) {
+func (f *fakeVersionGetter) ComponentVersions(ctx context.Context, name string) (map[string][]string, error) {
 	if name == constants.Etcd {
 		if f.isExternalEtcd {
 			return map[string][]string{}, nil
@@ -905,12 +905,13 @@ func TestGetAvailableUpgrades(t *testing.T) {
 	// Kubernetes release.
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 
 			dnsName := constants.CoreDNSDeploymentName
 
 			client := newMockClientForTest(t, dnsName, rt.beforeDNSVersion, rt.deployDNSFailed)
 
-			actualUpgrades, actualErr := GetAvailableUpgrades(rt.vg, rt.allowExperimental, rt.allowRCs, client, &output.TextPrinter{})
+			actualUpgrades, actualErr := GetAvailableUpgrades(ctx, rt.vg, rt.allowExperimental, rt.allowRCs, client, &output.TextPrinter{})
 			if diff := cmp.Diff(rt.expectedUpgrades, actualUpgrades); len(diff) > 0 {
 				t.Errorf("failed TestGetAvailableUpgrades\n\texpected upgrades:\n%v\n\tgot:\n%v\n\tdiff:\n%v", rt.expectedUpgrades, actualUpgrades, diff)
 			}
@@ -1101,9 +1102,10 @@ func TestGetSuggestedEtcdVersion(t *testing.T) {
 }
 
 func newMockClientForTest(t *testing.T, dnsName string, dnsVersion string, multiDNS bool) *clientsetfake.Clientset {
+	ctx := t.Context()
 	client := clientsetfake.NewSimpleClientset()
 	createDeployment := func(name string) {
-		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
+		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(ctx, &apps.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",

@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"reflect"
@@ -74,8 +75,8 @@ var clusterConfigHandler = handler{
 	fromCluster: clusterConfigFromCluster,
 }
 
-func clusterConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
-	return h.fromConfigMap(clientset, constants.KubeadmConfigConfigMap, constants.ClusterConfigurationConfigMapKey, true)
+func clusterConfigFromCluster(ctx context.Context, h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
+	return h.fromConfigMap(ctx, clientset, constants.KubeadmConfigConfigMap, constants.ClusterConfigurationConfigMapKey, true)
 }
 
 type clusterConfig struct {
@@ -351,7 +352,7 @@ func TestGeneratedConfigFromCluster(t *testing.T) {
 				}
 
 				client := clientsetfake.NewSimpleClientset(configMap)
-				cfg, err := clusterConfigHandler.FromCluster(client, testClusterCfg())
+				cfg, err := clusterConfigHandler.FromCluster(t.Context(), client, testClusterCfg())
 				if err != nil {
 					t.Fatalf("unexpected failure of FromCluster: %v", err)
 				}
@@ -476,7 +477,7 @@ func TestLoadingFromCluster(t *testing.T) {
 			testClusterConfigMap(in, false),
 		)
 
-		return clusterConfigHandler.FromCluster(client, testClusterCfg())
+		return clusterConfigHandler.FromCluster(t.Context(), client, testClusterCfg())
 	})
 }
 
@@ -526,7 +527,7 @@ func TestGetVersionStates(t *testing.T) {
 
 				clusterCfg := testClusterCfg()
 
-				got, err := GetVersionStates(clusterCfg, client)
+				got, err := GetVersionStates(t.Context(), clusterCfg, client)
 				if err != nil && !test.expectedErr {
 					t.Errorf("unexpected error: %v", err)
 				}

@@ -52,9 +52,9 @@ const (
 )
 
 // DeployedDNSAddon returns the image tag of the DNS addon currently deployed
-func DeployedDNSAddon(client clientset.Interface) (string, error) {
+func DeployedDNSAddon(ctx context.Context, client clientset.Interface) (string, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
-	deployments, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
+	deployments, err := deploymentsClient.List(ctx, metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
 	if err != nil {
 		return "", errors.Wrap(err, "couldn't retrieve DNS addon deployments")
 	}
@@ -70,9 +70,9 @@ func DeployedDNSAddon(client clientset.Interface) (string, error) {
 }
 
 // deployedDNSReplicas returns the replica count for the current DNS deployment
-func deployedDNSReplicas(client clientset.Interface, replicas int32) (*int32, error) {
+func deployedDNSReplicas(ctx context.Context, client clientset.Interface, replicas int32) (*int32, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
-	deployments, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
+	deployments, err := deploymentsClient.List(ctx, metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
 	if err != nil {
 		return &replicas, errors.Wrap(err, "couldn't retrieve DNS addon deployments")
 	}
@@ -87,11 +87,11 @@ func deployedDNSReplicas(client clientset.Interface, replicas int32) (*int32, er
 }
 
 // EnsureDNSAddon creates the CoreDNS addon
-func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, patchesDir string, out io.Writer, printManifest bool) error {
+func EnsureDNSAddon(ctx context.Context, cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, patchesDir string, out io.Writer, printManifest bool) error {
 	var replicas *int32
 	var err error
 	if !printManifest {
-		replicas, err = deployedDNSReplicas(client, coreDNSReplicas)
+		replicas, err = deployedDNSReplicas(ctx, client, coreDNSReplicas)
 		if err != nil {
 			return err
 		}
@@ -99,10 +99,10 @@ func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inter
 		var defaultReplicas int32 = coreDNSReplicas
 		replicas = &defaultReplicas
 	}
-	return coreDNSAddon(cfg, client, replicas, patchesDir, out, printManifest)
+	return coreDNSAddon(ctx, cfg, client, replicas, patchesDir, out, printManifest)
 }
 
-func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, patchesDir string, out io.Writer, printManifest bool) error {
+func coreDNSAddon(ctx context.Context, cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, replicas *int32, patchesDir string, out io.Writer, printManifest bool) error {
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct {
 		DeploymentName, Image, ControlPlaneTaintKey string
@@ -162,21 +162,21 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return nil
 	}
 
-	if err := createCoreDNSAddon(coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client); err != nil {
+	if err := createCoreDNSAddon(ctx, coreDNSDeploymentBytes, coreDNSServiceBytes, coreDNSConfigMapBytes, client); err != nil {
 		return err
 	}
 	fmt.Fprintln(out, "[addons] Applied essential addon: CoreDNS")
 	return nil
 }
 
-func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface) error {
+func createCoreDNSAddon(ctx context.Context, deploymentBytes, serviceBytes, configBytes []byte, client clientset.Interface) error {
 	coreDNSConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configBytes, coreDNSConfigMap); err != nil {
 		return errors.Wrapf(err, "%s ConfigMap", unableToDecodeCoreDNS)
 	}
 
 	// Create the ConfigMap for CoreDNS or update/migrate it in case it already exists
-	_, corefile, currentInstalledCoreDNSVersion, err := GetCoreDNSInfo(client)
+	_, corefile, currentInstalledCoreDNSVersion, err := GetCoreDNSInfo(ctx, client)
 	if err != nil {
 		return errors.Wrap(err, "unable to fetch CoreDNS current installed version and ConfigMap.")
 	}
@@ -193,23 +193,23 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 
 	if corefile == "" || migration.Default("", corefile) {
 		// If the Corefile is empty or default, the latest default Corefile will be applied
-		if err := apiclient.CreateOrUpdate(configMapClient, coreDNSConfigMap); err != nil {
+		if err := apiclient.CreateOrUpdate(ctx, configMapClient, coreDNSConfigMap); err != nil {
 			return err
 		}
 	} else if corefileMigrationRequired {
 		// If migration is required, try and migrate the Corefile
-		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
+		if err := migrateCoreDNSCorefile(ctx, client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
 			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
 			// to ignore preflight check errors.
 			canMigrateCorefile = false
 			klog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
-			if err := apiclient.CreateOrRetain(configMapClient, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
+			if err := apiclient.CreateOrRetain(ctx, configMapClient, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 				return err
 			}
 		}
 	} else {
 		// If the Corefile is modified and doesn't require any migration, it'll be retained for the benefit of the user
-		if err := apiclient.CreateOrRetain(configMapClient, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
+		if err := apiclient.CreateOrRetain(ctx, configMapClient, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 			return err
 		}
 	}
@@ -220,7 +220,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the Clusterroles for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoles(), coreDNSClusterRoles); err != nil {
+	if err := apiclient.CreateOrUpdate(ctx, client.RbacV1().ClusterRoles(), coreDNSClusterRoles); err != nil {
 		return err
 	}
 
@@ -230,7 +230,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the Clusterrolebindings for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), coreDNSClusterRolesBinding); err != nil {
+	if err := apiclient.CreateOrUpdate(ctx, client.RbacV1().ClusterRoleBindings(), coreDNSClusterRolesBinding); err != nil {
 		return err
 	}
 
@@ -240,7 +240,7 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 
 	// Create the ConfigMap for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdate(client.CoreV1().ServiceAccounts(coreDNSServiceAccount.GetNamespace()), coreDNSServiceAccount); err != nil {
+	if err := apiclient.CreateOrUpdate(ctx, client.CoreV1().ServiceAccounts(coreDNSServiceAccount.GetNamespace()), coreDNSServiceAccount); err != nil {
 		return err
 	}
 
@@ -252,27 +252,27 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	// Create the deployment for CoreDNS or retain it in case the CoreDNS migration has failed during upgrade
 	deploymentsClient := client.AppsV1().Deployments(coreDNSDeployment.GetNamespace())
 	if !canMigrateCorefile {
-		if err := apiclient.CreateOrRetain(deploymentsClient, coreDNSDeployment, kubeadmconstants.CoreDNSDeploymentName); err != nil {
+		if err := apiclient.CreateOrRetain(ctx, deploymentsClient, coreDNSDeployment, kubeadmconstants.CoreDNSDeploymentName); err != nil {
 			return err
 		}
 	} else {
 		// Create the Deployment for CoreDNS or update it in case it already exists
-		if err := apiclient.CreateOrUpdate(deploymentsClient, coreDNSDeployment); err != nil {
+		if err := apiclient.CreateOrUpdate(ctx, deploymentsClient, coreDNSDeployment); err != nil {
 			return err
 		}
 	}
 
 	coreDNSService := &v1.Service{}
-	return createDNSService(coreDNSService, serviceBytes, client)
+	return createDNSService(ctx, coreDNSService, serviceBytes, client)
 }
 
-func createDNSService(dnsService *v1.Service, serviceBytes []byte, client clientset.Interface) error {
+func createDNSService(ctx context.Context, dnsService *v1.Service, serviceBytes []byte, client clientset.Interface) error {
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), serviceBytes, dnsService); err != nil {
 		return errors.Wrap(err, "unable to decode the DNS service")
 	}
 
 	// Can't use a generic apiclient helper func here as we have to tolerate more than AlreadyExists.
-	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(context.TODO(), dnsService, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(ctx, dnsService, metav1.CreateOptions{}); err != nil {
 		// Ignore if the Service is invalid with this error message:
 		// 	Service "kube-dns" is invalid: spec.clusterIP: Invalid value: "10.96.0.10": provided IP is already allocated
 
@@ -280,7 +280,7 @@ func createDNSService(dnsService *v1.Service, serviceBytes []byte, client client
 			return errors.Wrap(err, "unable to create a new DNS service")
 		}
 
-		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(context.TODO(), dnsService, metav1.UpdateOptions{}); err != nil {
+		if _, err := client.CoreV1().Services(metav1.NamespaceSystem).Update(ctx, dnsService, metav1.UpdateOptions{}); err != nil {
 			return errors.Wrap(err, "unable to create/update the DNS service")
 		}
 	}
@@ -315,7 +315,7 @@ func isCoreDNSConfigMapMigrationRequired(corefile, currentInstalledCoreDNSVersio
 	return isMigrationRequired, nil
 }
 
-func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefile, currentInstalledCoreDNSVersion string) error {
+func migrateCoreDNSCorefile(ctx context.Context, client clientset.Interface, cm *v1.ConfigMap, corefile, currentInstalledCoreDNSVersion string) error {
 	// Since the current configuration present is not the default version, try and migrate it.
 	updatedCorefile, err := migration.Migrate(currentInstalledCoreDNSVersion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
 	if err != nil {
@@ -323,7 +323,7 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 	}
 
 	// Take a copy of the existing Corefile data as `Corefile-backup` and update the ConfigMap
-	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(context.TODO(), &v1.ConfigMap{
+	if _, err := client.CoreV1().ConfigMaps(cm.ObjectMeta.Namespace).Update(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.CoreDNSConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -337,7 +337,7 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 	}
 
 	// Point the CoreDNS deployment to the `Corefile-backup` data.
-	if err := setCorefile(client, "Corefile-backup"); err != nil {
+	if err := setCorefile(ctx, client, "Corefile-backup"); err != nil {
 		return err
 	}
 
@@ -357,8 +357,8 @@ func migrateCoreDNSCorefile(client clientset.Interface, cm *v1.ConfigMap, corefi
 }
 
 // GetCoreDNSInfo gets the current CoreDNS installed and the current Corefile Configuration of CoreDNS.
-func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, error) {
-	coreDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
+func GetCoreDNSInfo(ctx context.Context, client clientset.Interface) (*v1.ConfigMap, string, string, error) {
+	coreDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, "", "", nil
@@ -370,7 +370,7 @@ func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, 
 		return nil, "", "", errors.New("unable to find the CoreDNS Corefile data")
 	}
 
-	currentCoreDNSversion, err := DeployedDNSAddon(client)
+	currentCoreDNSversion, err := DeployedDNSAddon(ctx, client)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -378,14 +378,14 @@ func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, 
 	return coreDNSConfigMap, corefile, currentCoreDNSversion, nil
 }
 
-func setCorefile(client clientset.Interface, coreDNSCorefileName string) error {
-	dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSDeploymentName, metav1.GetOptions{})
+func setCorefile(ctx context.Context, client clientset.Interface, coreDNSCorefileName string) error {
+	dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.CoreDNSDeploymentName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 	patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"volumes":[{"name": "config-volume", "configMap":{"name": "coredns", "items":[{"key": "%s", "path": "Corefile"}]}}]}}}}`, coreDNSCorefileName)
 
-	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(context.TODO(), dnsDeployment.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
+	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(ctx, dnsDeployment.Name, types.StrategicMergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 		return errors.Wrap(err, "unable to patch the CoreDNS deployment")
 	}
 	return nil

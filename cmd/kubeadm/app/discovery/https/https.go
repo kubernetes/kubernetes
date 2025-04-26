@@ -17,6 +17,7 @@ limitations under the License.
 package https
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"time"
@@ -31,7 +32,7 @@ import (
 // RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func RetrieveValidatedConfigInfo(httpsURL string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
+func RetrieveValidatedConfigInfo(ctx context.Context, httpsURL string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
 	client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 	response, err := client.Get(httpsURL)
 	if err != nil {
@@ -48,5 +49,5 @@ func RetrieveValidatedConfigInfo(httpsURL string, discoveryTimeout time.Duration
 	if err != nil {
 		return nil, err
 	}
-	return file.ValidateConfigInfo(config, discoveryTimeout)
+	return file.ValidateConfigInfo(ctx, config, discoveryTimeout)
 }

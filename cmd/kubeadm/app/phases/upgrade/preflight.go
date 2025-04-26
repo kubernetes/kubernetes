@@ -23,6 +23,7 @@ import (
 
 	"github.com/coredns/corefile-migration/migration"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -37,7 +38,7 @@ import (
 type CoreDNSCheck struct {
 	name   string
 	client clientset.Interface
-	f      func(clientset.Interface) error
+	f      func(context.Context, clientset.Interface) error
 }
 
 // Name is part of the preflight.Checker interface
@@ -46,15 +47,15 @@ func (c CoreDNSCheck) Name() string {
 }
 
 // Check is part of the preflight.Checker interface
-func (c CoreDNSCheck) Check() (warnings, errors []error) {
-	if err := c.f(c.client); err != nil {
+func (c CoreDNSCheck) Check(ctx context.Context) (warnings, errors []error) {
+	if err := c.f(ctx, c.client); err != nil {
 		return nil, []error{err}
 	}
 	return nil, nil
 }
 
 // RunCoreDNSMigrationCheck initializes checks related to CoreDNS migration.
-func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors sets.Set[string]) error {
+func RunCoreDNSMigrationCheck(ctx context.Context, client clientset.Interface, ignorePreflightErrors sets.Set[string]) error {
 	migrationChecks := []preflight.Checker{
 		&CoreDNSCheck{
 			name:   "CoreDNSUnsupportedPlugins",
@@ -68,14 +69,14 @@ func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors 
 		},
 	}
 
-	return preflight.RunChecks(migrationChecks, os.Stderr, ignorePreflightErrors)
+	return preflight.RunChecks(ctx, migrationChecks, os.Stderr, ignorePreflightErrors)
 }
 
 // checkUnsupportedPlugins checks if there are any plugins included in the current configuration
 // that are unsupported for migration.
-func checkUnsupportedPlugins(client clientset.Interface) error {
+func checkUnsupportedPlugins(ctx context.Context, client clientset.Interface) error {
 	klog.V(1).Infoln("validating if there are any unsupported CoreDNS plugins in the Corefile")
-	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(client)
+	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -105,9 +106,9 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 }
 
 // checkMigration validates if migration of the current CoreDNS ConfigMap is possible.
-func checkMigration(client clientset.Interface) error {
+func checkMigration(ctx context.Context, client clientset.Interface) error {
 	klog.V(1).Infoln("validating if migration can be done for the current CoreDNS release.")
-	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(client)
+	_, corefile, currentInstalledCoreDNSversion, err := dns.GetCoreDNSInfo(ctx, client)
 	if err != nil {
 		return err
 	}

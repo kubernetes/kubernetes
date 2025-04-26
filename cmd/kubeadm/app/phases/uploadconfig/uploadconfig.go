@@ -17,6 +17,7 @@ limitations under the License.
 package uploadconfig
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +40,7 @@ const (
 )
 
 // UploadConfiguration saves the InitConfiguration used for later reference (when upgrading for instance)
-func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
+func UploadConfiguration(ctx context.Context, cfg *kubeadmapi.InitConfiguration, client clientset.Interface) error {
 	fmt.Printf("[upload-config] Storing the configuration used in ConfigMap %q in the %q Namespace\n", kubeadmconstants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 
 	// Prepare the ClusterConfiguration for upload
@@ -59,7 +60,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 		return err
 	}
 
-	err = apiclient.CreateOrMutate(client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
+	err = apiclient.CreateOrMutate(ctx, client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeadmConfigConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -78,7 +79,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	}
 
 	// Ensure that the NodesKubeadmConfigClusterRoleName exists
-	err = apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
+	err = apiclient.CreateOrUpdate(ctx, client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      NodesKubeadmConfigClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
@@ -99,7 +100,7 @@ func UploadConfiguration(cfg *kubeadmapi.InitConfiguration, client clientset.Int
 	// Binds the NodesKubeadmConfigClusterRoleName to all the bootstrap tokens
 	// that are members of the system:bootstrappers:kubeadm:default-node-token group
 	// and to all nodes
-	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(ctx, client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      NodesKubeadmConfigClusterRoleName,
 			Namespace: metav1.NamespaceSystem,

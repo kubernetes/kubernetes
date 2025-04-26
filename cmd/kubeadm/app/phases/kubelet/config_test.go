@@ -65,7 +65,7 @@ func TestCreateConfigMap(t *testing.T) {
 		t.Fatalf("unexpected failure when defaulting InitConfiguration: %v", err)
 	}
 
-	if err := CreateConfigMap(&internalcfg.ClusterConfiguration, client); err != nil {
+	if err := CreateConfigMap(t.Context(), &internalcfg.ClusterConfiguration, client); err != nil {
 		t.Errorf("CreateConfigMap: unexpected error %v", err)
 	}
 }
@@ -79,7 +79,7 @@ func TestCreateConfigMapRBACRules(t *testing.T) {
 		return true, nil, nil
 	})
 
-	if err := createConfigMapRBACRules(client); err != nil {
+	if err := createConfigMapRBACRules(t.Context(), client); err != nil {
 		t.Errorf("createConfigMapRBACRules: unexpected error %v", err)
 	}
 }

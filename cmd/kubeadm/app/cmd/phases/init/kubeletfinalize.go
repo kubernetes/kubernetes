@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,7 +70,7 @@ func NewKubeletFinalizePhase() workflow.Phase {
 // runKubeletFinalizeEnableClientCertRotation detects if the kubelet certificate rotation is enabled
 // and updates the kubelet.conf file to point to a rotatable certificate and key for the
 // Node user.
-func runKubeletFinalizeEnableClientCertRotation(c workflow.RunData) error {
+func runKubeletFinalizeEnableClientCertRotation(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-finalize phase invoked with an invalid data struct")

@@ -19,6 +19,7 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 
@@ -50,18 +51,18 @@ const (
 )
 
 // EnsureProxyAddon creates the kube-proxy addons
-func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface, out io.Writer, printManifest bool) error {
-	cmByte, err := createKubeProxyConfigMap(cfg, localEndpoint, client, printManifest)
+func EnsureProxyAddon(ctx context.Context, cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface, out io.Writer, printManifest bool) error {
+	cmByte, err := createKubeProxyConfigMap(ctx, cfg, localEndpoint, client, printManifest)
 	if err != nil {
 		return err
 	}
 
-	dsByte, err := createKubeProxyAddon(cfg, client, printManifest)
+	dsByte, err := createKubeProxyAddon(ctx, cfg, client, printManifest)
 	if err != nil {
 		return err
 	}
 
-	if err := printOrCreateKubeProxyObjects(cmByte, dsByte, client, out, printManifest); err != nil {
+	if err := printOrCreateKubeProxyObjects(ctx, cmByte, dsByte, client, out, printManifest); err != nil {
 		return err
 	}
 
@@ -69,7 +70,7 @@ func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubea
 }
 
 // Create SA, RBACRules or print manifests of them to out if printManifest is true
-func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientset.Interface, out io.Writer, printManifest bool) error {
+func printOrCreateKubeProxyObjects(ctx context.Context, cmByte []byte, dsByte []byte, client clientset.Interface, out io.Writer, printManifest bool) error {
 	var saBytes, crbBytes, roleBytes, roleBindingBytes []byte
 	var err error
 
@@ -133,19 +134,19 @@ func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientse
 
 	// Create the objects if printManifest is false
 	if !printManifest {
-		if err := apiclient.CreateOrUpdate(client.CoreV1().ServiceAccounts(sa.GetNamespace()), sa); err != nil {
+		if err := apiclient.CreateOrUpdate(ctx, client.CoreV1().ServiceAccounts(sa.GetNamespace()), sa); err != nil {
 			return errors.Wrap(err, "error when creating kube-proxy service account")
 		}
 
-		if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), crb); err != nil {
+		if err := apiclient.CreateOrUpdate(ctx, client.RbacV1().ClusterRoleBindings(), crb); err != nil {
 			return err
 		}
 
-		if err := apiclient.CreateOrUpdate(client.RbacV1().Roles(role.GetNamespace()), role); err != nil {
+		if err := apiclient.CreateOrUpdate(ctx, client.RbacV1().Roles(role.GetNamespace()), role); err != nil {
 			return err
 		}
 
-		if err := apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(rb.GetNamespace()), rb); err != nil {
+		if err := apiclient.CreateOrUpdate(ctx, client.RbacV1().RoleBindings(rb.GetNamespace()), rb); err != nil {
 			return err
 		}
 
@@ -189,7 +190,7 @@ func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientse
 	return nil
 }
 
-func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface, printManifest bool) ([]byte, error) {
+func createKubeProxyConfigMap(ctx context.Context, cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface, printManifest bool) ([]byte, error) {
 	// Generate ControlPlane Endpoint kubeconfig file
 	controlPlaneEndpoint, err := kubeadmutil.GetControlPlaneEndpoint(cfg.ControlPlaneEndpoint, localEndpoint)
 	if err != nil {
@@ -243,10 +244,10 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 	}
 
 	// Create the ConfigMap for kube-proxy or update it in case it already exists
-	return []byte(""), apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(kubeproxyConfigMap.GetNamespace()), kubeproxyConfigMap)
+	return []byte(""), apiclient.CreateOrUpdate(ctx, client.CoreV1().ConfigMaps(kubeproxyConfigMap.GetNamespace()), kubeproxyConfigMap)
 }
 
-func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, printManifest bool) ([]byte, error) {
+func createKubeProxyAddon(ctx context.Context, cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, printManifest bool) ([]byte, error) {
 	daemonSetbytes, err := kubeadmutil.ParseTemplate(KubeProxyDaemonSet19, struct{ Image, ProxyConfigMap, ProxyConfigMapKey string }{
 		Image:             images.GetKubernetesImage(constants.KubeProxy, cfg),
 		ProxyConfigMap:    constants.KubeProxyConfigMap,
@@ -269,5 +270,5 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 	*env = append(*env, kubeadmutil.MergeKubeadmEnvVars(kubeadmutil.GetProxyEnvVars(nil))...)
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
-	return []byte(""), apiclient.CreateOrUpdate(client.AppsV1().DaemonSets(kubeproxyDaemonSet.GetNamespace()), kubeproxyDaemonSet)
+	return []byte(""), apiclient.CreateOrUpdate(ctx, client.AppsV1().DaemonSets(kubeproxyDaemonSet.GetNamespace()), kubeproxyDaemonSet)
 }

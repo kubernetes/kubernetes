@@ -87,23 +87,23 @@ func NewKubeletWaitBootstrapPhase() workflow.Phase {
 		// https://github.com/kubernetes/enhancements/issues/4471
 		Hidden: true,
 		// Only run this phase as if `ControlPlaneKubeletLocalMode` is activated.
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, true)
+		RunIf: func(ctx context.Context, c workflow.RunData) (bool, error) {
+			return checkFeatureState(ctx, c, features.ControlPlaneKubeletLocalMode, true)
 		},
 	}
 }
 
-func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
+func getKubeletStartJoinData(ctx context.Context, c workflow.RunData) (*kubeadmapi.JoinConfiguration, *kubeadmapi.InitConfiguration, *clientcmdapi.Config, error) {
 	data, ok := c.(JoinData)
 	if !ok {
 		return nil, nil, nil, errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
-	initCfg, err := data.InitCfg()
+	initCfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	tlsBootstrapCfg, err := data.TLSBootstrapCfg()
+	tlsBootstrapCfg, err := data.TLSBootstrapCfg(ctx)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -113,8 +113,8 @@ func getKubeletStartJoinData(c workflow.RunData) (*kubeadmapi.JoinConfiguration,
 // runKubeletStartJoinPhase executes the kubelet TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer
-func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
-	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(c)
+func runKubeletStartJoinPhase(ctx context.Context, c workflow.RunData) (returnErr error) {
+	cfg, initCfg, tlsBootstrapCfg, err := getKubeletStartJoinData(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -138,7 +138,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	var client clientset.Interface
 	// If dry-use the client from joinData, else create a new bootstrap client
 	if data.DryRun() {
-		client, err = data.Client()
+		client, err = data.Client(ctx)
 		if err != nil {
 			return err
 		}
@@ -196,7 +196,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// A new Node with the same name as an existing control-plane Node can cause undefined
 	// behavior and ultimately control-plane failure.
 	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
-	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return errors.Wrapf(err, "cannot get Node %q", nodeName)
 	}
@@ -255,7 +255,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 
 	// Run the same code as KubeletWaitBootstrapPhase would do if the ControlPlaneKubeletLocalMode feature gate is disabled.
 	if !features.Enabled(initCfg.FeatureGates, features.ControlPlaneKubeletLocalMode) {
-		if err := runKubeletWaitBootstrapPhase(c); err != nil {
+		if err := runKubeletWaitBootstrapPhase(ctx, c); err != nil {
 			return err
 		}
 	}
@@ -266,13 +266,13 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 // runKubeletWaitBootstrapPhase waits for the kubelet to finish its TLS bootstrap process.
 // This process is executed by the kubelet and completes with the node joining the cluster
 // with a dedicates set of credentials as required by the node authorizer.
-func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
+func runKubeletWaitBootstrapPhase(ctx context.Context, c workflow.RunData) (returnErr error) {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
-	initCfg, err := data.InitCfg()
+	initCfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -283,7 +283,7 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		fmt.Println("[kubelet-wait] Would wait for the kubelet to be bootstrapped")
 
 		// Use the dry-run client.
-		if client, err = data.Client(); err != nil {
+		if client, err = data.Client(ctx); err != nil {
 			return errors.Wrap(err, "could not get client for dry-run")
 		}
 	} else {
@@ -311,12 +311,12 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		if !ok {
 			return errors.New("could not convert the KubeletConfiguration to a typed object")
 		}
-		if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
+		if err := waiter.WaitForKubelet(ctx, kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
 			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
 			return errors.Wrap(err, "failed while waiting for the kubelet to start")
 		}
 
-		if err := waitForTLSBootstrappedClient(cfg.Timeouts.TLSBootstrap.Duration); err != nil {
+		if err := waitForTLSBootstrappedClient(ctx, cfg.Timeouts.TLSBootstrap.Duration); err != nil {
 			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
 			return errors.Wrap(err, "failed while waiting for TLS bootstrap")
 		}
@@ -330,7 +330,7 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 
 	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
 		klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
-		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+		if err := patchnodephase.AnnotateCRISocket(ctx, client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 			return errors.Wrap(err, "error writing CRISocket for this node")
 		}
 	}
@@ -339,11 +339,11 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 }
 
 // waitForTLSBootstrappedClient waits for the /etc/kubernetes/kubelet.conf file to be available
-func waitForTLSBootstrappedClient(timeout time.Duration) error {
+func waitForTLSBootstrappedClient(ctx context.Context, timeout time.Duration) error {
 	fmt.Println("[kubelet-start] Waiting for the kubelet to perform the TLS Bootstrap")
 
 	// Loop on every falsy return. Return with an error if raised. Exit successfully if true is returned.
-	return wait.PollUntilContextTimeout(context.Background(),
+	return wait.PollUntilContextTimeout(ctx,
 		kubeadmconstants.TLSBootstrapRetryInterval, timeout,
 		true, func(_ context.Context) (bool, error) {
 			// Check that we can create a client set out of the kubelet kubeconfig. This ensures not

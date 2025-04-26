@@ -18,6 +18,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -57,7 +58,7 @@ func NewPreflightPhase() workflow.Phase {
 	}
 }
 
-func runPreflight(c workflow.RunData) error {
+func runPreflight(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(Data)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
@@ -66,24 +67,24 @@ func runPreflight(c workflow.RunData) error {
 
 	printer := &output.TextPrinter{}
 
-	initCfg, client, ignorePreflightErrors := data.InitCfg(), data.Client(), data.IgnorePreflightErrors()
+	initCfg, client, ignorePreflightErrors := data.InitCfg(ctx), data.Client(ctx), data.IgnorePreflightErrors()
 
 	// First, check if we're root separately from the other preflight checks and fail fast.
-	if err := preflight.RunRootCheckOnly(ignorePreflightErrors); err != nil {
+	if err := preflight.RunRootCheckOnly(ctx, ignorePreflightErrors); err != nil {
 		return err
 	}
-	if err := preflight.RunUpgradeChecks(ignorePreflightErrors); err != nil {
+	if err := preflight.RunUpgradeChecks(ctx, ignorePreflightErrors); err != nil {
 		return err
 	}
 
 	// Run CoreDNS migration check.
-	if err := upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors); err != nil {
+	if err := upgrade.RunCoreDNSMigrationCheck(ctx, client, ignorePreflightErrors); err != nil {
 		return err
 	}
 
 	// Run healthchecks against the cluster.
 	klog.V(1).Infoln("[upgrade/preflight] Verifying the cluster health")
-	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrors, data.DryRun(), printer); err != nil {
+	if err := upgrade.CheckClusterHealth(ctx, client, &initCfg.ClusterConfiguration, ignorePreflightErrors, data.DryRun(), printer); err != nil {
 		return err
 	}
 
@@ -111,7 +112,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	versionGetter := upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client), initCfg.KubernetesVersion)
-	if err := enforceVersionPolicies(initCfg.KubernetesVersion, upgradeVersion, data.AllowExperimentalUpgrades(), data.AllowRCUpgrades(), data.ForceUpgrade(), versionGetter); err != nil {
+	if err := enforceVersionPolicies(ctx, initCfg.KubernetesVersion, upgradeVersion, data.AllowExperimentalUpgrades(), data.AllowRCUpgrades(), data.ForceUpgrade(), versionGetter); err != nil {
 		return err
 	}
 
@@ -125,7 +126,7 @@ func runPreflight(c workflow.RunData) error {
 		fmt.Println("[upgrade/preflight] Pulling images required for setting up a Kubernetes cluster")
 		fmt.Println("[upgrade/preflight] This might take a minute or two, depending on the speed of your internet connection")
 		fmt.Println("[upgrade/preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
-		if err := preflight.RunPullImagesCheck(utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
+		if err := preflight.RunPullImagesCheck(ctx, utilsexec.New(), initCfg, ignorePreflightErrors); err != nil {
 			return err
 		}
 	} else {
@@ -137,10 +138,10 @@ func runPreflight(c workflow.RunData) error {
 
 // enforceVersionPolicies makes sure that the version the user specified is valid to upgrade to.
 // It handles both fatal and skippable (with --force) errors.
-func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades, force bool, versionGetter upgrade.VersionGetter) error {
+func enforceVersionPolicies(ctx context.Context, newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades, force bool, versionGetter upgrade.VersionGetter) error {
 	fmt.Printf("[upgrade/preflight] You have chosen to upgrade the cluster version to %q\n", newK8sVersionStr)
 
-	versionSkewErrs := upgrade.EnforceVersionPolicies(versionGetter, newK8sVersionStr, newK8sVersion, allowExperimentalUpgrades, allowRCUpgrades)
+	versionSkewErrs := upgrade.EnforceVersionPolicies(ctx, versionGetter, newK8sVersionStr, newK8sVersion, allowExperimentalUpgrades, allowRCUpgrades)
 	if versionSkewErrs != nil {
 
 		if len(versionSkewErrs.Mandatory) > 0 {

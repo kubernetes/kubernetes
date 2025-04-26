@@ -55,14 +55,13 @@ type kubernetesObject interface {
 
 // CreateOrUpdate creates a runtime object if the target resource doesn't exist.
 // If the resource exists already, this function will update the resource instead.
-func CreateOrUpdate[T kubernetesObject](client kubernetesInterface[T], obj T) error {
+func CreateOrUpdate[T kubernetesObject](ctx context.Context, client kubernetesInterface[T], obj T) error {
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(),
+	err := wait.PollUntilContextTimeout(ctx,
 		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
-		true, func(_ context.Context) (bool, error) {
+		true, func(ctx context.Context) (bool, error) {
 			// This uses a background context for API calls to avoid confusing callers that don't
 			// expect context-related errors.
-			ctx := context.Background()
 			if _, err := client.Create(ctx, obj, metav1.CreateOptions{}); err != nil {
 				if !apierrors.IsAlreadyExists(err) {
 					lastError = errors.Wrapf(err, "unable to create %T", obj)
@@ -85,14 +84,13 @@ func CreateOrUpdate[T kubernetesObject](client kubernetesInterface[T], obj T) er
 // the cluster and mutator callback will be called on it, then an Update of the mutated object will be performed. This function is resilient
 // to conflicts, and a retry will be issued if the object was modified on the server between the refresh and the update (while the mutation was
 // taking place).
-func CreateOrMutate[T kubernetesObject](client kubernetesInterface[T], obj T, mutator objectMutator[T]) error {
+func CreateOrMutate[T kubernetesObject](ctx context.Context, client kubernetesInterface[T], obj T, mutator objectMutator[T]) error {
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(),
+	err := wait.PollUntilContextTimeout(ctx,
 		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
-		true, func(_ context.Context) (bool, error) {
+		true, func(ctx context.Context) (bool, error) {
 			// This uses a background context for API calls to avoid confusing callers that don't
 			// expect context-related errors.
-			ctx := context.Background()
 			if _, err := client.Create(ctx, obj, metav1.CreateOptions{}); err != nil {
 				lastError = err
 				if apierrors.IsAlreadyExists(err) {
@@ -127,14 +125,13 @@ func mutate[T kubernetesObject](ctx context.Context, client kubernetesInterface[
 
 // CreateOrRetain creates a runtime object if the target resource doesn't exist.
 // If the resource exists already, this function will retain the resource instead.
-func CreateOrRetain[T kubernetesObject](client kubernetesInterface[T], obj T, name string) error {
+func CreateOrRetain[T kubernetesObject](ctx context.Context, client kubernetesInterface[T], obj T, name string) error {
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(),
+	err := wait.PollUntilContextTimeout(ctx,
 		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
-		true, func(_ context.Context) (bool, error) {
+		true, func(ctx context.Context) (bool, error) {
 			// This uses a background context for API calls to avoid confusing callers that don't
 			// expect context-related errors.
-			ctx := context.Background()
 			if _, err := client.Get(ctx, name, metav1.GetOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
 					lastError = errors.Wrapf(err, "unable to get %T", obj)
@@ -154,10 +151,10 @@ func CreateOrRetain[T kubernetesObject](client kubernetesInterface[T], obj T, na
 }
 
 // PatchNodeOnce executes patchFn on the node object found by the node name.
-func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1.Node), lastError *error) func(context.Context) (bool, error) {
+func PatchNodeOnce(ctx context.Context, client clientset.Interface, nodeName string, patchFn func(*v1.Node), lastError *error) func(context.Context) (bool, error) {
 	return func(_ context.Context) (bool, error) {
 		// First get the node object
-		ctx := context.Background()
+		ctx := ctx
 		n, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		if err != nil {
 			*lastError = err
@@ -205,11 +202,11 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 // PatchNode tries to patch a node using patchFn for the actual mutating logic.
 // Retries are provided by the wait package.
-func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
+func PatchNode(ctx context.Context, client clientset.Interface, nodeName string, patchFn func(*v1.Node)) error {
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(),
+	err := wait.PollUntilContextTimeout(ctx,
 		apiCallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
-		true, PatchNodeOnce(client, nodeName, patchFn, &lastError))
+		true, PatchNodeOnce(ctx, client, nodeName, patchFn, &lastError))
 	if err == nil {
 		return nil
 	}
@@ -219,17 +216,17 @@ func PatchNode(client clientset.Interface, nodeName string, patchFn func(*v1.Nod
 // GetConfigMapWithShortRetry tries to retrieve a ConfigMap using the given client, retrying for a short
 // time if it gets an unexpected error. The main usage of this function is in areas of the code that
 // fallback to a default ConfigMap value in case the one from the API cannot be quickly obtained.
-func GetConfigMapWithShortRetry(client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
+func GetConfigMapWithShortRetry(ctx context.Context, client clientset.Interface, namespace, name string) (*v1.ConfigMap, error) {
 	var cm *v1.ConfigMap
 	var lastError error
-	err := wait.PollUntilContextTimeout(context.Background(),
+	err := wait.PollUntilContextTimeout(ctx,
 		time.Millisecond*50, time.Millisecond*350,
 		true, func(_ context.Context) (bool, error) {
 			var err error
 			// Intentionally pass a new context to this API call. This will let the API call run
 			// independently of the parent context timeout, which is quite short and can cause the API
 			// call to return abruptly.
-			cm, err = client.CoreV1().ConfigMaps(namespace).Get(context.Background(), name, metav1.GetOptions{})
+			cm, err = client.CoreV1().ConfigMaps(namespace).Get(ctx, name, metav1.GetOptions{})
 			if err == nil {
 				return true, nil
 			}

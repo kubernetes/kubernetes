@@ -59,7 +59,7 @@ func TestCreateSparseCerts(t *testing.T) {
 				return certsData, nil
 			})
 
-			if err := r.Run([]string{}); (err != nil) != test.ExpectError {
+			if err := r.Run(t.Context(), []string{}); (err != nil) != test.ExpectError {
 				t.Fatalf("expected error to be %t, got %t (%v)", test.ExpectError, (err != nil), err)
 			}
 		})

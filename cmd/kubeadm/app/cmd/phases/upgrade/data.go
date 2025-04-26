@@ -18,6 +18,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -32,9 +33,9 @@ type Data interface {
 	RenewCerts() bool
 	DryRun() bool
 	Cfg() *kubeadmapi.UpgradeConfiguration
-	InitCfg() *kubeadmapi.InitConfiguration
+	InitCfg(context.Context) *kubeadmapi.InitConfiguration
 	IsControlPlaneNode() bool
-	Client() clientset.Interface
+	Client(context.Context) clientset.Interface
 	IgnorePreflightErrors() sets.Set[string]
 	PatchesDir() string
 	OutputWriter() io.Writer

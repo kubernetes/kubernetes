@@ -53,7 +53,7 @@ const (
 
 // createShortLivedBootstrapToken creates the token used to manager kubeadm-certs
 // and return the tokenID
-func createShortLivedBootstrapToken(client clientset.Interface) (string, error) {
+func createShortLivedBootstrapToken(ctx context.Context, client clientset.Interface) (string, error) {
 	tokenStr, err := bootstraputil.GenerateBootstrapToken()
 	if err != nil {
 		return "", errors.Wrap(err, "error generating token to upload certs")
@@ -70,7 +70,7 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 		},
 	}}
 
-	if err := nodebootstraptokenphase.CreateNewTokens(client, tokens); err != nil {
+	if err := nodebootstraptokenphase.CreateNewTokens(ctx, client, tokens); err != nil {
 		return "", errors.Wrap(err, "error creating token")
 	}
 	return tokens[0].Token.ID, nil
@@ -86,13 +86,13 @@ func CreateCertificateKey() (string, error) {
 }
 
 // UploadCerts save certs needs to join a new control-plane on kubeadm-certs secret.
-func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
+func UploadCerts(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
 	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
 		return errors.Wrap(err, "error decoding certificate key")
 	}
-	tokenID, err := createShortLivedBootstrapToken(client)
+	tokenID, err := createShortLivedBootstrapToken(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -101,12 +101,12 @@ func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, 
 	if err != nil {
 		return err
 	}
-	ref, err := getSecretOwnerRef(client, tokenID)
+	ref, err := getSecretOwnerRef(ctx, client, tokenID)
 	if err != nil {
 		return err
 	}
 
-	err = apiclient.CreateOrUpdate(client.CoreV1().Secrets(metav1.NamespaceSystem), &v1.Secret{
+	err = apiclient.CreateOrUpdate(ctx, client.CoreV1().Secrets(metav1.NamespaceSystem), &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            kubeadmconstants.KubeadmCertsSecret,
 			Namespace:       metav1.NamespaceSystem,
@@ -118,11 +118,11 @@ func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, 
 		return err
 	}
 
-	return createRBAC(client)
+	return createRBAC(ctx, client)
 }
 
-func createRBAC(client clientset.Interface) error {
-	err := apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
+func createRBAC(ctx context.Context, client clientset.Interface) error {
+	err := apiclient.CreateOrUpdate(ctx, client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeadmCertsClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
@@ -140,7 +140,7 @@ func createRBAC(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(ctx, client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeadmCertsClusterRoleName,
 			Namespace: metav1.NamespaceSystem,
@@ -159,9 +159,9 @@ func createRBAC(client clientset.Interface) error {
 	})
 }
 
-func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.OwnerReference, error) {
+func getSecretOwnerRef(ctx context.Context, client clientset.Interface, tokenID string) ([]metav1.OwnerReference, error) {
 	secretName := bootstraputil.BootstrapTokenSecretName(tokenID)
-	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), secretName, metav1.GetOptions{})
+	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(ctx, secretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error to get token reference")
 	}
@@ -216,7 +216,7 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 }
 
 // DownloadCerts downloads the certificates needed to join a new control plane.
-func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
+func DownloadCerts(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.InitConfiguration, key string) error {
 	fmt.Printf("[download-certs] Downloading the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 
 	decodedKey, err := hex.DecodeString(key)
@@ -224,7 +224,7 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 		return errors.Wrap(err, "error decoding certificate key")
 	}
 
-	secret, err := getSecret(client)
+	secret, err := getSecret(ctx, client)
 	if err != nil {
 		return errors.Wrap(err, "error downloading the secret")
 	}
@@ -262,8 +262,8 @@ func writeCertOrKey(certOrKeyPath string, certOrKeyData []byte) error {
 	return errors.New("unknown data found in Secret entry")
 }
 
-func getSecret(client clientset.Interface) (*v1.Secret, error) {
-	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
+func getSecret(ctx context.Context, client clientset.Interface) (*v1.Secret, error) {
+	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)

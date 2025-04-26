@@ -46,11 +46,11 @@ import (
 // NB. This function can only be called after the current control plane instance has been upgraded already.
 // Because it determines whether the other control plane instances have been upgraded by checking whether
 // the kube-apiserver image of other control plane instance is the same as that of this instance.
-func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string) ([]string, error) {
+func UnupgradedControlPlaneInstances(ctx context.Context, client clientset.Interface, nodeName string) ([]string, error) {
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
 		"component": kubeadmconstants.KubeAPIServer,
 	}))
-	pods, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{
+	pods, err := client.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, metav1.ListOptions{
 		LabelSelector: selector.String(),
 	})
 	if err != nil {

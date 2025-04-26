@@ -46,8 +46,8 @@ type ContainerRuntime interface {
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
 	RemoveContainers(containers []string) error
-	PullImage(image string) error
-	PullImagesInParallel(images []string, ifNotPresent bool) error
+	PullImage(ctx context.Context, image string) error
+	PullImagesInParallel(ctx context.Context, images []string, ifNotPresent bool) error
 	ImageExists(image string) bool
 	SandboxImage() (string, error)
 }
@@ -169,9 +169,9 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 }
 
 // PullImage pulls the image
-func (runtime *CRIRuntime) PullImage(image string) (err error) {
+func (runtime *CRIRuntime) PullImage(ctx context.Context, image string) (err error) {
 	for i := 0; i < constants.PullImageRetry; i++ {
-		if _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
+		if _, err = runtime.impl.PullImage(ctx, runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
 			return nil
 		}
 	}
@@ -179,8 +179,8 @@ func (runtime *CRIRuntime) PullImage(image string) (err error) {
 }
 
 // PullImagesInParallel pulls a list of images in parallel
-func (runtime *CRIRuntime) PullImagesInParallel(images []string, ifNotPresent bool) error {
-	errs := pullImagesInParallelImpl(images, ifNotPresent, runtime.ImageExists, runtime.PullImage)
+func (runtime *CRIRuntime) PullImagesInParallel(ctx context.Context, images []string, ifNotPresent bool) error {
+	errs := pullImagesInParallelImpl(ctx, images, ifNotPresent, runtime.ImageExists, runtime.PullImage)
 	return errorsutil.NewAggregate(errs)
 }
 
@@ -188,8 +188,8 @@ func defaultContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), defaultTimeout)
 }
 
-func pullImagesInParallelImpl(images []string, ifNotPresent bool,
-	imageExistsFunc func(string) bool, pullImageFunc func(string) error) []error {
+func pullImagesInParallelImpl(ctx context.Context, images []string, ifNotPresent bool,
+	imageExistsFunc func(string) bool, pullImageFunc func(context.Context, string) error) []error {
 
 	var errs []error
 	errChan := make(chan error, len(images))
@@ -206,7 +206,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 					return
 				}
 			}
-			err := pullImageFunc(image)
+			err := pullImageFunc(ctx, image)
 			if err != nil {
 				err = errors.WithMessagef(err, "failed to pull image %s", image)
 			} else {

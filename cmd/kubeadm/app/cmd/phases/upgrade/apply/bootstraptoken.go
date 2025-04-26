@@ -18,6 +18,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -44,7 +45,7 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	}
 }
 
-func runBootstrapToken(c workflow.RunData) error {
+func runBootstrapToken(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(Data)
 	if !ok {
 		return errors.New("bootstrap-token phase invoked with an invalid data struct")
@@ -57,31 +58,31 @@ func runBootstrapToken(c workflow.RunData) error {
 
 	fmt.Println("[upgrade/bootstrap-token] Configuring bootstrap token and cluster-info RBAC rules")
 
-	client := data.Client()
+	client := data.Client(ctx)
 
 	var errs []error
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
-	if err := nodebootstraptoken.AllowBootstrapTokensToGetNodes(client); err != nil {
+	if err := nodebootstraptoken.AllowBootstrapTokensToGetNodes(ctx, client); err != nil {
 		errs = append(errs, err)
 	}
 
 	// Create/update RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(client); err != nil {
+	if err := nodebootstraptoken.AllowBootstrapTokensToPostCSRs(ctx, client); err != nil {
 		errs = append(errs, err)
 	}
 
 	// Create/update RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(client); err != nil {
+	if err := nodebootstraptoken.AutoApproveNodeBootstrapTokens(ctx, client); err != nil {
 		errs = append(errs, err)
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(client); err != nil {
+	if err := nodebootstraptoken.AutoApproveNodeCertificateRotation(ctx, client); err != nil {
 		errs = append(errs, err)
 	}
 
 	// Create/update RBAC rules that makes the cluster-info ConfigMap reachable
-	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
+	if err := clusterinfophase.CreateClusterInfoRBACRules(ctx, client); err != nil {
 		errs = append(errs, err)
 	}
 

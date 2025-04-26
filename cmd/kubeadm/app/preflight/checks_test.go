@@ -26,6 +26,7 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/net/context"
 	utiltesting "k8s.io/client-go/util/testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -179,7 +180,7 @@ func (pfct preflightCheckTest) Name() string {
 	return "preflightCheckTest"
 }
 
-func (pfct preflightCheckTest) Check() (warning, errorList []error) {
+func (pfct preflightCheckTest) Check(ctx context.Context) (warning, errorList []error) {
 	if pfct.msg == "warning" {
 		return []error{errors.New("warning")}, nil
 	}
@@ -216,7 +217,7 @@ func TestFileExistingCheck(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		_, output := rt.check.Check()
+		_, output := rt.check.Check(t.Context())
 		if (output != nil) != rt.expectedError {
 			t.Errorf(
 				"Failed FileExistingCheck:%v\n\texpectedError: %t\n\t  actual: %t",
@@ -255,7 +256,7 @@ func TestFileAvailableCheck(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		_, output := rt.check.Check()
+		_, output := rt.check.Check(t.Context())
 		if (output != nil) != rt.expectedError {
 			t.Errorf(
 				"Failed FileAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
@@ -323,7 +324,7 @@ func TestFileContentCheck(t *testing.T) {
 		t.Fatalf("Failed to write to file: %v", err)
 	}
 	for _, rt := range tests {
-		_, output := rt.check.Check()
+		_, output := rt.check.Check(t.Context())
 		if (len(output) > 0) != rt.expectedError {
 			t.Errorf(
 				"Failed FileContentCheck:%v\n\texpectedError: %t\n\t  actual: %t",
@@ -369,7 +370,7 @@ func TestDirAvailableCheck(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		_, output := rt.check.Check()
+		_, output := rt.check.Check(t.Context())
 		if (output != nil) != rt.expectedError {
 			t.Errorf(
 				"Failed DirAvailableCheck:%v\n\texpectedError: %t\n\t  actual: %t",
@@ -404,7 +405,7 @@ func TestPortOpenCheck(t *testing.T) {
 		},
 	}
 	for _, rt := range tests {
-		_, output := rt.check.Check()
+		_, output := rt.check.Check(t.Context())
 		if (output != nil) != rt.expectedError {
 			t.Errorf(
 				"Failed PortOpenCheck:%v\n\texpectedError: %t\n\t  actual: %t",
@@ -438,7 +439,7 @@ func TestRunChecks(t *testing.T) {
 	}
 	for _, rt := range tokenTest {
 		buf := new(bytes.Buffer)
-		actual := RunChecks(rt.p, buf, sets.New[string]())
+		actual := RunChecks(t.Context(), rt.p, buf, sets.New[string]())
 		if (actual == nil) != rt.expected {
 			t.Errorf(
 				"failed RunChecks:\n\texpected: %t\n\t  actual: %t",
@@ -587,7 +588,7 @@ func TestKubernetesVersionCheck(t *testing.T) {
 	}
 
 	for _, rt := range tests {
-		warning, _ := rt.check.Check()
+		warning, _ := rt.check.Check(t.Context())
 		if (warning != nil) != rt.expectWarnings {
 			t.Errorf(
 				"failed KubernetesVersionCheck:\n\texpected: %t\n\t  actual: %t (KubeadmVersion:%s, KubernetesVersion: %s)",
@@ -645,7 +646,7 @@ func TestHTTPProxyCIDRCheck(t *testing.T) {
 	resetProxyEnv(t)
 
 	for _, rt := range tests {
-		warning, _ := rt.check.Check()
+		warning, _ := rt.check.Check(t.Context())
 		if (warning != nil) != rt.expectWarnings {
 			t.Errorf(
 				"failed HTTPProxyCIDRCheck:\n\texpected: %t\n\t  actual: %t (CIDR:%s). Warnings: %v",
@@ -725,7 +726,7 @@ func TestHTTPProxyCheck(t *testing.T) {
 	resetProxyEnv(t)
 
 	for _, rt := range tests {
-		warning, _ := rt.check.Check()
+		warning, _ := rt.check.Check(t.Context())
 		if (warning != nil) != rt.expectWarnings {
 			t.Errorf(
 				"%s failed HTTPProxyCheck:\n\texpected: %t\n\t  actual: %t (Host:%s). Warnings: %v",
@@ -803,7 +804,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 			}
 
 			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec, minKubeletVersion: minimumKubeletVersion}
-			warnings, errors := check.Check()
+			warnings, errors := check.Check(t.Context())
 
 			switch {
 			case warnings != nil && !tc.expectWarnings:
@@ -860,7 +861,7 @@ func TestNumCPUCheck(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(fmt.Sprintf("number of CPUs: %d", rt.numCPU), func(t *testing.T) {
-			warnings, errors := NumCPUCheck{NumCPU: rt.numCPU}.Check()
+			warnings, errors := NumCPUCheck{NumCPU: rt.numCPU}.Check(t.Context())
 			if len(warnings) != rt.numWarnings {
 				t.Errorf("expected %d warning(s) but got %d: %q", rt.numWarnings, len(warnings), warnings)
 			}
@@ -887,7 +888,7 @@ func TestMemCheck(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(fmt.Sprintf("MemoryCheck{%d}", rt.minimum), func(t *testing.T) {
-			warnings, errors := MemCheck{Mem: rt.minimum}.Check()
+			warnings, errors := MemCheck{Mem: rt.minimum}.Check(t.Context())
 			if len(warnings) > 0 {
 				t.Errorf("expected 0 warnings but got %d: %q", len(warnings), warnings)
 			} else if len(errors) != rt.expectedErrors {

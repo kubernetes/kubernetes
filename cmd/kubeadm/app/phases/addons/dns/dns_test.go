@@ -18,7 +18,6 @@ package dns
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -501,6 +500,7 @@ func TestCreateCoreDNSAddon(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := createClientAndCoreDNSManifest(t, tc.initialCorefileData, tc.coreDNSVersion)
 
 			configMapBytes, err := kubeadmutil.ParseTemplate(CoreDNSConfigMap, struct{ DNSDomain, UpstreamNameserver, StubDomain string }{
@@ -512,11 +512,11 @@ func TestCreateCoreDNSAddon(t *testing.T) {
 				t.Errorf("unexpected ParseTemplate failure: %+v", err)
 			}
 
-			err = createCoreDNSAddon(nil, nil, configMapBytes, client)
+			err = createCoreDNSAddon(ctx, nil, nil, configMapBytes, client)
 			if err != nil {
 				t.Fatalf("error creating the CoreDNS Addon: %v", err)
 			}
-			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
+			migratedConfigMap, _ := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.CoreDNSConfigMap, metav1.GetOptions{})
 			if !strings.EqualFold(migratedConfigMap.Data["Corefile"], tc.expectedCorefileData) {
 				t.Fatalf("expected to get %v, but got %v", tc.expectedCorefileData, migratedConfigMap.Data["Corefile"])
 			}
@@ -525,8 +525,9 @@ func TestCreateCoreDNSAddon(t *testing.T) {
 }
 
 func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion string) *clientsetfake.Clientset {
+	ctx := t.Context()
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
+	_, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.CoreDNSConfigMap,
 			Namespace: metav1.NamespaceSystem,
@@ -538,7 +539,7 @@ func createClientAndCoreDNSManifest(t *testing.T, corefile, coreDNSVersion strin
 	if err != nil {
 		t.Fatalf("error creating ConfigMap: %v", err)
 	}
-	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
+	_, err = client.AppsV1().Deployments(metav1.NamespaceSystem).Create(ctx, &apps.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
@@ -597,7 +598,7 @@ func TestDeployedDNSReplicas(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := newMockClientForTest(t, 2, tt.deploymentSize, "", "", "")
-			got, err := deployedDNSReplicas(client, 5)
+			got, err := deployedDNSReplicas(t.Context(), client, 5)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("deployedDNSReplicas() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -874,7 +875,7 @@ metadata:
 		t.Run(tt.name, func(t *testing.T) {
 			out := &bytes.Buffer{}
 			var replicas int32 = 3
-			if err := coreDNSAddon(tt.args.cfg, tt.args.client, &replicas, "", out, tt.args.printManifest); (err != nil) != tt.wantErr {
+			if err := coreDNSAddon(t.Context(), tt.args.cfg, tt.args.client, &replicas, "", out, tt.args.printManifest); (err != nil) != tt.wantErr {
 				t.Errorf("coreDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -1157,7 +1158,7 @@ metadata:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := &bytes.Buffer{}
-			if err := EnsureDNSAddon(tt.args.cfg, tt.args.client, "", out, tt.args.printManifest); (err != nil) != tt.wantErr {
+			if err := EnsureDNSAddon(t.Context(), tt.args.cfg, tt.args.client, "", out, tt.args.printManifest); (err != nil) != tt.wantErr {
 				t.Errorf("EnsureDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -1406,7 +1407,7 @@ func TestCreateDNSService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := newMockClientForTest(t, 1, 1, "", "", "")
-			if err := createDNSService(tt.args.dnsService, tt.args.serviceBytes, client); (err != nil) != tt.wantErr {
+			if err := createDNSService(t.Context(), tt.args.dnsService, tt.args.serviceBytes, client); (err != nil) != tt.wantErr {
 				t.Errorf("createDNSService() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1476,7 +1477,7 @@ func TestDeployedDNSAddon(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := newMockClientForTest(t, 1, tt.deploymentSize, tt.image, "", "")
 
-			version, err := DeployedDNSAddon(client)
+			version, err := DeployedDNSAddon(t.Context(), client)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DeployedDNSAddon() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1591,7 +1592,7 @@ func TestGetCoreDNSInfo(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, got2, err := GetCoreDNSInfo(tt.client)
+			got, got1, got2, err := GetCoreDNSInfo(t.Context(), tt.client)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetCoreDNSInfo() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1663,12 +1664,13 @@ func TestIsCoreDNSConfigMapMigrationRequired(t *testing.T) {
 // replicas is replica of each DNS deployment
 // deploymentSize is the number of deployments with `k8s-app=kube-dns` label.
 func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, image string, configMap string, configData string) *clientsetfake.Clientset {
+	ctx := t.Context()
 	if image == "" {
 		image = "registry.k8s.io/coredns/coredns:" + kubeadmconstants.CoreDNSVersion
 	}
 	client := clientsetfake.NewSimpleClientset()
 	for i := 0; i < deploymentSize; i++ {
-		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(context.TODO(), &apps.Deployment{
+		_, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Create(ctx, &apps.Deployment{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Deployment",
 				APIVersion: "apps/v1",
@@ -1693,7 +1695,7 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, imag
 			t.Fatalf("error creating deployment: %v", err)
 		}
 	}
-	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(context.TODO(), &v1.Service{
+	_, err := client.CoreV1().Services(metav1.NamespaceSystem).Create(ctx, &v1.Service{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Service",
 			APIVersion: "v1",
@@ -1729,7 +1731,7 @@ func newMockClientForTest(t *testing.T, replicas int32, deploymentSize int, imag
 		if configMap == "" {
 			configMap = "Corefile"
 		}
-		_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &v1.ConfigMap{
+		_, err = client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(t.Context(), &v1.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "ConfigMap",
 				APIVersion: "v1",

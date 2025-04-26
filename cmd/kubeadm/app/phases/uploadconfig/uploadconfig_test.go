@@ -17,7 +17,6 @@ limitations under the License.
 package uploadconfig
 
 import (
-	"context"
 	"reflect"
 	"testing"
 
@@ -49,6 +48,7 @@ func TestUploadConfiguration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t2 *testing.T) {
+			ctx := t.Context()
 			cfg, err := configutil.DefaultedStaticInitConfiguration()
 			if err != nil {
 				t2.Fatalf("UploadConfiguration() error = %v", err)
@@ -60,16 +60,16 @@ func TestUploadConfiguration(t *testing.T) {
 
 			client := clientsetfake.NewSimpleClientset()
 			// For idempotent test, we check the result of the second call.
-			if err := UploadConfiguration(cfg, client); err != nil {
+			if err := UploadConfiguration(ctx, cfg, client); err != nil {
 				t2.Fatalf("UploadConfiguration() error = %v", err)
 			}
 			if tt.updateExisting {
-				if err := UploadConfiguration(cfg, client); err != nil {
+				if err := UploadConfiguration(ctx, cfg, client); err != nil {
 					t2.Fatalf("UploadConfiguration() error = %v", err)
 				}
 			}
 			if tt.verifyResult {
-				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
+				controlPlaneCfg, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.KubeadmConfigConfigMap, metav1.GetOptions{})
 				if err != nil {
 					t2.Fatalf("Fail to query ConfigMap error = %v", err)
 				}

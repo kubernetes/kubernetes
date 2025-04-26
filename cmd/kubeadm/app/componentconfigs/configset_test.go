@@ -61,7 +61,7 @@ func TestFromCluster(t *testing.T) {
 	client := clientsetfake.NewSimpleClientset(objects...)
 	clusterCfg := testClusterCfg()
 
-	if err := FetchFromCluster(clusterCfg, client); err != nil {
+	if err := FetchFromCluster(t.Context(), clusterCfg, client); err != nil {
 		t.Fatalf("FetchFromCluster failed: %v", err)
 	}
 

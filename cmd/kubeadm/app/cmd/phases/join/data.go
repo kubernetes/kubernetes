@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -35,9 +36,9 @@ import (
 type JoinData interface {
 	CertificateKey() string
 	Cfg() *kubeadmapi.JoinConfiguration
-	TLSBootstrapCfg() (*clientcmdapi.Config, error)
-	InitCfg() (*kubeadmapi.InitConfiguration, error)
-	Client() (clientset.Interface, error)
+	TLSBootstrapCfg(context.Context) (*clientcmdapi.Config, error)
+	InitCfg(context.Context) (*kubeadmapi.InitConfiguration, error)
+	Client(context.Context) (clientset.Interface, error)
 	IgnorePreflightErrors() sets.Set[string]
 	OutputWriter() io.Writer
 	PatchesDir() string
@@ -48,13 +49,13 @@ type JoinData interface {
 	CertificateWriteDir() string
 }
 
-func checkFeatureState(c workflow.RunData, featureGate string, state bool) (bool, error) {
+func checkFeatureState(ctx context.Context, c workflow.RunData, featureGate string, state bool) (bool, error) {
 	data, ok := c.(JoinData)
 	if !ok {
 		return false, errors.New("control-plane-join phase invoked with an invalid data struct")
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return false, err
 	}

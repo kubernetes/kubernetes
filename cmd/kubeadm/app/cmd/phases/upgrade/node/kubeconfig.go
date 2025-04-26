@@ -18,6 +18,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -43,8 +44,8 @@ func NewKubeconfigPhase() workflow.Phase {
 	return phase
 }
 
-func runKubeconfig() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runKubeconfig() func(ctx context.Context, c workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(Data)
 		if !ok {
 			return errors.New("kubeconfig phase invoked with an invalid data struct")
@@ -57,7 +58,7 @@ func runKubeconfig() func(c workflow.RunData) error {
 		}
 
 		// Otherwise, retrieve all the info required for kubeconfig upgrade.
-		cfg := data.InitCfg()
+		cfg := data.InitCfg(ctx)
 
 		if err := upgrade.UpdateKubeletKubeconfigServer(cfg, data.DryRun()); err != nil {
 			return errors.Wrap(err, "failed to update kubelet local mode")

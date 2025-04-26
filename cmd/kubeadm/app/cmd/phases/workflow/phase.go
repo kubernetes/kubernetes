@@ -17,6 +17,8 @@ limitations under the License.
 package workflow
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -56,12 +58,12 @@ type Phase struct {
 	// Run defines a function implementing the phase action.
 	// It is recommended to implement type assertion, e.g. using golang type switch,
 	// for validating the RunData type.
-	Run func(data RunData) error
+	Run func(ctx context.Context, data RunData) error
 
 	// RunIf define a function that implements a condition that should be checked
 	// before executing the phase action.
 	// If this function return nil, the phase action is always executed.
-	RunIf func(data RunData) (bool, error)
+	RunIf func(ctx context.Context, data RunData) (bool, error)
 
 	// InheritFlags defines the list of flags that the cobra command generated for this phase should Inherit
 	// from local flags defined in the parent command / or additional flags defined in the phase runner.

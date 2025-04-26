@@ -17,6 +17,7 @@ limitations under the License.
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -115,7 +116,7 @@ func TestComputePhaseRunFlags(t *testing.T) {
 	}
 }
 
-func phaseBuilder1(name string, runIf func(data RunData) (bool, error), phases ...Phase) Phase {
+func phaseBuilder1(name string, runIf func(ctx context.Context, data RunData) (bool, error), phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
 		Short:  fmt.Sprintf("long description for %s ...", name),
@@ -127,18 +128,18 @@ func phaseBuilder1(name string, runIf func(data RunData) (bool, error), phases .
 
 var callstack []string
 
-func runBuilder(name string) func(data RunData) error {
-	return func(data RunData) error {
+func runBuilder(name string) func(ctx context.Context, data RunData) error {
+	return func(_ context.Context, data RunData) error {
 		callstack = append(callstack, name)
 		return nil
 	}
 }
 
-func runConditionTrue(data RunData) (bool, error) {
+func runConditionTrue(ctx context.Context, data RunData) (bool, error) {
 	return true, nil
 }
 
-func runConditionFalse(data RunData) (bool, error) {
+func runConditionFalse(ctx context.Context, data RunData) (bool, error) {
 	return false, nil
 }
 
@@ -172,7 +173,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 		t.Run(u.name, func(t *testing.T) {
 			callstack = []string{}
 			w.Options = u.options
-			err := w.Run([]string{})
+			err := w.Run(t.Context(), []string{})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -183,7 +184,7 @@ func TestRunOrderAndConditions(t *testing.T) {
 	}
 }
 
-func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func(data RunData) error, phases ...Phase) Phase {
+func phaseBuilder2(name string, runIf func(ctx context.Context, data RunData) (bool, error), run func(ctx context.Context, data RunData) error, phases ...Phase) Phase {
 	return Phase{
 		Name:   name,
 		Short:  fmt.Sprintf("long description for %s ...", name),
@@ -193,19 +194,19 @@ func phaseBuilder2(name string, runIf func(data RunData) (bool, error), run func
 	}
 }
 
-func runPass(data RunData) error {
+func runPass(ctx context.Context, data RunData) error {
 	return nil
 }
 
-func runFails(data RunData) error {
+func runFails(ctx context.Context, data RunData) error {
 	return errors.New("run fails")
 }
 
-func runConditionPass(data RunData) (bool, error) {
+func runConditionPass(ctx context.Context, data RunData) (bool, error) {
 	return true, nil
 }
 
-func runConditionFails(data RunData) (bool, error) {
+func runConditionFails(ctx context.Context, data RunData) (bool, error) {
 	return false, errors.New("run condition fails")
 }
 
@@ -241,7 +242,7 @@ func TestRunHandleErrors(t *testing.T) {
 	for _, u := range usecases {
 		t.Run(u.name, func(t *testing.T) {
 			w.Options = u.options
-			err := w.Run([]string{})
+			err := w.Run(t.Context(), []string{})
 			if (err != nil) != u.expectedError {
 				t.Errorf("Unexpected error: %v", err)
 			}

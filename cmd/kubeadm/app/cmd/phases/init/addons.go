@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"io"
 
 	"github.com/pkg/errors"
@@ -83,7 +84,7 @@ func NewAddonPhase() workflow.Phase {
 	}
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, error) {
+func getInitData(ctx context.Context, c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, error) {
 	data, ok := c.(InitData)
 	if !ok {
 		return nil, nil, "", nil, errors.New("addon phase invoked with an invalid data struct")
@@ -92,7 +93,7 @@ func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.I
 	var client clientset.Interface
 	var err error
 	if !printManifest {
-		client, err = data.Client()
+		client, err = data.Client(ctx)
 		if err != nil {
 			return nil, nil, "", nil, err
 		}
@@ -104,21 +105,21 @@ func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.I
 }
 
 // runCoreDNSAddon installs CoreDNS addon to a Kubernetes cluster
-func runCoreDNSAddon(c workflow.RunData) error {
-	cfg, client, patchesDir, out, err := getInitData(c)
+func runCoreDNSAddon(ctx context.Context, c workflow.RunData) error {
+	cfg, client, patchesDir, out, err := getInitData(ctx, c)
 	if err != nil {
 		return err
 	}
-	return dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, printManifest)
+	return dnsaddon.EnsureDNSAddon(ctx, &cfg.ClusterConfiguration, client, patchesDir, out, printManifest)
 }
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
-func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, _, out, err := getInitData(c)
+func runKubeProxyAddon(ctx context.Context, c workflow.RunData) error {
+	cfg, client, _, out, err := getInitData(ctx, c)
 	if err != nil {
 		return err
 	}
-	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, printManifest)
+	return proxyaddon.EnsureProxyAddon(ctx, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, printManifest)
 }
 
 func getAddonPhaseFlags(name string) []string {

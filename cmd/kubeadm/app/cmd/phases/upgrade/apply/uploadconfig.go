@@ -18,6 +18,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -72,8 +73,8 @@ func getUploadConfigPhaseFlags() []string {
 }
 
 // runUploadKubeadmConfig uploads the kubeadm configuration to a ConfigMap.
-func runUploadKubeadmConfig(c workflow.RunData) error {
-	cfg, client, dryRun, err := getUploadConfigData(c)
+func runUploadKubeadmConfig(ctx context.Context, c workflow.RunData) error {
+	cfg, client, dryRun, err := getUploadConfigData(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -84,15 +85,15 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 	}
 
 	klog.V(1).Infoln("[upgrade/upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
-	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
+	if err := uploadconfig.UploadConfiguration(ctx, cfg, client); err != nil {
 		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
 	}
 	return nil
 }
 
 // runUploadKubeletConfig uploads the kubelet configuration to a ConfigMap.
-func runUploadKubeletConfig(c workflow.RunData) error {
-	cfg, client, dryRun, err := getUploadConfigData(c)
+func runUploadKubeletConfig(ctx context.Context, c workflow.RunData) error {
+	cfg, client, dryRun, err := getUploadConfigData(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -104,17 +105,17 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	}
 
 	klog.V(1).Infoln("[upgrade/upload-config] Uploading the kubelet configuration to a ConfigMap")
-	if err = kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
+	if err = kubeletphase.CreateConfigMap(ctx, &cfg.ClusterConfiguration, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
 	}
 
 	if !features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
 		klog.V(1).Infoln("[upgrade/upload-config] Preserving the CRISocket information for this control-plane node")
-		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
+		if err := patchnodephase.AnnotateCRISocket(ctx, client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
 			return errors.Wrap(err, "error writing CRISocket for this node")
 		}
 	} else {
-		if err := patchnodephase.RemoveCRISocketAnnotation(client, cfg.NodeRegistration.Name); err != nil {
+		if err := patchnodephase.RemoveCRISocketAnnotation(ctx, client, cfg.NodeRegistration.Name); err != nil {
 			return err
 		}
 	}
@@ -122,11 +123,11 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	return nil
 }
 
-func getUploadConfigData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, bool, error) {
+func getUploadConfigData(ctx context.Context, c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, bool, error) {
 	data, ok := c.(Data)
 	if !ok {
 		return nil, nil, false, errors.New("upload-config phase invoked with an invalid data struct")
 	}
 
-	return data.InitCfg(), data.Client(), data.DryRun(), nil
+	return data.InitCfg(ctx), data.Client(ctx), data.DryRun(), nil
 }

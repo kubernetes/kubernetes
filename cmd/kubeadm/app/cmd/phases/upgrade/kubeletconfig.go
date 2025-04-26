@@ -18,6 +18,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -57,7 +58,7 @@ func NewKubeletConfigPhase() workflow.Phase {
 	return phase
 }
 
-func runKubeletConfigPhase(c workflow.RunData) error {
+func runKubeletConfigPhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(Data)
 	if !ok {
 		return errors.New("kubelet-config phase invoked with an invalid data struct")
@@ -66,13 +67,13 @@ func runKubeletConfigPhase(c workflow.RunData) error {
 	// Write the configuration for the kubelet down to disk and print the generated manifests instead of dry-running.
 	// If not dry-running, the kubelet config file will be backed up to the /etc/kubernetes/tmp/ dir, so that it could be
 	// recovered if anything goes wrong.
-	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(), kubeletConfigDir, data.PatchesDir(), data.DryRun(), data.OutputWriter())
+	err := upgrade.WriteKubeletConfigFiles(data.InitCfg(ctx), kubeletConfigDir, data.PatchesDir(), data.DryRun(), data.OutputWriter())
 	if err != nil {
 		return err
 	}
 
-	if features.Enabled(data.InitCfg().ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
-		if err := patchnodephase.RemoveCRISocketAnnotation(data.Client(), data.InitCfg().NodeRegistration.Name); err != nil {
+	if features.Enabled(data.InitCfg(ctx).ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
+		if err := patchnodephase.RemoveCRISocketAnnotation(ctx, data.Client(ctx), data.InitCfg(ctx).NodeRegistration.Name); err != nil {
 			return err
 		}
 	}

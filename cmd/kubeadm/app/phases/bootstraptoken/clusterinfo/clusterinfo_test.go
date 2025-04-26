@@ -18,7 +18,6 @@ package clusterinfo
 
 import (
 	"bytes"
-	"context"
 	"testing"
 	"text/template"
 	"time"
@@ -112,7 +111,7 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				err = CreateBootstrapConfigMapIfNotExists(client, kubeconfig)
+				err = CreateBootstrapConfigMapIfNotExists(t.Context(), client, kubeconfig)
 				if tc.expectErr && err == nil {
 					t.Errorf("CreateBootstrapConfigMapIfNotExists(%s) wanted error, got nil", tc.name)
 				} else if !tc.expectErr && err != nil {
@@ -139,7 +138,7 @@ func TestCreateClusterInfoRBACRules(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := CreateClusterInfoRBACRules(tt.client); err != nil {
+			if err := CreateClusterInfoRBACRules(t.Context(), tt.client); err != nil {
 				t.Errorf("CreateClusterInfoRBACRules() hits unexpected error: %v", err)
 			}
 		})
@@ -147,9 +146,10 @@ func TestCreateClusterInfoRBACRules(t *testing.T) {
 }
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
+	ctx := t.Context()
 	client := clientsetfake.NewSimpleClientset()
 
-	_, err := client.RbacV1().Roles(metav1.NamespacePublic).Create(context.TODO(), &rbac.Role{
+	_, err := client.RbacV1().Roles(metav1.NamespacePublic).Create(ctx, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,
 			Namespace: metav1.NamespacePublic,
@@ -167,7 +167,7 @@ func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
 		t.Fatalf("error creating role: %v", err)
 	}
 
-	_, err = client.RbacV1().RoleBindings(metav1.NamespacePublic).Create(context.TODO(), &rbac.RoleBinding{
+	_, err = client.RbacV1().RoleBindings(metav1.NamespacePublic).Create(ctx, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,
 			Namespace: metav1.NamespacePublic,

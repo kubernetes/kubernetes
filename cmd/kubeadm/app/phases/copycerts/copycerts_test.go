@@ -17,7 +17,6 @@ limitations under the License.
 package copycerts
 
 import (
-	"context"
 	"encoding/hex"
 	"os"
 	"path/filepath"
@@ -159,6 +158,7 @@ func TestCertOrKeyNameToSecretName(t *testing.T) {
 }
 
 func TestUploadCerts(t *testing.T) {
+	ctx := t.Context()
 	tmpdir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpdir)
 
@@ -175,14 +175,14 @@ func TestUploadCerts(t *testing.T) {
 	}
 
 	cs := fakeclient.NewSimpleClientset()
-	if err := UploadCerts(cs, initConfiguration, secretKey); err != nil {
+	if err := UploadCerts(ctx, cs, initConfiguration, secretKey); err != nil {
 		t.Fatalf("error uploading certs: %v", err)
 	}
 	rawSecretKey, err := hex.DecodeString(secretKey)
 	if err != nil {
 		t.Fatalf("error decoding key: %v", err)
 	}
-	secretMap, err := cs.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
+	secretMap, err := cs.CoreV1().Secrets(metav1.NamespaceSystem).Get(ctx, kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("could not fetch secret: %v", err)
 	}
@@ -204,6 +204,7 @@ func TestUploadCerts(t *testing.T) {
 }
 
 func TestDownloadCerts(t *testing.T) {
+	ctx := t.Context()
 	secretKey, err := CreateCertificateKey()
 	if err != nil {
 		t.Fatalf("could not create certificate key: %v", err)
@@ -227,7 +228,7 @@ func TestDownloadCerts(t *testing.T) {
 
 	kubeadmCertsSecret := createKubeadmCertsSecret(t, initConfiguration, secretKey)
 	cs := fakeclient.NewSimpleClientset(kubeadmCertsSecret)
-	if err := DownloadCerts(cs, initForDownloadConfiguration, secretKey); err != nil {
+	if err := DownloadCerts(ctx, cs, initForDownloadConfiguration, secretKey); err != nil {
 		t.Fatalf("error downloading certs: %v", err)
 	}
 

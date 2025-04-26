@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -53,7 +54,7 @@ func NewCleanupNodePhase() workflow.Phase {
 	}
 }
 
-func runCleanupNode(c workflow.RunData) error {
+func runCleanupNode(ctx context.Context, c workflow.RunData) error {
 	dirsToClean := []string{filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)}
 	r, ok := c.(resetData)
 	if !ok {

@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -45,7 +46,7 @@ func NewUploadCertsPhase() workflow.Phase {
 	}
 }
 
-func runUploadCerts(c workflow.RunData) error {
+func runUploadCerts(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("upload-certs phase invoked with an invalid data struct")
@@ -55,7 +56,7 @@ func runUploadCerts(c workflow.RunData) error {
 		fmt.Printf("[upload-certs] Skipping phase. Please see --%s\n", options.UploadCerts)
 		return nil
 	}
-	client, err := data.Client()
+	client, err := data.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -68,7 +69,7 @@ func runUploadCerts(c workflow.RunData) error {
 		data.SetCertificateKey(certificateKey)
 	}
 
-	if err := copycerts.UploadCerts(client, data.Cfg(), data.CertificateKey()); err != nil {
+	if err := copycerts.UploadCerts(ctx, client, data.Cfg(), data.CertificateKey()); err != nil {
 		return errors.Wrap(err, "error uploading certs")
 	}
 	if !data.SkipCertificateKeyPrint() {

@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"time"
@@ -49,7 +50,7 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	return phase
 }
 
-func runWaitControlPlanePhase(c workflow.RunData) error {
+func runWaitControlPlanePhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("wait-control-plane phase invoked with an invalid data struct")
@@ -64,7 +65,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// Both Wait* calls below use a /healthz endpoint, thus a client without permissions works fine
-	client, err := data.ClientWithoutBootstrap()
+	client, err := data.ClientWithoutBootstrap(ctx)
 	if err != nil {
 		return errors.Wrap(err, "cannot obtain client without bootstrap")
 	}
@@ -84,7 +85,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	if !ok {
 		return errors.New("could not convert the KubeletConfiguration to a typed object")
 	}
-	if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
+	if err := waiter.WaitForKubelet(ctx, kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
 		apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
 		return errors.Wrap(err, "failed while waiting for the kubelet to start")
 	}
@@ -95,11 +96,11 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		podMap, err = staticpodutil.ReadMultipleStaticPodsFromDisk(data.ManifestDir(),
 			constants.ControlPlaneComponents...)
 		if err == nil {
-			err = waiter.WaitForControlPlaneComponents(podMap,
+			err = waiter.WaitForControlPlaneComponents(ctx, podMap,
 				data.Cfg().LocalAPIEndpoint.AdvertiseAddress)
 		}
 	} else {
-		err = waiter.WaitForAPI()
+		err = waiter.WaitForAPI(ctx)
 	}
 	if err != nil {
 		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)

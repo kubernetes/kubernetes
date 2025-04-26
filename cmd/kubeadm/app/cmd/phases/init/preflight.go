@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -55,7 +56,7 @@ func NewPreflightPhase() workflow.Phase {
 }
 
 // runPreflight executes preflight checks logic.
-func runPreflight(c workflow.RunData) error {
+func runPreflight(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
@@ -63,10 +64,10 @@ func runPreflight(c workflow.RunData) error {
 
 	fmt.Println("[preflight] Running pre-flight checks")
 	// First, check if we're root separately from the other preflight checks and fail fast.
-	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
+	if err := preflight.RunRootCheckOnly(ctx, data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
-	if err := preflight.RunInitNodeChecks(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors(), false, false); err != nil {
+	if err := preflight.RunInitNodeChecks(ctx, utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors(), false, false); err != nil {
 		return err
 	}
 
@@ -78,5 +79,5 @@ func runPreflight(c workflow.RunData) error {
 	fmt.Println("[preflight] Pulling images required for setting up a Kubernetes cluster")
 	fmt.Println("[preflight] This might take a minute or two, depending on the speed of your internet connection")
 	fmt.Println("[preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
-	return preflight.RunPullImagesCheck(utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors())
+	return preflight.RunPullImagesCheck(ctx, utilsexec.New(), data.Cfg(), data.IgnorePreflightErrors())
 }

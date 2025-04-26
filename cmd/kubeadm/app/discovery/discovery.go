@@ -17,6 +17,7 @@ limitations under the License.
 package discovery
 
 import (
+	"context"
 	"net/url"
 
 	"github.com/pkg/errors"
@@ -38,10 +39,10 @@ const TokenUser = "tls-bootstrap-token-user"
 
 // For returns a kubeconfig object that can be used for doing the TLS Bootstrap with the right credentials
 // Also, before returning anything, it makes sure it can trust the API Server
-func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
+func For(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	// TODO: Print summary info about the CA certificate, along with the checksum signature
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
-	config, err := DiscoverValidatedKubeConfig(client, cfg)
+	config, err := DiscoverValidatedKubeConfig(ctx, client, cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
 	}
@@ -72,17 +73,17 @@ func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*client
 }
 
 // DiscoverValidatedKubeConfig returns a validated Config object that specifies where the cluster is and the CA cert to trust
-func DiscoverValidatedKubeConfig(dryRunClient clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
+func DiscoverValidatedKubeConfig(ctx context.Context, dryRunClient clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*clientcmdapi.Config, error) {
 	timeout := cfg.Timeouts.Discovery.Duration
 	switch {
 	case cfg.Discovery.File != nil:
 		kubeConfigPath := cfg.Discovery.File.KubeConfigPath
 		if isHTTPSURL(kubeConfigPath) {
-			return https.RetrieveValidatedConfigInfo(kubeConfigPath, timeout)
+			return https.RetrieveValidatedConfigInfo(ctx, kubeConfigPath, timeout)
 		}
-		return file.RetrieveValidatedConfigInfo(kubeConfigPath, timeout)
+		return file.RetrieveValidatedConfigInfo(ctx, kubeConfigPath, timeout)
 	case cfg.Discovery.BootstrapToken != nil:
-		return token.RetrieveValidatedConfigInfo(dryRunClient, &cfg.Discovery, timeout)
+		return token.RetrieveValidatedConfigInfo(ctx, dryRunClient, &cfg.Discovery, timeout)
 	default:
 		return nil, errors.New("couldn't find a valid discovery configuration")
 	}

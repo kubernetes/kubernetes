@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -45,7 +46,7 @@ type VersionSkewPolicyErrors struct {
 }
 
 // EnforceVersionPolicies enforces that the proposed new version is compatible with all the different version skew policies
-func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades bool) *VersionSkewPolicyErrors {
+func EnforceVersionPolicies(ctx context.Context, versionGetter VersionGetter, newK8sVersionStr string, newK8sVersion *version.Version, allowExperimentalUpgrades, allowRCUpgrades bool) *VersionSkewPolicyErrors {
 
 	skewErrors := &VersionSkewPolicyErrors{
 		Mandatory: []error{},
@@ -68,7 +69,7 @@ func EnforceVersionPolicies(versionGetter VersionGetter, newK8sVersionStr string
 	}
 	fmt.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionStr)
 
-	kubeletVersions, err := versionGetter.KubeletVersions()
+	kubeletVersions, err := versionGetter.KubeletVersions(ctx)
 	if err != nil {
 		// This is a non-critical error; continue although kubeadm couldn't look this up
 		skewErrors.Skippable = append(skewErrors.Skippable, errors.Wrap(err, "Unable to fetch kubelet version"))

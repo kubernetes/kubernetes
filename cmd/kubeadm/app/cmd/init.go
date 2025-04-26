@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -129,7 +130,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 
 			fmt.Printf("[init] Using Kubernetes version: %s\n", data.cfg.KubernetesVersion)
 
-			return initRunner.Run(args)
+			return initRunner.Run(cmd.Context(), args)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -517,8 +518,8 @@ func (d *initData) OutputWriter() io.Writer {
 }
 
 // getDryRunClient creates a fake client that answers some GET calls in order to be able to do the full init flow in dry-run mode.
-func getDryRunClient(d *initData) (clientset.Interface, error) {
-	dryRun := apiclient.NewDryRun()
+func getDryRunClient(ctx context.Context, d *initData) (clientset.Interface, error) {
+	dryRun := apiclient.NewDryRun(ctx)
 	if err := dryRun.WithKubeConfigFile(d.KubeConfigPath()); err != nil {
 		return nil, err
 	}
@@ -533,11 +534,11 @@ func getDryRunClient(d *initData) (clientset.Interface, error) {
 // Client returns a Kubernetes client to be used by kubeadm.
 // This function is implemented as a singleton, thus avoiding to recreate the client when it is used by different phases.
 // Important. This function must be called after the admin.conf kubeconfig file is created.
-func (d *initData) Client() (clientset.Interface, error) {
+func (d *initData) Client(ctx context.Context) (clientset.Interface, error) {
 	var err error
 	if d.client == nil {
 		if d.dryRun {
-			d.client, err = getDryRunClient(d)
+			d.client, err = getDryRunClient(ctx, d)
 			if err != nil {
 				return nil, err
 			}
@@ -547,7 +548,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 			// and if the bootstrapping was not already done
 			if !d.adminKubeConfigBootstrapped && isDefaultKubeConfigPath {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
-				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
+				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(ctx, kubeadmconstants.KubernetesDir, nil)
 				if err != nil {
 					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmconstants.AdminKubeConfigFileName)
 				}
@@ -571,13 +572,13 @@ func (d *initData) Client() (clientset.Interface, error) {
 // ClientWithoutBootstrap returns a dry-run client or a regular client from admin.conf.
 // Unlike Client(), it does not call EnsureAdminClusterRoleBinding() or sets d.client.
 // This means the client only has anonymous permissions and does not persist in initData.
-func (d *initData) ClientWithoutBootstrap() (clientset.Interface, error) {
+func (d *initData) ClientWithoutBootstrap(ctx context.Context) (clientset.Interface, error) {
 	var (
 		client clientset.Interface
 		err    error
 	)
 	if d.dryRun {
-		client, err = getDryRunClient(d)
+		client, err = getDryRunClient(ctx, d)
 		if err != nil {
 			return nil, err
 		}

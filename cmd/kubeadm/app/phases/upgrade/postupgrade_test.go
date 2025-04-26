@@ -273,13 +273,14 @@ func TestUnupgradedControlPlaneInstances(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
 			var runtimeObjs []runtime.Object
 			for _, pod := range tc.pods {
 				runtimeObjs = append(runtimeObjs, &pod) // Use pointer
 			}
 			client := fake.NewSimpleClientset(runtimeObjs...)
 
-			nodes, err := UnupgradedControlPlaneInstances(client, tc.currentNode)
+			nodes, err := UnupgradedControlPlaneInstances(ctx, client, tc.currentNode)
 			if tc.expectError != (err != nil) {
 				t.Fatalf("expected error: %v, got: %v", tc.expectError, err)
 			}

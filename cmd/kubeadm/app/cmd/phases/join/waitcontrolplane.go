@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"io"
 	"time"
 
@@ -45,7 +46,7 @@ func NewWaitControlPlanePhase() workflow.Phase {
 	return phase
 }
 
-func runWaitControlPlanePhase(c workflow.RunData) error {
+func runWaitControlPlanePhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("wait-control-plane phase invoked with an invalid data struct")
@@ -55,7 +56,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return nil
 	}
 
-	initCfg, err := data.InitCfg()
+	initCfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return errors.Wrap(err, "could not obtain InitConfiguration during the wait-control-plane phase")
 	}
@@ -67,7 +68,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return nil
 	}
 
-	client, err := data.Client()
+	client, err := data.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -83,7 +84,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	if err = waiter.WaitForControlPlaneComponents(pods,
+	if err = waiter.WaitForControlPlaneComponents(ctx, pods,
 		data.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
 		return errors.Wrap(err, "failed while waiting for the control plane to start")

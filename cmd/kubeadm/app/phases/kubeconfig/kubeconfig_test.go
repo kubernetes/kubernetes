@@ -991,7 +991,7 @@ func TestEnsureAdminClusterRoleBinding(t *testing.T) {
 				}
 			}
 
-			client, err := EnsureAdminClusterRoleBinding(dir, ensureRBACFunc)
+			client, err := EnsureAdminClusterRoleBinding(t.Context(), dir, ensureRBACFunc)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", err != nil, tc.expectedError, err)
 			}
@@ -1128,7 +1128,7 @@ func TestEnsureAdminClusterRoleBindingImpl(t *testing.T) {
 			}
 
 			client, err := EnsureAdminClusterRoleBindingImpl(
-				context.Background(), adminClient, superAdminClient, 0, 0)
+				t.Context(), adminClient, superAdminClient, 0, 0)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}

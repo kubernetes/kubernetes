@@ -17,6 +17,7 @@ limitations under the License.
 package dryrun
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -91,24 +92,24 @@ func NewWaiter() apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiServerAddress string) error {
+func (w *Waiter) WaitForControlPlaneComponents(_ context.Context, podsMap map[string]*v1.Pod, apiServerAddress string) error {
 	return nil
 }
 
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForAPI() error {
+func (w *Waiter) WaitForAPI(_ context.Context) error {
 	fmt.Println("[dryrun] Would wait for the API Server's /healthz endpoint to return 'ok'")
 	return nil
 }
 
 // WaitForPodsWithLabel just returns a dummy nil, to indicate that the program should just proceed
-func (w *Waiter) WaitForPodsWithLabel(kvLabel string) error {
+func (w *Waiter) WaitForPodsWithLabel(_ context.Context, kvLabel string) error {
 	fmt.Printf("[dryrun] Would wait for the Pods with the label %q in the %s namespace to become Running\n", kvLabel, metav1.NamespaceSystem)
 	return nil
 }
 
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-func (w *Waiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
+func (w *Waiter) WaitForKubelet(_ context.Context, healthzAddress string, healthzPort int32) error {
 	fmt.Printf("[dryrun] Would make sure the kubelet returns 'ok' at http://%s:%d/healthz\n", healthzAddress, healthzPort)
 	return nil
 }
@@ -117,7 +118,7 @@ func (w *Waiter) WaitForKubelet(healthzAddress string, healthzPort int32) error 
 func (w *Waiter) SetTimeout(_ time.Duration) {}
 
 // WaitForStaticPodControlPlaneHashes returns an empty hash for all control plane images;
-func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string, error) {
+func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ context.Context, _ string) (map[string]string, error) {
 	return map[string]string{
 		kubeadmconstants.KubeAPIServer:         "",
 		kubeadmconstants.KubeControllerManager: "",
@@ -127,12 +128,12 @@ func (w *Waiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string
 
 // WaitForStaticPodSingleHash returns an empty hash
 // but the empty strings there are needed
-func (w *Waiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) {
+func (w *Waiter) WaitForStaticPodSingleHash(_ context.Context, _ string, _ string) (string, error) {
 	return "", nil
 }
 
 // WaitForStaticPodHashChange returns a dummy nil error in order for the flow to just continue as we're dryrunning
-func (w *Waiter) WaitForStaticPodHashChange(_, _, _ string) error {
+func (w *Waiter) WaitForStaticPodHashChange(_ context.Context, _, _, _ string) error {
 	return nil
 }
 

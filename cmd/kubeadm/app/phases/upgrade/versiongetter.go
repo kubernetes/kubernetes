@@ -44,9 +44,9 @@ type VersionGetter interface {
 	// VersionFromCILabel should resolve CI labels like `latest`, `stable`, `stable-1.8`, etc. to real versions
 	VersionFromCILabel(string, string) (string, *versionutil.Version, error)
 	// KubeletVersions should return a map with a version and a list of node names that describes how many kubelets there are for that version
-	KubeletVersions() (map[string][]string, error)
+	KubeletVersions(context.Context) (map[string][]string, error)
 	// ComponentVersions should return a map with a version and a list of node names that describes how many a given control-plane components there are for that version
-	ComponentVersions(string) (map[string][]string, error)
+	ComponentVersions(context.Context, string) (map[string][]string, error)
 }
 
 // KubeVersionGetter handles the version-fetching mechanism from external sources
@@ -116,8 +116,8 @@ func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description strin
 }
 
 // KubeletVersions gets the versions of the kubelets in the cluster.
-func (g *KubeVersionGetter) KubeletVersions() (map[string][]string, error) {
-	nodes, err := g.client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+func (g *KubeVersionGetter) KubeletVersions(ctx context.Context) (map[string][]string, error) {
+	nodes, err := g.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.New("couldn't list all nodes in cluster")
 	}
@@ -134,9 +134,9 @@ func (g *KubeVersionGetter) KubeletVersions() (map[string][]string, error) {
 // ComponentVersions gets the versions of the control-plane components in the cluster.
 // The name parameter is the name of the component to get the versions for.
 // The function returns a map with the version as the key and a list of node names as the value.
-func (g *KubeVersionGetter) ComponentVersions(name string) (map[string][]string, error) {
+func (g *KubeVersionGetter) ComponentVersions(ctx context.Context, name string) (map[string][]string, error) {
 	podList, err := g.client.CoreV1().Pods(metav1.NamespaceSystem).List(
-		context.TODO(),
+		ctx,
 		metav1.ListOptions{
 			LabelSelector: fmt.Sprintf("component=%s,tier=%s", name, constants.ControlPlaneTier),
 		},

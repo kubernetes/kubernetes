@@ -305,7 +305,7 @@ func TestPullImage(t *testing.T) {
 			}
 			containerRuntime.SetImpl(mock)
 
-			err := containerRuntime.PullImage("")
+			err := containerRuntime.PullImage(t.Context(), "")
 
 			assert.Equal(t, tc.shouldError, err != nil)
 		})
@@ -496,7 +496,7 @@ func TestPullImagesInParallel(t *testing.T) {
 			}
 			containerRuntime.SetImpl(mock)
 
-			err := containerRuntime.PullImagesInParallel([]string{"first", "second"}, tc.ifNotPresent)
+			err := containerRuntime.PullImagesInParallel(t.Context(), []string{"first", "second"}, tc.ifNotPresent)
 
 			assert.Equal(t, tc.shouldError, err != nil)
 		})

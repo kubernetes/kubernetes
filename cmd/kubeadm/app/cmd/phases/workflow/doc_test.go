@@ -17,6 +17,7 @@ limitations under the License.
 package workflow
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -42,7 +43,7 @@ func ExamplePhase() {
 	var myPhase1 = Phase{
 		Name:  "myPhase1",
 		Short: "A phase of a kubeadm composable workflow...",
-		Run: func(data RunData) error {
+		Run: func(_ context.Context, data RunData) error {
 			// transform data into a typed data struct
 			d, ok := data.(myPhaseData)
 			if !ok {
@@ -59,7 +60,7 @@ func ExamplePhase() {
 	var myPhase2 = Phase{
 		Name:  "myPhase2",
 		Short: "Another phase of a kubeadm composable workflow...",
-		Run: func(data RunData) error {
+		Run: func(_ context.Context, data RunData) error {
 			// transform data into a typed data struct
 			d, ok := data.(myPhaseData)
 			if !ok {
@@ -83,7 +84,7 @@ func ExampleRunner_Run() {
 	var myPhase = Phase{
 		Name:  "myPhase",
 		Short: "A phase of a kubeadm composable workflow...",
-		Run: func(data RunData) error {
+		Run: func(_ context.Context, data RunData) error {
 			// transform data into a typed data struct
 			d, ok := data.(myPhaseData)
 			if !ok {
@@ -107,5 +108,7 @@ func ExampleRunner_Run() {
 	})
 
 	// Runs the workflow by passing a list of arguments
-	myWorkflowRunner.Run([]string{})
+	if err := myWorkflowRunner.Run(context.Background(), []string{}); err != nil {
+		panic(err)
+	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -43,7 +44,7 @@ func NewPreflightPhase() workflow.Phase {
 }
 
 // runPreflight executes preflight checks logic.
-func runPreflight(c workflow.RunData) error {
+func runPreflight(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(Data)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
@@ -51,10 +52,10 @@ func runPreflight(c workflow.RunData) error {
 	fmt.Println("[upgrade/preflight] Running pre-flight checks")
 
 	// First, check if we're root separately from the other preflight checks and fail fast.
-	if err := preflight.RunRootCheckOnly(data.IgnorePreflightErrors()); err != nil {
+	if err := preflight.RunRootCheckOnly(ctx, data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
-	if err := preflight.RunUpgradeChecks(data.IgnorePreflightErrors()); err != nil {
+	if err := preflight.RunUpgradeChecks(ctx, data.IgnorePreflightErrors()); err != nil {
 		return err
 	}
 
@@ -62,7 +63,7 @@ func runPreflight(c workflow.RunData) error {
 	if data.IsControlPlaneNode() {
 		// Update the InitConfiguration used for RunPullImagesCheck with ImagePullPolicy and ImagePullSerial
 		// that come from UpgradeNodeConfiguration.
-		initConfig := data.InitCfg()
+		initConfig := data.InitCfg(ctx)
 		initConfig.NodeRegistration.ImagePullPolicy = data.Cfg().Node.ImagePullPolicy
 		initConfig.NodeRegistration.ImagePullSerial = data.Cfg().Node.ImagePullSerial
 
@@ -70,7 +71,7 @@ func runPreflight(c workflow.RunData) error {
 			fmt.Println("[upgrade/preflight] Pulling images required for setting up a Kubernetes cluster")
 			fmt.Println("[upgrade/preflight] This might take a minute or two, depending on the speed of your internet connection")
 			fmt.Println("[upgrade/preflight] You can also perform this action beforehand using 'kubeadm config images pull'")
-			if err := preflight.RunPullImagesCheck(utilsexec.New(), initConfig, data.IgnorePreflightErrors()); err != nil {
+			if err := preflight.RunPullImagesCheck(ctx, utilsexec.New(), initConfig, data.IgnorePreflightErrors()); err != nil {
 				return err
 			}
 		} else {

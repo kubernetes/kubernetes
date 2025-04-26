@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -35,7 +36,7 @@ func NewCheckEtcdPhase() workflow.Phase {
 	}
 }
 
-func runCheckEtcdPhase(c workflow.RunData) error {
+func runCheckEtcdPhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("check-etcd phase invoked with an invalid data struct")
@@ -46,7 +47,7 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -66,10 +67,10 @@ func runCheckEtcdPhase(c workflow.RunData) error {
 	// Checks that the etcd cluster is healthy
 	// NB. this check cannot be implemented before because it requires the admin.conf and all the certificates
 	//     for connecting to etcd already in place
-	client, err := data.Client()
+	client, err := data.Client(ctx)
 	if err != nil {
 		return err
 	}
 
-	return etcdphase.CheckLocalEtcdClusterStatus(client, data.CertificateWriteDir())
+	return etcdphase.CheckLocalEtcdClusterStatus(ctx, client, data.CertificateWriteDir())
 }

@@ -41,7 +41,7 @@ func assertNotExists(t *testing.T, path string) {
 // assertDirEmpty verifies a directory either does not exist, or is empty.
 func assertDirEmpty(t *testing.T, path string) {
 	dac := preflight.DirAvailableCheck{Path: path}
-	_, errors := dac.Check()
+	_, errors := dac.Check(t.Context())
 	if len(errors) != 0 {
 		t.Errorf("directory not empty: [%v]", errors)
 	}

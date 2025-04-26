@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -45,7 +46,7 @@ func createTestRunDiffFile(contents []byte) (string, error) {
 	return file.Name(), nil
 }
 
-func fakeFetchInitConfig(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func fakeFetchInitConfig(ctx context.Context, client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	return &kubeadmapi.InitConfiguration{
 		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 			KubernetesVersion: "v1.0.1",
@@ -138,7 +139,7 @@ diff:
 				flags.controllerManagerManifestPath = tc.manifestPath
 				flags.schedulerManifestPath = tc.manifestPath
 			}
-			if err := runDiff(cmd.Flags(), flags, tc.args, fakeFetchInitConfig); (err != nil) != tc.expectedError {
+			if err := runDiff(t.Context(), cmd.Flags(), flags, tc.args, fakeFetchInitConfig); (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, saw: %v, error: %v", tc.expectedError, (err != nil), err)
 			}
 		})

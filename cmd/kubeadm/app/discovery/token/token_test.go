@@ -17,6 +17,7 @@ limitations under the License.
 package token
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -216,6 +217,7 @@ users: null
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
 			kubeconfig := buildSecureBootstrapKubeConfig("127.0.0.1", []byte(caCert), "somecluster")
 			kubeconfigBytes, err := clientcmd.Write(*kubeconfig)
 			if err != nil {
@@ -243,7 +245,7 @@ users: null
 
 			// Create a fake client and create the cluster-info ConfigMap
 			client := fakeclient.NewSimpleClientset()
-			if err = test.configMap.createOrUpdate(client); err != nil {
+			if err = test.configMap.createOrUpdate(ctx, client); err != nil {
 				t.Fatalf("could not create ConfigMap: %v", err)
 			}
 
@@ -256,14 +258,14 @@ users: null
 				test.configMap.data[bootstrapapi.JWSSignatureKeyPrefix+test.tokenID] = sig
 				go func() {
 					time.Sleep(time.Millisecond * 60)
-					if err := test.configMap.createOrUpdate(client); err != nil {
+					if err := test.configMap.createOrUpdate(ctx, client); err != nil {
 						t.Errorf("could not update the cluster-info ConfigMap with a JWS signature: %v", err)
 					}
 				}()
 			}
 
 			// Retrieve validated configuration
-			kubeconfig, err = retrieveValidatedConfigInfo(client, test.cfg, interval, timeout, false, true)
+			kubeconfig, err = retrieveValidatedConfigInfo(ctx, client, test.cfg, interval, timeout, false, true)
 			if (err != nil) != test.expectedError {
 				t.Errorf("expected error %v, got %v, error: %v", test.expectedError, err != nil, err)
 			}
@@ -302,8 +304,8 @@ type fakeConfigMap struct {
 	data map[string]string
 }
 
-func (c *fakeConfigMap) createOrUpdate(client clientset.Interface) error {
-	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespacePublic), &v1.ConfigMap{
+func (c *fakeConfigMap) createOrUpdate(ctx context.Context, client clientset.Interface) error {
+	return apiclient.CreateOrUpdate(ctx, client.CoreV1().ConfigMaps(metav1.NamespacePublic), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.name,
 			Namespace: metav1.NamespacePublic,

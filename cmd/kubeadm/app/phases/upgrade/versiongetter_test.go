@@ -225,7 +225,7 @@ func TestKubeVersionGetterKubeletVersions(t *testing.T) {
 			g := &KubeVersionGetter{
 				client: client,
 			}
-			got, err := g.KubeletVersions()
+			got, err := g.KubeletVersions(t.Context())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("error = %v, wantErr = %v", err, tt.wantErr)
 				return

@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"text/tabwriter"
@@ -257,18 +258,18 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 		}
 		addRenewFlags(cmd, flags)
 		// get the implementation of renewing this certificate
-		renewalFunc := func(handler *renewal.CertificateRenewHandler) func() error {
+		renewalFunc := func(ctx context.Context, handler *renewal.CertificateRenewHandler) func() error {
 			return func() error {
 				// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
 				client, _ := kubeconfigutil.ClientSetFromFile(flags.kubeconfigPath)
-				internalcfg, err := getInternalCfg(flags.cfgPath, client, flags.cfg, &output.TextPrinter{}, "renew")
+				internalcfg, err := getInternalCfg(ctx, flags.cfgPath, client, flags.cfg, &output.TextPrinter{}, "renew")
 				if err != nil {
 					return err
 				}
 
 				return renewCert(kdir, internalcfg, handler)
 			}
-		}(handler)
+		}(cmd.Context(), handler)
 		// install the implementation into the command
 		cmd.RunE = func(*cobra.Command, []string) error { return renewalFunc() }
 		cmd.Args = cobra.NoArgs
@@ -279,10 +280,10 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 		Use:   "all",
 		Short: "Renew all available certificates",
 		Long:  allLongDesc,
-		RunE: func(*cobra.Command, []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
 			client, _ := kubeconfigutil.ClientSetFromFile(flags.kubeconfigPath)
-			internalcfg, err := getInternalCfg(flags.cfgPath, client, flags.cfg, &output.TextPrinter{}, "renew")
+			internalcfg, err := getInternalCfg(cmd.Context(), flags.cfgPath, client, flags.cfg, &output.TextPrinter{}, "renew")
 			if err != nil {
 				return err
 			}
@@ -342,11 +343,11 @@ func renewCert(kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *
 	return nil
 }
 
-func getInternalCfg(cfgPath string, client kubernetes.Interface, cfg kubeadmapiv1.ClusterConfiguration, printer output.Printer, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
+func getInternalCfg(ctx context.Context, cfgPath string, client kubernetes.Interface, cfg kubeadmapiv1.ClusterConfiguration, printer output.Printer, logPrefix string) (*kubeadmapi.InitConfiguration, error) {
 	// In case the user is not providing a custom config, try to get current config from the cluster.
 	// NB. this operation should not block, because we want to allow certificate renewal also in case of not-working clusters
 	if cfgPath == "" && client != nil {
-		internalcfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, logPrefix, false, false)
+		internalcfg, err := configutil.FetchInitConfigurationFromCluster(ctx, client, printer, logPrefix, false, false)
 		if err == nil {
 			printer.Println() // add empty line to separate the FetchInitConfigurationFromCluster output from the command output
 			// certificate renewal or expiration checking doesn't depend on a running cluster, which means the CertificatesDir
@@ -448,7 +449,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 
 			// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)
 			client, _ := clientSetFromFile(flags.kubeconfigPath)
-			internalcfg, err := getInternalCfg(flags.cfgPath, client, flags.cfg, printer, "check-expiration")
+			internalcfg, err := getInternalCfg(cmd.Context(), flags.cfgPath, client, flags.cfg, printer, "check-expiration")
 			if err != nil {
 				return err
 			}

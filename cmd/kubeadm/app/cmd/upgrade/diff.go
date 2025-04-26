@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"io"
 	"os"
 
@@ -79,7 +80,7 @@ func newCmdDiff(out io.Writer) *cobra.Command {
 			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 				return err
 			}
-			return runDiff(cmd.Flags(), flags, args, configutil.FetchInitConfigurationFromCluster)
+			return runDiff(cmd.Context(), cmd.Flags(), flags, args, configutil.FetchInitConfigurationFromCluster)
 		},
 	}
 
@@ -106,9 +107,9 @@ func validateManifestsPath(manifests ...string) (err error) {
 }
 
 // FetchInitConfigurationFunc defines the signature of the function which will fetch InitConfiguration from cluster.
-type FetchInitConfigurationFunc func(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
+type FetchInitConfigurationFunc func(ctx context.Context, client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error)
 
-func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfigurationFromCluster FetchInitConfigurationFunc) error {
+func runDiff(ctx context.Context, fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfigurationFromCluster FetchInitConfigurationFunc) error {
 	externalCfg := &v1beta4.UpgradeConfiguration{}
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
@@ -119,7 +120,7 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 	if err != nil {
 		return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
-	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", false, true)
+	initCfg, err := fetchInitConfigurationFromCluster(ctx, client, &output.TextPrinter{}, "upgrade/diff", false, true)
 	if err != nil {
 		return err
 	}

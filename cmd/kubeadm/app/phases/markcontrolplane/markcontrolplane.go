@@ -17,6 +17,7 @@ limitations under the License.
 package markcontrolplane
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -33,7 +34,7 @@ var labelsToAdd = []string{
 }
 
 // MarkControlPlane taints the control-plane and sets the control-plane label
-func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
+func MarkControlPlane(ctx context.Context, client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
 	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the labels: %v\n",
 		controlPlaneName, labelsToAdd)
 
@@ -45,7 +46,7 @@ func MarkControlPlane(client clientset.Interface, controlPlaneName string, taint
 		fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the taints %v\n", controlPlaneName, taintStrs)
 	}
 
-	return apiclient.PatchNode(client, controlPlaneName, func(n *v1.Node) {
+	return apiclient.PatchNode(ctx, client, controlPlaneName, func(n *v1.Node) {
 		markControlPlaneNode(n, taints)
 	})
 }

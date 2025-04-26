@@ -173,7 +173,7 @@ func TestRunCreateToken(t *testing.T) {
 				},
 			}
 
-			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "", "")
+			err = RunCreateToken(t.Context(), &buf, fakeClient, "", cfg, tc.printJoin, "", "")
 			if tc.expectedError && err == nil {
 				t.Error("unexpected success")
 			} else if !tc.expectedError && err != nil {
@@ -262,6 +262,7 @@ func TestNewCmdToken(t *testing.T) {
 
 func TestGetClientForTokenCommands(t *testing.T) {
 	testConfigTokenFile := "test-config-file"
+	ctx := t.Context()
 
 	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
@@ -271,12 +272,12 @@ func TestGetClientForTokenCommands(t *testing.T) {
 	fullPath := filepath.Join(tmpDir, testConfigTokenFile)
 
 	// test dryRun = false on a non-existing file
-	if _, err = getClientForTokenCommands(fullPath, false); err == nil {
+	if _, err = getClientForTokenCommands(ctx, fullPath, false); err == nil {
 		t.Errorf("dry-run: false; did no fail for test file %q: %v", fullPath, err)
 	}
 
 	// test dryRun = true on a non-existing file
-	if _, err = getClientForTokenCommands(fullPath, true); err == nil {
+	if _, err = getClientForTokenCommands(ctx, fullPath, true); err == nil {
 		t.Errorf("dry-run: true; did no fail for test file %q: %v", fullPath, err)
 	}
 
@@ -291,13 +292,14 @@ func TestGetClientForTokenCommands(t *testing.T) {
 	}
 
 	// test dryRun = true on an existing file
-	if _, err = getClientForTokenCommands(fullPath, true); err != nil {
+	if _, err = getClientForTokenCommands(ctx, fullPath, true); err != nil {
 		t.Errorf("dry-run: true; failed for test file %q: %v", fullPath, err)
 	}
 }
 
 func TestRunDeleteTokens(t *testing.T) {
 	var buf bytes.Buffer
+	ctx := t.Context()
 
 	tmpDir, err := os.MkdirTemp("", "kubeadm-token-test")
 	if err != nil {
@@ -316,19 +318,19 @@ func TestRunDeleteTokens(t *testing.T) {
 		t.Errorf("Unable to write test file %q: %v", fullPath, err)
 	}
 
-	client, err := getClientForTokenCommands(fullPath, true)
+	client, err := getClientForTokenCommands(ctx, fullPath, true)
 	if err != nil {
 		t.Errorf("unable to create client for test file %q: %v", fullPath, err)
 	}
 
 	// test valid; should not fail
 	// for some reason Secrets().Delete() does not fail even for this dummy config
-	if err = RunDeleteTokens(&buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
+	if err = RunDeleteTokens(ctx, &buf, client, []string{"abcdef.1234567890123456", "abcdef.2345678901234567"}); err != nil {
 		t.Errorf("RunDeleteToken() failed for a valid token: %v", err)
 	}
 
 	// test invalid token; should fail
-	if err = RunDeleteTokens(&buf, client, []string{"invalid-token"}); err == nil {
+	if err = RunDeleteTokens(ctx, &buf, client, []string{"invalid-token"}); err == nil {
 		t.Errorf("RunDeleteToken() succeeded for an invalid token: %v", err)
 	}
 }

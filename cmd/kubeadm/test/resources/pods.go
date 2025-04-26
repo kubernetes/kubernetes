@@ -55,13 +55,13 @@ func (p *FakeStaticPod) Pod(suffix string) *v1.Pod {
 }
 
 // Create creates a fake static pod using the provided client
-func (p *FakeStaticPod) Create(client clientset.Interface) error {
-	return p.CreateWithPodSuffix(client, "")
+func (p *FakeStaticPod) Create(ctx context.Context, client clientset.Interface) error {
+	return p.CreateWithPodSuffix(ctx, client, "")
 }
 
 // CreateWithPodSuffix creates a fake static pod using the provided
 // client and suffix
-func (p *FakeStaticPod) CreateWithPodSuffix(client clientset.Interface, suffix string) error {
-	_, err := client.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), p.Pod(suffix), metav1.CreateOptions{})
+func (p *FakeStaticPod) CreateWithPodSuffix(ctx context.Context, client clientset.Interface, suffix string) error {
+	_, err := client.CoreV1().Pods(metav1.NamespaceSystem).Create(ctx, p.Pod(suffix), metav1.CreateOptions{})
 	return err
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package clusterinfo
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -40,7 +41,7 @@ const (
 )
 
 // CreateBootstrapConfigMapIfNotExists creates the kube-public ConfigMap if it doesn't exist already
-func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, kubeconfig *clientcmdapi.Config) error {
+func CreateBootstrapConfigMapIfNotExists(ctx context.Context, client clientset.Interface, kubeconfig *clientcmdapi.Config) error {
 
 	fmt.Printf("[bootstrap-token] Creating the %q ConfigMap in the %q namespace\n", bootstrapapi.ConfigMapClusterInfo, metav1.NamespacePublic)
 
@@ -69,7 +70,7 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, kubeconfig 
 
 	// Create or update the ConfigMap in the kube-public namespace
 	klog.V(1).Infoln("[bootstrap-token] creating/updating ConfigMap in kube-public namespace")
-	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespacePublic), &v1.ConfigMap{
+	return apiclient.CreateOrUpdate(ctx, client.CoreV1().ConfigMaps(metav1.NamespacePublic), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bootstrapapi.ConfigMapClusterInfo,
 			Namespace: metav1.NamespacePublic,
@@ -81,9 +82,9 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, kubeconfig 
 }
 
 // CreateClusterInfoRBACRules creates the RBAC rules for exposing the cluster-info ConfigMap in the kube-public namespace to unauthenticated users
-func CreateClusterInfoRBACRules(client clientset.Interface) error {
+func CreateClusterInfoRBACRules(ctx context.Context, client clientset.Interface) error {
 	klog.V(1).Infoln("creating the RBAC rules for exposing the cluster-info ConfigMap in the kube-public namespace")
-	err := apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespacePublic), &rbac.Role{
+	err := apiclient.CreateOrUpdate(ctx, client.RbacV1().Roles(metav1.NamespacePublic), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,
 			Namespace: metav1.NamespacePublic,
@@ -101,7 +102,7 @@ func CreateClusterInfoRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespacePublic), &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(ctx, client.RbacV1().RoleBindings(metav1.NamespacePublic), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      BootstrapSignerClusterRoleName,
 			Namespace: metav1.NamespacePublic,

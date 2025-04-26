@@ -17,6 +17,7 @@ limitations under the License.
 package workflow
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -191,7 +192,7 @@ func (e *Runner) InitData(args []string) (RunData, error) {
 }
 
 // Run the kubeadm composable kubeadm workflows.
-func (e *Runner) Run(args []string) error {
+func (e *Runner) Run(ctx context.Context, args []string) error {
 	e.prepareForExecution()
 
 	// determine which phase should be run according to RunnerOptions
@@ -246,7 +247,7 @@ func (e *Runner) Run(args []string) error {
 		// If the phase defines a condition to be checked before executing the phase action.
 		if p.RunIf != nil {
 			// Check the condition and returns if the condition isn't satisfied (or fails)
-			ok, err := p.RunIf(data)
+			ok, err := p.RunIf(ctx, data)
 			if err != nil {
 				return errors.Wrapf(err, "error execution run condition for phase %s", p.generatedName)
 			}
@@ -258,7 +259,7 @@ func (e *Runner) Run(args []string) error {
 
 		// Runs the phase action (if defined)
 		if p.Run != nil {
-			if err := p.Run(data); err != nil {
+			if err := p.Run(ctx, data); err != nil {
 				return errors.Wrapf(err, "error execution phase %s", p.generatedName)
 			}
 		}
@@ -373,7 +374,7 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 				// overrides the command triggering the Runner using the phaseCmd
 				e.runCmd = cmd
 				e.Options.FilterPhases = []string{phaseSelector}
-				return e.Run(args)
+				return e.Run(cmd.Context(), args)
 			},
 		}
 

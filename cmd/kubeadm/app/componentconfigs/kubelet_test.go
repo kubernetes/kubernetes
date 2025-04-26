@@ -274,6 +274,6 @@ func TestKubeletFromCluster(t *testing.T) {
 		client := clientsetfake.NewSimpleClientset(
 			testKubeletConfigMap(yaml),
 		)
-		return kubeletHandler.FromCluster(client, testClusterCfg())
+		return kubeletHandler.FromCluster(t.Context(), client, testClusterCfg())
 	})
 }

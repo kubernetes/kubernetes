@@ -38,18 +38,18 @@ import (
 // RetrieveValidatedConfigInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func RetrieveValidatedConfigInfo(filepath string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
+func RetrieveValidatedConfigInfo(ctx context.Context, filepath string, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
 	config, err := clientcmd.LoadFromFile(filepath)
 	if err != nil {
 		return nil, err
 	}
-	return ValidateConfigInfo(config, discoveryTimeout)
+	return ValidateConfigInfo(ctx, config, discoveryTimeout)
 }
 
 // ValidateConfigInfo connects to the API Server and makes sure it can talk
 // securely to the API Server using the provided CA cert/client certificates  and
 // optionally refreshes the cluster-info information from the cluster-info ConfigMap
-func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
+func ValidateConfigInfo(ctx context.Context, config *clientcmdapi.Config, discoveryTimeout time.Duration) (*clientcmdapi.Config, error) {
 	if len(config.Clusters) < 1 {
 		return nil, errors.New("the provided kubeconfig file must have at least one Cluster defined")
 	}
@@ -92,10 +92,10 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 	var clusterinfoCM *v1.ConfigMap
 
 	var lastError error
-	err = wait.PollUntilContextTimeout(context.Background(),
+	err = wait.PollUntilContextTimeout(ctx,
 		constants.DiscoveryRetryInterval, discoveryTimeout,
 		true, func(_ context.Context) (bool, error) {
-			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(context.TODO(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+			clusterinfoCM, lastError = client.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(ctx, bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if lastError != nil {
 				if apierrors.IsForbidden(lastError) {
 					// If the request fails with a forbidden error, the cluster admin has not granted access to the cluster info configmap for anonymous clients.

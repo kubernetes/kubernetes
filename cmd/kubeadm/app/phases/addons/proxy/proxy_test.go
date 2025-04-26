@@ -18,7 +18,6 @@ package proxy
 
 import (
 	"bytes"
-	"context"
 	"os"
 	"strings"
 	"testing"
@@ -156,7 +155,7 @@ func TestEnsureProxyAddon(t *testing.T) {
 				initConfiguration.ClusterConfiguration.Networking.PodSubnet = "2001:101::/48"
 			}
 
-			err = EnsureProxyAddon(&initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client, os.Stdout, false)
+			err = EnsureProxyAddon(t.Context(), &initConfiguration.ClusterConfiguration, &initConfiguration.LocalAPIEndpoint, client, os.Stdout, false)
 
 			// Compare actual to expected errors
 			actErr := "No error"
@@ -289,7 +288,7 @@ bar
 			client := newMockClientForTest(t)
 			cmByte := []byte{'\n', 'f', 'o', 'o', '\n'}
 			dsByte := []byte{'\n', 'b', 'a', 'r', '\n'}
-			if err := printOrCreateKubeProxyObjects(cmByte, dsByte, client, out, tt.printManifest); (err != nil) != tt.wantErr {
+			if err := printOrCreateKubeProxyObjects(t.Context(), cmByte, dsByte, client, out, tt.printManifest); (err != nil) != tt.wantErr {
 				t.Fatalf("printOrCreateKubeProxyObjects() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if gotOut := out.String(); gotOut != tt.wantOut {
@@ -301,7 +300,7 @@ bar
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Create(context.TODO(), &apps.DaemonSet{
+	_, err := client.AppsV1().DaemonSets(metav1.NamespaceSystem).Create(t.Context(), &apps.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: "apps/v1",

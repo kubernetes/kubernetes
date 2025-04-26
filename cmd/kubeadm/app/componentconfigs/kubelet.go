@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -69,10 +70,10 @@ var kubeletHandler = handler{
 	fromCluster: kubeletConfigFromCluster,
 }
 
-func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
+func kubeletConfigFromCluster(ctx context.Context, h *handler, clientset clientset.Interface, _ *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
 	configMapName := constants.KubeletBaseConfigurationConfigMap
 	klog.V(1).Infof("attempting to download the KubeletConfiguration from ConfigMap %q", configMapName)
-	cm, err := h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
+	cm, err := h.fromConfigMap(ctx, clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
 	if err != nil {
 		return nil, errors.Wrapf(err, "could not download the kubelet configuration from ConfigMap %q",
 			configMapName)

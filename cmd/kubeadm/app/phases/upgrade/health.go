@@ -52,12 +52,12 @@ type healthCheck struct {
 	dryRun  bool
 	printer output.Printer
 	// f is invoked with a k8s client and a kubeadm ClusterConfiguration passed to it. Should return an optional error
-	f func(clientset.Interface, *kubeadmapi.ClusterConfiguration, bool, output.Printer) error
+	f func(context.Context, clientset.Interface, *kubeadmapi.ClusterConfiguration, bool, output.Printer) error
 }
 
 // Check is part of the preflight.Checker interface
-func (c *healthCheck) Check() (warnings, errors []error) {
-	if err := c.f(c.client, c.cfg, c.dryRun, c.printer); err != nil {
+func (c *healthCheck) Check(ctx context.Context) (warnings, errors []error) {
+	if err := c.f(ctx, c.client, c.cfg, c.dryRun, c.printer); err != nil {
 		return nil, []error{err}
 	}
 	return nil, nil
@@ -72,7 +72,7 @@ func (c *healthCheck) Name() string {
 // - the cluster can accept a workload
 // - all control-plane Nodes are Ready
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
-func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string], dryRun bool, printer output.Printer) error {
+func CheckClusterHealth(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, ignoreChecksErrors sets.Set[string], dryRun bool, printer output.Printer) error {
 	_, _ = printer.Println("[upgrade] Running cluster health checks")
 
 	healthChecks := []preflight.Checker{
@@ -99,11 +99,11 @@ func CheckClusterHealth(client clientset.Interface, cfg *kubeadmapi.ClusterConfi
 		},
 	}
 
-	return preflight.RunChecks(healthChecks, os.Stderr, ignoreChecksErrors)
+	return preflight.RunChecks(ctx, healthChecks, os.Stderr, ignoreChecksErrors)
 }
 
 // createJob is a check that verifies that a Job can be created in the cluster
-func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, _ bool, _ output.Printer) error {
+func createJob(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration, _ bool, _ output.Printer) error {
 	const (
 		fieldSelector = "spec.unschedulable=false"
 		ns            = metav1.NamespaceSystem
@@ -112,14 +112,13 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 	)
 	var (
 		err, lastError error
-		ctx            = context.Background()
 		nodes          *v1.NodeList
 		listOptions    = metav1.ListOptions{Limit: 1, FieldSelector: fieldSelector}
 	)
 
 	// Check if there is at least one Node where a Job's Pod can schedule. If not, skip this preflight check.
-	err = wait.PollUntilContextTimeout(ctx, time.Second*1, timeout, true, func(_ context.Context) (bool, error) {
-		nodes, err = client.CoreV1().Nodes().List(context.Background(), listOptions)
+	err = wait.PollUntilContextTimeout(ctx, time.Second*1, timeout, true, func(ctx context.Context) (bool, error) {
+		nodes, err = client.CoreV1().Nodes().List(ctx, listOptions)
 		if err != nil {
 			klog.V(2).Infof("Could not list Nodes with field selector %q: %v", fieldSelector, err)
 			lastError = err
@@ -182,7 +181,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 	// Create the Job, but retry if it fails
 	klog.V(2).Infof("Creating a Job %q in the namespace %q", jobName, ns)
 	err = wait.PollUntilContextTimeout(ctx, time.Second*1, timeout, true, func(_ context.Context) (bool, error) {
-		_, err := client.BatchV1().Jobs(ns).Create(context.Background(), job, metav1.CreateOptions{})
+		_, err := client.BatchV1().Jobs(ns).Create(ctx, job, metav1.CreateOptions{})
 		if err != nil {
 			klog.V(2).Infof("Could not create Job %q in the namespace %q, retrying: %v", jobName, ns, err)
 			lastError = err
@@ -196,7 +195,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 
 	// Wait for the Job to complete
 	err = wait.PollUntilContextTimeout(ctx, time.Second*1, timeout, true, func(_ context.Context) (bool, error) {
-		job, err := client.BatchV1().Jobs(ns).Get(context.Background(), jobName, metav1.GetOptions{})
+		job, err := client.BatchV1().Jobs(ns).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			lastError = err
 			klog.V(2).Infof("could not get Job %q in the namespace %q, retrying: %v", jobName, ns, err)
@@ -221,11 +220,11 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 }
 
 // controlPlaneNodesReady checks whether all control-plane Nodes in the cluster are in the Running state
-func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterConfiguration, _ bool, _ output.Printer) error {
+func controlPlaneNodesReady(ctx context.Context, client clientset.Interface, _ *kubeadmapi.ClusterConfiguration, _ bool, _ output.Printer) error {
 	selectorControlPlane := labels.SelectorFromSet(map[string]string{
 		constants.LabelNodeRoleControlPlane: "",
 	})
-	nodes, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{
 		LabelSelector: selectorControlPlane.String(),
 	})
 	if err != nil {
@@ -240,7 +239,7 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 }
 
 // staticPodManifestHealth makes sure the required static pods are presents
-func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfiguration, dryRun bool, printer output.Printer) error {
+func staticPodManifestHealth(_ context.Context, _ clientset.Interface, _ *kubeadmapi.ClusterConfiguration, dryRun bool, printer output.Printer) error {
 	var nonExistentManifests []string
 	for _, component := range constants.ControlPlaneComponents {
 		manifestFile := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())

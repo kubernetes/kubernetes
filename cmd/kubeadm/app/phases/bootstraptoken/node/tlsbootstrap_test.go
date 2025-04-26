@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"context"
 	"testing"
 
 	rbac "k8s.io/api/rbac/v1"
@@ -77,7 +76,7 @@ func TestAllowBootstrapTokensToPostCSRs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AllowBootstrapTokensToPostCSRs(tt.client); err != nil {
+			if err := AllowBootstrapTokensToPostCSRs(t.Context(), tt.client); err != nil {
 				t.Errorf("AllowBootstrapTokensToPostCSRs() return error = %v", err)
 			}
 		})
@@ -134,7 +133,7 @@ func TestAutoApproveNodeBootstrapTokens(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AutoApproveNodeBootstrapTokens(tt.client); err != nil {
+			if err := AutoApproveNodeBootstrapTokens(t.Context(), tt.client); err != nil {
 				t.Errorf("AutoApproveNodeBootstrapTokens() return error = %v", err)
 			}
 		})
@@ -191,7 +190,7 @@ func TestAutoApproveNodeCertificateRotation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AutoApproveNodeCertificateRotation(tt.client); err != nil {
+			if err := AutoApproveNodeCertificateRotation(t.Context(), tt.client); err != nil {
 				t.Errorf("AutoApproveNodeCertificateRotation() return error = %v", err)
 			}
 		})
@@ -270,7 +269,7 @@ func TestAllowBootstrapTokensToGetNodes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := AllowBootstrapTokensToGetNodes(tt.client); err != nil {
+			if err := AllowBootstrapTokensToGetNodes(t.Context(), tt.client); err != nil {
 				t.Errorf("AllowBootstrapTokensToGetNodes() return error = %v", err)
 			}
 		})
@@ -279,7 +278,7 @@ func TestAllowBootstrapTokensToGetNodes(t *testing.T) {
 
 func newMockClusterRoleBinddingClientForTest(t *testing.T, clusterRoleBinding *rbac.ClusterRoleBinding) *clientsetfake.Clientset {
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{})
+	_, err := client.RbacV1().ClusterRoleBindings().Create(t.Context(), clusterRoleBinding, metav1.CreateOptions{})
 
 	if err != nil {
 		t.Fatalf("error creating ClusterRoleBindings: %v", err)
@@ -288,12 +287,13 @@ func newMockClusterRoleBinddingClientForTest(t *testing.T, clusterRoleBinding *r
 }
 
 func newMockRbacClientForTest(t *testing.T, clusterRole *rbac.ClusterRole, clusterRoleBinding *rbac.ClusterRoleBinding) *clientsetfake.Clientset {
+	ctx := t.Context()
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.RbacV1().ClusterRoles().Create(context.TODO(), clusterRole, metav1.CreateOptions{})
+	_, err := client.RbacV1().ClusterRoles().Create(ctx, clusterRole, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ClusterRoles: %v", err)
 	}
-	_, err = client.RbacV1().ClusterRoleBindings().Create(context.TODO(), clusterRoleBinding, metav1.CreateOptions{})
+	_, err = client.RbacV1().ClusterRoleBindings().Create(ctx, clusterRoleBinding, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("error creating ClusterRoleBindings: %v", err)
 	}

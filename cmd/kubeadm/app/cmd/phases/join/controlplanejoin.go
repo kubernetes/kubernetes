@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -92,8 +93,8 @@ func NewEtcdJoinPhase() workflow.Phase {
 		// https://github.com/kubernetes/enhancements/issues/4471
 		Hidden: true,
 		// Only run this phase as if `ControlPlaneKubeletLocalMode` is activated.
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, true)
+		RunIf: func(ctx context.Context, c workflow.RunData) (bool, error) {
+			return checkFeatureState(ctx, c, features.ControlPlaneKubeletLocalMode, true)
 		},
 	}
 }
@@ -107,8 +108,8 @@ func newEtcdLocalSubphase() workflow.Phase {
 		ArgsValidator: cobra.NoArgs,
 		// Only run this phase as subphase of control-plane-join phase if
 		// `ControlPlaneKubeletLocalMode` is deactivated.
-		RunIf: func(c workflow.RunData) (bool, error) {
-			return checkFeatureState(c, features.ControlPlaneKubeletLocalMode, false)
+		RunIf: func(ctx context.Context, c workflow.RunData) (bool, error) {
+			return checkFeatureState(ctx, c, features.ControlPlaneKubeletLocalMode, false)
 		},
 	}
 }
@@ -123,7 +124,7 @@ func newMarkControlPlaneSubphase() workflow.Phase {
 	}
 }
 
-func runEtcdPhase(c workflow.RunData) error {
+func runEtcdPhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
@@ -134,11 +135,11 @@ func runEtcdPhase(c workflow.RunData) error {
 	}
 
 	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.Client()
+	client, err := data.Client(ctx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -167,14 +168,14 @@ func runEtcdPhase(c workflow.RunData) error {
 	// because it needs two members as majority to agree on the consensus. You will only see this behavior between the time
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
 	// existing one."
-	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), data.CertificateWriteDir()); err != nil {
+	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(ctx, client, data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), data.CertificateWriteDir()); err != nil {
 		return errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
 	return nil
 }
 
-func runMarkControlPlanePhase(c workflow.RunData) error {
+func runMarkControlPlanePhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
@@ -185,17 +186,17 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 	}
 
 	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.Client()
+	client, err := data.Client(ctx)
 	if err != nil {
 		return errors.Wrap(err, "couldn't create Kubernetes client")
 	}
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
 
 	if !data.DryRun() {
-		if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
+		if err := markcontrolplanephase.MarkControlPlane(ctx, client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
 			return errors.Wrap(err, "error applying control-plane label and taints")
 		}
 	} else {

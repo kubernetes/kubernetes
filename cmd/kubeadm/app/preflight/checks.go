@@ -19,6 +19,7 @@ package preflight
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -83,7 +84,7 @@ func (e *Error) Preflight() bool {
 // Checker validates the state of the system to ensure kubeadm will be
 // successful as often as possible.
 type Checker interface {
-	Check() (warnings, errorList []error)
+	Check(ctx context.Context) (warnings, errorList []error)
 	Name() string
 }
 
@@ -98,7 +99,7 @@ func (ContainerRuntimeCheck) Name() string {
 }
 
 // Check validates the container runtime
-func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
+func (crc ContainerRuntimeCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the container runtime")
 	if err := crc.runtime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
@@ -124,7 +125,7 @@ func (sc ServiceCheck) Name() string {
 }
 
 // Check validates if the service is enabled and active.
-func (sc ServiceCheck) Check() (warnings, errorList []error) {
+func (sc ServiceCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infof("validating if the %q service is enabled and active", sc.Service)
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
@@ -162,7 +163,7 @@ func (FirewalldCheck) Name() string {
 }
 
 // Check validates if the firewall is enabled and active.
-func (fc FirewalldCheck) Check() (warnings, errorList []error) {
+func (fc FirewalldCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating if the firewall is enabled and active")
 	initSystem, err := initsystem.GetInitSystem()
 	if err != nil {
@@ -197,7 +198,7 @@ func (poc PortOpenCheck) Name() string {
 }
 
 // Check validates if the particular port is available.
-func (poc PortOpenCheck) Check() (warnings, errorList []error) {
+func (poc PortOpenCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infof("validating availability of port %d", poc.port)
 
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
@@ -237,7 +238,7 @@ func (dac DirAvailableCheck) Name() string {
 }
 
 // Check validates if a directory does not exist or empty.
-func (dac DirAvailableCheck) Check() (warnings, errorList []error) {
+func (dac DirAvailableCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence and emptiness of directory %s", dac.Path)
 
 	// If it doesn't exist we are good:
@@ -274,7 +275,7 @@ func (fac FileAvailableCheck) Name() string {
 }
 
 // Check validates if the given file does not already exist.
-func (fac FileAvailableCheck) Check() (warnings, errorList []error) {
+func (fac FileAvailableCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence of file %s", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err == nil {
@@ -298,7 +299,7 @@ func (fac FileExistingCheck) Name() string {
 }
 
 // Check validates if the given file already exists.
-func (fac FileExistingCheck) Check() (warnings, errorList []error) {
+func (fac FileExistingCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence of file %s", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err != nil {
@@ -323,7 +324,7 @@ func (fcc FileContentCheck) Name() string {
 }
 
 // Check validates if the given file contains the given content.
-func (fcc FileContentCheck) Check() (warnings, errorList []error) {
+func (fcc FileContentCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infof("validating the contents of file %s", fcc.Path)
 	f, err := os.Open(fcc.Path)
 	if err != nil {
@@ -364,7 +365,7 @@ func (ipc InPathCheck) Name() string {
 }
 
 // Check validates if the given executable is present in the path.
-func (ipc InPathCheck) Check() (warnings, errs []error) {
+func (ipc InPathCheck) Check(ctx context.Context) (warnings, errs []error) {
 	klog.V(1).Infof("validating the presence of executable %s", ipc.executable)
 	_, err := ipc.exec.LookPath(ipc.executable)
 	if err != nil {
@@ -395,7 +396,7 @@ func (HostnameCheck) Name() string {
 
 // Check validates if hostname match dns subdomain regex.
 // Check hostname length and format
-func (hc HostnameCheck) Check() (warnings, errorList []error) {
+func (hc HostnameCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("checking whether the given node name is valid and reachable using net.LookupHost")
 	for _, msg := range validation.IsQualifiedName(hc.nodeName) {
 		warnings = append(warnings, errors.Errorf("invalid node name format %q: %s", hc.nodeName, msg))
@@ -424,7 +425,7 @@ func (hst HTTPProxyCheck) Name() string {
 }
 
 // Check validates http connectivity type, direct or via proxy.
-func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
+func (hst HTTPProxyCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := &url.URL{Scheme: hst.Proto, Host: hst.Host}
 	if netutils.IsIPv6String(hst.Host) {
@@ -463,7 +464,7 @@ func (HTTPProxyCIDRCheck) Name() string {
 
 // Check validates http connectivity to first IP address in the CIDR.
 // If it is not directly connected and goes via proxy it will produce warning.
-func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
+func (subnet HTTPProxyCIDRCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating http connectivity to first IP address in the CIDR")
 	if len(subnet.CIDR) == 0 {
 		return nil, nil
@@ -510,7 +511,7 @@ func (SystemVerificationCheck) Name() string {
 }
 
 // Check runs all individual checks
-func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
+func (sysver SystemVerificationCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("running all checks")
 	// Create a buffered writer and choose a quite large value (1M) and suppose the output from the system verification test won't exceed the limit
 	// Run the system verification check, but write to out buffered writer instead of stdout
@@ -557,7 +558,7 @@ func (KubernetesVersionCheck) Name() string {
 }
 
 // Check validates Kubernetes and kubeadm versions
-func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
+func (kubever KubernetesVersionCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating Kubernetes and kubeadm version")
 	// Skip this check for "super-custom builds", where apimachinery/the overall codebase version is not set.
 	if strings.HasPrefix(kubever.KubeadmVersion, "v0.0.0") {
@@ -599,7 +600,7 @@ func (KubeletVersionCheck) Name() string {
 }
 
 // Check validates kubelet version. It should be not less than minimal supported version
-func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
+func (kubever KubeletVersionCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating kubelet version")
 	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
@@ -633,7 +634,7 @@ func (SwapCheck) Name() string {
 }
 
 // Check validates whether swap is enabled or not
-func (swc SwapCheck) Check() (warnings, errorList []error) {
+func (swc SwapCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating whether swap is enabled or not")
 	f, err := os.Open("/proc/swaps")
 	if err != nil {
@@ -676,7 +677,7 @@ func (ExternalEtcdVersionCheck) Name() string {
 
 // Check validates external etcd version
 // TODO: Use the official etcd Golang client for this instead?
-func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
+func (evc ExternalEtcdVersionCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	klog.V(1).Infoln("validating the external etcd version")
 
 	// Return quickly if the user isn't using external etcd
@@ -824,7 +825,7 @@ func (ImagePullCheck) Name() string {
 }
 
 // Check pulls images required by kubeadm. This is a mutating check
-func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
+func (ipc ImagePullCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	// Handle unsupported image pull policy and policy Never.
 	policy := ipc.imagePullPolicy
 	switch policy {
@@ -849,7 +850,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 
 	// Perform parallel pulls.
 	if !ipc.imagePullSerial {
-		if err := ipc.runtime.PullImagesInParallel(ipc.imageList, policy == v1.PullIfNotPresent); err != nil {
+		if err := ipc.runtime.PullImagesInParallel(ctx, ipc.imageList, policy == v1.PullIfNotPresent); err != nil {
 			errorList = append(errorList, err)
 		}
 		return warnings, errorList
@@ -866,7 +867,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 			fallthrough // Proceed with pulling the image if it does not exist
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)
-			if err := ipc.runtime.PullImage(image); err != nil {
+			if err := ipc.runtime.PullImage(ctx, image); err != nil {
 				errorList = append(errorList, errors.WithMessagef(err, "failed to pull image %s", image))
 			}
 		}
@@ -886,7 +887,7 @@ func (NumCPUCheck) Name() string {
 }
 
 // Check number of CPUs required by kubeadm
-func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
+func (ncc NumCPUCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	numCPU := runtime.NumCPU()
 	if numCPU < ncc.NumCPU {
 		errorList = append(errorList, errors.Errorf("the number of available CPUs %d is less than the required %d", numCPU, ncc.NumCPU))
@@ -1010,12 +1011,12 @@ func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguratio
 // The boolean flag 'isSecondaryControlPlane' controls whether we are running checks in a --join-control-plane scenario.
 // The boolean flag 'downloadCerts' controls whether we should skip checks on certificates because we are downloading them.
 // If the flag is set to true we should skip checks already executed by RunJoinNodeChecks.
-func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) error {
+func RunInitNodeChecks(ctx context.Context, execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) error {
 	checks, err := InitNodeChecks(execer, cfg, ignorePreflightErrors, isSecondaryControlPlane, downloadCerts)
 	if err != nil {
 		return err
 	}
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(ctx, checks, os.Stderr, ignorePreflightErrors)
 }
 
 // JoinNodeChecks returns checks specific to "kubeadm join"
@@ -1049,12 +1050,12 @@ func JoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguratio
 }
 
 // RunJoinNodeChecks executes all individual, applicable to node checks.
-func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) error {
+func RunJoinNodeChecks(ctx context.Context, execer utilsexec.Interface, cfg *kubeadmapi.JoinConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	checks, err := JoinNodeChecks(execer, cfg, ignorePreflightErrors)
 	if err != nil {
 		return err
 	}
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(ctx, checks, os.Stderr, ignorePreflightErrors)
 }
 
 // addCommonChecks is a helper function to duplicate checks that are common between both the
@@ -1080,25 +1081,25 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 }
 
 // RunRootCheckOnly initializes checks slice of structs and call RunChecks
-func RunRootCheckOnly(ignorePreflightErrors sets.Set[string]) error {
+func RunRootCheckOnly(ctx context.Context, ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		IsPrivilegedUserCheck{},
 	}
 
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(ctx, checks, os.Stderr, ignorePreflightErrors)
 }
 
 // RunUpgradeChecks initializes checks slice of structs and call RunChecks
-func RunUpgradeChecks(ignorePreflightErrors sets.Set[string]) error {
+func RunUpgradeChecks(ctx context.Context, ignorePreflightErrors sets.Set[string]) error {
 	checks := []Checker{
 		SystemVerificationCheck{},
 	}
 
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(ctx, checks, os.Stderr, ignorePreflightErrors)
 }
 
 // RunPullImagesCheck will pull images kubeadm needs if they are not found on the system
-func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
+func RunPullImagesCheck(ctx context.Context, execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string]) error {
 	containerRuntime := utilruntime.NewContainerRuntime(cfg.NodeRegistration.CRISocket)
 	if err := containerRuntime.Connect(); err != nil {
 		return &Error{Msg: err.Error()}
@@ -1118,17 +1119,17 @@ func RunPullImagesCheck(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigur
 			imagePullSerial: serialPull,
 		},
 	}
-	return RunChecks(checks, os.Stderr, ignorePreflightErrors)
+	return RunChecks(ctx, checks, os.Stderr, ignorePreflightErrors)
 }
 
 // RunChecks runs each check, displays its warnings/errors, and once all
 // are processed will exit if any errors occurred.
-func RunChecks(checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[string]) error {
+func RunChecks(ctx context.Context, checks []Checker, ww io.Writer, ignorePreflightErrors sets.Set[string]) error {
 	var errsBuffer bytes.Buffer
 
 	for _, c := range checks {
 		name := c.Name()
-		warnings, errs := c.Check()
+		warnings, errs := c.Check(ctx)
 
 		if setHasItemOrAll(ignorePreflightErrors, name) {
 			// Decrease severity of errors to warnings for this check

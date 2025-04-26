@@ -29,6 +29,7 @@ import (
 
 	"github.com/pkg/errors"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
+	"golang.org/x/net/context"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
@@ -100,17 +101,17 @@ func NewFakeStaticPodWaiter(errsToReturn map[string]error) apiclient.Waiter {
 }
 
 // WaitForControlPlaneComponents just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForControlPlaneComponents(podsMap map[string]*v1.Pod, apiServerAddress string) error {
+func (w *fakeWaiter) WaitForControlPlaneComponents(_ context.Context, _ map[string]*v1.Pod, _ string) error {
 	return nil
 }
 
 // WaitForAPI just returns a dummy nil, to indicate that the program should just proceed
-func (w *fakeWaiter) WaitForAPI() error {
+func (w *fakeWaiter) WaitForAPI(_ context.Context) error {
 	return nil
 }
 
 // WaitForPodsWithLabel just returns an error if set from errsToReturn
-func (w *fakeWaiter) WaitForPodsWithLabel(kvLabel string) error {
+func (w *fakeWaiter) WaitForPodsWithLabel(_ context.Context, _ string) error {
 	return w.errsToReturn[waitForPodsWithLabel]
 }
 
@@ -118,22 +119,22 @@ func (w *fakeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 func (w *fakeWaiter) SetTimeout(_ time.Duration) {}
 
 // WaitForStaticPodControlPlaneHashes returns an error if set from errsToReturn
-func (w *fakeWaiter) WaitForStaticPodControlPlaneHashes(_ string) (map[string]string, error) {
+func (w *fakeWaiter) WaitForStaticPodControlPlaneHashes(_ context.Context, _ string) (map[string]string, error) {
 	return map[string]string{}, w.errsToReturn[waitForHashes]
 }
 
 // WaitForStaticPodSingleHash returns an error if set from errsToReturn
-func (w *fakeWaiter) WaitForStaticPodSingleHash(_ string, _ string) (string, error) {
+func (w *fakeWaiter) WaitForStaticPodSingleHash(_ context.Context, _ string, _ string) (string, error) {
 	return "", w.errsToReturn[waitForHashes]
 }
 
 // WaitForStaticPodHashChange returns an error if set from errsToReturn
-func (w *fakeWaiter) WaitForStaticPodHashChange(_, _, _ string) error {
+func (w *fakeWaiter) WaitForStaticPodHashChange(_ context.Context, _, _, _ string) error {
 	return w.errsToReturn[waitForHashChange]
 }
 
 // WaitForHKubelet returns a dummy nil just to implement the interface
-func (w *fakeWaiter) WaitForKubelet(_ string, _ int32) error {
+func (w *fakeWaiter) WaitForKubelet(_ context.Context, _ string, _ int32) error {
 	return nil
 }
 
@@ -232,47 +233,47 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 
 type fakeTLSEtcdClient struct{ TLS bool }
 
-func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
+func (c fakeTLSEtcdClient) WaitForClusterAvailable(_ context.Context, _ int, _ time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakeTLSEtcdClient) CheckClusterHealth() error {
+func (c fakeTLSEtcdClient) CheckClusterHealth(ctx context.Context) error {
 	return nil
 }
 
-func (c fakeTLSEtcdClient) Sync() error { return nil }
+func (c fakeTLSEtcdClient) Sync(_ context.Context) error { return nil }
 
-func (c fakeTLSEtcdClient) ListMembers() ([]etcdutil.Member, error) {
+func (c fakeTLSEtcdClient) ListMembers(_ context.Context) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakeTLSEtcdClient) AddMemberAsLearner(name string, peerAddrs string) ([]etcdutil.Member, error) {
+func (c fakeTLSEtcdClient) AddMemberAsLearner(ctx context.Context, name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+func (c fakeTLSEtcdClient) AddMember(ctx context.Context, name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakeTLSEtcdClient) MemberPromote(learnerID uint64) error {
+func (c fakeTLSEtcdClient) MemberPromote(_ context.Context, _ uint64) error {
 	return nil
 }
 
-func (c fakeTLSEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+func (c fakeTLSEtcdClient) GetMemberID(ctx context.Context, peerURL string) (uint64, error) {
 	return 0, nil
 }
 
-func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
+func (c fakeTLSEtcdClient) RemoveMember(_ context.Context, _ uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
-func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
+func (c fakePodManifestEtcdClient) WaitForClusterAvailable(_ context.Context, _ int, _ time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
+func (c fakePodManifestEtcdClient) CheckClusterHealth(ctx context.Context) error {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -283,29 +284,29 @@ func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
 	return err
 }
 
-func (c fakePodManifestEtcdClient) Sync() error { return nil }
+func (c fakePodManifestEtcdClient) Sync(_ context.Context) error { return nil }
 
-func (c fakePodManifestEtcdClient) ListMembers() ([]etcdutil.Member, error) {
+func (c fakePodManifestEtcdClient) ListMembers(_ context.Context) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakePodManifestEtcdClient) AddMemberAsLearner(name string, peerAddrs string) ([]etcdutil.Member, error) {
+func (c fakePodManifestEtcdClient) AddMemberAsLearner(ctx context.Context, name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakePodManifestEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
+func (c fakePodManifestEtcdClient) AddMember(ctx context.Context, name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
-func (c fakePodManifestEtcdClient) MemberPromote(learnerID uint64) error {
+func (c fakePodManifestEtcdClient) MemberPromote(_ context.Context, _ uint64) error {
 	return nil
 }
 
-func (c fakePodManifestEtcdClient) GetMemberID(peerURL string) (uint64, error) {
+func (c fakePodManifestEtcdClient) GetMemberID(ctx context.Context, peerURL string) (uint64, error) {
 	return 0, nil
 }
 
-func (c fakePodManifestEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
+func (c fakePodManifestEtcdClient) RemoveMember(_ context.Context, _ uint64) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
 }
 
@@ -550,6 +551,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			actualErr := StaticPodControlPlane(
+				t.Context(),
 				nil,
 				waiter,
 				pathMgr,

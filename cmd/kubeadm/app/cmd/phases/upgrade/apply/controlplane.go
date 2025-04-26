@@ -18,6 +18,7 @@ limitations under the License.
 package apply
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -47,13 +48,13 @@ func NewControlPlanePhase() workflow.Phase {
 	return phase
 }
 
-func runControlPlane(c workflow.RunData) error {
+func runControlPlane(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(Data)
 	if !ok {
 		return errors.New("control-plane phase invoked with an invalid data struct")
 	}
 
-	initCfg, upgradeCfg, client, patchesDir := data.InitCfg(), data.Cfg(), data.Client(), data.PatchesDir()
+	initCfg, upgradeCfg, client, patchesDir := data.InitCfg(ctx), data.Cfg(), data.Client(ctx), data.PatchesDir()
 
 	if data.DryRun() {
 		fmt.Printf("[dryrun] Would upgrade your static Pod-hosted control plane to version %q", initCfg.KubernetesVersion)
@@ -64,7 +65,7 @@ func runControlPlane(c workflow.RunData) error {
 		initCfg.KubernetesVersion, upgradeCfg.Timeouts.UpgradeManifests.Duration)
 
 	waiter := apiclient.NewKubeWaiter(client, upgradeCfg.Timeouts.UpgradeManifests.Duration, os.Stdout)
-	if err := upgrade.PerformStaticPodUpgrade(client, waiter, initCfg, data.EtcdUpgrade(), data.RenewCerts(), patchesDir); err != nil {
+	if err := upgrade.PerformStaticPodUpgrade(ctx, client, waiter, initCfg, data.EtcdUpgrade(), data.RenewCerts(), patchesDir); err != nil {
 		return errors.Wrap(err, "couldn't complete the static pod upgrade")
 	}
 

@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"io"
 	"os"
 	"sort"
@@ -75,7 +76,7 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 				return err
 			}
-			return runPlan(cmd.Flags(), flags, args, printer)
+			return runPlan(cmd.Context(), cmd.Flags(), flags, args, printer)
 		},
 	}
 
@@ -97,11 +98,11 @@ func newComponentUpgradePlan(name, currentVersion, newVersion, nodeName string) 
 }
 
 // runPlan takes care of outputting available versions to upgrade to for the user
-func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer output.Printer) error {
+func runPlan(ctx context.Context, flagSet *pflag.FlagSet, flags *planFlags, args []string, printer output.Printer) error {
 	// Start with the basics, verify that the cluster is healthy, build a client and a versionGetter. Never dry-run when planning.
 	klog.V(1).Infoln("[upgrade/plan] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/plan] retrieving configuration from cluster")
-	client, versionGetter, initCfg, upgradeCfg, err := enforceRequirements(flagSet, flags.applyPlanFlags, args, false, false, printer)
+	client, versionGetter, initCfg, upgradeCfg, err := enforceRequirements(ctx, flagSet, flags.applyPlanFlags, args, false, false, printer)
 	if err != nil {
 		return err
 	}
@@ -120,14 +121,14 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 		return cmdutil.TypeMismatchErr("allowExperimentalUpgrades", "bool")
 	}
 
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, client, printer)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(ctx, versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, client, printer)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
 
 	// Fetch the current state of the component configs
 	klog.V(1).Infoln("[upgrade/plan] analysing component config version states")
-	configVersionStates, err := componentconfigs.GetVersionStates(&initCfg.ClusterConfiguration, client)
+	configVersionStates, err := componentconfigs.GetVersionStates(ctx, &initCfg.ClusterConfiguration, client)
 	if err != nil {
 		return errors.WithMessage(err, "[upgrade/versions] FATAL")
 	}

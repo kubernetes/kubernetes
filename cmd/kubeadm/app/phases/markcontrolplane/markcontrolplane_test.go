@@ -160,7 +160,7 @@ func TestMarkControlPlane(t *testing.T) {
 				t.Fatalf("unexpected error building clientset: %v", err)
 			}
 
-			if err := MarkControlPlane(cs, nodename, tc.newTaints); err != nil {
+			if err := MarkControlPlane(t.Context(), cs, nodename, tc.newTaints); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 

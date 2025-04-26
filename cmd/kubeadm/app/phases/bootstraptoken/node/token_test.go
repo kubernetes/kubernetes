@@ -17,7 +17,6 @@ limitations under the License.
 package node
 
 import (
-	"context"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -107,7 +106,7 @@ func TestUpdateOrCreateTokens(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newMockClientForTest(t)
-			if err := UpdateOrCreateTokens(client, tc.failIfExists, tc.tokens); (err != nil) != tc.wantErr {
+			if err := UpdateOrCreateTokens(t.Context(), client, tc.failIfExists, tc.tokens); (err != nil) != tc.wantErr {
 				t.Fatalf("UpdateOrCreateTokens() error = %v, wantErr %v", err, tc.wantErr)
 			}
 		})
@@ -116,7 +115,7 @@ func TestUpdateOrCreateTokens(t *testing.T) {
 
 func newMockClientForTest(t *testing.T) *clientsetfake.Clientset {
 	client := clientsetfake.NewSimpleClientset()
-	_, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(context.TODO(), &v1.Secret{
+	_, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Create(t.Context(), &v1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",

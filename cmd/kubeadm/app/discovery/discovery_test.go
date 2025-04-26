@@ -78,7 +78,7 @@ func TestFor(t *testing.T) {
 				Discovery: &metav1.Duration{Duration: 1 * time.Minute},
 			}
 			client := fakeclient.NewSimpleClientset()
-			_, actual := For(client, &config)
+			_, actual := For(t.Context(), client, &config)
 			if (actual == nil) != rt.expect {
 				t.Errorf(
 					"failed For:\n\texpected: %t\n\t  actual: %t",

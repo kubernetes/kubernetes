@@ -17,6 +17,8 @@ limitations under the License.
 package resources
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -31,8 +33,8 @@ type FakeConfigMap struct {
 }
 
 // Create creates a fake configmap using the provided client
-func (c *FakeConfigMap) Create(client clientset.Interface) error {
-	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
+func (c *FakeConfigMap) Create(ctx context.Context, client clientset.Interface) error {
+	return apiclient.CreateOrUpdate(ctx, client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      c.Name,
 			Namespace: metav1.NamespaceSystem,

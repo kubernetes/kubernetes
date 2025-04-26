@@ -623,7 +623,7 @@ type EnsureRBACFunc func(context.Context, clientset.Interface, clientset.Interfa
 // constructs a client from super-admin.conf if the file exists. It then proceeds
 // to pass the clients to EnsureAdminClusterRoleBindingImpl. The function returns a
 // usable client from admin.conf with RBAC properly constructed or an error.
-func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc) (clientset.Interface, error) {
+func EnsureAdminClusterRoleBinding(ctx context.Context, outDir string, ensureRBACFunc EnsureRBACFunc) (clientset.Interface, error) {
 	var (
 		err                           error
 		adminClient, superAdminClient clientset.Interface
@@ -648,7 +648,6 @@ func EnsureAdminClusterRoleBinding(outDir string, ensureRBACFunc EnsureRBACFunc)
 		ensureRBACFunc = EnsureAdminClusterRoleBindingImpl
 	}
 
-	ctx := context.Background()
 	return ensureRBACFunc(
 		ctx, adminClient, superAdminClient,
 		kubeadmconstants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,

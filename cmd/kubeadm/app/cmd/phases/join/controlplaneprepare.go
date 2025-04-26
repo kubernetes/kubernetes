@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -175,7 +176,7 @@ func newControlPlanePrepareControlPlaneSubphase() workflow.Phase {
 	}
 }
 
-func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
+func runControlPlanePrepareControlPlaneSubphase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -186,7 +187,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -215,7 +216,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 	return nil
 }
 
-func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
+func runControlPlanePrepareDownloadCertsPhaseLocal(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("download-certs phase invoked with an invalid data struct")
@@ -226,7 +227,7 @@ func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -236,18 +237,18 @@ func runControlPlanePrepareDownloadCertsPhaseLocal(c workflow.RunData) error {
 	cfg.CertificatesDir = data.CertificateWriteDir()
 	defer func() { cfg.CertificatesDir = certsDir }()
 
-	client, err := bootstrapClient(data)
+	client, err := bootstrapClient(ctx, data)
 	if err != nil {
 		return err
 	}
 
-	if err := copycerts.DownloadCerts(client, cfg, data.CertificateKey()); err != nil {
+	if err := copycerts.DownloadCerts(ctx, client, cfg, data.CertificateKey()); err != nil {
 		return errors.Wrap(err, "error downloading certs")
 	}
 	return nil
 }
 
-func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
+func runControlPlanePrepareCertsPhaseLocal(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -258,7 +259,7 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -273,7 +274,7 @@ func runControlPlanePrepareCertsPhaseLocal(c workflow.RunData) error {
 	return certsphase.CreatePKIAssets(cfg)
 }
 
-func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
+func runControlPlanePrepareKubeconfigPhaseLocal(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(JoinData)
 	if !ok {
 		return errors.New("control-plane-prepare phase invoked with an invalid data struct")
@@ -284,7 +285,7 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 		return nil
 	}
 
-	cfg, err := data.InitCfg()
+	cfg, err := data.InitCfg(ctx)
 	if err != nil {
 		return err
 	}
@@ -307,16 +308,16 @@ func runControlPlanePrepareKubeconfigPhaseLocal(c workflow.RunData) error {
 	return nil
 }
 
-func bootstrapClient(data JoinData) (clientset.Interface, error) {
+func bootstrapClient(ctx context.Context, data JoinData) (clientset.Interface, error) {
 	if data.DryRun() {
-		client, err := data.Client()
+		client, err := data.Client(ctx)
 		if err != nil {
 			return nil, err
 		}
 		return client, nil
 	}
 
-	tlsBootstrapCfg, err := data.TLSBootstrapCfg()
+	tlsBootstrapCfg, err := data.TLSBootstrapCfg(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to access the cluster")
 	}

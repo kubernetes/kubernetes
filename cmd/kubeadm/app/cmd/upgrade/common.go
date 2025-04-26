@@ -19,6 +19,7 @@ package upgrade
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -48,7 +49,7 @@ import (
 )
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, *kubeadmapi.UpgradeConfiguration, error) {
+func enforceRequirements(ctx context.Context, flagSet *pflag.FlagSet, flags *applyPlanFlags, args []string, dryRun bool, upgradeApply bool, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, *kubeadmapi.UpgradeConfiguration, error) {
 	externalCfg := &kubeadmapiv1.UpgradeConfiguration{}
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
@@ -70,7 +71,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 		}
 	}
 
-	client, err := getClient(flags.kubeConfigPath, *isDryRun, printer)
+	client, err := getClient(ctx, flags.kubeConfigPath, *isDryRun, printer)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 	}
@@ -88,11 +89,11 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, printer); err != nil {
+	if err := runPreflightChecks(ctx, client, ignorePreflightErrorsSet, printer); err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, false)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(ctx, client, printer, "upgrade/config", false, false)
 	if err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
 	}
@@ -131,7 +132,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	}
 
 	// Run healthchecks against the cluster
-	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, dryRun, printer); err != nil {
+	if err := upgrade.CheckClusterHealth(ctx, client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, dryRun, printer); err != nil {
 		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
 
@@ -173,22 +174,22 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
+func runPreflightChecks(ctx context.Context, client clientset.Interface, ignorePreflightErrors sets.Set[string], printer output.Printer) error {
 	printer.Printf("[preflight] Running pre-flight checks.\n")
-	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
+	err := preflight.RunRootCheckOnly(ctx, ignorePreflightErrors)
 	if err != nil {
 		return err
 	}
-	return upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
+	return upgrade.RunCoreDNSMigrationCheck(ctx, client, ignorePreflightErrors)
 }
 
 // getClient gets a real or fake client depending on whether the user is dry-running or not
-func getClient(file string, dryRun bool, printer output.Printer) (clientset.Interface, error) {
+func getClient(ctx context.Context, file string, dryRun bool, printer output.Printer) (clientset.Interface, error) {
 	if dryRun {
 		// Default the server version to the kubeadm version.
 		serverVersion := constants.CurrentKubernetesVersion.Info()
 
-		dryRun := apiclient.NewDryRun()
+		dryRun := apiclient.NewDryRun(ctx)
 		dryRun.WithDefaultMarshalFunction().
 			WithWriter(os.Stdout).
 			PrependReactor(dryRun.HealthCheckJobReactor()).
@@ -210,7 +211,7 @@ func getClient(file string, dryRun bool, printer output.Printer) (clientset.Inte
 			// the kubelet.conf client, if it exists. If not, it falls back to hostname.
 			_, _ = printer.Printf("[dryrun] Dryrunning without a real client\n")
 			kubeconfigPath := filepath.Join(constants.KubernetesDir, constants.KubeletKubeConfigFileName)
-			nodeName, err := configutil.GetNodeName(kubeconfigPath)
+			nodeName, err := configutil.GetNodeName(ctx, kubeconfigPath)
 			if err != nil {
 				return nil, err
 			}

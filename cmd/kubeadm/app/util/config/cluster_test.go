@@ -17,7 +17,6 @@ limitations under the License.
 package config
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -328,7 +327,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
-				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
+				_, err := client.CoreV1().Nodes().Create(t.Context(), rt.node, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("couldn't create Node")
 					return
@@ -336,7 +335,7 @@ func TestGetNodeRegistration(t *testing.T) {
 			}
 
 			cfg := &kubeadmapi.InitConfiguration{}
-			err = GetNodeRegistration(cfgPath, client, &cfg.NodeRegistration, &cfg.ClusterConfiguration)
+			err = GetNodeRegistration(t.Context(), cfgPath, client, &cfg.NodeRegistration, &cfg.ClusterConfiguration)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getNodeRegistration: %v", err)
 				return
@@ -463,16 +462,17 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
 			if rt.staticPod != nil {
 				rt.staticPod.NodeName = rt.nodeName
-				if err := rt.staticPod.Create(client); err != nil {
+				if err := rt.staticPod.Create(ctx, client); err != nil {
 					t.Error("could not create static pod")
 					return
 				}
 			}
 			apiEndpoint := kubeadmapi.APIEndpoint{}
-			err := getAPIEndpointWithRetry(client, rt.nodeName, &apiEndpoint,
+			err := getAPIEndpointWithRetry(ctx, client, rt.nodeName, &apiEndpoint,
 				time.Millisecond*10, time.Millisecond*100)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %q; was expecting no errors", err)
@@ -600,6 +600,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			cfgPath := filepath.Join(tmpdir, kubeadmconstants.KubeletKubeConfigFileName)
 			if len(rt.fileContents) > 0 {
 				err := os.WriteFile(cfgPath, rt.fileContents, 0644)
@@ -612,7 +613,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 
 			if rt.node != nil {
-				_, err := client.CoreV1().Nodes().Create(context.TODO(), rt.node, metav1.CreateOptions{})
+				_, err := client.CoreV1().Nodes().Create(t.Context(), rt.node, metav1.CreateOptions{})
 				if err != nil {
 					t.Errorf("couldn't create Node")
 					return
@@ -620,7 +621,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			}
 
 			for _, p := range rt.staticPods {
-				err := p.Create(client)
+				err := p.Create(ctx, client)
 				if err != nil {
 					t.Errorf("couldn't create pod for nodename %s", p.NodeName)
 					return
@@ -628,14 +629,14 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			}
 
 			for _, c := range rt.configMaps {
-				err := c.Create(client)
+				err := c.Create(ctx, client)
 				if err != nil {
 					t.Errorf("couldn't create ConfigMap %s", c.Name)
 					return
 				}
 			}
 
-			cfg, err := getInitConfigurationFromCluster(tmpdir, client, rt.newControlPlane, false)
+			cfg, err := getInitConfigurationFromCluster(t.Context(), tmpdir, client, rt.newControlPlane, false)
 			if rt.expectedError != (err != nil) {
 				t.Errorf("unexpected return err from getInitConfigurationFromCluster: %v", err)
 				return
@@ -718,10 +719,11 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
 			for i, pod := range rt.pods {
 				pod.NodeName = rt.nodeName
-				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
+				if err := pod.CreateWithPodSuffix(ctx, client, strconv.Itoa(i)); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
 					return
 				}
@@ -730,7 +732,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 				rt.clientSetup(client)
 			}
 			apiEndpoint := kubeadmapi.APIEndpoint{}
-			err := getAPIEndpointFromPodAnnotation(client, rt.nodeName, &apiEndpoint,
+			err := getAPIEndpointFromPodAnnotation(ctx, client, rt.nodeName, &apiEndpoint,
 				time.Millisecond*10, time.Millisecond*100)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %v, but wasn't expecting any error", err)
@@ -834,10 +836,11 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
 			for i, pod := range rt.pods {
 				pod.NodeName = rt.nodeName
-				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
+				if err := pod.CreateWithPodSuffix(ctx, client, strconv.Itoa(i)); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
 					return
 				}
@@ -845,7 +848,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 			if rt.clientSetup != nil {
 				rt.clientSetup(client)
 			}
-			endpoint, err := getRawAPIEndpointFromPodAnnotationWithoutRetry(context.Background(), client, rt.nodeName)
+			endpoint, err := getRawAPIEndpointFromPodAnnotationWithoutRetry(ctx, client, rt.nodeName)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %v, but wasn't expecting any error", err)
 				return
@@ -922,7 +925,7 @@ func TestGetNodeNameFromSSR(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			rt.clientSetup(client)
 
-			nodeName, err := getNodeNameFromSSR(client)
+			nodeName, err := getNodeNameFromSSR(t.Context(), client)
 
 			if (err != nil) != rt.expectedError {
 				t.Fatalf("expected error: %+v, got: %+v", rt.expectedError, err)

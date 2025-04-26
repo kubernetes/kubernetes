@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -46,7 +47,7 @@ func NewPreflightPhase() workflow.Phase {
 }
 
 // runPreflight executes preflight checks logic.
-func runPreflight(c workflow.RunData) error {
+func runPreflight(ctx context.Context, c workflow.RunData) error {
 	r, ok := c.(resetData)
 	if !ok {
 		return errors.New("preflight phase invoked with an invalid data struct")
@@ -60,5 +61,5 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	fmt.Println("[preflight] Running pre-flight checks")
-	return preflight.RunRootCheckOnly(r.IgnorePreflightErrors())
+	return preflight.RunRootCheckOnly(ctx, r.IgnorePreflightErrors())
 }

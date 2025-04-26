@@ -18,6 +18,8 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -38,7 +40,7 @@ func NewPostUpgradePhase() workflow.Phase {
 	}
 }
 
-func runPostUpgrade(c workflow.RunData) error {
+func runPostUpgrade(ctx context.Context, c workflow.RunData) error {
 	_, ok := c.(Data)
 	if !ok {
 		return errors.New("post-upgrade phase invoked with an invalid data struct")

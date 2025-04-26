@@ -18,6 +18,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -47,8 +48,8 @@ func NewControlPlane() workflow.Phase {
 	return phase
 }
 
-func runControlPlane() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runControlPlane() func(ctx context.Context, c workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(Data)
 		if !ok {
 			return errors.New("control-plane phase invoked with an invalid data struct")
@@ -61,8 +62,8 @@ func runControlPlane() func(c workflow.RunData) error {
 		}
 
 		// otherwise, retrieve all the info required for control plane upgrade
-		cfg := data.InitCfg()
-		client := data.Client()
+		cfg := data.InitCfg(ctx)
+		client := data.Client(ctx)
 		dryRun := data.DryRun()
 		etcdUpgrade := data.EtcdUpgrade()
 		renewCerts := data.RenewCerts()
@@ -75,9 +76,9 @@ func runControlPlane() func(c workflow.RunData) error {
 			return upgrade.DryRunStaticPodUpgrade(patchesDir, cfg)
 		}
 
-		waiter := apiclient.NewKubeWaiter(data.Client(), data.Cfg().Timeouts.UpgradeManifests.Duration, os.Stdout)
+		waiter := apiclient.NewKubeWaiter(data.Client(ctx), data.Cfg().Timeouts.UpgradeManifests.Duration, os.Stdout)
 
-		if err := upgrade.PerformStaticPodUpgrade(client, waiter, cfg, etcdUpgrade, renewCerts, patchesDir); err != nil {
+		if err := upgrade.PerformStaticPodUpgrade(ctx, client, waiter, cfg, etcdUpgrade, renewCerts, patchesDir); err != nil {
 			return errors.Wrap(err, "couldn't complete the static pod upgrade")
 		}
 

@@ -163,6 +163,6 @@ func TestKubeProxyFromCluster(t *testing.T) {
 			testKubeProxyConfigMap(yaml),
 		)
 
-		return kubeProxyHandler.FromCluster(client, testClusterCfg())
+		return kubeProxyHandler.FromCluster(t.Context(), client, testClusterCfg())
 	})
 }

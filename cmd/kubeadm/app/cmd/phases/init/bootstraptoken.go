@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -62,13 +63,13 @@ func NewBootstrapTokenPhase() workflow.Phase {
 	}
 }
 
-func runBootstrapToken(c workflow.RunData) error {
+func runBootstrapToken(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("bootstrap-token phase invoked with an invalid data struct")
 	}
 
-	client, err := data.Client()
+	client, err := data.Client(ctx)
 	if err != nil {
 		return err
 	}
@@ -88,32 +89,32 @@ func runBootstrapToken(c workflow.RunData) error {
 
 	fmt.Println("[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles")
 	// Create the default node bootstrap token
-	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, data.Cfg().BootstrapTokens); err != nil {
+	if err := nodebootstraptokenphase.UpdateOrCreateTokens(ctx, client, false, data.Cfg().BootstrapTokens); err != nil {
 		return errors.Wrap(err, "error updating or creating token")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToGetNodes(client); err != nil {
+	if err := nodebootstraptokenphase.AllowBootstrapTokensToGetNodes(ctx, client); err != nil {
 		return errors.Wrap(err, "error allowing bootstrap tokens to get Nodes")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
-	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
+	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(ctx, client); err != nil {
 		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
+	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(ctx, client); err != nil {
 		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
-	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
+	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(ctx, client); err != nil {
 		return err
 	}
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules
-	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, kubeconfig); err != nil {
+	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(ctx, client, kubeconfig); err != nil {
 		return errors.Wrap(err, "error creating bootstrap ConfigMap")
 	}
-	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
+	if err := clusterinfophase.CreateClusterInfoRBACRules(ctx, client); err != nil {
 		return errors.Wrap(err, "error creating clusterinfo RBAC rules")
 	}
 	return nil

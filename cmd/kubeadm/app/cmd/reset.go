@@ -96,6 +96,7 @@ func newResetOptions() *resetOptions {
 
 // newResetData returns a new resetData struct to be used for the execution of the kubeadm reset workflow.
 func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.Writer, allowExperimental bool) (*resetData, error) {
+	ctx := cmd.Context()
 	// Validate the mixed arguments with --config and return early on errors
 	if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
 		return nil, err
@@ -117,7 +118,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 
 	dryRunFlag := cmdutil.ValueFromFlagsOrConfig(cmd.Flags(), options.DryRun, resetCfg.DryRun, opts.externalcfg.DryRun).(bool)
 	if dryRunFlag {
-		dryRun := apiclient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
+		dryRun := apiclient.NewDryRun(ctx).WithDefaultMarshalFunction().WithWriter(os.Stdout)
 		dryRun.AppendReactor(dryRun.GetKubeadmConfigReactor()).
 			AppendReactor(dryRun.GetKubeletConfigReactor()).
 			AppendReactor(dryRun.GetKubeProxyConfigReactor())
@@ -132,7 +133,7 @@ func newResetData(cmd *cobra.Command, opts *resetOptions, in io.Reader, out io.W
 
 	if err == nil {
 		klog.V(1).Infof("[reset] Loaded client set from kubeconfig file: %s", opts.kubeconfigPath)
-		initCfg, err = configutil.FetchInitConfigurationFromCluster(client, nil, "reset", false, false)
+		initCfg, err = configutil.FetchInitConfigurationFromCluster(ctx, client, nil, "reset", false, false)
 		if err != nil {
 			klog.Warningf("[reset] Unable to fetch the kubeadm-config ConfigMap from cluster: %v", err)
 		}
@@ -224,7 +225,7 @@ func newCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 			if _, ok := data.(*resetData); !ok {
 				return errors.New("invalid data struct")
 			}
-			if err := resetRunner.Run(args); err != nil {
+			if err := resetRunner.Run(cmd.Context(), args); err != nil {
 				return err
 			}
 

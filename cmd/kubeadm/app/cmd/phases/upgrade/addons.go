@@ -18,6 +18,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -61,8 +62,8 @@ func NewAddonPhase() workflow.Phase {
 	}
 }
 
-func shouldUpgradeAddons(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) (bool, error) {
-	unupgradedControlPlanes, err := upgrade.UnupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
+func shouldUpgradeAddons(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) (bool, error) {
+	unupgradedControlPlanes, err := upgrade.UnupgradedControlPlaneInstances(ctx, client, cfg.NodeRegistration.Name)
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
 	}
@@ -73,19 +74,19 @@ func shouldUpgradeAddons(client clientset.Interface, cfg *kubeadmapi.InitConfigu
 	return true, nil
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, bool, bool, error) {
+func getInitData(ctx context.Context, c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, string, io.Writer, bool, bool, error) {
 	data, ok := c.(Data)
 	if !ok {
 		return nil, nil, "", nil, false, false, errors.New("addon phase invoked with an invalid data struct")
 	}
-	return data.InitCfg(), data.Client(), data.PatchesDir(), data.OutputWriter(), data.DryRun(), data.IsControlPlaneNode(), nil
+	return data.InitCfg(ctx), data.Client(ctx), data.PatchesDir(), data.OutputWriter(), data.DryRun(), data.IsControlPlaneNode(), nil
 }
 
 // runCoreDNSAddon upgrades the CoreDNS addon.
-func runCoreDNSAddon(c workflow.RunData) error {
+func runCoreDNSAddon(ctx context.Context, c workflow.RunData) error {
 	const skipMessagePrefix = "[upgrade/addon] Skipping the addon/coredns phase."
 
-	cfg, client, patchesDir, out, dryRun, isControlPlaneNode, err := getInitData(c)
+	cfg, client, patchesDir, out, dryRun, isControlPlaneNode, err := getInitData(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -100,7 +101,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	shouldUpgradeAddons, err := shouldUpgradeAddons(client, cfg, out)
+	shouldUpgradeAddons, err := shouldUpgradeAddons(ctx, client, cfg, out)
 	if err != nil {
 		return err
 	}
@@ -108,7 +109,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	if err := dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client, patchesDir, out, dryRun); err != nil {
+	if err := dnsaddon.EnsureDNSAddon(ctx, &cfg.ClusterConfiguration, client, patchesDir, out, dryRun); err != nil {
 		return err
 	}
 
@@ -116,10 +117,10 @@ func runCoreDNSAddon(c workflow.RunData) error {
 }
 
 // runKubeProxyAddon upgrades the kube-proxy addon.
-func runKubeProxyAddon(c workflow.RunData) error {
+func runKubeProxyAddon(ctx context.Context, c workflow.RunData) error {
 	const skipMessagePrefix = "[upgrade/addon] Skipping the addon/kube-proxy phase."
 
-	cfg, client, _, out, dryRun, isControlPlaneNode, err := getInitData(c)
+	cfg, client, _, out, dryRun, isControlPlaneNode, err := getInitData(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -134,7 +135,7 @@ func runKubeProxyAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	shouldUpgradeAddons, err := shouldUpgradeAddons(client, cfg, out)
+	shouldUpgradeAddons, err := shouldUpgradeAddons(ctx, client, cfg, out)
 	if err != nil {
 		return err
 	}
@@ -142,7 +143,7 @@ func runKubeProxyAddon(c workflow.RunData) error {
 		return nil
 	}
 
-	if err := proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, dryRun); err != nil {
+	if err := proxyaddon.EnsureProxyAddon(ctx, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client, out, dryRun); err != nil {
 		return err
 	}
 

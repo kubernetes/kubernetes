@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -74,14 +75,14 @@ type ClusterState struct {
 
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
-func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, client clientset.Interface, printer output.Printer) ([]Upgrade, error) {
+func GetAvailableUpgrades(ctx context.Context, versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, client clientset.Interface, printer output.Printer) ([]Upgrade, error) {
 	printer.Printf("[upgrade] Fetching available versions to upgrade to\n")
 
 	// Collect the upgrades kubeadm can do in this list
 	var upgrades []Upgrade
 
 	// Get the kube-apiserver versions in the cluster
-	kubeAPIServerVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.KubeAPIServer)
+	kubeAPIServerVersions, err := versionGetterImpl.ComponentVersions(ctx, kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		return upgrades, err
 	}
@@ -121,31 +122,31 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 	}
 
 	// Get the kubelet versions in the cluster
-	kubeletVersions, err := versionGetterImpl.KubeletVersions()
+	kubeletVersions, err := versionGetterImpl.KubeletVersions(ctx)
 	if err != nil {
 		return upgrades, err
 	}
 
 	// Get the kube-controller-manager versions in the cluster
-	kubeControllerManagerVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.KubeControllerManager)
+	kubeControllerManagerVersions, err := versionGetterImpl.ComponentVersions(ctx, kubeadmconstants.KubeControllerManager)
 	if err != nil {
 		return upgrades, err
 	}
 
 	// Get the kube-scheduler versions in the cluster
-	kubeSchedulerVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.KubeScheduler)
+	kubeSchedulerVersions, err := versionGetterImpl.ComponentVersions(ctx, kubeadmconstants.KubeScheduler)
 	if err != nil {
 		return upgrades, err
 	}
 
 	// Get the etcd versions in the cluster
-	etcdVersions, err := versionGetterImpl.ComponentVersions(kubeadmconstants.Etcd)
+	etcdVersions, err := versionGetterImpl.ComponentVersions(ctx, kubeadmconstants.Etcd)
 	if err != nil {
 		return upgrades, err
 	}
 	isExternalEtcd := len(etcdVersions) == 0
 
-	dnsVersion, err := dns.DeployedDNSAddon(client)
+	dnsVersion, err := dns.DeployedDNSAddon(ctx, client)
 	if err != nil {
 		return nil, err
 	}

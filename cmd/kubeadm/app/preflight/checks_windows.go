@@ -20,13 +20,15 @@ limitations under the License.
 package preflight
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"golang.org/x/sys/windows"
 	utilsexec "k8s.io/utils/exec"
 )
 
 // Check validates if a user has elevated (administrator) privileges.
-func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
+func (ipuc IsPrivilegedUserCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	hProcessToken := windows.GetCurrentProcessToken()
 	if hProcessToken.IsElevated() {
 		return nil, nil
@@ -36,7 +38,7 @@ func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
 
 // Check number of memory required by kubeadm
 // No-op for Windows.
-func (mc MemCheck) Check() (warnings, errorList []error) {
+func (mc MemCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	return nil, nil
 }
 

@@ -100,7 +100,8 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, _, err := enforceRequirements(&pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
+			ctx := t.Context()
+			_, _, _, _, err := enforceRequirements(ctx, &pflag.FlagSet{}, &tt.flags, nil, tt.dryRun, false, &output.TextPrinter{})
 			if err == nil && len(tt.expectedErr) != 0 {
 				t.Error("Expected error, but got success")
 			}
@@ -109,7 +110,7 @@ func TestEnforceRequirements(t *testing.T) {
 			// pre-flight check expects the user to be root, so the root and non-root should hit different errors
 			isPrivileged := preflight.IsPrivilegedUserCheck{}
 			// this will return an array of errors if we're not running as a privileged user.
-			_, errors := isPrivileged.Check()
+			_, errors := isPrivileged.Check(ctx)
 			if len(errors) != 0 && len(tt.expectedErrNonRoot) != 0 {
 				expErr = tt.expectedErrNonRoot
 			}

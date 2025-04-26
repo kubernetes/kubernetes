@@ -78,22 +78,22 @@ var (
 // Waiter is an interface for waiting for criteria in Kubernetes to happen
 type Waiter interface {
 	// WaitForControlPlaneComponents waits for all control plane components to be ready.
-	WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiServerAddress string) error
+	WaitForControlPlaneComponents(ctx context.Context, podMap map[string]*v1.Pod, apiServerAddress string) error
 	// WaitForAPI waits for the API Server's /healthz endpoint to become "ok"
 	// TODO: remove WaitForAPI once WaitForAllControlPlaneComponents goes GA:
 	// https://github.com/kubernetes/kubeadm/issues/2907
-	WaitForAPI() error
+	WaitForAPI(ctx context.Context) error
 	// WaitForPodsWithLabel waits for Pods in the kube-system namespace to become Ready
-	WaitForPodsWithLabel(kvLabel string) error
+	WaitForPodsWithLabel(ctx context.Context, kvLabel string) error
 	// WaitForStaticPodSingleHash fetches sha256 hash for the control plane static pod
-	WaitForStaticPodSingleHash(nodeName string, component string) (string, error)
+	WaitForStaticPodSingleHash(ctx context.Context, nodeName string, component string) (string, error)
 	// WaitForStaticPodHashChange waits for the given static pod component's static pod hash to get updated.
 	// By doing that we can be sure that the kubelet has restarted the given Static Pod
-	WaitForStaticPodHashChange(nodeName, component, previousHash string) error
+	WaitForStaticPodHashChange(ctx context.Context, nodeName, component, previousHash string) error
 	// WaitForStaticPodControlPlaneHashes fetches sha256 hashes for the control plane static pods
-	WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error)
+	WaitForStaticPodControlPlaneHashes(ctx context.Context, nodeName string) (map[string]string, error)
 	// WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'
-	WaitForKubelet(healthzAddress string, healthzPort int32) error
+	WaitForKubelet(ctx context.Context, healthzAddress string, healthzPort int32) error
 	// SetTimeout adjusts the timeout to the specified duration
 	SetTimeout(timeout time.Duration)
 }
@@ -245,7 +245,7 @@ func getControlPlaneComponents(podMap map[string]*v1.Pod, addressAPIServer strin
 }
 
 // WaitForControlPlaneComponents waits for all control plane components to report "ok".
-func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, apiSeverAddress string) error {
+func (w *KubeWaiter) WaitForControlPlaneComponents(ctx context.Context, podMap map[string]*v1.Pod, apiSeverAddress string) error {
 	_, _ = fmt.Fprintf(w.writer, "[control-plane-check] Waiting for healthy control plane components."+
 		" This can take up to %v\n", w.timeout)
 
@@ -271,7 +271,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 			var lastError error
 
 			err := wait.PollUntilContextTimeout(
-				context.Background(),
+				ctx,
 				constants.KubernetesAPICallRetryInterval,
 				w.timeout,
 				true, func(ctx context.Context) (bool, error) {
@@ -323,12 +323,12 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 }
 
 // WaitForAPI waits for the API Server's /healthz endpoint to report "ok"
-func (w *KubeWaiter) WaitForAPI() error {
+func (w *KubeWaiter) WaitForAPI(ctx context.Context) error {
 	_, _ = fmt.Fprintf(w.writer, "[api-check] Waiting for a healthy API server. This can take up to %v\n", w.timeout)
 
 	start := time.Now()
 	err := wait.PollUntilContextTimeout(
-		context.Background(),
+		ctx,
 		constants.KubernetesAPICallRetryInterval,
 		w.timeout,
 		true, func(ctx context.Context) (bool, error) {
@@ -350,14 +350,14 @@ func (w *KubeWaiter) WaitForAPI() error {
 
 // WaitForPodsWithLabel will lookup pods with the given label and wait until they are all
 // reporting status as running.
-func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
+func (w *KubeWaiter) WaitForPodsWithLabel(ctx context.Context, kvLabel string) error {
 
 	lastKnownPodNumber := -1
-	return wait.PollUntilContextTimeout(context.Background(),
+	return wait.PollUntilContextTimeout(ctx,
 		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
 			listOpts := metav1.ListOptions{LabelSelector: kvLabel}
-			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), listOpts)
+			pods, err := w.client.CoreV1().Pods(metav1.NamespaceSystem).List(ctx, listOpts)
 			if err != nil {
 				_, _ = fmt.Fprintf(w.writer, "[apiclient] Error getting Pods with label selector %q [%v]\n", kvLabel, err)
 				return false, nil
@@ -383,7 +383,7 @@ func (w *KubeWaiter) WaitForPodsWithLabel(kvLabel string) error {
 }
 
 // WaitForKubelet blocks until the kubelet /healthz endpoint returns 'ok'.
-func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) error {
+func (w *KubeWaiter) WaitForKubelet(ctx context.Context, healthzAddress string, healthzPort int32) error {
 	var (
 		lastError       error
 		start           = time.Now()
@@ -403,7 +403,7 @@ func (w *KubeWaiter) WaitForKubelet(healthzAddress string, healthzPort int32) er
 	}
 
 	err := wait.PollUntilContextTimeout(
-		context.Background(),
+		ctx,
 		constants.KubernetesAPICallRetryInterval,
 		w.timeout,
 		true, func(ctx context.Context) (bool, error) {
@@ -443,16 +443,16 @@ func (w *KubeWaiter) SetTimeout(timeout time.Duration) {
 }
 
 // WaitForStaticPodControlPlaneHashes blocks until it timeouts or gets a hash map for all components and their Static Pods
-func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[string]string, error) {
+func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(ctx context.Context, nodeName string) (map[string]string, error) {
 
 	componentHash := ""
 	var err, lastErr error
 	mirrorPodHashes := map[string]string{}
 	for _, component := range constants.ControlPlaneComponents {
-		err = wait.PollUntilContextTimeout(context.Background(),
+		err = wait.PollUntilContextTimeout(ctx,
 			constants.KubernetesAPICallRetryInterval, w.timeout,
-			true, func(_ context.Context) (bool, error) {
-				componentHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+			true, func(ctx context.Context) (bool, error) {
+				componentHash, err = getStaticPodSingleHash(ctx, w.client, nodeName, component)
 				if err != nil {
 					lastErr = err
 					return false, nil
@@ -469,14 +469,14 @@ func (w *KubeWaiter) WaitForStaticPodControlPlaneHashes(nodeName string) (map[st
 }
 
 // WaitForStaticPodSingleHash blocks until it timeouts or gets a hash for a single component and its Static Pod
-func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component string) (string, error) {
+func (w *KubeWaiter) WaitForStaticPodSingleHash(ctx context.Context, nodeName string, component string) (string, error) {
 
 	componentPodHash := ""
 	var err, lastErr error
-	err = wait.PollUntilContextTimeout(context.Background(),
+	err = wait.PollUntilContextTimeout(ctx,
 		constants.KubernetesAPICallRetryInterval, w.timeout,
-		true, func(_ context.Context) (bool, error) {
-			componentPodHash, err = getStaticPodSingleHash(w.client, nodeName, component)
+		true, func(ctx context.Context) (bool, error) {
+			componentPodHash, err = getStaticPodSingleHash(ctx, w.client, nodeName, component)
 			if err != nil {
 				lastErr = err
 				return false, nil
@@ -492,12 +492,12 @@ func (w *KubeWaiter) WaitForStaticPodSingleHash(nodeName string, component strin
 
 // WaitForStaticPodHashChange blocks until it timeouts or notices that the Mirror Pod (for the Static Pod, respectively) has changed
 // This implicitly means this function blocks until the kubelet has restarted the Static Pod in question
-func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHash string) error {
+func (w *KubeWaiter) WaitForStaticPodHashChange(ctx context.Context, nodeName, component, previousHash string) error {
 	var err, lastErr error
-	err = wait.PollUntilContextTimeout(context.Background(),
+	err = wait.PollUntilContextTimeout(ctx,
 		constants.KubernetesAPICallRetryInterval, w.timeout,
 		true, func(_ context.Context) (bool, error) {
-			hash, err := getStaticPodSingleHash(w.client, nodeName, component)
+			hash, err := getStaticPodSingleHash(ctx, w.client, nodeName, component)
 			if err != nil {
 				lastErr = err
 				return false, nil
@@ -520,10 +520,10 @@ func (w *KubeWaiter) WaitForStaticPodHashChange(nodeName, component, previousHas
 }
 
 // getStaticPodSingleHash computes hashes for a single Static Pod resource
-func getStaticPodSingleHash(client clientset.Interface, nodeName string, component string) (string, error) {
+func getStaticPodSingleHash(ctx context.Context, client clientset.Interface, nodeName string, component string) (string, error) {
 
 	staticPodName := fmt.Sprintf("%s-%s", component, nodeName)
-	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(context.TODO(), staticPodName, metav1.GetOptions{})
+	staticPod, err := client.CoreV1().Pods(metav1.NamespaceSystem).Get(ctx, staticPodName, metav1.GetOptions{})
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to obtain static Pod hash for component %s on Node %s", component, nodeName)
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -126,7 +127,7 @@ func getControlPlanePhaseFlags(name string) []string {
 	return flags
 }
 
-func runControlPlanePhase(c workflow.RunData) error {
+func runControlPlanePhase(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("control-plane phase invoked with an invalid data struct")
@@ -136,8 +137,8 @@ func runControlPlanePhase(c workflow.RunData) error {
 	return nil
 }
 
-func runControlPlaneSubphase(component string) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runControlPlaneSubphase(component string) func(ctx context.Context, c workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("control-plane phase invoked with an invalid data struct")

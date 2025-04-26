@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -171,6 +172,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 		Short: "Run this on any machine you wish to join an existing cluster",
 		Long:  joinLongDescription,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
 
 			c, err := joinRunner.InitData(args)
 			if err != nil {
@@ -182,7 +184,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 				return errors.New("invalid data struct")
 			}
 
-			if err := joinRunner.Run(args); err != nil {
+			if err := joinRunner.Run(ctx, args); err != nil {
 				return err
 			}
 
@@ -533,7 +535,7 @@ func (j *joinData) CertificateWriteDir() string {
 }
 
 // TLSBootstrapCfg returns the cluster-info (kubeconfig).
-func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
+func (j *joinData) TLSBootstrapCfg(ctx context.Context) (*clientcmdapi.Config, error) {
 	if j.tlsBootstrapCfg != nil {
 		return j.tlsBootstrapCfg, nil
 	}
@@ -543,45 +545,45 @@ func (j *joinData) TLSBootstrapCfg() (*clientcmdapi.Config, error) {
 		err    error
 	)
 	if j.dryRun {
-		client, err = j.Client()
+		client, err = j.Client(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not create a client for TLS bootstrap")
 		}
 	}
 	klog.V(1).Infoln("[preflight] Discovering cluster-info")
-	tlsBootstrapCfg, err := discovery.For(client, j.cfg)
+	tlsBootstrapCfg, err := discovery.For(ctx, client, j.cfg)
 	j.tlsBootstrapCfg = tlsBootstrapCfg
 	return tlsBootstrapCfg, err
 }
 
 // InitCfg returns the InitConfiguration.
-func (j *joinData) InitCfg() (*kubeadmapi.InitConfiguration, error) {
+func (j *joinData) InitCfg(ctx context.Context) (*kubeadmapi.InitConfiguration, error) {
 	if j.initCfg != nil {
 		return j.initCfg, nil
 	}
-	if _, err := j.TLSBootstrapCfg(); err != nil {
+	if _, err := j.TLSBootstrapCfg(ctx); err != nil {
 		return nil, err
 	}
 	klog.V(1).Infoln("[preflight] Fetching init configuration")
 	var client clientset.Interface
 	if j.dryRun {
 		var err error
-		client, err = j.Client()
+		client, err = j.Client(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "could not get dry-run client for fetching InitConfiguration")
 		}
 	}
-	initCfg, err := fetchInitConfigurationFromJoinConfiguration(j.cfg, client, j.tlsBootstrapCfg)
+	initCfg, err := fetchInitConfigurationFromJoinConfiguration(ctx, j.cfg, client, j.tlsBootstrapCfg)
 	j.initCfg = initCfg
 	return initCfg, err
 }
 
 // Client returns the Client for accessing the cluster with the identity defined in admin.conf.
-func (j *joinData) Client() (clientset.Interface, error) {
+func (j *joinData) Client(ctx context.Context) (clientset.Interface, error) {
 	pathAdmin := filepath.Join(j.KubeConfigDir(), kubeadmconstants.AdminKubeConfigFileName)
 
 	if j.dryRun {
-		dryRun := apiclient.NewDryRun()
+		dryRun := apiclient.NewDryRun(ctx)
 		// For the dynamic dry-run client use this kubeconfig only if it exists.
 		// That would happen presumably after TLS bootstrap.
 		if _, err := os.Stat(pathAdmin); err == nil {
@@ -648,7 +650,7 @@ func (j *joinData) PatchesDir() string {
 }
 
 // fetchInitConfigurationFromJoinConfiguration retrieves the init configuration from a join configuration, performing the discovery
-func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfiguration, client clientset.Interface, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
+func fetchInitConfigurationFromJoinConfiguration(ctx context.Context, cfg *kubeadmapi.JoinConfiguration, client clientset.Interface, tlsBootstrapCfg *clientcmdapi.Config) (*kubeadmapi.InitConfiguration, error) {
 	var err error
 
 	klog.V(1).Infoln("[preflight] Retrieving KubeConfig objects")
@@ -659,7 +661,7 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 			return nil, errors.Wrap(err, "unable to access the cluster")
 		}
 	}
-	initConfiguration, err := fetchInitConfiguration(client)
+	initConfiguration, err := fetchInitConfiguration(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -681,8 +683,8 @@ func fetchInitConfigurationFromJoinConfiguration(cfg *kubeadmapi.JoinConfigurati
 }
 
 // fetchInitConfiguration reads the cluster configuration from the kubeadm-admin configMap
-func fetchInitConfiguration(client clientset.Interface) (*kubeadmapi.InitConfiguration, error) {
-	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(client, nil, "preflight", true, false)
+func fetchInitConfiguration(ctx context.Context, client clientset.Interface) (*kubeadmapi.InitConfiguration, error) {
+	initConfiguration, err := configutil.FetchInitConfigurationFromCluster(ctx, client, nil, "preflight", true, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

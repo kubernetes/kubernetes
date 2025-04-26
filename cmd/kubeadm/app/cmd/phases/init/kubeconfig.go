@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -121,7 +122,7 @@ func getKubeConfigPhaseFlags(name string) []string {
 	return flags
 }
 
-func runKubeConfig(c workflow.RunData) error {
+func runKubeConfig(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubeconfig phase invoked with an invalid data struct")
@@ -132,8 +133,8 @@ func runKubeConfig(c workflow.RunData) error {
 }
 
 // runKubeConfigFile executes kubeconfig creation logic.
-func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runKubeConfigFile(kubeConfigFileName string) func(context.Context, workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("kubeconfig phase invoked with an invalid data struct")

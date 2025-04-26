@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -58,7 +59,7 @@ func NewKubeletStartPhase() workflow.Phase {
 }
 
 // runKubeletStart executes kubelet start logic.
-func runKubeletStart(c workflow.RunData) error {
+func runKubeletStart(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("kubelet-start phase invoked with an invalid data struct")

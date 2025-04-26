@@ -49,15 +49,15 @@ const BootstrapUser = "token-bootstrap-client"
 // RetrieveValidatedConfigInfo connects to the API Server and tries to fetch the cluster-info ConfigMap
 // It then makes sure it can trust the API Server by looking at the JWS-signed tokens and (if CACertHashes is not empty)
 // validating the cluster CA against a set of pinned public keys
-func RetrieveValidatedConfigInfo(dryRunClient clientset.Interface, cfg *kubeadmapi.Discovery, timeout time.Duration) (*clientcmdapi.Config, error) {
+func RetrieveValidatedConfigInfo(ctx context.Context, dryRunClient clientset.Interface, cfg *kubeadmapi.Discovery, timeout time.Duration) (*clientcmdapi.Config, error) {
 	isDryRun := dryRunClient != nil
 	isTesting := false
-	return retrieveValidatedConfigInfo(dryRunClient, cfg, constants.DiscoveryRetryInterval, timeout, isDryRun, isTesting)
+	return retrieveValidatedConfigInfo(ctx, dryRunClient, cfg, constants.DiscoveryRetryInterval, timeout, isDryRun, isTesting)
 }
 
 // retrieveValidatedConfigInfo is a private implementation of RetrieveValidatedConfigInfo.
 // It accepts an optional clientset that can be used for testing purposes.
-func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, interval, timeout time.Duration, isDryRun, isTesting bool) (*clientcmdapi.Config, error) {
+func retrieveValidatedConfigInfo(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.Discovery, interval, timeout time.Duration, isDryRun, isTesting bool) (*clientcmdapi.Config, error) {
 	var err error
 
 	// Make sure the interval is not bigger than the duration
@@ -76,7 +76,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 			return nil, err
 		}
 	}
-	insecureClusterInfo, err := getClusterInfo(client, cfg, interval, timeout, isDryRun)
+	insecureClusterInfo, err := getClusterInfo(ctx, client, cfg, interval, timeout, isDryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 			return nil, err
 		}
 	}
-	secureClusterInfo, err := getClusterInfo(client, cfg, interval, timeout, isDryRun)
+	secureClusterInfo, err := getClusterInfo(ctx, client, cfg, interval, timeout, isDryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -210,14 +210,14 @@ func validateClusterCA(insecureConfig *clientcmdapi.Config, pubKeyPins *pubkeypi
 }
 
 // getClusterInfo requests the cluster-info ConfigMap with the provided client.
-func getClusterInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, interval, duration time.Duration, dryRun bool) (*v1.ConfigMap, error) {
+func getClusterInfo(ctx context.Context, client clientset.Interface, cfg *kubeadmapi.Discovery, interval, duration time.Duration, dryRun bool) (*v1.ConfigMap, error) {
 	var (
 		cm        *v1.ConfigMap
 		err       error
 		lastError error
 	)
 
-	err = wait.PollUntilContextTimeout(context.Background(),
+	err = wait.PollUntilContextTimeout(ctx,
 		interval, duration, true,
 		func(ctx context.Context) (bool, error) {
 			token, err := bootstraptokenv1.NewBootstrapTokenString(cfg.BootstrapToken.Token)
@@ -231,7 +231,7 @@ func getClusterInfo(client clientset.Interface, cfg *kubeadmapi.Discovery, inter
 				" for token ID %q", token.ID)
 
 			cm, err = client.CoreV1().ConfigMaps(metav1.NamespacePublic).
-				Get(context.Background(), bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
+				Get(ctx, bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 			if err != nil {
 				lastError = errors.Wrapf(err, "failed to request the cluster-info ConfigMap")
 				klog.V(1).Infof("[discovery] Retrying due to error: %v", lastError)

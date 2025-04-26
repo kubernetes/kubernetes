@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -94,7 +95,7 @@ func newCmdNode(out io.Writer) *cobra.Command {
 			if _, ok := data.(*nodeData); !ok {
 				return errors.New("invalid data struct")
 			}
-			if err := nodeRunner.Run(args); err != nil {
+			if err := nodeRunner.Run(cmd.Context(), args); err != nil {
 				return err
 			}
 			if nodeOptions.dryRun {
@@ -164,6 +165,7 @@ func addUpgradeNodeFlags(flagSet *flag.FlagSet, nodeOptions *nodeOptions) {
 // This func takes care of validating nodeOptions passed to the command, and then it converts
 // options into the internal InitConfiguration type that is used as input all the phases in the kubeadm upgrade node workflow
 func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*nodeData, error) {
+	ctx := cmd.Context()
 	// Checks if a node is a control-plane node by looking up the kube-apiserver manifest file
 	isControlPlaneNode := true
 	filepath := constants.GetStaticPodFilepath(constants.KubeAPIServer, constants.GetStaticPodDirectory())
@@ -192,7 +194,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	}
 
 	printer := &output.TextPrinter{}
-	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun, printer)
+	client, err := getClient(ctx, nodeOptions.kubeConfigPath, *dryRun, printer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", nodeOptions.kubeConfigPath)
 	}
@@ -200,7 +202,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !isControlPlaneNode, false)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(ctx, client, nil, "upgrade", !isControlPlaneNode, false)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}
@@ -255,7 +257,7 @@ func (d *nodeData) Cfg() *kubeadmapi.UpgradeConfiguration {
 }
 
 // InitCfg returns the InitConfiguration.
-func (d *nodeData) InitCfg() *kubeadmapi.InitConfiguration {
+func (d *nodeData) InitCfg(ctx context.Context) *kubeadmapi.InitConfiguration {
 	return d.initCfg
 }
 
@@ -265,7 +267,7 @@ func (d *nodeData) IsControlPlaneNode() bool {
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
-func (d *nodeData) Client() clientset.Interface {
+func (d *nodeData) Client(ctx context.Context) clientset.Interface {
 	return d.client
 }
 

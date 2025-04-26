@@ -17,6 +17,8 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,7 +50,7 @@ type handler struct {
 
 	// fromCluster should load the component config from a config map on the cluster.
 	// Don't use this directly! Use FromCluster instead!
-	fromCluster func(*handler, clientset.Interface, *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error)
+	fromCluster func(context.Context, *handler, clientset.Interface, *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error)
 }
 
 // FromDocumentMap looks in the document map for documents with this handler's group.
@@ -71,8 +73,8 @@ func (h *handler) FromDocumentMap(docmap kubeadmapi.DocumentMap) (kubeadmapi.Com
 
 // fromConfigMap is an utility function, which will load the value of a key of a config map and use h.FromDocumentMap() to perform the parsing
 // This is an utility func. Used by the component config support implementations. Don't use it outside of that context.
-func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string, mustExist bool) (kubeadmapi.ComponentConfig, error) {
-	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, cmName)
+func (h *handler) fromConfigMap(ctx context.Context, client clientset.Interface, cmName, cmKey string, mustExist bool) (kubeadmapi.ComponentConfig, error) {
+	configMap, err := apiclient.GetConfigMapWithShortRetry(ctx, client, metav1.NamespaceSystem, cmName)
 	if err != nil {
 		if !mustExist && (apierrors.IsNotFound(err) || apierrors.IsForbidden(err)) {
 			klog.Warningf("Warning: No %s config is loaded. Continuing without it: %v", h.GroupVersion, err)
@@ -112,8 +114,8 @@ func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string
 }
 
 // FromCluster loads a component from a config map in the cluster
-func (h *handler) FromCluster(clientset clientset.Interface, clusterCfg *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
-	return h.fromCluster(h, clientset, clusterCfg)
+func (h *handler) FromCluster(ctx context.Context, clientset clientset.Interface, clusterCfg *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, error) {
+	return h.fromCluster(ctx, h, clientset, clusterCfg)
 }
 
 // known holds the known component config handlers. Add new component configs here.
@@ -209,11 +211,11 @@ func Default(clusterCfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kube
 }
 
 // FetchFromCluster attempts to fetch all known component configs from their config maps and store them in the supplied ClusterConfiguration
-func FetchFromCluster(clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
+func FetchFromCluster(ctx context.Context, clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
 	ensureInitializedComponentConfigs(clusterCfg)
 
 	for _, handler := range known {
-		componentCfg, err := handler.FromCluster(client, clusterCfg)
+		componentCfg, err := handler.FromCluster(ctx, client, clusterCfg)
 		if err != nil {
 			return err
 		}
@@ -246,13 +248,13 @@ func FetchFromDocumentMap(clusterCfg *kubeadmapi.ClusterConfiguration, docmap ku
 
 // GetVersionStates returns a slice of ComponentConfigVersionState structs
 // describing all supported component config groups that were identified on the cluster
-func GetVersionStates(clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) ([]outputapiv1alpha3.ComponentConfigVersionState, error) {
+func GetVersionStates(ctx context.Context, clusterCfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) ([]outputapiv1alpha3.ComponentConfigVersionState, error) {
 	// We don't want to modify clusterCfg so we make a working deep copy of it.
 	// Also, we don't want the defaulted component configs so we get rid of them.
 	scratchClusterCfg := clusterCfg.DeepCopy()
 	scratchClusterCfg.ComponentConfigs = kubeadmapi.ComponentConfigMap{}
 
-	err := FetchFromCluster(scratchClusterCfg, client)
+	err := FetchFromCluster(ctx, scratchClusterCfg, client)
 	if err != nil {
 		// This seems to be a genuine error so we end here
 		return nil, err

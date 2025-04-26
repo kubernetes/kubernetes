@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -102,7 +103,7 @@ func newCertSubPhases() []workflow.Phase {
 	return subPhases
 }
 
-func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(c workflow.RunData) error) workflow.Phase {
+func newCertSubPhase(certSpec *certsphase.KubeadmCert, run func(ctx context.Context, c workflow.RunData) error) workflow.Phase {
 	phase := workflow.Phase{
 		Name:  certSpec.Name,
 		Short: fmt.Sprintf("Generate the %s", certSpec.LongName),
@@ -176,7 +177,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	return fmt.Sprintf("\n\nDefault SANs are %s", strings.Join(sans, ", "))
 }
 
-func runCertsSa(c workflow.RunData) error {
+func runCertsSa(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("certs phase invoked with an invalid data struct")
@@ -192,7 +193,7 @@ func runCertsSa(c workflow.RunData) error {
 	return certsphase.CreateServiceAccountKeyAndPublicKeyFiles(data.CertificateWriteDir(), data.Cfg().ClusterConfiguration.EncryptionAlgorithmType())
 }
 
-func runCerts(c workflow.RunData) error {
+func runCerts(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("certs phase invoked with an invalid data struct")
@@ -202,8 +203,8 @@ func runCerts(c workflow.RunData) error {
 	return nil
 }
 
-func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runCAPhase(ca *certsphase.KubeadmCert) func(ctx context.Context, c workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("certs phase invoked with an invalid data struct")
@@ -250,8 +251,8 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 	}
 }
 
-func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) func(ctx context.Context, c workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("certs phase invoked with an invalid data struct")

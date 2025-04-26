@@ -66,10 +66,10 @@ type DryRun struct {
 }
 
 // NewDryRun creates a new DryRun object that only has a fake client.
-func NewDryRun() *DryRun {
+func NewDryRun(ctx context.Context) *DryRun {
 	d := &DryRun{}
 	d.fakeClient = fake.NewSimpleClientset()
-	d.addReactors()
+	d.addReactors(ctx)
 	return d
 }
 
@@ -167,7 +167,7 @@ func (d *DryRun) FakeClient() clientset.Interface {
 
 // addRectors is by default called by NewDryRun after creating the fake client.
 // It prepends a set of reactors before the default fake client reactor.
-func (d *DryRun) addReactors() {
+func (d *DryRun) addReactors(ctx context.Context) {
 	reactors := []testing.Reactor{
 		// Add a reactor for logging all requests that reach the fake client.
 		&testing.SimpleReactor{
@@ -190,7 +190,7 @@ func (d *DryRun) addReactors() {
 					return true, nil, errors.New("cannot cast reactor action to GetAction")
 				}
 
-				handled, obj, err := d.handleGetAction(getAction)
+				handled, obj, err := d.handleGetAction(ctx, getAction)
 				if err != nil {
 					fmt.Fprintln(d.writer, "[dryrun] Real object does not exist. "+
 						"Attempting to GET from followup reactors or from the fake client tracker")
@@ -213,7 +213,7 @@ func (d *DryRun) addReactors() {
 					return true, nil, errors.New("cannot cast reactor action to ListAction")
 				}
 
-				handled, obj, err := d.handleListAction(listAction)
+				handled, obj, err := d.handleListAction(ctx, listAction)
 				if err != nil {
 					fmt.Fprintln(d.writer, "[dryrun] Real object does not exist. "+
 						"Attempting to LIST from followup reactors or from the fake client tracker")
@@ -229,7 +229,7 @@ func (d *DryRun) addReactors() {
 }
 
 // handleGetAction tries to handle all GET actions with the dynamic client.
-func (d *DryRun) handleGetAction(action testing.GetAction) (bool, runtime.Object, error) {
+func (d *DryRun) handleGetAction(ctx context.Context, action testing.GetAction) (bool, runtime.Object, error) {
 	if d.dynamicClient == nil {
 		return false, nil, errors.New("dynamicClient is nil")
 	}
@@ -237,7 +237,7 @@ func (d *DryRun) handleGetAction(action testing.GetAction) (bool, runtime.Object
 	unstructuredObj, err := d.dynamicClient.
 		Resource(action.GetResource()).
 		Namespace(action.GetNamespace()).
-		Get(context.Background(), action.GetName(), metav1.GetOptions{})
+		Get(ctx, action.GetName(), metav1.GetOptions{})
 	if err != nil {
 		return true, nil, err
 	}
@@ -251,7 +251,7 @@ func (d *DryRun) handleGetAction(action testing.GetAction) (bool, runtime.Object
 }
 
 // handleListAction tries to handle all LIST actions with the dynamic client.
-func (d *DryRun) handleListAction(action testing.ListAction) (bool, runtime.Object, error) {
+func (d *DryRun) handleListAction(ctx context.Context, action testing.ListAction) (bool, runtime.Object, error) {
 	if d.dynamicClient == nil {
 		return false, nil, errors.New("dynamicClient is nil")
 	}
@@ -264,7 +264,7 @@ func (d *DryRun) handleListAction(action testing.ListAction) (bool, runtime.Obje
 	unstructuredObj, err := d.dynamicClient.
 		Resource(action.GetResource()).
 		Namespace(action.GetNamespace()).
-		List(context.Background(), listOpts)
+		List(ctx, listOpts)
 	if err != nil {
 		return true, nil, err
 	}

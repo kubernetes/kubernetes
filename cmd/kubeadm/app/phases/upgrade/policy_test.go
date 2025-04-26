@@ -239,7 +239,7 @@ func TestEnforceVersionPolicies(t *testing.T) {
 				t.Fatalf("couldn't parse version %s: %v", rt.newK8sVersion, err)
 			}
 
-			actualSkewErrs := EnforceVersionPolicies(rt.vg, rt.newK8sVersion, newK8sVer, rt.allowExperimental, rt.allowRCs)
+			actualSkewErrs := EnforceVersionPolicies(t.Context(), rt.vg, rt.newK8sVersion, newK8sVer, rt.allowExperimental, rt.allowRCs)
 			if actualSkewErrs == nil {
 				// No errors were seen. Report unit test failure if we expected to see errors
 				if rt.expectedMandatoryErrs+rt.expectedSkippableErrs > 0 {

@@ -110,6 +110,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			If no [token] is given, kubeadm will generate a random token instead.
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
+			ctx := tokenCmd.Context()
 			if len(args) > 0 {
 				bto.TokenStr = args[0]
 			}
@@ -124,12 +125,12 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
+			client, err := getClientForTokenCommands(ctx, kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
 
-			return RunCreateToken(out, client, cfgPath, cfg, printJoinCommand, certificateKey, kubeConfigFile)
+			return RunCreateToken(ctx, out, client, cfgPath, cfg, printJoinCommand, certificateKey, kubeConfigFile)
 		},
 	}
 
@@ -156,7 +157,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
+			client, err := getClientForTokenCommands(tokenCmd.Context(), kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
@@ -166,7 +167,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return errors.Wrap(err, "could not construct output printer")
 			}
 
-			return RunListTokens(out, errW, client, printer)
+			return RunListTokens(tokenCmd.Context(), out, errW, client, printer)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -189,13 +190,14 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) < 1 {
 				return errors.Errorf("missing argument; 'token delete' is missing token of form %q or %q", bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
+			ctx := tokenCmd.Context()
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
+			client, err := getClientForTokenCommands(ctx, kubeConfigFile, dryRun)
 			if err != nil {
 				return err
 			}
 
-			return RunDeleteTokens(out, client, args)
+			return RunDeleteTokens(ctx, out, client, args)
 		},
 	}
 	tokenCmd.AddCommand(deleteCmd)
@@ -227,7 +229,7 @@ func newCmdTokenGenerate(out io.Writer) *cobra.Command {
 }
 
 // RunCreateToken generates a new bootstrap token and stores it as a secret on the server.
-func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1.InitConfiguration, printJoinCommand bool, certificateKey string, kubeConfigFile string) error {
+func RunCreateToken(ctx context.Context, out io.Writer, client clientset.Interface, cfgPath string, initCfg *kubeadmapiv1.InitConfiguration, printJoinCommand bool, certificateKey string, kubeConfigFile string) error {
 	// ClusterConfiguration is needed just for the call to LoadOrDefaultInitConfiguration
 	clusterCfg := &kubeadmapiv1.ClusterConfiguration{
 		// KubernetesVersion is not used, but we set this explicitly to avoid
@@ -247,7 +249,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	}
 
 	klog.V(1).Infoln("[token] creating token")
-	if err := tokenphase.CreateNewTokens(client, internalcfg.BootstrapTokens); err != nil {
+	if err := tokenphase.CreateNewTokens(ctx, client, internalcfg.BootstrapTokens); err != nil {
 		return err
 	}
 
@@ -359,7 +361,7 @@ func (tpf *tokenTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, 
 }
 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
-func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, printer output.Printer) error {
+func RunListTokens(ctx context.Context, out io.Writer, errW io.Writer, client clientset.Interface, printer output.Printer) error {
 	// First, build our selector for bootstrap tokens only
 	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
@@ -372,7 +374,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 	}
 
 	klog.V(1).Info("[token] retrieving list of bootstrap tokens")
-	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(context.TODO(), listOptions)
+	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(ctx, listOptions)
 	if err != nil {
 		return errors.Wrap(err, "failed to list bootstrap tokens")
 	}
@@ -405,7 +407,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 }
 
 // RunDeleteTokens removes a bootstrap tokens from the server.
-func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens []string) error {
+func RunDeleteTokens(ctx context.Context, out io.Writer, client clientset.Interface, tokenIDsOrTokens []string) error {
 	for _, tokenIDOrToken := range tokenIDsOrTokens {
 		// Assume this is a token id and try to parse it
 		tokenID := tokenIDOrToken
@@ -422,7 +424,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 		klog.V(1).Infof("[token] deleting token %q", tokenID)
-		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, metav1.DeleteOptions{}); err != nil {
+		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(ctx, tokenSecretName, metav1.DeleteOptions{}); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
 		}
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
@@ -432,9 +434,9 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 
 // getClientForTokenCommands returns a client to be used with token commands.
 // When dry-running it includes token specific reactors.
-func getClientForTokenCommands(file string, dryRun bool) (clientset.Interface, error) {
+func getClientForTokenCommands(ctx context.Context, file string, dryRun bool) (clientset.Interface, error) {
 	if dryRun {
-		dryRun := apiclient.NewDryRun().WithDefaultMarshalFunction().WithWriter(os.Stdout)
+		dryRun := apiclient.NewDryRun(ctx).WithDefaultMarshalFunction().WithWriter(os.Stdout)
 		dryRun.AppendReactor(dryRun.DeleteBootstrapTokenReactor())
 		if err := dryRun.WithKubeConfigFile(file); err != nil {
 			return nil, err

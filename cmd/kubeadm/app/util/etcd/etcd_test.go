@@ -202,13 +202,14 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
 			for _, pod := range rt.pods {
-				if err := pod.Create(client); err != nil {
+				if err := pod.Create(ctx, client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
 				}
 			}
-			endpoints, err := getEtcdEndpointsWithRetry(client, time.Microsecond*10, time.Millisecond*100)
+			endpoints, err := getEtcdEndpointsWithRetry(ctx, client, time.Microsecond*10, time.Millisecond*100)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %q; was expecting no errors", err)
 				return
@@ -284,16 +285,17 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
 			for i, pod := range rt.pods {
-				if err := pod.CreateWithPodSuffix(client, strconv.Itoa(i)); err != nil {
+				if err := pod.CreateWithPodSuffix(ctx, client, strconv.Itoa(i)); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
 				}
 			}
 			if rt.clientSetup != nil {
 				rt.clientSetup(client)
 			}
-			endpoints, err := getRawEtcdEndpointsFromPodAnnotation(client, time.Microsecond*10, time.Millisecond*100)
+			endpoints, err := getRawEtcdEndpointsFromPodAnnotation(ctx, client, time.Microsecond*10, time.Millisecond*100)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %v, but wasn't expecting any error", err)
 				return
@@ -383,9 +385,10 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
 			for _, pod := range rt.pods {
-				if err := pod.Create(client); err != nil {
+				if err := pod.Create(ctx, client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
 					return
 				}
@@ -393,7 +396,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 			if rt.clientSetup != nil {
 				rt.clientSetup(client)
 			}
-			endpoints, _, err := getRawEtcdEndpointsFromPodAnnotationWithoutRetry(client)
+			endpoints, _, err := getRawEtcdEndpointsFromPodAnnotationWithoutRetry(ctx, client)
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %v, but wasn't expecting any error", err)
 				return
@@ -478,17 +481,18 @@ func TestClient_GetMemberID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
 			c := &Client{
 				Endpoints:     tt.fields.Endpoints,
 				newEtcdClient: tt.fields.newEtcdClient,
 			}
-			c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
+			c.listMembersFunc = func(ctx context.Context, _ time.Duration) (*clientv3.MemberListResponse, error) {
 				f, _ := c.newEtcdClient([]string{})
-				resp, _ := f.MemberList(context.Background())
+				resp, _ := f.MemberList(ctx)
 				return resp, nil
 			}
 
-			got, err := c.GetMemberID(tt.args.peerURL)
+			got, err := c.GetMemberID(ctx, tt.args.peerURL)
 			if !errors.Is(tt.wantErr, err) {
 				t.Errorf("Client.GetMemberID() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -504,7 +508,7 @@ func TestListMembers(t *testing.T) {
 	type fields struct {
 		Endpoints       []string
 		newEtcdClient   func(endpoints []string) (etcdClient, error)
-		listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
+		listMembersFunc func(ctx context.Context, timeout time.Duration) (*clientv3.MemberListResponse, error)
 	}
 	tests := []struct {
 		name      string
@@ -606,7 +610,7 @@ func TestListMembers(t *testing.T) {
 					}
 					return f, nil
 				},
-				listMembersFunc: func(_ time.Duration) (*clientv3.MemberListResponse, error) {
+				listMembersFunc: func(_ context.Context, _ time.Duration) (*clientv3.MemberListResponse, error) {
 					return nil, errNotImplemented
 				},
 			},
@@ -616,17 +620,18 @@ func TestListMembers(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
 			c := &Client{
 				Endpoints:       tt.fields.Endpoints,
 				newEtcdClient:   tt.fields.newEtcdClient,
 				listMembersFunc: tt.fields.listMembersFunc,
 			}
 			if c.listMembersFunc == nil {
-				c.listMembersFunc = func(_ time.Duration) (*clientv3.MemberListResponse, error) {
-					return c.listMembers(100 * time.Millisecond)
+				c.listMembersFunc = func(ctx context.Context, _ time.Duration) (*clientv3.MemberListResponse, error) {
+					return c.listMembers(ctx, 100*time.Millisecond)
 				}
 			}
-			got, err := c.ListMembers()
+			got, err := c.ListMembers(ctx)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ListMembers() = %v, want %v", got, tt.want)
 			}
@@ -641,7 +646,7 @@ func TestIsLearner(t *testing.T) {
 	type fields struct {
 		Endpoints       []string
 		newEtcdClient   func(endpoints []string) (etcdClient, error)
-		listMembersFunc func(timeout time.Duration) (*clientv3.MemberListResponse, error)
+		listMembersFunc func(ctx context.Context, timeout time.Duration) (*clientv3.MemberListResponse, error)
 	}
 	tests := []struct {
 		name      string
@@ -756,7 +761,7 @@ func TestIsLearner(t *testing.T) {
 					}
 					return f, nil
 				},
-				listMembersFunc: func(_ time.Duration) (*clientv3.MemberListResponse, error) {
+				listMembersFunc: func(_ context.Context, _ time.Duration) (*clientv3.MemberListResponse, error) {
 					return nil, errNotImplemented
 				},
 			},
@@ -766,19 +771,20 @@ func TestIsLearner(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
 			c := &Client{
 				Endpoints:       tt.fields.Endpoints,
 				newEtcdClient:   tt.fields.newEtcdClient,
 				listMembersFunc: tt.fields.listMembersFunc,
 			}
 			if c.listMembersFunc == nil {
-				c.listMembersFunc = func(t_ time.Duration) (*clientv3.MemberListResponse, error) {
+				c.listMembersFunc = func(ctx context.Context, _ time.Duration) (*clientv3.MemberListResponse, error) {
 					f, _ := c.newEtcdClient([]string{})
-					resp, _ := f.MemberList(context.Background())
+					resp, _ := f.MemberList(ctx)
 					return resp, nil
 				}
 			}
-			got, err := c.isLearner(tt.memberID)
+			got, err := c.isLearner(ctx, tt.memberID)
 			if got != tt.want {
 				t.Errorf("isLearner() = %v, want %v", got, tt.want)
 			}

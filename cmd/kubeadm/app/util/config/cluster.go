@@ -54,7 +54,7 @@ import (
 )
 
 // FetchInitConfigurationFromCluster fetches configuration from a ConfigMap in the cluster
-func FetchInitConfigurationFromCluster(client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func FetchInitConfigurationFromCluster(ctx context.Context, client clientset.Interface, printer output.Printer, logPrefix string, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	if printer == nil {
 		printer = &output.TextPrinter{}
 	}
@@ -63,7 +63,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config-file' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
-	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
+	cfg, err := getInitConfigurationFromCluster(ctx, constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
 	if err != nil {
 		return nil, err
 	}
@@ -78,9 +78,9 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 }
 
 // getInitConfigurationFromCluster is separate only for testing purposes, don't call it directly, use FetchInitConfigurationFromCluster instead
-func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Interface, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
+func getInitConfigurationFromCluster(ctx context.Context, kubeconfigDir string, client clientset.Interface, newControlPlane, skipComponentConfigs bool) (*kubeadmapi.InitConfiguration, error) {
 	// Also, the config map really should be KubeadmConfigConfigMap...
-	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
+	configMap, err := apiclient.GetConfigMapWithShortRetry(ctx, client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get config map")
 	}
@@ -110,7 +110,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 
 	if !skipComponentConfigs {
 		// get the component configs from the corresponding config maps
-		if err := componentconfigs.FetchFromCluster(&initcfg.ClusterConfiguration, client); err != nil {
+		if err := componentconfigs.FetchFromCluster(ctx, &initcfg.ClusterConfiguration, client); err != nil {
 			return nil, errors.Wrap(err, "failed to get component configs")
 		}
 	}
@@ -120,11 +120,11 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	if !newControlPlane {
 		// gets the nodeRegistration for the current from the node object
 		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
-		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration, &initcfg.ClusterConfiguration); err != nil {
+		if err := GetNodeRegistration(ctx, kubeconfigFile, client, &initcfg.NodeRegistration, &initcfg.ClusterConfiguration); err != nil {
 			return nil, errors.Wrap(err, "failed to get node registration")
 		}
 		// gets the APIEndpoint for the current node
-		if err := getAPIEndpoint(client, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
+		if err := getAPIEndpoint(ctx, client, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
 			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
 		}
 	}
@@ -137,7 +137,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 // If that fails it attempt to parse the kubeconfig client certificate subject.
 // Finally, it falls back to using the host name, which might not always be correct
 // due to node name overrides.
-func GetNodeName(kubeconfigFile string) (string, error) {
+func GetNodeName(ctx context.Context, kubeconfigFile string) (string, error) {
 	var (
 		nodeName string
 		err      error
@@ -145,7 +145,7 @@ func GetNodeName(kubeconfigFile string) (string, error) {
 	if kubeconfigFile != "" {
 		client, err := kubeconfig.ClientSetFromFile(kubeconfigFile)
 		if err == nil {
-			nodeName, err = getNodeNameFromSSR(client)
+			nodeName, err = getNodeNameFromSSR(ctx, client)
 			if err == nil {
 				return nodeName, nil
 			}
@@ -163,15 +163,15 @@ func GetNodeName(kubeconfigFile string) (string, error) {
 }
 
 // GetNodeRegistration returns the nodeRegistration for the current node
-func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions, clusterCfg *kubeadmapi.ClusterConfiguration) error {
+func GetNodeRegistration(ctx context.Context, kubeconfigFile string, client clientset.Interface, nodeRegistration *kubeadmapi.NodeRegistrationOptions, clusterCfg *kubeadmapi.ClusterConfiguration) error {
 	// gets the name of the current node
-	nodeName, err := GetNodeName(kubeconfigFile)
+	nodeName, err := GetNodeName(ctx, kubeconfigFile)
 	if err != nil {
 		return err
 	}
 
 	// gets the corresponding node and retrieves attributes stored there.
-	node, err := client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 	if err != nil {
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
@@ -258,9 +258,9 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 
 // getNodeNameFromSSR reads the node name from the SelfSubjectReview for a given client.
 // If the kubelet.conf is passed as fileName it can be used to retrieve the node name.
-func getNodeNameFromSSR(client clientset.Interface) (string, error) {
+func getNodeNameFromSSR(ctx context.Context, client clientset.Interface) (string, error) {
 	ssr, err := client.AuthenticationV1().SelfSubjectReviews().
-		Create(context.Background(), &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
+		Create(ctx, &authv1.SelfSubjectReview{}, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -272,30 +272,30 @@ func getNodeNameFromSSR(client clientset.Interface) (string, error) {
 	return strings.TrimPrefix(user, constants.NodesUserPrefix), nil
 }
 
-func getAPIEndpoint(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
-	return getAPIEndpointWithRetry(client, nodeName, apiEndpoint,
+func getAPIEndpoint(ctx context.Context, client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint) error {
+	return getAPIEndpointWithRetry(ctx, client, nodeName, apiEndpoint,
 		constants.KubernetesAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration)
 }
 
-func getAPIEndpointWithRetry(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
+func getAPIEndpointWithRetry(ctx context.Context, client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
 	interval, timeout time.Duration) error {
 	var err error
 	var errs []error
 
-	if err = getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, interval, timeout); err == nil {
+	if err = getAPIEndpointFromPodAnnotation(ctx, client, nodeName, apiEndpoint, interval, timeout); err == nil {
 		return nil
 	}
 	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
 	return errorsutil.NewAggregate(errs)
 }
 
-func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
+func getAPIEndpointFromPodAnnotation(ctx context.Context, client clientset.Interface, nodeName string, apiEndpoint *kubeadmapi.APIEndpoint,
 	interval, timeout time.Duration) error {
 	var rawAPIEndpoint string
 	var lastErr error
 	// Let's tolerate some unexpected transient failures from the API server or load balancers. Also, if
 	// static pods were not yet mirrored into the API server we want to wait for this propagation.
-	err := wait.PollUntilContextTimeout(context.Background(), interval, timeout, true,
+	err := wait.PollUntilContextTimeout(ctx, interval, timeout, true,
 		func(ctx context.Context) (bool, error) {
 			rawAPIEndpoint, lastErr = getRawAPIEndpointFromPodAnnotationWithoutRetry(ctx, client, nodeName)
 			return lastErr == nil, nil

@@ -17,7 +17,6 @@ limitations under the License.
 package apiclient
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -112,7 +111,7 @@ func testCreateOrUpdate[T kubernetesObject](t *testing.T, resource, resources st
 		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client, resources)
-			err := CreateOrUpdate(clientBuilder(client, empty), empty)
+			err := CreateOrUpdate(t.Context(), clientBuilder(client, empty), empty)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -205,7 +204,7 @@ func testCreateOrMutate[T kubernetesObject](t *testing.T, resource, resources st
 		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client)
-			err := CreateOrMutate[T](clientBuilder(client, empty), empty, tc.mutator)
+			err := CreateOrMutate[T](t.Context(), clientBuilder(client, empty), empty, tc.mutator)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -274,7 +273,7 @@ func testCreateOrRetain[T kubernetesObject](t *testing.T, resource, resources st
 		t.Run(fmt.Sprintf(tc.nameFormat, resource), func(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client)
-			err := CreateOrRetain[T](clientBuilder(client, empty), empty, resource)
+			err := CreateOrRetain[T](t.Context(), clientBuilder(client, empty), empty, resource)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -450,8 +449,9 @@ func TestPatchNodeOnce(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
 			client := clientsetfake.NewSimpleClientset()
-			_, err := client.CoreV1().Nodes().Create(context.Background(), &tc.node, metav1.CreateOptions{})
+			_, err := client.CoreV1().Nodes().Create(ctx, &tc.node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}
@@ -461,12 +461,12 @@ func TestPatchNodeOnce(t *testing.T) {
 				})
 			}
 			var lastError error
-			conditionFunction := PatchNodeOnce(client, tc.lookupName, func(node *v1.Node) {
+			conditionFunction := PatchNodeOnce(ctx, client, tc.lookupName, func(node *v1.Node) {
 				node.Annotations = map[string]string{
 					"updatedBy": "test",
 				}
 			}, &lastError)
-			success, err := conditionFunction(context.Background())
+			success, err := conditionFunction(ctx)
 			if err != nil && tc.success {
 				t.Fatalf("did not expect error: %v", err)
 			}
@@ -516,7 +516,7 @@ func TestPatchNode(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client)
 			patchFn := func(*v1.Node) {}
-			err := PatchNode(client, "some-node", patchFn)
+			err := PatchNode(t.Context(), client, "some-node", patchFn)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}
@@ -562,7 +562,7 @@ func TestGetConfigMapWithShortRetry(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			tc.setupClient(client)
-			actual, err := GetConfigMapWithShortRetry(client, "ns", "some-cm")
+			actual, err := GetConfigMapWithShortRetry(t.Context(), client, "ns", "some-cm")
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got %v, error: %v", tc.expectedError, err != nil, err)
 			}

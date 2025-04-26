@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"io"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,13 +32,13 @@ type testData struct{}
 // testData must satisfy Data.
 var _ Data = &testData{}
 
-func (t *testData) EtcdUpgrade() bool                       { return false }
-func (t *testData) RenewCerts() bool                        { return false }
-func (t *testData) DryRun() bool                            { return false }
-func (t *testData) Cfg() *kubeadmapi.UpgradeConfiguration   { return nil }
-func (t *testData) InitCfg() *kubeadmapi.InitConfiguration  { return nil }
-func (t *testData) IsControlPlaneNode() bool                { return false }
-func (t *testData) Client() clientset.Interface             { return nil }
-func (t *testData) IgnorePreflightErrors() sets.Set[string] { return nil }
-func (t *testData) PatchesDir() string                      { return "" }
-func (t *testData) OutputWriter() io.Writer                 { return nil }
+func (t *testData) EtcdUpgrade() bool                                     { return false }
+func (t *testData) RenewCerts() bool                                      { return false }
+func (t *testData) DryRun() bool                                          { return false }
+func (t *testData) Cfg() *kubeadmapi.UpgradeConfiguration                 { return nil }
+func (t *testData) InitCfg(context.Context) *kubeadmapi.InitConfiguration { return nil }
+func (t *testData) IsControlPlaneNode() bool                              { return false }
+func (t *testData) Client(context.Context) clientset.Interface            { return nil }
+func (t *testData) IgnorePreflightErrors() sets.Set[string]               { return nil }
+func (t *testData) PatchesDir() string                                    { return "" }
+func (t *testData) OutputWriter() io.Writer                               { return nil }

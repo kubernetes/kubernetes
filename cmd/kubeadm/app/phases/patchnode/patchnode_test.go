@@ -113,7 +113,7 @@ func TestAnnotateCRISocket(t *testing.T) {
 				t.Fatalf("unexpected error building clientset: %v", err)
 			}
 
-			if err := AnnotateCRISocket(cs, nodename, tc.newCRISocketAnnotation); err != nil {
+			if err := AnnotateCRISocket(t.Context(), cs, nodename, tc.newCRISocketAnnotation); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 

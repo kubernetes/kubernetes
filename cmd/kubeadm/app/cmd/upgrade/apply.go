@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -102,7 +103,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 			if !ok {
 				return errors.New("invalid data struct")
 			}
-			if err := applyRunner.Run(args); err != nil {
+			if err := applyRunner.Run(cmd.Context(), args); err != nil {
 				return err
 			}
 			if flags.dryRun {
@@ -111,7 +112,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 			}
 
 			fmt.Println("")
-			fmt.Printf("[upgrade] SUCCESS! A control plane node of your cluster was upgraded to %q.\n\n", applyData.InitCfg().KubernetesVersion)
+			fmt.Printf("[upgrade] SUCCESS! A control plane node of your cluster was upgraded to %q.\n\n", applyData.InitCfg(cmd.Context()).KubernetesVersion)
 			fmt.Println("[upgrade] Now please proceed with upgrading the rest of the nodes by following the right order.")
 
 			return nil
@@ -163,6 +164,8 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 	externalCfg := &v1beta4.UpgradeConfiguration{}
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(applyFlags.cfgPath, externalCfg, opt)
+	ctx := cmd.Context()
+
 	if err != nil {
 		return nil, err
 	}
@@ -222,14 +225,14 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 
 	printer := &output.TextPrinter{}
 
-	client, err := getClient(applyFlags.kubeConfigPath, *dryRun, printer)
+	client, err := getClient(ctx, applyFlags.kubeConfigPath, *dryRun, printer)
 	if err != nil {
 		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", applyFlags.kubeConfigPath)
 	}
 
 	// Fetches the cluster configuration.
 	klog.V(1).Infoln("[upgrade] retrieving configuration from cluster")
-	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", false, false)
+	initCfg, err := configutil.FetchInitConfigurationFromCluster(ctx, client, nil, "upgrade", false, false)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			_, _ = printer.Printf("[upgrade] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
@@ -305,12 +308,12 @@ func (d *applyData) Cfg() *kubeadmapi.UpgradeConfiguration {
 }
 
 // InitCfg returns the InitConfiguration.
-func (d *applyData) InitCfg() *kubeadmapi.InitConfiguration {
+func (d *applyData) InitCfg(ctx context.Context) *kubeadmapi.InitConfiguration {
 	return d.initCfg
 }
 
 // Client returns a Kubernetes client to be used by kubeadm.
-func (d *applyData) Client() clientset.Interface {
+func (d *applyData) Client(ctx context.Context) clientset.Interface {
 	return d.client
 }
 

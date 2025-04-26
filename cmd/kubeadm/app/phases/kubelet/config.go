@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -123,7 +124,7 @@ func ApplyPatchesToConfig(cfg *kubeadmapi.ClusterConfiguration, patchesDir strin
 
 // CreateConfigMap creates a ConfigMap with the generic kubelet configuration.
 // Used at "kubeadm init" and "kubeadm upgrade" time
-func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
+func CreateConfigMap(ctx context.Context, cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
 	configMapName := kubeadmconstants.KubeletBaseConfigurationConfigMap
 	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
 
@@ -151,19 +152,19 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		componentconfigs.SignConfigMap(configMap)
 	}
 
-	if err := apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(configMap.GetNamespace()), configMap); err != nil {
+	if err := apiclient.CreateOrUpdate(ctx, client.CoreV1().ConfigMaps(configMap.GetNamespace()), configMap); err != nil {
 		return err
 	}
 
-	if err := createConfigMapRBACRules(client); err != nil {
+	if err := createConfigMapRBACRules(ctx, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration configmap RBAC rules")
 	}
 	return nil
 }
 
 // createConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
-func createConfigMapRBACRules(client clientset.Interface) error {
-	if err := apiclient.CreateOrUpdate(client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
+func createConfigMapRBACRules(ctx context.Context, client clientset.Interface) error {
+	if err := apiclient.CreateOrUpdate(ctx, client.RbacV1().Roles(metav1.NamespaceSystem), &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRole,
 			Namespace: metav1.NamespaceSystem,
@@ -180,7 +181,7 @@ func createConfigMapRBACRules(client clientset.Interface) error {
 		return err
 	}
 
-	return apiclient.CreateOrUpdate(client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
+	return apiclient.CreateOrUpdate(ctx, client.RbacV1().RoleBindings(metav1.NamespaceSystem), &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kubeadmconstants.KubeletBaseConfigMapRole,
 			Namespace: metav1.NamespaceSystem,

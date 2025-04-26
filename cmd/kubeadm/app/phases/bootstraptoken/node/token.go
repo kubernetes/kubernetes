@@ -33,19 +33,19 @@ import (
 )
 
 // CreateNewTokens tries to create a token and fails if one with the same ID already exists
-func CreateNewTokens(client clientset.Interface, tokens []bootstraptokenv1.BootstrapToken) error {
-	return UpdateOrCreateTokens(client, true, tokens)
+func CreateNewTokens(ctx context.Context, client clientset.Interface, tokens []bootstraptokenv1.BootstrapToken) error {
+	return UpdateOrCreateTokens(ctx, client, true, tokens)
 }
 
 // UpdateOrCreateTokens attempts to update a token with the given ID, or create if it does not already exist.
-func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens []bootstraptokenv1.BootstrapToken) error {
+func UpdateOrCreateTokens(ctx context.Context, client clientset.Interface, failIfExists bool, tokens []bootstraptokenv1.BootstrapToken) error {
 
 	secretsClient := client.CoreV1().Secrets(metav1.NamespaceSystem)
 
 	for _, token := range tokens {
 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
-		secret, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
+		secret, err := secretsClient.Get(ctx, secretName, metav1.GetOptions{})
 		if secret != nil && err == nil && failIfExists {
 			return errors.Errorf("a token with id %q already exists", token.Token.ID)
 		}
@@ -54,11 +54,11 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 
 		var lastError error
 		err = wait.PollUntilContextTimeout(
-			context.Background(),
+			ctx,
 			kubeadmconstants.KubernetesAPICallRetryInterval,
 			kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
 			true, func(_ context.Context) (bool, error) {
-				if err := apiclient.CreateOrUpdate(secretsClient, updatedOrNewSecret); err != nil {
+				if err := apiclient.CreateOrUpdate(ctx, secretsClient, updatedOrNewSecret); err != nil {
 					lastError = errors.Wrapf(err, "failed to create or update bootstrap token with name %s", secretName)
 					return false, nil
 				}

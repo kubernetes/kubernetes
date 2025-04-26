@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -76,8 +77,8 @@ func getEtcdPhaseFlags() []string {
 	return flags
 }
 
-func runEtcdPhaseLocal() func(c workflow.RunData) error {
-	return func(c workflow.RunData) error {
+func runEtcdPhaseLocal() func(ctx context.Context, c workflow.RunData) error {
+	return func(ctx context.Context, c workflow.RunData) error {
 		data, ok := c.(InitData)
 		if !ok {
 			return errors.New("etcd phase invoked with an invalid data struct")

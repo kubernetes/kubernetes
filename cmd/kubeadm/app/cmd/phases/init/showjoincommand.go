@@ -17,6 +17,7 @@ limitations under the License.
 package phases
 
 import (
+	"context"
 	"io"
 	"text/template"
 
@@ -78,7 +79,7 @@ func NewShowJoinCommandPhase() workflow.Phase {
 }
 
 // showJoinCommand prints the join command after all the phases in init have finished
-func showJoinCommand(c workflow.RunData) error {
+func showJoinCommand(ctx context.Context, c workflow.RunData) error {
 	data, ok := c.(InitData)
 	if !ok {
 		return errors.New("show-join-command phase invoked with an invalid data struct")

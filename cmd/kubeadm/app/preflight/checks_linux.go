@@ -20,6 +20,7 @@ limitations under the License.
 package preflight
 
 import (
+	"context"
 	"syscall"
 
 	"github.com/pkg/errors"
@@ -30,7 +31,7 @@ import (
 )
 
 // Check number of memory required by kubeadm
-func (mc MemCheck) Check() (warnings, errorList []error) {
+func (mc MemCheck) Check(ctx context.Context) (warnings, errorList []error) {
 	info := syscall.Sysinfo_t{}
 	err := syscall.Sysinfo(&info)
 	if err != nil {
