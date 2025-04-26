@@ -104,8 +104,7 @@ func TestCommandsGenerated(t *testing.T) {
 }
 
 func TestRunRenewCommands(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	cfg := testutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = tmpDir
@@ -312,8 +311,7 @@ func TestRunRenewCommands(t *testing.T) {
 }
 
 func TestRunGenCSR(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	kubeConfigDir := filepath.Join(tmpDir, "kubernetes")
 	certDir := kubeConfigDir + "/pki"
@@ -404,8 +402,7 @@ kubernetesVersion: %s`,
 		kubeadmapiv1.SchemeGroupVersion.String(),
 		kubeadmconstants.MinimumControlPlaneVersion.String())
 
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 
 	customConfigPath := tmpDir + "/kubeadm.conf"
 
@@ -489,11 +486,8 @@ kubernetesVersion: %s`,
 }
 
 func TestRunCmdCertsExpiration(t *testing.T) {
-	kdir := testutil.SetupTempDir(t)
+	kdir := t.TempDir()
 	defer func() {
-		if err := os.RemoveAll(kdir); err != nil {
-			t.Fatalf("Failed to teardown: %s", err)
-		}
 		clientSetFromFile = kubeconfigutil.ClientSetFromFile
 	}()
 

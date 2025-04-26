@@ -35,6 +35,7 @@ import (
 
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func quantityMustParse(value string) *resource.Quantity {
@@ -43,6 +44,7 @@ func quantityMustParse(value string) *resource.Quantity {
 }
 
 func TestGetReclaimableThreshold(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testCases := map[string]struct {
 		thresholds                   []evictionapi.Threshold
 		expectedThreshold            evictionapi.Threshold
@@ -129,7 +131,7 @@ func TestGetReclaimableThreshold(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		sort.Sort(byEvictionPriority(testCase.thresholds))
-		threshold, ressourceName, found := getReclaimableThreshold(testCase.thresholds)
+		threshold, ressourceName, found := getReclaimableThreshold(logger, testCase.thresholds)
 		assert.Equal(t, testCase.expectedReclaimableToBeFound, found)
 		assert.Equal(t, testCase.expectedResourceName, ressourceName)
 		assert.Equal(t, testCase.expectedThreshold.Signal, threshold.Signal)
@@ -1358,6 +1360,7 @@ func newPodStats(pod *v1.Pod, podWorkingSetBytes uint64) statsapi.PodStats {
 }
 
 func TestMakeSignalObservations(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	podMaker := func(name, namespace, uid string, numContainers int) *v1.Pod {
 		pod := &v1.Pod{}
 		pod.Name = name
@@ -1453,7 +1456,7 @@ func TestMakeSignalObservations(t *testing.T) {
 	if res.CmpInt64(int64(allocatableMemoryCapacity)) != 0 {
 		t.Errorf("Expected Threshold %v to be equal to value %v", res.Value(), allocatableMemoryCapacity)
 	}
-	actualObservations, statsFunc := makeSignalObservations(fakeStats)
+	actualObservations, statsFunc := makeSignalObservations(logger, fakeStats)
 	allocatableMemQuantity, found := actualObservations[evictionapi.SignalAllocatableMemoryAvailable]
 	if !found {
 		t.Errorf("Expected allocatable memory observation, but didn't find one")
@@ -1557,6 +1560,7 @@ func TestMakeSignalObservations(t *testing.T) {
 }
 
 func TestThresholdsMet(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	hardThreshold := evictionapi.Threshold{
 		Signal:   evictionapi.SignalMemoryAvailable,
 		Operator: evictionapi.OpLessThan,
@@ -1621,7 +1625,7 @@ func TestThresholdsMet(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinReclaim)
+		actual := thresholdsMet(logger, testCase.thresholds, testCase.observations, testCase.enforceMinReclaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -1629,6 +1633,7 @@ func TestThresholdsMet(t *testing.T) {
 }
 
 func TestThresholdsUpdatedStats(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	updatedThreshold := evictionapi.Threshold{
 		Signal: evictionapi.SignalMemoryAvailable,
 	}
@@ -1711,7 +1716,7 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsUpdatedStats(testCase.thresholds, testCase.observations, testCase.last)
+		actual := thresholdsUpdatedStats(logger, testCase.thresholds, testCase.observations, testCase.last)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -1719,6 +1724,7 @@ func TestThresholdsUpdatedStats(t *testing.T) {
 }
 
 func TestPercentageThresholdsMet(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	specificThresholds := []evictionapi.Threshold{
 		{
 			Signal:   evictionapi.SignalMemoryAvailable,
@@ -1829,7 +1835,7 @@ func TestPercentageThresholdsMet(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinRelaim)
+		actual := thresholdsMet(logger, testCase.thresholds, testCase.observations, testCase.enforceMinRelaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
@@ -1886,6 +1892,7 @@ func TestThresholdsFirstObservedAt(t *testing.T) {
 }
 
 func TestThresholdsMetGracePeriod(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	now := metav1.Now()
 	hardThreshold := evictionapi.Threshold{
 		Signal:   evictionapi.SignalMemoryAvailable,
@@ -1936,7 +1943,7 @@ func TestThresholdsMetGracePeriod(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMetGracePeriod(testCase.observedAt, now.Time)
+		actual := thresholdsMetGracePeriod(logger, testCase.observedAt, now.Time)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
