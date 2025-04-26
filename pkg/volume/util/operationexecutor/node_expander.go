@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -28,6 +29,10 @@ import (
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+)
+
+var (
+	NodeExpansionNotRequired = "volume.kubernetes.io/node-expansion-not-required"
 )
 
 type NodeExpander struct {
@@ -102,7 +107,9 @@ func (ne *NodeExpander) runPreCheck() bool {
 
 	// PVC is already expanded but we are still trying to expand the volume because
 	// last recorded size in ASOW is older. This can happen for RWX volume types.
-	if ne.pvcAlreadyUpdated && storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) {
+	if ne.pvcAlreadyUpdated &&
+		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) &&
+		!metav1.HasAnnotation(ne.pvc.ObjectMeta, NodeExpansionNotRequired) {
 		return true
 	}
 
