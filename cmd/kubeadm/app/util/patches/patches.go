@@ -171,11 +171,7 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 	var err error
 	var patchedData []byte
 
-	var found bool
-	if slices.Contains(pm.knownTargets, patchTarget.Name) {
-		found = true
-	}
-	if !found {
+	if !slices.Contains(pm.knownTargets, patchTarget.Name) {
 		return errors.Errorf("unknown patch target name %q, must be one of %v", patchTarget.Name, pm.knownTargets)
 	}
 
