@@ -171,7 +171,6 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	}
 
 	var targets []generator.Target
-	linter := newLinter()
 
 	// First load other "input" packages.  We do this as a single call because
 	// it is MUCH faster.
@@ -242,6 +241,12 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	// Initialize all validator plugins exactly once.
 	validator := validators.InitGlobalValidator(context)
 
+	// Create a type discoverer for all types of all inputs.
+	td := NewTypeDiscoverer(validator, inputToPkg)
+
+	// Create a linter to collect errors as we go.
+	linter := newLinter()
+
 	// Build a cache of type->callNode for every type we need.
 	for _, input := range context.Inputs {
 		klog.V(2).InfoS("processing", "pkg", input)
@@ -303,7 +308,6 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			return cmp.Compare(a.Name.String(), b.Name.String())
 		})
 
-		td := NewTypeDiscoverer(validator, inputToPkg)
 		for _, t := range rootTypes {
 			klog.V(4).InfoS("pre-processing", "type", t)
 			if err := td.DiscoverType(t); err != nil {
