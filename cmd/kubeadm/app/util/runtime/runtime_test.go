@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -447,12 +448,7 @@ func TestDetectCRISocketImpl(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			socket, err := detectCRISocketImpl(func(path string) bool {
-				for _, existing := range test.existingSockets {
-					if path == existing {
-						return true
-					}
-				}
-				return false
+				return slices.Contains(test.existingSockets, path)
 			}, test.existingSockets)
 
 			if (err != nil) != test.expectedError {

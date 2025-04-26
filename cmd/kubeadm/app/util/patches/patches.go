@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -171,11 +172,8 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 	var patchedData []byte
 
 	var found bool
-	for _, pt := range pm.knownTargets {
-		if pt == patchTarget.Name {
-			found = true
-			break
-		}
+	if slices.Contains(pm.knownTargets, patchTarget.Name) {
+		found = true
 	}
 	if !found {
 		return errors.Errorf("unknown patch target name %q, must be one of %v", patchTarget.Name, pm.knownTargets)

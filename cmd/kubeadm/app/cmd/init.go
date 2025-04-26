@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -643,10 +644,5 @@ func manageSkippedAddons(cfg *kubeadmapi.ClusterConfiguration, skipPhases []stri
 }
 
 func isPhaseInSkipPhases(phase string, skipPhases []string) bool {
-	for _, item := range skipPhases {
-		if item == phase {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(skipPhases, phase)
 }
