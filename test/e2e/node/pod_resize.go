@@ -30,6 +30,7 @@ import (
 	helpers "k8s.io/component-helpers/resource"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -123,7 +124,7 @@ func doPodResizeAdmissionPluginsTests(f *framework.Framework) {
 			containers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
 				},
 			}
 			patchString := `{"spec":{"containers":[
@@ -132,7 +133,7 @@ func doPodResizeAdmissionPluginsTests(f *framework.Framework) {
 			expected := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
 				},
 			}
 			patchStringExceedCPU := `{"spec":{"containers":[
@@ -264,13 +265,13 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		c1 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c1",
-				Resources: &podresize.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Resources: &cgroups.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 			},
 		}
 		c2 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c2",
-				Resources: &podresize.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
+				Resources: &cgroups.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
 			},
 		}
 		patchTestpod2ToFitNode := fmt.Sprintf(`{
@@ -328,7 +329,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		c3 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c3",
-				Resources: &podresize.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
+				Resources: &cgroups.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
 			},
 		}
 		patchTestpod1ToMakeSpaceForPod3 := fmt.Sprintf(`{
@@ -413,7 +414,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		expected := []podresize.ResizableContainerInfo{
 			{
 				Name:         "c1",
-				Resources:    &podresize.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Resources:    &cgroups.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 				RestartCount: testPod1.Status.ContainerStatuses[0].RestartCount,
 			},
 		}

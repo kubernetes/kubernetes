@@ -18,7 +18,6 @@ package pod
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -289,55 +288,4 @@ func FindContainerStatusInPod(pod *v1.Pod, containerName string) *v1.ContainerSt
 		}
 	}
 	return nil
-}
-
-// VerifyCgroupValue verifies that the given cgroup path has the expected value in
-// the specified container of the pod. It execs into the container to retrieve the
-// cgroup value, and ensures that the retrieved cgroup value is equivalent to at
-// least one of the values in expectedCgValues.
-func VerifyCgroupValue(f *framework.Framework, pod *v1.Pod, cName, cgPath string, expectedCgValues ...string) error {
-	cmd := fmt.Sprintf("head -n 1 %s", cgPath)
-	framework.Logf("Namespace %s Pod %s Container %s - looking for one of the expected cgroup values %s in path %s",
-		pod.Namespace, pod.Name, cName, expectedCgValues, cgPath)
-	cgValue, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
-	if err != nil {
-		return fmt.Errorf("failed to read cgroup value %q for container %q: %w", cgPath, cName, err)
-	}
-	cgValue = strings.Trim(cgValue, "\n")
-
-	if err := framework.Gomega().Expect(cgValue).To(gomega.BeElementOf(expectedCgValues)); err != nil {
-		return fmt.Errorf("value of cgroup %q for container %q was %q; expected one of %q", cgPath, cName, cgValue, expectedCgValues)
-	}
-
-	return nil
-}
-
-// VerifyOomScoreAdjValue verifies that oom_score_adj for pid 1 (pidof init/systemd -> app)
-// has the expected value in specified container of the pod. It execs into the container,
-// reads the oom_score_adj value from procfs, and compares it against the expected value.
-func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expectedOomScoreAdj string) error {
-	cmd := "cat /proc/1/oom_score_adj"
-	framework.Logf("Namespace %s Pod %s Container %s - looking for oom_score_adj value %s",
-		pod.Namespace, pod.Name, cName, expectedOomScoreAdj)
-	oomScoreAdj, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, cName, "/bin/sh", "-c", cmd)
-	if err != nil {
-		return fmt.Errorf("failed to find expected value %s for container app process", expectedOomScoreAdj)
-	}
-	oomScoreAdj = strings.Trim(oomScoreAdj, "\n")
-	if oomScoreAdj != expectedOomScoreAdj {
-		return fmt.Errorf("oom_score_adj value %s not equal to expected %s", oomScoreAdj, expectedOomScoreAdj)
-	}
-	return nil
-}
-
-// IsPodOnCgroupv2Node checks whether the pod is running on cgroupv2 node.
-// TODO: Deduplicate this function with NPD cluster e2e test:
-// https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
-func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) bool {
-	cmd := "mount -t cgroup2"
-	out, _, err := ExecCommandInContainerWithFullOutput(f, pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
-	if err != nil {
-		return false
-	}
-	return len(out) != 0
 }

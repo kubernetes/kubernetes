@@ -25,85 +25,26 @@ import (
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	helpers "k8s.io/component-helpers/resource"
 	"k8s.io/kubectl/pkg/util/podutils"
-	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
 	kubeqos "k8s.io/kubernetes/pkg/kubelet/qos"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
 const (
-	CgroupCPUPeriod            string = "/sys/fs/cgroup/cpu/cpu.cfs_period_us"
-	CgroupCPUShares            string = "/sys/fs/cgroup/cpu/cpu.shares"
-	CgroupCPUQuota             string = "/sys/fs/cgroup/cpu/cpu.cfs_quota_us"
-	CgroupMemLimit             string = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
-	Cgroupv2MemLimit           string = "/sys/fs/cgroup/memory.max"
-	Cgroupv2MemRequest         string = "/sys/fs/cgroup/memory.min"
-	Cgroupv2CPULimit           string = "/sys/fs/cgroup/cpu.max"
-	Cgroupv2CPURequest         string = "/sys/fs/cgroup/cpu.weight"
-	CPUPeriod                  string = "100000"
 	MinContainerRuntimeVersion string = "1.6.9"
 )
 
-var (
-	podOnCgroupv2Node *bool
-)
-
-type ContainerResources struct {
-	CPUReq              string
-	CPULim              string
-	MemReq              string
-	MemLim              string
-	EphStorReq          string
-	EphStorLim          string
-	ExtendedResourceReq string
-	ExtendedResourceLim string
-}
-
-func (cr *ContainerResources) ResourceRequirements() *v1.ResourceRequirements {
-	if cr == nil {
-		return nil
-	}
-
-	var lim, req v1.ResourceList
-	if cr.CPULim != "" || cr.MemLim != "" || cr.EphStorLim != "" {
-		lim = make(v1.ResourceList)
-	}
-	if cr.CPUReq != "" || cr.MemReq != "" || cr.EphStorReq != "" {
-		req = make(v1.ResourceList)
-	}
-	if cr.CPULim != "" {
-		lim[v1.ResourceCPU] = resource.MustParse(cr.CPULim)
-	}
-	if cr.MemLim != "" {
-		lim[v1.ResourceMemory] = resource.MustParse(cr.MemLim)
-	}
-	if cr.EphStorLim != "" {
-		lim[v1.ResourceEphemeralStorage] = resource.MustParse(cr.EphStorLim)
-	}
-	if cr.CPUReq != "" {
-		req[v1.ResourceCPU] = resource.MustParse(cr.CPUReq)
-	}
-	if cr.MemReq != "" {
-		req[v1.ResourceMemory] = resource.MustParse(cr.MemReq)
-	}
-	if cr.EphStorReq != "" {
-		req[v1.ResourceEphemeralStorage] = resource.MustParse(cr.EphStorReq)
-	}
-	return &v1.ResourceRequirements{Limits: lim, Requests: req}
-}
-
 type ResizableContainerInfo struct {
 	Name          string
-	Resources     *ContainerResources
+	Resources     *cgroups.ContainerResources
 	CPUPolicy     *v1.ResourceResizeRestartPolicy
 	MemPolicy     *v1.ResourceResizeRestartPolicy
 	RestartCount  int32
@@ -133,10 +74,7 @@ type patchSpec struct {
 	} `json:"spec"`
 }
 
-func getTestResourceInfo(tcInfo ResizableContainerInfo) (res v1.ResourceRequirements, resizePol []v1.ContainerResizePolicy) {
-	if tcInfo.Resources != nil {
-		res = *tcInfo.Resources.ResourceRequirements()
-	}
+func getTestResizePolicy(tcInfo ResizableContainerInfo) (resizePol []v1.ContainerResizePolicy) {
 	if tcInfo.CPUPolicy != nil {
 		cpuPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceCPU, RestartPolicy: *tcInfo.CPUPolicy}
 		resizePol = append(resizePol, cpuPol)
@@ -145,21 +83,14 @@ func getTestResourceInfo(tcInfo ResizableContainerInfo) (res v1.ResourceRequirem
 		memPol := v1.ContainerResizePolicy{ResourceName: v1.ResourceMemory, RestartPolicy: *tcInfo.MemPolicy}
 		resizePol = append(resizePol, memPol)
 	}
-	return res, resizePol
+	return resizePol
 }
 
 func makeResizableContainer(tcInfo ResizableContainerInfo) v1.Container {
 	cmd := "grep Cpus_allowed_list /proc/self/status | cut -f2 && sleep 1d"
-	res, resizePol := getTestResourceInfo(tcInfo)
-
-	tc := v1.Container{
-		Name:         tcInfo.Name,
-		Image:        imageutils.GetE2EImage(imageutils.BusyBox),
-		Command:      []string{"/bin/sh"},
-		Args:         []string{"-c", cmd},
-		Resources:    res,
-		ResizePolicy: resizePol,
-	}
+	resizePol := getTestResizePolicy(tcInfo)
+	tc := cgroups.MakeContainerWithResources(tcInfo.Name, tcInfo.Resources, cmd)
+	tc.ResizePolicy = resizePol
 	if tcInfo.RestartPolicy != "" {
 		tc.RestartPolicy = &tcInfo.RestartPolicy
 	}
@@ -302,65 +233,13 @@ func verifyPodContainersStatusResources(gotCtrStatuses []v1.ContainerStatus, wan
 
 func VerifyPodContainersCgroupValues(ctx context.Context, f *framework.Framework, pod *v1.Pod, tcInfo []ResizableContainerInfo) error {
 	ginkgo.GinkgoHelper()
-	if podOnCgroupv2Node == nil {
-		value := e2epod.IsPodOnCgroupv2Node(f, pod)
-		podOnCgroupv2Node = &value
-	}
-	cgroupMemLimit := Cgroupv2MemLimit
-	cgroupCPULimit := Cgroupv2CPULimit
-	cgroupCPURequest := Cgroupv2CPURequest
-	if !*podOnCgroupv2Node {
-		cgroupMemLimit = CgroupMemLimit
-		cgroupCPULimit = CgroupCPUQuota
-		cgroupCPURequest = CgroupCPUShares
-	}
+
+	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, pod)
 
 	var errs []error
 	for _, ci := range tcInfo {
-		if ci.Resources == nil {
-			continue
-		}
 		tc := makeResizableContainer(ci)
-		if tc.Resources.Limits != nil || tc.Resources.Requests != nil {
-			var expectedCPUShares int64
-			var expectedMemLimitString string
-			expectedMemLimitInBytes := tc.Resources.Limits.Memory().Value()
-			cpuRequest := tc.Resources.Requests.Cpu()
-			cpuLimit := tc.Resources.Limits.Cpu()
-			if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuLimit.MilliValue()))
-			} else {
-				expectedCPUShares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
-			}
-
-			expectedCPULimits := GetCPULimitCgroupExpectations(cpuLimit)
-			expectedMemLimitString = strconv.FormatInt(expectedMemLimitInBytes, 10)
-			if *podOnCgroupv2Node {
-				if expectedMemLimitString == "0" {
-					expectedMemLimitString = "max"
-				}
-				// convert cgroup v1 cpu.shares value to cgroup v2 cpu.weight value
-				// https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2254-cgroup-v2#phase-1-convert-from-cgroups-v1-settings-to-v2
-				expectedCPUShares = int64(1 + ((expectedCPUShares-2)*9999)/262142)
-			}
-
-			if expectedMemLimitString != "0" {
-				if err := e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupMemLimit, expectedMemLimitString); err != nil {
-					errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
-				}
-			}
-
-			if err := e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPULimit, expectedCPULimits...); err != nil {
-				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
-			}
-
-			if err := e2epod.VerifyCgroupValue(f, pod, ci.Name, cgroupCPURequest, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
-				errs = append(errs, fmt.Errorf("failed to verify cpu request cgroup value: %w", err))
-			}
-
-			// TODO(vinaykul,InPlacePodVerticalScaling): Verify oom_score_adj when runc adds support for updating it
-			// See https://github.com/opencontainers/runc/pull/4669
-		}
+		errs = append(errs, cgroups.VerifyContainerCgroupValues(f, pod, &tc, onCgroupv2))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -416,7 +295,7 @@ func verifyOomScoreAdj(f *framework.Framework, pod *v1.Pod, containerName string
 	oomScoreAdj := kubeqos.GetContainerOOMScoreAdjust(pod, container, int64(nodeMemoryCapacity.Value()))
 	expectedOomScoreAdj := strconv.FormatInt(int64(oomScoreAdj), 10)
 
-	return e2epod.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj)
+	return cgroups.VerifyOomScoreAdjValue(f, pod, container.Name, expectedOomScoreAdj)
 }
 
 func WaitForPodResizeActuation(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, pod *v1.Pod, expectedContainers []ResizableContainerInfo) *v1.Pod {
@@ -543,36 +422,4 @@ func formatErrors(err error) error {
 		errStrings[i] = err.Error()
 	}
 	return fmt.Errorf("[\n%s\n]", strings.Join(errStrings, ",\n"))
-}
-
-// TODO: Remove the rounded cpu limit values when https://github.com/opencontainers/runc/issues/4622
-// is fixed.
-func GetCPULimitCgroupExpectations(cpuLimit *resource.Quantity) []string {
-	var expectedCPULimits []string
-	milliCPULimit := cpuLimit.MilliValue()
-
-	cpuQuota := kubecm.MilliCPUToQuota(milliCPULimit, kubecm.QuotaPeriod)
-	if cpuLimit.IsZero() {
-		cpuQuota = -1
-	}
-	expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuota))
-
-	if milliCPULimit%10 != 0 && cpuQuota != -1 {
-		roundedCPULimit := (milliCPULimit/10 + 1) * 10
-		cpuQuotaRounded := kubecm.MilliCPUToQuota(roundedCPULimit, kubecm.QuotaPeriod)
-		expectedCPULimits = append(expectedCPULimits, getExpectedCPULimitFromCPUQuota(cpuQuotaRounded))
-	}
-
-	return expectedCPULimits
-}
-
-func getExpectedCPULimitFromCPUQuota(cpuQuota int64) string {
-	expectedCPULimitString := strconv.FormatInt(cpuQuota, 10)
-	if *podOnCgroupv2Node {
-		if expectedCPULimitString == "-1" {
-			expectedCPULimitString = "max"
-		}
-		expectedCPULimitString = fmt.Sprintf("%s %s", expectedCPULimitString, CPUPeriod)
-	}
-	return expectedCPULimitString
 }
