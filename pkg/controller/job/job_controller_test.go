@@ -6248,7 +6248,7 @@ func TestGetPodsForJob(t *testing.T) {
 }
 
 func TestAddPod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 
@@ -6294,7 +6294,7 @@ func TestAddPod(t *testing.T) {
 }
 
 func TestAddPodOrphan(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6323,7 +6323,7 @@ func TestAddPodOrphan(t *testing.T) {
 }
 
 func TestUpdatePod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6372,7 +6372,7 @@ func TestUpdatePod(t *testing.T) {
 }
 
 func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6400,7 +6400,7 @@ func TestUpdatePodOrphanWithNewLabels(t *testing.T) {
 }
 
 func TestUpdatePodChangeControllerRef(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6428,7 +6428,7 @@ func TestUpdatePodChangeControllerRef(t *testing.T) {
 }
 
 func TestUpdatePodRelease(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	_, ctx := ktesting.NewTestContext(t)
 	logger := klog.FromContext(ctx)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
@@ -6456,7 +6456,7 @@ func TestUpdatePodRelease(t *testing.T) {
 }
 
 func TestDeletePod(t *testing.T) {
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, fastSyncJobBatchPeriod))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, fastSyncJobBatchPeriod))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	fakeClock := clocktesting.NewFakeClock(time.Now())
@@ -6501,7 +6501,7 @@ func TestDeletePod(t *testing.T) {
 
 func TestDeletePodOrphan(t *testing.T) {
 	// Disable batching of pod updates to show it does not get requeued at all
-	t.Cleanup(setDurationDuringTest(&syncJobBatchPeriod, 0))
+	t.Cleanup(setDurationDuringTest(&SyncJobBatchPeriod, 0))
 	logger, ctx := ktesting.NewTestContext(t)
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	jm, informer := newControllerFromClient(ctx, t, clientset, controller.NoResyncPeriodFunc)
@@ -7023,7 +7023,7 @@ func TestJobBackoff(t *testing.T) {
 		"failure with pod updates batching": {
 			requeues:    0,
 			phase:       v1.PodFailed,
-			wantBackoff: syncJobBatchPeriod,
+			wantBackoff: SyncJobBatchPeriod,
 		},
 	}
 
