@@ -279,6 +279,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeProxyDaemonSetMigration = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
 
+	// Owner: sig-network
+	// Marks tests that require the kernel to have support for the nfacct subsystem.
+	// (Some distros don't include this in the kernel.)
+	KubeProxyNFAcct = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyNFAcct"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LabelSelector = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
 
