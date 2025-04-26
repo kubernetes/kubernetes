@@ -41,8 +41,7 @@ import (
 
 func TestGetDataFromInitConfig(t *testing.T) {
 	certData := []byte("cert-data")
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 	cfg := &kubeadmapi.InitConfiguration{}
 	cfg.CertificatesDir = tmpdir
 
@@ -159,8 +158,7 @@ func TestCertOrKeyNameToSecretName(t *testing.T) {
 }
 
 func TestUploadCerts(t *testing.T) {
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	secretKey, err := CreateCertificateKey()
 	if err != nil {
@@ -210,14 +208,12 @@ func TestDownloadCerts(t *testing.T) {
 	}
 
 	// Temporary directory where certificates will be generated
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 	initConfiguration := testutil.GetDefaultInternalConfig(t)
 	initConfiguration.ClusterConfiguration.CertificatesDir = tmpdir
 
 	// Temporary directory where certificates will be downloaded to
-	targetTmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(targetTmpdir)
+	targetTmpdir := t.TempDir()
 	initForDownloadConfiguration := testutil.GetDefaultInternalConfig(t)
 	initForDownloadConfiguration.ClusterConfiguration.CertificatesDir = targetTmpdir
 
