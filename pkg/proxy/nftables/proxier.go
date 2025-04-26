@@ -1586,7 +1586,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						protocol, "dport", svcInfo.Port(),
 						"jump", markMasqChain,
 					),
 				})
@@ -1600,7 +1599,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						protocol, "dport", svcInfo.Port(),
 						proxier.localDetector.IfNotLocalNFT(),
 						"jump", markMasqChain,
 					),
