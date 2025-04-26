@@ -265,7 +265,7 @@ func TestValidateOptions(t *testing.T) {
 	}
 }
 
-func TestValidateServcieAccountTokenSigningConfig(t *testing.T) {
+func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 	tests := []struct {
 		name           string
 		featureEnabled bool
