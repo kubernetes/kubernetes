@@ -354,23 +354,21 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		return node, nil
 	}
 
-	// If we are descending into a named type, reboot the field path for better
-	// logging.  Otherwise the field path might come in as something like
-	// <type1>.<field1>.<field2> which is true, but not super useful.
-	switch t.Kind {
-	case types.Alias, types.Struct:
-		fldPath = field.NewPath(t.Name.String())
-	}
-
 	// This is the type-node being assembled in the rest of this function.
 	thisNode := &typeNode{
 		valueType: t,
 	}
 	td.typeNodes[t] = thisNode
 
-	// If this is a known, named type, we can call its validation function.
+	// If we are descending into a named type...
 	switch t.Kind {
 	case types.Alias, types.Struct:
+		// Reboot the field path for better logging.  Otherwise the field path
+		// might come in as something like <type1>.<field1>.<field2> which is
+		// true, but not super useful.
+		fldPath = field.NewPath(t.Name.String())
+
+		// Find its validation function for later use.
 		if fn, ok := td.getValidationFunctionName(t); ok {
 			thisNode.funcName = fn
 		}
