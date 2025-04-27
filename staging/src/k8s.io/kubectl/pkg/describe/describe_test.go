@@ -721,19 +721,13 @@ Annotations:  <none>
 
 Data
 ====
-key1:
-----
-value1
-
-key2:
-----
-value2
-
+key1:  value1
+key2:  value2
 
 BinaryData
 ====
-binarykey1: 5 bytes
-binarykey2: 6 bytes
+binarykey1:  5 bytes
+binarykey2:  6 bytes
 
 Events:  <none>
 `

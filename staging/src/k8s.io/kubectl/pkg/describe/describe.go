@@ -4567,14 +4567,12 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		w.Write(LEVEL_0, "\nData\n====\n")
 		for _, k := range slices.Sorted(maps.Keys(configMap.Data)) {
 			v := configMap.Data[k]
-			w.Write(LEVEL_0, "%s:\n----\n", k)
-			w.Write(LEVEL_0, "%s\n", string(v))
-			w.Write(LEVEL_0, "\n")
+			w.Write(LEVEL_0, "%s:\t%s\n", k, string(v))
 		}
 		w.Write(LEVEL_0, "\nBinaryData\n====\n")
 		for _, k := range slices.Sorted(maps.Keys(configMap.BinaryData)) {
 			v := configMap.BinaryData[k]
-			w.Write(LEVEL_0, "%s: %s bytes\n", k, strconv.Itoa(len(v)))
+			w.Write(LEVEL_0, "%s:\t%s bytes\n", k, strconv.Itoa(len(v)))
 		}
 		w.Write(LEVEL_0, "\n")
 
