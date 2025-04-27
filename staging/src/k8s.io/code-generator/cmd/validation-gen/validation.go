@@ -92,10 +92,8 @@ func (g *genValidations) Namers(_ *generator.Context) namer.NameSystems {
 
 func (g *genValidations) Filter(_ *generator.Context, t *types.Type) bool {
 	// We want to emit code for all root types.
-	for _, rt := range g.rootTypes {
-		if rt == t {
-			return true
-		}
+	if slices.Contains(g.rootTypes, t) {
+		return true
 	}
 	// We want to emit for any other type that is transitively part of a root
 	// type and has validations.
@@ -1326,7 +1324,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			}
 			rv.Type().Elem()
 			sw.Do("[$.arraySize$]$.itemType${", map[string]string{"arraySize": arraySize, "itemType": itemType})
-			for i := 0; i < rv.Len(); i++ {
+			for i := range rv.Len() {
 				val := rv.Index(i)
 				toGolangSourceDataLiteral(sw, c, val.Interface())
 				if i < rv.Len()-1 {
