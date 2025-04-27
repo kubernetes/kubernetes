@@ -144,6 +144,26 @@ func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 	}
 	_, resizeErr := ne.volumePlugin.NodeExpand(ne.pluginResizeOpts)
 	if resizeErr != nil {
+		// In order to support node volume expansion for RWX volumes on different nodes,
+		// we bypass the check for VolumeExpansionPendingOnNode state during the pre-check
+		// and then directly call the NodeExpandVolume method on the plugin.
+		//
+		// However, it does not make sense where the csi driver does not support node expansion.
+		// We should not treat this as a failure. It is a workaround for this issue:
+		// https://github.com/kubernetes/kubernetes/issues/131381.
+		//
+		// For other access modes, we should not hit this state, because we will wait for
+		// VolumeExpansionPendingOnNode before trying to expand volume in kubelet.
+		// See runPreCheck() above.
+		//
+		// If volume is already expanded, then we should not retry expansion on the node if
+		// driver returns OperationNotSupportedError.
+		if volumetypes.IsOperationNotSupportedError(resizeErr) && ne.pvcAlreadyUpdated {
+			klog.V(4).InfoS(ne.vmt.GenerateMsgDetailed("MountVolume.NodeExpandVolume failed", "NodeExpandVolume not supported"), "pod", klog.KObj(ne.vmt.Pod))
+			ne.testStatus = testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: false}
+			return true, ne.pluginResizeOpts.NewSize, nil
+		}
+
 		if volumetypes.IsOperationFinishedError(resizeErr) {
 			var markFailedError error
 			ne.actualStateOfWorld.MarkVolumeExpansionFailedWithFinalError(ne.vmt.VolumeName)
