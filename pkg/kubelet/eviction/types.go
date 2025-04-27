@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -153,7 +154,7 @@ type CgroupNotifier interface {
 type NotifierFactory interface {
 	// NewCgroupNotifier creates a CgroupNotifier that creates events when the threshold
 	// on the attribute in the cgroup specified by the path is crossed.
-	NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error)
+	NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error)
 }
 
 // ThresholdNotifier manages CgroupNotifiers based on memory eviction thresholds, and performs a function

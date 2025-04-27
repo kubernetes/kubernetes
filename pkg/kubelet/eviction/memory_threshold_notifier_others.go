@@ -95,7 +95,7 @@ func (m *linuxMemoryThresholdNotifier) UpdateThreshold(ctx context.Context, summ
 	if m.notifier != nil {
 		m.notifier.Stop()
 	}
-	newNotifier, err := m.factory.NewCgroupNotifier(m.cgroupPath, memoryUsageAttribute, memcgThreshold.Value())
+	newNotifier, err := m.factory.NewCgroupNotifier(logger, m.cgroupPath, memoryUsageAttribute, memcgThreshold.Value())
 	if err != nil {
 		return err
 	}

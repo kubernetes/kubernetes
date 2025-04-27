@@ -47,7 +47,7 @@ var _ CgroupNotifier = &linuxCgroupNotifier{}
 
 // NewCgroupNotifier returns a linuxCgroupNotifier, which performs cgroup control operations required
 // to receive notifications from the cgroup when the threshold is crossed in either direction.
-func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
+func NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error) {
 	// cgroupv2 does not support monitoring cgroup memory thresholds using cgroup.event_control.
 	// Instead long term, on cgroupv2 kubelet should rely on combining usage of memory.low on root pods cgroup with inotify notifications on memory.events and or PSI pressure.
 	// For now, let's return a fake "disabled" cgroup notifier on cgroupv2.

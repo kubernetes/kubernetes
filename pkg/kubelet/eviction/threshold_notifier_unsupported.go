@@ -26,8 +26,8 @@ import (
 )
 
 // NewCgroupNotifier creates a cgroup notifier that does nothing because cgroups do not exist on non-linux systems.
-func NewCgroupNotifier(path, attribute string, threshold int64) (CgroupNotifier, error) {
-	klog.TODO().V(5).Info("cgroup notifications not supported")
+func NewCgroupNotifier(logger klog.Logger, path, attribute string, threshold int64) (CgroupNotifier, error) {
+	logger.V(5).Info("cgroup notifications not supported")
 	return &unsupportedThresholdNotifier{}, nil
 }
 

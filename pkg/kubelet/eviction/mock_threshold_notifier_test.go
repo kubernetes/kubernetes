@@ -83,9 +83,9 @@ func (_c *MockThresholdNotifier_Description_Call) RunAndReturn(run func() string
 	return _c
 }
 
-// Start provides a mock function with no fields
-func (_m *MockThresholdNotifier) Start() {
-	_m.Called()
+// Start provides a mock function with given fields: ctx
+func (_m *MockThresholdNotifier) Start(ctx context.Context) {
+	_m.Called(ctx)
 }
 
 // MockThresholdNotifier_Start_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Start'
@@ -111,8 +111,9 @@ func (_c *MockThresholdNotifier_Start_Call) Return() *MockThresholdNotifier_Star
 	return _c
 }
 
-func (_c *MockThresholdNotifier_Start_Call) RunAndReturn(run func()) *MockThresholdNotifier_Start_Call {
+func (_c *MockThresholdNotifier_Start_Call) RunAndReturn(run func(context.Context)) *MockThresholdNotifier_Start_Call {
 	_c.Run(run)
+	return _c
 }
 
 // UpdateThreshold provides a mock function with given fields: ctx, summary

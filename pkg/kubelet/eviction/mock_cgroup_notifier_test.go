@@ -66,7 +66,7 @@ func (_c *MockCgroupNotifier_Start_Call) Return() *MockCgroupNotifier_Start_Call
 	return _c
 }
 
-func (_c *MockCgroupNotifier_Start_Call) RunAndReturn(run func(chan<- struct{})) *MockCgroupNotifier_Start_Call {
+func (_c *MockCgroupNotifier_Start_Call) RunAndReturn(run func(context.Context, chan<- struct{})) *MockCgroupNotifier_Start_Call {
 	_c.Run(run)
 	return _c
 }
