@@ -162,14 +162,14 @@ func hasValidationsImpl(n *typeNode, seen map[*typeNode]bool) bool {
 		return false
 	}
 
+	if r, found := hasValidationsCache[n]; found {
+		return r
+	}
+
 	if seen[n] {
 		return false // prevent infinite recursion
 	}
 	seen[n] = true
-
-	if r, found := hasValidationsCache[n]; found {
-		return r
-	}
 
 	r := hasValidationsMiss(n, seen)
 	hasValidationsCache[n] = r
