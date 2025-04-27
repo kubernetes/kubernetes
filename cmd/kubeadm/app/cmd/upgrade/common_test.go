@@ -30,7 +30,6 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const testConfigToken = `apiVersion: v1
@@ -55,8 +54,7 @@ users:
 `
 
 func TestEnforceRequirements(t *testing.T) {
-	tmpDir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	fullPath := filepath.Join(tmpDir, "test-config-file")
 	f, err := os.Create(fullPath)
 	if err != nil {

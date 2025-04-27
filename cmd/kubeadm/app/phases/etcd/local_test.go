@@ -71,8 +71,7 @@ func TestGetEtcdPodSpec(t *testing.T) {
 
 func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	var tests = []struct {
 		cfg              *kubeadmapi.ClusterConfiguration
@@ -230,8 +229,7 @@ status: {}
 
 func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	// Create temp folder for the test case
-	tmpdir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(tmpdir)
+	tmpdir := t.TempDir()
 
 	// Creates a Cluster Configuration
 	cfg := &kubeadmapi.ClusterConfiguration{
