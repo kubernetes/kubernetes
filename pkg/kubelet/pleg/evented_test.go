@@ -19,6 +19,7 @@ package pleg
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -227,6 +228,78 @@ func TestEventedPLEG_getPodIPs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if got := e.getPodIPs(test.args.pid, test.args.status); !reflect.DeepEqual(got, test.expected) {
 				t.Errorf("EventedPLEG.getPodIPs() = %v, expected %v", got, test.expected)
+			}
+		})
+	}
+}
+
+func TestEventedPLEGUsage(t *testing.T) {
+	// init status false
+	assert.False(t, isEventedPLEGInUse(), "Expected EventedPLEG not in use initially")
+
+	// set status true
+	setEventedPLEGUsage(true)
+	assert.True(t, isEventedPLEGInUse(), "Expected EventedPLEG to be in use after enabling")
+
+	// set status false
+	setEventedPLEGUsage(false)
+	assert.False(t, isEventedPLEGInUse(), "Expected EventedPLEG not in use after disabling")
+}
+
+func TestSendPodLifecycleEvent(t *testing.T) {
+	eventChannel := make(chan *PodLifecycleEvent, 3)
+	eventedPLEG := &EventedPLEG{
+		eventChannel: eventChannel,
+	}
+
+	// send events to channel
+	for i := 0; i < 3; i++ {
+		eventedPLEG.sendPodLifecycleEvent(&PodLifecycleEvent{ID: types.UID("pod-" + strconv.Itoa(i))})
+	}
+
+	eventedPLEG.sendPodLifecycleEvent(&PodLifecycleEvent{ID: "pod-overflow"})
+
+	// check channel events
+	assert.Len(t, eventChannel, 3, "Event channel should contain 3 events")
+}
+
+func TestUpdateGlobalCache(t *testing.T) {
+	// Create a fake cache
+	fakeCache := kubecontainer.NewCache()
+	eventedPLEG := &EventedPLEG{
+		cache: fakeCache,
+	}
+
+	// Define test cases
+	testCases := []struct {
+		name        string
+		initialTime time.Time
+	}{
+		{
+			name:        "Initial time is one hour ago",
+			initialTime: time.Now().Add(-1 * time.Hour),
+		},
+		{
+			name:        "Initial time is one day ago",
+			initialTime: time.Now().Add(-24 * time.Hour),
+		},
+	}
+
+	// Iterate over the test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set the initial time in the fake cache
+			podUID := types.UID("test-pod")
+			fakeCache.UpdateTime(tc.initialTime)
+			fakeCache.Set(podUID, &kubecontainer.PodStatus{}, nil, tc.initialTime)
+
+			// Call updateGlobalCache
+			eventedPLEG.updateGlobalCache()
+
+			// Use GetNewerThan to validate that the cache time was updated
+			_, err := fakeCache.GetNewerThan(podUID, tc.initialTime)
+			if err != nil {
+				t.Errorf("Expected cache to be updated, but it was not. Initial time: %v", tc.initialTime)
 			}
 		})
 	}
