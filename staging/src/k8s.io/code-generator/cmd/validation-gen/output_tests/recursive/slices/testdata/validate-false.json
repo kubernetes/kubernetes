@@ -1,0 +1,178 @@
+{
+  "*slices.T1": {
+    "t2.st1[0].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "t2.st1[0].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "t2.st1[0].t3": [
+      "type T3"
+    ],
+    "t2.st1[0].t3.t4.st3[0]": [
+      "type T3"
+    ],
+    "t2.st1[0].t3.t4.st3[1]": [
+      "type T3"
+    ],
+    "t2.st1[1].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "t2.st1[1].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "t2.st1[1].t3": [
+      "type T3"
+    ],
+    "t2.st1[1].t3.t4.st3[0]": [
+      "type T3"
+    ],
+    "t2.st1[1].t3.t4.st3[1]": [
+      "type T3"
+    ],
+    "t3": [
+      "type T3"
+    ],
+    "t3.t4.st3[0]": [
+      "type T3"
+    ],
+    "t3.t4.st3[0].t4.st3[0]": [
+      "type T3"
+    ],
+    "t3.t4.st3[0].t4.st3[1]": [
+      "type T3"
+    ],
+    "t3.t4.st3[1]": [
+      "type T3"
+    ],
+    "t3.t4.st3[1].t4.st3[0]": [
+      "type T3"
+    ],
+    "t3.t4.st3[1].t4.st3[1]": [
+      "type T3"
+    ]
+  },
+  "*slices.T2": {
+    "st1[0].t2.st1[0].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "st1[0].t2.st1[0].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "st1[0].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "st1[0].t2.st1[1].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "st1[0].t2.st1[1].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "st1[0].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "st1[0].t3": [
+      "type T3"
+    ],
+    "st1[0].t3.t4.st3[0]": [
+      "type T3"
+    ],
+    "st1[0].t3.t4.st3[1]": [
+      "type T3"
+    ],
+    "st1[1].t2.st1[0].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "st1[1].t2.st1[0].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "st1[1].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "st1[1].t2.st1[1].t2.st1[0].t3": [
+      "type T3"
+    ],
+    "st1[1].t2.st1[1].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "st1[1].t2.st1[1].t3": [
+      "type T3"
+    ],
+    "st1[1].t3": [
+      "type T3"
+    ],
+    "st1[1].t3.t4.st3[0]": [
+      "type T3"
+    ],
+    "st1[1].t3.t4.st3[1]": [
+      "type T3"
+    ]
+  },
+  "*slices.T3": {
+    "": [
+      "type T3"
+    ],
+    "t4.st3[0]": [
+      "type T3"
+    ],
+    "t4.st3[0].t4.st3[0]": [
+      "type T3"
+    ],
+    "t4.st3[0].t4.st3[1]": [
+      "type T3"
+    ],
+    "t4.st3[1]": [
+      "type T3"
+    ],
+    "t4.st3[1].t4.st3[0]": [
+      "type T3"
+    ],
+    "t4.st3[1].t4.st3[1]": [
+      "type T3"
+    ]
+  },
+  "*slices.T4": {
+    "st3[0]": [
+      "type T3"
+    ],
+    "st3[0].t4.st3[0]": [
+      "type T3"
+    ],
+    "st3[0].t4.st3[0].t4.st3[0]": [
+      "type T3"
+    ],
+    "st3[0].t4.st3[0].t4.st3[1]": [
+      "type T3"
+    ],
+    "st3[0].t4.st3[1]": [
+      "type T3"
+    ],
+    "st3[0].t4.st3[1].t4.st3[0]": [
+      "type T3"
+    ],
+    "st3[0].t4.st3[1].t4.st3[1]": [
+      "type T3"
+    ],
+    "st3[1]": [
+      "type T3"
+    ],
+    "st3[1].t4.st3[0]": [
+      "type T3"
+    ],
+    "st3[1].t4.st3[0].t4.st3[0]": [
+      "type T3"
+    ],
+    "st3[1].t4.st3[0].t4.st3[1]": [
+      "type T3"
+    ],
+    "st3[1].t4.st3[1]": [
+      "type T3"
+    ],
+    "st3[1].t4.st3[1].t4.st3[0]": [
+      "type T3"
+    ],
+    "st3[1].t4.st3[1].t4.st3[1]": [
+      "type T3"
+    ]
+  }
+}
