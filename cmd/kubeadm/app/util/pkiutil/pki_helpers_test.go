@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	certutil "k8s.io/client-go/util/cert"
@@ -634,13 +635,7 @@ func TestGetAPIServerAltNames(t *testing.T) {
 			}
 
 			for _, DNSName := range rt.expectedDNSNames {
-				found := false
-				for _, val := range altNames.DNSNames {
-					if val == DNSName {
-						found = true
-						break
-					}
-				}
+				found := slices.Contains(altNames.DNSNames, DNSName)
 
 				if !found {
 					t.Errorf("%s: altNames does not contain DNSName %s but %v", rt.name, DNSName, altNames.DNSNames)
@@ -696,13 +691,7 @@ func TestGetEtcdAltNames(t *testing.T) {
 	expectedDNSNames := []string{"myNode", "localhost", proxy}
 	for _, DNSName := range expectedDNSNames {
 		t.Run(DNSName, func(t *testing.T) {
-			found := false
-			for _, val := range altNames.DNSNames {
-				if val == DNSName {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(altNames.DNSNames, DNSName)
 
 			if !found {
 				t.Errorf("altNames does not contain DNSName %s", DNSName)
@@ -758,13 +747,7 @@ func TestGetEtcdPeerAltNames(t *testing.T) {
 	expectedDNSNames := []string{hostname, proxy}
 	for _, DNSName := range expectedDNSNames {
 		t.Run(DNSName, func(t *testing.T) {
-			found := false
-			for _, val := range altNames.DNSNames {
-				if val == DNSName {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(altNames.DNSNames, DNSName)
 
 			if !found {
 				t.Errorf("altNames does not contain DNSName %s", DNSName)
