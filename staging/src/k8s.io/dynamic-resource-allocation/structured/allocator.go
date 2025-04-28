@@ -254,7 +254,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					expression:   constraint.MatchExpression,
 					devices:      make([]*draapi.BasicDevice, 0),
 					celCache:     alloc.celCache,
-					numDevices:   minDevicesPerClaim,
+					numDevices:   3,
 				}
 				constraints[i] = m
 			default:
@@ -681,14 +681,17 @@ func (m *matchExpressionConstraint) add(requestName, subRequestName string, devi
 	}
 
 	// Add device to array
+	m.logger.V(7).Info("Appending device", device)
 	m.devices = append(m.devices, device)
 
 	// Only evaluate when we have all devices
+	m.logger.V(7).Info("devices added so far ", "current", len(m.devices), "expected", m.numDevices)
 	if m.numDevices > len(m.devices) {
 		m.logger.V(7).Info("Collecting devices", "current", len(m.devices), "expected", m.numDevices)
 		return true
 	}
 
+	//m.logger.V(7).Info("Checking all devices ", m.devices)
 	// Convert devices to format expected by CEL
 	var deviceList []cel.Device
 	for _, dev := range m.devices {
@@ -704,6 +707,7 @@ func (m *matchExpressionConstraint) add(requestName, subRequestName string, devi
 		})
 	}
 
+	m.logger.V(7).Info("Compiling expression %s", m.expression)
 	// Get compiled expression from cache
 	expr := m.celCache.GetOrCompile(m.expression)
 	if expr.Error != nil {
@@ -712,11 +716,8 @@ func (m *matchExpressionConstraint) add(requestName, subRequestName string, devi
 	}
 
 	// Evaluate expression
-	matches, details, err := expr.DeviceMatches(context.Background(), cel.Device{
-		Driver:     deviceID.Driver.String(),
-		Attributes: deviceList[0].Attributes,
-		Capacity:   deviceList[0].Capacity,
-	})
+	m.logger.V(7).Info("Evaluating expression %s", m.expression)
+	matches, details, err := expr.DevicesMatch(context.Background(), deviceList)
 	if err != nil {
 		m.logger.Error(err, "Expression evaluation failed")
 		return false
