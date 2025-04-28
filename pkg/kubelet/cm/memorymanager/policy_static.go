@@ -480,7 +480,8 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 					klog.ErrorS(err, "Failed to get container allocated resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", &ctn.Name)
 					return nil
 				}
-				return handleResize(pod, &ctn, containerBlocks, reqRsrcs, allocatedResources, s.GetMachineState())
+				// TODO(pravk03): Handle cases where number of container blocks are different for different containers
+				return p.handleResize(pod, &ctn, containerBlocks, reqRsrcs, allocatedResources, s.GetMachineState())
 
 			} else {
 				return regenerateHints(pod, &ctn, containerBlocks, reqRsrcs)
@@ -489,7 +490,7 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 	}
 
 	// the pod topology hints calculated only once for all containers, so no need to pass re-usable state
-	return p.calculateHints(s.GetMachineState(), pod, reqRsrcs)
+	return p.calculateHints(s.GetMachineState(), pod, reqRsrcs, false)
 }
 
 // GetTopologyHints implements the topologymanager.HintProvider Interface
@@ -517,16 +518,16 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 				klog.ErrorS(err, "Failed to get container allocated resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 				return nil
 			}
-			return handleResize(pod, container, containerBlocks, requestedResources, allocatedResources, s.GetMachineState())
+			return p.handleResize(pod, container, containerBlocks, requestedResources, allocatedResources, s.GetMachineState())
 		} else {
 			return regenerateHints(pod, container, containerBlocks, requestedResources)
 		}
 	}
 
-	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
+	return p.calculateHints(s.GetMachineState(), pod, requestedResources, false)
 }
 
-func handleResize(pod *v1.Pod, container *v1.Container, containerBlocks []state.Block, requestedResources map[v1.ResourceName]uint64, allocatedResources map[v1.ResourceName]uint64, machineState state.NUMANodeMap) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) handleResize(pod *v1.Pod, container *v1.Container, containerBlocks []state.Block, requestedResources map[v1.ResourceName]uint64, allocatedResources map[v1.ResourceName]uint64, machineState state.NUMANodeMap) map[string][]topologymanager.TopologyHint {
 	regeneratedHints := regenerateHints(pod, container, containerBlocks, requestedResources)
 	if regeneratedHints == nil {
 		return nil
@@ -576,9 +577,59 @@ func handleResize(pod *v1.Pod, container *v1.Container, containerBlocks []state.
 	}
 
 	if len(filteredHints) == 0 {
+		klog.InfoS("NUMA affinity of the current hint does not accomodate resize. Attempting to extend NUMA affinity", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+
+		for _, hint := range regeneratedHints[string(v1.ResourceMemory)] {
+			numBlocksAssigned := len(containerBlocks)
+			extendedHints := p.extendHintForResize(pod, deltaRsc, hint.NUMANodeAffinity, numBlocksAssigned, machineState)
+			for _, extendedHint := range extendedHints {
+				for resourceName := range requestedResources {
+					filteredHints[string(resourceName)] = append(filteredHints[string(resourceName)], extendedHint)
+				}
+			}
+		}
+	}
+
+	if len(filteredHints) == 0 {
 		klog.InfoS("Cannot accomodate memory request of resized pod", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 	}
 
+	return filteredHints
+}
+
+func (p *staticPolicy) extendHintForResize(pod *v1.Pod, resizeAmount map[v1.ResourceName]uint64, currentNUMAAffinity bitmask.BitMask, currentBlocksAssignedCnt int, machineState state.NUMANodeMap) []topologymanager.TopologyHint {
+	hints := p.calculateHints(machineState, pod, resizeAmount, true)
+	var filteredHints []topologymanager.TopologyHint
+	// hints for all memory types should be the same, so we do not have to loop through all of them here
+	for _, hint := range hints[string(v1.ResourceMemory)] {
+		affinityBits := hint.NUMANodeAffinity.GetBits()
+		// filter all hints that does not include currentHint
+		hintInGroup := isHintInGroup(currentNUMAAffinity.GetBits(), affinityBits)
+		if hintInGroup {
+			singleNUMAHint := len(affinityBits) == 1
+
+			addHint := true
+			for _, nodeID := range affinityBits {
+				// the node already used for the memory allocation
+				if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > currentBlocksAssignedCnt {
+					// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
+					if len(machineState[nodeID].Cells) == 1 {
+						addHint = false
+						break
+					}
+
+					// the node already used with different group of nodes, it can not be use with in the current hint
+					if !areGroupsEqual(machineState[nodeID].Cells, affinityBits) {
+						addHint = false
+						break
+					}
+				}
+			}
+			if addHint {
+				filteredHints = append(filteredHints, hint)
+			}
+		}
+	}
 	return filteredHints
 }
 
@@ -629,7 +680,7 @@ func getAllocatedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 	return allocatedResources, nil
 }
 
-func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
+func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64, isResize bool) map[string][]topologymanager.TopologyHint {
 	var numaNodes []int
 	for n := range machineState {
 		numaNodes = append(numaNodes, n)
@@ -680,7 +731,7 @@ func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Po
 
 		for _, nodeID := range maskBits {
 			// the node already used for the memory allocation
-			if !singleNUMAHint && machineState[nodeID].NumberOfAssignments > 0 {
+			if !singleNUMAHint && (!isResize && machineState[nodeID].NumberOfAssignments > 0) {
 				// the node used for the single NUMA memory allocation, it can not be used for the multi NUMA node allocation
 				if len(machineState[nodeID].Cells) == 1 {
 					return
@@ -956,7 +1007,7 @@ func (p *staticPolicy) getResourceSystemReserved(nodeID int, resourceName v1.Res
 }
 
 func (p *staticPolicy) getDefaultHint(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) (*topologymanager.TopologyHint, error) {
-	hints := p.calculateHints(machineState, pod, requestedResources)
+	hints := p.calculateHints(machineState, pod, requestedResources, false)
 	if len(hints) < 1 {
 		return nil, fmt.Errorf("[memorymanager] failed to get the default NUMA affinity, no NUMA nodes with enough memory is available")
 	}
@@ -991,7 +1042,7 @@ func isAffinitySatisfyRequest(machineState state.NUMANodeMap, mask bitmask.BitMa
 // it possible that we will get the subset of hint that we provided to the topology manager, in this case we want to extend
 // it to the original one
 func (p *staticPolicy) extendTopologyManagerHint(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64, mask bitmask.BitMask) (*topologymanager.TopologyHint, error) {
-	hints := p.calculateHints(machineState, pod, requestedResources)
+	hints := p.calculateHints(machineState, pod, requestedResources, false)
 
 	var filteredHints []topologymanager.TopologyHint
 	// hints for all memory types should be the same, so we will check hints only for regular memory type
