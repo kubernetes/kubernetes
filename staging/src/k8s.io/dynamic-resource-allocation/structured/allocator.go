@@ -254,7 +254,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					expression:   constraint.MatchExpression,
 					devices:      make([]*draapi.BasicDevice, 0),
 					celCache:     alloc.celCache,
-					numDevices:   3,
+					numDevices:   minDevicesPerClaim,
 				}
 				constraints[i] = m
 			default:
