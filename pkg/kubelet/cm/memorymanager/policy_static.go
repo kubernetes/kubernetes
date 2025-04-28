@@ -111,23 +111,30 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 			metrics.MemoryManagerPinningErrorsTotal.Inc()
 		}
 	}()
-	if blocks := s.GetMemoryBlocks(podUID, container.Name); blocks != nil {
-		p.updatePodReusableMemory(pod, container, blocks)
 
-		klog.InfoS("Container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
-		return nil
+	requestedResources, err := getContainerRequestedResources(container)
+	if err != nil {
+		return err
+	}
+
+	machineState := s.GetMachineState()
+	if blocks := s.GetMemoryBlocks(podUID, container.Name); blocks != nil {
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingStaticMemoryPolicy) {
+			klog.InfoS("Container already present. Attempting resize", "pod", klog.KObj(pod), "containerName", container.Name)
+			// Reset resources currently allocated on the copy of machine state to the container and attempt new allocation after resize.
+			// In case the resize failes and we return early from Allocate() it should be fine as the state is not upated in case of failed ALlocate()
+			p.releaseResourcesInMachineState(machineState, blocks)
+		} else {
+			p.updatePodReusableMemory(pod, container, blocks)
+			klog.InfoS("Container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+			return nil
+		}
 	}
 
 	// Call Topology Manager to get the aligned affinity across all hint providers.
 	hint := p.affinity.GetAffinity(podUID, container.Name)
 	klog.InfoS("Got topology affinity", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "hint", hint)
 
-	requestedResources, err := getRequestedResources(pod, container)
-	if err != nil {
-		return err
-	}
-
-	machineState := s.GetMachineState()
 	bestHint := &hint
 	// topology manager returned the hint with NUMA affinity nil
 	// we should use the default NUMA affinity calculated the same way as for the topology manager
@@ -247,18 +254,7 @@ func (p *staticPolicy) getPodReusableMemory(pod *v1.Pod, numaAffinity bitmask.Bi
 	return numaReusableMemory[resourceName]
 }
 
-// RemoveContainer call is idempotent
-func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
-	blocks := s.GetMemoryBlocks(podUID, containerName)
-	if blocks == nil {
-		return
-	}
-
-	klog.InfoS("RemoveContainer", "podUID", podUID, "containerName", containerName)
-	s.Delete(podUID, containerName)
-
-	// Mutate machine memory state to update free and reserved memory
-	machineState := s.GetMachineState()
+func (p *staticPolicy) releaseResourcesInMachineState(machineState state.NUMANodeMap, blocks []state.Block) {
 	for _, b := range blocks {
 		releasedSize := b.Size
 		for _, nodeID := range b.NUMAAffinity {
@@ -296,7 +292,21 @@ func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerNa
 			releasedSize = 0
 		}
 	}
+}
 
+// RemoveContainer call is idempotent
+func (p *staticPolicy) RemoveContainer(s state.State, podUID string, containerName string) {
+	blocks := s.GetMemoryBlocks(podUID, containerName)
+	if blocks == nil {
+		return
+	}
+
+	klog.InfoS("RemoveContainer", "podUID", podUID, "containerName", containerName)
+	s.Delete(podUID, containerName)
+
+	// Mutate machine memory state to update free and reserved memory
+	machineState := s.GetMachineState()
+	p.releaseResourcesInMachineState(machineState, blocks)
 	s.SetMachineState(machineState)
 }
 
@@ -343,7 +353,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	// Total resources requested by restartable init containers.
 	reqRsrcsByRestartableInitCtrs := make(map[v1.ResourceName]uint64)
 	for _, ctr := range pod.Spec.InitContainers {
-		reqRsrcs, err := getRequestedResources(pod, &ctr)
+		reqRsrcs, err := getContainerRequestedResources(&ctr)
 
 		if err != nil {
 			return nil, err
@@ -365,7 +375,7 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 
 	reqRsrcsByAppCtrs := make(map[v1.ResourceName]uint64)
 	for _, ctr := range pod.Spec.Containers {
-		reqRsrcs, err := getRequestedResources(pod, &ctr)
+		reqRsrcs, err := getContainerRequestedResources(&ctr)
 
 		if err != nil {
 			return nil, err
@@ -392,6 +402,61 @@ func getPodRequestedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
 	return reqRsrcs, nil
 }
 
+func getPodAllocatedResources(pod *v1.Pod) (map[v1.ResourceName]uint64, error) {
+	// Maximun resources requested by init containers at any given time.
+	allocResourcesByInitCtrs := make(map[v1.ResourceName]uint64)
+	// Total resources requested by restartable init containers.
+	allocResourcesByRestartableInitCtrs := make(map[v1.ResourceName]uint64)
+	for _, ctr := range pod.Spec.InitContainers {
+		allocatedResources, err := getAllocatedResources(pod, &ctr)
+
+		if err != nil {
+			return nil, err
+		}
+		for rsrcName, qty := range allocatedResources {
+			if _, ok := allocResourcesByInitCtrs[rsrcName]; !ok {
+				allocResourcesByInitCtrs[rsrcName] = uint64(0)
+			}
+
+			// See https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/753-sidecar-containers#resources-calculation-for-scheduling-and-pod-admission
+			// for the detail.
+			if podutil.IsRestartableInitContainer(&ctr) {
+				allocResourcesByRestartableInitCtrs[rsrcName] += qty
+			} else if allocResourcesByRestartableInitCtrs[rsrcName]+qty > allocResourcesByInitCtrs[rsrcName] {
+				allocResourcesByInitCtrs[rsrcName] = allocResourcesByRestartableInitCtrs[rsrcName] + qty
+			}
+		}
+	}
+
+	allocRsrcsByAppCtrs := make(map[v1.ResourceName]uint64)
+	for _, ctr := range pod.Spec.Containers {
+		allocatedResources, err := getAllocatedResources(pod, &ctr)
+
+		if err != nil {
+			return nil, err
+		}
+		for rsrcName, qty := range allocatedResources {
+			if _, ok := allocRsrcsByAppCtrs[rsrcName]; !ok {
+				allocRsrcsByAppCtrs[rsrcName] = uint64(0)
+			}
+
+			allocRsrcsByAppCtrs[rsrcName] += qty
+		}
+	}
+
+	allocatedResources := make(map[v1.ResourceName]uint64)
+	for rsrcName := range allocRsrcsByAppCtrs {
+		// Total resources requested by long-running containers.
+		reqRsrcsByLongRunningCtrs := allocRsrcsByAppCtrs[rsrcName] + allocResourcesByRestartableInitCtrs[rsrcName]
+		allocatedResources[rsrcName] = reqRsrcsByLongRunningCtrs
+
+		if allocatedResources[rsrcName] < allocResourcesByInitCtrs[rsrcName] {
+			allocatedResources[rsrcName] = allocResourcesByInitCtrs[rsrcName]
+		}
+	}
+	return allocatedResources, nil
+}
+
 func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	if v1qos.GetPodQOS(pod) != v1.PodQOSGuaranteed {
 		return nil
@@ -409,7 +474,17 @@ func (p *staticPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[strin
 		// memory allocated for the container. This might happen after a
 		// kubelet restart, for example.
 		if containerBlocks != nil {
-			return regenerateHints(pod, &ctn, containerBlocks, reqRsrcs)
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingStaticMemoryPolicy) {
+				allocatedResources, err := getPodAllocatedResources(pod)
+				if err != nil {
+					klog.ErrorS(err, "Failed to get container allocated resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", &ctn.Name)
+					return nil
+				}
+				return handleResize(pod, &ctn, containerBlocks, reqRsrcs, allocatedResources, s.GetMachineState())
+
+			} else {
+				return regenerateHints(pod, &ctn, containerBlocks, reqRsrcs)
+			}
 		}
 	}
 
@@ -425,7 +500,7 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 		return nil
 	}
 
-	requestedResources, err := getRequestedResources(pod, container)
+	requestedResources, err := getContainerRequestedResources(container)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get container requested resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
 		return nil
@@ -436,30 +511,80 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v
 	// memory allocated for the container. This might happen after a
 	// kubelet restart, for example.
 	if containerBlocks != nil {
-		return regenerateHints(pod, container, containerBlocks, requestedResources)
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingStaticMemoryPolicy) {
+			allocatedResources, err := getAllocatedResources(pod, container)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get container allocated resources", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+				return nil
+			}
+			return handleResize(pod, container, containerBlocks, requestedResources, allocatedResources, s.GetMachineState())
+		} else {
+			return regenerateHints(pod, container, containerBlocks, requestedResources)
+		}
 	}
 
 	return p.calculateHints(s.GetMachineState(), pod, requestedResources)
 }
 
-func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
-	requestedResources := map[v1.ResourceName]uint64{}
-	resources := container.Resources.Requests
-	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
-	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
-	// We should return this value because this is what kubelet agreed to allocate for the container
-	// and the value configured with runtime.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		containerStatuses := pod.Status.ContainerStatuses
-		if podutil.IsRestartableInitContainer(container) {
-			if len(pod.Status.InitContainerStatuses) != 0 {
-				containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
-			}
+func handleResize(pod *v1.Pod, container *v1.Container, containerBlocks []state.Block, requestedResources map[v1.ResourceName]uint64, allocatedResources map[v1.ResourceName]uint64, machineState state.NUMANodeMap) map[string][]topologymanager.TopologyHint {
+	regeneratedHints := regenerateHints(pod, container, containerBlocks, requestedResources)
+	if regeneratedHints == nil {
+		return nil
+	}
+
+	deltaRsc := map[v1.ResourceName]uint64{}
+	needsUpdate := false
+	for resourceName, requestedSize := range requestedResources {
+		deltaRsc[resourceName] = 0
+		allocatedSize, ok := allocatedResources[resourceName]
+		if !ok {
+			continue
 		}
-		if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
-			resources = cs.AllocatedResources
+
+		if requestedSize < allocatedSize {
+			klog.InfoS("Memory resize is infeasible as requested resources is less than allocated")
+			return nil
+		}
+
+		if regeneratedHints[string(resourceName)] == nil {
+			continue
+		}
+
+		delta := requestedSize - allocatedSize
+		deltaRsc[resourceName] = (requestedSize - allocatedSize)
+		if delta > 0 {
+			needsUpdate = true
 		}
 	}
+	if !needsUpdate {
+		return regeneratedHints
+	}
+
+	filteredHints := map[string][]topologymanager.TopologyHint{}
+	for resourceName, hints := range regeneratedHints {
+		for _, hint := range hints {
+			totalFreeSize := uint64(0)
+			for _, nodeID := range hint.NUMANodeAffinity.GetBits() {
+				totalFreeSize += machineState[nodeID].MemoryMap[v1.ResourceName(resourceName)].Free
+			}
+
+			if totalFreeSize > deltaRsc[v1.ResourceName(resourceName)] {
+				filteredHints[resourceName] = append(filteredHints[resourceName], hint)
+			}
+
+		}
+	}
+
+	if len(filteredHints) == 0 {
+		klog.InfoS("Cannot accomodate memory request of resized pod", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name)
+	}
+
+	return filteredHints
+}
+
+func getContainerRequestedResources(container *v1.Container) (map[v1.ResourceName]uint64, error) {
+	requestedResources := map[v1.ResourceName]uint64{}
+	resources := container.Resources.Requests
 	for resourceName, quantity := range resources {
 		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
 			continue
@@ -471,6 +596,37 @@ func getRequestedResources(pod *v1.Pod, container *v1.Container) (map[v1.Resourc
 		requestedResources[resourceName] = uint64(requestedSize)
 	}
 	return requestedResources, nil
+}
+
+func getAllocatedResources(pod *v1.Pod, container *v1.Container) (map[v1.ResourceName]uint64, error) {
+	allocatedResources := map[v1.ResourceName]uint64{}
+	var resources v1.ResourceList
+	// In-place pod resize feature makes Container.Resources field mutable for CPU & memory.
+	// AllocatedResources holds the value of Container.Resources.Requests when the pod was admitted.
+	// We should return this value because this is what kubelet agreed to allocate for the container
+	// and the value configured with runtime.
+
+	containerStatuses := pod.Status.ContainerStatuses
+	if podutil.IsRestartableInitContainer(container) {
+		if len(pod.Status.InitContainerStatuses) != 0 {
+			containerStatuses = append(containerStatuses, pod.Status.InitContainerStatuses...)
+		}
+	}
+	if cs, ok := podutil.GetContainerStatus(containerStatuses, container.Name); ok {
+		resources = cs.AllocatedResources
+	}
+
+	for resourceName, quantity := range resources {
+		if resourceName != v1.ResourceMemory && !corehelper.IsHugePageResourceName(resourceName) {
+			continue
+		}
+		allocatedSize, succeed := quantity.AsInt64()
+		if !succeed {
+			return nil, fmt.Errorf("[memorymanager] failed to represent quantity as int64")
+		}
+		allocatedResources[resourceName] = uint64(allocatedSize)
+	}
+	return allocatedResources, nil
 }
 
 func (p *staticPolicy) calculateHints(machineState state.NUMANodeMap, pod *v1.Pod, requestedResources map[v1.ResourceName]uint64) map[string][]topologymanager.TopologyHint {
