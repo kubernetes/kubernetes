@@ -292,8 +292,8 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersionStr := c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().MajorMinorPatchString()
-		emulationVersionStr := c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().MajorMinorString()
+		binaryVersionStr := c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().MajorMinorPatch().String()
+		emulationVersionStr := c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().MajorMinor().String()
 
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
