@@ -24,6 +24,8 @@ import (
 )
 
 // ReachableFields returns the set of fields that can be accessed from the given expression.
+// If a non-scalar path is returned, this indicates that the value at the path was either a target or argument
+// of a function call. In this case, the exact set of fields that can be accessed from the expression is not known.
 func ReachableFields(e ast.Expr) sets.Set[string] {
 	ac := &tracker{observed: sets.New[string]()}
 	scope := scope{accVars: sets.New[string](), iterVars: map[string]string{}}
@@ -40,7 +42,10 @@ type scope struct {
 	iterVars map[string]string // Comprehension iterator variables
 }
 
-func (v scope) newScope() scope {
+// Push creates a new scope above the current scope. Variables in the new scope shadow the current scope.
+func (v scope) push() scope {
+	// We COULD use a stack of scopes and search. Might not be worth it. Variable counts are bounded to iter vars and
+	// accr vars (max 3 per scope), and CEL scope depth is bounded to 12.
 	return scope{
 		accVars:  v.accVars.Clone(),
 		iterVars: maps.Clone(v.iterVars),
@@ -74,7 +79,7 @@ func (ac *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
 		}
 		return targetPath.Union(argPaths)
 	case ast.ComprehensionKind:
-		vars := scope.newScope()
+		vars := scope.push()
 		comprehension := e.AsComprehension()
 		for path := range ac.paths(comprehension.IterRange(), vars) {
 			if !comprehension.HasIterVar2() {
