@@ -20,9 +20,11 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"math"
@@ -572,7 +574,12 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 		return
 	}
 	logger := klog.FromContext(ctx)
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
+	eventBroadcaster := record.NewBroadcaster(
+		record.WithContext(ctx),
+		record.WithCorrelatorOptions(record.CorrelatorOptions{
+			SpamKeyFunc: getEventSpamKey,
+		}),
+	)
 	kubeDeps.Recorder = eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: server.ComponentKubelet, Host: string(nodeName)})
 	eventBroadcaster.StartStructuredLogging(3)
 	if kubeDeps.EventClient != nil {
@@ -581,6 +588,25 @@ func makeEventRecorder(ctx context.Context, kubeDeps *kubelet.Dependencies, node
 	} else {
 		logger.Info("No api server defined - no events will be sent to API server")
 	}
+}
+
+func getEventSpamKey(event *v1.Event) string {
+	hasher := fnv.New32()
+	_, _ = fmt.Fprintf(hasher, "%s", event.Message)
+	msgHash := hex.EncodeToString(hasher.Sum(nil))
+
+	return strings.Join([]string{
+		event.Source.Component,
+		event.Source.Host,
+		event.InvolvedObject.Kind,
+		event.InvolvedObject.Namespace,
+		event.InvolvedObject.Name,
+		string(event.InvolvedObject.UID),
+		event.InvolvedObject.APIVersion,
+		event.Type,
+		msgHash,
+	},
+		"")
 }
 
 func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.CPUSet, error) {
