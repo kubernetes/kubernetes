@@ -177,7 +177,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	inputPkgs := make([]string, 0, len(context.Inputs))
 	pkgToInput := map[string]string{}
 	for _, input := range context.Inputs {
-		klog.V(5).Infof("considering pkg %q", input)
+		klog.V(4).Infof("considering pkg %q", input)
 
 		pkg := context.Universe[input]
 
@@ -195,7 +195,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 				klog.Fatalf("relative path (%s=%s) is not supported; use full package path (as used by 'import') instead", inputTagName, inputPath)
 			}
 
-			klog.V(5).Infof("  input pkg %v", inputPath)
+			klog.V(4).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
 			pkgToInput[input] = inputPath
 		} else {
@@ -309,14 +309,14 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		})
 
 		for _, t := range rootTypes {
-			klog.V(4).InfoS("pre-processing", "type", t)
+			klog.V(3).InfoS("pre-processing", "type", t)
 			if err := td.DiscoverType(t); err != nil {
 				klog.Fatalf("failed to generate validations: %v", err)
 			}
 		}
 
 		for _, t := range rootTypes {
-			klog.V(4).InfoS("linting root-type", "type", t)
+			klog.V(3).InfoS("linting root-type", "type", t)
 			if err := linter.lintType(t); err != nil {
 				klog.Fatalf("failed to lint type %q: %v", t.Name, err)
 			}

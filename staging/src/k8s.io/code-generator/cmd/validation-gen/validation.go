@@ -353,6 +353,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	if node, found := td.typeNodes[t]; found {
 		return node, nil
 	}
+	klog.V(4).InfoS("discoverType", "type", t, "kind", t.Kind, "path", fldPath.String())
 
 	// This is the type-node being assembled in the rest of this function.
 	thisNode := &typeNode{
@@ -443,122 +444,124 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	// For example, all struct field validators get called before the type
 	// validators.  This does not influence the order in which the validations
 	// are called in emitted code, just how we evaluate what to emit.
-	//
-	// This should only ever hit Struct and Alias types, since that is the only
-	// opportunity to have type-attached comments to process.
-	context := validators.Context{
-		Scope:  validators.ScopeType,
-		Type:   t,
-		Parent: nil,
-		Path:   fldPath,
-	}
-	if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
-		return nil, fmt.Errorf("%v: %w", fldPath, err)
-	} else if !validations.Empty() {
-		klog.V(5).InfoS("found type-attached validations", "n", validations.Len())
-		thisNode.typeValidations.Add(validations)
-	}
+	switch t.Kind {
+	case types.Alias, types.Struct:
+		context := validators.Context{
+			Scope:  validators.ScopeType,
+			Type:   t,
+			Parent: nil,
+			Path:   fldPath,
+		}
+		if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
+			return nil, fmt.Errorf("%v: %w", fldPath, err)
+		} else if validations.Empty() {
+			klog.V(6).InfoS("no type-attached validations", "type", t)
+		} else {
+			klog.V(5).InfoS("found type-attached validations", "n", validations.Len(), "type", t)
+			thisNode.typeValidations.Add(validations)
+		}
 
-	// Handle type definitions whose output depends on the rest of type
-	// discovery being complete. In particular, aliases to lists and maps need
-	// iteration, but we don't want to iterate them if the key or value types
-	// don't actually have validations. We also want to handle non-included
-	// types and make users tell us what they intended. Lastly, we want to
-	// handle recursive types, but we need to finish discovering the type
-	// before we know if there are other validations, again so we don't emit
-	// empty functions.
-	if t.Kind == types.Alias {
-		underlying := thisNode.underlying
+		// Handle type definitions whose output depends on the rest of type
+		// discovery being complete. In particular, aliases to lists and maps need
+		// iteration, but we don't want to iterate them if the key or value types
+		// don't actually have validations. We also want to handle non-included
+		// types and make users tell us what they intended. Lastly, we want to
+		// handle recursive types, but we need to finish discovering the type
+		// before we know if there are other validations, again so we don't emit
+		// empty functions.
+		if t.Kind == types.Alias {
+			underlying := thisNode.underlying
 
-		switch t.Underlying.Kind {
-		case types.Slice:
-			// Validate each value.
-			if elemNode := underlying.node.elem.node; elemNode == nil {
-				if !thisNode.typeValidations.OpaqueValType {
-					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						fldPath, underlying.node.elem.childType)
-				}
-			} else if thisNode.typeValidations.OpaqueValType {
-				// If the type is marked as opaque, we can treat it as it is
-				// were in a non-included package.
-			} else {
-				// If the value type is a named type, call the validation
-				// function for each element.
-				if funcName := elemNode.funcName; funcName.Name != "" {
-					// We only need the iteration function if the underlying
-					// type has validations, otherwise it is noise.
-					if hasValidations(underlying.node) {
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, underlying.childType,
-							validators.Function("iterateListValues", validators.DefaultFlags, funcName))
-						if err != nil {
-							return nil, fmt.Errorf("generating list iteration: %w", err)
-						} else {
-							thisNode.typeValidations.Add(v)
+			switch t.Underlying.Kind {
+			case types.Slice:
+				// Validate each value.
+				if elemNode := underlying.node.elem.node; elemNode == nil {
+					if !thisNode.typeValidations.OpaqueValType {
+						return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
+							fldPath, underlying.node.elem.childType)
+					}
+				} else if thisNode.typeValidations.OpaqueValType {
+					// If the type is marked as opaque, we can treat it as it is
+					// were in a non-included package.
+				} else {
+					// If the value type is a named type, call the validation
+					// function for each element.
+					if funcName := elemNode.funcName; funcName.Name != "" {
+						// We only need the iteration function if the underlying
+						// type has validations, otherwise it is noise.
+						if hasValidations(underlying.node) {
+							// Note: the first argument to Function() is really
+							// only for debugging.
+							v, err := validators.ForEachVal(fldPath, underlying.childType,
+								validators.Function("iterateListValues", validators.DefaultFlags, funcName))
+							if err != nil {
+								return nil, fmt.Errorf("generating list iteration: %w", err)
+							} else {
+								thisNode.typeValidations.Add(v)
+							}
 						}
 					}
 				}
-			}
-		case types.Map:
-			// Validate each key.
-			if keyNode := underlying.node.key.node; keyNode == nil {
-				if !thisNode.typeValidations.OpaqueKeyType {
-					return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
-						fldPath, underlying.node.elem.childType)
-				}
-			} else if thisNode.typeValidations.OpaqueKeyType {
-				// If the type is marked as opaque, we can treat it as it is
-				// were in a non-included package.
-			} else {
-				// If the key type is a named type, call the validation
-				// function for each key.
-				if funcName := keyNode.funcName; funcName.Name != "" {
-					// We only need the iteration function if the underlying
-					// type has validations, otherwise it is noise.
-					if hasValidations(underlying.node) {
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachKey(fldPath, underlying.childType,
-							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
-						if err != nil {
-							return nil, fmt.Errorf("generating map key iteration: %w", err)
-						} else {
-							thisNode.typeValidations.Add(v)
+			case types.Map:
+				// Validate each key.
+				if keyNode := underlying.node.key.node; keyNode == nil {
+					if !thisNode.typeValidations.OpaqueKeyType {
+						return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
+							fldPath, underlying.node.elem.childType)
+					}
+				} else if thisNode.typeValidations.OpaqueKeyType {
+					// If the type is marked as opaque, we can treat it as it is
+					// were in a non-included package.
+				} else {
+					// If the key type is a named type, call the validation
+					// function for each key.
+					if funcName := keyNode.funcName; funcName.Name != "" {
+						// We only need the iteration function if the underlying
+						// type has validations, otherwise it is noise.
+						if hasValidations(underlying.node) {
+							// Note: the first argument to Function() is really
+							// only for debugging.
+							v, err := validators.ForEachKey(fldPath, underlying.childType,
+								validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+							if err != nil {
+								return nil, fmt.Errorf("generating map key iteration: %w", err)
+							} else {
+								thisNode.typeValidations.Add(v)
+							}
 						}
 					}
 				}
-			}
-			// Validate each value.
-			if elemNode := underlying.node.elem.node; elemNode == nil {
-				if !thisNode.typeValidations.OpaqueValType {
-					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						fldPath, underlying.node.elem.childType)
-				}
-			} else if thisNode.typeValidations.OpaqueValType {
-				// If the type is marked as opaque, we can treat it as it is
-				// were in a non-included package.
-			} else {
-				// If the value type is a named type, call the validation
-				// function for each element.
-				if funcName := elemNode.funcName; funcName.Name != "" {
-					// We only need the iteration function if the underlying
-					// type has validations, otherwise it is noise.
-					if hasValidations(underlying.node) {
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachVal(fldPath, underlying.childType,
-							validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
-						if err != nil {
-							return nil, fmt.Errorf("generating map value iteration: %w", err)
-						} else {
-							thisNode.typeValidations.Add(v)
+				// Validate each value.
+				if elemNode := underlying.node.elem.node; elemNode == nil {
+					if !thisNode.typeValidations.OpaqueValType {
+						return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
+							fldPath, underlying.node.elem.childType)
+					}
+				} else if thisNode.typeValidations.OpaqueValType {
+					// If the type is marked as opaque, we can treat it as it is
+					// were in a non-included package.
+				} else {
+					// If the value type is a named type, call the validation
+					// function for each element.
+					if funcName := elemNode.funcName; funcName.Name != "" {
+						// We only need the iteration function if the underlying
+						// type has validations, otherwise it is noise.
+						if hasValidations(underlying.node) {
+							// Note: the first argument to Function() is really
+							// only for debugging.
+							v, err := validators.ForEachVal(fldPath, underlying.childType,
+								validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+							if err != nil {
+								return nil, fmt.Errorf("generating map value iteration: %w", err)
+							} else {
+								thisNode.typeValidations.Add(v)
+							}
 						}
 					}
 				}
@@ -572,6 +575,8 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 // discoverStruct walks a struct type recursively.
 func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path) error {
 	var fields []*childNode
+
+	klog.V(5).InfoS("discoverStruct", "type", thisNode.valueType)
 
 	// Discover into each field of this struct.
 	for _, memb := range thisNode.valueType.Members {
@@ -595,10 +600,9 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			jsonName = commentTags.Name
 		}
 
-		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type)
-
 		// Discover the field type.
 		childPath := fldPath.Child(name)
+		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type, "path", childPath)
 		childType := memb.Type
 		var child *childNode
 		if node, err := td.discoverType(childType, childPath); err != nil {
@@ -622,8 +626,10 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		}
 		if validations, err := td.validator.ExtractValidations(context, memb.CommentLines); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
-		} else if !validations.Empty() {
-			klog.V(5).InfoS("found field-attached validations", "n", validations.Len())
+		} else if validations.Empty() {
+			klog.V(6).InfoS("no field-attached validations", "field", childPath)
+		} else {
+			klog.V(5).InfoS("found field-attached validations", "n", validations.Len(), "field", childPath)
 			child.fieldValidations.Add(validations)
 			if len(validations.Variables) > 0 {
 				return fmt.Errorf("%v: variable generation is not supported for field validations", childPath)
