@@ -24,8 +24,9 @@ import (
 
 type stateMemory struct {
 	sync.RWMutex
-	assignments  ContainerMemoryAssignments
-	machineState NUMANodeMap
+	assignments         ContainerMemoryAssignments
+	promisedAssignments ContainerMemoryAssignments
+	machineState        NUMANodeMap
 }
 
 var _ State = &stateMemory{}
@@ -34,8 +35,9 @@ var _ State = &stateMemory{}
 func NewMemoryState() State {
 	klog.InfoS("Initializing new in-memory state store")
 	return &stateMemory{
-		assignments:  ContainerMemoryAssignments{},
-		machineState: NUMANodeMap{},
+		assignments:         ContainerMemoryAssignments{},
+		promisedAssignments: ContainerMemoryAssignments{},
+		machineState:        NUMANodeMap{},
 	}
 }
 
@@ -53,6 +55,17 @@ func (s *stateMemory) GetMemoryBlocks(podUID string, containerName string) []Blo
 	defer s.RUnlock()
 
 	if res, ok := s.assignments[podUID][containerName]; ok {
+		return append([]Block{}, res...)
+	}
+	return nil
+}
+
+// GetPromisedMemoryBlocks returns promised memory assignments of a container
+func (s *stateMemory) GetPromisedMemoryBlocks(podUID string, containerName string) []Block {
+	s.RLock()
+	defer s.RUnlock()
+
+	if res, ok := s.promisedAssignments[podUID][containerName]; ok {
 		return append([]Block{}, res...)
 	}
 	return nil
@@ -88,6 +101,22 @@ func (s *stateMemory) SetMemoryBlocks(podUID string, containerName string, block
 	klog.InfoS("Updated memory state", "podUID", podUID, "containerName", containerName)
 }
 
+// SetPromisedMemoryBlocks stores memory assignments of container's first assignment (before potential resize requests).
+func (s *stateMemory) SetPromisedMemoryBlocks(podUID string, containerName string, blocks []Block) {
+	s.Lock()
+	defer s.Unlock()
+
+	if _, ok := s.promisedAssignments[podUID]; !ok {
+		s.promisedAssignments[podUID] = map[string][]Block{}
+	} else if _, ok := s.promisedAssignments[podUID][containerName]; ok {
+		// Memory blocks already updated for the container
+		return
+	}
+
+	s.promisedAssignments[podUID][containerName] = append([]Block{}, blocks...)
+	klog.InfoS("Updated promised memory state", "podUID", podUID, "containerName", containerName)
+}
+
 // SetMemoryAssignments sets ContainerMemoryAssignments by using the passed parameter
 func (s *stateMemory) SetMemoryAssignments(assignments ContainerMemoryAssignments) {
 	s.Lock()
@@ -109,6 +138,10 @@ func (s *stateMemory) Delete(podUID string, containerName string) {
 	delete(s.assignments[podUID], containerName)
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
+	}
+	delete(s.promisedAssignments[podUID], containerName)
+	if len(s.promisedAssignments[podUID]) == 0 {
+		delete(s.promisedAssignments, podUID)
 	}
 	klog.V(2).InfoS("Deleted memory assignment", "podUID", podUID, "containerName", containerName)
 }

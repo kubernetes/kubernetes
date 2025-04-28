@@ -115,6 +115,14 @@ func (sc *stateCheckpoint) GetMemoryBlocks(podUID string, containerName string) 
 	return sc.cache.GetMemoryBlocks(podUID, containerName)
 }
 
+// GetMemoryBlocks returns memory assignments of a container
+func (sc *stateCheckpoint) GetPromisedMemoryBlocks(podUID string, containerName string) []Block {
+	sc.RLock()
+	defer sc.RUnlock()
+
+	return sc.cache.GetPromisedMemoryBlocks(podUID, containerName)
+}
+
 // GetMemoryAssignments returns ContainerMemoryAssignments
 func (sc *stateCheckpoint) GetMemoryAssignments() ContainerMemoryAssignments {
 	sc.RLock()
@@ -141,6 +149,18 @@ func (sc *stateCheckpoint) SetMemoryBlocks(podUID string, containerName string, 
 	defer sc.Unlock()
 
 	sc.cache.SetMemoryBlocks(podUID, containerName, blocks)
+	err := sc.storeState()
+	if err != nil {
+		klog.ErrorS(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
+	}
+}
+
+// SetPromisedMemoryBlocks stores promised memory assignments of container
+func (sc *stateCheckpoint) SetPromisedMemoryBlocks(podUID string, containerName string, blocks []Block) {
+	sc.Lock()
+	defer sc.Unlock()
+
+	sc.cache.SetPromisedMemoryBlocks(podUID, containerName, blocks)
 	err := sc.storeState()
 	if err != nil {
 		klog.ErrorS(err, "Failed to store state to checkpoint", "podUID", podUID, "containerName", containerName)
