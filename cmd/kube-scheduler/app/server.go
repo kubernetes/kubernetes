@@ -214,8 +214,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 	readyzChecks = append(readyzChecks, handlerSyncCheck)
 
 	if cc.LeaderElection != nil && utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CoordinatedLeaderElection) {
-		binaryVersion := cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().String()
-		emulationVersion := cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().String()
+		binaryVersionStr := cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).BinaryVersion().MajorMinorPatchString()
+		emulationVersionStr := cc.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent).EmulationVersion().MajorMinorString()
 
 		// Start lease candidate controller for coordinated leader election
 		leaseCandidate, waitForSync, err := leaderelection.NewCandidate(
@@ -223,8 +223,8 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 			metav1.NamespaceSystem,
 			cc.LeaderElection.Lock.Identity(),
 			kubeScheduler,
-			binaryVersion,
-			emulationVersion,
+			binaryVersionStr,
+			emulationVersionStr,
 			coordinationv1.OldestEmulationVersion,
 		)
 		if err != nil {

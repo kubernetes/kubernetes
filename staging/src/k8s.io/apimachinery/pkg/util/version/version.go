@@ -333,6 +333,34 @@ func (v *Version) String() string {
 	return buffer.String()
 }
 
+// MajorMinorString returns the version as "major.minor",
+// omitting patch, pre-release, and build metadata.
+// Used for EmulationVersion display in leases and logs.
+func (v *Version) MajorMinorString() string {
+	if v == nil {
+		return "<nil>"
+	}
+	comps := v.Components()
+	if len(comps) < 2 {
+		return "<invalid>"
+	}
+	return fmt.Sprintf("%d.%d", comps[0], comps[1])
+}
+
+// MajorMinorPatchString returns the version as "major.minor.patch",
+// omitting any pre-release or build metadata.
+// Example: Version{1, 33, 0, pre: "alpha.1"} => "1.33.0"
+func (v *Version) MajorMinorPatchString() string {
+	if v == nil {
+		return "<nil>"
+	}
+	comps := v.Components()
+	if len(comps) < 3 {
+		return "<invalid>"
+	}
+	return fmt.Sprintf("%d.%d.%d", comps[0], comps[1], comps[2])
+}
+
 // compareInternal returns -1 if v is less than other, 1 if it is greater than other, or 0
 // if they are equal
 func (v *Version) compareInternal(other *Version) int {

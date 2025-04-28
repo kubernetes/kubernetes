@@ -548,3 +548,51 @@ func TestParse(t *testing.T) {
 		}
 	}
 }
+
+func TestMajorMinorString(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  *Version
+		expected string
+	}{
+		{"normal version", MustParseGeneric("1.32.0"), "1.32"},
+		{"non-zero patch", MustParseGeneric("1.32.5"), "1.32"},
+		{"with prerelease", MustParseGeneric("1.33.0-alpha.1"), "1.33"},
+		{"with build metadata", MustParseGeneric("1.34.0+build.123"), "1.34"},
+		{"nil version", nil, "<nil>"},
+		{"missing patch", &Version{components: []uint{1, 33}}, "1.33"},
+		{"missing minor", &Version{components: []uint{1}}, "<invalid>"},
+		{"empty components", &Version{}, "<invalid>"},
+	}
+
+	for _, tt := range tests {
+		got := tt.version.MajorMinorString()
+		if got != tt.expected {
+			t.Errorf("%s: got %q, want %q", tt.name, got, tt.expected)
+		}
+	}
+}
+
+func TestMajorMinorPatchString(t *testing.T) {
+	tests := []struct {
+		name     string
+		version  *Version
+		expected string
+	}{
+		{"normal patch", MustParseGeneric("1.33.0"), "1.33.0"},
+		{"non-zero patch", MustParseGeneric("1.33.5"), "1.33.5"},
+		{"with prerelease", MustParseGeneric("1.34.0-alpha.1"), "1.34.0"},
+		{"with metadata", MustParseGeneric("1.35.2+build.456"), "1.35.2"},
+		{"nil version", nil, "<nil>"},
+		{"missing patch", &Version{components: []uint{1, 33}}, "<invalid>"},
+		{"missing minor", &Version{components: []uint{1}}, "<invalid>"},
+		{"empty components", &Version{}, "<invalid>"},
+	}
+
+	for _, tt := range tests {
+		got := tt.version.MajorMinorPatchString()
+		if got != tt.expected {
+			t.Errorf("%s: got %q, want %q", tt.name, got, tt.expected)
+		}
+	}
+}
