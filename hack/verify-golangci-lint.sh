@@ -119,14 +119,27 @@ for arg; do
   fi
 done
 
+kube::util::ensure-temp-dir
+
 # Install golangci-lint
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
 GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 if [ "${golangci_config}" ]; then
-  # This cannot be used without a config.
-  # This uses `go build` because `go install -buildmode=plugin` doesn't work
-  # (on purpose: https://github.com/golang/go/issues/64964).
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  # Plugins cannot be used without a config, so only build them when we a config might enable them.
+  # The build process uses https://golangci-lint.run/plugins/module-plugins because then the plugin
+  # gets built into the golangci-lint binary, which removes the need to look it up at runtime
+  # and enables using `run.relative-path-mode: wd`. The plugin lookup is affected by that setting
+  # and would break when invoked elsewhere than the root.
+  cat >"$KUBE_TEMP/.custom-gcl.yml" <<EOF
+# Versions are maintained in hack/tools/go.mod, as usual.
+version: $(grep github.com/golangci/golangci-lint "${KUBE_ROOT}/hack/tools/go.mod" | sed -e 's/.* \([^ ]*\)$/\1/')
+plugins:
+  - module: sigs.k8s.io/logtools
+    import: sigs.k8s.io/logtools/logcheck/gclplugin
+    version: $(grep sigs.k8s.io/logtools "${KUBE_ROOT}/hack/tools/go.mod" | sed -e 's/.* \([^ ]*\)$/\1/')
+EOF
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" sh -c "cd '$KUBE_TEMP'; golangci-lint custom -v"
+  mv "$KUBE_TEMP/custom-gcl" "${GOBIN}/golangci-lint"
 fi
 
 # Verify that the given config is valid. "golangci-lint run" does not
@@ -146,22 +159,8 @@ EOF
 fi
 
 if [ "${golangci_config}" ]; then
-  # The relative path to _output/local/bin only works if that actually is the
-  # GOBIN. If not, then we have to make a temporary copy of the config and
-  # replace the path with an absolute one. This could be done also
-  # unconditionally, but the invocation that is printed below is nicer if we
-  # don't to do it when not required.
-  if grep -q 'path: ../_output/local/bin/' "${golangci_config}" &&
-     [ "${GOBIN}" != "${KUBE_ROOT}/_output/local/bin" ]; then
-    kube::util::ensure-temp-dir
-    patched_golangci_config="${KUBE_TEMP}/$(basename "${golangci_config}")"
-    sed -e "s;path: _output/local/bin/;path: ${GOBIN}/;" "${golangci_config}" >"${patched_golangci_config}"
-    golangci_config="${patched_golangci_config}"
-  fi
   golangci+=(--config="${golangci_config}")
 fi
-
-cd "${KUBE_ROOT}"
 
 res=0
 run () {
