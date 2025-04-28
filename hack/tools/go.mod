@@ -7,8 +7,8 @@ godebug default=go1.24
 require (
 	github.com/aojea/sloppy-netparser v0.0.0-20210819225411-1b3bd8b3b975
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c
-	github.com/client9/misspell v0.3.4
 	github.com/golangci/golangci-lint v1.64.5
+	github.com/golangci/misspell v0.6.0
 	github.com/jcchavezs/porto v0.6.0
 	github.com/vektra/mockery/v2 v2.53.3
 	go.uber.org/automaxprocs v1.6.0
@@ -86,7 +86,6 @@ require (
 	github.com/golangci/dupl v0.0.0-20180902072040-3e9179ac440a // indirect
 	github.com/golangci/go-printf-func-name v0.1.0 // indirect
 	github.com/golangci/gofmt v0.0.0-20250106114630-d62b90e6713d // indirect
-	github.com/golangci/misspell v0.6.0 // indirect
 	github.com/golangci/plugin-module-register v0.1.1 // indirect
 	github.com/golangci/revgrep v0.8.0 // indirect
 	github.com/golangci/unconvert v0.0.0-20240309020433-c5143eacb3ed // indirect
