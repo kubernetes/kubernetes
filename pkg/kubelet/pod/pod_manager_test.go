@@ -100,6 +100,7 @@ func TestAddOrUpdatePod(t *testing.T) {
 				podByFullName:       make(map[string]*v1.Pod),
 				mirrorPodByFullName: make(map[string]*v1.Pod),
 				translationByUID:    make(map[kubetypes.MirrorPodUID]kubetypes.ResolvedPodUID),
+				stateChannel:        make(PodStateChannel, 500),
 			}
 			pm.AddPod(test.pod)
 			verify(t, pm, test.isMirror, test.pod)

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/utils/clock"
@@ -595,6 +596,9 @@ type podWorkers struct {
 
 	// clock is used for testing timing
 	clock clock.PassiveClock
+
+	// Add the pod state channel
+	podStateChannel pod.PodStateChannel
 }
 
 func newPodWorkers(
@@ -603,6 +607,7 @@ func newPodWorkers(
 	workQueue queue.WorkQueue,
 	resyncInterval, backOffPeriod time.Duration,
 	podCache kubecontainer.Cache,
+	podStateChannel pod.PodStateChannel,
 ) PodWorkers {
 	return &podWorkers{
 		podSyncStatuses:                    map[types.UID]*podSyncStatus{},
@@ -616,6 +621,7 @@ func newPodWorkers(
 		backOffPeriod:                      backOffPeriod,
 		podCache:                           podCache,
 		clock:                              clock.RealClock{},
+		podStateChannel:                    podStateChannel,
 	}
 }
 
@@ -1420,6 +1426,13 @@ func (p *podWorkers) completeTerminating(podUID types.UID) {
 	// the pod has now transitioned to terminated and we want to run syncTerminatedPod
 	// as soon as possible, so if no update is already waiting queue a synthetic update
 	p.requeueLastPodUpdate(podUID, status)
+
+	// Send termination event
+	p.podStateChannel <- pod.PodStateEvent{
+		Type: pod.PodTerminated,
+		Pod:  nil,
+		UID:  podUID,
+	}
 }
 
 // completeTerminatingRuntimePod is invoked when syncTerminatingPod completes successfully,

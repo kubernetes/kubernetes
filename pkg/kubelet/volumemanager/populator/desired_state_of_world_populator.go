@@ -31,6 +31,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,6 +48,13 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+)
+
+const (
+	dswpEventChannelCapacity                    = 1000
+	dswpEventMaxStreamRetries                   = 5
+	dswpEventMinLoopBeforeIncreasingSleepPeriod = 3
+	initialLoopSleepDuration                    = 100 * time.Millisecond
 )
 
 // DesiredStateOfWorldPopulator periodically loops through the list of active
@@ -81,6 +90,7 @@ type PodStateProvider interface {
 type PodManager interface {
 	GetPodByUID(types.UID) (*v1.Pod, bool)
 	GetPods() []*v1.Pod
+	GetPodStateChannel() pod.PodStateChannel
 }
 
 // NewDesiredStateOfWorldPopulator returns a new instance of
@@ -106,12 +116,15 @@ func NewDesiredStateOfWorldPopulator(
 	intreeToCSITranslator csimigration.InTreeToCSITranslator,
 	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
-		kubeClient:          kubeClient,
-		loopSleepDuration:   loopSleepDuration,
-		podManager:          podManager,
-		podStateProvider:    podStateProvider,
-		desiredStateOfWorld: desiredStateOfWorld,
-		actualStateOfWorld:  actualStateOfWorld,
+		kubeClient:             kubeClient,
+		loopSleepDuration:      loopSleepDuration,
+		loopSleepDurationLock:  sync.RWMutex{},
+		watchProcessStoped:     true,
+		watchProcessStopedLock: sync.RWMutex{},
+		podManager:             podManager,
+		podStateProvider:       podStateProvider,
+		desiredStateOfWorld:    desiredStateOfWorld,
+		actualStateOfWorld:     actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
 		kubeContainerRuntime:     kubeContainerRuntime,
@@ -126,6 +139,9 @@ func NewDesiredStateOfWorldPopulator(
 type desiredStateOfWorldPopulator struct {
 	kubeClient               clientset.Interface
 	loopSleepDuration        time.Duration
+	loopSleepDurationLock    sync.RWMutex
+	watchProcessStoped       bool
+	watchProcessStopedLock   sync.RWMutex
 	podManager               PodManager
 	podStateProvider         PodStateProvider
 	desiredStateOfWorld      cache.DesiredStateOfWorld
@@ -134,6 +150,8 @@ type desiredStateOfWorldPopulator struct {
 	kubeContainerRuntime     kubecontainer.Runtime
 	hasAddedPods             bool
 	hasAddedPodsLock         sync.RWMutex
+	populatorLock            sync.RWMutex
+	executionCounter         int
 	csiMigratedPluginManager csimigration.PluginManager
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 	volumePluginMgr          *volume.VolumePluginMgr
@@ -148,7 +166,7 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 	// Wait for the completion of a loop that started after sources are all ready, then set hasAddedPods accordingly
 	logger := klog.FromContext(ctx)
 	logger.Info("Desired state populator starts to run")
-	_ = wait.PollUntilContextCancel(ctx, dswp.loopSleepDuration, false, func(ctx context.Context) (bool, error) {
+	_ = wait.PollUntilContextCancel(ctx, dswp.getLoopSleepDuration(), false, func(ctx context.Context) (bool, error) {
 		done := sourcesReady.AllReady()
 		dswp.populatorLoop(ctx)
 		return done, nil
@@ -159,12 +177,103 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 		dswp.hasAddedPods = true
 	}
 	dswp.hasAddedPodsLock.Unlock()
-	wait.UntilWithContext(ctx, dswp.populatorLoop, dswp.loopSleepDuration)
+
+	// initially the loopSleepDuration is set to 100ms (min period)
+	// the only check needed is wether the FG is enabled
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedDesiredStateOfWorldPopulator) {
+		dswp.setWatchProcessStoped(false)
+		go func() {
+			_ = wait.PollUntilContextCancel(ctx, 0, false, func(ctx context.Context) (bool, error) {
+				dswp.watchAndProcessEvent(ctx)
+				return true, nil
+			})
+		}()
+	}
+	wait.DyanmicPeriodUntil(ctx, func() {
+		dswp.populatorLoop(ctx)
+		if utilfeature.DefaultFeatureGate.Enabled(features.EventedDesiredStateOfWorldPopulator) {
+			if !dswp.isWatchProcessStoped() {
+				dswp.increaseLoopSleepDuration(ctx)
+			} else if dswp.getLoopSleepDuration() != initialLoopSleepDuration {
+				// make sure after the watch func is stoped => reset the loopSleepDuration to the initial default value
+				dswp.setLoopSleepDuration(100 * time.Millisecond)
+			}
+		}
+	}, func() time.Duration {
+		return dswp.getLoopSleepDuration()
+	}, 0, true)
+}
+
+func (dswp *desiredStateOfWorldPopulator) increaseLoopSleepDuration(ctx context.Context) {
+	if dswp.executionCounter > dswpEventMinLoopBeforeIncreasingSleepPeriod && dswp.getLoopSleepDuration() == initialLoopSleepDuration {
+		dswp.executionCounter = 0
+	}
+	dswp.executionCounter++
+	// gradually increase after the third execution
+	// ( +100ms on each iteration) the sleep period to a maximum ( 1 second)
+	if dswp.getLoopSleepDuration() < initialLoopSleepDuration*10 && dswp.executionCounter > dswpEventMinLoopBeforeIncreasingSleepPeriod {
+		dswp.setLoopSleepDuration(dswp.getLoopSleepDuration() + 100*time.Millisecond)
+	}
+}
+
+// Subscribe to pod state channel
+func (dswp *desiredStateOfWorldPopulator) watchAndProcessEvent(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Evented DSWP: watchAndProcessEvent")
+
+	for {
+		podState := <-dswp.podManager.GetPodStateChannel()
+		dswp.processPodStateEvents(ctx, podState)
+	}
+}
+
+// Check the event emitted event and reset the interval to 100ms
+// when the podState in (pod.PodAdded, pod.PodUpdated, pod.PodTerminated)
+func (dswp *desiredStateOfWorldPopulator) processPodStateEvents(ctx context.Context, podState pod.PodStateEvent) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Evented DSWP: event received", "type", podState.Type)
+	// Process the pod state event based on its type
+	switch podState.Type {
+	case pod.PodAdded, pod.PodUpdated, pod.PodTerminated:
+		dswp.setLoopSleepDuration(initialLoopSleepDuration)
+		metrics.EventedDSWPPodCount.Inc()
+		// force execution of populatorLoop function
+		// => remediate a condition when multiple events received
+		// as a consequence it will reset the timer befor executing
+		// the populator loop.
+		go dswp.populatorLoop(ctx)
+	default:
+		logger.Info("Evented DSWP: unmanaged pod state event (populatorLoop was not forced to execute)", "type", podState.Type)
+	}
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
 	dswp.markPodProcessingFailed(podName)
+}
+
+func (dswp *desiredStateOfWorldPopulator) isWatchProcessStoped() bool {
+	dswp.watchProcessStopedLock.RLock()
+	defer dswp.watchProcessStopedLock.RUnlock()
+	return dswp.watchProcessStoped
+}
+
+func (dswp *desiredStateOfWorldPopulator) setLoopSleepDuration(duration time.Duration) {
+	dswp.loopSleepDurationLock.Lock()
+	defer dswp.loopSleepDurationLock.Unlock()
+	dswp.loopSleepDuration = duration
+}
+
+func (dswp *desiredStateOfWorldPopulator) getLoopSleepDuration() time.Duration {
+	dswp.loopSleepDurationLock.RLock()
+	defer dswp.loopSleepDurationLock.RUnlock()
+	return dswp.loopSleepDuration
+}
+
+func (dswp *desiredStateOfWorldPopulator) setWatchProcessStoped(enable bool) {
+	dswp.watchProcessStopedLock.Lock()
+	defer dswp.watchProcessStopedLock.Unlock()
+	dswp.watchProcessStoped = enable
 }
 
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
@@ -174,6 +283,12 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 }
 
 func (dswp *desiredStateOfWorldPopulator) populatorLoop(ctx context.Context) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EventedDesiredStateOfWorldPopulator) {
+		dswp.populatorLock.Lock()
+		defer dswp.populatorLock.Unlock()
+		logger := klog.FromContext(ctx)
+		logger.Info("Evented DSWP: populatorLoop lunch")
+	}
 	dswp.findAndAddNewPods(ctx)
 	dswp.findAndRemoveDeletedPods()
 }

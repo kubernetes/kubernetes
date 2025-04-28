@@ -412,7 +412,6 @@ func newTestVolumeManager(t *testing.T, tmpDir string, podManager kubepod.Manage
 	// TODO (#51147) inject mock prober
 	fakeVolumeHost := volumetest.NewFakeKubeletVolumeHost(t, tmpDir, kubeClient, nil)
 	fakeVolumeHost.WithNode(node)
-
 	plugMgr.InitPlugins([]volume.VolumePlugin{attachablePlug, unattachablePlug}, nil /* prober */, fakeVolumeHost)
 	stateProvider := &fakePodStateProvider{}
 	fakePathHandler := volumetest.NewBlockVolumePathHandler()

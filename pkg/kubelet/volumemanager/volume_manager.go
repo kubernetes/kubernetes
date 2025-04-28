@@ -41,6 +41,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/populator"
@@ -168,6 +169,7 @@ type PodStateProvider interface {
 type PodManager interface {
 	GetPodByUID(k8stypes.UID) (*v1.Pod, bool)
 	GetPods() []*v1.Pod
+	GetPodStateChannel() pod.PodStateChannel
 }
 
 // NewVolumeManager returns a new concrete instance implementing the

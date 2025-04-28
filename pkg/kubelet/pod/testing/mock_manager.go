@@ -22,6 +22,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 
+	pod "k8s.io/kubernetes/pkg/kubelet/pod"
+
 	types "k8s.io/apimachinery/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
@@ -427,6 +429,53 @@ func (_c *MockManager_GetPodByUID_Call) Return(_a0 *v1.Pod, _a1 bool) *MockManag
 }
 
 func (_c *MockManager_GetPodByUID_Call) RunAndReturn(run func(types.UID) (*v1.Pod, bool)) *MockManager_GetPodByUID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPodStateChannel provides a mock function with no fields
+func (_m *MockManager) GetPodStateChannel() pod.PodStateChannel {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPodStateChannel")
+	}
+
+	var r0 pod.PodStateChannel
+	if rf, ok := ret.Get(0).(func() pod.PodStateChannel); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(pod.PodStateChannel)
+		}
+	}
+
+	return r0
+}
+
+// MockManager_GetPodStateChannel_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPodStateChannel'
+type MockManager_GetPodStateChannel_Call struct {
+	*mock.Call
+}
+
+// GetPodStateChannel is a helper method to define mock.On call
+func (_e *MockManager_Expecter) GetPodStateChannel() *MockManager_GetPodStateChannel_Call {
+	return &MockManager_GetPodStateChannel_Call{Call: _e.mock.On("GetPodStateChannel")}
+}
+
+func (_c *MockManager_GetPodStateChannel_Call) Run(run func()) *MockManager_GetPodStateChannel_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockManager_GetPodStateChannel_Call) Return(_a0 pod.PodStateChannel) *MockManager_GetPodStateChannel_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockManager_GetPodStateChannel_Call) RunAndReturn(run func() pod.PodStateChannel) *MockManager_GetPodStateChannel_Call {
 	_c.Call.Return(run)
 	return _c
 }

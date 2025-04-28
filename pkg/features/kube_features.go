@@ -892,6 +892,12 @@ const (
 	// Initial implementation focused on ReadWriteOncePod volumes.
 	SELinuxMountReadWriteOncePod featuregate.Feature = "SELinuxMountReadWriteOncePod"
 
+	// owner: @bouaouda-achraf
+	// kep: https://kep.k8s.io/4979
+	// Dynamically adjust the Desired State of the World Populator (DSWP)
+	// sleep period during inactivity and trigger populator logic based on pod events.
+	EventedDesiredStateOfWorldPopulator featuregate.Feature = "EventedDesiredStateOfWorldPopulator"
+
 	// owner: @Sh4d1,@RyanAoh,@rikatz
 	// kep: http://kep.k8s.io/1860
 	// LoadBalancerIPMode enables the IPMode field in the LoadBalancerIngress status of a Service
@@ -1178,6 +1184,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	EventedPLEG: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	EventedDesiredStateOfWorldPopulator: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ExecProbeTimeout: {

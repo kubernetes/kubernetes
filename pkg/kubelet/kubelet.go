@@ -731,6 +731,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.resyncInterval,
 		backOffPeriod,
 		klet.podCache,
+		klet.podManager.GetPodStateChannel(),
 	)
 
 	var singleProcessOOMKill *bool
