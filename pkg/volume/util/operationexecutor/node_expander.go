@@ -31,10 +31,6 @@ import (
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
-var (
-	NodeExpansionNotRequired = "volume.kubernetes.io/node-expansion-not-required"
-)
-
 type NodeExpander struct {
 	nodeResizeOperationOpts
 	kubeClient clientset.Interface
@@ -105,11 +101,15 @@ func (ne *NodeExpander) runPreCheck() bool {
 		ne.pvcAlreadyUpdated = true
 	}
 
-	// PVC is already expanded but we are still trying to expand the volume because
-	// last recorded size in ASOW is older. This can happen for RWX volume types.
+	// if the volume is already expanded, but volume is of type RWX and
+	// pvc doesn't have annotation indicating that node expansion is not required
+	// then we should allow node expansion to proceed, even if the volume is already expanded.
+	//
+	// This special cases is needed because, in case of RWX volumes, the volume expansion
+	// should be performed on all nodes, even if the volume is already expanded.
 	if ne.pvcAlreadyUpdated &&
 		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) &&
-		!metav1.HasAnnotation(ne.pvc.ObjectMeta, NodeExpansionNotRequired) {
+		!metav1.HasAnnotation(ne.pvc.ObjectMeta, volumetypes.NodeExpansionNotRequired) {
 		return true
 	}
 
