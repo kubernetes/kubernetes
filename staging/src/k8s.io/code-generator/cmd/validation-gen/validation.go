@@ -256,7 +256,7 @@ func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
 		return fmt.Errorf("type %v: pointer root-types are not supported", t)
 	}
 	fldPath := field.NewPath(t.Name.String())
-	if node, err := td.discover(t, fldPath); err != nil {
+	if node, err := td.discoverType(t, fldPath); err != nil {
 		return err
 	} else if node == nil {
 		panic(fmt.Sprintf("discovered a nil node for type %v", t))
@@ -272,12 +272,12 @@ func unalias(t *types.Type) *types.Type {
 	return t
 }
 
-// discover walks the given type recursively and returns a typeNode
+// discoverType walks the given type recursively and returns a typeNode
 // representing it. This does not distinguish between discovering a type
 // definition and discovering a field of a struct.  The first time it
-// encounters a type it has not seen before, it will discover that type. If it
+// encounters a type it has not seen before, it will explore that type. If it
 // finds a type it has already processed, it will return the existing node.
-func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNode, error) {
+func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typeNode, error) {
 	// With the exception of builtins (which gengo puts in package ""), we
 	// can't traverse into packages which are not being processed by this tool.
 	if t.Name.Package != "" {
@@ -345,7 +345,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 
 	// Discovery applies to values, not pointers.
 	if t.Kind == types.Pointer {
-		return td.discover(t.Elem, fldPath)
+		return td.discoverType(t.Elem, fldPath)
 	}
 
 	// If we have done this type already, we can stop here and break any
@@ -393,7 +393,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		//    3) In the case of a type definition whose RHS is a struct which
 		//       has fields with validation tags, the validation for those fields
 		//       WILL be called from the generated for for the new type.
-		if node, err := td.discover(t.Underlying, fldPath); err != nil {
+		if node, err := td.discoverType(t.Underlying, fldPath); err != nil {
 			return nil, err
 		} else {
 			thisNode.underlying = &childNode{
@@ -408,7 +408,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 	case types.Slice:
 		// Discover the element type.
-		if node, err := td.discover(t.Elem, fldPath.Key("vals")); err != nil {
+		if node, err := td.discoverType(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
 		} else {
 			thisNode.elem = &childNode{
@@ -418,7 +418,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 	case types.Map:
 		// Discover the key type.
-		if node, err := td.discover(t.Key, fldPath.Key("keys")); err != nil {
+		if node, err := td.discoverType(t.Key, fldPath.Key("keys")); err != nil {
 			return nil, err
 		} else {
 			thisNode.key = &childNode{
@@ -428,7 +428,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 
 		// Discover the element type.
-		if node, err := td.discover(t.Elem, fldPath.Key("vals")); err != nil {
+		if node, err := td.discoverType(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
 		} else {
 			thisNode.elem = &childNode{
@@ -601,7 +601,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		childPath := fldPath.Child(name)
 		childType := memb.Type
 		var child *childNode
-		if node, err := td.discover(childType, childPath); err != nil {
+		if node, err := td.discoverType(childType, childPath); err != nil {
 			return err
 		} else {
 			child = &childNode{
@@ -652,8 +652,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		// because some of this is conditional on whether other validations
 		// were emitted (to avoid emitting empty functions).
 		//
-		// We do this here, rather than in discover() because we need to know
-		// information about the field, not just the type.
+		// We do this here, rather than in discoverType() because we need to
+		// know information about the field, not just the type.
 		switch childType.Kind {
 		case types.Slice:
 			// Validate each value of a list field.
