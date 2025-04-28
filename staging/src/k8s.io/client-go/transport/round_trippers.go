@@ -43,7 +43,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 		rt = config.WrapTransport(rt)
 	}
 
-	rt = DebugWrappers(rt)
+	rt = MaybeDebugWrappers(rt, config.ForceDebugWrappers)
 
 	// Set authentication wrappers
 	switch {
@@ -73,11 +73,20 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 // DebugWrappers potentially wraps a round tripper with a wrapper that logs
 // based on the log level in the context of each individual request.
 //
-// At the moment, wrapping depends on the global log verbosity and is done
-// if that verbosity is >= 6. This may change in the future.
+// At the moment, wrapping depends on the global klog verbosity and is done
+// if that verbosity is >= 6.
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	//nolint:logcheck // The actual logging is done with a different logger, so only checking here is okay.
 	if klog.V(6).Enabled() {
+		rt = NewDebuggingRoundTripper(rt, DebugByContext)
+	}
+	return rt
+}
+
+// MaybeDebugWrappers is a variant of [DebugWrappers] where the additional force parameter
+// can be used to enable wrapping regardless of the global klog verbosity.
+func MaybeDebugWrappers(rt http.RoundTripper, force bool) http.RoundTripper {
+	if force || klog.V(6).Enabled() {
 		rt = NewDebuggingRoundTripper(rt, DebugByContext)
 	}
 	return rt

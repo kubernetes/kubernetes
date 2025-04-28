@@ -77,6 +77,14 @@ type Config struct {
 	//
 	// socks5 proxying does not currently support spdy streaming endpoints.
 	Proxy func(*http.Request) (*url.URL, error)
+
+	// ForceDebugWrappers enables wrapping of the final transport such that the wrapper
+	// logs information while processing a request. See [NewDebuggingRoundTripper]
+	// for details.
+	//
+	// If false, then wrapping still happens when the global klog verbosity level
+	// is >= 6. This is the traditional Kubernetes behavior.
+	ForceDebugWrappers bool
 }
 
 // DialHolder is used to make the wrapped function comparable so that it can be used as a map key.
