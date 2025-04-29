@@ -41,6 +41,15 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CronJob(in *batchv1.CronJob) {
 	SetDefaults_CronJob(in)
+	if in.Spec.JobTemplate.Spec.PodFailurePolicy != nil {
+		for i := range in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules {
+			a := &in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules[i]
+			for j := range a.OnPodConditions {
+				b := &a.OnPodConditions[j]
+				SetDefaults_PodFailurePolicyOnPodConditionsPattern(b)
+			}
+		}
+	}
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
@@ -350,6 +359,15 @@ func SetObjectDefaults_CronJobList(in *batchv1.CronJobList) {
 
 func SetObjectDefaults_Job(in *batchv1.Job) {
 	SetDefaults_Job(in)
+	if in.Spec.PodFailurePolicy != nil {
+		for i := range in.Spec.PodFailurePolicy.Rules {
+			a := &in.Spec.PodFailurePolicy.Rules[i]
+			for j := range a.OnPodConditions {
+				b := &a.OnPodConditions[j]
+				SetDefaults_PodFailurePolicyOnPodConditionsPattern(b)
+			}
+		}
+	}
 	apiscorev1.SetDefaults_PodSpec(&in.Spec.Template.Spec)
 	for i := range in.Spec.Template.Spec.Volumes {
 		a := &in.Spec.Template.Spec.Volumes[i]
