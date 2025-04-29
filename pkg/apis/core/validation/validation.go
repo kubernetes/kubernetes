@@ -3038,6 +3038,13 @@ func gatherPodResourceClaimNames(claims []core.PodResourceClaim) sets.Set[string
 }
 
 func validatePodResourceClaim(podMeta *metav1.ObjectMeta, claim core.PodResourceClaim, podClaimNames *sets.Set[string], fldPath *field.Path) field.ErrorList {
+	// static pods don't support resource claims
+	if podMeta != nil {
+		if _, ok := podMeta.Annotations[core.MirrorPodAnnotationKey]; ok {
+			return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods do not support resource claims")}
+		}
+	}
+
 	var allErrs field.ErrorList
 	if claim.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))

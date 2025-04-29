@@ -335,6 +335,10 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 		}
 	}
 
+	if len(pod.Spec.ResourceClaims) > 0 {
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference resourceclaims", nodeName))
+	}
+
 	return nil
 }
 
