@@ -24,13 +24,14 @@ spec:
   containers:
   - name: with-resource
     image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
-    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && sleep 10000"]
     resources:
       claims:
       - name: resource
   - name: without-resource
     image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
-    command: ["sh", "-c", "set && mount && ls -la /dev/"]
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && sleep 10000"]
+  terminationGracePeriodSeconds: 0 # Shut down immediately.
   resourceClaims:
   - name: resource
     resourceClaimName: external-claim
