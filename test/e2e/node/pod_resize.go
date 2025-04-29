@@ -40,7 +40,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func doPodResizeAdmissionPluginsTests() {
+func doPodResizeAdmissionPluginsTests(f *framework.Framework) {
 	testcases := []struct {
 		name                  string
 		enableAdmissionPlugin func(ctx context.Context, f *framework.Framework)
@@ -119,8 +119,6 @@ func doPodResizeAdmissionPluginsTests() {
 	}
 
 	for _, tc := range testcases {
-		f := framework.NewDefaultFramework(tc.name)
-
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			containers := []podresize.ResizableContainerInfo{
 				{
@@ -459,7 +457,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
 	})
-	doPodResizeAdmissionPluginsTests()
+	doPodResizeAdmissionPluginsTests(f)
 })
 
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string) error {
