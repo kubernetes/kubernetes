@@ -69,7 +69,7 @@ func offsetMemory(index int64, value string) string {
 	return ptr.String()
 }
 
-func doPodResizeTests() {
+func doPodResizeTests(f *framework.Framework) {
 	type testCase struct {
 		name                string
 		containers          []podresize.ResizableContainerInfo
@@ -1157,7 +1157,6 @@ func doPodResizeTests() {
 
 	for idx := range tests {
 		tc := tests[idx]
-		f := framework.NewDefaultFramework("pod-resize-tests")
 
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			podClient := e2epod.NewPodClient(f)
@@ -1235,7 +1234,7 @@ func doPodResizeTests() {
 	}
 }
 
-func doPodResizeErrorTests() {
+func doPodResizeErrorTests(f *framework.Framework) {
 
 	type testCase struct {
 		name        string
@@ -1390,7 +1389,6 @@ func doPodResizeErrorTests() {
 
 	for idx := range tests {
 		tc := tests[idx]
-		f := framework.NewDefaultFramework("pod-resize-error-tests")
 
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			podClient := e2epod.NewPodClient(f)
@@ -1453,6 +1451,6 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 		}
 	})
 
-	doPodResizeTests()
-	doPodResizeErrorTests()
+	doPodResizeTests(f)
+	doPodResizeErrorTests(f)
 })
