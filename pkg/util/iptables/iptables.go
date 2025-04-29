@@ -654,12 +654,8 @@ func (runner *runner) ChainExists(table Table, chain Chain) (bool, error) {
 	trace := utiltrace.New("iptables ChainExists")
 	defer trace.LogIfLong(2 * time.Second)
 
-	out, err := runner.run(opListChain, fullArgs)
-	if err != nil {
-		klog.ErrorS(err, "Failed to list chain", "chain", chain, "table", table, "output", string(out))
-		return false, err
-	}
-	return true, nil
+	_, err := runner.run(opListChain, fullArgs)
+	return err == nil, err
 }
 
 type operation string
