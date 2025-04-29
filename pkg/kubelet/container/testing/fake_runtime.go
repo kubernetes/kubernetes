@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -369,7 +370,9 @@ func (f *FakeRuntime) GetImageRef(_ context.Context, image kubecontainer.ImageSp
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetImageRef")
 	for _, i := range f.ImageList {
-		if i.ID == image.Image {
+		if i.ID == image.Image ||
+			slices.Index(i.RepoDigests, image.Image) > -1 ||
+			slices.Index(i.RepoTags, image.Image) > -1 {
 			return i.ID, nil
 		}
 	}
