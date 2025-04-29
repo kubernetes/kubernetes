@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -416,6 +417,9 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 	namespaceDeletedAt metav1.Time) (gvrDeletionMetadata, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Namespace controller - deleteAllContentForGroupVersionResource", "namespace", namespace, "resource", gvr)
+	if strings.Contains(namespace, "nsdeletetest") {
+		logger.V(4).Info("Namespace controller - deleteAllContentForGroupVersionResource", "namespace", namespace, "resource", gvr)
+	}
 
 	// estimate how long it will take for the resource to be deleted (needed for objects that support graceful delete)
 	estimate, err := d.estimateGracefulTermination(ctx, gvr, namespace, namespaceDeletedAt)
