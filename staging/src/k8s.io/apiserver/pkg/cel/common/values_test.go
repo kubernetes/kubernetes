@@ -39,12 +39,14 @@ import (
 // TestToValue also tests that UnstructuredToValue and TypedToValue behave identically
 // for a Kubernetes object.
 func TestToValue(t *testing.T) {
-	struct1 := Struct{S: "hello", I: 10, B: true, F: 1.5}
-	struct1Ptr := &struct1
-	struct2 := Struct{S: "world", I: 20, B: false, F: 2.5}
-	struct1Again := Struct{S: "hello", I: 10, B: true, F: 1.5}
-	zeroStruct := Struct{}
-	zeroStructPtr := &Struct{}
+	struct1value := Struct{S: "hello", I: 10, B: true, F: 1.5}
+	struct1 := typedValue{value: struct1value, schema: structSchema}
+	struct1Ptr := typedValue{value: &struct1value, schema: structSchema}
+	struct2value := Struct{S: "world", I: 20, B: false, F: 2.5}
+	struct2 := typedValue{value: struct2value, schema: structSchema}
+	struct1Again := typedValue{value: struct1value, schema: structSchema}
+	zeroStruct := typedValue{value: Struct{}, schema: structSchema}
+	zeroStructPtr := typedValue{value: Struct{}, schema: structSchema}
 
 	now := metav1.NewTime(time.Now().Truncate(0))
 	duration1 := metav1.Duration{Duration: 5 * time.Second}
@@ -59,21 +61,21 @@ func TestToValue(t *testing.T) {
 	}
 	microTime1 := metav1.MicroTime{Time: microTime1Parsed}
 
-	nested1 := Nested{Name: "nested1", Info: struct1}
+	nested1value := Nested{Name: "nested1", Info: Struct{S: "hello", I: 10, B: true, F: 1.5}}
 
-	complex1 := Complex{
+	complex1value := Complex{
 		TypeMeta:    metav1.TypeMeta{Kind: "Complex", APIVersion: "v1"},
 		ObjectMeta:  metav1.ObjectMeta{Name: "complex1"},
 		ID:          "c1",
 		Tags:        []string{"a", "b", "c"},
 		Labels:      map[string]string{"key1": "val1", "key2": "val2"},
-		NestedObj:   nested1,
+		NestedObj:   nested1value,
 		Timeout:     duration1,
 		Time:        time1,
 		MicroTime:   microTime1,
 		RawBytes:    []byte("bytes1"),
 		NilBytes:    nil,
-		ChildPtr:    &struct2,
+		ChildPtr:    &struct2value,
 		NilPtr:      nil,
 		EmptySlice:  []int{},
 		NilSlice:    nil,
@@ -99,17 +101,19 @@ func TestToValue(t *testing.T) {
 		},
 		SetList: []SetEntry{1, 2, 3},
 	}
-	complex2 := Complex{
+	complex1 := typedValue{value: complex1value, schema: complexSchema}
+
+	complex2value := Complex{
 		TypeMeta:    metav1.TypeMeta{Kind: "Complex2", APIVersion: "v1"},
 		ObjectMeta:  metav1.ObjectMeta{Name: "complex2"},
 		ID:          "c2",
 		Tags:        []string{"x", "y"},
 		Labels:      map[string]string{"key3": "val3"},
-		NestedObj:   Nested{Name: "nested2", Info: struct2},
+		NestedObj:   Nested{Name: "nested2", Info: struct2value},
 		Timeout:     metav1.Duration{Duration: 10 * time.Second},
 		RawBytes:    []byte("bytes2"),
 		NilBytes:    []byte{}, // Non-nil but empty
-		ChildPtr:    &struct1,
+		ChildPtr:    &struct1value,
 		NilPtr:      nil,
 		EmptySlice:  []int{1},               // Non-empty
 		NilSlice:    []int{1},               // Non-nil
@@ -135,7 +139,9 @@ func TestToValue(t *testing.T) {
 		},
 		SetList: []SetEntry{3, 2, 1},
 	}
-	complex3 := Complex{
+	complex2 := typedValue{value: complex2value, schema: complexSchema}
+
+	complex3value := Complex{
 		MapList: []MapListEntry{
 			{
 				Key1:  "k1v3",
@@ -150,7 +156,9 @@ func TestToValue(t *testing.T) {
 		},
 		SetList: []SetEntry{4, 1},
 	}
-	complex4 := Complex{
+	complex3 := typedValue{value: complex3value, schema: complexSchema}
+
+	complex4value := Complex{
 		MapList: []MapListEntry{
 			{
 				Key1:  "k1v3",
@@ -170,6 +178,8 @@ func TestToValue(t *testing.T) {
 		},
 		SetList: []SetEntry{4, 3, 2, 1},
 	}
+	complex4 := typedValue{value: complex4value, schema: complexSchema}
+
 	complex1Again := complex1 // Create a copy for equality checks
 
 	slice1 := []int{1, 2, 3}
@@ -188,297 +198,297 @@ func TestToValue(t *testing.T) {
 		{
 			name:       "basic: int32",
 			expression: "c.i32 == 32",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "basic: int64",
 			expression: "c.i64 == 64",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "basic: float32",
 			expression: "c.f32 == 32.5",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "basic: enum",
 			expression: "c.enum == 'a'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "basic: nil bytes",
 			expression: "!has(c.nilBytes)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 
 		// Struct Tests
 		{
 			name:       "struct: zero value struct",
 			expression: "obj.s == '' && obj.i == 0 && obj.b == false && obj.f == 0.0",
-			activation: map[string]typedValue{"obj": typedValue{value: zeroStruct, schema: structSchema}},
+			activation: map[string]typedValue{"obj": zeroStruct},
 		},
 		{
 			name:       "struct: zero value struct pointer",
 			expression: "obj.s == '' && obj.i == 0 && obj.b == false && obj.f == 0.0",
-			activation: map[string]typedValue{"obj": typedValue{value: zeroStructPtr, schema: structSchema}},
+			activation: map[string]typedValue{"obj": zeroStructPtr},
 		},
 		{
 			name:       "struct: populated struct field access",
 			expression: "obj.s == 'hello' && obj.i == 10 && obj.b == true && obj.f == 1.5",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct1},
 		},
 		{
 			name:       "struct: populated struct pointer field access",
 			expression: "obj.s == 'hello' && obj.i == 10 && obj.b == true && obj.f == 1.5",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1Ptr, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct1Ptr},
 		},
 		{
 			name:       "struct: access omitempty field (has)",
 			expression: "!has(obj.so)",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct1},
 		},
 		{
 			name:       "struct: access non-existent field (has)",
 			expression: "!has(obj.nonExistent)",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 		},
 		{
 			name:       "struct: access non-existent field direct (error)",
 			expression: "obj.nonExistent",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 			wantErr:    "no such key: nonExistent",
 		},
 		{
 			name:       "struct: access with non-string key (get) (error)",
 			expression: "obj[1]",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 			wantErr:    "no such overload",
 		},
 		{
 			name:       "struct: check contains non-string key (error)",
 			expression: "1 in obj",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 			wantErr:    "no such overload",
 		},
 		{
 			name:       "struct: convert to its own type",
 			expression: "type(obj) == type(obj)",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 		},
 		{
 			name:       "struct: embedded inline",
 			expression: "c.apiVersion == 'v1' && c.kind == 'Complex'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "struct: embedded inline: omitempty",
 			expression: "!has(c.apiVersion)",
-			activation: map[string]typedValue{"c": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"c": struct2},
 		},
 		{
 			name:       "struct: embedded struct",
 			expression: "c.metadata.name == 'complex1'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "struct: embedded struct: omitempty struct field",
 			expression: "!has(c.metadata.labels)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 
 		// Comparison Tests
 		{
 			name:       "compare: identity (struct)",
 			expression: "s1 == s1",
-			activation: map[string]typedValue{"s1": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"s1": struct1},
 		},
 		{
 			name:       "compare: identical structs",
 			expression: "s1 == s1_again",
 			activation: map[string]typedValue{
-				"s1":       typedValue{value: struct1, schema: structSchema},
-				"s1_again": typedValue{value: struct1Again, schema: structSchema},
+				"s1":       struct1,
+				"s1_again": struct1Again,
 			},
 		},
 		{
 			name:       "compare: different structs",
 			expression: "s1 != s2",
 			activation: map[string]typedValue{
-				"s1": typedValue{value: struct1, schema: structSchema},
-				"s2": typedValue{value: struct2, schema: structSchema},
+				"s1": struct1,
+				"s2": struct2,
 			},
 		},
 		{
 			name:       "compare: struct and pointer to identical struct",
 			expression: "s1 == s1_ptr",
 			activation: map[string]typedValue{
-				"s1":     typedValue{value: struct1, schema: structSchema},
-				"s1_ptr": typedValue{value: struct1Ptr, schema: structSchema},
+				"s1":     struct1,
+				"s1_ptr": struct1Ptr,
 			},
 		},
 		{
 			name:       "compare: struct and nil",
 			expression: "s1 != null",
-			activation: map[string]typedValue{"s1": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"s1": struct1},
 		},
 		{
 			name:       "compare: struct and different type",
 			expression: "s1 != 10",
-			activation: map[string]typedValue{"s1": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"s1": struct1},
 		},
 		{
 			name:       "compare: nil struct pointer and null",
 			expression: "nil_obj == null",
-			activation: map[string]typedValue{"nil_obj": typedValue{value: nil, schema: structSchema}},
+			activation: map[string]typedValue{"nil_obj": {value: nil, schema: structSchema}},
 		},
 		{
 			name:       "compare: identical slices (activation)",
 			expression: "sl1 == sl1a",
 			activation: map[string]typedValue{
-				"sl1":  typedValue{value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
-				"sl1a": typedValue{value: slice1Again, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"sl1":  {value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"sl1a": {value: slice1Again, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: different slices (activation)",
 			expression: "sl1 != sl2",
 			activation: map[string]typedValue{
-				"sl1": typedValue{value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
-				"sl2": typedValue{value: slice2, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"sl1": {value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"sl2": {value: slice2, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: slices of different types",
 			expression: "sl1 != sl3",
 			activation: map[string]typedValue{
-				"sl1": typedValue{value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
-				"sl3": typedValue{value: slice3, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: stringSchema}}}},
+				"sl1": {value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"sl3": {value: slice3, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: stringSchema}}}},
 			},
 		},
 		{
 			name:       "compare: slice and non-list",
 			expression: "sl1 != 1",
 			activation: map[string]typedValue{
-				"sl1": typedValue{value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"sl1": {value: slice1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: identical maps (activation)",
 			expression: "m1 == m1a",
 			activation: map[string]typedValue{
-				"m1":  typedValue{value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
-				"m1a": typedValue{value: map1Again, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m1":  {value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m1a": {value: map1Again, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: different maps (value) (activation)",
 			expression: "m1 != m2",
 			activation: map[string]typedValue{
-				"m1": typedValue{value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
-				"m2": typedValue{value: map2, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m1": {value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m2": {value: map2, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: different maps (key) (activation)",
 			expression: "m1 != m3",
 			activation: map[string]typedValue{
-				"m1": typedValue{value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
-				"m3": typedValue{value: map3, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m1": {value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m3": {value: map3, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: different maps (value type)",
 			expression: "m1 != m4",
 			activation: map[string]typedValue{
-				"m1": typedValue{value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
-				"m4": typedValue{value: map4, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: stringSchema}}}},
+				"m1": {value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m4": {value: map4, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: stringSchema}}}},
 			},
 		},
 		{
 			name:       "compare: map and non-map",
 			expression: "m1 != 1",
 			activation: map[string]typedValue{
-				"m1": typedValue{value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m1": {value: map1, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
 			},
 		},
 		{
 			name:       "compare: time instances (equal)",
 			expression: "t1 == t2",
 			activation: map[string]typedValue{
-				"t1": typedValue{value: now, schema: &timeFormat},
-				"t2": typedValue{value: now, schema: &timeFormat},
+				"t1": {value: now, schema: &timeFormat},
+				"t2": {value: now, schema: &timeFormat},
 			},
 		},
 		{
 			name:       "compare: time instances (different)",
 			expression: "t1 != t2",
 			activation: map[string]typedValue{
-				"t1": typedValue{value: now, schema: &timeFormat},
-				"t2": typedValue{value: metav1.MicroTime{Time: now.Add(time.Nanosecond)}, schema: stringSchema},
+				"t1": {value: now, schema: &timeFormat},
+				"t2": {value: metav1.MicroTime{Time: now.Add(time.Nanosecond)}, schema: stringSchema},
 			},
 		},
 		{
 			name:       "compare: microTime instances (equal)",
 			expression: "t1 == t2",
 			activation: map[string]typedValue{
-				"t1": typedValue{value: now, schema: stringSchema},
-				"t2": typedValue{value: now, schema: stringSchema},
+				"t1": {value: now, schema: stringSchema},
+				"t2": {value: now, schema: stringSchema},
 			},
 		},
 		{
 			name:       "compare: microTime instances (different)",
 			expression: "t1 != t2",
 			activation: map[string]typedValue{
-				"t1": typedValue{value: now, schema: stringSchema},
-				"t2": typedValue{value: metav1.MicroTime{Time: now.Add(time.Nanosecond)}, schema: stringSchema},
+				"t1": {value: now, schema: stringSchema},
+				"t2": {value: metav1.MicroTime{Time: now.Add(time.Nanosecond)}, schema: stringSchema},
 			},
 		},
 		{
 			name:       "compare: duration instances (equal)",
 			expression: "d1 == d2",
 			activation: map[string]typedValue{
-				"d1": typedValue{value: duration1, schema: stringSchema},
-				"d2": typedValue{value: metav1.Duration{Duration: 5 * time.Second}, schema: stringSchema},
+				"d1": {value: duration1, schema: stringSchema},
+				"d2": {value: metav1.Duration{Duration: 5 * time.Second}, schema: stringSchema},
 			},
 		},
 		{
 			name:       "compare: duration instances (different)",
 			expression: "d1 != d2",
 			activation: map[string]typedValue{
-				"d1": typedValue{value: duration1, schema: stringSchema},
-				"d2": typedValue{value: metav1.Duration{Duration: 6 * time.Second}, schema: stringSchema},
+				"d1": {value: duration1, schema: stringSchema},
+				"d2": {value: metav1.Duration{Duration: 6 * time.Second}, schema: stringSchema},
 			},
 		},
 		{
 			name:       "compare: bytes instances (equal)",
 			expression: "b1 == b2",
 			activation: map[string]typedValue{
-				"b1": typedValue{value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
-				"b2": typedValue{value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
+				"b1": {value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
+				"b2": {value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
 			},
 		},
 		{
 			name:       "compare: bytes instances (different)",
 			expression: "b1 != b2",
 			activation: map[string]typedValue{
-				"b1": typedValue{value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
-				"b2": typedValue{value: []byte("abd"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
+				"b1": {value: []byte("abc"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
+				"b2": {value: []byte("abd"), schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"string"}, Format: "byte"}}},
 			},
 		},
 		{
 			name:       "compare: empty slices (different underlying types)",
 			expression: "e1 == e2",
 			activation: map[string]typedValue{
-				"e1": typedValue{value: []int{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
-				"e2": typedValue{value: []string{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: stringSchema}}}},
+				"e1": {value: []int{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: int64Schema}}}},
+				"e2": {value: []string{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: stringSchema}}}},
 			},
 		},
 		{
 			name:       "compare: empty maps (different underlying types)",
 			expression: "m1 == m2",
 			activation: map[string]typedValue{
-				"m1": typedValue{value: map[string]int{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
-				"m2": typedValue{value: map[string]bool{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: boolSchema}}}},
+				"m1": {value: map[string]int{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: int64Schema}}}},
+				"m2": {value: map[string]bool{}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"object"}, AdditionalProperties: &spec.SchemaOrBool{Schema: boolSchema}}}},
 			},
 		},
 
@@ -486,22 +496,22 @@ func TestToValue(t *testing.T) {
 		{
 			name:       "nested: access field",
 			expression: "c.nestedObj.info.s == 'hello'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "nested: compare nested struct",
 			expression: "c1.nestedObj != c2.nestedObj",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c2": typedValue{value: complex2, schema: complexSchema},
+				"c1": complex1,
+				"c2": complex2,
 			},
 		},
 		{
 			name:       "nested: compare identical nested struct",
 			expression: "c1.nestedObj == c1_again.nestedObj",
 			activation: map[string]typedValue{
-				"c1":       typedValue{value: complex1, schema: complexSchema},
-				"c1_again": typedValue{value: complex1Again, schema: complexSchema},
+				"c1":       complex1,
+				"c1_again": complex1Again,
 			},
 		},
 
@@ -509,52 +519,52 @@ func TestToValue(t *testing.T) {
 		{
 			name:       "slice: access element",
 			expression: "c.tags[1] == 'b'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: size",
 			expression: "size(c.tags) == 3",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: contains ('in')",
 			expression: "'b' in c.tags",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: not contains ('in')",
 			expression: "!('d' in c.tags)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: contains with non-primitive (struct)",
 			expression: "s1 in structs",
 			activation: map[string]typedValue{
-				"structs": typedValue{value: []Struct{struct2, struct1}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: structSchema}}}},
-				"s1":      typedValue{value: struct1, schema: structSchema},
+				"structs": {value: []Struct{struct2value, struct1value}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: structSchema}}}},
+				"s1":      struct1,
 			},
 		},
 		{
 			name:       "slice: contains with non-primitive (struct ptr)",
 			expression: "s1 in structs",
 			activation: map[string]typedValue{
-				"structs": typedValue{value: []*Struct{&struct2, &struct1}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: structSchema}}}},
-				"s1":      typedValue{value: &struct1, schema: structSchema},
+				"structs": {value: []*Struct{&struct2value, &struct1value}, schema: &spec.Schema{SchemaProps: spec.SchemaProps{Type: []string{"array"}, Items: &spec.SchemaOrArray{Schema: structSchema}}}},
+				"s1":      struct1,
 			},
 		},
 		{
 			name:       "slice: add",
 			expression: "size(c1.tags + c2.tags) == 5 && (c1.tags + c2.tags)[3] == 'x'",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c2": typedValue{value: complex2, schema: complexSchema},
+				"c1": complex1,
+				"c2": complex2,
 			},
 		},
 		{
 			name:       "slice: add non-list (error)",
 			expression: "c.tags + 1",
 			activation: map[string]typedValue{
-				"c": typedValue{value: complex1, schema: complexSchema},
+				"c": complex1,
 			},
 			wantErr: "no such overload",
 		},
@@ -562,241 +572,241 @@ func TestToValue(t *testing.T) {
 			name:       "slice: get with non-int index (error)",
 			expression: `c.tags['a']`,
 			activation: map[string]typedValue{
-				"c": typedValue{value: complex1, schema: complexSchema},
+				"c": complex1,
 			},
 			wantErr: `unsupported index type 'string' in list`,
 		},
 		{
 			name:       "slice: all() true",
 			expression: "c.tags.all(t, t.startsWith(''))",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: all() false",
 			expression: "!c.tags.all(t, t == 'a')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: exists() true",
 			expression: "c.tags.exists(t, t == 'c')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: exists() false",
 			expression: "!c.tags.exists(t, t == 'z')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: out of bounds access",
 			expression: "c.tags[5]",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 			wantErr:    "index out of bounds: 5",
 		},
 		{
 			name:       "slice: empty slice size",
 			expression: "size(c.emptySlice) == 0",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: exists() on empty",
 			expression: "!c.emptySlice.exists(x, true)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: all() on empty",
 			expression: "c.emptySlice.all(x, false)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: convert to list type",
 			expression: "type(c.tags) == list",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "slice: convert list to type type",
 			expression: "type(c.tags) == list",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 
 		// Map Tests
 		{
 			name:       "map: access element",
 			expression: "c.labels['key1'] == 'val1'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: size",
 			expression: "size(c.labels) == 2",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: contains key ('in')",
 			expression: "'key1' in c.labels",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: not contains key ('in')",
 			expression: "!('key3' in c.labels)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: has() key",
 			expression: "has(c.labels.key1)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: has() non-existent key",
 			expression: "!has(c.labels.key3)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: access non-existent key (error)",
 			expression: "c.labels['key3']",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 			wantErr:    "no such key: key3",
 		},
 		{
 			name:       "map: all() on keys true",
 			expression: "c.labels.all(name, name.startsWith('key'))",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: all() on keys false",
 			expression: "!c.labels.all(name, name == 'key1')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: exists() on keys true",
 			expression: "c.labels.exists(name, name == 'key2')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: exists() on keys false",
 			expression: "!c.labels.exists(name, name == 'key3')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: empty map size",
 			expression: "size(c.emptyMap) == 0",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: exists() on empty",
 			expression: "!c.emptyMap.exists(name, true)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: all() on empty",
 			expression: "c.emptyMap.all(name, false)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: convert to map type",
 			expression: "type(c.labels) == map",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "map: convert map to type type",
 			expression: "type(c.labels) == map",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 
 		// Pointer Tests
 		{
 			name:       "pointer: access through non-nil pointer field",
 			expression: "c.childPtr.s == 'world'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "pointer: compare non-nil pointer field",
 			expression: "c.childPtr == s2",
 			activation: map[string]typedValue{
-				"c":  typedValue{value: complex1, schema: complexSchema},
-				"s2": typedValue{value: struct2, schema: structSchema},
+				"c":  complex1,
+				"s2": struct2,
 			},
 		},
-		{ // TODO: valuesreflect should respect !has()
+		{
 			name:       "pointer: access through nil pointer field (error)",
 			expression: "c.nilPtr.s",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 			wantErr:    "no such key: nilPtr", // Accessing field 's' on a null object
 		},
 		{
 			name:       "pointer: check has() nil pointer",
 			expression: "!has(c.nilPtr)",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 
 		// Type Tests
 		{
 			name:       "type: string",
 			expression: "type(obj.s) == string",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 		},
 		{
 			name:       "type: int",
 			expression: "type(obj.i) == int",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 		},
 		{
 			name:       "type: bool",
 			expression: "type(obj.b) == bool",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 		},
 		{
 			name:       "type: float",
 			expression: "type(obj.f) == double",
-			activation: map[string]typedValue{"obj": typedValue{value: struct1, schema: structSchema}},
+			activation: map[string]typedValue{"obj": struct2},
 		},
 		{
 			name:       "type: slice",
 			expression: "type(c.tags) == list",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: map",
 			expression: "type(c.labels) == map",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: time",
 			expression: "type(c.time) == google.protobuf.Timestamp",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: microTime",
 			expression: "type(c.microTime) == google.protobuf.Timestamp",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: duration",
 			expression: "type(c.timeout) == google.protobuf.Duration",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: bytes",
 			expression: "type(c.rawBytes) == bytes",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: int32",
 			expression: "type(c.i32) == int",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: int64",
 			expression: "type(c.i64) == int",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: float32",
 			expression: "type(c.f32) == double",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "type: enum",
 			expression: "type(c.enum) == string",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 
 		// listType=map
@@ -804,33 +814,33 @@ func TestToValue(t *testing.T) {
 			name:       "listType=map: equal",
 			expression: "c1.mapList == c2.mapList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c2": typedValue{value: complex2, schema: complexSchema},
+				"c1": complex1,
+				"c2": complex2,
 			},
 		},
 		{
 			name:       "listType=map: not equal",
 			expression: "c1.mapList != c3.mapList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c3": typedValue{value: complex3, schema: complexSchema},
+				"c1": complex1,
+				"c3": complex3,
 			},
 		},
 		{
 			name:       "listType=map: add overlapping",
 			expression: "c1.mapList + c2.mapList == c1.mapList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c2": typedValue{value: complex2, schema: complexSchema},
+				"c1": complex1,
+				"c2": complex2,
 			},
 		},
 		{
 			name:       "listType=map: add non-overlapping",
 			expression: "c1.mapList + c3.mapList == c4.mapList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c3": typedValue{value: complex3, schema: complexSchema},
-				"c4": typedValue{value: complex4, schema: complexSchema},
+				"c1": complex1,
+				"c3": complex3,
+				"c4": complex4,
 			},
 		},
 
@@ -839,33 +849,33 @@ func TestToValue(t *testing.T) {
 			name:       "listType=set: equal",
 			expression: "c1.setList == c2.setList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c2": typedValue{value: complex2, schema: complexSchema},
+				"c1": complex1,
+				"c2": complex2,
 			},
 		},
 		{
 			name:       "listType=set: not equal",
 			expression: "c1.setList != c3.setList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c3": typedValue{value: complex3, schema: complexSchema},
+				"c1": complex1,
+				"c3": complex3,
 			},
 		},
 		{
 			name:       "listType=set: add overlapping",
 			expression: "c1.setList + c2.setList == c1.setList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c2": typedValue{value: complex2, schema: complexSchema},
+				"c1": complex1,
+				"c2": complex2,
 			},
 		},
 		{
 			name:       "listType=set: add non-overlapping",
 			expression: "c1.setList + c3.setList == c4.setList",
 			activation: map[string]typedValue{
-				"c1": typedValue{value: complex1, schema: complexSchema},
-				"c3": typedValue{value: complex3, schema: complexSchema},
-				"c4": typedValue{value: complex4, schema: complexSchema},
+				"c1": complex1,
+				"c3": complex3,
+				"c4": complex4,
 			},
 		},
 
@@ -873,52 +883,52 @@ func TestToValue(t *testing.T) {
 		{
 			name:       "time: comparison equals",
 			expression: "c.time == timestamp('2000-01-01T12:00:00Z')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "microTime: comparison equals",
 			expression: "c.microTime == timestamp('2000-01-01T12:00:00.000001Z')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "duration: comparison equals",
 			expression: "c.timeout == duration('5s')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "duration: comparison greater",
 			expression: "c.timeout > duration('1s')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "intOrString: int comparison",
 			expression: "c.intOrString == 5",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "intOrString: string comparison",
 			expression: "c.intOrString == 'port'",
-			activation: map[string]typedValue{"c": typedValue{value: complex2, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex2},
 		},
 		{
 			name:       "quantity: comparison",
 			expression: "quantity(c.quantity).isGreaterThan(quantity('99m')) && quantity(c.quantity).isLessThan(quantity('101m'))",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "quantity: equality",
 			expression: "quantity(c.quantity) == quantity('100m')",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "bytes: size",
 			expression: "size(c.rawBytes) == 6",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 		{
 			name:       "bytes: equality",
 			expression: "c.rawBytes == b'bytes1'",
-			activation: map[string]typedValue{"c": typedValue{value: complex1, schema: complexSchema}},
+			activation: map[string]typedValue{"c": complex1},
 		},
 	}
 
