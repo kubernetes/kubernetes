@@ -75,7 +75,7 @@ func NewFilteredAPIServiceInformer(client clientset.Interface, resyncPeriod time
 				}
 				return client.ApiregistrationV1beta1().APIServices().List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

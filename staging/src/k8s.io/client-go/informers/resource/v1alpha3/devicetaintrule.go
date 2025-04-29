@@ -75,7 +75,7 @@ func NewFilteredDeviceTaintRuleInformer(client kubernetes.Interface, resyncPerio
 				}
 				return client.ResourceV1alpha3().DeviceTaintRules().List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

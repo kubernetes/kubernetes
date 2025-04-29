@@ -75,7 +75,7 @@ func NewFilteredVolumeAttachmentInformer(client kubernetes.Interface, resyncPeri
 				}
 				return client.StorageV1alpha1().VolumeAttachments().List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

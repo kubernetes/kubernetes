@@ -76,7 +76,7 @@ func NewFilteredResourceClaimTemplateInformer(client kubernetes.Interface, names
 				}
 				return client.ResourceV1beta2().ResourceClaimTemplates(namespace).List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

@@ -76,7 +76,7 @@ func NewFilteredEndpointsInformer(client kubernetes.Interface, namespace string,
 				}
 				return client.CoreV1().Endpoints(namespace).List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

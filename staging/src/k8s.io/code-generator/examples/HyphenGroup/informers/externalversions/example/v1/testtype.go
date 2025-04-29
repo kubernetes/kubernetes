@@ -76,7 +76,7 @@ func NewFilteredTestTypeInformer(client versioned.Interface, namespace string, r
 				}
 				return client.ExampleGroupV1().TestTypes(namespace).List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

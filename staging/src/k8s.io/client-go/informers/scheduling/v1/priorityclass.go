@@ -75,7 +75,7 @@ func NewFilteredPriorityClassInformer(client kubernetes.Interface, resyncPeriod 
 				}
 				return client.SchedulingV1().PriorityClasses().List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

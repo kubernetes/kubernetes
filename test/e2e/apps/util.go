@@ -63,7 +63,7 @@ func (t *IndexedPodAnnotationTracker) Start(ctx context.Context, c clientset.Int
 				obj, err := c.CoreV1().Pods(t.ownerNs).List(ctx, options)
 				return runtime.Object(obj), err
 			},
-			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 				options.LabelSelector = t.labelSelector
 				return c.CoreV1().Pods(t.ownerNs).Watch(ctx, options)
 			},

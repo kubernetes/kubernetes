@@ -167,7 +167,7 @@ func NewFiltered$.type|public$Informer(client $.clientSetInterface|raw$$if .name
 				}
 				return client.$.group$$.version$().$.type|publicPlural$($if .namespaced$namespace$end$).List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx $.contextContext|raw$, options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
+			WatchWithContextFunc: func(ctx $.contextContext|raw$, options $.v1ListOptions|raw$) ($.watchInterface|raw$, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

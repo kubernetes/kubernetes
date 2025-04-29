@@ -76,7 +76,7 @@ func NewFilteredFooInformer(client versioned.Interface, namespace string, resync
 				}
 				return client.SamplecontrollerV1alpha1().Foos(namespace).List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

@@ -75,7 +75,7 @@ func NewFilteredCertificateSigningRequestInformer(client kubernetes.Interface, r
 				}
 				return client.CertificatesV1beta1().CertificateSigningRequests().List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}

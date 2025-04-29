@@ -75,7 +75,7 @@ func NewFilteredResourceSliceInformer(client kubernetes.Interface, resyncPeriod 
 				}
 				return client.ResourceV1beta1().ResourceSlices().List(ctx, options)
 			},
-			WatchFuncWithContext: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
+			WatchWithContextFunc: func(ctx context.Context, options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
