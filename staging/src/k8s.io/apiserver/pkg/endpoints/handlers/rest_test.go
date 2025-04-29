@@ -181,7 +181,7 @@ func TestLimitedReadBody(t *testing.T) {
 			defer metrics.RequestBodySizes.Reset()
 			defer legacyregistry.Reset()
 
-			req, err := http.NewRequest("POST", "/", tc.requestBody)
+			req, err := http.NewRequest(request.MethodPost, "/", tc.requestBody)
 			if err != nil {
 				t.Errorf("err not expected: got %v", err)
 			}

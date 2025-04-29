@@ -19,16 +19,17 @@ package filters
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"testing"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"net/http"
-	"net/http/httptest"
-	"reflect"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 	batch "k8s.io/api/batch/v1"
@@ -52,7 +53,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 		EnableAuthorizationSelector bool
 	}{
 		"non-resource root": {
-			Verb: "POST",
+			Verb: http.MethodPost,
 			Path: "/",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb: "post",
@@ -60,7 +61,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"non-resource api prefix": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/api/",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb: "get",
@@ -68,7 +69,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"non-resource group api prefix": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/extensions/",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb: "get",
@@ -77,7 +78,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 		},
 
 		"resource": {
-			Verb: "POST",
+			Verb: http.MethodPost,
 			Path: "/api/v1/nodes/mynode",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "create",
@@ -89,7 +90,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"namespaced resource": {
-			Verb: "PUT",
+			Verb: http.MethodPut,
 			Path: "/api/v1/namespaces/myns/pods/mypod",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "update",
@@ -102,7 +103,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"API group resource": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
@@ -115,7 +116,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"disabled, ignore good field selector": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs?fieldSelector%=foo%3Dbar",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
@@ -128,7 +129,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"enabled, good field selector": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs?fieldSelector=foo%3D%3Dbar",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
@@ -145,7 +146,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			EnableAuthorizationSelector: true,
 		},
 		"enabled, bad field selector": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs?fieldSelector=%2Abar",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:                    "list",
@@ -160,7 +161,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			EnableAuthorizationSelector: true,
 		},
 		"disabled, ignore good label selector": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs?labelSelector%=foo%3Dbar",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
@@ -173,7 +174,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			},
 		},
 		"enabled, good label selector": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs?labelSelector=foo%3D%3Dbar",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:            "list",
@@ -190,7 +191,7 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 			EnableAuthorizationSelector: true,
 		},
 		"enabled, bad label selector": {
-			Verb: "GET",
+			Verb: http.MethodGet,
 			Path: "/apis/batch/v1/namespaces/myns/jobs?labelSelector=%2Abar",
 			ExpectedAttributes: &authorizer.AttributesRecord{
 				Verb:                    "list",
@@ -284,7 +285,7 @@ func TestAuditAnnotation(t *testing.T) {
 		handler := WithAuthorization(&fakeHTTPHandler{}, tc.authorizer, negotiatedSerializer)
 		// TODO: fake audit injector
 
-		req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+		req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 		req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
 		ae := audit.AuditEventFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"

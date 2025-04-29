@@ -1233,7 +1233,7 @@ func TestPerRequestWithSlowReader(t *testing.T) {
 		defer close(clientErrCh)
 
 		// we don't set up a request context with deadline on the client-side
-		req, err := http.NewRequestWithContext(context.Background(), "GET", server.URL+"/foo", nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL+"/foo", nil)
 		if err != nil {
 			t.Errorf("failed to create a new request: %v", err)
 			return
@@ -1313,7 +1313,7 @@ func TestPerRequestWithSlowReader(t *testing.T) {
 
 func sendWithTrace(t *testing.T, client *http.Client, url string, f func(*testing.T, httptrace.GotConnInfo)) (*http.Response, error) {
 	t.Helper()
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("failed to create new request: %v", err)
 	}

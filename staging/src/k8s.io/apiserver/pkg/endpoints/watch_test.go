@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -219,7 +220,7 @@ func TestWatchClientClose(t *testing.T) {
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
 	dest.RawQuery = "watch=1"
 
-	request, err := http.NewRequest("GET", dest.String(), nil)
+	request, err := http.NewRequest(request.MethodGet, dest.String(), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -263,7 +264,7 @@ func TestWatchRead(t *testing.T) {
 
 	connectHTTP := func(accept string) (io.ReadCloser, string) {
 		client := http.Client{}
-		request, err := http.NewRequest("GET", dest.String(), nil)
+		request, err := http.NewRequest(request.MethodGet, dest.String(), nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -415,7 +416,7 @@ func TestWatchHTTPAccept(t *testing.T) {
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
-	request, err := http.NewRequest("GET", dest.String(), nil)
+	request, err := http.NewRequest(request.MethodGet, dest.String(), nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -565,7 +566,7 @@ func TestWatchProtocolSelection(t *testing.T) {
 	}
 
 	for _, item := range table {
-		request, err := http.NewRequest("GET", dest.String(), nil)
+		request, err := http.NewRequest(request.MethodGet, dest.String(), nil)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -637,13 +638,13 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	dest.Path = "/" + prefix + "/" + newGroupVersion.Group + "/" + newGroupVersion.Version + "/watch/simples"
 	dest.RawQuery = ""
 
-	request, err := http.NewRequest("GET", dest.String(), nil)
+	req, err := http.NewRequest(request.MethodGet, dest.String(), nil)
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
 	}
-	request.Header.Add("Accept", contentType)
+	req.Header.Add("Accept", contentType)
 
-	response, err := client.Do(request)
+	response, err := client.Do(req)
 	if err != nil {
 		b.Fatalf("unexpected error: %v", err)
 	}

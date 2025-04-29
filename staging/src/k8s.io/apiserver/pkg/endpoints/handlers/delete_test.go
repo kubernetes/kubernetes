@@ -237,7 +237,7 @@ func TestDeleteCollectionWithNoContextDeadlineEnforced(t *testing.T) {
 	}
 	handler := DeleteCollection(fakeCollectionDeleterFunc(fakeDeleterFn), false, scope, nil)
 
-	request, err := http.NewRequest("GET", "/test", nil)
+	request, err := http.NewRequest(request.MethodGet, "/test", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

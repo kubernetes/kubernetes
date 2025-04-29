@@ -204,7 +204,7 @@ func TestAudit(t *testing.T) {
 		{
 			"read-only empty",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {},
@@ -226,7 +226,7 @@ func TestAudit(t *testing.T) {
 		{
 			"short running with auditID",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			uuid.New().String(),
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -250,7 +250,7 @@ func TestAudit(t *testing.T) {
 		{
 			"read-only panic",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -275,7 +275,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing empty",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {},
@@ -297,7 +297,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing sleep",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -322,7 +322,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing 403+write",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -347,7 +347,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing panic",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -371,7 +371,7 @@ func TestAudit(t *testing.T) {
 		{
 			"writing write+panic",
 			shortRunningPath,
-			"PUT",
+			request.MethodPut,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -397,7 +397,7 @@ func TestAudit(t *testing.T) {
 		{
 			"empty longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {},
@@ -425,7 +425,7 @@ func TestAudit(t *testing.T) {
 		{
 			"empty longrunning with audit id",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			uuid.New().String(),
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -455,7 +455,7 @@ func TestAudit(t *testing.T) {
 		{
 			"sleep longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(http.ResponseWriter, *http.Request) {
@@ -485,7 +485,7 @@ func TestAudit(t *testing.T) {
 		{
 			"sleep+403 longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -516,7 +516,7 @@ func TestAudit(t *testing.T) {
 		{
 			"write longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -546,7 +546,7 @@ func TestAudit(t *testing.T) {
 		{
 			"403+write longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -577,7 +577,7 @@ func TestAudit(t *testing.T) {
 		{
 			"panic longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -601,7 +601,7 @@ func TestAudit(t *testing.T) {
 		{
 			"write+panic longrunning",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			nil,
 			func(w http.ResponseWriter, req *http.Request) {
@@ -632,7 +632,7 @@ func TestAudit(t *testing.T) {
 		{
 			"omit RequestReceived",
 			shortRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			[]auditinternal.Stage{auditinternal.StageRequestReceived},
 			func(w http.ResponseWriter, req *http.Request) {
@@ -651,7 +651,7 @@ func TestAudit(t *testing.T) {
 		{
 			"emit Panic only",
 			longRunningPath,
-			"GET",
+			request.MethodGet,
 			"",
 			[]auditinternal.Stage{auditinternal.StageRequestReceived, auditinternal.StageResponseStarted, auditinternal.StageResponseComplete},
 			func(w http.ResponseWriter, req *http.Request) {
@@ -743,7 +743,7 @@ func TestAudit(t *testing.T) {
 func TestAuditNoPanicOnNilUser(t *testing.T) {
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, fakeRuleEvaluator, nil)
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req = withTestContext(req, nil, nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
@@ -758,7 +758,7 @@ func TestAuditLevelNone(t *testing.T) {
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelNone, nil)
 	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 
-	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequest(request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 
@@ -814,7 +814,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 			handler = WithAuditInit(handler)
 
-			req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
+			req, _ := http.NewRequest(request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 			req.RemoteAddr = "127.0.0.1"
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 			if test.requestHeader != "" {

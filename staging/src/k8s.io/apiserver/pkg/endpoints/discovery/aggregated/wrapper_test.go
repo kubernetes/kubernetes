@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -42,7 +43,7 @@ const aggregatedProtoAccept = protobufAccept + aggregatedAcceptSuffix
 
 func fetchPath(handler http.Handler, path, accept string) string {
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", discoveryPath, nil)
+	req := httptest.NewRequest(request.MethodGet, discoveryPath, nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", accept)
