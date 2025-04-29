@@ -19,6 +19,7 @@ package windows
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -162,18 +163,20 @@ func overrideAllocatableMemoryTest(ctx context.Context, f *framework.Framework, 
 	framework.Logf("Ensuring that pod %s fails to schedule", podName)
 	failurePod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, failurePod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	gomega.Eventually(ctx, func() bool {
+	gomega.Eventually(ctx, func() error {
 		eventList, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		if err != nil {
+			return fmt.Errorf("error getting events: %w", err)
+		}
 		for _, e := range eventList.Items {
 			// Look for an event that shows FailedScheduling
 			if e.Type == "Warning" && e.Reason == "FailedScheduling" && e.InvolvedObject.Name == failurePod.ObjectMeta.Name {
 				framework.Logf("Found %+v event with message %+v", e.Reason, e.Message)
-				return true
+				return nil
 			}
 		}
-		return false
-	}, 3*time.Minute, 10*time.Second).Should(gomega.BeTrueBecause("Expected %s pod to be failed scheduling", podName))
+		return fmt.Errorf("did not find any FailedScheduling event for pod %s", failurePod.ObjectMeta.Name)
+	}, 3*time.Minute, 10*time.Second).Should(gomega.Succeed())
 }
 
 func getNodeMemory(ctx context.Context, f *framework.Framework, node v1.Node) nodeMemory {
