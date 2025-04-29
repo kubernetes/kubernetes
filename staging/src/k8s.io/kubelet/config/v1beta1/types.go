@@ -923,7 +923,7 @@ type KubeletConfiguration struct {
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
 
 	// UserNamespaces contains User Namespace configurations.
-	// +featureGate=UserNamespaceSupport
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
 }
@@ -1131,7 +1131,7 @@ type UserNamespaces struct {
 	// Changing the value may require recreating all containers on the node.
 	//
 	// Default: 65536
-	// +featureGate=UserNamespaceSupport
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	IDsPerPod *int64 `json:"idsPerPod,omitempty"`
 }
