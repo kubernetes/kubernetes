@@ -580,6 +580,68 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 	return claimInfos, nil
 }
 
+// UpdateAllocatedResourcesStatus updates the health status of allocated DRA resources in the pod's container statuses.
+func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+	logger := klog.FromContext(context.Background())
+	for _, container := range pod.Spec.Containers {
+		// Get all the DRA claim details associated with this specific container.
+		claimInfos, err := m.GetContainerClaimInfos(pod, &container)
+		if err != nil {
+			logger.Error(err, "Failed to get claim infos for container", "pod", klog.KObj(pod), "container", container.Name)
+			continue
+		}
+
+		// Find the corresponding container status
+		for i, containerStatus := range status.ContainerStatuses {
+			if containerStatus.Name != container.Name {
+				continue
+			}
+
+			// Initialize AllocatedResourcesStatus if nil
+			if status.ContainerStatuses[i].AllocatedResourcesStatus == nil {
+				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
+			}
+
+			// Loop through each claim associated with the container
+			for _, claimInfo := range claimInfos {
+				// Iterate through the map holding the state specific to each driver
+				for driverName, driverState := range claimInfo.DriverState {
+					// Iterate through each specific device allocated by this driver
+					for _, device := range driverState.Devices {
+						m.healthInfoMutex.Lock()
+						health := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+						m.healthInfoMutex.Unlock()
+
+						// Create resource status
+						resourceStatus := v1.ResourceStatus{
+							Name: claimInfo.ClaimName,
+							Health: v1.ResourceHealth{
+								Health: string(health),
+							},
+						}
+						if len(device.CDIDeviceIDs) > 0 {
+							resourceStatus.ID = device.CDIDeviceIDs[0]
+						}
+
+						// Update or append to AllocatedResourcesStatus
+						found := false
+						for j, existing := range status.ContainerStatuses[i].AllocatedResourcesStatus {
+							if existing.Name == resourceStatus.Name {
+								status.ContainerStatuses[i].AllocatedResourcesStatus[j] = resourceStatus
+								found = true
+								break
+							}
+						}
+						if !found {
+							status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, resourceStatus)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 // watchResources starts a health monitoring stream for a DRA plugin.
 func (m *ManagerImpl) watchResources(ctx context.Context, pluginName string, p *dra.Plugin) error {
 	logger := klog.FromContext(ctx)
