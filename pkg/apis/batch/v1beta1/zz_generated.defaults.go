@@ -25,6 +25,7 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
+	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
@@ -39,6 +40,15 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_CronJob(in *batchv1beta1.CronJob) {
 	SetDefaults_CronJob(in)
+	if in.Spec.JobTemplate.Spec.PodFailurePolicy != nil {
+		for i := range in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules {
+			a := &in.Spec.JobTemplate.Spec.PodFailurePolicy.Rules[i]
+			for j := range a.OnPodConditions {
+				b := &a.OnPodConditions[j]
+				batchv1.SetDefaults_PodFailurePolicyOnPodConditionsPattern(b)
+			}
+		}
+	}
 	corev1.SetDefaults_PodSpec(&in.Spec.JobTemplate.Spec.Template.Spec)
 	for i := range in.Spec.JobTemplate.Spec.Template.Spec.Volumes {
 		a := &in.Spec.JobTemplate.Spec.Template.Spec.Volumes[i]
