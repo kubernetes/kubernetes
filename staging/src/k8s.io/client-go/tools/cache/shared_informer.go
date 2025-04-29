@@ -1074,10 +1074,10 @@ func (p *processorListener) run() {
 			case updateNotification:
 				p.handler.OnUpdate(notification.oldObj, notification.newObj)
 			case addNotification:
-				p.handler.OnAdd(notification.newObj, notification.isInInitialList)
 				if notification.isInInitialList {
-					p.syncTracker.Finished()
+					defer p.syncTracker.Finished()
 				}
+				p.handler.OnAdd(notification.newObj, notification.isInInitialList)
 			case deleteNotification:
 				p.handler.OnDelete(notification.oldObj)
 			default:
