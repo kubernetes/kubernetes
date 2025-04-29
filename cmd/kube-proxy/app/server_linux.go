@@ -112,16 +112,18 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	if isIPTablesBased(s.Config.Mode) {
 		// Check for the iptables and ip6tables binaries.
-		ipts := utiliptables.NewDualStack()
+		var ipts map[v1.IPFamily]utiliptables.Interface
+		ipts, err = utiliptables.NewDualStack()
+
 		ipv4Supported = ipts[v1.IPv4Protocol] != nil
 		ipv6Supported = ipts[v1.IPv6Protocol] != nil
 
 		if !ipv4Supported && !ipv6Supported {
-			err = fmt.Errorf("iptables is not available on this host")
+			err = fmt.Errorf("iptables is not available on this host : %w", err)
 		} else if !ipv4Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv4Protocol, "error", err)
 		} else if !ipv6Supported {
-			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol)
+			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol, "error", err)
 		}
 	} else {
 		// The nft CLI always supports both families.
@@ -151,7 +153,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		logger.Info("Using iptables Proxier")
-		ipts := utiliptables.NewDualStack()
+		ipts, _ := utiliptables.NewDualStack()
 
 		if dualStack {
 			// TODO this has side effects that should only happen when Run() is invoked.
@@ -205,7 +207,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
-		ipts := utiliptables.NewDualStack()
+		ipts, _ := utiliptables.NewDualStack()
 
 		logger.Info("Using ipvs Proxier")
 		if dualStack {
