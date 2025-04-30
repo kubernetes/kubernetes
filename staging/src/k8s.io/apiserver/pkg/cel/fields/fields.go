@@ -27,14 +27,21 @@ import (
 // If a non-scalar path is returned, this indicates that the value at the path was either a target or argument
 // of a function call. In this case, the exact set of fields that can be accessed from the expression is not known.
 func ReachableFields(e ast.Expr) sets.Set[string] {
-	ac := &tracker{observed: sets.New[string]()}
-	scope := scope{accVars: sets.New[string](), iterVars: map[string]string{}}
-	returns := ac.paths(e, scope)
-	return ac.observed.Union(returns)
+	t := newTracker()
+	returns := t.paths(e, newScope())
+	return t.observed.Union(returns)
+}
+
+func newTracker() *tracker {
+	return &tracker{observed: sets.New[string]()}
 }
 
 type tracker struct {
 	observed sets.Set[string] // observed tracks fields that are referenced in the expression but are not part of the returns
+}
+
+func newScope() scope {
+	return scope{accVars: sets.New[string](), iterVars: map[string]string{}}
 }
 
 type scope struct {
@@ -44,7 +51,7 @@ type scope struct {
 
 // Push creates a new scope above the current scope. Variables in the new scope shadow the current scope.
 func (v scope) push() scope {
-	// We COULD use a stack of scopes and search. Might not be worth it. Variable counts are bounded to iter vars and
+	// We COULD use a stack of scopes. Might not be worth it. Variable counts are bounded to iter vars and
 	// accr vars (max 3 per scope), and CEL scope depth is bounded to 12.
 	return scope{
 		accVars:  v.accVars.Clone(),
@@ -52,36 +59,36 @@ func (v scope) push() scope {
 	}
 }
 
-func (ac *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
+func (t *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
 	if e == nil {
 		return nil
 	}
 	switch e.Kind() {
 	case ast.CallKind:
 		call := e.AsCall()
-		targetPath := ac.paths(call.Target(), scope)
+		targetPath := t.paths(call.Target(), scope)
 
 		// Index operator is implemented as a function where
 		// the indexable and index scope are just args
 		if call.FunctionName() == "_[_]" && len(call.Args()) == 2 {
-			indexable := ac.paths(call.Args()[0], scope)
+			indexable := t.paths(call.Args()[0], scope)
 			indexed := sets.New[string]()
 			for path := range indexable {
 				indexed.Insert(path + ".@index")
 			}
-			index := ac.paths(call.Args()[1], scope)
-			ac.observed = ac.observed.Union(index)
+			index := t.paths(call.Args()[1], scope)
+			t.observed = t.observed.Union(index)
 			return indexed
 		}
 		argPaths := sets.New[string]()
 		for _, arg := range call.Args() {
-			argPaths = argPaths.Union(ac.paths(arg, scope))
+			argPaths = argPaths.Union(t.paths(arg, scope))
 		}
 		return targetPath.Union(argPaths)
 	case ast.ComprehensionKind:
 		vars := scope.push()
 		comprehension := e.AsComprehension()
-		for path := range ac.paths(comprehension.IterRange(), vars) {
+		for path := range t.paths(comprehension.IterRange(), vars) {
 			if !comprehension.HasIterVar2() {
 				vars.iterVars[comprehension.IterVar()] = path + ".@item" // @item is a list element or map key
 			} else {
@@ -90,7 +97,7 @@ func (ac *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
 			}
 		}
 		vars.accVars.Insert(comprehension.AccuVar())
-		result := ac.paths(comprehension.LoopStep(), vars)
+		result := t.paths(comprehension.LoopStep(), vars)
 		result = result.Delete(comprehension.AccuVar())
 		return result
 	case ast.IdentKind:
@@ -103,7 +110,7 @@ func (ac *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
 		list := e.AsList()
 		result := sets.New[string]()
 		for _, elem := range list.Elements() {
-			result = result.Union(ac.paths(elem, scope))
+			result = result.Union(t.paths(elem, scope))
 		}
 		return result
 	case ast.LiteralKind:
@@ -112,14 +119,14 @@ func (ac *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
 		m := e.AsMap()
 		result := sets.New[string]()
 		for _, entry := range m.Entries() {
-			ac.observed = ac.observed.Union(ac.paths(entry.AsMapEntry().Key(), scope))
-			result = result.Union(ac.paths(entry.AsMapEntry().Value(), scope))
+			t.observed = t.observed.Union(t.paths(entry.AsMapEntry().Key(), scope))
+			result = result.Union(t.paths(entry.AsMapEntry().Value(), scope))
 		}
 		return result
 	case ast.SelectKind:
 		selectExpr := e.AsSelect()
 		result := sets.New[string]()
-		for path := range ac.paths(selectExpr.Operand(), scope) {
+		for path := range t.paths(selectExpr.Operand(), scope) {
 			result.Insert(path + "." + selectExpr.FieldName())
 		}
 		return result
