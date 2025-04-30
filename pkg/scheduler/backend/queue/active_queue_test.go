@@ -28,6 +28,7 @@ import (
 )
 
 func TestClose(t *testing.T) {
+	initMetrics(t)
 	logger, ctx := ktesting.NewTestContext(t)
 	rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
 	aq := newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](newDefaultQueueSort()), metrics.NewActivePodsRecorder()), true, *rr, nil)

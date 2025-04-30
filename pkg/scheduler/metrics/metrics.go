@@ -134,8 +134,14 @@ func Register() {
 		RegisterMetrics(metricsList...)
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 
+		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerHighPrecisionMetrics) {
+			RegisterMetrics(EventHandlingLatency, PluginExecutionDuration)
+		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-			RegisterMetrics(queueingHintExecutionDuration, InFlightEvents)
+			RegisterMetrics(InFlightEvents)
+			if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerHighPrecisionMetrics) {
+				RegisterMetrics(queueingHintExecutionDuration)
+			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
 			RegisterMetrics(PreemptionGoroutinesDuration, PreemptionGoroutinesExecutionTotal)
@@ -157,8 +163,8 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "event_handling_duration_seconds",
 			Help:      "Event handling latency in seconds.",
-			// Start with 0.1ms with the last bucket being [~200ms, Inf)
-			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 12),
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~120ms, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 30),
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"event"})
 
@@ -172,10 +178,11 @@ func InitMetrics() {
 		}, []string{"result", "profile"})
 	SchedulingAlgorithmLatency = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Subsystem:      SchedulerSubsystem,
-			Name:           "scheduling_algorithm_duration_seconds",
-			Help:           "Scheduling algorithm latency in seconds",
-			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			Subsystem: SchedulerSubsystem,
+			Name:      "scheduling_algorithm_duration_seconds",
+			Help:      "Scheduling algorithm latency in seconds",
+			// Start with 0.1ms with the last bucket being [~1.6s, Inf)
+			Buckets:        metrics.ExponentialBuckets(0.0001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -248,14 +255,16 @@ func InitMetrics() {
 		},
 		[]string{"extension_point", "status", "profile"})
 
+	// TODO(@ania-borowiec): Make this and other metrics behind SchedulerHighPrecisionMetrics feature gate
+	// to use native histograms, to save memory.
 	PluginExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
 			Name:      "plugin_execution_duration_seconds",
 			Help:      "Duration for running a plugin at a specific extension point.",
-			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// Start with 0.0001ms (0.1 microsecond) with the last bucket being [~97ms, Inf). We use a small factor (1.4)
 			// so that we have better granularity since plugin latency is very sensitive.
-			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
+			Buckets:        metrics.ExponentialBuckets(0.0000001, 1.4, 56),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "extension_point", "status"})
@@ -266,9 +275,9 @@ func InitMetrics() {
 			Subsystem: SchedulerSubsystem,
 			Name:      "queueing_hint_execution_duration_seconds",
 			Help:      "Duration for running a queueing hint function of a plugin.",
-			// Start with 0.01ms with the last bucket being [~22ms, Inf). We use a small factor (1.5)
+			// Start with 0.001ms (1 microsecond) with the last bucket being [~16ms, Inf). We use a small factor (1.5)
 			// so that we have better granularity since plugin latency is very sensitive.
-			Buckets:        metrics.ExponentialBuckets(0.00001, 1.5, 20),
+			Buckets:        metrics.ExponentialBuckets(0.000001, 1.5, 25),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin", "event", "hint"})
@@ -338,14 +347,12 @@ func InitMetrics() {
 		scheduleAttempts,
 		schedulingLatency,
 		SchedulingAlgorithmLatency,
-		EventHandlingLatency,
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
 		PodSchedulingSLIDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
-		PluginExecutionDuration,
 		SchedulerQueueIncomingPods,
 		Goroutines,
 		PermitWaitDuration,

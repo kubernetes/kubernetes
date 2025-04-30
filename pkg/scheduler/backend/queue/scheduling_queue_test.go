@@ -103,7 +103,15 @@ var (
 	}
 )
 
-func init() {
+// The reason for having this function instead of init(): Some of the metrics tested in this file are registered conditionally,
+// depending on the feature gate SchedulerHighPrecisionMetrics, which is disabled by default. To register the metrics, the feature
+// gate needs to be enabled for testing.
+// It is not sufficient to set the feature gate only in test cases actually testing the metrics, because metrics.Register()
+// is only executed once, and all subsequent calls are ignored. Therefore the feature gate needs to be set before the first test
+// is executed, and since test are executed in random order, it needs to be done at the beginning of every test case.
+// TODO: Refactor tests to use mocks instead of a real metric registry.
+func initMetrics(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerHighPrecisionMetrics, true)
 	metrics.Register()
 }
 
@@ -132,6 +140,7 @@ func TestPriorityQueue_Add(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Add(logger, medPriorityPodInfo.Pod)
 	q.Add(logger, unschedulablePodInfo.Pod)
@@ -172,6 +181,7 @@ func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Add(logger, medPriorityPodInfo.Pod)
 	q.Add(logger, highPriorityPodInfo.Pod)
@@ -754,6 +764,7 @@ func Test_InFlightPods(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			obj := make([]runtime.Object, 0, len(test.initialPods))
 			for _, p := range test.initialPods {
 				obj = append(obj, p)
@@ -893,6 +904,7 @@ func TestPop(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{pod}, WithQueueingHintMapPerProfile(queueingHintMap))
 			q.Add(logger, pod)
 
@@ -921,6 +933,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	// insert unschedulablePodInfo and pop right after that
 	// because the scheduling queue records unschedulablePod as in-flight Pod.
@@ -954,6 +967,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(time.Now())))
 	totalNum := 10
 	expectedPods := make([]v1.Pod, 0, totalNum)
@@ -1065,6 +1079,7 @@ func TestPriorityQueue_Pop(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 
 			// Add medium priority pod to the activeQ
@@ -1226,6 +1241,7 @@ func TestPriorityQueue_Update(t *testing.T) {
 				objs := []runtime.Object{highPriorityPodInfo.Pod, unschedulablePodInfo.Pod, medPriorityPodInfo.Pod}
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
+				initMetrics(t)
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs, WithClock(c), WithQueueingHintMapPerProfile(queueingHintMap))
 
 				oldPod, newPod := tt.prepareFunc(t, logger, q)
@@ -1285,6 +1301,7 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 	defer cancel()
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
+	initMetrics(t)
 	m := makeEmptyQueueingHintMapPerProfile()
 	// fakePlugin could change its scheduling result by any updates in Pods.
 	m[""][framework.EventUnscheduledPodUpdate] = []*QueueingHintFunction{
@@ -1335,6 +1352,7 @@ func TestPriorityQueue_Delete(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Update(logger, highPriorityPodInfo.Pod, highPriNominatedPodInfo.Pod)
 	q.Add(logger, unschedulablePodInfo.Pod)
@@ -1355,7 +1373,6 @@ func TestPriorityQueue_Delete(t *testing.T) {
 }
 
 func TestPriorityQueue_Activate(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name                        string
 		qPodInfoInUnschedulablePods []*framework.QueuedPodInfo
@@ -1410,6 +1427,7 @@ func TestPriorityQueue_Activate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.qHintEnabled)
+			initMetrics(t)
 			var objs []runtime.Object
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -1591,6 +1609,7 @@ func TestPriorityQueue_moveToActiveQ(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
+				initMetrics(t)
 				m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
 					WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
@@ -1684,6 +1703,7 @@ func TestPriorityQueue_moveToBackoffQ(t *testing.T) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 
+				initMetrics(t)
 				m := map[string][]framework.PreEnqueuePlugin{"": tt.plugins}
 				q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), []runtime.Object{tt.pod}, WithPreEnqueuePluginMap(m),
 					WithPodInitialBackoffDuration(time.Second*30), WithPodMaxBackoffDuration(time.Second*60))
@@ -1768,6 +1788,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 		for _, podsInUnschedulablePods := range []int{1000, 5000} {
 			b.Run(fmt.Sprintf("%v-%v", tt.name, podsInUnschedulablePods), func(b *testing.B) {
 				logger, ctx := ktesting.NewTestContext(b)
+				metrics.Register()
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
 					c := testingclock.NewFakeClock(time.Now())
@@ -1896,6 +1917,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
+			initMetrics(t)
 			m := makeEmptyQueueingHintMapPerProfile()
 			m[""][nodeAdd] = []*QueueingHintFunction{
 				{
@@ -1940,6 +1962,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueue(t *testing.T) {
 	defer cancel()
 	m := makeEmptyQueueingHintMapPerProfile()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
+	initMetrics(t)
 
 	m[""][nodeAdd] = []*QueueingHintFunction{
 		{
@@ -2087,6 +2110,7 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithOutQueueingHint(t *testi
 	defer cancel()
 	m := makeEmptyQueueingHintMapPerProfile()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+	initMetrics(t)
 	m[""][nodeAdd] = []*QueueingHintFunction{
 		{
 			PluginName:     "fooPlugin",
@@ -2266,6 +2290,7 @@ func TestPriorityQueue_AssignedPodAdded_(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			initMetrics(t)
 			c := testingclock.NewFakeClock(time.Now())
 			m := makeEmptyQueueingHintMapPerProfile()
 			m[""][framework.EventAssignedPodAdd] = []*QueueingHintFunction{
@@ -2372,6 +2397,7 @@ func TestPriorityQueue_AssignedPodUpdated(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 
+			initMetrics(t)
 			c := testingclock.NewFakeClock(time.Now())
 			m := makeEmptyQueueingHintMapPerProfile()
 			m[""] = map[framework.ClusterEvent][]*QueueingHintFunction{
@@ -2426,6 +2452,7 @@ func TestPriorityQueue_NominatedPodsForNode(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Add(logger, medPriorityPodInfo.Pod)
 	q.Add(logger, unschedulablePodInfo.Pod)
@@ -2475,6 +2502,7 @@ func TestPriorityQueue_NominatedPodDeleted(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
+			initMetrics(t)
 			cs := fake.NewClientset(tt.podInfo.Pod)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
 			podLister := informerFactory.Core().V1().Pods().Lister()
@@ -2512,6 +2540,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent()s below.
 	q.Add(logger, unschedulablePodInfo.Pod)
@@ -2555,6 +2584,7 @@ func TestPriorityQueue_UpdateNominatedPodForNode(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	objs := []runtime.Object{medPriorityPodInfo.Pod, unschedulablePodInfo.Pod, highPriorityPodInfo.Pod, scheduledPodInfo.Pod}
 	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
 	q.Add(logger, medPriorityPodInfo.Pod)
@@ -2643,6 +2673,7 @@ func TestPriorityQueue_NewWithOptions(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx,
 		newDefaultQueueSort(),
 		WithPodInitialBackoffDuration(2*time.Second),
@@ -2737,6 +2768,7 @@ func TestUnschedulablePodsMap(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			initMetrics(t)
 			upm := newUnschedulablePods(nil, nil)
 			for _, p := range test.podsToAdd {
 				upm.addOrUpdate(newQueuedPodInfoForLookup(p), framework.EventUnscheduledPodAdd.Label())
@@ -2771,6 +2803,7 @@ func TestSchedulingQueue_Close(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -2797,6 +2830,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
 	// Add a few pods to priority queue.
 	for i := 0; i < 5; i++ {
@@ -2849,6 +2883,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
 
 	// Add an unschedulable pod to a priority queue.
@@ -2929,6 +2964,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort())
 
 	midPod := st.MakePod().Name("test-midpod").Namespace("ns1").UID("tp-mid").Priority(midPriority).NominatedNodeName("node1").Obj()
@@ -2982,6 +3018,7 @@ func TestHighPriorityFlushUnschedulablePodsLeftover(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	initMetrics(t)
 	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m))
 	midPod := st.MakePod().Name("test-midpod").Namespace("ns1").UID("tp-mid").Priority(midPriority).NominatedNodeName("node1").Obj()
 	highPod := st.MakePod().Name("test-highpod").Namespace("ns1").UID("tp-high").Priority(highPriority).NominatedNodeName("node1").Obj()
@@ -3079,6 +3116,7 @@ func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			var queue *PriorityQueue
 			if test.podMaxInUnschedulablePodsDuration > 0 {
 				queue = NewTestQueue(ctx, newDefaultQueueSort(),
@@ -3265,6 +3303,7 @@ func TestPodTimestamp(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			var podInfoList []*framework.QueuedPodInfo
 
@@ -3501,10 +3540,11 @@ scheduler_pending_pods{queue="unschedulable"} 20
 			metricsName:                "scheduler_plugin_execution_duration_seconds",
 			pluginMetricsSamplePercent: 0,
 			wants: `
-# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
-# TYPE scheduler_plugin_execution_duration_seconds histogram
-`, // the observed value will always be 0, because we don't proceed the fake clock.
+						# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
+						# TYPE scheduler_plugin_execution_duration_seconds histogram
+						`, // the observed value will always be 0, because we don't proceed the fake clock.
 		},
+
 		{
 			name: "the metrics should be recorded (pluginMetricsSamplePercent=100)",
 			operations: []operation{
@@ -3516,32 +3556,68 @@ scheduler_pending_pods{queue="unschedulable"} 20
 			metricsName:                "scheduler_plugin_execution_duration_seconds",
 			pluginMetricsSamplePercent: 100,
 			wants: `
-# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
-# TYPE scheduler_plugin_execution_duration_seconds histogram
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1e-05"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.5000000000000002e-05"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.2500000000000005e-05"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="3.375000000000001e-05"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="5.062500000000001e-05"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="7.593750000000002e-05"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00011390625000000003"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00017085937500000006"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0002562890625000001"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00038443359375000017"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0005766503906250003"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0008649755859375004"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0012974633789062506"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0019461950683593758"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0029192926025390638"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.004378938903808595"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.006568408355712893"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.009852612533569338"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.014778918800354007"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.02216837820053101"} 1
-scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="+Inf"} 1
-scheduler_plugin_execution_duration_seconds_sum{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success"} 0
-scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success"} 1
-`, // the observed value will always be 0, because we don't proceed the fake clock.
+				# HELP scheduler_plugin_execution_duration_seconds [ALPHA] Duration for running a plugin at a specific extension point.
+				# TYPE scheduler_plugin_execution_duration_seconds histogram
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.3999999999999998e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.9599999999999996e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.743999999999999e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="3.8415999999999986e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="5.378239999999998e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="7.529535999999996e-07"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.0541350399999994e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.4757890559999992e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.066104678399999e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.8925465497599982e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="4.049565169663997e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="5.669391237529595e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="7.937147732541432e-06"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.1112006825558005e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.5556809555781205e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.1779533378093685e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="3.0491346729331156e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="4.2687885421063616e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="5.976303958948906e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="8.366825542528468e-05"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00011713555759539855"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00016398978063355795"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0002295856928869811"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00032141997004177356"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.00044998795805848297"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0006299831412818761"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0008819763977946266"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0012347669569124772"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.001728673739677468"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.002420143235548455"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.003388200529767837"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.004743480741674971"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.006640873038344959"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.009297222253682942"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.013016111155156117"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.018222555617218562"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.025511577864105985"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.035716209009748374"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.050002692613647724"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.0700037696591068"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.09800527752274953"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.13720738853184933"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.19209034394458904"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.26892648152242465"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.3764970741313945"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.5270959037839522"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="0.737934265297533"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.033107971416546"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="1.4463511599831644"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.0248916239764303"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="2.8348482735670024"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="3.9687875829938033"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="5.556302616191324"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="7.778823662667853"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="10.890353127734993"} 1
+				scheduler_plugin_execution_duration_seconds_bucket{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success",le="+Inf"} 1
+				scheduler_plugin_execution_duration_seconds_sum{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success"} 0
+				scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",plugin="preEnqueuePlugin",status="Success"} 1
+				`, // the observed value will always be 0, because we don't proceed the fake clock.
 		},
 	}
 
@@ -3558,6 +3634,7 @@ scheduler_plugin_execution_duration_seconds_count{extension_point="PreEnqueue",p
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			resetMetrics()
 			resetPodInfos()
 
@@ -3673,6 +3750,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			initMetrics(t)
 
 			c := testingclock.NewFakeClock(timestamp)
 			pod := st.MakePod().Name("test-pod").Namespace("test-ns").UID("test-uid").Obj()
@@ -3772,6 +3850,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			metrics.SchedulerQueueIncomingPods.Reset()
 			queue := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
 			for _, op := range test.operations {
@@ -3806,6 +3885,7 @@ func TestBackOffFlow(t *testing.T) {
 	}
 	for _, popFromBackoffQEnabled := range []bool{true, false} {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPopFromBackoffQ, popFromBackoffQEnabled)
+		initMetrics(t)
 
 		q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(cl))
 
@@ -3930,6 +4010,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			initMetrics(t)
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c))
 			for _, podInfo := range tt.podInfos {
 				// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
@@ -3989,7 +4070,7 @@ func mustNewPodInfo(pod *v1.Pod) *framework.PodInfo {
 
 // Test_isPodWorthRequeuing tests isPodWorthRequeuing function.
 func Test_isPodWorthRequeuing(t *testing.T) {
-	metrics.Register()
+	initMetrics(t)
 	count := 0
 	queueHintReturnQueue := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
 		count++
@@ -4299,6 +4380,7 @@ func Test_isPodWorthRequeuing(t *testing.T) {
 }
 
 func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
+	initMetrics(t)
 	logger, ctx := ktesting.NewTestContext(t)
 	plugin, _ := schedulinggates.New(ctx, nil, nil, plfeature.Features{})
 	m := map[string][]framework.PreEnqueuePlugin{"": {plugin.(framework.PreEnqueuePlugin)}}
@@ -4322,6 +4404,7 @@ func Test_queuedPodInfo_gatedSetUponCreationAndUnsetUponUpdate(t *testing.T) {
 }
 
 func TestPriorityQueue_GetPod(t *testing.T) {
+	initMetrics(t)
 	activeQPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "pod1",
