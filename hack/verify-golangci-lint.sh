@@ -121,14 +121,21 @@ done
 
 kube::util::ensure-temp-dir
 
-# Install golangci-lint
+# Install golangci-lint.
+#
+# hack/tools/golangci-lint uses the "tool" directive in a stand-alone
+# go.mod.
+#
+# Installing from source (https://golangci-lint.run/welcome/install/#install-from-sources)
+# is not recommended, but for Kubernetes we prefer it because it avoids the need for
+# pre-built binaries for different platforms and gives more insights on dependencies.
 echo "installing golangci-lint and logcheck plugin from hack/tools into ${GOBIN}"
-GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" install github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 if [ "${golangci_config}" ]; then
   # This cannot be used without a config.
   # This uses `go build` because `go install -buildmode=plugin` doesn't work
   # (on purpose: https://github.com/golang/go/issues/64964).
-  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
+  GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/golangci-lint" build -o "${GOBIN}/logcheck.so" -buildmode=plugin sigs.k8s.io/logtools/logcheck/plugin
 fi
 
 # Verify that the given config is valid. "golangci-lint run" does not
