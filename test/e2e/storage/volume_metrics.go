@@ -770,9 +770,10 @@ func verifyMetricCount(oldMetrics, newMetrics *storageControllerMetrics, metricN
 	// even if the test is run serially.  We really just verify if new count
 	// is greater than old count
 	if !expectFailure {
-		gomega.Expect(newLatencyCount).To(gomega.BeNumerically(">", oldLatencyCount), "New latency count %d should be more than old count %d for action %s", newLatencyCount, oldLatencyCount, metricName)
+		gomega.Expect(newLatencyCount).To(gomega.BeNumerically(">", oldLatencyCount), fmt.Sprintf("Latency metric '%s' did not increase as expected. Previous count: %d, Current count: %d. This may indicate that the operation did not execute or failed silently.", metricName, oldLatencyCount, newLatencyCount))
+
 	}
-	gomega.Expect(newStatusCount).To(gomega.BeNumerically(">", oldStatusCount), "New status count %d should be more than old count %d for action %s", newStatusCount, oldStatusCount, metricName)
+	gomega.Expect(newStatusCount).To(gomega.BeNumerically(">", oldStatusCount), fmt.Sprintf("Status metric '%s' did not increase as expected. Previous count: %d, Current count: %d. Expected at least one successful/failure action depending on the test case.", metricName, oldStatusCount, newStatusCount))
 }
 
 func getControllerStorageMetrics(ms e2emetrics.ControllerManagerMetrics, pluginName string) *storageControllerMetrics {
@@ -839,7 +840,7 @@ func findVolumeStatMetric(metricKeyName string, namespace string, pvcName string
 			}
 		}
 	}
-	gomega.Expect(errCount).To(gomega.Equal(0), "Found invalid samples")
+	gomega.Expect(errCount).To(gomega.Equal(0), fmt.Sprintf("Expected 0 invalid samples but found %d while looking for PVC '%s' in namespace '%s' for metric '%s'", errCount, pvcName, namespace, metricKeyName))
 	return found
 }
 
@@ -859,7 +860,7 @@ func waitForPVControllerSync(ctx context.Context, metricsGrabber *e2emetrics.Gra
 		return len(testutil.GetMetricValuesForLabel(testutil.Metrics(updatedMetrics), metricName, dimension)) > 0, nil
 	}
 	waitErr := wait.ExponentialBackoffWithContext(ctx, backoff, verifyMetricFunc)
-	framework.ExpectNoError(waitErr, "Unable to get pv controller metrics")
+	framework.ExpectNoError(waitErr, "Unable to get PV controller metric %q with dimension %q after retries", metricName, dimension)
 }
 
 func calculateRelativeValues(originValues, updatedValues map[string]int64) map[string]int64 {
