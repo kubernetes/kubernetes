@@ -303,11 +303,9 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			},
 		},
 		{
-			name:           "invalid external signer endpoint provided - 1",
+			name:           "relative external signer endpoint provided",
 			featureEnabled: true,
-			expectedErrors: []error{
-				fmt.Errorf("invalid value \"abc\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
-			},
+			expectedErrors: []error{},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "abc",
 			},
@@ -316,7 +314,7 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			name:           "invalid external signer endpoint provided - 2",
 			featureEnabled: true,
 			expectedErrors: []error{
-				fmt.Errorf("invalid value \"@abc@\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
+				fmt.Errorf("invalid value \"@abc@\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "@abc@",
@@ -326,30 +324,10 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			name:           "invalid external signer endpoint provided - 3",
 			featureEnabled: true,
 			expectedErrors: []error{
-				fmt.Errorf("invalid value \"@abc.abc  .ae\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
+				fmt.Errorf("invalid value \"@abc.abc  .ae\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
 				ServiceAccountSigningEndpoint: "@abc.abc  .ae",
-			},
-		},
-		{
-			name:           "invalid external signer endpoint provided - 4",
-			featureEnabled: true,
-			expectedErrors: []error{
-				fmt.Errorf("invalid value \"/@e_adnb/xyz /efg\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
-			},
-			options: &Options{
-				ServiceAccountSigningEndpoint: "/@e_adnb/xyz /efg",
-			},
-		},
-		{
-			name:           "invalid external signer endpoint provided - 5",
-			featureEnabled: true,
-			expectedErrors: []error{
-				fmt.Errorf("invalid value \"/e /xyz /efg\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
-			},
-			options: &Options{
-				ServiceAccountSigningEndpoint: "/e /xyz /efg",
 			},
 		},
 		{
@@ -382,10 +360,10 @@ func TestValidateServiceAccountTokenSigningConfig(t *testing.T) {
 			expectedErrors: []error{
 				fmt.Errorf("can't set `--service-account-signing-key-file` and/or `--service-account-key-file` with `--service-account-signing-endpoint` (They are mutually exclusive)"),
 				fmt.Errorf("setting `--service-account-signing-endpoint` requires enabling ExternalServiceAccountTokenSigner feature gate"),
-				fmt.Errorf("invalid value \"/e /xyz /efg\" passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace"),
+				fmt.Errorf("invalid value \"@a@\" passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name"),
 			},
 			options: &Options{
-				ServiceAccountSigningEndpoint: "/e /xyz /efg",
+				ServiceAccountSigningEndpoint: "@a@",
 				ServiceAccountSigningKeyFile:  "/abc/efg",
 				Authentication: &kubeoptions.BuiltInAuthenticationOptions{
 					ServiceAccounts: &kubeoptions.ServiceAccountAuthenticationOptions{
