@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,7 +42,7 @@ import (
 
 var (
 	vacGVR = schema.GroupVersionResource{
-		Group:    storagev1beta1.GroupName,
+		Group:    storagev1.GroupName,
 		Version:  "v1beta1",
 		Resource: "volumeattributesclasses",
 	}
@@ -98,7 +98,7 @@ func TestVACProtectionController(t *testing.T) {
 
 		// VAC event to simulate. This VAC will be automatically added to
 		// initialObjects.
-		updatedVAC *storagev1beta1.VolumeAttributesClass
+		updatedVAC *storagev1.VolumeAttributesClass
 
 		// PV event to simulate. The updatedPV will be automatically added to
 		// initialObjects.
@@ -274,7 +274,7 @@ func TestVACProtectionController(t *testing.T) {
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		pvcInformer := informers.Core().V1().PersistentVolumeClaims()
 		pvInformer := informers.Core().V1().PersistentVolumes()
-		vacInformer := informers.Storage().V1beta1().VolumeAttributesClasses()
+		vacInformer := informers.Storage().V1().VolumeAttributesClasses()
 
 		// Populate the informers with initial objects so the controller can
 		// Get() it.
@@ -284,7 +284,7 @@ func TestVACProtectionController(t *testing.T) {
 				require.NoError(t, pvcInformer.Informer().GetStore().Add(obj), "failed to add object to PVC informer")
 			case *v1.PersistentVolume:
 				require.NoError(t, pvInformer.Informer().GetStore().Add(obj), "failed to add object to PV informer")
-			case *storagev1beta1.VolumeAttributesClass:
+			case *storagev1.VolumeAttributesClass:
 				require.NoError(t, vacInformer.Informer().GetStore().Add(obj), "failed to add object to VAC informer")
 			default:
 				t.Fatalf("Unknown initialObject type: %+v", obj)
