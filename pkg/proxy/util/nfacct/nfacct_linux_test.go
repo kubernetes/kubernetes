@@ -22,6 +22,9 @@ package nfacct
 import (
 	"syscall"
 	"testing"
+	"bytes"
+	"encoding/binary"
+	"io"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vishvananda/netlink/nl"
@@ -175,6 +178,42 @@ func TestRunner_Add(t *testing.T) {
 		})
 	}
 }
+
+func ShiftByteOrder_BE(msg []byte) []byte {
+	reader := bytes.NewReader(msg)
+	reader.Seek(4, io.SeekCurrent)
+
+	var length, attrType uint16
+
+	for reader.Len() > 0 {
+		index, _ := reader.Seek(0, io.SeekCurrent)
+		msg[index], msg[index+1], msg[index+2], msg[index+3] = msg[index+1], msg[index], msg[index+3], msg[index+2]
+		reader = bytes.NewReader(msg)
+		reader.Seek(index, io.SeekStart)
+
+		binary.Read(reader, binary.NativeEndian, &length)
+		binary.Read(reader, binary.NativeEndian, &attrType)
+
+		length -= 4
+		switch attrType {
+		case 1:
+			reader.Seek(int64(length), io.SeekCurrent)
+		case 2:
+			reader.Seek(8, io.SeekCurrent)
+		case 3:
+			reader.Seek(8, io.SeekCurrent)
+		default:
+			reader.Seek(int64(length), io.SeekCurrent)
+		}
+
+		if length%4 != 0 {
+			padding := 4 - length%4
+			reader.Seek(int64(padding), io.SeekCurrent)
+		}
+	}
+	return msg
+}
+
 func TestRunner_Get(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -337,6 +376,15 @@ func TestRunner_Get(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if binary.NativeEndian.Uint16([]byte{0x01, 0x02}) == 0x0102 {
+				if tc.handler.responses != nil && len(tc.handler.responses) > 0 {
+					for i := 0; i < len(tc.handler.responses); i++ {
+						for j := 0; j < len(tc.handler.responses[i]); j++ {
+							tc.handler.responses[i][j] = ShiftByteOrder_BE(tc.handler.responses[i][j])
+						}
+					}
+				}
+			}
 			rnr, err := newInternal(tc.handler)
 			assert.NoError(t, err)
 
@@ -410,6 +458,15 @@ func TestRunner_Ensure(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if binary.NativeEndian.Uint16([]byte{0x01, 0x02}) == 0x0102 {
+				if tc.handler.responses != nil && len(tc.handler.responses) > 0 {
+					for i := 0; i < len(tc.handler.responses); i++ {
+						for j := 0; j < len(tc.handler.responses[i]); j++ {
+							tc.handler.responses[i][j] = ShiftByteOrder_BE(tc.handler.responses[i][j])
+						}
+					}
+				}
+			}
 			rnr, err := newInternal(tc.handler)
 			assert.NoError(t, err)
 
@@ -473,6 +530,16 @@ func TestRunner_List(t *testing.T) {
 		{Name: "nfacct-list-test-metric", Packets: 134038, Bytes: 31901044},
 		{Name: "test", Packets: 147941304813314, Bytes: 31067674010795934},
 		{Name: "ct_invalid_dropped_packets", Packets: 1230217421033, Bytes: 14762609052396},
+	}
+
+	if binary.NativeEndian.Uint16([]byte{0x01, 0x02}) == 0x0102 {
+		if hndlr.responses != nil && len(hndlr.responses) > 0 {
+			for i := 0; i < len(hndlr.responses); i++ {
+				for j := 0; j < len(hndlr.responses[i]); j++ {
+					hndlr.responses[i][j] = ShiftByteOrder_BE(hndlr.responses[i][j])
+				}
+			}
+		}
 	}
 
 	rnr, err := newInternal(hndlr)
@@ -616,6 +683,11 @@ func TestDecode(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if binary.NativeEndian.Uint16([]byte{0x01, 0x02}) == 0x0102 {
+				if tc.msg != nil && len(tc.msg) > 0 {
+					tc.msg = ShiftByteOrder_BE(tc.msg)
+				}
+			}
 			counter, err := decode(tc.msg, false)
 			assert.NoError(t, err)
 			assert.NotNil(t, counter)
