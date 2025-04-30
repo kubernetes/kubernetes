@@ -2472,6 +2472,327 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
+			name: "claim mappings with expressions and deeply nested claim - success",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: "claims.turtle.foo.other1.bit1 && !claims.turtle.foo.bar.other1.bit2",
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[0]",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[1]",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda",
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "bio.snorlax.org/1",
+								ValueExpression: "string(claims.turtle.foo.bar.other1.bit2)",
+							},
+							{
+								Key:             "bio.snorlax.org/2",
+								ValueExpression: "string(claims.turtle.foo.bar.baz.other1.bit3)",
+							},
+							{
+								Key:             "bio.snorlax.org/3",
+								ValueExpression: "[string(claims.turtle.foo.bar.baz.other1.bit1)] + ['a', 'b', 'c']",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username != "bad"`,
+						},
+						{
+							Expression: `user.uid == "007"`,
+						},
+						{
+							Expression: `"claus" in user.groups`,
+						},
+						{
+							Expression: `user.extra["bio.snorlax.org/3"].size() == 4`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								}
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "snorlax",
+				UID:    "007",
+				Groups: []string{"snorlax", "007", "santa", "claus"},
+				Extra: map[string][]string{
+					"bio.snorlax.org/1": {"false"},
+					"bio.snorlax.org/2": {"1"},
+					"bio.snorlax.org/3": {"true", "a", "b", "c"},
+				},
+			},
+		},
+		{
+			name: "claim mappings with expressions and deeply nested claim - success via optional",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: "claims.turtle.foo.other1.bit1 && !claims.turtle.foo.bar.other1.bit2",
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[0]",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[1]",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.?a.b.c.d.orValue([ 'claus' ])", // this passes because of the optional
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "bio.snorlax.org/1",
+								ValueExpression: "string(claims.turtle.foo.bar.other1.bit2)",
+							},
+							{
+								Key:             "bio.snorlax.org/2",
+								ValueExpression: "string(claims.turtle.foo.bar.baz.other1.bit3)",
+							},
+							{
+								Key:             "bio.snorlax.org/3",
+								ValueExpression: "[string(claims.turtle.foo.bar.baz.other1.bit1)] + ['a', 'b', 'c']",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username != "bad"`,
+						},
+						{
+							Expression: `user.uid == "007"`,
+						},
+						{
+							Expression: `"claus" in user.groups`,
+						},
+						{
+							Expression: `user.extra["bio.snorlax.org/3"].size() == 4`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								}
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name:   "snorlax",
+				UID:    "007",
+				Groups: []string{"claus"},
+				Extra: map[string][]string{
+					"bio.snorlax.org/1": {"false"},
+					"bio.snorlax.org/2": {"1"},
+					"bio.snorlax.org/3": {"true", "a", "b", "c"},
+				},
+			},
+		},
+		{
+			name: "claim mappings with expressions and deeply nested claim - failure without optional",
+			options: Options{
+				JWTAuthenticator: apiserver.JWTAuthenticator{
+					Issuer: apiserver.Issuer{
+						URL:       "https://auth.example.com",
+						Audiences: []string{"my-client"},
+					},
+					ClaimValidationRules: []apiserver.ClaimValidationRule{
+						{
+							Expression: "claims.turtle.foo.other1.bit1 && !claims.turtle.foo.bar.other1.bit2",
+						},
+					},
+					ClaimMappings: apiserver.ClaimMappings{
+						Username: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[0]",
+						},
+						UID: apiserver.ClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.panda[1]",
+						},
+						Groups: apiserver.PrefixedClaimOrExpression{
+							Expression: "claims.turtle.foo.bar.baz.a.b.c.d", // this fails because the key does not exist
+						},
+						Extra: []apiserver.ExtraMapping{
+							{
+								Key:             "bio.snorlax.org/1",
+								ValueExpression: "string(claims.turtle.foo.bar.other1.bit2)",
+							},
+							{
+								Key:             "bio.snorlax.org/2",
+								ValueExpression: "string(claims.turtle.foo.bar.baz.other1.bit3)",
+							},
+							{
+								Key:             "bio.snorlax.org/3",
+								ValueExpression: "[string(claims.turtle.foo.bar.baz.other1.bit1)] + ['a', 'b', 'c']",
+							},
+						},
+					},
+					UserValidationRules: []apiserver.UserValidationRule{
+						{
+							Expression: `user.username != "bad"`,
+						},
+						{
+							Expression: `user.uid == "007"`,
+						},
+						{
+							Expression: `"claus" in user.groups`,
+						},
+						{
+							Expression: `user.extra["bio.snorlax.org/3"].size() == 4`,
+						},
+					},
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"exp": %d,
+				"turtle": {
+					"foo": {
+						"1": "a",
+						"2": "b",
+						"other1": {
+							"bit1": true,
+							"bit2": false,
+							"bit3": 1
+						},
+						"bar": {
+							"3": "c",
+							"4": "d",
+							"other1": {
+								"bit1": true,
+								"bit2": false,
+								"bit3": 1
+							},
+							"baz": {
+								"5": "e",
+								"6": "f",
+								"panda": [
+									"snorlax",
+									"007",
+									"santa",
+									"claus"
+								],
+								"other1": {
+									"bit1": true,
+									"bit2": false,
+									"bit3": 1
+								}
+							}
+						}
+					}
+				}
+}`, valid.Unix()),
+			wantErr: "oidc: error evaluating group claim expression: expression 'claims.turtle.foo.bar.baz.a.b.c.d' resulted in error: no such key: a",
+		},
+		{
 			name: "groups claim mapping with expression",
 			options: Options{
 				JWTAuthenticator: apiserver.JWTAuthenticator{
@@ -3506,8 +3827,12 @@ func TestToken(t *testing.T) {
 
 	var successTestCount, failureTestCount int
 	for _, test := range tests {
-		t.Run(test.name, test.run)
-		if test.wantSkip || len(test.wantInitErr) > 0 || len(test.wantHealthErrPrefix) > 0 {
+		var called bool
+		t.Run(test.name, func(t *testing.T) {
+			called = true
+			test.run(t)
+		})
+		if test.wantSkip || len(test.wantInitErr) > 0 || len(test.wantHealthErrPrefix) > 0 || !called {
 			continue
 		}
 		// check metrics for success and failure
