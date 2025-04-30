@@ -25,15 +25,15 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -65,7 +65,8 @@ func InitCustomVolumeModifyTestSuite(patterns []storageframework.TestPattern) st
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
-			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass)},
+			// TODO: Remove feature.OffByDefault once the csi driver is promoted to GA and the manifest is updated.
+			TestTags: []interface{}{feature.OffByDefault},
 		},
 	}
 }
@@ -102,7 +103,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		config *storageframework.PerTestConfig
 
 		resource *storageframework.VolumeResource
-		vac      *storagev1beta1.VolumeAttributesClass
+		vac      *storagev1.VolumeAttributesClass
 	}
 	var l local
 
@@ -123,7 +124,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		}
 
 		ginkgo.By("Creating VolumeAttributesClass")
-		_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating VolumeAttributesClass")
 
 		ginkgo.By("Creating volume")
@@ -206,7 +207,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		vacDriver, _ := driver.(storageframework.VolumeAttributesClassTestDriver)
 		newVAC := vacDriver.GetVolumeAttributesClass(ctx, l.config)
 		gomega.Expect(newVAC).NotTo(gomega.BeNil())
-		_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
 		ginkgo.DeferCleanup(CleanupVAC, newVAC, f.ClientSet, vacCleanupWaitPeriod)
 
@@ -238,7 +239,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		// Create VAC with unsupported parameter
 		invalidVAC := MakeInvalidVAC(l.config)
-		_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, invalidVAC, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, invalidVAC, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
 		ginkgo.DeferCleanup(CleanupVAC, invalidVAC, f.ClientSet, vacCleanupWaitPeriod)
 
@@ -279,7 +280,7 @@ func (v *volumeModifyTestSuite) DefineTests(driver storageframework.TestDriver, 
 		vacDriver, _ := driver.(storageframework.VolumeAttributesClassTestDriver)
 		newVAC := vacDriver.GetVolumeAttributesClass(ctx, l.config)
 		gomega.Expect(newVAC).NotTo(gomega.BeNil())
-		createdVAC, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
+		createdVAC, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, newVAC, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating new VolumeAttributesClass")
 		ginkgo.DeferCleanup(CleanupVAC, newVAC, f.ClientSet, vacCleanupWaitPeriod)
 
@@ -411,8 +412,8 @@ func SetPVCVACName(ctx context.Context, origPVC *v1.PersistentVolumeClaim, name 
 }
 
 // MakeInvalidVAC creates a VolumeAttributesClass with an invalid parameter
-func MakeInvalidVAC(config *storageframework.PerTestConfig) *storagev1beta1.VolumeAttributesClass {
-	return storageframework.CopyVolumeAttributesClass(&storagev1beta1.VolumeAttributesClass{
+func MakeInvalidVAC(config *storageframework.PerTestConfig) *storagev1.VolumeAttributesClass {
+	return storageframework.CopyVolumeAttributesClass(&storagev1.VolumeAttributesClass{
 		DriverName: config.GetUniqueDriverName(),
 		Parameters: map[string]string{
 			"xxInvalidParameterKey": "xxInvalidParameterValue",
@@ -421,7 +422,7 @@ func MakeInvalidVAC(config *storageframework.PerTestConfig) *storagev1beta1.Volu
 }
 
 // CleanupVAC cleans up the test VolumeAttributesClass
-func CleanupVAC(ctx context.Context, vac *storagev1beta1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
+func CleanupVAC(ctx context.Context, vac *storagev1.VolumeAttributesClass, c clientset.Interface, timeout time.Duration) {
 	gomega.Eventually(ctx, func() error {
 		err := c.StorageV1beta1().VolumeAttributesClasses().Delete(ctx, vac.Name, metav1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {

@@ -1803,6 +1803,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.34"
 - name: WatchCacheInitializationPostStartHook
   versionedSpecs:
   - default: false

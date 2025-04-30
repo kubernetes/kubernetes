@@ -22,16 +22,16 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	storageinformers "k8s.io/client-go/informers/storage/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
+	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
@@ -276,10 +276,10 @@ func (c *Controller) processVAC(ctx context.Context, vacName string) error {
 	return nil
 }
 
-func (c *Controller) addFinalizer(ctx context.Context, vac *storagev1beta1.VolumeAttributesClass) error {
+func (c *Controller) addFinalizer(ctx context.Context, vac *storagev1.VolumeAttributesClass) error {
 	vacClone := vac.DeepCopy()
 	vacClone.ObjectMeta.Finalizers = append(vacClone.ObjectMeta.Finalizers, volumeutil.VACProtectionFinalizer)
-	_, err := c.client.StorageV1beta1().VolumeAttributesClasses().Update(ctx, vacClone, metav1.UpdateOptions{})
+	_, err := c.client.StorageV1().VolumeAttributesClasses().Update(ctx, vacClone, metav1.UpdateOptions{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
 		logger.V(3).Info("Error adding protection finalizer to VAC", "VAC", klog.KObj(vac), "err", err)
@@ -289,10 +289,10 @@ func (c *Controller) addFinalizer(ctx context.Context, vac *storagev1beta1.Volum
 	return nil
 }
 
-func (c *Controller) removeFinalizer(ctx context.Context, vac *storagev1beta1.VolumeAttributesClass) error {
+func (c *Controller) removeFinalizer(ctx context.Context, vac *storagev1.VolumeAttributesClass) error {
 	vacClone := vac.DeepCopy()
 	vacClone.ObjectMeta.Finalizers = slice.RemoveString(vacClone.ObjectMeta.Finalizers, volumeutil.VACProtectionFinalizer, nil)
-	_, err := c.client.StorageV1beta1().VolumeAttributesClasses().Update(ctx, vacClone, metav1.UpdateOptions{})
+	_, err := c.client.StorageV1().VolumeAttributesClasses().Update(ctx, vacClone, metav1.UpdateOptions{})
 	logger := klog.FromContext(ctx)
 	if err != nil {
 		logger.V(3).Info("Error removing protection finalizer from VAC", "VAC", klog.KObj(vac), "err", err)
@@ -302,7 +302,7 @@ func (c *Controller) removeFinalizer(ctx context.Context, vac *storagev1beta1.Vo
 	return nil
 }
 
-func (c *Controller) isBeingUsed(ctx context.Context, vac *storagev1beta1.VolumeAttributesClass) bool {
+func (c *Controller) isBeingUsed(ctx context.Context, vac *storagev1.VolumeAttributesClass) bool {
 	logger := klog.FromContext(ctx)
 
 	pvs, err := c.getPVsAssignedToVAC(vac.Name)
@@ -327,7 +327,7 @@ func (c *Controller) isBeingUsed(ctx context.Context, vac *storagev1beta1.Volume
 
 // pvAddedUpdated reacts to vac added/updated events
 func (c *Controller) vacAddedUpdated(logger klog.Logger, obj interface{}) {
-	vac, ok := obj.(*storagev1beta1.VolumeAttributesClass)
+	vac, ok := obj.(*storagev1.VolumeAttributesClass)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("VAC informer returned non-VAC object: %#v", obj))
 		return
