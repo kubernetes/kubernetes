@@ -843,7 +843,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	if err != nil {
 		klog.V(4).Infof("failed to detect the sandbox image for local container runtime, %v", err)
 	} else if criSandboxImage != ipc.sandboxImage {
-		klog.Warningf("detected that the sandbox image %q of the container runtime is inconsistent with that used by kubeadm."+
+		klog.Warningf("detected that the sandbox image %q of the container runtime is inconsistent with that used by kubeadm. "+
 			"It is recommended to use %q as the CRI sandbox image.", criSandboxImage, ipc.sandboxImage)
 	}
 
