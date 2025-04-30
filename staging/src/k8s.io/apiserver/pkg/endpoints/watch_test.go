@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -43,7 +44,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	example "k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/endpoints/request"
-	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
 
@@ -70,9 +71,9 @@ var watchTestTable = []struct {
 	t   watch.EventType
 	obj runtime.Object
 }{
-	{watch.Added, &apitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}},
-	{watch.Modified, &apitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}},
-	{watch.Deleted, &apitesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}},
+	{watch.Added, &endpointstesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}},
+	{watch.Modified, &endpointstesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}},
+	{watch.Deleted, &endpointstesting.Simple{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}},
 }
 
 func podWatchTestTable() []struct {
@@ -106,6 +107,7 @@ func TestWatchWebsocket(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	defer apitesting.Close(t, ws)
 
 	try := func(action watch.EventType, object runtime.Object) {
 		// Send
@@ -156,6 +158,11 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	// Ensure the websocket is closed without error
+	closeWebSocket := apitesting.Close
+	defer func() {
+		closeWebSocket(t, ws)
+	}()
 
 	try := func(action watch.EventType, object runtime.Object) {
 		// Send
@@ -191,8 +198,10 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		try(item.t, item.obj)
 	}
 
-	// Client requests a close
-	ws.Close()
+	// Websocket.Close errors if called twice.
+	// So disable the defer close and close immediately instead.
+	closeWebSocket = apitesting.CloseNoOp
+	require.NoError(t, ws.Close())
 
 	select {
 	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
@@ -203,11 +212,10 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		t.Errorf("watcher did not close when client closed")
 	}
 
+	// Reading from a closed websocket should error
 	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
-	if err == nil {
-		t.Errorf("Unexpected non-error")
-	}
+	require.ErrorContains(t, err, "use of closed network connection")
 }
 
 func TestWatchClientClose(t *testing.T) {
@@ -232,6 +240,8 @@ func TestWatchClientClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	// Ensure the response body is closed without error
+	defer apitesting.Close(t, response.Body)
 
 	if response.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(response.Body)
@@ -251,6 +261,10 @@ func TestWatchClientClose(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Errorf("watcher did not close when client closed")
 	}
+
+	// Reading from a closed response body should error
+	_, err = io.Copy(io.Discard, response.Body)
+	require.ErrorContains(t, err, "http: read on closed response body")
 }
 
 func TestWatchRead(t *testing.T) {
@@ -353,7 +367,10 @@ func TestWatchRead(t *testing.T) {
 				streamSerializer := info.StreamSerializer
 
 				r, contentType := protocol.fn(test.Accept)
-				defer r.Close()
+				closeBody := apitesting.Close
+				defer func() {
+					closeBody(t, r)
+				}()
 
 				if contentType != "__default__" && contentType != test.ExpectedContentType {
 					t.Errorf("Unexpected content type: %#v", contentType)
@@ -365,6 +382,10 @@ func TestWatchRead(t *testing.T) {
 					fr = streamSerializer.Framer.NewFrameReader(r)
 				}
 				d := streaming.NewDecoder(fr, streamSerializer.Serializer)
+				// Websockets error if closed twice.
+				// So disable the Body.Close and use Decoder.Close instead.
+				closeBody = apitesting.CloseNoOp
+				defer apitesting.Close(t, d)
 
 				var w *watch.FakeWatcher
 				for w == nil {
@@ -535,7 +556,7 @@ func TestWatchParamParsing(t *testing.T) {
 			t.Errorf("%v: unexpected error: %v", item.rawQuery, err)
 			continue
 		}
-		resp.Body.Close()
+		defer apitesting.Close(t, resp.Body)
 		if e, a := item.namespace, simpleStorage.requestedResourceNamespace; e != a {
 			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
 		}
@@ -665,7 +686,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		defer response.Body.Close()
+		defer apitesting.Close(b, response.Body)
 		if _, err := io.Copy(io.Discard, response.Body); err != nil {
 			b.Error(err)
 		}
@@ -705,7 +726,7 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		defer ws.Close()
+		defer apitesting.Close(b, ws)
 		if _, err := io.Copy(io.Discard, ws); err != nil {
 			b.Error(err)
 		}
