@@ -29,7 +29,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -41,11 +40,7 @@ import (
 )
 
 var (
-	vacGVR = schema.GroupVersionResource{
-		Group:    storagev1.GroupName,
-		Version:  "v1beta1",
-		Resource: "volumeattributesclasses",
-	}
+	vacGVR = storagev1.SchemeGroupVersion.WithResource("volumeattributesclasses")
 
 	vac1                         = protectionutil.MakeVolumeAttributesClass().Name("vac1").Obj()
 	vac1WithFinalizer            = protectionutil.MakeVolumeAttributesClass().Name("vac1").Finalizer(volumeutil.VACProtectionFinalizer).Obj()
