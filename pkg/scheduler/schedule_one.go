@@ -101,6 +101,9 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
 	state := framework.NewCycleState()
+	// For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
+	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
+	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 
 	// Initialize an empty podsToActivate struct, which will be filled up by plugins or stay empty.
