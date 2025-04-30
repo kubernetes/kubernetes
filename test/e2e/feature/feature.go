@@ -312,6 +312,29 @@ var (
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 
+	// Owner: sig-testing
+	//
+	// The following test-infra jobs runs tests with this label:
+	// - pull-kubernetes-e2e-kind-alpha-beta-features
+	// - ci-kubernetes-e2e-kind-alpha-beta-features
+	// - pull-kubernetes-e2e-kind-beta-features
+	// - ci-kubernetes-e2e-kind-beta-features
+	//
+	// OffByDefault marks tests which depend on some API group and/or feature gate which
+	// is not enabled by default. Jobs which allow tests to run which have this feature label
+	// must enable both alpha and beta API groups and features. Jobs may keep alpha
+	// API groups and features disabled if they exclude tests which have the `Alpha` label.
+	// Jobs may keep beta API groups and features in their default state if they exclude tests
+	// which have the `BetaOffByDefault` label. `Alpha`, `Beta` and `BetaOffByDefault`
+	// are stand-alone labels, not feature labels.
+	//
+	// Normally, `Feature:OffByDefault`, `Alpha`, and `Beta` labels get added automatically
+	// through [framework.WithFeatureGate]. Adding OffByDefault manually
+	// is useful in those rare situations where a test for e.g. a GA feature depends on the
+	// previous beta API group. This can happen when it depends on external components
+	// which cannot be updated in lock-step with the GA graduation.
+	OffByDefault = framework.WithFeature(framework.ValidFeatures.Add("OffByDefault"))
+
 	// Owner: sig-network
 	// Marks a single test that tests cluster DNS performance with many services.
 	PerformanceDNS = framework.WithFeature(framework.ValidFeatures.Add("PerformanceDNS"))
