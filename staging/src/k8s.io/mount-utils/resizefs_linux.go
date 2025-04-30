@@ -21,9 +21,9 @@ package mount
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 )
@@ -129,18 +129,93 @@ func (resizefs *ResizeFs) NeedResize(devicePath string, deviceMountPath string) 
 		return false, nil
 	}
 
-	supportedFormats := sets.New("ext3", "ext4", "xfs", "btrfs")
-	if !supportedFormats.Has(format) {
+	switch format {
+	case "ext3", "ext4", "xfs":
+		// For ext3/ext4/xfs, recommendation received from linux filesystem folks is to let
+		// resize2fs/xfs_growfs do the check for us. So we will not do any check here.
+		return true, nil
+	case "btrfs":
+		deviceSize, err := resizefs.getDeviceSize(devicePath)
+		if err != nil {
+			return false, err
+		}
+		blockSize, fsSize, err := resizefs.getBtrfsSize(devicePath)
+		klog.V(5).Infof("Btrfs size: filesystem size=%d, block size=%d, err=%v", fsSize, blockSize, err)
+		if err != nil {
+			return false, err
+		}
+		if deviceSize <= fsSize+blockSize {
+			return false, nil
+		}
+		return true, nil
+	default:
 		return false, fmt.Errorf("could not parse fs info of given filesystem format: %s. Supported fs types are: xfs, ext3, ext4", format)
 	}
-	return true, nil
+}
+
+func (resizefs *ResizeFs) getDeviceSize(devicePath string) (uint64, error) {
+	output, err := resizefs.exec.Command(blockDev, "--getsize64", devicePath).CombinedOutput()
+	outStr := strings.TrimSpace(string(output))
+	if err != nil {
+		return 0, fmt.Errorf("failed to read size of device %s: %s: %s", devicePath, err, outStr)
+	}
+	size, err := strconv.ParseUint(outStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse size of device %s %s: %s", devicePath, outStr, err)
+	}
+	return size, nil
+}
+
+func (resizefs *ResizeFs) getBtrfsSize(devicePath string) (uint64, uint64, error) {
+	output, err := resizefs.exec.Command("btrfs", "inspect-internal", "dump-super", "-f", devicePath).CombinedOutput()
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to read size of filesystem on %s: %s: %s", devicePath, err, string(output))
+	}
+
+	blockSize, totalBytes, _ := resizefs.parseBtrfsInfoOutput(string(output), "sectorsize", "total_bytes")
+
+	if blockSize == 0 {
+		return 0, 0, fmt.Errorf("could not find block size of device %s", devicePath)
+	}
+	if totalBytes == 0 {
+		return 0, 0, fmt.Errorf("could not find total size of device %s", devicePath)
+	}
+	return blockSize, totalBytes, nil
+}
+
+func (resizefs *ResizeFs) parseBtrfsInfoOutput(cmdOutput string, blockSizeKey string, totalBytesKey string) (uint64, uint64, error) {
+	lines := strings.Split(cmdOutput, "\n")
+	var blockSize, blockCount uint64
+	var err error
+
+	for _, line := range lines {
+		tokens := strings.Fields(line)
+		if len(tokens) != 2 {
+			continue
+		}
+		key, value := strings.ToLower(strings.TrimSpace(tokens[0])), strings.ToLower(strings.TrimSpace(tokens[1]))
+
+		if key == blockSizeKey {
+			blockSize, err = strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to parse block size %s: %s", value, err)
+			}
+		}
+		if key == totalBytesKey {
+			blockCount, err = strconv.ParseUint(value, 10, 64)
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to parse total size %s: %s", value, err)
+			}
+		}
+	}
+	return blockSize, blockCount, err
 }
 
 func (resizefs *ResizeFs) getDeviceRO(devicePath string) (bool, error) {
 	output, err := resizefs.exec.Command(blockDev, "--getro", devicePath).CombinedOutput()
 	outStr := strings.TrimSpace(string(output))
 	if err != nil {
-		return false, fmt.Errorf("failed to get readonly bit from device %s: %s: %s", devicePath, err, outStr)
+		return false, fmt.Errorf("failed to get readonly bit from device %s: %w: %s", devicePath, err, outStr)
 	}
 	switch outStr {
 	case "0":
