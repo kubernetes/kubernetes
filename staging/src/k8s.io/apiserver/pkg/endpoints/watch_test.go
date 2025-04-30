@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/websocket"
 
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -100,6 +101,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
 	require.NoError(t, err)
+	defer apitesting.Close(t, ws)
 
 	// Wait for storage watcher to start
 	var watcher *watch.FakeWatcher
@@ -146,6 +148,10 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
 	require.NoError(t, err)
+	closeWebSocket := apitesting.Close
+	defer func() {
+		closeWebSocket(t, ws)
+	}()
 
 	// Wait for storage watcher to start
 	var watcher *watch.FakeWatcher
@@ -180,7 +186,9 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		try(item.t, item.obj)
 	}
 
-	// Client requests a close
+	// Websockets error if closed twice.
+	// So disable the defer close and close immediately instead.
+	closeWebSocket = func(apitesting.TestingT, io.Closer) {}
 	require.NoError(t, ws.Close())
 
 	select {
@@ -192,8 +200,10 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		t.Errorf("watcher did not close when client closed")
 	}
 
+	// Validate read after close errors
 	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
+	apitesting.AssertWebSocketClosedError(t, err)
 }
 
 func TestWatchClientClose(t *testing.T) {
@@ -215,6 +225,7 @@ func TestWatchClientClose(t *testing.T) {
 
 	response, err := http.DefaultClient.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	if response.StatusCode != http.StatusOK {
 		b, err := io.ReadAll(response.Body)
@@ -347,7 +358,10 @@ func TestWatchRead(t *testing.T) {
 				streamSerializer := info.StreamSerializer
 
 				r, contentType := protocol.openFn(ctx, test.Accept)
-				defer r.Close()
+				closeBody := apitesting.Close
+				defer func() {
+					closeBody(t, r)
+				}()
 
 				if contentType != "__default__" && contentType != test.ExpectedContentType {
 					t.Errorf("Unexpected content type: %#v", contentType)
@@ -359,6 +373,10 @@ func TestWatchRead(t *testing.T) {
 					fr = streamSerializer.Framer.NewFrameReader(r)
 				}
 				d := streaming.NewDecoder(fr, streamSerializer.Serializer)
+				// Websockets error if closed twice.
+				// So disable the Body.Close and use Decoder.Close instead.
+				closeBody = func(apitesting.TestingT, io.Closer) {}
+				defer apitesting.Close(t, d)
 
 				// Wait for storage watcher to start
 				var watcher *watch.FakeWatcher
@@ -383,8 +401,11 @@ func TestWatchRead(t *testing.T) {
 					require.NoError(t, err, name)
 					require.Equal(t, object, gotObj, name)
 				}
+
+				// Stop the watcher to tell the server we're done reading events
 				watcher.Stop()
 
+				// Confirm that Decode errors after the watcher is stopped
 				var got metav1.WatchEvent
 				_, _, err := d.Decode(nil, &got)
 				require.Equal(t, io.EOF, err)
@@ -514,7 +535,7 @@ func TestWatchParamParsing(t *testing.T) {
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
-			require.NoError(t, resp.Body.Close())
+			defer apitesting.Close(t, resp.Body)
 			if e, a := item.namespace, simpleStorage.requestedResourceNamespace; e != a {
 				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
 			}
@@ -649,7 +670,7 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		defer resp.Body.Close()
+		defer apitesting.Close(b, resp.Body)
 		_, err := io.Copy(io.Discard, resp.Body)
 		assert.NoError(b, err)
 		wg.Done()
@@ -694,7 +715,7 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
-		defer ws.Close()
+		defer apitesting.Close(b, ws)
 		_, err := io.Copy(io.Discard, ws)
 		assert.NoError(b, err)
 		wg.Done()

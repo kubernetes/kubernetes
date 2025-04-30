@@ -41,6 +41,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -795,6 +796,7 @@ func TestNotFound(t *testing.T) {
 
 			resp, err := client.Do(req)
 			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
 			require.Equal(t, v.Status, resp.StatusCode)
 		})
 	}
@@ -861,7 +863,7 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 
 			response, err := client.Do(request)
 			require.NoError(t, err)
-			defer response.Body.Close()
+			defer apitesting.Close(t, response.Body)
 			data, err := io.ReadAll(response.Body)
 			require.NoError(t, err)
 			require.Equal(t, v.ErrCode, response.StatusCode, string(data))
@@ -924,7 +926,7 @@ func TestSomeUnimplementedRESTStorage(t *testing.T) {
 
 			response, err := client.Do(request)
 			require.NoError(t, err)
-			defer response.Body.Close()
+			defer apitesting.Close(t, response.Body)
 			data, err := io.ReadAll(response.Body)
 			require.NoError(t, err)
 			require.Equal(t, v.ErrCode, response.StatusCode, string(data))
@@ -1085,7 +1087,7 @@ func TestList(t *testing.T) {
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, testCase.url, http.StatusOK, resp)
 				body, err := io.ReadAll(resp.Body)
@@ -1137,7 +1139,7 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(r)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusBadRequest {
 				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, url, http.StatusBadRequest, resp)
 				body, err := io.ReadAll(resp.Body)
@@ -1196,7 +1198,7 @@ func TestListCompression(t *testing.T) {
 			req.Header.Set("Accept-Encoding", testCase.acceptEncoding)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, testCase.url, http.StatusOK, resp)
 				body, err := io.ReadAll(resp.Body)
@@ -1243,6 +1245,7 @@ func TestLogs(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	body, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
@@ -1265,6 +1268,7 @@ func TestErrorList(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
@@ -1290,6 +1294,7 @@ func TestNonEmptyList(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
@@ -1360,6 +1365,7 @@ func TestGet(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(resp, &itemOut)
@@ -1394,6 +1400,7 @@ func BenchmarkGet(b *testing.B) {
 			require.NoError(b, err)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(b, err)
+			defer apitesting.Close(b, resp.Body)
 			require.Equal(b, http.StatusOK, resp.StatusCode)
 			_, err = io.Copy(io.Discard, resp.Body)
 			require.NoError(b, err)
@@ -1432,6 +1439,7 @@ func BenchmarkGetNoCompression(b *testing.B) {
 			require.NoError(b, err)
 			resp, err := client.Do(req)
 			require.NoError(b, err)
+			defer apitesting.Close(b, resp.Body)
 			require.Equal(b, http.StatusOK, resp.StatusCode)
 			_, err = io.Copy(io.Discard, resp.Body)
 			require.NoError(b, err)
@@ -1473,6 +1481,7 @@ func TestGetCompression(t *testing.T) {
 			req.Header.Set("Accept-Encoding", test.acceptEncoding)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 			var decoder *json.Decoder
 			if test.acceptEncoding == "gzip" {
@@ -1913,7 +1922,7 @@ func TestWatchTable(t *testing.T) {
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
-			defer resp.Body.Close()
+			defer apitesting.Close(t, resp.Body)
 			if test.statusCode != 0 {
 				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
@@ -2098,6 +2107,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			req.Header.Set("Accept", test.accept)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
 			if test.statusCode != 0 {
 				assert.Equal(t, test.statusCode, resp.StatusCode)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
@@ -2144,6 +2154,7 @@ func TestGetBinary(t *testing.T) {
 	req.Header.Add("Accept", "text/other, */*")
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
@@ -2283,6 +2294,7 @@ func TestGetWithOptions(t *testing.T) {
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
+			defer apitesting.Close(t, resp.Body)
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 
 			var itemOut runtime.Object
@@ -2328,6 +2340,7 @@ func TestGetMissing(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
@@ -2347,6 +2360,7 @@ func TestGetRetryAfter(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 	if resp.Header.Get("Retry-After") != "2" {
 		t.Errorf("Unexpected Retry-After header: %v", resp.Header)
@@ -2375,8 +2389,8 @@ func TestConnect(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
@@ -2410,8 +2424,8 @@ func TestConnectResponderObject(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
-	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
@@ -2446,8 +2460,8 @@ func TestConnectResponderError(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusForbidden, resp.StatusCode)
-	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
@@ -2507,8 +2521,8 @@ func TestConnectWithOptions(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	if connectStorage.receivedID != itemID {
@@ -2551,8 +2565,8 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
-	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.Equal(t, itemID, connectStorage.receivedID)
@@ -2580,6 +2594,7 @@ func TestDelete(t *testing.T) {
 	require.NoError(t, err)
 	res, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, ID, simpleStorage.deleted)
 }
@@ -2607,6 +2622,7 @@ func TestDeleteWithOptions(t *testing.T) {
 	require.NoError(t, err)
 	res, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := io.ReadAll(res.Body)
@@ -2639,6 +2655,7 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	require.NoError(t, err)
 	res, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := io.ReadAll(res.Body)
@@ -2672,6 +2689,7 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	require.NoError(t, err)
 	res, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, res.Body)
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("unexpected response: %s %#v", request.URL, res)
 		s, err := io.ReadAll(res.Body)
@@ -2702,6 +2720,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 			require.NoError(t, err)
 			response, err := client.Do(request)
 			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
 			require.Equal(t, http.StatusForbidden, response.StatusCode)
 		})
 	}
@@ -2725,6 +2744,7 @@ func TestDeleteMissing(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
@@ -2754,6 +2774,7 @@ func TestUpdate(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	dump, err := httputil.DumpResponse(response, true)
 	require.NoError(t, err)
 	t.Log(string(dump))
@@ -2790,6 +2811,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 			require.NoError(t, err)
 			response, err := client.Do(request)
 			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
 			dump, err := httputil.DumpResponse(response, true)
 			require.NoError(t, err)
 			t.Log(string(dump))
@@ -2820,6 +2842,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	if response.StatusCode != http.StatusBadRequest {
 		dump, err := httputil.DumpResponse(response, true)
 		require.NoError(t, err)
@@ -2853,6 +2876,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	dump, err := httputil.DumpResponse(response, true)
 	require.NoError(t, err)
 	t.Log(string(dump))
@@ -2886,6 +2910,7 @@ func TestUpdateDisallowsMismatchedNamespaceOnError(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	dump, err := httputil.DumpResponse(response, true)
 	require.NoError(t, err)
 	t.Log(string(dump))
@@ -2919,6 +2944,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
 
@@ -2950,6 +2976,7 @@ func TestUpdateMissing(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
@@ -2975,6 +3002,7 @@ func TestCreateNotFound(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusNotFound, response.StatusCode)
 }
 
@@ -2993,6 +3021,7 @@ func TestCreateChecksDecode(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
@@ -3096,6 +3125,7 @@ func TestNamedCreaterWithName(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	assert.Equal(t, http.StatusCreated, response.StatusCode)
 	assert.Equal(t, pathName, storage.createdName)
 }
@@ -3127,6 +3157,7 @@ func TestNamedCreaterWithoutName(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	// empty name is not allowed for NamedCreater
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 }
@@ -3188,6 +3219,7 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusCreated, response.StatusCode)
 
 	var itemOut genericapitesting.Simple
@@ -3217,6 +3249,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
@@ -3247,6 +3280,7 @@ func TestCreate(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
@@ -3296,6 +3330,7 @@ func TestCreateYAML(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBodyDecoder(response, &itemOut, decoder)
@@ -3335,6 +3370,7 @@ func TestCreateInNamespace(t *testing.T) {
 
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
@@ -3376,6 +3412,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 
 			response, err := client.Do(request)
 			require.NoError(t, err)
+			defer apitesting.Close(t, response.Body)
 			require.Equal(t, http.StatusForbidden, response.StatusCode)
 		})
 	}
@@ -3390,6 +3427,7 @@ func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *m
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	var status metav1.Status
 	body, err := extractBody(response, &status)
 	require.NoError(t, err)
@@ -3508,6 +3546,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
@@ -3537,6 +3576,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	require.Equal(t, http.StatusCreated, response.StatusCode)
 }
 
@@ -3555,6 +3595,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 	require.NoError(t, err)
 	response, err := client.Do(request)
 	require.NoError(t, err)
+	defer apitesting.Close(t, response.Body)
 	assert.Equal(t, http.StatusBadRequest, response.StatusCode)
 	b, err := io.ReadAll(response.Body)
 	require.NoError(t, err)
@@ -3706,6 +3747,7 @@ unknown: baz`)
 		t.Run(test.name, func(t *testing.T) {
 			baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 			response := runRequest(t, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+			defer apitesting.Close(t, response.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(response.Body)
 
@@ -3821,6 +3863,7 @@ other: bar`)
 			for n := 0; n < b.N; n++ {
 				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 				response := runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+				defer apitesting.Close(b, response.Body)
 				require.Equal(b, test.expectedStatusCode, response.StatusCode)
 			}
 		})
@@ -3909,6 +3952,7 @@ func TestXGSubresource(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	var itemOut genericapitesting.SimpleXGSubresource
 	body, err := extractBody(resp, &itemOut)
@@ -3967,6 +4011,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 			request.Header.Set("Content-Type", "application/vnd.kubernetes.protobuf")
 			response, err := client.Do(request)
 			require.NoError(b, err)
+			defer apitesting.Close(b, response.Body)
 			if response.StatusCode != http.StatusBadRequest {
 				body, err := io.ReadAll(response.Body)
 				require.NoError(b, err)
@@ -3974,7 +4019,6 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 			}
 			_, err = io.ReadAll(response.Body)
 			require.NoError(b, err)
-			response.Body.Close()
 		}()
 	}
 	b.StopTimer()
