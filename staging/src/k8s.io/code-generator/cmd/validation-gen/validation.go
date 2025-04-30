@@ -250,16 +250,6 @@ type typeNode struct {
 	typeValidations validators.Validations // validations on the type
 }
 
-// lookupField returns the childNode with the specified JSON name.
-func (n typeNode) lookupField(jsonName string) *childNode {
-	for _, fld := range n.fields {
-		if fld.jsonName == jsonName {
-			return fld
-		}
-	}
-	return nil
-}
-
 // DiscoverType walks the given type recursively, building a type-graph in this
 // typeDiscoverer.  If this is called multiple times for different types, the
 // graphs will be will be merged.
