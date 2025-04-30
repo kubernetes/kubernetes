@@ -23,11 +23,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	/*"github.com/onsi/gomega"*/
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -44,7 +45,7 @@ type volumeModifyStressTestSuite struct {
 type volumeModifyStressTest struct {
 	config *storageframework.PerTestConfig
 
-	vac *storagev1beta1.VolumeAttributesClass
+	vac *storagev1.VolumeAttributesClass
 
 	volumes []*storageframework.VolumeResource
 	pods    []*v1.Pod
@@ -66,7 +67,7 @@ func InitCustomVolumeModifyStressTestSuite(patterns []storageframework.TestPatte
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
-			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass)},
+			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass), feature.VolumeAttributesClass},
 		},
 	}
 }
@@ -135,7 +136,7 @@ func (v *volumeModifyStressTestSuite) DefineTests(driver storageframework.TestDr
 		}
 
 		ginkgo.By("Creating VolumeAttributesClass")
-		_, err := f.ClientSet.StorageV1beta1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
+		_, err := f.ClientSet.StorageV1().VolumeAttributesClasses().Create(ctx, l.vac, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "While creating VolumeAttributesClass")
 	}
 

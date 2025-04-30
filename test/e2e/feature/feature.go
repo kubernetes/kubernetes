@@ -473,6 +473,10 @@ var (
 	ValidatingAdmissionPolicy = framework.WithFeature(framework.ValidFeatures.Add("ValidatingAdmissionPolicy"))
 
 	// Owner: sig-storage
+	// TODO: Remove it once the csi driver is promoted to GA and the manifest is updated.
+	VolumeAttributesClass = framework.WithFeature(framework.ValidFeatures.Add("VolumeAttributesClass"))
+
+	// Owner: sig-storage
 	// Volume group snapshot tests
 	VolumeGroupSnapshotDataSource = framework.WithFeature(framework.ValidFeatures.Add("volumegroupsnapshot"))
 
