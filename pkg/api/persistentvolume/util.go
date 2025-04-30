@@ -49,11 +49,11 @@ var deprecatedAnnotations = []struct {
 	message string
 }{
 	{
-		key:     `volume.beta.kubernetes.io/storage-class`,
+		key:     api.BetaStorageClassAnnotation,
 		message: `deprecated since v1.8; use "storageClassName" attribute instead`,
 	},
 	{
-		key:     `volume.beta.kubernetes.io/mount-options`,
+		key:     api.MountOptionAnnotation,
 		message: `deprecated since v1.31; use "mountOptions" attribute instead`,
 	},
 }
