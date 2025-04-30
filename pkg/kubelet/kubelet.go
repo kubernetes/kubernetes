@@ -2979,7 +2979,7 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			return
 		}
 		if kl.isPodResizeInProgress(allocatedPod, podStatus) {
-			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
+			// If a resize is in progress, make sure the cache has the correct state.
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", generationForPodResizeInProgressCondition, false)
 		} else {
 			// (Allocated == Actual) => clear the resize in-progress status.
