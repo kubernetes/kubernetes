@@ -32,21 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/features"
 	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExternalJWTSigningAndAuth(t *testing.T) {
-	// Enable feature gate for external JWT signer.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
-
 	// Prep some keys to use with test.
 	key1, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -280,9 +274,6 @@ func waitForDataTimestamp(t *testing.T, client kubernetes.Interface, minimumData
 }
 
 func TestDelayedStartForSigner(t *testing.T) {
-	// Enable feature gate for external JWT signer.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
-
 	tCtx := ktesting.Init(t)
 	ctx, cancel := context.WithCancel(tCtx)
 	defer cancel()

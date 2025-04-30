@@ -31,11 +31,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
 
@@ -120,9 +117,6 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 			ctx := context.Background()
 			// add the namespace to the context as it is required
 			ctx = request.WithNamespace(ctx, serviceAccount.Namespace)
-
-			// Enable ExternalServiceAccountTokenSigner feature
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
 
 			// record namespace in the store.
 			_, err := storage.Store.Create(ctx, serviceAccount, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
