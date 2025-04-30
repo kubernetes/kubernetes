@@ -572,7 +572,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newServiceLBControllerDescriptor())          // cloud provider controller
 	register(newNodeRouteControllerDescriptor())          // cloud provider controller
 	register(newCloudNodeLifecycleControllerDescriptor()) // cloud provider controller
-	// TODO: persistent volume controllers into the IncludeCloudLoops only set as a cloud provider controller.
 
 	register(newPersistentVolumeBinderControllerDescriptor())
 	register(newPersistentVolumeAttachDetachControllerDescriptor())
