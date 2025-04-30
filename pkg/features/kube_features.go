@@ -1132,7 +1132,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DisableAllocatorDualWrite: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta}, // remove after MultiCIDRServiceAllocator is GA
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA}, // remove after MultiCIDRServiceAllocator is GA
 	},
 
 	DisableNodeKubeProxyVersion: {
@@ -1521,7 +1522,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	MultiCIDRServiceAllocator: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: false}, // remove in 1.36
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37 (locked to default in 1.34)
 	},
 
 	MutableCSINodeAllocatableCount: {
