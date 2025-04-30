@@ -177,11 +177,12 @@ func TestLimitedReadBody(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {
+			ctx := t.Context()
 			// reset metrics
 			defer metrics.RequestBodySizes.Reset()
 			defer legacyregistry.Reset()
 
-			req, err := http.NewRequest(request.MethodPost, "/", tc.requestBody)
+			req, err := http.NewRequestWithContext(ctx, request.MethodPost, "/", tc.requestBody)
 			if err != nil {
 				t.Errorf("err not expected: got %v", err)
 			}

@@ -61,6 +61,7 @@ func init() {
 }
 
 func TestWatchHTTPErrors(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	doneCh := make(chan struct{})
@@ -92,7 +93,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest(http.MethodGet, dest.String(), nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -124,6 +125,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 }
 
 func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	doneCh := make(chan struct{})
@@ -161,7 +163,7 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest(http.MethodGet, dest.String(), nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
@@ -227,6 +229,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 }
 
 func TestWatchHTTPTimeout(t *testing.T) {
+	ctx := t.Context()
 	watcher := watch.NewFake()
 	timeoutCh := make(chan time.Time)
 	done := make(chan struct{})
@@ -258,7 +261,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	dest.Path = "/" + namedGroupPrefix + "/" + testGroupV2.Group + "/" + testGroupV2.Version + "/simple"
 	dest.RawQuery = "watch=true"
 
-	req, _ := http.NewRequest(http.MethodGet, dest.String(), nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)

@@ -1313,7 +1313,8 @@ func TestPerRequestWithSlowReader(t *testing.T) {
 
 func sendWithTrace(t *testing.T, client *http.Client, url string, f func(*testing.T, httptrace.GotConnInfo)) (*http.Response, error) {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatalf("failed to create new request: %v", err)
 	}

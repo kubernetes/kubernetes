@@ -252,13 +252,14 @@ func TestRecordAuthorizationMetricsMetrics(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
+			ctx := t.Context()
 			defer authorizationAttemptsCounter.Reset()
 
 			audit := &auditinternal.Event{Level: auditinternal.LevelMetadata}
 			handler := WithAuthorization(&fakeHTTPHandler{}, tt.authorizer, negotiatedSerializer)
 			// TODO: fake audit injector
 
-			req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 			req = withTestContext(req, nil, audit)
 			req.RemoteAddr = "127.0.0.1"
 			handler.ServeHTTP(httptest.NewRecorder(), req)

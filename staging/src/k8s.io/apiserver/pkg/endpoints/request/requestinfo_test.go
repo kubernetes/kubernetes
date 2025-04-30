@@ -95,7 +95,8 @@ func TestGetAPIRequestInfo(t *testing.T) {
 	resolver := newTestRequestInfoResolver()
 
 	for _, successCase := range successCases {
-		req, _ := http.NewRequest(successCase.method, successCase.url, nil)
+		ctx := t.Context()
+		req, _ := http.NewRequestWithContext(ctx, successCase.method, successCase.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
@@ -136,7 +137,8 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		"missing api group":           "/apis/version/resource",
 	}
 	for k, v := range errorCases {
-		req, err := http.NewRequest(MethodGet, v, nil)
+		ctx := t.Context()
+		req, err := http.NewRequestWithContext(ctx, MethodGet, v, nil)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
@@ -174,7 +176,8 @@ func TestGetNonAPIRequestInfo(t *testing.T) {
 	resolver := newTestRequestInfoResolver()
 
 	for testName, tc := range tests {
-		req, _ := http.NewRequest(MethodGet, tc.url, nil)
+		ctx := t.Context()
+		req, _ := http.NewRequestWithContext(ctx, MethodGet, tc.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {
@@ -315,7 +318,8 @@ func TestSelectorParsing(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
 
 	for _, tc := range tests {
-		req, _ := http.NewRequest(tc.method, tc.url, nil)
+		ctx := t.Context()
+		req, _ := http.NewRequestWithContext(ctx, tc.method, tc.url, nil)
 
 		apiRequestInfo, err := resolver.NewRequestInfo(req)
 		if err != nil {

@@ -224,7 +224,8 @@ func newServer(t *testing.T, h http.Handler, http2 bool) *httptest.Server {
 }
 
 func sendRequest(t *testing.T, server *httptest.Server) {
-	req, err := http.NewRequest(request.MethodGet, server.URL, nil)
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL, nil)
 	if err != nil {
 		t.Fatalf("error creating request: %v", err)
 	}
