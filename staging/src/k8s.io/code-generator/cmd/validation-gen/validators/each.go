@@ -41,7 +41,7 @@ var globalEachKey *eachKeyTagValidator
 func init() {
 	// Lists with list-map semantics are comprised of multiple tags, which need
 	// to share information between them.
-	shared := map[string]*listMap{} // keyed by the fieldpath
+	shared := map[string]*listMetadata{} // keyed by the fieldpath
 	RegisterTagValidator(listTypeTagValidator{shared})
 	RegisterTagValidator(listMapKeyTagValidator{shared})
 
@@ -55,14 +55,14 @@ func init() {
 // This applies to all tags in this file.
 var listTagsValidScopes = sets.New(ScopeAny)
 
-// listMap collects information about a single list with map semantics.
-type listMap struct {
+// listMetadata collects information about a single list with map semantics.
+type listMetadata struct {
 	declaredAsMap bool
 	keyFields     []string
 }
 
 type listTypeTagValidator struct {
-	byFieldPath map[string]*listMap
+	byFieldPath map[string]*listMetadata
 }
 
 func (listTypeTagValidator) Init(Config) {}
@@ -105,7 +105,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 
 		// Save the fact that this list is a map.
 		if lttv.byFieldPath[context.Path.String()] == nil {
-			lttv.byFieldPath[context.Path.String()] = &listMap{}
+			lttv.byFieldPath[context.Path.String()] = &listMetadata{}
 		}
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsMap = true
@@ -132,7 +132,7 @@ func (lttv listTypeTagValidator) Docs() TagDoc {
 }
 
 type listMapKeyTagValidator struct {
-	byFieldPath map[string]*listMap
+	byFieldPath map[string]*listMetadata
 }
 
 func (listMapKeyTagValidator) Init(Config) {}
@@ -166,7 +166,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, 
 	}
 
 	if lmktv.byFieldPath[context.Path.String()] == nil {
-		lmktv.byFieldPath[context.Path.String()] = &listMap{}
+		lmktv.byFieldPath[context.Path.String()] = &listMetadata{}
 	}
 	lm := lmktv.byFieldPath[context.Path.String()]
 	lm.keyFields = append(lm.keyFields, fieldName)
@@ -190,7 +190,7 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 }
 
 type eachValTagValidator struct {
-	byFieldPath map[string]*listMap
+	byFieldPath map[string]*listMetadata
 	validator   Validator
 }
 
@@ -266,7 +266,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	result := Validations{}
 	result.OpaqueValType = validations.OpaqueType
 
-	var listMap *listMap
+	var listMetadata *listMetadata
 	if lm, found := evtv.byFieldPath[fldPath.String()]; found {
 		if !lm.declaredAsMap {
 			return Validations{}, fmt.Errorf("found listMapKey without listType=map")
@@ -274,11 +274,11 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		if len(lm.keyFields) == 0 {
 			return Validations{}, fmt.Errorf("found listType=map without listMapKey")
 		}
-		listMap = lm
+		listMetadata = lm
 	}
 	for _, vfn := range validations.Functions {
 		var cmpArg any = Literal("nil")
-		if listMap != nil {
+		if listMetadata != nil {
 			cmpFn := FunctionLiteral{
 				Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
 				Results:    []ParamResult{{"", types.Bool}},
@@ -287,7 +287,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			buf.WriteString("return ")
 			// Note: this does not handle pointer fields, which are not
 			// supposed to be used as listMap keys.
-			for i, fld := range listMap.keyFields {
+			for i, fld := range listMetadata.keyFields {
 				if i > 0 {
 					buf.WriteString(" && ")
 				}
