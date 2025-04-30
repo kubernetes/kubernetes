@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -2953,6 +2954,51 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 	return false, ""
 }
 
+// PodResourceSummary save container and pod-level resources for resizing
+type PodResourceSummary struct {
+	// TODO: Add pod-level resources here once resizing pod-level resources is supported
+	InitContainers map[string]v1.ResourceRequirements `json:"InitContainers,omitempty"`
+	Containers     map[string]v1.ResourceRequirements `json:"Containers,omitempty"`
+}
+
+// getPodResizeInfo to cache containers and pod resources CPU and memory resources once resizing is completed
+func (kl *Kubelet) getPodResizeInfo(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) map[string]string {
+	resizedInfo := &PodResourceSummary{
+		InitContainers: make(map[string]v1.ResourceRequirements),
+		Containers:     make(map[string]v1.ResourceRequirements),
+	}
+
+	podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
+		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) bool {
+			if !isResizableContainer(allocatedContainer, containerType) {
+				// If the container is not resizeable container, it doesn't need to be saved to resize completed event annotations
+				return true
+			}
+
+			containerStatus := podStatus.FindContainerStatusByName(allocatedContainer.Name)
+			if containerStatus == nil || containerStatus.State != kubecontainer.ContainerStateRunning {
+				// If the container isn't running, it doesn't need to be saved to completed event
+				return true
+			}
+
+			actuatedResources, _ := kl.allocationManager.GetActuatedResources(allocatedPod.UID, allocatedContainer.Name)
+			var targetMapContainers map[string]v1.ResourceRequirements
+			if containerType == podutil.InitContainers {
+				targetMapContainers = resizedInfo.InitContainers
+			} else {
+				targetMapContainers = resizedInfo.Containers
+			}
+			targetMapContainers[allocatedContainer.Name] = *actuatedResources.DeepCopy()
+			return true
+		})
+
+	podResizeMsgDetails, _ := json.Marshal(resizedInfo)
+	annotations := map[string]string{
+		"Pod-reisze-details": string(podResizeMsgDetails),
+	}
+	return annotations
+}
+
 // handlePodResourcesResize returns the "allocated pod", which should be used for all resource
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
@@ -2967,23 +3013,19 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
 			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
 		} else {
-			// (Allocated == Actual) => clear the resize in-progress status.
-			// If pod resize completed, print ResizeCompleted event
-			resizeStatus := kl.statusManager.GetPodResizeConditions(allocatedPod.UID)
-			ifPodResizeInProgress := slices.ContainsFunc(resizeStatus, func(cond *v1.PodCondition) bool {
-				return cond != nil && cond.Type == v1.PodConditionType("PodResizeInProgress")
-			})
-			if ifPodResizeInProgress {
-				if msg, err := allocation.GetPodResizeInfo(pod); err == nil {
-					kl.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, msg)
-				} else {
-					klog.ErrorS(err, "Pod Resize info error")
-				}
-				// Clear resize data after pod resize complete
-				allocation.ClearPodResizeAllocation(pod)
-			}
+			PodResizeConditionsLenBefore := len(kl.statusManager.GetPodResizeConditions(pod.UID))
 
+			// (Allocated == Actual) => clear the resize in-progress status.
 			kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+
+			// If pod resize completed, print pod resize complete event
+			if (PodResizeConditionsLenBefore != 0) && (len(kl.statusManager.GetPodResizeConditions(pod.UID)) == 0) {
+				// PodResizecompleteAnnotations including pod all resizeable container resrouce, it is printed in event annotaions
+				PodResizecompleteAnnotations := kl.getPodResizeInfo(allocatedPod, podStatus)
+				currentTime := time.Now().Format("2006-01-02 15:04:05")
+				// Event annotations doesn't update if reize msg conetent is same, add currentTime in the event message to distinguish between different resize processing
+				kl.recorder.AnnotatedEventf(pod, PodResizecompleteAnnotations, v1.EventTypeNormal, events.ResizeCompleted, "Pod resize completed, time:%s", currentTime)
+			}
 		}
 	}()
 
