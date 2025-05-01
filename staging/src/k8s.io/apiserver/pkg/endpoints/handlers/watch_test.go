@@ -86,7 +86,7 @@ func TestWatchHTTPErrors(t *testing.T) {
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	s := httptest.NewServer(serveWatch(watchServer, nil))
 	defer s.Close()
 
 	// Setup a client
@@ -175,7 +175,7 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	statusErr := apierrors.NewInternalError(fmt.Errorf("we got an error"))
 	errStatus := statusErr.Status()
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, statusErr))
+	s := httptest.NewServer(serveWatch(watchServer, statusErr))
 	defer s.Close()
 
 	// Setup a client
@@ -248,7 +248,7 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	s := httptest.NewServer(serveWatch(watchServer, nil))
 	defer s.Close()
 	defer s.CloseClientConnections()
 
@@ -303,7 +303,7 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh: timeoutCh, done: doneCh},
 	}
 
-	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
+	s := httptest.NewServer(serveWatch(watchServer, nil))
 	defer s.Close()
 
 	// Setup a client
@@ -375,9 +375,9 @@ func (t *fakeTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
 
 // serveWatch will serve a watch response according to the watcher and watchServer.
 // Before watchServer.HandleHTTP, an error may occur like k8s.io/apiserver/pkg/endpoints/handlers/watch.go#serveWatch does.
-func serveWatch(watcher watch.Interface, watchServer *WatchServer, preServeErr error) http.HandlerFunc {
+func serveWatch(watchServer *WatchServer, preServeErr error) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		defer watcher.Stop()
+		defer watchServer.Watching.Stop()
 
 		if preServeErr != nil {
 			responsewriters.ErrorNegotiated(preServeErr, watchServer.Scope.Serializer, watchServer.Scope.Kind.GroupVersion(), w, req)
