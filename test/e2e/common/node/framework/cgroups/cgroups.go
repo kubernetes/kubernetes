@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
-	"github.com/onsi/ginkgo/v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -31,6 +31,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
@@ -47,7 +48,9 @@ const (
 )
 
 var (
-	podOnCgroupv2Node *bool
+	// TODO: cgroup version shouldn't be cached as a global for a cluster where v1 and v2 are mixed.
+	podOnCgroupv2Node      *bool
+	podOnCgroupv2NodeMutex sync.Mutex
 )
 
 type ContainerResources struct {
@@ -152,7 +155,7 @@ func getCgroupMemLimitPath(cgPath string, podOnCgroupv2 bool) string {
 	if podOnCgroupv2 {
 		return fmt.Sprintf("%s/%s", cgPath, cgroupv2MemLimitFile)
 	} else {
-		return fmt.Sprintf("%s/%s", cgPath, cgroupMemLimitFile)
+		return fmt.Sprintf("%s/memory/%s", cgPath, cgroupMemLimitFile)
 	}
 }
 
@@ -160,7 +163,7 @@ func getCgroupCPULimitPath(cgPath string, podOnCgroupv2 bool) string {
 	if podOnCgroupv2 {
 		return fmt.Sprintf("%s/%s", cgPath, cgroupv2CPULimitFile)
 	} else {
-		return fmt.Sprintf("%s/%s", cgPath, cgroupCPUQuotaFile)
+		return fmt.Sprintf("%s/cpu/%s", cgPath, cgroupCPUQuotaFile)
 	}
 }
 
@@ -168,7 +171,7 @@ func getCgroupCPURequestPath(cgPath string, podOnCgroupv2 bool) string {
 	if podOnCgroupv2 {
 		return fmt.Sprintf("%s/%s", cgPath, cgroupv2CPUWeightFile)
 	} else {
-		return fmt.Sprintf("%s/%s", cgPath, cgroupCPUSharesFile)
+		return fmt.Sprintf("%s/cpu/%s", cgPath, cgroupCPUSharesFile)
 	}
 }
 
@@ -214,8 +217,8 @@ func getExpectedCPUShares(rr *v1.ResourceRequirements, podOnCgroupv2 bool) int64
 		shares = int64(kubecm.MilliCPUToShares(cpuRequest.MilliValue()))
 	}
 	if podOnCgroupv2 {
+		// TODO: This fomula should be a shared function.
 		return 1 + ((shares-2)*9999)/262142
-
 	} else {
 		return shares
 	}
@@ -230,55 +233,31 @@ func getExpectedMemLimitString(rr *v1.ResourceRequirements, podOnCgroupv2 bool) 
 	return expectedMemLimitString
 }
 
-func verifyCPUWeight(f *framework.Framework, pod *v1.Pod, containerName, cgPath string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	cpuWeightCgPath := getCgroupCPURequestPath(cgPath, podOnCgroupv2)
-	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
-	return VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10))
-}
-
-func verifyCPULimit(f *framework.Framework, pod *v1.Pod, containerName string, cgPath string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	cpuLimCgPath := getCgroupCPULimitPath(cgPath, podOnCgroupv2)
-	expectedCPULimits := getCPULimitCgroupExpectations(expectedResources.Limits.Cpu(), podOnCgroupv2)
-	return VerifyCgroupValue(f, pod, containerName, cpuLimCgPath, expectedCPULimits...)
-}
-
-func verifyMemoryLimit(f *framework.Framework, pod *v1.Pod, containerName, cgPath string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	memLimCgPath := getCgroupMemLimitPath(cgPath, podOnCgroupv2)
-	expectedMemLim := getExpectedMemLimitString(expectedResources, podOnCgroupv2)
-	if expectedMemLim == "0" {
-		return nil
-	}
-	return VerifyCgroupValue(f, pod, containerName, memLimCgPath, expectedMemLim)
-}
-
 func verifyContainerCPUWeight(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	path := cgroupFsPath
-	if !podOnCgroupv2 {
-		path += "/cpu"
-	}
-	if err := verifyCPUWeight(f, pod, containerName, path, expectedResources, podOnCgroupv2); err != nil {
+	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
+	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
+	if err := VerifyCgroupValue(f, pod, containerName, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
 		return fmt.Errorf("failed to verify cpu request cgroup value: %w", err)
 	}
 	return nil
 }
 
 func VerifyContainerCPULimit(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	path := cgroupFsPath
-	if !podOnCgroupv2 {
-		path += "/cpu"
-	}
-	if err := verifyCPULimit(f, pod, containerName, path, expectedResources, podOnCgroupv2); err != nil {
+	cpuLimCgPath := getCgroupCPULimitPath(cgroupFsPath, podOnCgroupv2)
+	expectedCPULimits := getCPULimitCgroupExpectations(expectedResources.Limits.Cpu(), podOnCgroupv2)
+	if err := VerifyCgroupValue(f, pod, containerName, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("failed to verify cpu limit cgroup value: %w", err)
 	}
 	return nil
 }
 
 func VerifyContainerMemoryLimit(f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
-	path := cgroupFsPath
-	if !podOnCgroupv2 {
-		path += "/memory"
+	memLimCgPath := getCgroupMemLimitPath(cgroupFsPath, podOnCgroupv2)
+	expectedMemLim := getExpectedMemLimitString(expectedResources, podOnCgroupv2)
+	if expectedMemLim == "0" {
+		return nil
 	}
-	if err := verifyMemoryLimit(f, pod, containerName, path, expectedResources, podOnCgroupv2); err != nil {
+	if err := VerifyCgroupValue(f, pod, containerName, memLimCgPath, expectedMemLim); err != nil {
 		return fmt.Errorf("failed to verify memory limit cgroup value: %w", err)
 	}
 	return nil
@@ -299,7 +278,15 @@ func verifyPodCPUWeight(f *framework.Framework, pod *v1.Pod, expectedResources *
 			return err
 		}
 	}
-	if err := verifyCPUWeight(f, pod, pod.Spec.Containers[0].Name, podCgPath, expectedResources, podOnCgroupv2); err != nil {
+
+	var cpuWeightCgPath string
+	if podOnCgroupv2 {
+		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupv2CPUWeightFile)
+	} else {
+		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
+	}
+	expectedCPUShares := getExpectedCPUShares(expectedResources, podOnCgroupv2)
+	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, strconv.FormatInt(expectedCPUShares, 10)); err != nil {
 		return fmt.Errorf("pod cgroup cpu weight verification failed: %w", err)
 	}
 	return nil
@@ -313,7 +300,14 @@ func verifyPodCPULimit(f *framework.Framework, pod *v1.Pod, expectedResources *v
 		}
 	}
 
-	if err := verifyCPULimit(f, pod, pod.Spec.Containers[0].Name, podCgPath, expectedResources, podOnCgroupv2); err != nil {
+	var cpuLimCgPath string
+	if podOnCgroupv2 {
+		cpuLimCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupv2CPULimitFile)
+	} else {
+		cpuLimCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUQuotaFile)
+	}
+	expectedCPULimits := getCPULimitCgroupExpectations(expectedResources.Limits.Cpu(), podOnCgroupv2)
+	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, cpuLimCgPath, expectedCPULimits...); err != nil {
 		return fmt.Errorf("pod cgroup cpu limit verification failed: %w", err)
 	}
 	return nil
@@ -325,7 +319,18 @@ func verifyPodMemoryLimit(f *framework.Framework, pod *v1.Pod, expectedResources
 		return err
 	}
 
-	if err := verifyMemoryLimit(f, pod, pod.Spec.Containers[0].Name, podCgPath, expectedResources, podOnCgroupv2); err != nil {
+	var memLimCgPath string
+	if podOnCgroupv2 {
+		memLimCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupv2MemLimitFile)
+	} else {
+		memLimCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupMemLimitFile)
+	}
+	expectedMemLim := getExpectedMemLimitString(expectedResources, podOnCgroupv2)
+	if expectedMemLim == "0" {
+		return nil
+	}
+
+	if err := VerifyCgroupValue(f, pod, pod.Spec.Containers[0].Name, memLimCgPath, expectedMemLim); err != nil {
 		return fmt.Errorf("pod cgroup memory limit verification failed: %w", err)
 	}
 	return nil
@@ -404,6 +409,8 @@ func VerifyOomScoreAdjValue(f *framework.Framework, pod *v1.Pod, cName, expected
 // TODO: Deduplicate this function with NPD cluster e2e test:
 // https://github.com/kubernetes/kubernetes/blob/2049360379bcc5d6467769cef112e6e492d3d2f0/test/e2e/node/node_problem_detector.go#L369
 func IsPodOnCgroupv2Node(f *framework.Framework, pod *v1.Pod) (result bool) {
+	podOnCgroupv2NodeMutex.Lock()
+	defer podOnCgroupv2NodeMutex.Unlock()
 	if podOnCgroupv2Node != nil {
 		return *podOnCgroupv2Node
 	}
