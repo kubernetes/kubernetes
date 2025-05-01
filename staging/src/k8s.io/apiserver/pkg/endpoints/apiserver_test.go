@@ -1225,7 +1225,7 @@ func TestListCompression(t *testing.T) {
 			acceptEncoding: "gzip",
 		},
 	}
-	for testIndex, test := range cases {
+	for _, test := range cases {
 		t.Run(test.acceptEncoding, func(t *testing.T) {
 			ctx := t.Context()
 			storage := map[string]rest.Storage{}
@@ -1246,7 +1246,7 @@ func TestListCompression(t *testing.T) {
 
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, server.URL+test.url, nil)
 			if err != nil {
-				t.Fatalf("%d: unexpected error: %v", testIndex, err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			// It's necessary to manually set Accept-Encoding here
 			// to prevent http.DefaultClient from automatically
@@ -1254,7 +1254,7 @@ func TestListCompression(t *testing.T) {
 			req.Header.Set("Accept-Encoding", test.acceptEncoding)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				t.Fatalf("%d: unexpected error: %v", testIndex, err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusOK {
@@ -1488,6 +1488,8 @@ func BenchmarkGet(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Use a closure to execute defers before continuing
 		func() {
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			req, err := http.NewRequestWithContext(ctx, request.MethodGet, url, nil)
 			require.NoError(b, err)
 			resp, err := http.DefaultClient.Do(req)
@@ -2494,11 +2496,11 @@ func TestGetWithOptions(t *testing.T) {
 			require.NoError(t, err)
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				t.Fatalf("%s: %v", test.name, err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("%s: unexpected response: %#v", test.name, resp)
+				t.Fatalf("unexpected response: %#v", resp)
 			}
 
 			var itemOut runtime.Object
@@ -2509,11 +2511,11 @@ func TestGetWithOptions(t *testing.T) {
 			}
 			body, err := extractBody(resp, itemOut)
 			if err != nil {
-				t.Fatalf("%s: %v", test.name, err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			if metadata, err := meta.Accessor(itemOut); err == nil {
 				if metadata.GetName() != simpleStorage.item.Name {
-					t.Fatalf("%s: Unexpected data: %#v, expected %#v (%s)", test.name, itemOut, simpleStorage.item, string(body))
+					t.Fatalf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
 				}
 			} else {
 				t.Errorf("Couldn't get name from %#v: %v", itemOut, err)
@@ -4581,6 +4583,8 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Use a closure to execute defers before continuing
 		func() {
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 			request, err := http.NewRequestWithContext(ctx, request.MethodPut, dest.String(), bytes.NewReader(data))
 			if err != nil {
 				b.Fatalf("unexpected error: %v", err)
