@@ -42,9 +42,9 @@ func TestIsVowel(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if got := isVowel(tt.arg); got != tt.want {
-			t.Errorf("%q. IsVowel() = %v, want %v", tt.name, got, tt.want)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, isVowel(tt.arg))
+		})
 	}
 }
 
@@ -96,9 +96,9 @@ func TestGetArticleForNoun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if got := GetArticleForNoun(tt.noun, tt.padding); got != tt.want {
-			t.Errorf("%q. GetArticleForNoun() = %v, want %v", tt.noun, got, tt.want)
-		}
+		t.Run(tt.noun, func(t *testing.T) {
+			require.Equal(t, tt.want, GetArticleForNoun(tt.noun, tt.padding), tt.noun)
+		})
 	}
 }
 
@@ -364,7 +364,7 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 					Verbs:      []string{"create", "delete", "deletecollection", "get", "list", "patch", "update", "watch"},
 				},
 			},
-			wantAPIResourceDiscovery: []apidiscoveryv2.APIResourceDiscovery{},
+			wantAPIResourceDiscovery: nil,
 			wantErr:                  true,
 		},
 		{
@@ -440,13 +440,14 @@ func TestConvertAPIResourceToDiscovery(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		discoveryAPIResources, err := ConvertGroupVersionIntoToDiscovery(tt.resources)
-		if err != nil {
-			if tt.wantErr == false {
-				t.Error(err)
+		t.Run(tt.name, func(t *testing.T) {
+			discoveryAPIResources, err := ConvertGroupVersionIntoToDiscovery(tt.resources)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
-		} else {
 			require.Equal(t, tt.wantAPIResourceDiscovery, discoveryAPIResources)
-		}
+		})
 	}
 }
