@@ -110,9 +110,16 @@ func TestWatchWebsocket(t *testing.T) {
 	}
 	defer apitesting.Close(t, ws)
 
+	// Wait for storage watcher to start
+	var watcher *watch.FakeWatcher
+	for watcher == nil {
+		watcher = simpleStorage.Watcher()
+		time.Sleep(time.Millisecond)
+	}
+
 	try := func(action watch.EventType, object runtime.Object) {
 		// Send
-		simpleStorage.fakeWatch.Action(action, object)
+		watcher.Action(action, object)
 		// Test receive
 		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
@@ -134,7 +141,7 @@ func TestWatchWebsocket(t *testing.T) {
 	for _, item := range watchTestTable {
 		try(item.t, item.obj)
 	}
-	simpleStorage.fakeWatch.Stop()
+	watcher.Stop()
 
 	var got watchJSON
 	err = websocket.JSON.Receive(ws, &got)
@@ -165,9 +172,16 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 		closeWebSocket(t, ws)
 	}()
 
+	// Wait for storage watcher to start
+	var watcher *watch.FakeWatcher
+	for watcher == nil {
+		watcher = simpleStorage.Watcher()
+		time.Sleep(time.Millisecond)
+	}
+
 	try := func(action watch.EventType, object runtime.Object) {
 		// Send
-		simpleStorage.fakeWatch.Action(action, object)
+		watcher.Action(action, object)
 		// Test receive
 		var got watchJSON
 		err := websocket.JSON.Receive(ws, &got)
@@ -205,7 +219,7 @@ func TestWatchWebsocketClientClose(t *testing.T) {
 	require.NoError(t, ws.Close())
 
 	select {
-	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
+	case data, ok := <-watcher.ResultChan():
 		if ok {
 			t.Errorf("expected a closed result channel, but got watch result %#v", data)
 		}
@@ -249,13 +263,20 @@ func TestWatchClientClose(t *testing.T) {
 		t.Fatalf("Unexpected response: %#v\n%s", response, string(b))
 	}
 
+	// Wait for storage watcher to start
+	var watcher *watch.FakeWatcher
+	for watcher == nil {
+		watcher = simpleStorage.Watcher()
+		time.Sleep(time.Millisecond)
+	}
+
 	// Close response to cause a cancel on the server
 	if err := response.Body.Close(); err != nil {
 		t.Fatalf("Unexpected close client err: %v", err)
 	}
 
 	select {
-	case data, ok := <-simpleStorage.fakeWatch.ResultChan():
+	case data, ok := <-watcher.ResultChan():
 		if ok {
 			t.Errorf("expected a closed result channel, but got watch result %#v", data)
 		}
@@ -389,9 +410,10 @@ func TestWatchRead(t *testing.T) {
 				closeBody = apitesting.CloseNoOp
 				defer apitesting.Close(t, d)
 
-				var w *watch.FakeWatcher
-				for w == nil {
-					w = simpleStorage.Watcher()
+				// Wait for storage watcher to start
+				var watcher *watch.FakeWatcher
+				for watcher == nil {
+					watcher = simpleStorage.Watcher()
 					time.Sleep(time.Millisecond)
 				}
 
@@ -400,7 +422,7 @@ func TestWatchRead(t *testing.T) {
 					name := fmt.Sprintf("%s-%s-%d", protocol.name, test.MediaType, i)
 
 					// Send
-					w.Action(action, object)
+					watcher.Action(action, object)
 					// Test receive
 					var got metav1.WatchEvent
 					_, _, err := d.Decode(nil, &got)
@@ -419,7 +441,7 @@ func TestWatchRead(t *testing.T) {
 						t.Errorf("%s: different: %s", name, cmp.Diff(e, a))
 					}
 				}
-				w.Stop()
+				watcher.Stop()
 
 				var got metav1.WatchEvent
 				_, _, err := d.Decode(nil, &got)
@@ -690,6 +712,13 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 		b.Fatalf("Unexpected response %#v", response)
 	}
 
+	// Wait for storage watcher to start
+	var watcher *watch.FakeWatcher
+	for watcher == nil {
+		watcher = simpleStorage.Watcher()
+		time.Sleep(time.Millisecond)
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -704,9 +733,9 @@ func runWatchHTTPBenchmark(b *testing.B, items []runtime.Object, contentType str
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		simpleStorage.fakeWatch.Action(actions[i%len(actions)], items[i%len(items)])
+		watcher.Action(actions[i%len(actions)], items[i%len(items)])
 	}
-	simpleStorage.fakeWatch.Stop()
+	watcher.Stop()
 	wg.Wait()
 	b.StopTimer()
 }
@@ -730,6 +759,13 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 		b.Fatalf("unexpected error: %v", err)
 	}
 
+	// Wait for storage watcher to start
+	var watcher *watch.FakeWatcher
+	for watcher == nil {
+		watcher = simpleStorage.Watcher()
+		time.Sleep(time.Millisecond)
+	}
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -744,9 +780,9 @@ func BenchmarkWatchWebsocket(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		simpleStorage.fakeWatch.Action(actions[i%len(actions)], &items[i%len(items)])
+		watcher.Action(actions[i%len(actions)], &items[i%len(items)])
 	}
-	simpleStorage.fakeWatch.Stop()
+	watcher.Stop()
 	wg.Wait()
 	b.StopTimer()
 }

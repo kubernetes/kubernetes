@@ -2105,9 +2105,16 @@ func TestWatchTable(t *testing.T) {
 				t.Fatalf("unexpected response: %#v", resp)
 			}
 
+			// Wait for storage watcher to start
+			var watcher *watch.FakeWatcher
+			for watcher == nil {
+				watcher = simpleStorage.Watcher()
+				time.Sleep(time.Millisecond)
+			}
+
 			go func() {
-				defer simpleStorage.fakeWatch.Stop()
-				test.send(simpleStorage.fakeWatch)
+				defer watcher.Stop()
+				test.send(watcher)
 			}()
 
 			body, err := io.ReadAll(resp.Body)
@@ -2115,7 +2122,7 @@ func TestWatchTable(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Logf("Body:\n%s", string(body))
-			d := watcher(resp.Header.Get("Content-Type"), io.NopCloser(bytes.NewReader(body)))
+			d := watchDecoder(resp.Header.Get("Content-Type"), io.NopCloser(bytes.NewReader(body)))
 			var actual []*metav1.WatchEvent
 			for {
 				var event metav1.WatchEvent
@@ -2135,7 +2142,7 @@ func TestWatchTable(t *testing.T) {
 	}
 }
 
-func watcher(mediaType string, r io.ReadCloser) streaming.Decoder {
+func watchDecoder(mediaType string, r io.ReadCloser) streaming.Decoder {
 	info, ok := runtime.SerializerInfoForMediaType(metainternalversionscheme.Codecs.SupportedMediaTypes(), mediaType)
 	if !ok || info.StreamSerializer == nil {
 		panic(info)
