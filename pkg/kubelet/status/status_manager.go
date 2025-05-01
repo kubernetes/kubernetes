@@ -155,6 +155,10 @@ type Manager interface {
 	// GetPodResizeConditions returns cached PodStatus Resize conditions value
 	GetPodResizeConditions(podUID types.UID) []*v1.PodCondition
 
+	// GetPodResizeInProgressCondition gets the PodResizeInProgress condition for the pod from the cache
+	// if there is one.
+	GetPodResizeInProgressCondition(podUID types.UID) *v1.PodCondition
+
 	// SetPodResizePendingCondition caches the last PodResizePending condition for the pod.
 	SetPodResizePendingCondition(podUID types.UID, reason, message string, observedGeneration int64)
 
@@ -287,6 +291,14 @@ func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, mess
 		PodResizeInProgress: updatedPodResizeCondition(v1.PodResizeInProgress, m.podResizeConditions[podUID].PodResizeInProgress, reason, message, observedGeneration),
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 	}
+}
+
+// GetPodResizeInProgressCondition gets the PodResizeInProgress condition for the pod from the cache
+// if there is one.
+func (m *manager) GetPodResizeInProgressCondition(podUID types.UID) *v1.PodCondition {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+	return m.podResizeConditions[podUID].PodResizeInProgress
 }
 
 // ClearPodResizePendingCondition clears the PodResizePending condition for the pod from the cache.

@@ -2069,12 +2069,15 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	for _, r := range result.SyncResults {
 		if r.Action == kubecontainer.ResizePodInPlace {
 			// We don't want to update the ObservedGeneration here.
-			generationForPodResizeInProgressCondition := kl.oldResizeInProgressGeneration(pod)
+			gen := pod.Generation
+			if c := kl.statusManager.GetPodResizeInProgressCondition(pod.UID); c != nil {
+				gen = c.ObservedGeneration
+			}
 			if r.Error == nil {
 				// The pod was resized successfully, clear any pod resize errors in the PodResizeInProgress condition.
-				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", generationForPodResizeInProgressCondition, true)
+				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", gen, true)
 			} else {
-				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, generationForPodResizeInProgressCondition, false)
+				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, gen, false)
 			}
 		}
 	}
@@ -2970,8 +2973,6 @@ func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desired
 // calculations after this function is called. It also updates the cached ResizeStatus according to
 // the allocation decision and pod status.
 func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontainer.PodStatus) (allocatedPod *v1.Pod, err error) {
-	generationForPodResizeInProgressCondition := pod.Generation
-
 	// Always check whether a resize is in progress so we can set the PodResizeInProgressCondition
 	// accordingly.
 	defer func() {
@@ -2980,7 +2981,16 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		}
 		if kl.isPodResizeInProgress(allocatedPod, podStatus) {
 			// If a resize is in progress, make sure the cache has the correct state.
-			kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", generationForPodResizeInProgressCondition, false)
+			if len(kl.statusManager.GetPodResizeConditions(pod.UID)) == 2 {
+				// The new pod resize is either deferred or infeasible, which means if there is a pod
+				// resize in progress, it is associated with an older resize. In this case, the
+				// condition reflecting the older resize should also have the older observedGeneration.
+				gen := kl.statusManager.GetPodResizeInProgressCondition(pod.UID).ObservedGeneration
+				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", gen, false)
+			} else {
+				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation, false)
+			}
+
 		} else {
 			// (Allocated == Actual) => clear the resize in-progress status.
 			kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
@@ -3037,26 +3047,9 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 
 	if reason != "" {
 		kl.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation)
-
-		// The new pod resize is either deferred or infeasible, which means if there is a pod
-		// resize in progress, it is associated with an older resize. In this case, the
-		// condition reflecting the older resize should also have the older observedGeneration.
-		generationForPodResizeInProgressCondition = kl.oldResizeInProgressGeneration(pod)
 	}
 
 	return podFromAllocation, nil
-}
-
-// oldResizeInProgressGeneration returns the ObservedGeneration of the existing PodResizeInProgress
-// condition if it exists. If the condition is not found, it returns the pod metadata.generation.
-func (kl *Kubelet) oldResizeInProgressGeneration(pod *v1.Pod) int64 {
-	conditions := kl.statusManager.GetPodResizeConditions(pod.UID)
-	for _, c := range conditions {
-		if c.Type == v1.PodResizeInProgress {
-			return c.ObservedGeneration
-		}
-	}
-	return pod.Generation
 }
 
 // isPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
