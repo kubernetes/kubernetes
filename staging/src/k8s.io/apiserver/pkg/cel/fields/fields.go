@@ -19,122 +19,193 @@ package fields
 import (
 	"fmt"
 	"github.com/google/cel-go/common/ast"
-	"k8s.io/apimachinery/pkg/util/sets"
+	pointer "k8s.io/utils/ptr"
 	"maps"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/value"
 )
 
-// ReachableFields returns the set of fields that can be accessed from the given expression.
-// If a non-scalar path is returned, this indicates that the value at the path was either a target or argument
-// of a function call. In this case, the exact set of fields that can be accessed from the expression is not known.
-func ReachableFields(e ast.Expr) sets.Set[string] {
+// ReachableFields returns the set of fields that can be accessed from the given
+// expression. If a path to a non-leaf value is returned, this indicates that the
+// value at the path was either a target or argument of a function call. In such
+// cases, the exact set of fields reachable by the expression cannot be precisely
+// determined, since the implementation of the function is opaque, and the caller must
+// assume that all fields contained in the value are reachable by the expression.
+//
+// Wildcard may be included in FieldElements of the result to identify where an
+// object, map or list is indexed by unknown value.
+func ReachableFields(e ast.Expr) *fieldpath.Set {
 	t := newTracker()
-	returns := t.paths(e, newScope())
+	returns := t.search(e)
 	return t.observed.Union(returns)
 }
 
+// Search returns resultReachable which identifies the fields that are reachable from
+// the evaluated result of the expression. Fields that are reachable by the expression
+// but not reachable from the result of the expression are tracked as observed.
+// For example, consider the `a.b[c.d]` subexpression of `a.b[c.d].e`. This
+// observes `c.d` and returns a resultReachable of `a.b[*]`. This resultReachable
+// is then used to construct `a.b[*].e` as the resultReachable from the full
+// expression.
+func (t *tracker) search(expr ast.Expr) (resultReachable *fieldpath.Set) {
+	if expr == nil {
+		return fieldpath.NewSet()
+	}
+	switch expr.Kind() {
+	case ast.IdentKind:
+		return t.lookupVar(expr.AsIdent())
+	case ast.CallKind:
+		call := expr.AsCall()
+
+		// The index operator must be handled as a special case to formulate the path the expression evaluates to.
+		if call.FunctionName() == "_[_]" && len(call.Args()) == 2 {
+			indexableArg := call.Args()[0]
+			indexArg := call.Args()[1]
+
+			t.observe(t.search(indexArg))
+			indexed := fieldpath.NewSet()
+			t.search(indexableArg).Iterate(func(path fieldpath.Path) {
+				indexed.Insert(append(path, Wildcard)) // We don't attempt to provide data literal indices due to lack of typing
+			})
+			return indexed
+		}
+		// The + operator must be handled as a special case to combine the operands into the result. This is important for
+		// proper handling of map and list concatenation.
+		if call.FunctionName() == "_+_" && len(call.Args()) == 2 {
+			lhs := t.search(call.Args()[0])
+			rhs := t.search(call.Args()[1])
+			return lhs.Union(rhs)
+		}
+
+		// All other function calls are handled as an observation of the target and args.
+		t.observe(t.search(call.Target()))
+		for _, arg := range call.Args() {
+			t.observe(t.search(arg))
+		}
+		return fieldpath.NewSet()
+	case ast.ComprehensionKind:
+		t.pushScope()
+		defer t.popScope()
+		comprehension := expr.AsComprehension()
+
+		iterRangePaths := t.search(comprehension.IterRange())
+
+		// map keys are required to be strings in the Kubernetes API, so we don't need a KeyWildcard element.
+		t.addIterVar(comprehension.IterVar(), appendAll(iterRangePaths, Wildcard)) // map key or array index
+		if comprehension.HasIterVar2() {
+			t.addIterVar(comprehension.IterVar2(), appendAll(iterRangePaths, Wildcard)) // map value or array element
+		}
+
+		accuPath := fieldpath.Path{fieldpath.PathElement{FieldName: pointer.To(comprehension.AccuVar())}}
+		t.currentScope().accVars.Insert(accuPath)
+		result := t.search(comprehension.LoopStep())
+		result = result.Difference(fieldpath.NewSet(accuPath))
+		return result
+	case ast.ListKind:
+		list := expr.AsList()
+		result := fieldpath.NewSet()
+		for _, elem := range list.Elements() {
+			result = result.Union(t.search(elem))
+		}
+		return result
+	case ast.LiteralKind:
+		return fieldpath.NewSet() // nothing to do for scalar data literals
+	case ast.MapKind:
+		m := expr.AsMap()
+		result := fieldpath.NewSet()
+		for _, entry := range m.Entries() {
+			t.observe(t.search(entry.AsMapEntry().Key()))
+			result = result.Union(t.search(entry.AsMapEntry().Value()))
+		}
+		return result
+	case ast.SelectKind:
+		selectExpr := expr.AsSelect()
+		result := fieldpath.NewSet()
+		operandPaths := t.search(selectExpr.Operand())
+		operandPaths.Iterate(func(path fieldpath.Path) {
+			result.Insert(append(path, fieldpath.PathElement{FieldName: pointer.To(selectExpr.FieldName())}))
+		})
+		return result
+	case ast.UnspecifiedExprKind:
+		return fieldpath.NewSet()
+	case ast.StructKind:
+		panic("object initialization not supported")
+	default:
+		panic(fmt.Sprintf("unknown expression kind: %v", expr.Kind()))
+	}
+}
+
 func newTracker() *tracker {
-	return &tracker{observed: sets.New[string]()}
+	return &tracker{observed: fieldpath.NewSet(), stack: []scope{newScope()}}
 }
 
 type tracker struct {
-	observed sets.Set[string] // observed tracks fields that are referenced in the expression but are not part of the returns
+	observed *fieldpath.Set // tracks fields that are referenced in the expression but are not part of the returns
+	stack    []scope
+}
+
+func (t *tracker) observe(sets ...*fieldpath.Set) {
+	for _, s := range sets {
+		s.Iterate(func(path fieldpath.Path) {
+			if !t.currentScope().accVars.Has(path) {
+				t.observed.Insert(path)
+			}
+		})
+	}
+}
+
+func (t *tracker) addIterVar(name string, rangePaths *fieldpath.Set) {
+	t.currentScope().iterVars[name] = rangePaths
+}
+
+func (t *tracker) lookupVar(ident string) *fieldpath.Set {
+	if iterVars, ok := t.currentScope().iterVars[ident]; ok {
+		return iterVars
+	}
+	return fieldpath.NewSet(fieldpath.Path{fieldpath.PathElement{FieldName: pointer.To(ident)}})
+}
+
+func (t *tracker) currentScope() scope {
+	return t.stack[len(t.stack)-1]
+}
+
+func (t *tracker) pushScope() {
+	top := t.stack[len(t.stack)-1]
+	t.stack = append(t.stack, top.push())
+}
+
+func (t *tracker) popScope() {
+	t.stack = t.stack[:len(t.stack)-1]
 }
 
 func newScope() scope {
-	return scope{accVars: sets.New[string](), iterVars: map[string]string{}}
+	return scope{accVars: fieldpath.NewSet(), iterVars: map[string]*fieldpath.Set{}}
 }
 
 type scope struct {
-	accVars  sets.Set[string]  // Comprehension accumulator variables
-	iterVars map[string]string // Comprehension iterator variables
+	accVars  *fieldpath.Set            // Comprehension accumulator variable names
+	iterVars map[string]*fieldpath.Set // Map from comprehension iterator variable names to the field paths they are bound to
 }
 
-// Push creates a new scope above the current scope. Variables in the new scope shadow the current scope.
+// Push creates a new scope above the current scope. Variables in the new scope shadow those in the current scope.
 func (v scope) push() scope {
-	// We COULD use a stack of scopes. Might not be worth it. Variable counts are bounded to iter vars and
-	// accr vars (max 3 per scope), and CEL scope depth is bounded to 12.
+	// We COULD avoid the copies here, but it's probably not worth it. Variable counts are bounded to iterator and
+	// accumulator vars (max 3 per scope), and CEL scope depth is bounded to 12.
 	return scope{
-		accVars:  v.accVars.Clone(),
+		accVars:  v.accVars.Union(fieldpath.NewSet()), // TODO: Switch to .Copy once available.
 		iterVars: maps.Clone(v.iterVars),
 	}
 }
 
-func (t *tracker) paths(e ast.Expr, scope scope) sets.Set[string] {
-	if e == nil {
-		return nil
-	}
-	switch e.Kind() {
-	case ast.CallKind:
-		call := e.AsCall()
-		targetPath := t.paths(call.Target(), scope)
-
-		// Index operator is implemented as a function where
-		// the indexable and index scope are just args
-		if call.FunctionName() == "_[_]" && len(call.Args()) == 2 {
-			indexable := t.paths(call.Args()[0], scope)
-			indexed := sets.New[string]()
-			for path := range indexable {
-				indexed.Insert(path + ".@index")
-			}
-			index := t.paths(call.Args()[1], scope)
-			t.observed = t.observed.Union(index)
-			return indexed
-		}
-		argPaths := sets.New[string]()
-		for _, arg := range call.Args() {
-			argPaths = argPaths.Union(t.paths(arg, scope))
-		}
-		return targetPath.Union(argPaths)
-	case ast.ComprehensionKind:
-		vars := scope.push()
-		comprehension := e.AsComprehension()
-		for path := range t.paths(comprehension.IterRange(), vars) {
-			if !comprehension.HasIterVar2() {
-				vars.iterVars[comprehension.IterVar()] = path + ".@item" // @item is a list element or map key
-			} else {
-				vars.iterVars[comprehension.IterVar()] = path + ".@index"  // @index is a list index or map key
-				vars.iterVars[comprehension.IterVar2()] = path + ".@value" // @value is a list element or map value
-			}
-		}
-		vars.accVars.Insert(comprehension.AccuVar())
-		result := t.paths(comprehension.LoopStep(), vars)
-		result = result.Delete(comprehension.AccuVar())
-		return result
-	case ast.IdentKind:
-		ident := e.AsIdent()
-		if i, ok := scope.iterVars[ident]; ok {
-			return sets.New[string](i)
-		}
-		return sets.New[string](ident)
-	case ast.ListKind:
-		list := e.AsList()
-		result := sets.New[string]()
-		for _, elem := range list.Elements() {
-			result = result.Union(t.paths(elem, scope))
-		}
-		return result
-	case ast.LiteralKind:
-		return sets.New[string]() // nothing to do for scalar data literals
-	case ast.MapKind:
-		m := e.AsMap()
-		result := sets.New[string]()
-		for _, entry := range m.Entries() {
-			t.observed = t.observed.Union(t.paths(entry.AsMapEntry().Key(), scope))
-			result = result.Union(t.paths(entry.AsMapEntry().Value(), scope))
-		}
-		return result
-	case ast.SelectKind:
-		selectExpr := e.AsSelect()
-		result := sets.New[string]()
-		for path := range t.paths(selectExpr.Operand(), scope) {
-			result.Insert(path + "." + selectExpr.FieldName())
-		}
-		return result
-	case ast.UnspecifiedExprKind:
-		return sets.New[string]()
-	case ast.StructKind:
-		panic("object initialization not supported")
-	default:
-		panic(fmt.Sprintf("unknown expression kind: %v", e.Kind()))
-	}
+func appendAll(set *fieldpath.Set, el fieldpath.PathElement) *fieldpath.Set {
+	result := fieldpath.NewSet()
+	set.Iterate(func(path fieldpath.Path) {
+		result.Insert(append(path, el))
+	})
+	return result
 }
+
+// Wildcard represents access to either a map entry or an array element.
+var Wildcard = fieldpath.PathElement{Value: wildcard}
+
+var wildcard = pointer.To(value.NewValueInterface("*"))
