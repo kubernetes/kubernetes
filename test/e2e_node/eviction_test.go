@@ -76,7 +76,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 	const expectedNodeCondition = v1.NodeDiskPressure
 	const expectedStarvedResource = resourceInodes
 	const pressureTimeout = 15 * time.Minute
-	const inodesToThreshold = uint64(200000)
+	const inodesToThreshold = uint64(100000)
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesToThreshold, so that using inodesToThreshold causes an eviction.
@@ -116,6 +116,17 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 	const expectedStarvedResource = resourceInodes
 	const inodesToThreshold = uint64(100000)
 	ginkgo.Context(fmt.Sprintf(testContextFmt, expectedNodeCondition), func() {
+		prepull := func(ctx context.Context) {
+			// Prepull images for image garbage collector to remove them
+			// when reclaiming resources
+			err := PrePullAllImages(ctx)
+			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
+		}
+		ginkgo.BeforeEach(prepull)
+		if framework.TestContext.PrepullImages {
+			ginkgo.AfterEach(prepull)
+		}
+
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesToThreshold, so that using inodesToThreshold causes an eviction.
 			summary := eventuallyGetSummary(ctx)
@@ -129,7 +140,7 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 		})
 		// Consume enough inodes to induce disk pressure,
 		// but expect that image garbage collection can reduce it enough to avoid an eviction
-		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logInodeMetrics, []podEvictSpec{
 			{
 				evictionPriority: 0,
 				pod:              inodeConsumingPod("container-inode", 110000, nil, true),
@@ -1288,11 +1299,6 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 		volumes = []v1.Volume{{Name: volumeName, VolumeSource: *volumeSource}}
 	}
 
-	cmd := fmt.Sprintf("i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done", iterations, command)
-	if sleepAfterExecuting {
-		cmd += "; " + e2epod.InfiniteSleepCommand
-	}
-
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-pod", name)},
 		Spec: v1.PodSpec{
@@ -1305,7 +1311,7 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 					Command: []string{
 						"sh",
 						"-c",
-						cmd,
+						fmt.Sprintf("i=0; while [ $i -lt %d ]; do %s i=$(($i+1)); done; while %v; do sleep 5; done", iterations, command, sleepAfterExecuting),
 					},
 					Resources:    resources,
 					VolumeMounts: volumeMounts,
