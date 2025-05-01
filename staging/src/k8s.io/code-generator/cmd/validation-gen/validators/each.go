@@ -101,6 +101,10 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsSet = true
+		// Only compare primitive values when possible. Slices and maps are not
+		// comparable, and structs might hold pointer fields, which are directly
+		// comparable but not what we need.
+		//
 		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 		if util.IsDirectComparable(util.NativeType(t.Elem)) {
 			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByCompare)}}, nil
@@ -324,8 +328,15 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 				cmpFn.Body = buf.String()
 				cmpArg = cmpFn
 			} else if listMetadata.declaredAsSet {
+				// Emit the cmpArg as a simple comparison when possible.
+				// Slices and maps are not comparable, and structs might hold
+				// pointer fields, which are directly comparable but not what we need.
+				//
+				// Note: This compares the pointee, not the pointer itself.
 				elemType := util.NativeType(t.Elem)
 				if elemType.IsComparable() {
+					// TODO: encapsulate this in a function (validate.DirectEqual)
+					// for readibility.
 					cmpArg = FunctionLiteral{
 						Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
 						Results:    []ParamResult{{"", types.Bool}},

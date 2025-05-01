@@ -100,6 +100,27 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 			return
 		}(fldPath.Child("sliceSetNonComparableField"), obj.SliceSetNonComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []NonComparableStruct { return oldObj.SliceSetNonComparableField }))...)
 
+	// field ImmutableStruct.SlicePrimitiveField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []int) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, validate.ImmutableByCompare)...)
+			return
+		}(fldPath.Child("slicePrimitiveField"), obj.SlicePrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SlicePrimitiveField }))...)
+
+	// field ImmutableStruct.SliceSetPrimitiveField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []int) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
+			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a int, b int) bool { return a == b }, validate.ImmutableByCompare)...)
+			return
+		}(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SliceSetPrimitiveField }))...)
+
 	return errs
 }
 
