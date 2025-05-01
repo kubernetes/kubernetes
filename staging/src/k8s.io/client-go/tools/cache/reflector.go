@@ -401,6 +401,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 func (r *Reflector) ListAndWatchWithContext(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Listing and watching", "type", r.typeDescription, "reflector", r.name)
+	defer utilruntime.HandleCrashWithContext(ctx)
 	var err error
 	var w watch.Interface
 	useWatchList := ptr.Deref(r.UseWatchList, false)
@@ -482,8 +483,6 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 	logger := klog.FromContext(ctx)
 	var err error
 	retry := NewRetryWithDeadline(r.MaxInternalErrorRetryDuration, time.Minute, apierrors.IsInternalError, r.clock)
-
-	defer utilruntime.HandleCrashWithContext(ctx)
 
 	for {
 		// give the stopCh a chance to stop the loop, even in case of continue statements further down on errors
@@ -567,7 +566,6 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 // the resource version can be used for further progress notification (aka. watch).
 func (r *Reflector) list(ctx context.Context) error {
 	// Catch panics and log them via Kubernetes crash handlers
-	defer utilruntime.HandleCrashWithContext(ctx)
 
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
