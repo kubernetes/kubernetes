@@ -28,36 +28,26 @@ func Test(t *testing.T) {
 	st.Value(&Struct{}).ExpectValid()
 
 	st.Value(&Struct{
-		SliceStringField: []string{"aaa", "bbb"},
-		SliceIntField:    []int{1, 2},
-		SliceComparableField: []ComparableStruct{
-			ComparableStruct{"aaa"},
-			ComparableStruct{"bbb"},
-		},
+		SliceStringField:     []string{"aaa", "bbb"},
+		SliceIntField:        []int{1, 2},
+		SliceComparableField: []ComparableStruct{{"aaa"}, {"bbb"}},
 		SliceNonComparableField: []NonComparableStruct{
-			NonComparableStruct{[]string{"aaa", "bbb"}},
-			NonComparableStruct{[]string{"bbb", "aaa"}},
+			{[]string{"aaa", "bbb"}},
+			{[]string{"bbb", "aaa"}},
 		},
 	}).ExpectValid()
 
 	st.Value(&Struct{
-		SliceStringField: []string{"aaa", "bbb", "ccc", "ccc", "bbb", "aaa"},
-		SliceIntField:    []int{1, 2, 3, 3, 2, 1},
-		SliceComparableField: []ComparableStruct{
-			ComparableStruct{"aaa"},
-			ComparableStruct{"bbb"},
-			ComparableStruct{"ccc"},
-			ComparableStruct{"ccc"},
-			ComparableStruct{"bbb"},
-			ComparableStruct{"aaa"},
-		},
+		SliceStringField:     []string{"aaa", "bbb", "ccc", "ccc", "bbb", "aaa"},
+		SliceIntField:        []int{1, 2, 3, 3, 2, 1},
+		SliceComparableField: []ComparableStruct{{"aaa"}, {"bbb"}, {"ccc"}, {"ccc"}, {"bbb"}, {"aaa"}},
 		SliceNonComparableField: []NonComparableStruct{
-			NonComparableStruct{[]string{"aaa", "111"}},
-			NonComparableStruct{[]string{"bbb", "222"}},
-			NonComparableStruct{[]string{"ccc", "333"}},
-			NonComparableStruct{[]string{"ccc", "333"}},
-			NonComparableStruct{[]string{"bbb", "222"}},
-			NonComparableStruct{[]string{"aaa", "111"}},
+			{[]string{"aaa", "111"}},
+			{[]string{"bbb", "222"}},
+			{[]string{"ccc", "333"}},
+			{[]string{"ccc", "333"}},
+			{[]string{"bbb", "222"}},
+			{[]string{"aaa", "111"}},
 		},
 	}).ExpectInvalid(
 		field.Duplicate(field.NewPath("sliceStringField").Index(3), "ccc"),
