@@ -18,191 +18,140 @@ package runner
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
-	"k8s.io/client-go/util/flowcontrol"
-
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // BoundedFrequencyRunner manages runs of a user-provided function.
 // See NewBoundedFrequencyRunner for examples.
 type BoundedFrequencyRunner struct {
-	name        string        // the name of this instance
-	minInterval time.Duration // the min time between runs, modulo bursts
-	maxInterval time.Duration // the max time between runs
+	name          string        // the name of this instance
+	minInterval   time.Duration // the min time between runs, modulo bursts
+	retryInterval time.Duration
+	maxInterval   time.Duration // the max time between runs
 
 	run chan struct{} // try an async run
 
-	mu      sync.Mutex  // guards runs of fn and all mutations
-	fn      func()      // function to run
-	lastRun time.Time   // time of last run
-	timer   timer       // timer for deferred runs
-	limiter rateLimiter // rate limiter for on-demand runs
+	fn                 func() error // function to run
+	minIntervalTimer   clock.Timer
+	retryIntervalTimer clock.Timer
+	maxIntervalTimer   clock.Timer
+	clock              clock.Clock
 
-	retry     chan struct{} // schedule a retry
-	retryMu   sync.Mutex    // guards retryTime
-	retryTime time.Time     // when to retry
+	ready chan struct{} // signals the loop is ready
 }
 
-// designed so that flowcontrol.RateLimiter satisfies
-type rateLimiter interface {
-	TryAccept() bool
-	Stop()
-}
-
-type nullLimiter struct{}
-
-func (nullLimiter) TryAccept() bool {
-	return true
-}
-
-func (nullLimiter) Stop() {}
-
-var _ rateLimiter = nullLimiter{}
-
-// for testing
-type timer interface {
-	// C returns the timer's selectable channel.
-	C() <-chan time.Time
-
-	// See time.Timer.Reset.
-	Reset(d time.Duration) bool
-
-	// See time.Timer.Stop.
-	Stop() bool
-
-	// See time.Now.
-	Now() time.Time
-
-	// Remaining returns the time until the timer will go off (if it is running).
-	Remaining() time.Duration
-
-	// See time.Since.
-	Since(t time.Time) time.Duration
-
-	// See time.Sleep.
-	Sleep(d time.Duration)
-}
-
-// implement our timer in terms of std time.Timer.
-type realTimer struct {
-	timer *time.Timer
-	next  time.Time
-}
-
-func (rt *realTimer) C() <-chan time.Time {
-	return rt.timer.C
-}
-
-func (rt *realTimer) Reset(d time.Duration) bool {
-	rt.next = time.Now().Add(d)
-	return rt.timer.Reset(d)
-}
-
-func (rt *realTimer) Stop() bool {
-	return rt.timer.Stop()
-}
-
-func (rt *realTimer) Now() time.Time {
-	return time.Now()
-}
-
-func (rt *realTimer) Remaining() time.Duration {
-	return rt.next.Sub(time.Now())
-}
-
-func (rt *realTimer) Since(t time.Time) time.Duration {
-	return time.Since(t)
-}
-
-func (rt *realTimer) Sleep(d time.Duration) {
-	time.Sleep(d)
-}
-
-var _ timer = &realTimer{}
-
-// NewBoundedFrequencyRunner creates a new BoundedFrequencyRunner instance,
-// which will manage runs of the specified function.
+// NewBoundedFrequencyRunner creates and returns a new BoundedFrequencyRunner.
+// This runner manages the execution frequency of the provided function `fn`.
 //
-// All runs will be async to the caller of BoundedFrequencyRunner.Run, but
-// multiple runs are serialized. If the function needs to hold locks, it must
-// take them internally.
+// The runner guarantees three properties:
+//  1. Minimum Interval (`minInterval`): At least `minInterval` must pass between
+//     the *completion* of one execution and the *start* of the next. Calls to
+//     `Run()` during this cooldown period are coalesced and deferred until the
+//     interval expires. This prevents burst executions.
+//  2. Maximum Interval (`maxInterval`): The function `fn` is guaranteed to run
+//     at least once per `maxInterval`, ensuring periodic execution even without
+//     explicit `Run()` calls (e.g., for refreshing state).
+//  3. Retry Interval (`retryInterval`): Any error returned by `fn`
+//     will run again no later than `retryInterval`, unless another trigger (like
+//     `Run()` or `maxInterval`) causes it to run sooner. Any successful run will
+//     abort the retry attempt.
 //
-// Runs of the function will have at least minInterval between them (from
-// completion to next start), except that up to bursts may be allowed.  Burst
-// runs are "accumulated" over time, one per minInterval up to burstRuns total.
-// This can be used, for example, to mitigate the impact of expensive operations
-// being called in response to user-initiated operations. Run requests that
-// would violate the minInterval are coalesced and run at the next opportunity.
+// After `fn` completes, the loop waits for the `minInterval` timer to expire
+// before it becomes eligible to execute `fn` again. This ensures the minimum
+// time between executions.
 //
-// The function will be run at least once per maxInterval. For example, this can
-// force periodic refreshes of state in the absence of anyone calling Run.
-//
-// Examples:
-//
-// NewBoundedFrequencyRunner("name", fn, time.Second, 5*time.Second, 1)
-// - fn will have at least 1 second between runs
-// - fn will have no more than 5 seconds between runs
-//
-// NewBoundedFrequencyRunner("name", fn, 3*time.Second, 10*time.Second, 3)
-// - fn will have at least 3 seconds between runs, with up to 3 burst runs
-// - fn will have no more than 10 seconds between runs
-//
-// The maxInterval must be greater than or equal to the minInterval,  If the
-// caller passes a maxInterval less than minInterval, this function will panic.
-func NewBoundedFrequencyRunner(name string, fn func(), minInterval, maxInterval time.Duration, burstRuns int) *BoundedFrequencyRunner {
-	timer := &realTimer{timer: time.NewTimer(0)} // will tick immediately
-	<-timer.C()                                  // consume the first tick
-	return construct(name, fn, minInterval, maxInterval, burstRuns, timer)
+// `maxInterval` must be greater than or equal to `minInterval`; otherwise,
+// this function will panic.
+func NewBoundedFrequencyRunner(name string, fn func() error, minInterval, retryInterval, maxInterval time.Duration) *BoundedFrequencyRunner {
+	return construct(name, fn, minInterval, retryInterval, maxInterval, clock.RealClock{})
 }
 
 // Make an instance with dependencies injected.
-func construct(name string, fn func(), minInterval, maxInterval time.Duration, burstRuns int, timer timer) *BoundedFrequencyRunner {
+func construct(name string, fn func() error, minInterval, retryInterval, maxInterval time.Duration, clock clock.Clock) *BoundedFrequencyRunner {
 	if maxInterval < minInterval {
 		panic(fmt.Sprintf("%s: maxInterval (%v) must be >= minInterval (%v)", name, maxInterval, minInterval))
 	}
-	if timer == nil {
-		panic(fmt.Sprintf("%s: timer must be non-nil", name))
+	if clock == nil {
+		panic(fmt.Sprintf("%s: clock must be non-nil", name))
 	}
 
 	bfr := &BoundedFrequencyRunner{
-		name:        name,
-		fn:          fn,
-		minInterval: minInterval,
-		maxInterval: maxInterval,
-		run:         make(chan struct{}, 1),
-		retry:       make(chan struct{}, 1),
-		timer:       timer,
+		name:          name,
+		fn:            fn,
+		minInterval:   minInterval,
+		retryInterval: retryInterval,
+		maxInterval:   maxInterval,
+		run:           make(chan struct{}, 1),
+		ready:         make(chan struct{}), // used to synchronize tests
+		clock:         clock,
 	}
-	if minInterval == 0 {
-		bfr.limiter = nullLimiter{}
-	} else {
-		// allow burst updates in short succession
-		qps := float32(time.Second) / float32(minInterval)
-		bfr.limiter = flowcontrol.NewTokenBucketRateLimiterWithClock(qps, burstRuns, timer)
-	}
+
 	return bfr
 }
 
 // Loop handles the periodic timer and run requests.  This is expected to be
 // called as a goroutine.
 func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
-	klog.V(3).Infof("%s Loop running", bfr.name)
-	bfr.timer.Reset(bfr.maxInterval)
+	klog.V(3).InfoS("Loop running", "name", bfr.name)
+	defer close(bfr.run)
+
+	// retryIntervalTimer is only started after a Retry() call
+	// so it starts stopped.
+	bfr.retryIntervalTimer = bfr.clock.NewTimer(bfr.retryInterval)
+	bfr.retryIntervalTimer.Stop()
+	defer bfr.retryIntervalTimer.Stop()
+
+	bfr.minIntervalTimer = bfr.clock.NewTimer(bfr.minInterval)
+	defer bfr.minIntervalTimer.Stop()
+
+	bfr.maxIntervalTimer = bfr.clock.NewTimer(bfr.maxInterval)
+	defer bfr.maxIntervalTimer.Stop()
+
+	// Signal the loop is ready
+	close(bfr.ready)
+
 	for {
 		select {
 		case <-stop:
-			bfr.stop()
-			klog.V(3).Infof("%s Loop stopping", bfr.name)
+			klog.V(3).InfoS("Loop stopping", "name", bfr.name)
 			return
-		case <-bfr.timer.C():
-			bfr.tryRun()
+		case <-bfr.maxIntervalTimer.C():
+		case <-bfr.retryIntervalTimer.C():
 		case <-bfr.run:
-			bfr.tryRun()
-		case <-bfr.retry:
-			bfr.doRetry()
+		}
+
+		func() {
+			// stop the timers here to allow the tests using the fake clock to synchronize
+			// with the fakeClock.HasWaiters() method. The timers are reset after the function
+			// is executed.
+			bfr.minIntervalTimer.Stop()
+			bfr.maxIntervalTimer.Stop()
+
+			// avoid crashing if the function executed crashes
+			defer utilruntime.HandleCrash()
+			err := bfr.fn()
+			// an error will schedule a retry after the retryInterval,
+			// any successful run until that period will stop the retry attempt.
+			if err != nil {
+				klog.V(3).InfoS("retrying", "name", bfr.name, "interval", bfr.retryInterval)
+				bfr.retryIntervalTimer.Reset(bfr.retryInterval)
+			} else {
+				bfr.retryIntervalTimer.Stop()
+			}
+			// reset the timers taking into account the time to execute the function
+			bfr.minIntervalTimer.Reset(bfr.minInterval)
+			bfr.maxIntervalTimer.Reset(bfr.maxInterval)
+		}()
+
+		select {
+		case <-stop:
+			klog.V(3).InfoS("Loop stopping", "name", bfr.name)
+			return
+		case <-bfr.minIntervalTimer.C():
 		}
 	}
 }
@@ -213,101 +162,18 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 // may be dropped - it is just guaranteed that we will try calling the
 // underlying function as soon as possible starting from now.
 func (bfr *BoundedFrequencyRunner) Run() {
-	// If it takes a lot of time to run the underlying function, noone is really
-	// processing elements from <run> channel. So to avoid blocking here on the
-	// putting element to it, we simply skip it if there is already an element
-	// in it.
+	// Wait until the loop is ready
+	select {
+	case <-bfr.ready:
+	default:
+		return
+	}
+	// It attempts to send a signal to the internal queue. If the queue is already
+	// full (meaning an execution is already pending or waiting for the minInterval),
+	// this call is effectively coalesced with the previous one, and no new signal
+	// is added. This ensures that rapid calls to Run() don't queue up indefinitely.
 	select {
 	case bfr.run <- struct{}{}:
 	default:
 	}
-}
-
-// RetryAfter ensures that the function will run again after no later than interval. This
-// can be called from inside a run of the BoundedFrequencyRunner's function, or
-// asynchronously.
-func (bfr *BoundedFrequencyRunner) RetryAfter(interval time.Duration) {
-	// This could be called either with or without bfr.mu held, so we can't grab that
-	// lock, and therefore we can't update the timer directly.
-
-	// If the Loop thread is currently running fn then it may be a while before it
-	// processes our retry request. But we want to retry at interval from now, not at
-	// interval from "whenever doRetry eventually gets called". So we convert to
-	// absolute time.
-	retryTime := bfr.timer.Now().Add(interval)
-
-	// We can't just write retryTime to a channel because there could be multiple
-	// RetryAfter calls before Loop gets a chance to read from the channel. So we
-	// record the soonest requested retry time in bfr.retryTime and then only signal
-	// the Loop thread once, just like Run does.
-	bfr.retryMu.Lock()
-	defer bfr.retryMu.Unlock()
-	if !bfr.retryTime.IsZero() && bfr.retryTime.Before(retryTime) {
-		return
-	}
-	bfr.retryTime = retryTime
-
-	select {
-	case bfr.retry <- struct{}{}:
-	default:
-	}
-}
-
-// assumes the lock is not held
-func (bfr *BoundedFrequencyRunner) stop() {
-	bfr.mu.Lock()
-	defer bfr.mu.Unlock()
-	bfr.limiter.Stop()
-	bfr.timer.Stop()
-}
-
-// assumes the lock is not held
-func (bfr *BoundedFrequencyRunner) doRetry() {
-	bfr.mu.Lock()
-	defer bfr.mu.Unlock()
-	bfr.retryMu.Lock()
-	defer bfr.retryMu.Unlock()
-
-	if bfr.retryTime.IsZero() {
-		return
-	}
-
-	// Timer wants an interval not an absolute time, so convert retryTime back now
-	retryInterval := bfr.retryTime.Sub(bfr.timer.Now())
-	bfr.retryTime = time.Time{}
-	if retryInterval < bfr.timer.Remaining() {
-		klog.V(3).Infof("%s: retrying in %v", bfr.name, retryInterval)
-		bfr.timer.Stop()
-		bfr.timer.Reset(retryInterval)
-	}
-}
-
-// assumes the lock is not held
-func (bfr *BoundedFrequencyRunner) tryRun() {
-	bfr.mu.Lock()
-	defer bfr.mu.Unlock()
-
-	if bfr.limiter.TryAccept() {
-		// We're allowed to run the function right now.
-		bfr.fn()
-		bfr.lastRun = bfr.timer.Now()
-		bfr.timer.Stop()
-		bfr.timer.Reset(bfr.maxInterval)
-		klog.V(3).Infof("%s: ran, next possible in %v, periodic in %v", bfr.name, bfr.minInterval, bfr.maxInterval)
-		return
-	}
-
-	// It can't run right now, figure out when it can run next.
-	elapsed := bfr.timer.Since(bfr.lastRun)   // how long since last run
-	nextPossible := bfr.minInterval - elapsed // time to next possible run
-	nextScheduled := bfr.timer.Remaining()    // time to next scheduled run
-	klog.V(4).Infof("%s: %v since last run, possible in %v, scheduled in %v", bfr.name, elapsed, nextPossible, nextScheduled)
-
-	// It's hard to avoid race conditions in the unit tests unless we always reset
-	// the timer here, even when it's unchanged
-	if nextPossible < nextScheduled {
-		nextScheduled = nextPossible
-	}
-	bfr.timer.Stop()
-	bfr.timer.Reset(nextScheduled)
 }
