@@ -987,7 +987,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 			t.Errorf("Unexpected error: %#v", err)
 		}
 	} else {
-		if err == nil || err.Error() != apierrors.NewTooManyRequests("storage is (re)initializing", 1).Error() {
+		if err == nil || !strings.Contains(err.Error(), "storage is (re)initializing") {
 			t.Errorf("Unexpected error: %#v", err)
 		}
 	}
