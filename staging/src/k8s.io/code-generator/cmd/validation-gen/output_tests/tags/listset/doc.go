@@ -56,6 +56,13 @@ type ImmutableStruct struct {
 	// +k8s:listType=set
 	// +k8s:eachVal=+k8s:immutable
 	SliceSetNonComparableField []NonComparableStruct `json:"sliceSetNonComparableField"`
+
+	// +k8s:eachVal=+k8s:immutable
+	SlicePrimitiveField []int `json:"slicePrimitiveField"`
+
+	// +k8s:listType=set
+	// +k8s:eachVal=+k8s:immutable
+	SliceSetPrimitiveField []int `json:"sliceSetPrimitiveField"`
 }
 
 type ComparableStruct struct {
