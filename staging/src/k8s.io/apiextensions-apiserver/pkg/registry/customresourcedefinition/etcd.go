@@ -102,7 +102,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 		err = apierrors.NewConflict(
 			apiextensions.Resource("customresourcedefinitions"),
 			name,
-			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, crd.UID),
+			fmt.Errorf("precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, crd.UID),
 		)
 		return nil, false, err
 	}
@@ -110,7 +110,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 		err = apierrors.NewConflict(
 			apiextensions.Resource("customresourcedefinitions"),
 			name,
-			fmt.Errorf("Precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v", *options.Preconditions.ResourceVersion, crd.ResourceVersion),
+			fmt.Errorf("precondition failed: ResourceVersion in precondition: %v, ResourceVersion in object meta: %v", *options.Preconditions.ResourceVersion, crd.ResourceVersion),
 		)
 		return nil, false, err
 	}
