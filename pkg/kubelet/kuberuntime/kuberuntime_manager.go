@@ -729,7 +729,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodMemoryConfig)
 	currentPodResources = mergeResourceConfig(currentPodResources, currentPodCPUConfig)
 
-	const maxValue = int64(-1)
+	const maxValue = int64(-1) // handled as max in libcontainer, which updates pod cgroup values.
 	setPodCgroupConfig := func(rName v1.ResourceName, setLimitValue bool) error {
 		var err error
 		resizedResources := &cm.ResourceConfig{}
@@ -815,8 +815,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 				return resizeResult
 			}
 		} else {
-			value := maxValue
-			podResources.Memory = &value
+			podResources.Memory = ptr.To(maxValue)
 		}
 		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
@@ -832,8 +831,7 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(pod *v1.Pod, podContainerC
 		}
 
 		if podResources.CPUQuota == nil {
-			val := maxValue
-			podResources.CPUQuota = &val
+			podResources.CPUQuota = ptr.To(maxValue)
 			// CPUPeriod is not set in podResources by ResourceConfigForPod() when no limit is configured.
 			// This is necessary for update the CPU limit in the runtime.
 			podResources.CPUPeriod = &cpuPeriod

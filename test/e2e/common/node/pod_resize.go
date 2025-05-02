@@ -1159,7 +1159,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1168,7 +1168,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
 				},
 			},
 		},
@@ -1177,7 +1177,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1186,7 +1186,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 		},
@@ -1195,7 +1195,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1204,7 +1204,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 		},
@@ -1213,7 +1213,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1222,7 +1222,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
 				},
 			},
 		},
@@ -1231,7 +1231,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1240,7 +1240,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
 				},
 			},
 		},
@@ -1249,7 +1249,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1258,7 +1258,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 		},
@@ -1267,7 +1267,7 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 				},
 			},
 			patchString: `{"spec":{"containers":[
@@ -1276,7 +1276,7 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit},
 				},
 			},
 		},
@@ -1285,11 +1285,11 @@ func doPodResizeTests(f *framework.Framework) {
 			containers: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
+					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPULimit, MemReq: originalMem, MemLim: originalMemLimit},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
@@ -1299,11 +1299,11 @@ func doPodResizeTests(f *framework.Framework) {
 			expected: []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
+					Resources: &cgroups.ContainerResources{CPUReq: originalCPU, CPULim: originalCPU, MemReq: originalMem, MemLim: originalMem},
 				},
 				{
 					Name:          "c1-init",
-					Resources:     &podresize.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
+					Resources:     &cgroups.ContainerResources{CPUReq: originalCPU, MemReq: originalMem},
 					InitCtr:       true,
 					RestartPolicy: v1.ContainerRestartPolicyAlways,
 				},
