@@ -256,6 +256,8 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
 			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
+			framework.ExpectNoError(err, "while verifying recovery related fields")
 		})
 
 		ginkgo.It("should resize volume when PVC is edited while pod is using it", func(ctx context.Context) {
@@ -305,6 +307,9 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
 			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+
+			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
+			framework.ExpectNoError(err, "while verifying recovery related fields")
 		})
 
 	}
@@ -482,4 +487,17 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}
 	return updatedPVC, nil
+}
+
+func VerifyRecoveryRelatedFields(pvc *v1.PersistentVolumeClaim) error {
+	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+	if resizeStatus != "" {
+		return fmt.Errorf("pvc %q had %s resize status", pvc.Name, resizeStatus)
+	}
+
+	allocatedSize := pvc.Status.AllocatedResources[v1.ResourceStorage]
+	if allocatedSize.Cmp(pvc.Spec.Resources.Requests[v1.ResourceStorage]) != 0 {
+		return fmt.Errorf("pvc %q had %s allocated size", pvc.Name, allocatedSize.String())
+	}
+	return nil
 }
