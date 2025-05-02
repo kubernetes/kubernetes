@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/servicecidrs"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -43,11 +42,9 @@ func TestServiceAllocNewServiceCIDR(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1=true",
 			"--service-cluster-ip-range=192.168.0.0/29",
 			"--advertise-address=10.1.1.1",
 			"--disable-admission-plugins=ServiceAccount",
-			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 	defer s.TearDownFn()
@@ -141,11 +138,9 @@ func TestServiceCIDRDeletion(t *testing.T) {
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1=true",
 			"--service-cluster-ip-range=" + cidr1,
 			"--advertise-address=172.16.1.1",
 			"--disable-admission-plugins=ServiceAccount",
-			fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 		},
 		etcdOptions)
 	defer s.TearDownFn()

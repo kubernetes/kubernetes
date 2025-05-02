@@ -29,7 +29,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -89,11 +88,9 @@ func TestServiceAllocPerformance(t *testing.T) {
 			s1 := kubeapiservertesting.StartTestServerOrDie(t,
 				apiServerOptions,
 				[]string{
-					"--runtime-config=networking.k8s.io/v1beta1=true",
 					"--service-cluster-ip-range=" + "10.0.0.0/12",
 					"--advertise-address=10.0.0.1",
 					"--disable-admission-plugins=ServiceAccount",
-					fmt.Sprintf("--feature-gates=%s=true,%s=true", features.MultiCIDRServiceAllocator, features.DisableAllocatorDualWrite),
 				},
 				etcdOptions)
 
