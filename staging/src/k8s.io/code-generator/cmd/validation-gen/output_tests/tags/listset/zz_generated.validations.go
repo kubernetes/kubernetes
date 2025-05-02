@@ -87,28 +87,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.SliceStringField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []string) (errs field.ErrorList) {
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("sliceStringField"), obj.SliceStringField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceStringField }))...)
 
 	// field Struct.SliceIntField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []int) (errs field.ErrorList) {
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("sliceIntField"), obj.SliceIntField, safe.Field(oldObj, func(oldObj *Struct) []int { return oldObj.SliceIntField }))...)
 
 	// field Struct.SliceComparableField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []ComparableStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("sliceComparableField"), obj.SliceComparableField, safe.Field(oldObj, func(oldObj *Struct) []ComparableStruct { return oldObj.SliceComparableField }))...)
 
 	// field Struct.SliceNonComparableField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []NonComparableStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.UniqueNonComparable(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.UniqueByReflect(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.SliceNonComparableField }))...)
 

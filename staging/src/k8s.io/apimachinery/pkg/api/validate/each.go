@@ -84,17 +84,21 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
-// Unique verifies that each element of newSlice is unique.  This function can
-// only be used on types that are directly comparable. For non-comparable
-// types, use UniqueNonComparable.
-func Unique[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
+// UniqueByCompare verifies that each element of newSlice is unique.  This
+// function can only be used on types that are directly comparable. For
+// non-comparable types, use UniqueByReflect.
+//
+// Caution: structs with pointer fields satisfy comparable, but this function
+// will only compare pointer values.  It does not compare the pointed-to
+// values.
+func UniqueByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
 	return unique(fldPath, newSlice, func(a, b T) bool { return a == b })
 }
 
-// UniqueNonComparable verifies that each element of newSlice is unique. Unlike
-// Unique, this function can be used with types that are not directly
+// UniqueByReflect verifies that each element of newSlice is unique. Unlike
+// UniqueByCompare, this function can be used with types that are not directly
 // comparable, at the cost of performance.
-func UniqueNonComparable[T any](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
+func UniqueByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
 	return unique(fldPath, newSlice, SemanticDeepEqual)
 }
 

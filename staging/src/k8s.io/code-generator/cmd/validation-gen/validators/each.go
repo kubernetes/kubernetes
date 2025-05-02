@@ -78,8 +78,8 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateUnique              = types.Name{Package: libValidationPkg, Name: "Unique"}
-	validateUniqueNonComparable = types.Name{Package: libValidationPkg, Name: "UniqueNonComparable"}
+	validateUniqueByCompare = types.Name{Package: libValidationPkg, Name: "UniqueByCompare"}
+	validateUniqueByReflect = types.Name{Package: libValidationPkg, Name: "UniqueByReflect"}
 )
 
 func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
@@ -100,9 +100,9 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 		lm.declaredAsSet = true
 		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 		if nativeType(t.Elem).IsComparable() {
-			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUnique)}}, nil
+			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByCompare)}}, nil
 		}
-		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueNonComparable)}}, nil
+		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByReflect)}}, nil
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
 		if nativeType(t.Elem).Kind != types.Struct {
