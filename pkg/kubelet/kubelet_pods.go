@@ -2207,8 +2207,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 			}
 		} else if resources.Limits != nil && !resources.Limits.Cpu().IsZero() {
-			// Only if limits is in the allocation, restore limits to container sutatus from old status.
-			// Otherwise, assume limits are removed.
+			// Only if limits is in the allocation, restore limits to container status from old status.
+			// Otherwise, assume limits were removed.
 			preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
 		}
 		// Update memory limit from status
@@ -2219,8 +2219,8 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 			resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 		} else if resources.Limits != nil && !resources.Limits.Memory().IsZero() {
-			// Only if limits is in the allocation, restore limits to container sutatus from old status.
-			// Otherwise, assume limits are removed.
+			// Only if limits is in the allocation, restore limits to container status from old status.
+			// Otherwise, assume limits were removed.
 			preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
 		}
 		// Update CPU request form status
@@ -2237,7 +2237,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		} else if resources.Requests != nil && !resources.Requests.Cpu().IsZero() {
 			// Only if requests is in the allocation, restore requests to container status from old status.
-			// Otherwise, assume requests are removed.
+			// Otherwise, assume requests were removed.
 			preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
 		}
 		// Update memory request from status
