@@ -97,6 +97,7 @@
             "description": "Last time the condition transitioned from one status to another."
           },
           "message": {
+            "default": "",
             "description": "A human readable message indicating details about the transition.",
             "type": "string"
           },

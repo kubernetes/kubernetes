@@ -194,7 +194,7 @@ type CounterSet struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
-	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
+	Counters map[string]Counter `json:"counters" protobuf:"bytes,2,name=counters"`
 }
 
 // Counter describes a quantity associated with a device.
@@ -361,7 +361,7 @@ type DeviceCounterConsumption struct {
 	// 16 counters each).
 	//
 	// +required
-	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
+	Counters map[string]Counter `json:"counters" protobuf:"bytes,2,opt,name=counters"`
 }
 
 // Limit for the sum of the number of entries in both attributes and capacity.
@@ -1599,7 +1599,7 @@ type DeviceTaintRuleSpec struct {
 	// The taint that gets applied to matching devices.
 	//
 	// +required
-	Taint DeviceTaint `json:"taint,omitempty" protobuf:"bytes,2,rep,name=taint"`
+	Taint DeviceTaint `json:"taint" protobuf:"bytes,2,rep,name=taint"`
 }
 
 // DeviceTaintSelector defines which device(s) a DeviceTaintRule applies to.

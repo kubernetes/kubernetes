@@ -189,7 +189,7 @@ type CounterSet struct {
 	// The maximum number of counters is 32.
 	//
 	// +required
-	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,name=counters"`
+	Counters map[string]Counter `json:"counters" protobuf:"bytes,2,name=counters"`
 }
 
 // Counter describes a quantity associated with a device.
@@ -356,7 +356,7 @@ type DeviceCounterConsumption struct {
 	// 16 counters each).
 	//
 	// +required
-	Counters map[string]Counter `json:"counters,omitempty" protobuf:"bytes,2,opt,name=counters"`
+	Counters map[string]Counter `json:"counters" protobuf:"bytes,2,opt,name=counters"`
 }
 
 // DeviceCapacity describes a quantity associated with a device.

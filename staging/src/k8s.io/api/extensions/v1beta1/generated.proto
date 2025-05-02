@@ -529,6 +529,8 @@ message IngressPortStatus {
   //   format foo.example.com/CamelCase.
   // ---
   // The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+  // This field is optional in core types but required in CRDs (the kubebuilder marker takes precedence when generating the CRD schema).
+  // Removing either the optional or required marker would be a breaking change for someone.
   // +optional
   // +kubebuilder:validation:Required
   // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`

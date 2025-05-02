@@ -117,7 +117,7 @@ type StorageVersionCondition struct {
 	Reason string `json:"reason" protobuf:"bytes,5,opt,name=reason"`
 	// A human readable message indicating details about the transition.
 	// +required
-	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+	Message string `json:"message" protobuf:"bytes,6,opt,name=message"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
