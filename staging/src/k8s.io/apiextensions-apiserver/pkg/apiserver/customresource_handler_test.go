@@ -678,7 +678,6 @@ unknown: foo`
 	"apiVersion": "stable.example.com/v1beta1",
 	"kind": "MultiVersion",
 	"metadata": {
-		"creationTimestamp": null,
 		"generation": 1,
 		"name": "my-mv"
 	},
@@ -695,7 +694,6 @@ unknown: foo`
 	"apiVersion": "stable.example.com/v1beta1",
 	"kind": "MultiVersion",
 	"metadata": {
-		"creationTimestamp": null,
 		"generation": 1,
 		"name": "my-mv"
 	},

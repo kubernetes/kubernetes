@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -421,8 +422,6 @@ func TestListWithTypedFixtures(t *testing.T) {
 	u.SetGroupVersionKind(r.GetObjectKind().GroupVersionKind())
 	u.SetName(r.GetName())
 	u.SetNamespace(r.GetNamespace())
-	// Needed see: https://github.com/kubernetes/kubernetes/issues/67610
-	unstructured.SetNestedField(u.Object, nil, "metadata", "creationTimestamp")
 
 	typedScheme := runtime.NewScheme()
 	typedScheme.AddKnownTypeWithName(gvk, &mockResource{})

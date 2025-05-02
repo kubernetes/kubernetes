@@ -31,7 +31,6 @@ import (
 var podSpec = `
 {
     "metadata": {
-        "creationTimestamp": null,
         "labels": {
             "app": "cats"
         }

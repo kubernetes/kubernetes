@@ -812,7 +812,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, validPod2},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: `@@ -12 +12 @@
+			expectedDiff: `@@ -11 +11 @@
 -  - image: gcr.io/google_containers/etcd-amd64:3.1.11
 +  - image: gcr.io/google_containers/etcd-amd64:3.1.12
 `,
@@ -822,7 +822,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 			podYamls:       []string{validPod, invalidWithDefaultFields},
 			expectedResult: false,
 			expectErr:      false,
-			expectedDiff: `@@ -14,0 +15 @@
+			expectedDiff: `@@ -13,0 +14 @@
 +  restartPolicy: Always
 `,
 		},

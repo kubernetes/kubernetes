@@ -99,8 +99,7 @@ func TestCreateToken(t *testing.T) {
 			serverResponseToken: "abc",
 			expectStdout: `apiVersion: authentication.k8s.io/v1
 kind: TokenRequest
-metadata:
-  creationTimestamp: null
+metadata: {}
 spec:
   audiences: null
   boundObjectRef: null

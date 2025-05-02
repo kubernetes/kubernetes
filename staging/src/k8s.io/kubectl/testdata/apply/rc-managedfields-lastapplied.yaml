@@ -77,7 +77,6 @@ spec:
     name: test-rc
   template:
     metadata:
-      creationTimestamp: null
       labels:
         name: test-rc
     spec:
