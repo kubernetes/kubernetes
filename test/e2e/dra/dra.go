@@ -2230,24 +2230,15 @@ func (b *builder) parametersEnv() (string, []string) {
 // makePod returns a simple pod with no resource claims.
 // The pod prints its env and waits.
 func (b *builder) pod() *v1.Pod {
+	// The e2epod.InfiniteSleepCommand was changed so that it reacts to SIGTERM,
+	// causing the pod to shut down immediately. This is better than the previous approach
+	// with `terminationGraceperiodseconds: 1` because that still caused a one second delay.
+	//
+	// It is tempting to use `terminationGraceperiodSeconds: 0`, but that is a very bad
+	// idea because it removes the pod before the kubelet had a chance to react (https://github.com/kubernetes/kubernetes/issues/120671).
 	pod := e2epod.MakePod(b.f.Namespace.Name, nil, nil, b.f.NamespacePodSecurityLevel, "" /* no command = pause */)
 	pod.Labels = make(map[string]string)
 	pod.Spec.RestartPolicy = v1.RestartPolicyNever
-	// Let kubelet kill the pods quickly. Setting
-	// TerminationGracePeriodSeconds to zero would bypass kubelet
-	// completely because then the apiserver enables a force-delete even
-	// when DeleteOptions for the pod don't ask for it (see
-	// https://github.com/kubernetes/kubernetes/blob/0f582f7c3f504e807550310d00f130cb5c18c0c3/pkg/registry/core/pod/strategy.go#L151-L171).
-	//
-	// We don't do that because it breaks tracking of claim usage: the
-	// kube-controller-manager assumes that kubelet is done with the pod
-	// once it got removed or has a grace period of 0. Setting the grace
-	// period to zero directly in DeletionOptions or indirectly through
-	// TerminationGracePeriodSeconds causes the controller to remove
-	// the pod from ReservedFor before it actually has stopped on
-	// the node.
-	one := int64(1)
-	pod.Spec.TerminationGracePeriodSeconds = &one
 	pod.ObjectMeta.GenerateName = ""
 	b.podCounter++
 	pod.ObjectMeta.Name = fmt.Sprintf("tester%s-%d", b.driver.NameSuffix, b.podCounter)

@@ -28,14 +28,14 @@ spec:
   restartPolicy: Never
   containers:
   - name: with-resource
-    image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
-    command: ["sh", "-c", "set && mount && ls -la /dev/ && sleep 10000"]
+    image: registry.k8s.io/e2e-test-images/agnhost:2.53
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
     resources:
       claims:
       - name: resource
   - name: without-resource
-    image: registry.k8s.io/e2e-test-images/busybox:1.36.1-1
-    command: ["sh", "-c", "set && mount && ls -la /dev/ && sleep 10000"]
+    image: registry.k8s.io/e2e-test-images/agnhost:2.53
+    command: ["sh", "-c", "set && mount && ls -la /dev/ && /agnhost pause"]
   terminationGracePeriodSeconds: 0 # Shut down immediately.
   resourceClaims:
   - name: resource
