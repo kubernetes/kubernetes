@@ -490,44 +490,50 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	logger.V(5).Info("Existing slices", "obsolete", klog.KObjSlice(obsoleteSlices), "current", klog.KObjSlice(currentSlices))
 
 	if pool, ok := resources.Pools[poolName]; ok {
-		// Match each existing slice against the desired slices.
-		// Two slices match if they contain exactly the same
-		// device IDs, in an arbitrary order. Such a matched
-		// slice gets updated with the desired content if
-		// there is a difference.
+		// Match each existing slice against the desired slices. Two slices
+		// "match" if they contain exactly the same device IDs, in an arbitrary
+		// order. As a special case, slices are also considered "matched" in the
+		// scenario where there's a single existing slice and a single desired
+		// slice. Such a "matched" slice gets updated with the desired content
+		// if there is a difference.
 		//
-		// This supports updating the definition of devices
-		// in a slice. Adding or removing devices is done
-		// by deleting the old slice and creating a new one.
+		// In the case where there is more than one existing or desired slices,
+		// adding or removing devices is done by deleting the old slice and
+		// creating a new one. This is primarily a simplification of the code:
+		// to support adding or removing devices from existing slices, we would
+		// have to identify "most similar" slices (= minimal editing distance).
 		//
-		// This is primarily a simplification of the code:
-		// to support adding or removing devices from
-		// existing slices, we would have to identify "most
-		// similar" slices (= minimal editing distance).
+		// In currentSliceForDesiredSlice we keep track of which desired slice
+		// has a matched slice.
 		//
-		// In currentSliceForDesiredSlice we keep track of
-		// which desired slice has a matched slice.
-		//
-		// At the end of the loop, each current slice is either
-		// a match or obsolete.
+		// At the end of the loop, each current slice is either a match or
+		// obsolete.
 		currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
-		for _, currentSlice := range currentSlices {
-			matched := false
-			for i := range pool.Slices {
-				if _, ok := currentSliceForDesiredSlice[i]; ok {
-					// Already has a match.
-					continue
+		if len(currentSlices) == 1 && len(currentSlices) == len(pool.Slices) {
+			// If there's just one existing slice and one desired slice, assume
+			// they "matched" such that if required, it is the existing slice
+			// which gets updated and we avoid an unnecessary deletion and
+			// recreation of the slice.
+			currentSliceForDesiredSlice[0] = currentSlices[0]
+		} else {
+			for _, currentSlice := range currentSlices {
+				matched := false
+				for i := range pool.Slices {
+					if _, ok := currentSliceForDesiredSlice[i]; ok {
+						// Already has a match.
+						continue
+					}
+					if sameSlice(currentSlice, &pool.Slices[i]) {
+						currentSliceForDesiredSlice[i] = currentSlice
+						logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
+						matched = true
+						break
+					}
 				}
-				if sameSlice(currentSlice, &pool.Slices[i]) {
-					currentSliceForDesiredSlice[i] = currentSlice
-					logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
-					matched = true
-					break
+				if !matched {
+					obsoleteSlices = append(obsoleteSlices, currentSlice)
+					logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
 				}
-			}
-			if !matched {
-				obsoleteSlices = append(obsoleteSlices, currentSlice)
-				logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
 			}
 		}
 
