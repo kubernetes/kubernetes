@@ -30,7 +30,8 @@ import (
 // comparable, they should use ImmutableByReflect instead.
 //
 // Caution: structs with pointer fields satisfy comparable, but this function
-// will onlyu compare pointer values.  It does not do a "deep" comparison.
+// will only compare pointer values.  It does not compare the pointed-to
+// values.
 func ImmutableByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
