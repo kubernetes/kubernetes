@@ -2095,10 +2095,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				resources.Limits[v1.ResourceCPU] = cStatus.Resources.CPULimit.DeepCopy()
 			}
 		} else if resources.Limits != nil && !resources.Limits.Cpu().IsZero() {
-			// Only if limits is in the allocation, restore limits to container sutatus from old status.
-			// Otherwise, assume limits are removed.
+			// Only if limits is in the allocation, restore limits to container status from old status.
+			// Otherwise, assume limits were removed.
 			preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Limits, resources.Limits)
 		}
+
 		if cStatus.Resources != nil && cStatus.Resources.MemoryLimit != nil {
 			if resources.Limits == nil {
 				// If limits are being removed, cStatus has limits while allocated resource does not.
@@ -2106,10 +2107,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 			resources.Limits[v1.ResourceMemory] = cStatus.Resources.MemoryLimit.DeepCopy()
 		} else if resources.Limits != nil && !resources.Limits.Memory().IsZero() {
-			// Only if limits is in the allocation, restore limits to container sutatus from old status.
-			// Otherwise, assume limits are removed.
+			// Only if limits is in the allocation, restore limits to container status from old status.
+			// Otherwise, assume limits were removed.
 			preserveOldResourcesValue(v1.ResourceMemory, oldStatus.Resources.Limits, resources.Limits)
 		}
+
 		if cStatus.Resources != nil && cStatus.Resources.CPURequest != nil {
 			// If both the allocated & actual resources are at or below MinShares, preserve the
 			// allocated value in the API to avoid confusion and simplify comparisons.
@@ -2123,9 +2125,10 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 			}
 		} else if resources.Requests != nil && !resources.Requests.Cpu().IsZero() {
 			// Only if requests is in the allocation, restore requests to container status from old status.
-			// Otherwise, assume requests are removed.
+			// Otherwise, assume requests were removed.
 			preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)
 		}
+
 		if resources.Requests != nil {
 			// TODO(tallclair,vinaykul,InPlacePodVerticalScaling): Investigate defaulting to actuated resources instead of allocated resources above
 			if _, exists := resources.Requests[v1.ResourceMemory]; exists {
