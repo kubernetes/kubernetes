@@ -609,15 +609,22 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 }
 
 func TestValidateIngress(t *testing.T) {
-	serviceBackend := &networking.IngressServiceBackend{
+	servicePort := networking.ServiceBackendPort{
+		Number: 80,
+	}
+	serviceName := networking.ServiceBackendPort{
+		Name: "http",
+	}
+	servicePortBackend := &networking.IngressServiceBackend{
 		Name: "defaultbackend",
-		Port: networking.ServiceBackendPort{
-			Name:   "",
-			Number: 80,
-		},
+		Port: servicePort,
+	}
+	serviceNameBackend := &networking.IngressServiceBackend{
+		Name: "defaultbackend",
+		Port: serviceName,
 	}
 	defaultBackend := networking.IngressBackend{
-		Service: serviceBackend,
+		Service: servicePortBackend,
 	}
 	pathTypePrefix := networking.PathTypePrefix
 	pathTypeImplementationSpecific := networking.PathTypeImplementationSpecific
@@ -702,6 +709,27 @@ func TestValidateIngress(t *testing.T) {
 				"spec.rules[0].http.paths",
 			},
 		},
+		"no rules": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.Rules = nil
+			},
+			expectErrsOnFields: []string{},
+		},
+		"no defaultBackend": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.DefaultBackend = nil
+			},
+			expectErrsOnFields: []string{},
+		},
+		"no defaultBackend or rules specified": {
+			tweakIngress: func(ing *networking.Ingress) {
+				ing.Spec.DefaultBackend = nil
+				ing.Spec.Rules = []networking.IngressRule{}
+			},
+			expectErrsOnFields: []string{
+				"spec",
+			},
+		},
 		"invalid host (foobar:80)": {
 			tweakIngress: func(ing *networking.Ingress) {
 				ing.Spec.Rules[0].Host = "foobar:80"
@@ -748,7 +776,7 @@ func TestValidateIngress(t *testing.T) {
 							Path:     "/foo",
 							PathType: &pathTypeImplementationSpecific,
 							Backend: networking.IngressBackend{
-								Service: serviceBackend,
+								Service: serviceNameBackend,
 								Resource: &api.TypedLocalObjectReference{
 									APIGroup: utilpointer.String("example.com"),
 									Kind:     "foo",
@@ -771,7 +799,7 @@ func TestValidateIngress(t *testing.T) {
 							Path:     "/foo",
 							PathType: &pathTypeImplementationSpecific,
 							Backend: networking.IngressBackend{
-								Service: serviceBackend,
+								Service: servicePortBackend,
 								Resource: &api.TypedLocalObjectReference{
 									APIGroup: utilpointer.String("example.com"),
 									Kind:     "foo",
@@ -789,7 +817,7 @@ func TestValidateIngress(t *testing.T) {
 		"spec.backend resource and service name are not allowed together": {
 			tweakIngress: func(ing *networking.Ingress) {
 				ing.Spec.DefaultBackend = &networking.IngressBackend{
-					Service: serviceBackend,
+					Service: serviceNameBackend,
 					Resource: &api.TypedLocalObjectReference{
 						APIGroup: utilpointer.String("example.com"),
 						Kind:     "foo",
@@ -804,7 +832,7 @@ func TestValidateIngress(t *testing.T) {
 		"spec.backend resource and service port are not allowed together": {
 			tweakIngress: func(ing *networking.Ingress) {
 				ing.Spec.DefaultBackend = &networking.IngressBackend{
-					Service: serviceBackend,
+					Service: servicePortBackend,
 					Resource: &api.TypedLocalObjectReference{
 						APIGroup: utilpointer.String("example.com"),
 						Kind:     "foo",
