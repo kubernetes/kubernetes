@@ -80,7 +80,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	}{
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
-				KubernetesVersion: "v1.7.0",
+				KubernetesVersion: "v1.99.0",
 				Etcd: kubeadmapi.Etcd{
 					Local: &kubeadmapi.LocalEtcd{
 						DataDir: tmpdir + "/etcd",
