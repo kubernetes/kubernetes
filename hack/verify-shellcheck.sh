@@ -21,7 +21,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)"
 
 # allow overriding docker cli, which should work fine for this script
 DOCKER="${DOCKER:-docker}"
