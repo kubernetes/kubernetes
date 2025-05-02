@@ -15483,7 +15483,7 @@
           "type": "string"
         },
         "count": {
-          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list. For the last entry, a count of zero is allowed. If AllocationMode is ExactCount and this field is not specified, the default is one.",
           "format": "int64",
           "type": "integer"
         },
@@ -16644,7 +16644,7 @@
           "type": "string"
         },
         "count": {
-          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list. For the last entry, a count of zero is allowed. If AllocationMode is ExactCount and this field is not specified, the default is one.",
           "format": "int64",
           "type": "integer"
         },
@@ -17652,7 +17652,7 @@
           "type": "string"
         },
         "count": {
-          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+          "description": "Count is used only when the count mode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list. For the last entry, a count of zero is allowed. If AllocationMode is ExactCount and this field is not specified, the default is one.",
           "format": "int64",
           "type": "integer"
         },
