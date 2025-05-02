@@ -644,7 +644,7 @@ func runCfsQuotaGuPods(ctx context.Context, f *framework.Framework, disabledCPUQ
 		deletePodsAsync(ctx2, f, podsToClean)
 	})
 
-	podCFSCheckCommand := []string{"sh", "-c", `cat $(find /sysfscgroup | grep "$(cat /podinfo/uid | sed 's/-/_/g').slice/cpu.max$") && sleep 1d`}
+	podCFSCheckCommand := []string{"sh", "-c", `cat $(find /sysfscgroup | grep -E "($(cat /podinfo/uid)|$(cat /podinfo/uid | sed 's/-/_/g'))(/|\.slice/)cpu.max$") && sleep 1d`}
 	cfsCheckCommand := []string{"sh", "-c", "cat /sys/fs/cgroup/cpu.max && sleep 1d"}
 	defaultPeriod := "100000"
 

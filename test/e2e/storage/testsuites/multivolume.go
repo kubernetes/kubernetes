@@ -466,7 +466,14 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 
 		// Create volume
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
-		resource := storageframework.CreateVolumeResource(ctx, l.driver, l.config, pattern, testVolumeSizeRange)
+		resource := storageframework.CreateVolumeResourceWithAccessModes(
+			ctx,
+			l.driver,
+			l.config,
+			pattern,
+			testVolumeSizeRange,
+			[]v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
+			nil /* vacName */)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node

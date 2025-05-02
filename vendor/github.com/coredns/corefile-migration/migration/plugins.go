@@ -441,7 +441,24 @@ var plugins = map[string]map[string]plugin{
 				"policy":         {},
 				"health_check":   {},
 				"max_concurrent": {},
-				"next":           {}, // new option
+				"next":           {},
+				"fail_fast":      {}, // new option
+			},
+		},
+		"v5": plugin{
+			namedOptions: map[string]option{
+				"except":                           {},
+				"force_tcp":                        {},
+				"prefer_udp":                       {},
+				"expire":                           {},
+				"max_fails":                        {},
+				"tls":                              {},
+				"tls_servername":                   {},
+				"policy":                           {},
+				"health_check":                     {},
+				"max_concurrent":                   {},
+				"next":                             {},
+				"failfast_all_unhealthy_upstreams": {}, // new option
 			},
 		},
 	},

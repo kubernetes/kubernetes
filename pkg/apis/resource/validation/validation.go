@@ -173,27 +173,9 @@ func gatherAllocatedDevices(allocationResult *resource.DeviceAllocationResult) s
 func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
 	allErrs := validateRequestName(request.Name, fldPath.Child("name"))
 
-	if request.DeviceClassName == "" && len(request.FirstAvailable) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `deviceClassName` or `firstAvailable` must be specified"))
-	} else if request.DeviceClassName != "" && len(request.FirstAvailable) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `deviceClassName` or `firstAvailable` must be specified"))
-	} else if request.DeviceClassName != "" {
-		allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
-		allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
-		allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
-	} else if len(request.FirstAvailable) > 0 {
-		if request.Selectors != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("selectors"), request.Selectors, "must not be specified when firstAvailable is set"))
-		}
-		if request.AllocationMode != "" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("allocationMode"), request.AllocationMode, "must not be specified when firstAvailable is set"))
-		}
-		if request.Count != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("count"), request.Count, "must not be specified when firstAvailable is set"))
-		}
-		if request.AdminAccess != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("adminAccess"), request.AdminAccess, "must not be specified when firstAvailable is set"))
-		}
+	numDeviceRequestType := 0
+	if len(request.FirstAvailable) > 0 {
+		numDeviceRequestType++
 		allErrs = append(allErrs, validateSet(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path) field.ErrorList {
 				return validateDeviceSubRequest(subRequest, fldPath, stored)
@@ -203,10 +185,19 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 			},
 			fldPath.Child("firstAvailable"))...)
 	}
-	for i, toleration := range request.Tolerations {
-		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
+
+	if request.Exactly != nil {
+		numDeviceRequestType++
+		allErrs = append(allErrs, validateExactDeviceRequest(*request.Exactly, fldPath.Child("exactly"), stored)...)
 	}
 
+	switch numDeviceRequestType {
+	case 0:
+		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `exactly` or `firstAvailable` is required"))
+	case 1:
+	default:
+		allErrs = append(allErrs, field.Invalid(fldPath, nil, "exactly one of `exactly` or `firstAvailable` is required, but multiple fields are set"))
+	}
 	return allErrs
 }
 
@@ -216,6 +207,17 @@ func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *fie
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
 	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
 	for i, toleration := range subRequest.Tolerations {
+		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
+	}
+	return allErrs
+}
+
+func validateExactDeviceRequest(request resource.ExactDeviceRequest, fldPath *field.Path, stored bool) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, validateDeviceClass(request.DeviceClassName, fldPath.Child("deviceClassName"))...)
+	allErrs = append(allErrs, validateSelectorSlice(request.Selectors, fldPath.Child("selectors"), stored)...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(request.AllocationMode, request.Count, fldPath.Child("allocationMode"), fldPath.Child("count"))...)
+	for i, toleration := range request.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
 	return allErrs
@@ -587,9 +589,14 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 
 	setFields := make([]string, 0, 4)
-	if spec.NodeName != "" {
-		setFields = append(setFields, "`nodeName`")
-		allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
+	if spec.NodeName != nil {
+		if *spec.NodeName != "" {
+			setFields = append(setFields, "`nodeName`")
+			allErrs = append(allErrs, validateNodeName(*spec.NodeName, fldPath.Child("nodeName"))...)
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *spec.NodeName,
+				"must be either unset or set to a non-empty string"))
+		}
 	}
 	if spec.NodeSelector != nil {
 		setFields = append(setFields, "`nodeSelector`")
@@ -600,9 +607,16 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeSelector", "nodeSelectorTerms"), spec.NodeSelector.NodeSelectorTerms, "must have exactly one node selector term"))
 		}
 	}
-	if spec.AllNodes {
-		setFields = append(setFields, "`allNodes`")
+
+	if spec.AllNodes != nil {
+		if *spec.AllNodes {
+			setFields = append(setFields, "`allNodes`")
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("allNodes"), *spec.AllNodes,
+				"must be either unset or set to true"))
+		}
 	}
+
 	if spec.PerDeviceNodeSelection != nil {
 		if *spec.PerDeviceNodeSelection {
 			setFields = append(setFields, "`perDeviceNodeSelection`")
@@ -610,8 +624,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("perDeviceNodeSelection"), *spec.PerDeviceNodeSelection,
 				"must be either unset or set to true"))
 		}
-
 	}
+
 	switch len(setFields) {
 	case 0:
 		allErrs = append(allErrs, field.Required(fldPath, "exactly one of `nodeName`, `nodeSelector`, `allNodes`, `perDeviceNodeSelection` is required"))
@@ -630,7 +644,26 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 			return device.Name, "name"
 		}, fldPath.Child("devices"))...)
 
-	allErrs = append(allErrs, validateSet(spec.SharedCounters, resource.ResourceSliceMaxSharedCounters,
+	// Size limit for total number of counters in devices enforced here.
+	numDeviceCounters := 0
+	for _, device := range spec.Devices {
+		for _, c := range device.ConsumesCounters {
+			numDeviceCounters += len(c.Counters)
+		}
+	}
+	if numDeviceCounters > resource.ResourceSliceMaxDeviceCountersPerSlice {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("devices"), numDeviceCounters, fmt.Sprintf("the total number of counters in devices must not exceed %d", resource.ResourceSliceMaxDeviceCountersPerSlice)))
+	}
+
+	// Size limit for all shared counters enforced here.
+	numCounters := 0
+	for _, set := range spec.SharedCounters {
+		numCounters += len(set.Counters)
+	}
+	if numCounters > resource.ResourceSliceMaxSharedCounters {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("sharedCounters"), numCounters, fmt.Sprintf("the total number of shared counters must not exceed %d", resource.ResourceSliceMaxSharedCounters)))
+	}
+	allErrs = append(allErrs, validateSet(spec.SharedCounters, -1,
 		validateCounterSet,
 		func(counterSet resource.CounterSet) (string, string) {
 			return counterSet.Name, "name"
@@ -649,7 +682,8 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 	if len(counterSet.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
 	} else {
-		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxSharedCountersCounters, attributeAndCapacityMaxKeyLength,
+		// The size limit is enforced for across all sets by the caller.
+		allErrs = append(allErrs, validateMap(counterSet.Counters, -1, validation.DNS1123LabelMaxLength,
 			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
 	}
 
@@ -658,12 +692,12 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 
 func gatherSharedCounterCounterNames(sharedCounters []resource.CounterSet) map[string]sets.Set[string] {
 	sharedCounterToCounterMap := make(map[string]sets.Set[string])
-	for _, sharedCounter := range sharedCounters {
+	for _, counterSet := range sharedCounters {
 		counterNames := sets.New[string]()
-		for counterName := range sharedCounter.Counters {
+		for counterName := range counterSet.Counters {
 			counterNames.Insert(counterName)
 		}
-		sharedCounterToCounterMap[sharedCounter.Name] = counterNames
+		sharedCounterToCounterMap[counterSet.Name] = counterNames
 	}
 	return sharedCounterToCounterMap
 }
@@ -683,44 +717,42 @@ func validateResourcePool(pool resource.ResourcePool, fldPath *field.Path) field
 func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
-	if device.Basic == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("basic"), ""))
-	} else {
-		allErrs = append(allErrs, validateBasicDevice(*device.Basic, fldPath.Child("basic"), sharedCounterToCounterNames, perDeviceNodeSelection)...)
-	}
-	return allErrs
-}
-
-func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, sharedCounterToCounterNames map[string]sets.Set[string], perDeviceNodeSelection *bool) field.ErrorList {
-	var allErrs field.ErrorList
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
+	attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
+	if attributeAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
+		allErrs = append(allErrs, field.Invalid(fldPath, attributeAndCapacityLength, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
+	}
+
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
 	allErrs = append(allErrs, validateMap(device.Capacity, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceCapacity, fldPath.Child("capacity"))...)
-	if combinedLen, max := len(device.Attributes)+len(device.Capacity), resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice; combinedLen > max {
-		allErrs = append(allErrs, field.Invalid(fldPath, combinedLen, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", max)))
-	}
-	for i, taint := range device.Taints {
-		allErrs = append(allErrs, validateDeviceTaint(taint, fldPath.Child("taints").Index(i))...)
-	}
+	allErrs = append(allErrs, validateSlice(device.Taints, resource.DeviceTaintsMaxLength, validateDeviceTaint, fldPath.Child("taints"))...)
 
-	allErrs = append(allErrs, validateSet(device.ConsumesCounter, resource.ResourceSliceMaxDeviceCounterConsumptions,
+	allErrs = append(allErrs, validateSet(device.ConsumesCounters, -1,
 		validateDeviceCounterConsumption,
 		func(deviceCapacityConsumption resource.DeviceCounterConsumption) (string, string) {
-			return deviceCapacityConsumption.SharedCounter, "sharedCounter"
-		}, fldPath.Child("consumesCounter"))...)
+			return deviceCapacityConsumption.CounterSet, "counterSet"
+		}, fldPath.Child("consumesCounters"))...)
 
-	for i, deviceCounterConsumption := range device.ConsumesCounter {
-		if capacityNames, exists := sharedCounterToCounterNames[deviceCounterConsumption.SharedCounter]; exists {
+	var countersLength int
+	for _, set := range device.ConsumesCounters {
+		countersLength += len(set.Counters)
+	}
+	if countersLength > resource.ResourceSliceMaxCountersPerDevice {
+		allErrs = append(allErrs, field.Invalid(fldPath, countersLength, fmt.Sprintf("the total number of counters must not exceed %d", resource.ResourceSliceMaxCountersPerDevice)))
+	}
+
+	for i, deviceCounterConsumption := range device.ConsumesCounters {
+		if capacityNames, exists := sharedCounterToCounterNames[deviceCounterConsumption.CounterSet]; exists {
 			for capacityName := range deviceCounterConsumption.Counters {
 				if !capacityNames.Has(string(capacityName)) {
-					allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounter").Index(i).Child("counters"),
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounters").Index(i).Child("counters"),
 						capacityName, "must reference a counter defined in the ResourceSlice sharedCounters"))
 				}
 			}
 		} else {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounter").Index(i).Child("sharedCounter"),
-				deviceCounterConsumption.SharedCounter, "must reference a counterSet defined in the ResourceSlice sharedCounters"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("consumesCounters").Index(i).Child("counterSet"),
+				deviceCounterConsumption.CounterSet, "must reference a counterSet defined in the ResourceSlice sharedCounters"))
 		}
 	}
 
@@ -756,20 +788,20 @@ func validateBasicDevice(device resource.BasicDevice, fldPath *field.Path, share
 	} else if (perDeviceNodeSelection == nil || !*perDeviceNodeSelection) && (device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil) {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 	}
-
 	return allErrs
 }
 
 func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if len(deviceCounterConsumption.SharedCounter) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("sharedCounter"), ""))
+	if len(deviceCounterConsumption.CounterSet) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("counterSet"), ""))
 	}
-	if deviceCounterConsumption.Counters == nil {
+	if len(deviceCounterConsumption.Counters) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
 	} else {
-		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxDeviceCounterConsumptionCounters, attributeAndCapacityMaxKeyLength,
+		// The size limit is enforced for the entire device.
+		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, -1, validation.DNS1123LabelMaxLength,
 			validateCounterName, validateDeviceCounter, fldPath.Child("counters"))...)
 	}
 	return allErrs

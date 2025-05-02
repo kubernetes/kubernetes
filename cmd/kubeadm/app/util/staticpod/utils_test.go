@@ -34,7 +34,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestComponentResources(t *testing.T) {
@@ -671,8 +670,7 @@ func TestReadStaticPodFromDisk(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.description, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			manifestPath := filepath.Join(tmpdir, "pod.yaml")
 			if rt.writeManifest {
@@ -844,8 +842,7 @@ func TestManifestFilesAreEqual(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.description, func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			// write 2 manifests
 			for i := 0; i < 2; i++ {

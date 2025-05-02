@@ -1548,14 +1548,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			Spec: validPodSpecNodeSelector,
 		},
 	}
-	validPodTemplateAbc2 := api.PodTemplate{
-		Template: api.PodTemplateSpec{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: validSelector2,
-			},
-			Spec: validPodSpecAbc,
-		},
-	}
 	validPodTemplateDef := api.PodTemplate{
 		Template: api.PodTemplateSpec{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1611,30 +1603,6 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				},
 			},
 		},
-		"change template and selector": {
-			old: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
-					TemplateGeneration: 2,
-					Template:           validPodTemplateAbc.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-			update: apps.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
-				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
-					TemplateGeneration: 3,
-					Template:           validPodTemplateAbc2.Template,
-					UpdateStrategy: apps.DaemonSetUpdateStrategy{
-						Type: apps.OnDeleteDaemonSetStrategyType,
-					},
-				},
-			},
-		},
 		"change template": {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -1674,9 +1642,9 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			update: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
-					TemplateGeneration: 2,
-					Template:           validPodTemplateDef.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -1805,6 +1773,31 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 			},
 			expectedErrNum: 1,
 		},
+		"change selector": {
+			old: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					TemplateGeneration: 1,
+					Template:           validPodTemplateAbc.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			update: apps.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: apps.DaemonSetSpec{
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
+					TemplateGeneration: 2,
+					Template:           validPodTemplateDef.Template,
+					UpdateStrategy: apps.DaemonSetUpdateStrategy{
+						Type: apps.OnDeleteDaemonSetStrategyType,
+					},
+				},
+			},
+			expectedErrNum: 1,
+		},
 		"invalid selector": {
 			old: apps.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
@@ -1828,7 +1821,7 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 					},
 				},
 			},
-			expectedErrNum: 1,
+			expectedErrNum: 2,
 		},
 		"invalid pod": {
 			old: apps.DaemonSet{
@@ -1946,8 +1939,8 @@ func TestValidateDaemonSetUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: apps.DaemonSetSpec{
 					TemplateGeneration: 2,
-					Selector:           &metav1.LabelSelector{MatchLabels: validSelector2},
-					Template:           validPodTemplateAbc2.Template,
+					Selector:           &metav1.LabelSelector{MatchLabels: validSelector},
+					Template:           validPodTemplateNodeSelector.Template,
 					UpdateStrategy: apps.DaemonSetUpdateStrategy{
 						Type: apps.OnDeleteDaemonSetStrategyType,
 					},
@@ -2677,7 +2670,7 @@ func TestValidateDeploymentUpdate(t *testing.T) {
 						Strategy: apps.DeploymentStrategy{Type: apps.RecreateDeploymentStrategyType},
 					},
 				},
-				expectedErrNum: 3,
+				expectedErrNum: 4,
 			},
 			"invalid pod": {
 				old: apps.Deployment{
@@ -3093,7 +3086,7 @@ func TestValidateReplicaSetUpdate(t *testing.T) {
 					Template: validPodTemplate.Template,
 				},
 			},
-			expectedErrNum: 3,
+			expectedErrNum: 4,
 		},
 		"invalid pod": {
 			old: apps.ReplicaSet{

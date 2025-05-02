@@ -35,6 +35,7 @@ import (
 // Tests aiming for full coverage of versions should test fixtures of all supported versions.
 func GetSupportedEmulatedVersions() []string {
 	return []string{
+		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(3).String(),
 		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(2).String(),
 		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().SubtractMinor(1).String(),
 		compatibility.DefaultKubeEffectiveVersionForTest().BinaryVersion().String(),
@@ -294,18 +295,16 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 			IntroducedVersion: "1.7",
 		},
 		gvr("networking.k8s.io", "v1", "ipaddresses"): {
-			Stub:                                   `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
-			ExpectedEtcdPath:                       "/registry/ipaddresses/192.168.2.3",
-			ExpectedGVK:                            gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
-			IntroducedVersion:                      "1.33",
-			EmulationForwardCompatibleSinceVersion: "1.31",
+			Stub:              `{"metadata": {"name": "192.168.2.3"}, "spec": {"parentRef": {"resource": "services","name": "test", "namespace": "ns"}}}`,
+			ExpectedEtcdPath:  "/registry/ipaddresses/192.168.2.3",
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "IPAddress"),
+			IntroducedVersion: "1.33",
 		},
 		gvr("networking.k8s.io", "v1", "servicecidrs"): {
-			Stub:                                   `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
-			ExpectedEtcdPath:                       "/registry/servicecidrs/range-b2",
-			ExpectedGVK:                            gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
-			IntroducedVersion:                      "1.33",
-			EmulationForwardCompatibleSinceVersion: "1.31",
+			Stub:              `{"metadata": {"name": "range-b2"}, "spec": {"cidrs": ["192.168.0.0/16","fd00:1::/120"]}}`,
+			ExpectedEtcdPath:  "/registry/servicecidrs/range-b2",
+			ExpectedGVK:       gvkP("networking.k8s.io", "v1beta1", "ServiceCIDR"),
+			IntroducedVersion: "1.33",
 		},
 		// --
 
@@ -625,6 +624,37 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		},
 		// --
 
+		// k8s.io/kubernetes/pkg/apis/resource/v1beta2
+		gvr("resource.k8s.io", "v1beta2", "deviceclasses"): {
+			Stub:              `{"metadata": {"name": "class3name"}}`,
+			ExpectedEtcdPath:  "/registry/deviceclasses/class3name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "DeviceClass"),
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		gvr("resource.k8s.io", "v1beta2", "resourceclaims"): {
+			Stub:              `{"metadata": {"name": "claim3name"}, "spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}`,
+			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim3name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceClaim"),
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		gvr("resource.k8s.io", "v1beta2", "resourceclaimtemplates"): {
+			Stub:              `{"metadata": {"name": "claimtemplate3name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}}`,
+			ExpectedEtcdPath:  "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate3name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceClaimTemplate"),
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		gvr("resource.k8s.io", "v1beta2", "resourceslices"): {
+			Stub:              `{"metadata": {"name": "node3slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
+			ExpectedEtcdPath:  "/registry/resourceslices/node3slice",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceSlice"),
+			IntroducedVersion: "1.33",
+			RemovedVersion:    "1.39",
+		},
+		// --
+
 		// k8s.io/apiserver/pkg/apis/apiserverinternal/v1alpha1
 		gvr("internal.apiserver.k8s.io", "v1alpha1", "storageversions"): {
 			Stub:             `{"metadata":{"name":"sv1.test"},"spec":{}}`,
@@ -649,6 +679,22 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		// --
 	}
 
+	// get the min version the Beta api of a group is introduced, and it would be used to determine emulation forward compatibility.
+	minBetaVersions := map[schema.GroupResource]*version.Version{}
+	for key, data := range etcdStorageData {
+		if !strings.Contains(key.Version, "beta") {
+			continue
+		}
+		introduced := version.MustParse(data.IntroducedVersion)
+		if ver, ok := minBetaVersions[key.GroupResource()]; ok {
+			if introduced.LessThan(ver) {
+				minBetaVersions[key.GroupResource()] = introduced
+			}
+		} else {
+			minBetaVersions[key.GroupResource()] = introduced
+		}
+	}
+
 	// Delete types no longer served or not yet added at a particular emulated version.
 	for key, data := range etcdStorageData {
 		if data.RemovedVersion != "" && version.MustParse(v).AtLeast(version.MustParse(data.RemovedVersion)) {
@@ -657,7 +703,8 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		if data.IntroducedVersion == "" || version.MustParse(v).AtLeast(version.MustParse(data.IntroducedVersion)) {
 			continue
 		}
-		if data.EmulationForwardCompatibleSinceVersion != "" && version.MustParse(v).AtLeast(version.MustParse(data.EmulationForwardCompatibleSinceVersion)) {
+		minBetaVersion, ok := minBetaVersions[key.GroupResource()]
+		if ok && version.MustParse(v).AtLeast(minBetaVersion) {
 			continue
 		}
 		delete(etcdStorageData, key)
@@ -704,10 +751,6 @@ type StorageData struct {
 	ExpectedGVK       *schema.GroupVersionKind // The GVK that we expect this object to be stored as - leave this nil to use the default
 	IntroducedVersion string                   // The version that this type is introduced
 	RemovedVersion    string                   // The version that this type is removed. May be empty for stable resources
-	// EmulationForwardCompatibleSinceVersion indicates the api should be kept if the emulation version is >= this version, even when the api is introduced after the emulation version.
-	// Only needed for some Beta (Beta2+) and GA APIs, and is the version when the lowest Beta api is introduced.
-	// This is needed to enable some Beta features where the api used in the corresponding controller has GAed.
-	EmulationForwardCompatibleSinceVersion string
 }
 
 // Prerequisite contains information required to create a resource (but not verify it)

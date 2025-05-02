@@ -150,6 +150,7 @@ aliases:
     - mauriciopoppe
     - msau42
     - saikat-royc
+    - sunnylovestiramisu
     - xing-yang
   # emeritus:
   # - chrishenzie
@@ -158,13 +159,14 @@ aliases:
   # - rootfs
   # - verult
   sig-scheduling-maintainers:
-    - alculquicondor
     - ahg-g
+    - dom4ha
     - Huang-Wei
     - kerthcet
     - macsko
     - sanposhiho
   # emeritus:
+  # - alculquicondor
   # - damemi
   # - bsalamat
   # - k82cn
@@ -310,7 +312,9 @@ aliases:
 
   sig-autoscaling-maintainers:
     - gjtempleton
-    - MaciekPytel
+    - jackfrancis
+    - raywainman
+    - towca
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
@@ -375,8 +379,7 @@ aliases:
     - smarterclayton
     - thockin
   sig-network-api-reviewers:
-    - andrewsykim
-    - caseydavenport
+    - aojea
     - danwinship
     - thockin
   sig-scheduling-api-approvers:
@@ -469,12 +472,16 @@ aliases:
   sig-scalability-approvers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt

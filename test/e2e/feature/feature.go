@@ -66,6 +66,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
 
+	// Owner: sig-node
+	// Enables configuring custom stop signals for containers from container lifecycle
+	ContainerStopSignals = framework.WithFeature(framework.ValidFeatures.Add("ContainerStopSignals"))
+
 	// Owner: sig-api-machinery
 	// Marks tests that require coordinated leader election
 	CoordinatedLeaderElection = framework.WithFeature(framework.ValidFeatures.Add("CoordinatedLeaderElection"))
@@ -219,6 +223,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	HPA = framework.WithFeature(framework.ValidFeatures.Add("HPA"))
 
+	// OWNER: sig-autoscaling
+	// Marks tests that require HPA configurable tolerance (https://kep.k8s.io/4951).
+	HPAConfigurableTolerance = framework.WithFeature(framework.ValidFeatures.Add("HPAConfigurableTolerance"))
+
 	// owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))
 
@@ -254,8 +262,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletCredentialProviders = framework.WithFeature(framework.ValidFeatures.Add("KubeletCredentialProviders"))
-
-	KubeletFineGrainedAuthz = framework.WithFeature(framework.ValidFeatures.Add("KubeletFineGrainedAuthz"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeletSecurity = framework.WithFeature(framework.ValidFeatures.Add("KubeletSecurity"))
@@ -515,14 +521,6 @@ var (
 	// - ci-kubernetes-node-e2e-cri-proxy-serial
 	CriProxy = framework.WithFeature(framework.ValidFeatures.Add("CriProxy"))
 
-	// Owner: sig-network
-	// Marks tests that require a cluster with Topology Hints enabled.
-	TopologyHints = framework.WithFeature(framework.ValidFeatures.Add("Topology Hints"))
-
-	// Owner: sig-network
-	// Marks tests that require a cluster with Traffic Distribution enabled.
-	TrafficDistribution = framework.WithFeature(framework.ValidFeatures.Add("Traffic Distribution"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	TopologyManager = framework.WithFeature(framework.ValidFeatures.Add("TopologyManager"))
 
@@ -556,9 +554,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Vsphere = framework.WithFeature(framework.ValidFeatures.Add("vsphere"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	WatchList = framework.WithFeature(framework.ValidFeatures.Add("WatchList"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Windows = framework.WithFeature(framework.ValidFeatures.Add("Windows"))

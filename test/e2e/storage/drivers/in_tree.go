@@ -69,11 +69,20 @@ const (
 	iSCSIIQNTemplate = "iqn.2003-01.io.k8s:e2e.%s"
 )
 
+type NFSProtocalVersion string
+
+const (
+	NFSv3 NFSProtocalVersion = "3"
+	NFSv4 NFSProtocalVersion = "4"
+)
+
 // NFS
 type nfsDriver struct {
 	externalProvisionerPod *v1.Pod
 	externalPluginName     string
 
+	// path that is exported by the NFS server.
+	path       string
 	driverInfo storageframework.DriverInfo
 }
 
@@ -90,28 +99,43 @@ var _ storageframework.PreprovisionedPVTestDriver = &nfsDriver{}
 var _ storageframework.DynamicPVTestDriver = &nfsDriver{}
 
 // InitNFSDriver returns nfsDriver that implements TestDriver interface
-func InitNFSDriver() storageframework.TestDriver {
-	return &nfsDriver{
-		driverInfo: storageframework.DriverInfo{
-			Name:             "nfs",
-			InTreePluginName: "kubernetes.io/nfs",
-			MaxFileSize:      storageframework.FileSizeLarge,
-			SupportedSizeRange: e2evolume.SizeRange{
-				Min: "1Gi",
+func InitNFSDriver(version NFSProtocalVersion) func() storageframework.TestDriver {
+	var driverName, path, mountOption string
+	switch version {
+	case NFSv3:
+		driverName = "nfs3"
+		path = "/exports"
+		mountOption = "vers=3"
+	case NFSv4:
+		driverName = "nfs"
+		path = "/"
+		mountOption = "vers=4.0"
+	}
+
+	return func() storageframework.TestDriver {
+		return &nfsDriver{
+			path: path,
+			driverInfo: storageframework.DriverInfo{
+				Name:             driverName,
+				InTreePluginName: "kubernetes.io/nfs",
+				MaxFileSize:      storageframework.FileSizeLarge,
+				SupportedSizeRange: e2evolume.SizeRange{
+					Min: "1Gi",
+				},
+				SupportedFsType: sets.NewString(
+					"", // Default fsType
+				),
+				SupportedMountOption: sets.NewString("relatime"),
+				RequiredMountOption:  sets.NewString(mountOption),
+				Capabilities: map[storageframework.Capability]bool{
+					storageframework.CapPersistence:       true,
+					storageframework.CapExec:              true,
+					storageframework.CapRWX:               true,
+					storageframework.CapMultiPODs:         true,
+					storageframework.CapMultiplePVsSameID: true,
+				},
 			},
-			SupportedFsType: sets.NewString(
-				"", // Default fsType
-			),
-			SupportedMountOption: sets.NewString("relatime"),
-			RequiredMountOption:  sets.NewString("vers=4.0"),
-			Capabilities: map[storageframework.Capability]bool{
-				storageframework.CapPersistence:       true,
-				storageframework.CapExec:              true,
-				storageframework.CapRWX:               true,
-				storageframework.CapMultiPODs:         true,
-				storageframework.CapMultiplePVsSameID: true,
-			},
-		},
+		}
 	}
 }
 
@@ -130,7 +154,7 @@ func (n *nfsDriver) GetVolumeSource(readOnly bool, fsType string, e2evolume stor
 	return &v1.VolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverHost,
-			Path:     "/",
+			Path:     n.path,
 			ReadOnly: readOnly,
 		},
 	}
@@ -144,7 +168,7 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 	return &v1.PersistentVolumeSource{
 		NFS: &v1.NFSVolumeSource{
 			Server:   nv.serverHost,
-			Path:     "/",
+			Path:     n.path,
 			ReadOnly: readOnly,
 		},
 	}, nil
@@ -152,7 +176,8 @@ func (n *nfsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2ev
 
 func (n *nfsDriver) GetDynamicProvisionStorageClass(ctx context.Context, config *storageframework.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := n.externalPluginName
-	parameters := map[string]string{"mountOptions": "vers=4.0"}
+	mountOptions := strings.Join(n.driverInfo.RequiredMountOption.List(), ",")
+	parameters := map[string]string{"mountOptions": mountOptions}
 	ns := config.Framework.Namespace.Name
 
 	return storageframework.GetStorageClass(provisioner, parameters, nil, ns)
@@ -1367,26 +1392,10 @@ func (l *localDriver) GetPersistentVolumeSource(readOnly bool, fsType string, e2
 	}, l.nodeAffinityForNode(lv.ltr.Node)
 }
 
-// cleanUpVolumeServer is a wrapper of cleanup function for volume server without secret created by specific CreateStorageServer function.
+// cleanUpVolumeServer is a wrapper of cleanup function for volume server.
 func cleanUpVolumeServer(ctx context.Context, f *framework.Framework, serverPod *v1.Pod) {
-	cleanUpVolumeServerWithSecret(ctx, f, serverPod, nil)
-}
-
-// cleanUpVolumeServerWithSecret is a wrapper of cleanup function for volume server with secret created by specific CreateStorageServer function.
-func cleanUpVolumeServerWithSecret(ctx context.Context, f *framework.Framework, serverPod *v1.Pod, secret *v1.Secret) {
-	cs := f.ClientSet
-	ns := f.Namespace
-
-	if secret != nil {
-		framework.Logf("Deleting server secret %q...", secret.Name)
-		err := cs.CoreV1().Secrets(ns.Name).Delete(ctx, secret.Name, metav1.DeleteOptions{})
-		if err != nil {
-			framework.Logf("Delete secret failed: %v", err)
-		}
-	}
-
 	framework.Logf("Deleting server pod %q...", serverPod.Name)
-	err := e2epod.DeletePodWithWait(ctx, cs, serverPod)
+	err := e2epod.DeletePodWithWait(ctx, f.ClientSet, serverPod)
 	if err != nil {
 		framework.Logf("Server pod delete failed: %v", err)
 	}

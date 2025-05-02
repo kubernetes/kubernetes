@@ -247,8 +247,9 @@ type GenericAPIServer struct {
 	EffectiveVersion basecompatibility.EffectiveVersion
 	// EmulationForwardCompatible is an option to implicitly enable all APIs which are introduced after the emulation version and
 	// have higher priority than APIs of the same group resource enabled at the emulation version.
-	// If true, all APIs that have higher priority than the APIs of the same group resource enabled at the emulation version will be installed.
+	// If true, all APIs that have higher priority than the APIs(beta+) of the same group resource enabled at the emulation version will be installed.
 	// This is needed when a controller implementation migrates to newer API versions, for the binary version, and also uses the newer API versions even when emulation version is set.
+	// Not applicable to alpha APIs.
 	EmulationForwardCompatible bool
 	// RuntimeConfigEmulationForwardCompatible is an option to explicitly enable specific APIs introduced after the emulation version through the runtime-config.
 	// If true, APIs identified by group/version that are enabled in the --runtime-config flag will be installed even if it is introduced after the emulation version. --runtime-config flag values that identify multiple APIs, such as api/all,api/ga,api/beta, are not influenced by this flag and will only enable APIs available at the current emulation version.

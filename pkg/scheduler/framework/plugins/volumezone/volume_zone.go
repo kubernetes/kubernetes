@@ -108,7 +108,7 @@ func (pl *VolumeZone) Name() string {
 //
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
-func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	logger := klog.FromContext(ctx)
 	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {

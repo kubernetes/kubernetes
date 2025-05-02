@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
@@ -52,7 +53,7 @@ func validNewResourceSlice(name string) *resource.ResourceSlice {
 			Name: name,
 		},
 		Spec: resource.ResourceSliceSpec{
-			NodeName: name,
+			NodeName: ptr.To(name),
 			Driver:   "cdi.example.com",
 			Pool: resource.ResourcePool{
 				Name:               "worker-1",

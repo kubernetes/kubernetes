@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -155,6 +154,11 @@ func TestWatchListMatchSingle(t *testing.T) {
 	storagetesting.RunWatchListMatchSingle(ctx, t, store)
 }
 
+func TestWatchErrorEventIsBlockingFurtherEvent(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+	storagetesting.RunWatchErrorIsBlockingFurtherEvents(ctx, t, &storeWithPrefixTransformer{store})
+}
+
 // =======================================================================
 // Implementation-specific tests are following.
 // The following tests are exercising the details of the implementation
@@ -162,28 +166,6 @@ func TestWatchListMatchSingle(t *testing.T) {
 // As such, they may focus e.g. on non-functional aspects like performance
 // impact.
 // =======================================================================
-
-func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
-	origCtx, store, _ := testSetup(t)
-	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, false, storage.Everything)
-	// make resultChan and errChan blocking to ensure ordering.
-	w.resultChan = make(chan watch.Event)
-	w.errChan = make(chan error)
-	// The event flow goes like:
-	// - first we send an error, it should block on resultChan.
-	// - Then we cancel ctx. The blocking on resultChan should be freed up
-	//   and run() goroutine should return.
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		w.run(false, true)
-		wg.Done()
-	}()
-	w.errChan <- fmt.Errorf("some error")
-	cancel()
-	wg.Wait()
-}
 
 // TestWatchErrorIncorrectConfiguration checks if an error
 // will be returned when the storage hasn't been properly

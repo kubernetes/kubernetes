@@ -73,9 +73,9 @@ func TestGetControlPlaneComponents(t *testing.T) {
 				return podMap
 			},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: fmt.Sprintf("https://[fd00:1::]:1111/%s", endpointLivez)},
-				{name: "kube-controller-manager", url: fmt.Sprintf("https://127.0.0.1:2222/%s", endpointHealthz)},
-				{name: "kube-scheduler", url: fmt.Sprintf("https://127.0.0.1:3333/%s", endpointLivez)},
+				{name: "kube-apiserver", addressPort: "[fd00:1::]:1111", endpoint: endpointLivez},
+				{name: "kube-controller-manager", addressPort: "127.0.0.1:2222", endpoint: endpointHealthz},
+				{name: "kube-scheduler", addressPort: "127.0.0.1:3333", endpoint: endpointLivez},
 			},
 		},
 		{
@@ -106,9 +106,9 @@ func TestGetControlPlaneComponents(t *testing.T) {
 				return podMap
 			},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: fmt.Sprintf("https://[fd00:1::]:1111/%s", endpointLivez)},
-				{name: "kube-controller-manager", url: fmt.Sprintf("https://127.0.0.1:2222/%s", endpointHealthz)},
-				{name: "kube-scheduler", url: fmt.Sprintf("https://127.0.0.1:3333/%s", endpointLivez)},
+				{name: "kube-apiserver", addressPort: "[fd00:1::]:1111", endpoint: endpointLivez},
+				{name: "kube-controller-manager", addressPort: "127.0.0.1:2222", endpoint: endpointHealthz},
+				{name: "kube-scheduler", addressPort: "127.0.0.1:3333", endpoint: endpointLivez},
 			},
 		},
 		{
@@ -133,9 +133,9 @@ func TestGetControlPlaneComponents(t *testing.T) {
 				return podMap
 			},
 			expected: []controlPlaneComponent{
-				{name: "kube-apiserver", url: fmt.Sprintf("https://192.168.0.1:6443/%s", endpointLivez)},
-				{name: "kube-controller-manager", url: fmt.Sprintf("https://127.0.0.1:10257/%s", endpointHealthz)},
-				{name: "kube-scheduler", url: fmt.Sprintf("https://127.0.0.1:10259/%s", endpointLivez)},
+				{name: "kube-apiserver", addressPort: "192.168.0.1:6443", endpoint: endpointLivez},
+				{name: "kube-controller-manager", addressPort: "127.0.0.1:10257", endpoint: endpointHealthz},
+				{name: "kube-scheduler", addressPort: "127.0.0.1:10259", endpoint: endpointLivez},
 			},
 		},
 		{

@@ -55,6 +55,7 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 	restartCount := 0
 	opts, _, _ := m.runtimeHelper.GenerateRunContainerOptions(ctx, pod, container, podIP, []string{podIP}, nil)
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
+	stopsignal := getContainerConfigStopSignal(container)
 	restartCountUint32 := uint32(restartCount)
 	envs := make([]*runtimeapi.KeyValue, len(opts.Envs))
 
@@ -80,6 +81,9 @@ func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerInde
 		Linux:       l,
 		Envs:        envs,
 		CDIDevices:  makeCDIDevices(opts),
+	}
+	if stopsignal != nil {
+		expectedConfig.StopSignal = *stopsignal
 	}
 	return expectedConfig
 }

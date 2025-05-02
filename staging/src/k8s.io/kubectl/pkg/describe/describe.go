@@ -22,9 +22,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/url"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2580,12 +2582,12 @@ func describeSecret(secret *corev1.Secret) (string, error) {
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
 		w.Write(LEVEL_0, "\nData\n====\n")
-		for k, v := range secret.Data {
+		for _, k := range slices.Sorted(maps.Keys(secret.Data)) {
 			switch {
 			case k == corev1.ServiceAccountTokenKey && secret.Type == corev1.SecretTypeServiceAccountToken:
-				w.Write(LEVEL_0, "%s:\t%s\n", k, string(v))
+				w.Write(LEVEL_0, "%s:\t%s\n", k, string(secret.Data[k]))
 			default:
-				w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(v))
+				w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(secret.Data[k]))
 			}
 		}
 
@@ -3154,6 +3156,9 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 		}
 		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
 			w.Write(LEVEL_0, "LoadBalancer Source Ranges:\t%v\n", strings.Join(service.Spec.LoadBalancerSourceRanges, ","))
+		}
+		if service.Spec.TrafficDistribution != nil {
+			w.Write(LEVEL_0, "Traffic Distribution:\t%s\n", *service.Spec.TrafficDistribution)
 		}
 		if events != nil {
 			DescribeEvents(events, w)

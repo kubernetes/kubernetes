@@ -856,7 +856,7 @@ func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) err
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
 		}
 
-		if slice.Spec.NodeName != nodeName {
+		if slice.Spec.NodeName == nil || *slice.Spec.NodeName != nodeName {
 			return admission.NewForbidden(a, errors.New("can only create ResourceSlice with the same NodeName as the requesting node"))
 		}
 	case admission.Delete:
@@ -865,7 +865,7 @@ func (p *Plugin) admitResourceSlice(nodeName string, a admission.Attributes) err
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
 		}
 
-		if slice.Spec.NodeName != nodeName {
+		if slice.Spec.NodeName == nil || *slice.Spec.NodeName != nodeName {
 			return admission.NewForbidden(a, errors.New("can only delete ResourceSlice with the same NodeName as the requesting node"))
 		}
 	}

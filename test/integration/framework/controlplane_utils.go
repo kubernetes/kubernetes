@@ -86,6 +86,12 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
+//
+// The transport CertFile/KeyFile/TrustedCAFile will be empty for insecure connections.
+// In that case, *no* TLS config should be used because etcd would try to use
+// it for Unix Domain sockets (https://github.com/etcd-io/etcd/blob/5a8fba466087686fc15815f5bc041fb7eb1f23ea/client/v3/internal/endpoint/endpoint.go#L61-L66)
+// and fail to connect because the TLS config is insufficient. It works
+// for TCP because http disables using TLS.
 func SharedEtcd() *storagebackend.Config {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	cfg.Transport.ServerList = []string{GetEtcdURL()}

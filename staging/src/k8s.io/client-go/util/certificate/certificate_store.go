@@ -231,6 +231,11 @@ func (s *fileStore) Update(certData, keyData []byte) (*tls.Certificate, error) {
 	}
 	pem.Encode(f, keyBlock)
 
+	// Ensure data is written to disk
+	if err := f.Sync(); err != nil {
+		return nil, fmt.Errorf("failed to sync certificate data to disk: %w (file: %q)", err, certPath)
+	}
+
 	cert, err := loadFile(certPath)
 	if err != nil {
 		return nil, err

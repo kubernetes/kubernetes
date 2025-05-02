@@ -765,28 +765,31 @@ var ValidateServiceCIDRName = apimachineryvalidation.NameIsDNSSubdomain
 
 func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&cidrConfig.ObjectMeta, false, ValidateServiceCIDRName, field.NewPath("metadata"))
-	fieldPath := field.NewPath("spec", "cidrs")
+	allErrs = append(allErrs, validateServiceCIDRSpec(&cidrConfig.Spec, field.NewPath("spec", "cidrs"))...)
+	return allErrs
+}
 
-	if len(cidrConfig.Spec.CIDRs) == 0 {
+func validateServiceCIDRSpec(cidrConfigSpec *networking.ServiceCIDRSpec, fieldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(cidrConfigSpec.CIDRs) == 0 {
 		allErrs = append(allErrs, field.Required(fieldPath, "at least one CIDR required"))
 		return allErrs
 	}
 
-	if len(cidrConfig.Spec.CIDRs) > 2 {
-		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may only hold up to 2 values"))
+	if len(cidrConfigSpec.CIDRs) > 2 {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfigSpec, "may only hold up to 2 values"))
 		return allErrs
 	}
-	// validate cidrs are dual stack, one of each IP family
-	if len(cidrConfig.Spec.CIDRs) == 2 {
-		isDual, err := netutils.IsDualStackCIDRStrings(cidrConfig.Spec.CIDRs)
-		if err != nil || !isDual {
-			allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfig.Spec, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
-			return allErrs
-		}
+
+	for i, cidr := range cidrConfigSpec.CIDRs {
+		allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(i), cidr)...)
 	}
 
-	for i, cidr := range cidrConfig.Spec.CIDRs {
-		allErrs = append(allErrs, validation.IsValidCIDR(fieldPath.Index(i), cidr)...)
+	// validate cidrs are dual stack, one of each IP family
+	if len(cidrConfigSpec.CIDRs) == 2 &&
+		netutils.IPFamilyOfCIDRString(cidrConfigSpec.CIDRs[0]) == netutils.IPFamilyOfCIDRString(cidrConfigSpec.CIDRs[1]) &&
+		netutils.IPFamilyOfCIDRString(cidrConfigSpec.CIDRs[0]) != netutils.IPFamilyUnknown {
+		allErrs = append(allErrs, field.Invalid(fieldPath, cidrConfigSpec.CIDRs, "may specify no more than one IP for each IP family, i.e 192.168.0.0/24 and 2001:db8::/64"))
 	}
 
 	return allErrs
@@ -796,8 +799,28 @@ func ValidateServiceCIDR(cidrConfig *networking.ServiceCIDR) field.ErrorList {
 func ValidateServiceCIDRUpdate(update, old *networking.ServiceCIDR) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.CIDRs, old.Spec.CIDRs, field.NewPath("spec").Child("cidrs"))...)
+	switch {
+	// no change in Spec.CIDRs lengths fields must not change
+	case len(old.Spec.CIDRs) == len(update.Spec.CIDRs):
+		for i, ip := range old.Spec.CIDRs {
+			if ip != update.Spec.CIDRs[i] {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cidrs").Index(i), update.Spec.CIDRs[i], apimachineryvalidation.FieldImmutableErrorMsg))
+			}
+		}
+		// added a new CIDR is allowed to convert to Dual Stack
+		// ref: https://issues.k8s.io/131261
+	case len(old.Spec.CIDRs) == 1 && len(update.Spec.CIDRs) == 2:
+		// existing CIDR can not change
+		if update.Spec.CIDRs[0] != old.Spec.CIDRs[0] {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cidrs").Index(0), update.Spec.CIDRs[0], apimachineryvalidation.FieldImmutableErrorMsg))
+		}
+		// validate the new added CIDR
+		allErrs = append(allErrs, validateServiceCIDRSpec(&update.Spec, field.NewPath("spec", "cidrs"))...)
 
+		// no other changes allowed
+	default:
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec").Child("cidrs"), update.Spec.CIDRs, apimachineryvalidation.FieldImmutableErrorMsg))
+	}
 	return allErrs
 }
 

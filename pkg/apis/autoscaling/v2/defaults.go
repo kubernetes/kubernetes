@@ -91,9 +91,12 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2.HorizontalPodAutosca
 	SetDefaults_HorizontalPodAutoscalerBehavior(obj)
 }
 
-// SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it is not null
+// SetDefaults_HorizontalPodAutoscalerBehavior fills the behavior if it contains
+// at least one scaling rule policy (for scale-up or scale-down)
 func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPodAutoscaler) {
-	// if behavior is specified, we should fill all the 'nil' values with the default ones
+	// If behavior contains a scaling rule policy (either for scale-up, scale-down, or both), we
+	// should fill all the unset scaling policy fields (i.e. StabilizationWindowSeconds,
+	// SelectPolicy, Policies) with default values
 	if obj.Spec.Behavior != nil {
 		obj.Spec.Behavior.ScaleUp = GenerateHPAScaleUpRules(obj.Spec.Behavior.ScaleUp)
 		obj.Spec.Behavior.ScaleDown = GenerateHPAScaleDownRules(obj.Spec.Behavior.ScaleDown)
@@ -128,6 +131,9 @@ func copyHPAScalingRules(from, to *autoscalingv2.HPAScalingRules) *autoscalingv2
 	}
 	if from.Policies != nil {
 		to.Policies = from.Policies
+	}
+	if from.Tolerance != nil {
+		to.Tolerance = from.Tolerance
 	}
 	return to
 }

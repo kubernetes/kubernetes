@@ -18,6 +18,7 @@ package markcontrolplane
 
 import (
 	"fmt"
+	"slices"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -50,23 +51,13 @@ func MarkControlPlane(client clientset.Interface, controlPlaneName string, taint
 	})
 }
 
-func taintExists(taint v1.Taint, taints []v1.Taint) bool {
-	for _, t := range taints {
-		if t == taint {
-			return true
-		}
-	}
-
-	return false
-}
-
 func markControlPlaneNode(n *v1.Node, taints []v1.Taint) {
 	for _, label := range labelsToAdd {
 		n.ObjectMeta.Labels[label] = ""
 	}
 
 	for _, nt := range n.Spec.Taints {
-		if !taintExists(nt, taints) {
+		if !slices.Contains(taints, nt) {
 			taints = append(taints, nt)
 		}
 	}

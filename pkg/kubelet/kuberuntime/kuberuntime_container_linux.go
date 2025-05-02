@@ -294,13 +294,13 @@ func (m *kubeGenericRuntimeManager) calculateLinuxResources(cpuRequest, cpuLimit
 	if m.cpuCFSQuota {
 		// if cpuLimit.Amount is nil, then the appropriate default value is returned
 		// to allow full usage of cpu resource.
-		cpuPeriod := int64(quotaPeriod)
+		cpuPeriod := int64(cm.QuotaPeriod)
 		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUCFSQuotaPeriod) {
 			// kubeGenericRuntimeManager.cpuCFSQuotaPeriod is provided in time.Duration,
 			// but we need to convert it to number of microseconds which is used by kernel.
 			cpuPeriod = int64(m.cpuCFSQuotaPeriod.Duration / time.Microsecond)
 		}
-		cpuQuota := milliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
+		cpuQuota := cm.MilliCPUToQuota(cpuLimit.MilliValue(), cpuPeriod)
 		resources.CpuQuota = cpuQuota
 		if disableCPUQuota {
 			resources.CpuQuota = int64(-1)

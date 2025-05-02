@@ -19,6 +19,7 @@ package describe
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"testing"
@@ -350,27 +351,79 @@ func TestDescribeTopologySpreadConstraints(t *testing.T) {
 }
 
 func TestDescribeSecret(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+	testCases := []struct {
+		description string
+		data        map[string][]byte // secret key -> secret in bytes
+		expected    []string
+	}{
+		{
+			description: "alphabetical ordering",
+			data: map[string][]byte{
+				"username": []byte("YWRtaW4="),
+				"password": []byte("MWYyZDFlMmU2N2Rm"),
+			},
+			expected: []string{"password", "username"},
 		},
-		Data: map[string][]byte{
-			"username": []byte("YWRtaW4="),
-			"password": []byte("MWYyZDFlMmU2N2Rm"),
+		{
+			description: "uppercase takes precedence",
+			data: map[string][]byte{
+				"text": []byte("a3ViZXJuZXRlcwo="),
+				"Text": []byte("dGhpcyBpcyBhIHRlc3QK"),
+				"tExt": []byte("d2VpcmQgY2FzaW5nCg=="),
+			},
+			expected: []string{"Text", "tExt", "text"},
 		},
-	})
-	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
-	d := SecretDescriber{c}
-	out, err := d.Describe("foo", "bar", DescriberSettings{})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		{
+			description: "numbers take precedence",
+			data: map[string][]byte{
+				"key_1": []byte("c29tZV9zZWNyZXQK"),
+				"1_key": []byte("c29tZV90ZXh0Cg=="),
+			},
+			expected: []string{"1_key", "key_1"},
+		},
 	}
-	if !strings.Contains(out, "bar") || !strings.Contains(out, "foo") || !strings.Contains(out, "username") || !strings.Contains(out, "8 bytes") || !strings.Contains(out, "password") || !strings.Contains(out, "16 bytes") {
-		t.Errorf("unexpected out: %s", out)
-	}
-	if strings.Contains(out, "YWRtaW4=") || strings.Contains(out, "MWYyZDFlMmU2N2Rm") {
-		t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Data: testCase.data,
+			}
+			fake := fake.NewSimpleClientset(secret)
+			c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+			d := SecretDescriber{c}
+
+			out, err := d.Describe("foo", "bar", DescriberSettings{})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			for value := range maps.Values(testCase.data) {
+				if strings.Contains(out, string(value)) {
+					t.Errorf("sensitive data should not be shown, unexpected out: %s", out)
+				}
+			}
+
+			expectedOut := `Name:         bar
+Namespace:    foo
+Labels:       <none>
+Annotations:  <none>
+
+Type:  
+
+Data
+====`
+
+			for _, expectedKey := range testCase.expected {
+				expectedOut = fmt.Sprintf("%s\n%s:  %d bytes", expectedOut, expectedKey, len(testCase.data[expectedKey]))
+			}
+			expectedOut = fmt.Sprintf("%s\n", expectedOut)
+
+			assert.Equal(t, expectedOut, out)
+		})
 	}
 }
 
@@ -728,6 +781,7 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 
 func TestDescribeService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
+	preferClose := corev1.ServiceTrafficDistributionPreferClose
 	testCases := []struct {
 		name           string
 		service        *corev1.Service
@@ -1083,6 +1137,54 @@ func TestDescribeService(t *testing.T) {
 				Session Affinity:         None
 				External Traffic Policy:  Local
 				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
+		},
+		{
+			name: "test-TrafficDistribution",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					TrafficDistribution:   &preferClose,
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				Desired LoadBalancer IP:  5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                <none>
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Traffic Distribution:     PreferClose
 				Events:                   <none>
 			`)[1:],
 		},

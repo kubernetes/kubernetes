@@ -59,17 +59,6 @@ func SetDefaults_Job(obj *batchv1.Job) {
 	if obj.Spec.Suspend == nil {
 		obj.Spec.Suspend = ptr.To(false)
 	}
-	if obj.Spec.PodFailurePolicy != nil {
-		for _, rule := range obj.Spec.PodFailurePolicy.Rules {
-			if rule.OnPodConditions != nil {
-				for i, pattern := range rule.OnPodConditions {
-					if pattern.Status == "" {
-						rule.OnPodConditions[i].Status = corev1.ConditionTrue
-					}
-				}
-			}
-		}
-	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 		if obj.Spec.PodReplacementPolicy == nil {
 			if obj.Spec.PodFailurePolicy != nil {
@@ -96,5 +85,11 @@ func SetDefaults_CronJob(obj *batchv1.CronJob) {
 	}
 	if obj.Spec.FailedJobsHistoryLimit == nil {
 		obj.Spec.FailedJobsHistoryLimit = ptr.To[int32](1)
+	}
+}
+
+func SetDefaults_PodFailurePolicyOnPodConditionsPattern(obj *batchv1.PodFailurePolicyOnPodConditionsPattern) {
+	if obj.Status == "" {
+		obj.Status = corev1.ConditionTrue
 	}
 }

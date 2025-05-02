@@ -880,6 +880,13 @@ func HPAScalingRuleWithScalingPolicy(policyType autoscalingv2.HPAScalingPolicyTy
 	}
 }
 
+func HPAScalingRuleWithToleranceMilli(toleranceMilli int64) *autoscalingv2.HPAScalingRules {
+	quantity := resource.NewMilliQuantity(toleranceMilli, resource.DecimalSI)
+	return &autoscalingv2.HPAScalingRules{
+		Tolerance: quantity,
+	}
+}
+
 func HPABehaviorWithStabilizationWindows(upscaleStabilization, downscaleStabilization time.Duration) *autoscalingv2.HorizontalPodAutoscalerBehavior {
 	scaleUpRule := HPAScalingRuleWithStabilizationWindow(int32(upscaleStabilization.Seconds()))
 	scaleDownRule := HPAScalingRuleWithStabilizationWindow(int32(downscaleStabilization.Seconds()))

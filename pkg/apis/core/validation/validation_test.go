@@ -8372,6 +8372,7 @@ func TestValidateLinuxPodSecurityContext(t *testing.T) {
 
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
+	podOS := &core.PodOS{Name: core.OSName(v1.Linux)}
 	capabilities.ResetForTest()
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
@@ -8568,11 +8569,19 @@ func TestValidateContainers(t *testing.T) {
 				{ResourceName: "memory", RestartPolicy: "NotRequired"},
 				{ResourceName: "cpu", RestartPolicy: "RestartContainer"},
 			},
+		}, {
+			Name:                     "container-with-stopsignal-lifecycle",
+			Image:                    "image",
+			ImagePullPolicy:          "IfNotPresent",
+			TerminationMessagePolicy: "File",
+			Lifecycle: &core.Lifecycle{
+				StopSignal: ptr.To(core.SIGTERM),
+			},
 		},
 	}
 
 	var PodRestartPolicy core.RestartPolicy = "Always"
-	if errs := validateContainers(successCase, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateContainers(successCase, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9187,7 +9196,7 @@ func TestValidateContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateContainers(tc.containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateContainers(tc.containers, podOS, volumeDevices, nil, defaultGracePeriod, field.NewPath("containers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -9202,6 +9211,7 @@ func TestValidateContainers(t *testing.T) {
 
 func TestValidateInitContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
+	podOS := &core.PodOS{Name: core.OSName(v1.Linux)}
 	capabilities.ResetForTest()
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
@@ -9285,7 +9295,7 @@ func TestValidateInitContainers(t *testing.T) {
 	},
 	}
 	var PodRestartPolicy core.RestartPolicy = "Never"
-	if errs := validateInitContainers(successCase, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
+	if errs := validateInitContainers(successCase, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("field"), PodValidationOptions{AllowSidecarResizePolicy: true}, &PodRestartPolicy, noUserNamespace); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
@@ -9679,7 +9689,7 @@ func TestValidateInitContainers(t *testing.T) {
 
 	for _, tc := range errorCases {
 		t.Run(tc.title+"__@L"+tc.line, func(t *testing.T) {
-			errs := validateInitContainers(tc.initContainers, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
+			errs := validateInitContainers(tc.initContainers, podOS, containers, volumeDevices, nil, defaultGracePeriod, field.NewPath("initContainers"), PodValidationOptions{}, &PodRestartPolicy, noUserNamespace)
 			if len(errs) == 0 {
 				t.Fatal("expected error but received none")
 			}
@@ -11051,6 +11061,22 @@ func TestValidatePod(t *testing.T) {
 				},
 			}),
 		),
+		"Pod with valid StopSignal and valid OS": *podtest.MakePod("test-pod",
+			podtest.SetOS(core.Linux),
+			podtest.SetContainers(podtest.MakeContainer(
+				"test-container",
+				podtest.SetContainerImage("image"),
+				podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGTERM)}),
+			)),
+		),
+		"Pod with valid StopSignal and valid OS (Windows)": *podtest.MakePod("test-pod",
+			podtest.SetOS(core.Windows),
+			podtest.SetContainers(podtest.MakeContainer(
+				"test-container",
+				podtest.SetContainerImage("image"),
+				podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGTERM)}),
+			)),
+		),
 	}
 
 	for k, v := range successCases {
@@ -12388,6 +12414,27 @@ func TestValidatePod(t *testing.T) {
 							}},
 						}},
 				}),
+			),
+		},
+		"Pod with a StopSignal without `spec.os.name`": {
+			expectedError: "spec.containers[0].lifecycle.stopSignal: Forbidden: may not be set for containers with empty `spec.os.name`",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetContainers(podtest.MakeContainer(
+					"test-container",
+					podtest.SetContainerImage("image"),
+					podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGTERM)}),
+				)),
+			),
+		},
+		"Pod with a StopSignal not supported by OS": {
+			expectedError: "spec.containers[0].lifecycle.stopSignal: Unsupported value: \"SIGHUP\": supported values: \"SIGKILL\", \"SIGTERM\"",
+			spec: *podtest.MakePod("test-pod",
+				podtest.SetOS(core.Windows),
+				podtest.SetContainers(podtest.MakeContainer(
+					"test-container",
+					podtest.SetContainerImage("image"),
+					podtest.SetContainerLifecycle(core.Lifecycle{StopSignal: ptr.To(core.SIGHUP)}),
+				)),
 			),
 		},
 	}
@@ -26964,6 +27011,61 @@ func TestValidateNodeSwapStatus(t *testing.T) {
 			if len(errs) != 0 && !tc.expectError {
 				t.Errorf("expected success for %s, but there were errors: %v", tc.name, errs)
 				return
+			}
+		})
+	}
+}
+
+func TestValidateStopSignal(t *testing.T) {
+	fldPath := field.NewPath("root")
+	sigkill := core.SIGKILL
+	sigterm := core.SIGTERM
+	sighup := core.SIGHUP
+	linux := core.PodOS{Name: core.Linux}
+	windows := core.PodOS{Name: core.Windows}
+
+	testCases := []struct {
+		name       string
+		stopsignal *core.Signal
+		os         *core.PodOS
+		expectErr  field.ErrorList
+	}{
+		{
+			name:       "Empty spec.os.name",
+			stopsignal: &sigterm,
+			os:         nil,
+			expectErr:  field.ErrorList{field.Forbidden(fldPath, "may not be set for containers with empty `spec.os.name`")},
+		},
+		{
+			name:       "Invalid signal passed to windows pod",
+			stopsignal: &sighup,
+			os:         &windows,
+			expectErr:  field.ErrorList{field.NotSupported(fldPath, &sighup, sets.List(supportedStopSignalsWindows))},
+		},
+		{
+			name:       "Valid signal passed to windows pod",
+			stopsignal: &sigkill,
+			os:         &windows,
+		},
+		{
+			name:       "Valid signal passed to linux pod",
+			stopsignal: &sighup,
+			os:         &linux,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := validateStopSignal(tc.stopsignal, fldPath, tc.os)
+
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Unexpected error(s): %v", errs)
+				}
 			}
 		})
 	}

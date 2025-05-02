@@ -66,6 +66,24 @@ function setup-os-params {
   # /sbin/crash_reporter which is more restrictive in saving crash dumps. So for
   # now, set a generic core_pattern that users can work with.
   echo "/core.%e.%p.%t" > /proc/sys/kernel/core_pattern
+  echo "Default max_user_watches / max_user_instances:"
+  # ensure we have enough inotify watches for many pods, versus the OS defaults
+  # debug before & after / defaults for comparison
+  sysctl fs.inotify.max_user_watches
+  sysctl fs.inotify.max_user_instances
+  cat <<EOF > /etc/sysctl.d/inotify.conf
+fs.inotify.max_user_watches=65536
+fs.inotify.max_user_instances=8192
+EOF
+  # Ubuntu vs COS, load sysctl settings now
+  if [[ -e "/usr/lib/systemd/systemd-sysctl" ]]; then
+    /usr/lib/systemd/systemd-sysctl
+  else
+    /lib/systemd/systemd-sysctl
+  fi
+  echo "Updated max_user_watches / max_user_instances:"
+  sysctl fs.inotify.max_user_watches
+  sysctl fs.inotify.max_user_instances
 }
 
 # secure_random generates a secure random string of bytes. This function accepts

@@ -274,7 +274,7 @@ func TestSingleZone(t *testing.T) {
 				scLister:                  nil,
 				enableSchedulingQueueHint: false,
 			}
-			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -407,7 +407,7 @@ func TestMultiZone(t *testing.T) {
 				scLister:                  nil,
 				enableSchedulingQueueHint: false,
 			}
-			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -533,7 +533,7 @@ func TestWithBinding(t *testing.T) {
 				scLister:                  scLister,
 				enableSchedulingQueueHint: false,
 			}
-			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod)
+			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -826,7 +826,7 @@ func BenchmarkVolumeZone(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				if tt.PreFilter {
-					_, _ = p.PreFilter(ctx, state, tt.Pod)
+					_, _ = p.PreFilter(ctx, state, tt.Pod, nil)
 				}
 				for _, node := range nodeInfos {
 					_ = p.Filter(ctx, state, tt.Pod, node)

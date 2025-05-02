@@ -540,7 +540,7 @@ type KubeletConfiguration struct {
 	CrashLoopBackOff CrashLoopBackOffConfig
 
 	// UserNamespaces contains User Namespace configurations.
-	// +featureGate=UserNamespaceSupport
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces
 }
@@ -737,6 +737,8 @@ type ServiceAccountTokenAttributes struct {
 	// additional information required to fetch credentials or allow workloads to opt in to
 	// using service account tokens for image pull.
 	// If non-empty, requireServiceAccount must be set to true.
+	// Keys in this list must be unique.
+	// This list needs to be mutually exclusive with optionalServiceAccountAnnotationKeys.
 	// +optional
 	RequiredServiceAccountAnnotationKeys []string
 
@@ -747,6 +749,7 @@ type ServiceAccountTokenAttributes struct {
 	// the existence of annotations and their values.
 	// This field is optional and may be empty. Plugins may use this field to extract
 	// additional information required to fetch credentials.
+	// Keys in this list must be unique.
 	// +optional
 	OptionalServiceAccountAnnotationKeys []string
 }
@@ -890,7 +893,7 @@ type UserNamespaces struct {
 	// Changing the value may require recreating all containers on the node.
 	//
 	// Default: 65536
-	// +featureGate=UserNamespaceSupport
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	IDsPerPod *int64
 }

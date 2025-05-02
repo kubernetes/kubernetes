@@ -241,6 +241,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+- name: ContainerStopSignals
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: ContextualLogging
   versionedSpecs:
   - default: false
@@ -373,12 +379,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: DeploymentPodReplacementPolicy
+- name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.32"
+    version: "1.33"
 - name: DevicePluginCDIDevices
   versionedSpecs:
   - default: false
@@ -538,6 +544,12 @@
   - default: true
     lockToDefault: true
     preRelease: GA
+    version: "1.33"
+- name: HPAConfigurableTolerance
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
     version: "1.33"
 - name: HPAScaleToZero
   versionedSpecs:
@@ -709,6 +721,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.27"
+- name: KubeletPSI
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.33"
 - name: KubeletRegistrationGetOnExistsOnly
   versionedSpecs:
   - default: true
@@ -1669,6 +1687,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: false
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.33"
 - name: WindowsCPUAndMemoryAffinity
   versionedSpecs:
   - default: false

@@ -27,7 +27,7 @@ import (
 )
 
 type ResourceEncodingConfig interface {
-	// StorageEncoding returns the serialization format for the resource.
+	// StorageEncodingFor returns the serialization format for the resource.
 	// TODO this should actually return a GroupVersionKind since you can logically have multiple "matching" Kinds
 	// For now, it returns just the GroupVersion for consistency with old behavior
 	StorageEncodingFor(schema.GroupResource) (schema.GroupVersion, error)

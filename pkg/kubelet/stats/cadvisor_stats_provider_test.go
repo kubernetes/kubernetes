@@ -114,6 +114,7 @@ func TestFilterTerminatedContainerInfoAndAssembleByPodCgroupKey(t *testing.T) {
 }
 
 func TestCadvisorListPodStats(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	ctx := context.Background()
 	const (
 		namespace0 = "test0"
@@ -295,12 +296,14 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod0Container0", seedPod0Container0, con.CPU)
 	checkMemoryStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Memory)
 	checkSwapStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.Swap)
+	checkIOStats(t, "Pod0Conainer0", seedPod0Container0, infos["/pod0-c0"], con.IO)
 
 	con = indexCon[cName01]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
 	checkCPUStats(t, "Pod0Container1", seedPod0Container1, con.CPU)
 	checkMemoryStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Memory)
 	checkSwapStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.Swap)
+	checkIOStats(t, "Pod0Container1", seedPod0Container1, infos["/pod0-c1"], con.IO)
 
 	assert.EqualValues(t, p0Time.Unix(), ps.StartTime.Time.Unix())
 	checkNetworkStats(t, "Pod0", seedPod0Infra, ps.Network)
@@ -315,6 +318,9 @@ func TestCadvisorListPodStats(t *testing.T) {
 		checkSwapStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.Swap)
 		checkContainersSwapStats(t, ps, infos["/pod0-c0"], infos["/pod0-c1"])
 	}
+	if ps.IO != nil {
+		checkIOStats(t, "Pod0", seedPod0Infra, infos["/pod0-i"], ps.IO)
+	}
 
 	// Validate Pod1 Results
 	ps, found = indexPods[prf1]
@@ -325,6 +331,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod1Container0", seedPod1Container, con.CPU)
 	checkMemoryStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Memory)
 	checkSwapStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.Swap)
+	checkIOStats(t, "Pod1Container0", seedPod1Container, infos["/pod1-c0"], con.IO)
 	checkNetworkStats(t, "Pod1", seedPod1Infra, ps.Network)
 	checkContainersSwapStats(t, ps, infos["/pod1-c0"])
 
@@ -337,6 +344,7 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod2Container0", seedPod2Container, con.CPU)
 	checkMemoryStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Memory)
 	checkSwapStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.Swap)
+	checkIOStats(t, "Pod2Container0", seedPod2Container, infos["/pod2-c0"], con.IO)
 	checkNetworkStats(t, "Pod2", seedPod2Infra, ps.Network)
 	checkContainersSwapStats(t, ps, infos["/pod2-c0"])
 
@@ -355,10 +363,12 @@ func TestCadvisorListPodStats(t *testing.T) {
 	checkCPUStats(t, "Pod3Container1", seedPod3Container1, con.CPU)
 	checkMemoryStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Memory)
 	checkSwapStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.Swap)
+	checkIOStats(t, "Pod3Container1", seedPod3Container1, infos["/pod3-c1"], con.IO)
 	checkContainersSwapStats(t, ps, infos["/pod3-c1"])
 }
 
 func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
 	ctx := context.Background()
 	const (
 		namespace0 = "test0"
@@ -476,6 +486,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(t, con.Logs)
 	assert.Nil(t, con.Accelerators)
 	assert.Nil(t, con.UserDefinedMetrics)
+	assert.Nil(t, con.IO)
 
 	con = indexCon[cName01]
 	assert.EqualValues(t, testTime(creationTime, seedPod0Container1).Unix(), con.StartTime.Time.Unix())
@@ -486,11 +497,13 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(t, con.Logs)
 	assert.Nil(t, con.Accelerators)
 	assert.Nil(t, con.UserDefinedMetrics)
+	assert.Nil(t, con.IO)
 
 	assert.EqualValues(t, testTime(creationTime, seedPod0Infra).Unix(), ps.StartTime.Time.Unix())
 	assert.Nil(t, ps.EphemeralStorage)
 	assert.Nil(t, ps.VolumeStats)
 	assert.Nil(t, ps.Network)
+	assert.Nil(t, con.IO)
 	if ps.CPU != nil {
 		checkCPUStats(t, "Pod0", seedPod0Infra, ps.CPU)
 	}
@@ -515,6 +528,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(t, ps.EphemeralStorage)
 	assert.Nil(t, ps.VolumeStats)
 	assert.Nil(t, ps.Network)
+	assert.Nil(t, con.IO)
 
 	// Validate Pod2 Results
 	ps, found = indexPods[prf2]
@@ -529,6 +543,7 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(t, ps.EphemeralStorage)
 	assert.Nil(t, ps.VolumeStats)
 	assert.Nil(t, ps.Network)
+	assert.Nil(t, con.IO)
 }
 
 func TestCadvisorImagesFsStatsKubeletSeparateDiskOff(t *testing.T) {

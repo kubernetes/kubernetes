@@ -56,18 +56,18 @@ type Device struct {
 }
 
 type BasicDevice struct {
-	Attributes      map[QualifiedName]DeviceAttribute
-	Capacity        map[QualifiedName]DeviceCapacity
-	ConsumesCounter []DeviceCounterConsumption
-	NodeName        *string
-	NodeSelector    *v1.NodeSelector
-	AllNodes        *bool
-	Taints          []resourceapi.DeviceTaint
+	Attributes       map[QualifiedName]DeviceAttribute
+	Capacity         map[QualifiedName]DeviceCapacity
+	ConsumesCounters []DeviceCounterConsumption
+	NodeName         *string
+	NodeSelector     *v1.NodeSelector
+	AllNodes         *bool
+	Taints           []resourceapi.DeviceTaint
 }
 
 type DeviceCounterConsumption struct {
-	SharedCounter UniqueString
-	Counters      map[string]Counter
+	CounterSet UniqueString
+	Counters   map[string]Counter
 }
 
 type QualifiedName string

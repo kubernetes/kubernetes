@@ -33,13 +33,11 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 func TestPKICertificateReadWriter(t *testing.T) {
 	// creates a tmp folder
-	dir := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dir)
+	dir := t.TempDir()
 
 	// creates a certificate
 	cert := writeTestCertificate(t, dir, "test", testCACert, testCAKey, testCertOrganization, time.Time{}, time.Time{})
@@ -84,10 +82,8 @@ func TestPKICertificateReadWriter(t *testing.T) {
 
 func TestKubeconfigReadWriter(t *testing.T) {
 	// creates tmp folders
-	dirKubernetes := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dirKubernetes)
-	dirPKI := testutil.SetupTempDir(t)
-	defer os.RemoveAll(dirPKI)
+	dirKubernetes := t.TempDir()
+	dirPKI := t.TempDir()
 
 	// write the CA cert and key to the temporary PKI dir
 	caName := kubeadmconstants.CACertAndKeyBaseName

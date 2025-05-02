@@ -377,7 +377,7 @@ type QueuedPodInfo struct {
 	// latency for a pod.
 	InitialAttemptTimestamp *time.Time
 	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
-	// at specific extension points: PreFilter, Filter, Reserve, Permit (WaitOnPermit), or PreBind.
+	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	// If Pods are rejected at other extension points,
 	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
 	// and retried soon after a backoff period.

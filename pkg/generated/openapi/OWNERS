@@ -9,5 +9,5 @@ reviewers:
   - roycaihw
   - liggitt
 labels:
-  - sig/api-machinery
+  - kind/api-change
   - area/code-generation
