@@ -46,6 +46,22 @@ linters:
             #   pointerPolicy: SuggestFix # Defaults to `SuggestFix`. We want our required fields to not be pointers.
   
   exclusions:
+    rules:
+      # All four of these files contain a variant of {Ingress}PortStatus, which has an Error field marked as optional and kubebuilder:validation:Required.
+      # This means the behaviour of the field is inconsistent for core types vs CRDs, and should not be fixed.
+      # It also means the requiredfield linter complains about the fields being pointers, which they must be for the core types.
+      - path: "staging/src/k8s.io/api/core/v1/types.go|staging/src/k8s.io/api/extensions/v1beta1/types.go|staging/src/k8s.io/api/networking/v1beta1/types.go|staging/src/k8s.io/api/networking/v1/types.go"
+        text: "field Error must not be marked as both optional and required"
+      - path: "staging/src/k8s.io/api/core/v1/types.go|staging/src/k8s.io/api/extensions/v1beta1/types.go|staging/src/k8s.io/api/networking/v1beta1/types.go|staging/src/k8s.io/api/networking/v1/types.go"
+        text: "field Error is marked as required, but has the omitempty tag|field Error is marked as required, should not be a pointer"
+
+      # The ParentRef is marked required, but is a pointer and has omitempty.
+      # There is no validation checking the field is actually required (should it be optional?)
+      # but it is required per the openapi spec.
+      - path: "staging/src/k8s.io/api/networking/v1/types.go|staging/src/k8s.io/api/networking/v1beta1/types.go|staging/src/k8s.io/api/networking/v1alpha1/types.go"
+        text: "field ParentRef is marked as required, but has the omitempty tag|field ParentRef is marked as required, should not be a pointer"
+
+
     generated: lax
     presets:
       - comments
@@ -69,3 +85,4 @@ formatters:
       - third_party$
       - builtin$
       - examples$
+ 

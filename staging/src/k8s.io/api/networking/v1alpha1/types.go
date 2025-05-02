@@ -59,13 +59,13 @@ type ParentReference struct {
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resource is the resource of the object being referenced.
 	// +required
-	Resource string `json:"resource,omitempty" protobuf:"bytes,2,opt,name=resource"`
+	Resource string `json:"resource" protobuf:"bytes,2,opt,name=resource"`
 	// Namespace is the namespace of the object being referenced.
 	// +optional
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,3,opt,name=namespace"`
 	// Name is the name of the object being referenced.
 	// +required
-	Name string `json:"name,omitempty" protobuf:"bytes,4,opt,name=name"`
+	Name string `json:"name" protobuf:"bytes,4,opt,name=name"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
