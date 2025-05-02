@@ -510,6 +510,26 @@ var (
 	DefaultKubernetesPlaceholderVersion = version.MustParseSemantic("v1.0.0-placeholder-version")
 )
 
+// GetKubernetesMinorVersionByEtcdVersion returns the Kubernetes minor version that corresponds to a given etcd version.
+func GetKubernetesMinorVersionByEtcdVersion(ver string) (uint8, error) {
+	inputEtcdVersion, err := version.ParseSemantic(ver)
+	if err != nil {
+		return 0, fmt.Errorf("invalid input etcd version %s, error: %w", ver, err)
+	}
+
+	for k, v := range SupportedEtcdVersion {
+		supportedEtcdVersion, err := version.ParseSemantic(v)
+		if err != nil {
+			return 0, fmt.Errorf("invalid supported etcd version %s, error: %w", v, err)
+		}
+		if inputEtcdVersion.Major() == supportedEtcdVersion.Major() && inputEtcdVersion.Minor() == supportedEtcdVersion.Minor() {
+			return k, nil
+		}
+	}
+
+	return 0, errors.New("Kubernetes minor version not found")
+}
+
 // getSkewedKubernetesVersion returns the current MAJOR.(MINOR+n).0 Kubernetes version with a skew of 'n'
 // It uses the kubeadm version provided by the 'component-base/version' package. This version must be populated
 // by passing linker flags during the kubeadm build process. If the version is empty, assume that kubeadm

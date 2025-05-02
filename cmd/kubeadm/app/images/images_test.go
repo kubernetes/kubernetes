@@ -98,6 +98,7 @@ func TestGetKubernetesImage(t *testing.T) {
 
 func TestGetEtcdImage(t *testing.T) {
 	testEtcdVer, _, _ := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, testversion)
+	k8sMinorVer, _ := constants.GetKubernetesMinorVersionByEtcdVersion(constants.DefaultEtcdVersion)
 	var tests = []struct {
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
@@ -144,7 +145,7 @@ func TestGetEtcdImage(t *testing.T) {
 			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),
 			cfg: &kubeadmapi.ClusterConfiguration{
 				ImageRepository:   gcrPrefix,
-				KubernetesVersion: testversion,
+				KubernetesVersion: fmt.Sprintf("v1.%d.0", k8sMinorVer),
 			},
 		},
 	}
