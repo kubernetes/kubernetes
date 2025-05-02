@@ -166,6 +166,12 @@ type Manager interface {
 
 	// ClearPodResizeInProgressCondition clears the PodResizeInProgress condition for the pod from the cache.
 	ClearPodResizeInProgressCondition(podUID types.UID)
+
+	// IsPodResizeDeferred returns true if the pod resize is currently deferred.
+	IsPodResizeDeferred(podUID types.UID) bool
+
+	// IsPodResizeInfeasible returns true if the pod resize is infeasible.
+	IsPodResizeInfeasible(podUID types.UID) bool
 }
 
 const syncPeriod = 10 * time.Second
@@ -307,6 +313,22 @@ func (m *manager) ClearPodResizeInProgressCondition(podUID types.UID) {
 		PodResizePending:    m.podResizeConditions[podUID].PodResizePending,
 		PodResizeInProgress: nil,
 	}
+}
+
+// IsPodResizeDeferred returns true if the pod resize is currently deferred.
+func (m *manager) IsPodResizeDeferred(podUID types.UID) bool {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	return m.podResizeConditions[podUID].PodResizePending != nil && m.podResizeConditions[podUID].PodResizePending.Reason == v1.PodReasonDeferred
+}
+
+// IsPodResizeInfeasible returns true if the pod resize is currently infeasible.
+func (m *manager) IsPodResizeInfeasible(podUID types.UID) bool {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	return m.podResizeConditions[podUID].PodResizePending != nil && m.podResizeConditions[podUID].PodResizePending.Reason == v1.PodReasonInfeasible
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
