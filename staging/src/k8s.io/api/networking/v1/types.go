@@ -65,6 +65,7 @@ type NetworkPolicySpec struct {
 	// the ingress rules for each are combined additively.
 	// This field is NOT optional and follows standard label selector semantics.
 	// An empty podSelector matches all pods in this namespace.
+	// +optional
 	PodSelector metav1.LabelSelector `json:"podSelector" protobuf:"bytes,1,opt,name=podSelector"`
 
 	// ingress is a list of ingress rules to be applied to the selected pods.
@@ -177,6 +178,7 @@ type NetworkPolicyPort struct {
 type IPBlock struct {
 	// cidr is a string representing the IPBlock
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
+	// +required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 
 	// except is a slice of CIDRs that should not be included within an IPBlock
@@ -439,6 +441,7 @@ type IngressRuleValue struct {
 type HTTPIngressRuleValue struct {
 	// paths is a collection of paths that map requests to backends.
 	// +listType=atomic
+	// +required
 	Paths []HTTPIngressPath `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 }
 
@@ -497,10 +500,13 @@ type HTTPIngressPath struct {
 	//   the IngressClass. Implementations can treat this as a separate PathType
 	//   or treat it identically to Prefix or Exact path types.
 	// Implementations are required to support all path types.
+	// +default=ImplementationSpecific
+	// +optional
 	PathType *PathType `json:"pathType" protobuf:"bytes,3,opt,name=pathType"`
 
 	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
+	// +required
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
@@ -523,11 +529,13 @@ type IngressBackend struct {
 type IngressServiceBackend struct {
 	// name is the referenced service. The service must exist in
 	// the same namespace as the Ingress object.
+	// +required
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 
 	// port of the referenced service. A port name or port number
 	// is required for a IngressServiceBackend.
-	Port ServiceBackendPort `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
+	// +required
+	Port ServiceBackendPort `json:"port" protobuf:"bytes,2,opt,name=port"`
 }
 
 // ServiceBackendPort is the service port being referenced.
@@ -576,7 +584,8 @@ type IngressClassSpec struct {
 	// same implementing controller. This should be specified as a
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
-	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
+	// +required
+	Controller string `json:"controller" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional
 	// configuration for the controller. This is optional if the controller does
@@ -604,13 +613,16 @@ type IngressClassParametersReference struct {
 	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=aPIGroup"`
 
 	// kind is the type of resource being referenced.
+	// +required
 	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
 
 	// name is the name of resource being referenced.
+	// +required
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 
 	// scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
+	// +default=Cluster
 	// +optional
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
 
