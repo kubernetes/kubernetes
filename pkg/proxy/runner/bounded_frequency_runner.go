@@ -35,11 +35,10 @@ type BoundedFrequencyRunner struct {
 
 	run chan struct{} // try an async run
 
-	fn                 func() error // function to run
-	minIntervalTimer   clock.Timer
-	retryIntervalTimer clock.Timer
-	maxIntervalTimer   clock.Timer
-	clock              clock.Clock
+	fn               func() error // function to run
+	minIntervalTimer clock.Timer
+	nextRunTimer     clock.Timer // Combined timer for maxInterval and retryInterval logic
+	clock            clock.Clock
 
 	ready chan struct{} // signals the loop is ready
 }
@@ -99,17 +98,12 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 	klog.V(3).InfoS("Loop running", "name", bfr.name)
 	defer close(bfr.run)
 
-	// retryIntervalTimer is only started after a Retry() call
-	// so it starts stopped.
-	bfr.retryIntervalTimer = bfr.clock.NewTimer(bfr.retryInterval)
-	bfr.retryIntervalTimer.Stop()
-	defer bfr.retryIntervalTimer.Stop()
-
 	bfr.minIntervalTimer = bfr.clock.NewTimer(bfr.minInterval)
 	defer bfr.minIntervalTimer.Stop()
 
-	bfr.maxIntervalTimer = bfr.clock.NewTimer(bfr.maxInterval)
-	defer bfr.maxIntervalTimer.Stop()
+	// Initialize nextRunTimer with maxInterval
+	bfr.nextRunTimer = bfr.clock.NewTimer(bfr.maxInterval)
+	defer bfr.nextRunTimer.Stop()
 
 	// Signal the loop is ready
 	close(bfr.ready)
@@ -119,8 +113,7 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 		case <-stop:
 			klog.V(3).InfoS("Loop stopping", "name", bfr.name)
 			return
-		case <-bfr.maxIntervalTimer.C():
-		case <-bfr.retryIntervalTimer.C():
+		case <-bfr.nextRunTimer.C(): // Wait on the single timer
 		case <-bfr.run:
 		}
 
@@ -129,22 +122,24 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 			// with the fakeClock.HasWaiters() method. The timers are reset after the function
 			// is executed.
 			bfr.minIntervalTimer.Stop()
-			bfr.maxIntervalTimer.Stop()
+			bfr.nextRunTimer.Stop() // Stop the single timer before running fn
 
 			// avoid crashing if the function executed crashes
 			defer utilruntime.HandleCrash()
 			err := bfr.fn()
-			// an error will schedule a retry after the retryInterval,
-			// any successful run until that period will stop the retry attempt.
+
+			// Determine the next interval based on the result
+			nextInterval := bfr.maxInterval
 			if err != nil {
-				klog.V(3).InfoS("retrying", "name", bfr.name, "interval", bfr.retryInterval)
-				bfr.retryIntervalTimer.Reset(bfr.retryInterval)
-			} else {
-				bfr.retryIntervalTimer.Stop()
+				// If error, ensure next run is within retryInterval and maxInterval
+				if bfr.retryInterval < nextInterval {
+					nextInterval = bfr.retryInterval
+				}
+				klog.V(3).InfoS("scheduling retry", "name", bfr.name, "interval", nextInterval, "error", err)
 			}
-			// reset the timers taking into account the time to execute the function
+			// Reset the timers
 			bfr.minIntervalTimer.Reset(bfr.minInterval)
-			bfr.maxIntervalTimer.Reset(bfr.maxInterval)
+			bfr.nextRunTimer.Reset(nextInterval) // Reset with the calculated interval
 		}()
 
 		select {

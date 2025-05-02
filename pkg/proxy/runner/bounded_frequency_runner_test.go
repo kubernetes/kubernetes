@@ -183,7 +183,7 @@ func Test_BoundedFrequencyRunnerRetry(t *testing.T) {
 	runner.Run()
 	assertCalls(t, obj, 1)
 	// wait for the timers to be reset
-	for fakeClock.Waiters() != 3 { // wait for retryIntervalTimer
+	for fakeClock.Waiters() != 2 {
 		time.Sleep(1 * time.Millisecond)
 	}
 
@@ -237,7 +237,7 @@ func Test_BoundedFrequencyRunnerRetry(t *testing.T) {
 	obj.setReturnValue(fmt.Errorf("sync error"))
 	runner.Run()
 	assertCalls(t, obj, 5)
-	for fakeClock.Waiters() != 3 { // wait for retryIntervalTimer
+	for fakeClock.Waiters() != 2 { // wait for retryIntervalTimer
 		time.Sleep(1 * time.Millisecond)
 	}
 
@@ -289,7 +289,7 @@ func Test_BoundedFrequencyRunnerRetryShorterThanMinInterval(t *testing.T) {
 	runner.Run()
 	obj.setReturnValue(fmt.Errorf("sync error"))
 	assertCalls(t, obj, 1)
-	for fakeClock.Waiters() != 3 {
+	for fakeClock.Waiters() != 2 {
 		time.Sleep(1 * time.Millisecond)
 	}
 
