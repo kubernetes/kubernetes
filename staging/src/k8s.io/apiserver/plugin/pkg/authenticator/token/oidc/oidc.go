@@ -45,6 +45,7 @@ import (
 	celgo "github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/common/types/traits"
 
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -55,6 +56,7 @@ import (
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
 	authenticationtokenjwt "k8s.io/apiserver/pkg/authentication/token/jwt"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/lazy"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
@@ -1037,7 +1039,7 @@ func newClaimsValue(c claims) *lazy.MapValue {
 			if err := json.Unmarshal(data, &value); err != nil {
 				return types.NewErr("claim %q failed to unmarshal: %w", name, err)
 			}
-			return types.DefaultTypeAdapter.NativeToValue(value)
+			return nativeToValueWithUnescape(value)
 		})
 	}
 	return lazyMap
@@ -1128,7 +1130,7 @@ func newUserInfoValue(info user.Info) *lazy.MapValue {
 	field := func(name string, get func() any) {
 		lazyMap.Append(name, func(_ *lazy.MapValue) ref.Val {
 			value := get()
-			return types.DefaultTypeAdapter.NativeToValue(value)
+			return nativeToValueWithUnescape(value)
 		})
 	}
 	field("username", func() any { return info.GetName() })
@@ -1136,4 +1138,59 @@ func newUserInfoValue(info user.Info) *lazy.MapValue {
 	field("groups", func() any { return info.GetGroups() })
 	field("extra", func() any { return info.GetExtra() })
 	return lazyMap
+}
+
+func nativeToValueWithUnescape(value any) ref.Val {
+	return unescapeWrapper(types.DefaultTypeAdapter.NativeToValue(value))
+}
+
+type unescapeMapper struct {
+	traits.Mapper
+}
+
+func (m *unescapeMapper) Find(key ref.Val) (ref.Val, bool) {
+	name, ok := unescapedName(key)
+	if ok {
+		key = name
+	}
+	value, ok := m.Mapper.Find(key)
+	return unescapeWrapper(value), ok
+}
+
+type unescapeLister struct {
+	traits.Lister
+}
+
+func (l *unescapeLister) Get(index ref.Val) ref.Val {
+	return unescapeWrapper(l.Lister.Get(index))
+}
+
+// unescapeWrapper handles __dot__ based field access for native types that are converted into CEL values.
+// This means we need to handle map lookups for our native types (the claims JSON and the user info data).
+// User info is straightforward since it just has a single map field that needs the __dot__ support.  The
+// claims JSON is more complicated because maps can appear in deeply nested fields.  This means that we need
+// to account for both nested JSON objects and nested JSON arrays in all contexts where we return a CEL value.
+// It is safe to pass any CEL value to this function, including nil (i.e. the caller can skip error checking).
+func unescapeWrapper(value ref.Val) ref.Val {
+	switch v := value.(type) {
+	case traits.Mapper:
+		return &unescapeMapper{Mapper: v} // handle nested JSON objects
+	case traits.Lister:
+		return &unescapeLister{Lister: v} // handle nested JSON arrays
+	default:
+		return value
+	}
+}
+
+func unescapedName(key ref.Val) (types.String, bool) {
+	n, ok := key.(types.String)
+	if !ok {
+		return "", false
+	}
+	ns := string(n)
+	name, ok := cel.Unescape(ns)
+	if !ok || name == ns {
+		return "", false
+	}
+	return types.String(name), true
 }
