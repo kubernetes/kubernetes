@@ -565,8 +565,6 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 // list simply lists all items and records a resource version obtained from the server at the moment of the call.
 // the resource version can be used for further progress notification (aka. watch).
 func (r *Reflector) list(ctx context.Context) error {
-	// Catch panics and log them via Kubernetes crash handlers
-
 	var resourceVersion string
 	options := metav1.ListOptions{ResourceVersion: r.relistResourceVersion()}
 
