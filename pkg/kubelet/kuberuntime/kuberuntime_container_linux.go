@@ -268,12 +268,14 @@ func (m *kubeGenericRuntimeManager) generateContainerResourcesForUpdate(ctx cont
 		return nil
 	}
 	if m.cpuCFSQuota && containerResources.Linux.CpuQuota == 0 {
+		// a negative value can be used for setting the max in runtimes, at least runc and crun.
 		containerResources.Linux.CpuQuota = -1
 	}
 	if containerResources.Linux.CpuShares == 0 {
 		containerResources.Linux.CpuShares = cm.MinShares
 	}
 	if containerResources.Linux.MemoryLimitInBytes == 0 {
+		// -1 can be used for setting the max in runtimes, at least runc and crun.
 		containerResources.Linux.MemoryLimitInBytes = -1
 	}
 	return containerResources
