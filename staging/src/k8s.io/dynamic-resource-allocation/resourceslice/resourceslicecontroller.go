@@ -490,26 +490,31 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	logger.V(5).Info("Existing slices", "obsolete", klog.KObjSlice(obsoleteSlices), "current", klog.KObjSlice(currentSlices))
 
 	if pool, ok := resources.Pools[poolName]; ok {
-		// Match each existing slice against the desired slices. Two slices
-		// "match" if they contain exactly the same device IDs, in an arbitrary
-		// order. As a special case, slices are also considered "matched" in the
-		// scenario where there's a single existing slice and a single desired
-		// slice. Such a "matched" slice gets updated with the desired content
-		// if there is a difference.
+		// Match each existing slice against the desired slices.
+		// Two slices "match" if they contain exactly the
+		// same device IDs, in an arbitrary order. As a
+		// special case, slices are also considered
+		// "matched" in the scenario where there's a single
+		// existing slice and a single desired slice. Such a
+		// matched slice gets updated with the desired
+		// content if there is a difference.
 		//
-		// In the case where there is more than one existing or desired slices,
-		// adding or removing devices is done by deleting the old slice and
-		// creating a new one. This is primarily a simplification of the code:
-		// to support adding or removing devices from existing slices, we would
-		// have to identify "most similar" slices (= minimal editing distance).
+		// In the case where there is more than one existing
+		// or desired slices, adding or removing devices is
+		// done by deleting the old slice and creating a new one.
 		//
-		// In currentSliceForDesiredSlice we keep track of which desired slice
-		// has a matched slice.
+		// This is primarily a simplification of the code:
+		// to support adding or removing devices from
+		// existing slices, we would have to identify "most
+		// similar" slices (= minimal editing distance).
 		//
-		// At the end of the loop, each current slice is either a match or
-		// obsolete.
+		// In currentSliceForDesiredSlice we keep track of
+		// which desired slice has a matched slice.
+		//
+		// At the end of the loop, each current slice is either
+		// a match or obsolete.
 		currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
-		if len(currentSlices) == 1 && len(currentSlices) == len(pool.Slices) {
+		if len(currentSlices) == 1 && len(pool.Slices) == 1 {
 			// If there's just one existing slice and one desired slice, assume
 			// they "matched" such that if required, it is the existing slice
 			// which gets updated and we avoid an unnecessary deletion and
