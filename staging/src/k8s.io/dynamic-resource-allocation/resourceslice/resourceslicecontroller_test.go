@@ -272,7 +272,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: nil,
 		},
-		"delete-and-add-slice": {
+		"one-existing-and-one-desired-slice-should-be-updated-inplace": {
 			nodeUID: nodeUID,
 			initialObjects: []runtime.Object{
 				// no devices
@@ -288,14 +288,52 @@ func TestControllerSyncPool(t *testing.T) {
 				},
 			},
 			expectedStats: Stats{
-				NumDeletes: 1,
+				NumUpdates: 1,
+			},
+			expectedResourceSlices: []resourceapi.ResourceSlice{
+				*MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
+			},
+		},
+		"delete-and-add-slice-when-more-than-one-existing-or-desired-slice": {
+			nodeUID: nodeUID,
+			initialObjects: []runtime.Object{
+				// No devices in first ResourceSlice.
+				MakeResourceSlice().Name(resourceSlice1).UID(resourceSlice1).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).Obj(),
+				MakeResourceSlice().Name(resourceSlice2).UID(resourceSlice2).
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName2}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).Obj(),
+			},
+			inputDriverResources: &DriverResources{
+				Pools: map[string]Pool{
+					poolName: {
+						Slices: []Slice{
+							{Devices: []resourceapi.Device{{Name: deviceName1}}},
+							{Devices: []resourceapi.Device{{Name: deviceName2}}},
+						},
+					},
+				},
+			},
+			expectedStats: Stats{
 				NumCreates: 1,
+				NumUpdates: 1,
+				NumDeletes: 1,
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generatedName1).GenerateName(generateName).
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
-					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName}}).
-					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 1}).Obj(),
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName1}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 2}).Obj(),
+				*MakeResourceSlice().Name(resourceSlice2).UID(resourceSlice2).ResourceVersion("1").
+					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
+					Driver(driverName).Devices([]resourceapi.Device{{Name: deviceName2}}).
+					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 2}).Obj(),
 			},
 		},
 		"delete-redundant-slice": {
