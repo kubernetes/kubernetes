@@ -17,6 +17,7 @@ limitations under the License.
 package storage
 
 import (
+        "fmt"
 	"context"
 	"fmt"
 	"os"
@@ -127,7 +128,7 @@ var _ = SIGDescribe("HostPath", func() {
 		}
 
 		e2epodoutput.TestContainerOutput(ctx, f, "hostPath subPath", pod, 1, []string{
-			"content of file \"" + filePathInReader + "\": mount-tester new file",
+			fmt.Sprintf("content of file \"%s\": mount-tester new file", filePathInReader),
 		})
 	})
 })

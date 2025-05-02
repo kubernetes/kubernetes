@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+        "fmt"
 	"context"
 
 	v1 "k8s.io/api/core/v1"
@@ -84,7 +85,11 @@ var _ = SIGDescribe("ContainerLogPath", framework.WithNodeConformance(), func() 
 								Name: podName,
 								// If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
-								Command: []string{"sh", "-c", "while true; do if [ -e " + expectedLogPath + " ] && grep -q " + log + " " + expectedLogPath + "; then exit 0; fi; sleep 1; done"},
+								Command: []string{
+                                                                    "sh", "-c",
+                                                                    fmt.Sprintf("while true; do if [ -e %s ] && grep -q %s %s; then exit 0; fi; sleep 1; done", expectedLogPath, log, expectedLogPath),
+                                                                },
+
 								VolumeMounts: []v1.VolumeMount{
 									{
 										Name: "logdir",

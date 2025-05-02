@@ -17,6 +17,7 @@ limitations under the License.
 package apps
 
 import (
+        "fmt"
 	"context"
 	"fmt"
 	"time"
@@ -166,7 +167,7 @@ var _ = SIGDescribe("ControllerRevision", framework.WithSerial(), func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("Patching ControllerRevision %q", initialRevision.Name))
-		payload := "{\"metadata\":{\"labels\":{\"" + initialRevision.Name + "\":\"patched\"}}}"
+		payload := fmt.Sprintf(`{"metadata":{"labels":{"%s":"patched"}}}`, initialRevision.Name)
 		patchedControllerRevision, err := csAppsV1.ControllerRevisions(ns).Patch(ctx, initialRevision.Name, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ControllerRevision %s in namespace %s", initialRevision.Name, ns)
 		gomega.Expect(patchedControllerRevision.Labels).To(gomega.HaveKeyWithValue(initialRevision.Name, "patched"), "Did not find 'patched' label for this ControllerRevision. Current labels: %v", patchedControllerRevision.Labels)
