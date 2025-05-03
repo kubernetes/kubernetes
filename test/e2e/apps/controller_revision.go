@@ -17,7 +17,6 @@ limitations under the License.
 package apps
 
 import (
-        "fmt"
 	"context"
 	"fmt"
 	"time"

@@ -17,7 +17,6 @@ limitations under the License.
 package storage
 
 import (
-        "fmt"
 	"context"
 	"fmt"
 	"os"

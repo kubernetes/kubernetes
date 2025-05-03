@@ -17,7 +17,6 @@ limitations under the License.
 package apimachinery
 
 import (
-        "fmt"
 	"context"
 	"encoding/json"
 	"fmt"
