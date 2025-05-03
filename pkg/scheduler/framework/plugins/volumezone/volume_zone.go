@@ -216,10 +216,25 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 		}
 	}
 
-	if !hasAnyNodeConstraint {
+	singleZone := true
+	zoneKey := ""
+	for _, topo := range podPVTopologies {
+		if zoneKey == "" {
+			zoneKey = topo.key
+		} else if zoneKey != topo.key {
+			singleZone = false
+			break
+		}
+	}
+
+	if !hasAnyNodeConstraint && singleZone {
 		// The node has no zone constraints, so we're OK to schedule.
 		// This is to handle a single-zone cluster scenario where the node may not have any topology labels.
 		return nil
+	}
+	if !hasAnyNodeConstraint {
+		// Reject: multi-zone cluster but node missing zone label
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 	}
 
 	for _, pvTopology := range podPVTopologies {
