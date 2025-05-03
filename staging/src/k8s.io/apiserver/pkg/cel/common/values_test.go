@@ -41,6 +41,10 @@ import (
 func TestToValue(t *testing.T) {
 	struct1value := Struct{S: "hello", I: 10, B: true, F: 1.5}
 	struct1 := typedValue{value: struct1value, schema: structSchema}
+	structOmitEmpty1value := StructOmitEmpty{}
+	structOmitEmpty1 := typedValue{value: structOmitEmpty1value, schema: structSchema}
+	structOmitZero1value := StructOmitZero{}
+	structOmitZero1 := typedValue{value: structOmitZero1value, schema: structSchema}
 	struct1Ptr := typedValue{value: &struct1value, schema: structSchema}
 	struct2value := Struct{S: "world", I: 20, B: false, F: 2.5}
 	struct2 := typedValue{value: struct2value, schema: structSchema}
@@ -70,6 +74,8 @@ func TestToValue(t *testing.T) {
 		Tags:        []string{"a", "b", "c"},
 		Labels:      map[string]string{"key1": "val1", "key2": "val2"},
 		NestedObj:   nested1value,
+		NestedEmpty: Nested{},
+		NestedZero:  Nested{},
 		Timeout:     duration1,
 		Time:        time1,
 		MicroTime:   microTime1,
@@ -110,6 +116,8 @@ func TestToValue(t *testing.T) {
 		Tags:        []string{"x", "y"},
 		Labels:      map[string]string{"key3": "val3"},
 		NestedObj:   Nested{Name: "nested2", Info: struct2value},
+		NestedEmpty: Nested{Name: "nested3"},
+		NestedZero:  Nested{Name: "nested4"},
 		Timeout:     metav1.Duration{Duration: 10 * time.Second},
 		RawBytes:    []byte("bytes2"),
 		NilBytes:    []byte{}, // Non-nil but empty
@@ -291,9 +299,49 @@ func TestToValue(t *testing.T) {
 			activation: map[string]typedValue{"c": complex1},
 		},
 		{
-			name:       "struct: embedded struct: omitempty struct field",
-			expression: "!has(c.metadata.labels)",
+			name:       "struct: omitempty: zero valued: has struct field",
+			expression: "has(c.nestedEmpty)",
+			activation: map[string]typedValue{"c": complex2},
+		},
+		{
+			name:       "struct: omitempty: zero valued: does not have scalar fields",
+			expression: "!has(c.s) && !has(c.i) && !has(c.b) && !has(c.f)",
+			activation: map[string]typedValue{"c": structOmitEmpty1},
+		},
+		{
+			name:       "struct: omitempty: zero valued: does not have pointer to scalar fields",
+			expression: "!has(c.sp) && !has(c.ip) && !has(c.bp) && !has(c.fp)",
+			activation: map[string]typedValue{"c": structOmitEmpty1},
+		},
+		{
+			name:       "struct: omitzero: zero valued: does not have struct field",
+			expression: "!has(c.nestedZero)",
 			activation: map[string]typedValue{"c": complex1},
+		},
+		{
+			name:       "struct: omitzero: zero valued: does not have scalar fields",
+			expression: "!has(c.s) && !has(c.i) && !has(c.b) && !has(c.f)",
+			activation: map[string]typedValue{"c": structOmitEmpty1},
+		},
+		{
+			name:       "struct: omitzero: zero valued: does not have pointer to scalar fields",
+			expression: "!has(c.sp) && !has(c.ip) && !has(c.bp) && !has(c.fp)",
+			activation: map[string]typedValue{"c": structOmitEmpty1},
+		},
+		{
+			name:       "struct: omitzero: non-zero valued: has struct field",
+			expression: "has(c.nestedZero)",
+			activation: map[string]typedValue{"c": complex2},
+		},
+		{
+			name:       "struct: omitempty: zero valued: has embedded struct field",
+			expression: "has(c.metadata)",
+			activation: map[string]typedValue{"c": structOmitEmpty1},
+		},
+		{
+			name:       "struct: omitzero: zero valued: does not have embedded struct field",
+			expression: "!has(c.metadata)",
+			activation: map[string]typedValue{"c": structOmitZero1},
 		},
 
 		// Comparison Tests
@@ -1013,23 +1061,63 @@ func evalExpression(t *testing.T, env *cel.Env, expression string, activation ma
 
 type Struct struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
 	S string  `json:"s"`
 	I int     `json:"i"`
 	B bool    `json:"b"`
 	F float64 `json:"f"`
 
-	SO string  `json:"so,omitempty"`
-	IO int     `json:"io,omitempty"`
-	BO bool    `json:"bo,omitempty"`
-	FO float64 `json:"fo,omitempty"`
+	SP string  `json:"sp"`
+	IP int     `json:"ip"`
+	BP bool    `json:"bp"`
+	FP float64 `json:"fp"`
+}
+
+type StructOmitEmpty struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	S string  `json:"s,omitempty"`
+	I int     `json:"i,omitempty"`
+	B bool    `json:"b,omitempty"`
+	F float64 `json:"f,omitempty"`
+
+	SP string  `json:"sp,omitempty"`
+	IP int     `json:"ip,omitempty"`
+	BP bool    `json:"bp,omitempty"`
+	FP float64 `json:"fp,omitempty"`
+}
+
+type StructOmitZero struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitzero"`
+
+	S string  `json:"s,omitzero"`
+	I int     `json:"i,omitzero"`
+	B bool    `json:"b,omitzero"`
+	F float64 `json:"f,omitzero"`
+
+	SP string  `json:"sp,omitzero"`
+	IP int     `json:"ip,omitzero"`
+	BP bool    `json:"bp,omitzero"`
+	FP float64 `json:"fp,omitzero"`
 }
 
 var structSchema = &spec.Schema{
 	SchemaProps: spec.SchemaProps{
 		Type: []string{"object"},
 		Properties: map[string]spec.Schema{
+			"kind":       *stringSchema,
+			"apiVersion": *stringSchema,
+			"metadata": {
+				SchemaProps: spec.SchemaProps{
+					Type: []string{"object"},
+					Properties: map[string]spec.Schema{
+						"name": *stringSchema,
+					},
+				},
+			},
 			"s":  *stringSchema,
 			"i":  *int64Schema,
 			"b":  *boolSchema,
@@ -1081,6 +1169,8 @@ type Complex struct {
 	Tags        []string           `json:"tags"`
 	Labels      map[string]string  `json:"labels"`
 	NestedObj   Nested             `json:"nestedObj"`
+	NestedEmpty Nested             `json:"nestedEmpty,omitempty"`
+	NestedZero  Nested             `json:"nestedZero,omitzero"`
 	Timeout     metav1.Duration    `json:"timeout"`
 	Time        metav1.Time        `json:"time"`
 	MicroTime   metav1.MicroTime   `json:"microTime"`
@@ -1124,21 +1214,23 @@ var complexSchema = &spec.Schema{
 					},
 				},
 			},
-			"id":         *stringSchema,
-			"tags":       *stringArraySchema,
-			"labels":     *stringMapSchema,
-			"nestedObj":  *nestedSchema,
-			"timeout":    durationFormat,
-			"time":       timeFormat,
-			"microTime":  timeFormat,
-			"rawBytes":   bytesFormat,
-			"nilBytes":   bytesFormat,
-			"childPtr":   *structSchema,
-			"nilPtr":     *structSchema,
-			"emptySlice": *intArraySchema,
-			"nilSlice":   *intArraySchema,
-			"emptyMap":   *intMapSchema,
-			"nilMap":     *intMapSchema,
+			"id":          *stringSchema,
+			"tags":        *stringArraySchema,
+			"labels":      *stringMapSchema,
+			"nestedObj":   *nestedSchema,
+			"nestedEmpty": *nestedSchema,
+			"nestedZero":  *nestedSchema,
+			"timeout":     durationFormat,
+			"time":        timeFormat,
+			"microTime":   timeFormat,
+			"rawBytes":    bytesFormat,
+			"nilBytes":    bytesFormat,
+			"childPtr":    *structSchema,
+			"nilPtr":      *structSchema,
+			"emptySlice":  *intArraySchema,
+			"nilSlice":    *intArraySchema,
+			"emptyMap":    *intMapSchema,
+			"nilMap":      *intMapSchema,
 			"intOrString": {
 				VendorExtensible: intOrStringSchema,
 			},
