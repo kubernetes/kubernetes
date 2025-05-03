@@ -1036,7 +1036,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		gomega.Expect(rq.Items).To(gomega.HaveLen(1), "Failed to find ResourceQuotes %v", rqName)
 
 		ginkgo.By("Patching the ResourceQuota")
-		payload := fmt.Sprintf(`{"metadata":{"labels":{"%s":"patched"}},"spec":{"hard":{"memory":"750Mi"}}}`, rqName)
+		payload := "{\"metadata\":{\"labels\":{\"" + rqName + "\":\"patched\"}},\"spec\":{\"hard\":{ \"memory\":\"750Mi\"}}}"
 		patchedResourceQuota, err := client.CoreV1().ResourceQuotas(ns).Patch(ctx, rqName, types.StrategicMergePatchType, []byte(payload), metav1.PatchOptions{})
 		framework.ExpectNoError(err, "failed to patch ResourceQuota %s in namespace %s", rqName, ns)
 		gomega.Expect(patchedResourceQuota.Labels[rqName]).To(gomega.Equal("patched"), "Failed to find the label for this ResourceQuota. Current labels: %v", patchedResourceQuota.Labels)
