@@ -32,16 +32,45 @@ import (
 func Run() error {
 	var allFlags flag.FlagSet
 	klog.InitFlags(&allFlags)
-	// only add the flags that are still supported for kubeadm
+	// Only add the flags that are currently supported for kubeadm. This
+	// preprevents new klog flags from being accidentally exposed.
 	allFlags.VisitAll(func(f *flag.Flag) {
 		switch f.Name {
-		case "v", "add_dir_header", "skip_headers":
+		case
+			"v",
+			"add_dir_header",
+			"skip_headers",
+			// Below are flags we support but don't expose in the help.
+			"alsologtostderr",
+			"log_backtrace_at",
+			"log_dir",
+			"logtostderr",
+			"log_file",
+			"log_file_max_size",
+			"one_output",
+			"skip_log_headers",
+			"stderrthreshold",
+			"vmodule":
 			flag.CommandLine.Var(f.Value, f.Name, f.Usage)
 		}
 	})
 
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+
+	// We hide the klog flags that most users will not care about to reduce the
+	// clutter from the output. Note that these MarkHidden calls must be after
+	// the lines above.
+	pflag.CommandLine.MarkHidden("alsologtostderr")
+	pflag.CommandLine.MarkHidden("log-backtrace-at")
+	pflag.CommandLine.MarkHidden("log-dir")
+	pflag.CommandLine.MarkHidden("logtostderr")
+	pflag.CommandLine.MarkHidden("log-file")          //nolint:errcheck
+	pflag.CommandLine.MarkHidden("log-file-max-size") //nolint:errcheck
+	pflag.CommandLine.MarkHidden("one-output")        //nolint:errcheck
+	pflag.CommandLine.MarkHidden("skip-log-headers")  //nolint:errcheck
+	pflag.CommandLine.MarkHidden("stderrthreshold")
+	pflag.CommandLine.MarkHidden("vmodule")
 
 	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
