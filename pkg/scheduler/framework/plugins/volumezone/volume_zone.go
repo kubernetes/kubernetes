@@ -234,6 +234,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	}
 	if !hasAnyNodeConstraint {
 		// Reject: multi-zone cluster but node missing zone label
+		logger.V(10).Info("Won't schedule pod onto node due to missing topology label", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
 		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 	}
 
