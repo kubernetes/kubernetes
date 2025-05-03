@@ -61,16 +61,16 @@ func Run() error {
 	// We hide the klog flags that most users will not care about to reduce the
 	// clutter from the output. Note that these MarkHidden calls must be after
 	// the lines above.
-	pflag.CommandLine.MarkHidden("alsologtostderr")
-	pflag.CommandLine.MarkHidden("log-backtrace-at")
-	pflag.CommandLine.MarkHidden("log-dir")
-	pflag.CommandLine.MarkHidden("logtostderr")
+	pflag.CommandLine.MarkHidden("alsologtostderr")   //nolint:errcheck
+	pflag.CommandLine.MarkHidden("log-backtrace-at")  //nolint:errcheck
+	pflag.CommandLine.MarkHidden("log-dir")           //nolint:errcheck
+	pflag.CommandLine.MarkHidden("logtostderr")       //nolint:errcheck
 	pflag.CommandLine.MarkHidden("log-file")          //nolint:errcheck
 	pflag.CommandLine.MarkHidden("log-file-max-size") //nolint:errcheck
 	pflag.CommandLine.MarkHidden("one-output")        //nolint:errcheck
 	pflag.CommandLine.MarkHidden("skip-log-headers")  //nolint:errcheck
-	pflag.CommandLine.MarkHidden("stderrthreshold")
-	pflag.CommandLine.MarkHidden("vmodule")
+	pflag.CommandLine.MarkHidden("stderrthreshold")   //nolint:errcheck
+	pflag.CommandLine.MarkHidden("vmodule")           //nolint:errcheck
 
 	cmd := cmd.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
 	return cmd.Execute()
