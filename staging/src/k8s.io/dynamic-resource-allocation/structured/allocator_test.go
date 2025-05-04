@@ -1670,6 +1670,103 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
 		},
+		"with-constraint-expression-contiguous-outofsequence": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{
+						{
+							Requests: []string{req0},
+							MatchExpression: fmt.Sprintf(`size(devices) <= 1 || devices.all(d, devices.exists(other,
+                        d != other &&
+                        (d.attributes["%s"].deviceId == other.attributes["%s"].deviceId + 1 ||
+                        d.attributes["%s"].deviceId == other.attributes["%s"].deviceId - 1)))`,
+								driverA, driverA, driverA, driverA),
+						},
+					},
+					resourceapi.DeviceRequest{
+						Name:            req0,
+						Count:           3,
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						DeviceClassName: classA,
+					},
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(2))}, // Out of sequence but still contiguous
+					},
+				),
+				device(device2,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(1))},
+					},
+				),
+				device(device3,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(0))},
+					},
+				),
+			)),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, false),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
+
+		"with-constraint-expression-non-contiguous": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{
+						{
+							Requests: []string{req0},
+							MatchExpression: fmt.Sprintf(`size(devices) <= 1 || devices.all(d, devices.exists(other,
+                        d != other &&
+                        (d.attributes["%s"].deviceId == other.attributes["%s"].deviceId + 1 ||
+                        d.attributes["%s"].deviceId == other.attributes["%s"].deviceId - 1)))`,
+								driverA, driverA, driverA, driverA),
+						},
+					},
+					resourceapi.DeviceRequest{
+						Name:            req0,
+						Count:           3,
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						DeviceClassName: classA,
+					},
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(0))}, // Non-contiguous IDs
+					},
+				),
+				device(device2,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(2))},
+					},
+				),
+				device(device3,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(4))},
+					},
+				),
+			)),
+			node:          node(node1, region1),
+			expectResults: nil, // Should fail as devices are not contiguous
+		},
+
 		"with-class-device-config": {
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(classWithConfig(classA, driverA, "classAttribute")),
