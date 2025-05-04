@@ -218,10 +218,15 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 
 	singleZone := true
 	zoneKey := ""
-	for _, topo := range podPVTopologies {
+
+	// For each PV‐topology constraint on the pod…
+	for _, pvTopology := range podPVTopologies {
+		if _, ok := node.Labels[pvTopology.key]; !ok {
+			continue
+		}
 		if zoneKey == "" {
-			zoneKey = topo.key
-		} else if zoneKey != topo.key {
+			zoneKey = pvTopology.key
+		} else if zoneKey != pvTopology.key {
 			singleZone = false
 			break
 		}
@@ -234,8 +239,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	}
 	if !hasAnyNodeConstraint {
 		// Reject: multi-zone cluster but node missing zone label
-		logger.V(10).Info("Won't schedule pod onto node due to missing topology label", "pod", klog.KObj(pod), "node", klog.KObj(node), "PV", klog.KRef("", pvTopology.pvName), "PVLabelKey", pvTopology.key)
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
+		logger.V(10).Info("Won't schedule pod onto node due to missing topology label", "pod", klog.KObj(pod), "node", klog.KObj(node))
 	}
 
 	for _, pvTopology := range podPVTopologies {
