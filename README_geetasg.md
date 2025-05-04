@@ -1,3 +1,6 @@
+Add a tag
+ git tag -a v1.34.0-alpha.dracelexpr
+
 KUBE_BUILD_PLATFORMS=linux/amd64 KUBE_DOCKER_IMAGE_TAG=v1.34.0-dracelexpr make quick-release-images
 
 kind load docker-image registry.k8s.io/kube-controller-manager-amd64:v1.34.0-dracelexpr --name dra-example-driver-cluster
