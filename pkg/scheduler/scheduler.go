@@ -132,6 +132,7 @@ type schedulerOptions struct {
 	extenders                  []schedulerapi.Extender
 	frameworkCapturer          FrameworkCapturer
 	parallelism                int32
+	exportHighPrecisionMetrics bool
 	applyDefaultProfile        bool
 }
 
@@ -254,6 +255,7 @@ var defaultSchedulerOptions = schedulerOptions{
 	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	podMaxInUnschedulablePodsDuration: internalqueue.DefaultPodMaxInUnschedulablePodsDuration,
 	parallelism:                       int32(parallelize.DefaultParallelism),
+	exportHighPrecisionMetrics:        false,
 	// Ideally we would statically set the default profile here, but we can't because
 	// creating the default profile may require testing feature gates, which may get
 	// set dynamically in tests. Therefore, we delay creating it until New is actually
@@ -285,6 +287,7 @@ func New(ctx context.Context,
 			return nil, err
 		}
 		options.profiles = cfg.Profiles
+		options.exportHighPrecisionMetrics = cfg.ExportHighPrecisionMetrics
 	}
 
 	registry := frameworkplugins.NewInTreeRegistry()
@@ -292,7 +295,7 @@ func New(ctx context.Context,
 		return nil, err
 	}
 
-	metrics.Register()
+	metrics.Register(options.exportHighPrecisionMetrics)
 
 	extenders, err := buildExtenders(logger, options.extenders, options.profiles)
 	if err != nil {

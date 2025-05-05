@@ -127,19 +127,19 @@ var (
 var registerMetrics sync.Once
 
 // Register all metrics.
-func Register() {
+func Register(shouldRegisterHighPrecisionMetrics bool) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		InitMetrics()
 		RegisterMetrics(metricsList...)
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerHighPrecisionMetrics) {
+		if shouldRegisterHighPrecisionMetrics {
 			RegisterMetrics(EventHandlingLatency, PluginExecutionDuration)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
 			RegisterMetrics(InFlightEvents)
-			if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerHighPrecisionMetrics) {
+			if shouldRegisterHighPrecisionMetrics {
 				RegisterMetrics(queueingHintExecutionDuration)
 			}
 		}

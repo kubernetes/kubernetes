@@ -94,6 +94,15 @@ type KubeSchedulerConfiguration struct {
 	// failover with the benefit of lower memory overhead while waiting to become leader.
 	// Defaults to false.
 	DelayCacheUntilActive bool
+
+	// ExportHighPrecisionMetrics specifies if scheduler should export some expensive metrics that monitor
+	// the latency of operations within the pod scheduling cycle with high precision and a large number
+	// of histogram buckets.
+	// Metrics enabled by this setting:
+	// - scheduler_event_handling_duration_seconds
+	// - scheduler_plugin_execution_duration_seconds
+	// - scheduler_queueing_hint_execution_duration_seconds (if feature flag SchedulerQueueingHints is also enabled)
+	ExportHighPrecisionMetrics bool
 }
 
 // KubeSchedulerProfile is a scheduling profile.

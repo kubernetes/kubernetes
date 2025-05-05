@@ -31,13 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
@@ -3100,8 +3097,7 @@ func TestRecordingMetrics(t *testing.T) {
 // is executed, and since test are executed in random order, it needs to be done at the beginning of every test case.
 // TODO: Refactor tests to use mocks instead of a real metric registry.
 func initMetrics(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerHighPrecisionMetrics, true)
-	metrics.Register()
+	metrics.Register(true /* exportHighPrecisionMetrics*/)
 	metrics.FrameworkExtensionPointDuration.Reset()
 	metrics.PluginExecutionDuration.Reset()
 	metrics.PermitWaitDuration.Reset()

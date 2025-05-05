@@ -64,7 +64,7 @@ var (
 )
 
 func init() {
-	metrics.Register()
+	metrics.Register(true)
 }
 
 type FakePostFilterPlugin struct {
@@ -622,7 +622,7 @@ func TestPrepareCandidate(t *testing.T) {
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
 		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%v (Async preemption enabled: %v)", tt.name, asyncPreemptionEnabled), func(t *testing.T) {
-				metrics.Register()
+				metrics.Register(true)
 				logger, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
@@ -1014,7 +1014,7 @@ func TestCallExtenders(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics.Register()
+			metrics.Register(true)
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()

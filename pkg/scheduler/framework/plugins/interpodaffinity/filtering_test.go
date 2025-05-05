@@ -44,7 +44,7 @@ var (
 )
 
 func init() {
-	metrics.Register()
+	metrics.Register(true)
 }
 
 func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]string, affinity, antiAffinity []v1.PodAffinityTerm) *v1.Pod {

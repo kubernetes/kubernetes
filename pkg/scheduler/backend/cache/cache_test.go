@@ -47,7 +47,7 @@ var nodeInfoCmpOpts = []cmp.Option{
 }
 
 func init() {
-	metrics.Register()
+	metrics.Register(true)
 }
 
 func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.NodeInfo) error {

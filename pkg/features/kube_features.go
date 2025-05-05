@@ -685,16 +685,6 @@ const (
 	// which improves the scheduling latency when the preemption involves in.
 	SchedulerAsyncPreemption featuregate.Feature = "SchedulerAsyncPreemption"
 
-	// owner: @ania-borowiec
-	//
-	// Enables exporting some expensive metrics that monitor the latency of operations within
-	// the pod scheduling cycle with high precision and a large number of histogram buckets.
-	// Metrics enabled by this feature gate:
-	// - scheduler_event_handling_duration_seconds
-	// - scheduler_plugin_execution_duration_seconds
-	// - scheduler_queueing_hint_execution_duration_seconds
-	SchedulerHighPrecisionMetrics featuregate.Feature = "SchedulerHighPrecisionMetrics"
-
 	// owner: @macsko
 	// kep: http://kep.k8s.io/5142
 	//
@@ -1686,10 +1676,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	SchedulerPopFromBackoffQ: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	SchedulerHighPrecisionMetrics: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SchedulerQueueingHints: {

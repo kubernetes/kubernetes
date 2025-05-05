@@ -111,8 +111,7 @@ var (
 // is executed, and since test are executed in random order, it needs to be done at the beginning of every test case.
 // TODO: Refactor tests to use mocks instead of a real metric registry.
 func initMetrics(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerHighPrecisionMetrics, true)
-	metrics.Register()
+	metrics.Register(true /* exportHighPrecisionMetrics */)
 }
 
 func setQueuedPodInfoGated(queuedPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
@@ -1788,7 +1787,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 		for _, podsInUnschedulablePods := range []int{1000, 5000} {
 			b.Run(fmt.Sprintf("%v-%v", tt.name, podsInUnschedulablePods), func(b *testing.B) {
 				logger, ctx := ktesting.NewTestContext(b)
-				metrics.Register()
+				metrics.Register(true /* exportHighPrecisionMetrics */)
 				for i := 0; i < b.N; i++ {
 					b.StopTimer()
 					c := testingclock.NewFakeClock(time.Now())
