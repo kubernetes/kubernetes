@@ -19,7 +19,8 @@ package listset
 import (
 	"testing"
 
-	field "k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -37,6 +38,8 @@ func Test(t *testing.T) {
 		},
 	}).ExpectValid()
 
+	ptrS1 := ptr.To("same value")
+	ptrS2 := ptr.To("same value")
 	st.Value(&Struct{
 		SliceStringField:     []string{"aaa", "bbb", "ccc", "ccc", "bbb", "aaa"},
 		SliceIntField:        []int{1, 2, 3, 3, 2, 1},
@@ -48,6 +51,10 @@ func Test(t *testing.T) {
 			{[]string{"ccc", "333"}},
 			{[]string{"bbb", "222"}},
 			{[]string{"aaa", "111"}},
+		},
+		SliceFalselyComparableField: []FalselyComparableStruct{
+			{StringPtrField: ptrS1},
+			{StringPtrField: ptrS2},
 		},
 	}).ExpectInvalid(
 		field.Duplicate(field.NewPath("sliceStringField").Index(3), "ccc"),
@@ -62,6 +69,7 @@ func Test(t *testing.T) {
 		field.Duplicate(field.NewPath("sliceNonComparableField").Index(3), NonComparableStruct{[]string{"ccc", "333"}}),
 		field.Duplicate(field.NewPath("sliceNonComparableField").Index(4), NonComparableStruct{[]string{"bbb", "222"}}),
 		field.Duplicate(field.NewPath("sliceNonComparableField").Index(5), NonComparableStruct{[]string{"aaa", "111"}}),
+		field.Duplicate(field.NewPath("sliceFalselyComparableField").Index(1), FalselyComparableStruct{StringPtrField: ptrS2}),
 	)
 }
 
@@ -77,27 +85,31 @@ func TestSetCorrelation(t *testing.T) {
 
 	structNew = ImmutableStruct{SliceSetComparableField: []ComparableStruct{{"aaa"}, {"bbb"}}}
 	structOld = ImmutableStruct{SliceSetComparableField: []ComparableStruct{{"bbb"}, {"aaa"}}}
-	st.Value(&structOld).OldValue(&structNew).ExpectValid()
+	st.Value(&structNew).OldValue(&structOld).ExpectValid()
 
 	structNew = ImmutableStruct{SliceNonComparableField: []NonComparableStruct{{[]string{"aaa"}}, {[]string{"bbb"}}}}
 	structOld = ImmutableStruct{SliceNonComparableField: []NonComparableStruct{{[]string{"bbb"}}, {[]string{"aaa"}}}}
-	st.Value(&structOld).OldValue(&structNew).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&structNew).OldValue(&structOld).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("sliceNonComparableField").Index(0), ""),
 		field.Forbidden(field.NewPath("sliceNonComparableField").Index(1), ""),
 	})
 
 	structNew = ImmutableStruct{SliceSetNonComparableField: []NonComparableStruct{{[]string{"aaa"}}, {[]string{"bbb"}}}}
 	structOld = ImmutableStruct{SliceSetNonComparableField: []NonComparableStruct{{[]string{"bbb"}}, {[]string{"aaa"}}}}
-	st.Value(&structOld).OldValue(&structNew).ExpectValid()
+	st.Value(&structNew).OldValue(&structOld).ExpectValid()
 
 	structNew = ImmutableStruct{SlicePrimitiveField: []int{1, 2}}
 	structOld = ImmutableStruct{SlicePrimitiveField: []int{2, 1}}
-	st.Value(&structOld).OldValue(&structNew).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+	st.Value(&structNew).OldValue(&structOld).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
 		field.Forbidden(field.NewPath("slicePrimitiveField").Index(0), ""),
 		field.Forbidden(field.NewPath("slicePrimitiveField").Index(1), ""),
 	})
 
 	structNew = ImmutableStruct{SliceSetPrimitiveField: []int{1, 2}}
 	structOld = ImmutableStruct{SliceSetPrimitiveField: []int{2, 1}}
-	st.Value(&structOld).OldValue(&structNew).ExpectValid()
+	st.Value(&structNew).OldValue(&structOld).ExpectValid()
+
+	structNew = ImmutableStruct{SliceSetFalselyComparableField: []FalselyComparableStruct{{StringPtrField: ptr.To("same value")}}}
+	structOld = ImmutableStruct{SliceSetFalselyComparableField: []FalselyComparableStruct{{StringPtrField: ptr.To("same value")}}}
+	st.Value(&structNew).OldValue(&structOld).ExpectValid()
 }
