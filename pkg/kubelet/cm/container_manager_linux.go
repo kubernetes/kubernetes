@@ -1049,7 +1049,10 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 	// For now we only support Device Plugin
 	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
 
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources which is planned for the next iteration of a KEP.
+	// Update DRA resources if the feature is enabled and the manager exists
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		cm.draManager.UpdateAllocatedResourcesStatus(pod, status)
+	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {

@@ -39,8 +39,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
-	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -59,8 +59,10 @@ type fakeDRADriverGRPCServer struct {
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
 	unprepareResourceCalls     atomic.Uint32
+	watchResourcesCalls        atomic.Uint32
 	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
+	watchResourcesResponses    chan *drahealthv1alpha1.WatchResourcesResponse
 	watchResourcesError        error
 }
 
@@ -111,6 +113,42 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	return s.unprepareResourcesResponse, nil
 }
 
+type mockWatchResourcesServer struct {
+	grpc.ServerStream
+	responses chan *drahealthv1alpha1.WatchResourcesResponse
+	err       error
+	ctx       context.Context
+}
+
+func (x *mockWatchResourcesServer) Send(m *drahealthv1alpha1.WatchResourcesResponse) error {
+	return nil
+}
+
+func (x *mockWatchResourcesServer) Recv() (*drahealthv1alpha1.WatchResourcesResponse, error) {
+	select {
+	case <-x.ctx.Done():
+		return nil, x.ctx.Err()
+	case resp, ok := <-x.responses:
+		if !ok {
+			return nil, x.err
+		}
+		return resp, nil
+	}
+}
+
+func (s *fakeDRADriverGRPCServer) WatchResources(req *drahealthv1alpha1.WatchResourcesRequest, stream drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	s.watchResourcesCalls.Add(1)
+
+	mockStream := &mockWatchResourcesServer{
+		ServerStream: stream,
+		responses:    s.watchResourcesResponses,
+		err:          s.watchResourcesError,
+		ctx:          stream.Context(),
+	}
+	<-mockStream.ctx.Done()
+	return mockStream.ctx.Err()
+}
+
 type tearDown func()
 
 type fakeDRAServerInfo struct {
@@ -122,7 +160,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse, watchResourcesError error) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -158,12 +196,15 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		driverName:                 driverName,
 		prepareResourcesResponse:   prepareResourcesResponse,
 		unprepareResourcesResponse: unprepareResourcesResponse,
+		watchResourcesResponses:    make(chan *drahealthv1alpha1.WatchResourcesResponse, 10),
+		watchResourcesError:        watchResourcesError,
 	}
 	if shouldTimeout {
 		timeout := *pluginClientTimeout * 2
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
+	drahealthv1alpha1.RegisterNodeHealthServer(s, fakeDRADriverGRPCServer)
 	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
 
 	go func(ctx context.Context) {
@@ -577,7 +618,7 @@ func TestPrepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -714,7 +755,7 @@ func TestUnprepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -970,4 +1011,176 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	}
 	wgStart.Done() // Start executing goroutines
 	wgSync.Wait()  // Wait for all goroutines to finish
+}
+
+// TestHandleWatchResourcesStream verifies the manager's ability to process health updates
+// received from a DRA plugin's WatchResources stream. It checks if the internal health cache
+// is updated correctly, if affected pods are identified, and if update notifications are sent
+// through the manager's update channel. It covers various scenarios including health changes, stream errors, and context cancellation.
+func TestHandleWatchResourcesStream(t *testing.T) {
+	tCtx, cancel := context.WithCancel(ktesting.Init(t))
+	defer cancel()
+
+	// Setup Manager with caches
+	manager, err := NewManagerImpl(nil, t.TempDir(), "worker") // KubeClient not needed for this test
+	require.NoError(t, err)
+
+	// Populate claimInfoCache
+	claimInfo := genTestClaimInfo([]string{podUID}, true) // Assume prepared
+	manager.cache.add(claimInfo)
+
+	// Mock stream setup
+	responses := make(chan *drahealthv1alpha1.WatchResourcesResponse, 5)
+	streamErr := make(chan error, 1)
+	mockStream := &mockWatchResourcesServer{
+		responses: responses,
+		err:       nil, // Will be set via streamErr channel
+		ctx:       tCtx,
+	}
+
+	// Start handling the stream in a goroutine
+	streamHandlingDone := make(chan struct{})
+	go func() {
+		defer close(streamHandlingDone)
+		err := manager.HandleWatchResourcesStream(tCtx, mockStream, driverName)
+		if err != nil && err != context.Canceled {
+			t.Logf("HandleWatchResourcesStream exited with error: %v", err)
+		}
+	}()
+
+	// --- Test Case 1: Health change for an allocated device ---
+	t.Log("Test Case 1: Health change for allocated device")
+	unhealthyDevice := &drahealthv1alpha1.DeviceHealth{
+		PoolName:   poolName,
+		DeviceName: deviceName,
+		Health:     "Unhealthy",
+	}
+	responses <- &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDevice}}
+
+	// Verify update notification
+	select {
+	case update := <-manager.update:
+		assert.ElementsMatch(t, []string{podUID}, update.PodUIDs, "Expected pod UID in update")
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for update notification")
+	}
+	// Verify healthInfoCache update
+	manager.healthInfoMutex.Lock()
+	cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+	manager.healthInfoMutex.Unlock()
+	assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealth, "Health info cache not updated")
+
+	// --- Test Case 2: Health change for a non-allocated device ---
+	t.Log("Test Case 2: Health change for non-allocated device")
+	otherDevice := &drahealthv1alpha1.DeviceHealth{
+		PoolName:   poolName,
+		DeviceName: "other-device",
+		Health:     "Unhealthy",
+	}
+	responses <- &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{otherDevice}}
+
+	// Verify NO update notification
+	select {
+	case update := <-manager.update:
+		t.Fatalf("Unexpected update notification received: %+v", update)
+	case <-time.After(100 * time.Millisecond):
+		// Expected timeout
+	}
+	// Verify healthInfoCache update for the other device
+	manager.healthInfoMutex.Lock()
+	cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
+	manager.healthInfoMutex.Unlock()
+	assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealthOther, "Health info cache not updated for other device")
+
+	// --- Test Case 3: No actual health change ---
+	t.Log("Test Case 3: No actual health change")
+	responses <- &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDevice}} // Send unhealthy again
+
+	// Verify NO update notification
+	select {
+	case update := <-manager.update:
+		t.Fatalf("Unexpected update notification received: %+v", update)
+	case <-time.After(100 * time.Millisecond):
+		// Expected timeout
+	}
+
+	// --- Test Case 4: Stream error ---
+	t.Log("Test Case 4: Stream error")
+	mockStream.err = fmt.Errorf("gRPC stream error")
+	close(responses) // Close channel to signal stream end/error
+
+	// Wait for the handler goroutine to finish
+	select {
+	case <-streamHandlingDone:
+		// Goroutine finished as expected
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for stream handler to exit after error")
+	}
+
+	// --- Test Case 5: Context cancellation (Restart handler for this) ---
+	t.Log("Test Case 5: Context cancellation")
+	tCtxCancel, cancelFunc := context.WithCancel(context.Background())
+	responsesCancel := make(chan *drahealthv1alpha1.WatchResourcesResponse, 1)
+	mockStreamCancel := &mockWatchResourcesServer{
+		responses: responsesCancel,
+		err:       nil,
+		ctx:       tCtxCancel,
+	}
+	streamHandlingDoneCancel := make(chan struct{})
+	go func() {
+		defer close(streamHandlingDoneCancel)
+		manager.HandleWatchResourcesStream(tCtxCancel, mockStreamCancel, driverName)
+	}()
+
+	cancelFunc() // Cancel the context
+
+	// Wait for the handler goroutine to finish
+	select {
+	case <-streamHandlingDoneCancel:
+		// Goroutine finished as expected
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for stream handler to exit after context cancellation")
+	}
+}
+
+// TestUpdateAllocatedResourcesStatus checks if the manager correctly updates the
+// PodStatus with the health information of allocated DRA resources. It populates
+// the caches with known claim and health data, then calls the function and verifies the resulting PodStatus.
+func TestUpdateAllocatedResourcesStatus(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	// Setup Manager with caches
+	manager, err := NewManagerImpl(nil, t.TempDir(), "worker")
+	require.NoError(t, err)
+
+	// Populate claimInfoCache
+	claimInfo := genTestClaimInfo([]string{podUID}, true) // Assume prepared
+	manager.cache.add(claimInfo)
+
+	// Populate healthInfoCache
+	healthyDevice := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Healthy", LastUpdated: time.Now()}
+	_, _, err = manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{healthyDevice})
+	require.NoError(t, err)
+
+	// Create Pod and Status objects
+	pod := genTestPod()
+	podStatus := &v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{Name: pod.Spec.Containers[0].Name}, // Match container name if specified, otherwise use index 0
+		},
+	}
+
+	// Call the function under test
+	manager.UpdateAllocatedResourcesStatus(pod, podStatus)
+
+	// Assertions
+	require.Len(t, podStatus.ContainerStatuses, 1)
+	contStatus := podStatus.ContainerStatuses[0]
+	require.NotNil(t, contStatus.AllocatedResourcesStatus)
+	require.Len(t, contStatus.AllocatedResourcesStatus, 1)
+
+	resourceStatus := contStatus.AllocatedResourcesStatus[0]
+	assert.Equal(t, v1.ResourceName(claimName), resourceStatus.Name)
+	assert.Equal(t, cdiID, resourceStatus.ID) // Assuming CDI ID is used as ResourceStatus.ID
+	assert.Equal(t, v1.ResourceHealth{Health: string(state.DeviceHealthStringHealthy)}, resourceStatus.Health)
 }

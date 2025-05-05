@@ -236,7 +236,7 @@ func (p *Plugin) WatchResources(ctx context.Context) (drahealthv1alpha1.NodeHeal
 	stream, err := p.healthClient.WatchResources(ctx, &drahealthv1alpha1.WatchResourcesRequest{})
 	if err != nil {
 		logger.Error(err, "WatchResources RPC call failed")
-		return nil, err // Return original gRPC error
+		return nil, err
 	}
 
 	logger.V(4).Info("WatchResources stream initiated successfully")

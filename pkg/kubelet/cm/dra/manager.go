@@ -598,7 +598,7 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.Pod
 			}
 
 			// Initialize AllocatedResourcesStatus if nil
-			if status.ContainerStatuses[i].AllocatedResourcesStatus == nil {
+			if containerStatus.AllocatedResourcesStatus == nil {
 				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
 			}
 

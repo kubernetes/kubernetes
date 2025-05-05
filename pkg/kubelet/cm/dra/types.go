@@ -52,6 +52,9 @@ type Manager interface {
 
 	// GetContainerClaimInfos gets Container ClaimInfo objects
 	GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error)
+
+	// UpdateAllocatedResourcesStatus modifies the status object in-place.
+	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
 }
 
 // ContainerInfo contains information required by the runtime to consume prepared resources.
