@@ -29,7 +29,7 @@ import (
 // BoundedFrequencyRunner manages runs of a user-provided work function.
 type BoundedFrequencyRunner struct {
 	name        string        // the name of this instance
-	minInterval time.Duration // the min time between runs, modulo bursts
+	minInterval time.Duration // the min time between runs
 	maxInterval time.Duration // the max time between runs
 
 	run chan struct{} // try an async run
@@ -140,14 +140,14 @@ var _ timer = &realTimer{}
 //
 // `maxInterval` must be greater than or equal to `minInterval`; otherwise,
 // this function will panic.
-func NewBoundedFrequencyRunner(name string, fn func(), minInterval, maxInterval time.Duration, burstRuns int) *BoundedFrequencyRunner {
+func NewBoundedFrequencyRunner(name string, fn func(), minInterval, maxInterval time.Duration) *BoundedFrequencyRunner {
 	timer := &realTimer{timer: time.NewTimer(0)} // will tick immediately
 	<-timer.C()                                  // consume the first tick
-	return construct(name, fn, minInterval, maxInterval, burstRuns, timer)
+	return construct(name, fn, minInterval, maxInterval, timer)
 }
 
 // Make an instance with dependencies injected.
-func construct(name string, fn func(), minInterval, maxInterval time.Duration, burstRuns int, timer timer) *BoundedFrequencyRunner {
+func construct(name string, fn func(), minInterval, maxInterval time.Duration, timer timer) *BoundedFrequencyRunner {
 	if maxInterval < minInterval {
 		panic(fmt.Sprintf("%s: maxInterval (%v) must be >= minInterval (%v)", name, maxInterval, minInterval))
 	}
@@ -164,9 +164,8 @@ func construct(name string, fn func(), minInterval, maxInterval time.Duration, b
 	if minInterval == 0 {
 		bfr.limiter = nullLimiter{}
 	} else {
-		// allow burst updates in short succession
 		qps := float32(time.Second) / float32(minInterval)
-		bfr.limiter = flowcontrol.NewTokenBucketRateLimiterWithClock(qps, burstRuns, timer)
+		bfr.limiter = flowcontrol.NewTokenBucketRateLimiterWithClock(qps, 1, timer)
 	}
 	return bfr
 }

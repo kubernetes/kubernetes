@@ -215,10 +215,10 @@ func waitForNothing(name string, t *testing.T, timer *fakeTimer, obj *receiver) 
 	checkReceiver(name, t, obj, false)
 }
 
-func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
+func Test_BoundedFrequencyRunner(t *testing.T) {
 	obj := &receiver{}
 	timer := newFakeTimer()
-	runner := construct("test-runner", obj.F, minInterval, maxInterval, 1, timer)
+	runner := construct("test-runner", obj.F, minInterval, maxInterval, timer)
 	stop := make(chan struct{})
 
 	var upd timerUpdate
@@ -289,94 +289,10 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 	<-timer.updated
 }
 
-func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
-	obj := &receiver{}
-	timer := newFakeTimer()
-	runner := construct("test-runner", obj.F, minInterval, maxInterval, 2, timer)
-	stop := make(chan struct{})
-
-	var upd timerUpdate
-
-	// Start.
-	go runner.Loop(stop)
-	upd = <-timer.updated // wait for initial time to be set to max
-	checkTimer("init", t, upd, true, maxInterval)
-	checkReceiver("init", t, obj, false)
-
-	// Run once, immediately.
-	// abs=0ms, rel=0ms
-	runner.Run()
-	waitForRun("first run", t, timer, obj)
-
-	// Run again, before minInterval expires, with burst.
-	timer.advance(1 * time.Millisecond) // abs=1ms, rel=1ms
-	runner.Run()
-	waitForRun("second run", t, timer, obj)
-
-	// Run again, before minInterval expires.
-	timer.advance(498 * time.Millisecond) // abs=499ms, rel=498ms
-	runner.Run()
-	waitForDefer("too soon after second", t, timer, obj, 502*time.Millisecond)
-
-	// Run again, before minInterval expires.
-	timer.advance(1 * time.Millisecond) // abs=500ms, rel=499ms
-	runner.Run()
-	waitForDefer("too soon after second 2", t, timer, obj, 501*time.Millisecond)
-
-	// Run again, before minInterval expires.
-	timer.advance(1 * time.Millisecond) // abs=501ms, rel=500ms
-	runner.Run()
-	waitForDefer("too soon after second 3", t, timer, obj, 500*time.Millisecond)
-
-	// Advance timer enough to replenish bursts, but not enough to be minInterval
-	// after the last run
-	timer.advance(499 * time.Millisecond) // abs=1000ms, rel=999ms
-	waitForNothing("not minInterval", t, timer, obj)
-	runner.Run()
-	waitForRun("third run", t, timer, obj)
-
-	// Run again, before minInterval expires.
-	timer.advance(1 * time.Millisecond) // abs=1001ms, rel=1ms
-	runner.Run()
-	waitForDefer("too soon after third", t, timer, obj, 999*time.Millisecond)
-
-	// Run again, before minInterval expires.
-	timer.advance(998 * time.Millisecond) // abs=1999ms, rel=999ms
-	runner.Run()
-	waitForDefer("too soon after third 2", t, timer, obj, 1*time.Millisecond)
-
-	// Advance and do the deferred run
-	timer.advance(1 * time.Millisecond) // abs=2000ms, rel=1000ms
-	waitForRun("fourth run", t, timer, obj)
-
-	// Run again, once burst has fully replenished.
-	timer.advance(2 * time.Second) // abs=4000ms, rel=2000ms
-	runner.Run()
-	waitForRun("fifth run", t, timer, obj)
-	runner.Run()
-	waitForRun("sixth run", t, timer, obj)
-	runner.Run()
-	waitForDefer("too soon after sixth", t, timer, obj, 1*time.Second)
-
-	// Wait until minInterval after the last run
-	timer.advance(1 * time.Second) // abs=5000ms, rel=1000ms
-	waitForRun("seventh run", t, timer, obj)
-
-	// Wait for maxInterval
-	timer.advance(10 * time.Second) // abs=15000ms, rel=10000ms
-	waitForRun("maxInterval", t, timer, obj)
-
-	// Clean up.
-	stop <- struct{}{}
-	// a message is sent to time.updated in func Stop() at the end of the child goroutine
-	// to terminate the child, a receive on time.updated is needed here
-	<-timer.updated
-}
-
 func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
 	obj := &receiver{}
 	timer := newFakeTimer()
-	runner := construct("test-runner", obj.F, minInterval, maxInterval, 1, timer)
+	runner := construct("test-runner", obj.F, minInterval, maxInterval, timer)
 	stop := make(chan struct{})
 
 	var upd timerUpdate
