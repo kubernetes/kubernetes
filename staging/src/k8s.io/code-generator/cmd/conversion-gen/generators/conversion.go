@@ -76,14 +76,20 @@ func extractExternalTypesTag(comments []string) ([]string, error) {
 	return extractTagValues(externalTypesTagName, comments)
 }
 
-func isCopyOnly(comments []string) bool {
-	values, _ := extractTagValues("k8s:conversion-fn", comments)
-	return len(values) == 1 && values[0] == "copy-only"
+func isCopyOnly(comments []string) (bool, error) {
+	values, err := extractTagValues("k8s:conversion-fn", comments)
+	if err != nil {
+		return false, err
+	}
+	return len(values) == 1 && values[0] == "copy-only", nil
 }
 
-func isDrop(comments []string) bool {
-	values, _ := extractTagValues("k8s:conversion-fn", comments)
-	return len(values) == 1 && values[0] == "drop"
+func isDrop(comments []string) (bool, error) {
+	values, err := extractTagValues("k8s:conversion-fn", comments)
+	if err != nil {
+		return false, err
+	}
+	return len(values) == 1 && values[0] == "drop", nil
 }
 
 // TODO: This is created only to reduce number of changes in a single PR.
@@ -360,7 +366,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	// If there is a manual conversion defined between two types, exclude it
 	// from being a candidate for unsafe conversion
 	for k, v := range manualConversions {
-		if isCopyOnly(v.CommentLines) {
+		copyOnly, err := isCopyOnly(v.CommentLines)
+		if err != nil {
+			klog.Errorf("error extracting tags: %v", err)
+		} else if copyOnly {
 			klog.V(4).Infof("Conversion function %s will not block memory copy because it is copy-only", v.Name)
 			continue
 		}
@@ -954,7 +963,10 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 
 		// check based on the top level name, not the underlying names
 		if function, ok := g.preexists(inMember.Type, outMember.Type); ok {
-			if isDrop(function.CommentLines) {
+			dropFn, err := isDrop(function.CommentLines)
+			if err != nil {
+				klog.Errorf("Error extracting drop tag for function %s: %v", function.Name, err)
+			} else if dropFn {
 				continue
 			}
 			// copy-only functions that are directly assignable can be inlined instead of invoked.
@@ -962,7 +974,12 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 			// correctly copied between types. These functions are equivalent to a memory assignment,
 			// and are necessary for the reflection path, but should not block memory conversion.
 			// Convert_unversioned_Time_to_unversioned_Time is an example of this logic.
-			if !isCopyOnly(function.CommentLines) || !g.isFastConversion(inMemberType, outMemberType) {
+			copyOnly, copyErr := isCopyOnly(function.CommentLines)
+			if copyErr != nil {
+				klog.Errorf("Error extracting copy-only tag for function %s: %v", function.Name, copyErr)
+				copyOnly = false
+			}
+			if !copyOnly || !g.isFastConversion(inMemberType, outMemberType) {
 				args["function"] = function
 				sw.Do("if err := $.function|raw$(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 				sw.Do("return err\n", nil)
