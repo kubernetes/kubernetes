@@ -227,9 +227,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		// false, adding more devices will not cause it to return true. This
 		// allows the search to stop early once a constraint returns false.
 		constraints := make([]constraint, len(claim.Spec.Devices.Constraints))
+		alloc.logger.V(6).Info("Checking constraints", "total constraints", len(claim.Spec.Devices.Constraints))
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
+				alloc.logger.V(6).Info("Evaluating match attrib constraint")
 				matchAttribute := draapi.FullyQualifiedName(*constraint.MatchAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
@@ -244,6 +246,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				constraints[i] = m
 			case constraint.MatchExpression != "":
 				logger := alloc.logger
+				alloc.logger.V(6).Info("Evaluating match expr constraint")
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchExpressionConstraint")
 					logger = klog.LoggerWithValues(logger, "matchExpression", constraint.MatchExpression)
