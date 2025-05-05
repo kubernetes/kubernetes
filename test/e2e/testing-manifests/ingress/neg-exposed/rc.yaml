@@ -14,13 +14,13 @@ spec:
         run: hostname
     spec:
       containers:
-      - image: registry.k8s.io/e2e-test-images/agnhost:2.32
+      - image: registry.k8s.io/e2e-test-images/agnhost:2.54
         name: host1
         args: ["serve-hostname", "--http=true", "--udp=false", "--port=8000"]
         ports:
         - protocol: TCP
           containerPort: 8000
-      - image: registry.k8s.io/e2e-test-images/agnhost:2.32
+      - image: registry.k8s.io/e2e-test-images/agnhost:2.54
         name: host2
         args: ["serve-hostname", "--http=true", "--udp=false", "--port=8080"]
         ports:
