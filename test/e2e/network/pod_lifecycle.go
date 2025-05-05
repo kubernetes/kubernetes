@@ -56,10 +56,12 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 	})
 
 	ginkgo.It("should be able to connect from a Pod to a terminating Pod", func(ctx context.Context) {
-		ginkgo.By("Creating 1 webserver pod able to serve traffic during the grace period of 300 seconds")
-		gracePeriod := int64(100)
-		webserverPod := e2epod.NewAgnhostPod(ns, "webserver-pod", nil, nil, nil, "netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod))
-		webserverPod.Spec.TerminationGracePeriodSeconds = &gracePeriod
+		gracePeriodSeconds := int64(100)
+		containerPort := 80
+
+		ginkgo.By("Creating 1 webserver pod able to serve traffic during the grace period of " + fmt.Sprint(gracePeriodSeconds) + " seconds")
+		webserverPod := e2epod.NewAgnhostPod(ns, "webserver-pod", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
+		webserverPod.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		webserverPod = podClient.CreateSync(ctx, webserverPod)
 
 		ginkgo.By("Creating 1 client pod that will try to connect to the webserver")
@@ -68,7 +70,7 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 
 		ginkgo.By("Try to connect to the webserver")
 		// Wait until we are able to connect to the Pod
-		podIPAddress := net.JoinHostPort(webserverPod.Status.PodIP, strconv.Itoa(80))
+		podIPAddress := net.JoinHostPort(webserverPod.Status.PodIP, strconv.Itoa(containerPort))
 		execHostnameTest(*pausePod, podIPAddress, webserverPod.Name)
 
 		// webserver should continue to serve traffic after delete
@@ -81,19 +83,21 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 	})
 
 	ginkgo.It("should be able to connect to other Pod from a terminating Pod", func(ctx context.Context) {
-		ginkgo.By("Creating 1 webserver pod able to serve traffic during the grace period of 300 seconds")
-		gracePeriod := int64(100)
-		webserverPod := e2epod.NewAgnhostPod(ns, "webserver-pod", nil, nil, nil, "netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod))
+		gracePeriodSeconds := int64(100)
+		containerPort := 80
+
+		ginkgo.By("Creating 1 webserver pod able to serve traffic during the grace period of " + fmt.Sprint(gracePeriodSeconds) + " seconds")
+		webserverPod := e2epod.NewAgnhostPod(ns, "webserver-pod", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		webserverPod = podClient.CreateSync(ctx, webserverPod)
 
 		ginkgo.By("Creating 1 client pod that will try to connect to the webservers")
-		pausePod := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil, "netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod))
-		pausePod.Spec.TerminationGracePeriodSeconds = &gracePeriod
+		pausePod := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
+		pausePod.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		pausePod = podClient.CreateSync(ctx, pausePod)
 
 		ginkgo.By("Try to connect to the webserver")
 		// Wait until we are able to connect to the Pod
-		podIPAddress := net.JoinHostPort(webserverPod.Status.PodIP, strconv.Itoa(80))
+		podIPAddress := net.JoinHostPort(webserverPod.Status.PodIP, strconv.Itoa(containerPort))
 		execHostnameTest(*pausePod, podIPAddress, webserverPod.Name)
 
 		// pod client should continue to connect to the webserver after delete
@@ -108,6 +112,9 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 	ginkgo.It("should be able to have zero downtime on a Blue Green deployment using Services and Readiness Gates", func(ctx context.Context) {
 		readinessGate := "k8s.io/blue-green"
 		patchStatusFmt := `{"status":{"conditions":[{"type":%q, "status":%q}]}}`
+		gracePeriodSeconds := int64(30)
+		containerPort := int32(80)
+		servicePort := int32(80)
 
 		serviceName := "blue-green-svc"
 		blueGreenJig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -115,14 +122,13 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		blueGreenService, err := blueGreenJig.CreateTCPService(ctx, func(svc *v1.Service) {
 			svc.Spec.Type = v1.ServiceTypeClusterIP
 			svc.Spec.Ports = []v1.ServicePort{
-				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(80)},
+				{Port: servicePort, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt32(containerPort)},
 			}
 		})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Creating 2 webserver pod (green and blue) able to serve traffic during the grace period of 30 seconds")
-		gracePeriod := int64(30)
-		bluePod := e2epod.NewAgnhostPod(ns, "blue-pod", nil, nil, nil, "netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod))
+		ginkgo.By("Creating 2 webserver pod (green and blue) able to serve traffic during the grace period of " + fmt.Sprint(gracePeriodSeconds) + " seconds")
+		bluePod := e2epod.NewAgnhostPod(ns, "blue-pod", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		bluePod.Labels = blueGreenService.Labels
 		bluePod.Spec.ReadinessGates = []v1.PodReadinessGate{
 			{ConditionType: v1.PodConditionType(readinessGate)},
@@ -136,7 +142,7 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 			framework.Failf("Expect pod(%s/%s)'s Ready condition to be false initially.", ns, bluePod.Name)
 		}
 
-		greenPod := e2epod.NewAgnhostPod(ns, "green-pod", nil, nil, nil, "netexec", "--http-port=80", fmt.Sprintf("--delay-shutdown=%d", gracePeriod))
+		greenPod := e2epod.NewAgnhostPod(ns, "green-pod", nil, nil, nil, "netexec", "--http-port", fmt.Sprint(containerPort), "--delay-shutdown", fmt.Sprint(gracePeriodSeconds))
 		greenPod.Labels = blueGreenService.Labels
 		greenPod.Spec.ReadinessGates = []v1.PodReadinessGate{
 			{ConditionType: v1.PodConditionType(readinessGate)},
@@ -152,7 +158,7 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 
 		ginkgo.By("Creating 1 client pod that will try to connect to the blue-green-svc")
 		clientPod := e2epod.NewAgnhostPod(ns, "client-pod-1", nil, nil, nil)
-		clientPod.Spec.TerminationGracePeriodSeconds = &gracePeriod
+		clientPod.Spec.TerminationGracePeriodSeconds = &gracePeriodSeconds
 		clientPod = podClient.CreateSync(ctx, clientPod)
 
 		ginkgo.By(fmt.Sprintf("patching blue pod status with condition %q to true", readinessGate))
