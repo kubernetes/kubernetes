@@ -321,12 +321,12 @@ func TestToValue(t *testing.T) {
 		{
 			name:       "struct: omitzero: zero valued: does not have scalar fields",
 			expression: "!has(c.s) && !has(c.i) && !has(c.b) && !has(c.f)",
-			activation: map[string]typedValue{"c": structOmitEmpty1},
+			activation: map[string]typedValue{"c": structOmitZero1},
 		},
 		{
 			name:       "struct: omitzero: zero valued: does not have pointer to scalar fields",
 			expression: "!has(c.sp) && !has(c.ip) && !has(c.bp) && !has(c.fp)",
-			activation: map[string]typedValue{"c": structOmitEmpty1},
+			activation: map[string]typedValue{"c": structOmitZero1},
 		},
 		{
 			name:       "struct: omitzero: non-zero valued: has struct field",
