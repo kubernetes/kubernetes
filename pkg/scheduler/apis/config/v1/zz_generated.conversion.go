@@ -466,6 +466,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 	}
 	out.Extenders = *(*[]configv1.Extender)(unsafe.Pointer(&in.Extenders))
 	out.DelayCacheUntilActive = in.DelayCacheUntilActive
+	// WARNING: in.ExportHighPrecisionMetrics requires manual conversion: does not exist in peer-type
 	return nil
 }
 
