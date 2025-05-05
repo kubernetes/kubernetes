@@ -48,25 +48,41 @@ const (
 	externalTypesTagName = "k8s:conversion-gen-external-types"
 )
 
-func extractTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[tagName]
+func extractTagValues(tagName string, comments []string) ([]string, error) {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagName}, comments)
+	if err != nil {
+		return nil, err
+	}
+	tagList, exists := tags[tagName]
+	if !exists {
+		return nil, nil
+	}
+	values := make([]string, len(tagList))
+	for i, v := range tagList {
+		values[i] = v.Value
+	}
+	return values, nil
 }
 
-func extractExplicitFromTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[explicitFromTagName]
+func extractTag(comments []string) ([]string, error) {
+	return extractTagValues(tagName, comments)
 }
 
-func extractExternalTypesTag(comments []string) []string {
-	return gengo.ExtractCommentTags("+", comments)[externalTypesTagName]
+func extractExplicitFromTag(comments []string) ([]string, error) {
+	return extractTagValues(explicitFromTagName, comments)
+}
+
+func extractExternalTypesTag(comments []string) ([]string, error) {
+	return extractTagValues(externalTypesTagName, comments)
 }
 
 func isCopyOnly(comments []string) bool {
-	values := gengo.ExtractCommentTags("+", comments)["k8s:conversion-fn"]
+	values, _ := extractTagValues("k8s:conversion-fn", comments)
 	return len(values) == 1 && values[0] == "copy-only"
 }
 
 func isDrop(comments []string) bool {
-	values := gengo.ExtractCommentTags("+", comments)["k8s:conversion-fn"]
+	values, _ := extractTagValues("k8s:conversion-fn", comments)
 	return len(values) == 1 && values[0] == "drop"
 }
 
@@ -229,9 +245,13 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		// Only generate conversions for packages which explicitly request it
 		// by specifying one or more "+k8s:conversion-gen=<peer-pkg>"
 		// in their doc.go file.
-		peerPkgs := extractTag(pkg.Comments)
+		peerPkgs, err := extractTag(pkg.Comments)
 		if peerPkgs == nil {
 			klog.V(3).Infof("  no tag")
+			continue
+		}
+		if err != nil {
+			klog.Errorf("failed to extract tag %s", err)
 			continue
 		}
 		klog.V(3).Infof("  tags: %q", peerPkgs)
@@ -250,7 +270,10 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 		// if the external types are not in the same package where the
 		// conversion functions to be generated
-		externalTypesValues := extractExternalTypesTag(pkg.Comments)
+		externalTypesValues, err := extractExternalTypesTag(pkg.Comments)
+		if err != nil {
+			klog.Fatalf("Failed to extract external types tag for package %q: %v", i, err)
+		}
 		if externalTypesValues != nil {
 			if len(externalTypesValues) != 1 {
 				klog.Fatalf("  expect only one value for %q tag, got: %q", externalTypesTagName, externalTypesValues)
@@ -520,7 +543,12 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 		return false
 	}
 	// If the type has opted out, skip it.
-	tagvals := extractTag(t.CommentLines)
+	tagvals, err := extractTag(t.CommentLines)
+	if err != nil {
+		klog.Errorf("Type %v: error extracting tags: %v", t, err)
+		return false
+	}
+
 	if tagvals != nil {
 		if tagvals[0] != "false" {
 			klog.Fatalf("Type %v: unsupported %s value: %q", t, tagName, tagvals[0])
@@ -542,8 +570,12 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 func getExplicitFromTypes(t *types.Type) []types.Name {
 	comments := t.SecondClosestCommentLines
 	comments = append(comments, t.CommentLines...)
-	paths := extractExplicitFromTag(comments)
 	result := []types.Name{}
+	paths, err := extractExplicitFromTag(comments)
+	if err != nil {
+		klog.Errorf("Error extracting explicit-from tag for %v: %v", t.Name, err)
+		return result
+	}
 	for _, path := range paths {
 		items := strings.Split(path, ".")
 		if len(items) != 2 {
@@ -869,7 +901,11 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	for _, inMember := range inType.Members {
-		if tagvals := extractTag(inMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+		tagvals, err := extractTag(inMember.CommentLines)
+		if err != nil {
+			klog.Errorf("Member %v.%v: error extracting tags: %v", inType, inMember.Name, err)
+		}
+		if tagvals != nil && tagvals[0] == "false" {
 			// This field is excluded from conversion.
 			sw.Do("// INFO: in."+inMember.Name+" opted out of conversion generation\n", nil)
 			continue
@@ -1080,7 +1116,11 @@ func (g *genConversion) generateFromURLValues(inType, outType *types.Type, sw *g
 	}
 	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
 	for _, outMember := range outType.Members {
-		if tagvals := extractTag(outMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+		tagvals, err := extractTag(outMember.CommentLines)
+		if err != nil {
+			klog.Errorf("Member %v.%v: error extracting tags: %v", outType, outMember.Name, err)
+		}
+		if tagvals != nil && tagvals[0] == "false" {
 			// This field is excluded from conversion.
 			sw.Do("// INFO: in."+outMember.Name+" opted out of conversion generation\n", nil)
 			continue
