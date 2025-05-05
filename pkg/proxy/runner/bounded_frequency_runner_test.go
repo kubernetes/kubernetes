@@ -152,6 +152,7 @@ func (ft *fakeTimer) advance(d time.Duration) {
 // return the calling line number (for printing)
 // test the timer's state
 func checkTimer(name string, t *testing.T, upd timerUpdate, active bool, next time.Duration) {
+	t.Helper()
 	if upd.active != active {
 		t.Fatalf("%s: expected timer active=%v", name, active)
 	}
@@ -162,6 +163,7 @@ func checkTimer(name string, t *testing.T, upd timerUpdate, active bool, next ti
 
 // test and reset the receiver's state
 func checkReceiver(name string, t *testing.T, receiver *receiver, expected bool) {
+	t.Helper()
 	triggered := receiver.reset()
 	if expected && !triggered {
 		t.Fatalf("%s: function should have been called", name)
@@ -175,6 +177,7 @@ var minInterval = 1 * time.Second
 var maxInterval = 10 * time.Second
 
 func waitForReset(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectCall bool, expectNext time.Duration) {
+	t.Helper()
 	upd := <-timer.updated // wait for stop
 	checkReceiver(name, t, obj, expectCall)
 	checkReceiver(name, t, obj, false) // prove post-condition
@@ -184,20 +187,24 @@ func waitForReset(name string, t *testing.T, timer *fakeTimer, obj *receiver, ex
 }
 
 func waitForRun(name string, t *testing.T, timer *fakeTimer, obj *receiver) {
+	t.Helper()
 	waitForReset(name, t, timer, obj, true, maxInterval)
 }
 
 func waitForRunWithRetry(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectNext time.Duration) {
+	t.Helper()
 	// It will first get reset as with a normal run, and then get set again
 	waitForRun(name, t, timer, obj)
 	waitForReset(name, t, timer, obj, false, expectNext)
 }
 
 func waitForDefer(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectNext time.Duration) {
+	t.Helper()
 	waitForReset(name, t, timer, obj, false, expectNext)
 }
 
 func waitForNothing(name string, t *testing.T, timer *fakeTimer, obj *receiver) {
+	t.Helper()
 	select {
 	case <-timer.c:
 		t.Fatalf("%s: unexpected timer tick", name)
