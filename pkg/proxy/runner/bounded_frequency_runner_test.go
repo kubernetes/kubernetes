@@ -17,6 +17,7 @@ limitations under the License.
 package runner
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -24,20 +25,21 @@ import (
 
 // Track calls to the managed function.
 type receiver struct {
-	lock    sync.Mutex
-	run     bool
-	retryFn func()
+	lock  sync.Mutex
+	run   bool
+	retry bool
 }
 
-func (r *receiver) F() {
+func (r *receiver) F() error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.run = true
 
-	if r.retryFn != nil {
-		r.retryFn()
-		r.retryFn = nil
+	if r.retry {
+		r.retry = false
+		return fmt.Errorf("retry")
 	}
+	return nil
 }
 
 func (r *receiver) reset() bool {
@@ -48,10 +50,10 @@ func (r *receiver) reset() bool {
 	return was
 }
 
-func (r *receiver) setRetryFn(retryFn func()) {
+func (r *receiver) setRetry(retry bool) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
-	r.retryFn = retryFn
+	r.retry = retry
 }
 
 // A single change event in the fake timer.
@@ -174,6 +176,7 @@ func checkReceiver(name string, t *testing.T, receiver *receiver, expected bool)
 
 // Durations embedded in test cases depend on these.
 var minInterval = 1 * time.Second
+var retryInterval = 5 * time.Second
 var maxInterval = 10 * time.Second
 
 func waitForReset(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectCall bool, expectNext time.Duration) {
@@ -193,9 +196,7 @@ func waitForRun(name string, t *testing.T, timer *fakeTimer, obj *receiver) {
 
 func waitForRunWithRetry(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectNext time.Duration) {
 	t.Helper()
-	// It will first get reset as with a normal run, and then get set again
-	waitForRun(name, t, timer, obj)
-	waitForReset(name, t, timer, obj, false, expectNext)
+	waitForReset(name, t, timer, obj, true, expectNext)
 }
 
 func waitForDefer(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectNext time.Duration) {
@@ -218,7 +219,7 @@ func waitForNothing(name string, t *testing.T, timer *fakeTimer, obj *receiver) 
 func Test_BoundedFrequencyRunner(t *testing.T) {
 	obj := &receiver{}
 	timer := newFakeTimer()
-	runner := construct("test-runner", obj.F, minInterval, maxInterval, timer)
+	runner := construct("test-runner", obj.F, minInterval, retryInterval, maxInterval, timer)
 	stop := make(chan struct{})
 
 	var upd timerUpdate
@@ -289,10 +290,10 @@ func Test_BoundedFrequencyRunner(t *testing.T) {
 	<-timer.updated
 }
 
-func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
+func Test_BoundedFrequencyRunnerRetry(t *testing.T) {
 	obj := &receiver{}
 	timer := newFakeTimer()
-	runner := construct("test-runner", obj.F, minInterval, maxInterval, timer)
+	runner := construct("test-runner", obj.F, minInterval, retryInterval, maxInterval, timer)
 	stop := make(chan struct{})
 
 	var upd timerUpdate
@@ -305,7 +306,7 @@ func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
 
 	// Run once, immediately, and queue a retry
 	// rel=0ms
-	obj.setRetryFn(func() { runner.RetryAfter(5 * time.Second) })
+	obj.setRetry(true)
 	runner.Run()
 	waitForRunWithRetry("first run", t, timer, obj, 5*time.Second)
 
@@ -322,9 +323,9 @@ func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
 	runner.Run()
 	waitForDefer("too soon after retry", t, timer, obj, 501*time.Millisecond)
 
-	// Do the deferred run, queue another retry after it returns
+	// Do the deferred run, have it queue another retry
+	obj.setRetry(true)
 	timer.advance(501 * time.Millisecond) // rel=1000ms
-	runner.RetryAfter(5 * time.Second)
 	waitForRunWithRetry("second run", t, timer, obj, 5*time.Second)
 
 	// Wait for minInterval to pass
@@ -339,13 +340,8 @@ func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
 	timer.advance(4 * time.Second)
 	waitForNothing("retry cancelled", t, timer, obj)
 
-	// Run, queue a retry from a goroutine
-	obj.setRetryFn(func() {
-		go func() {
-			time.Sleep(100 * time.Millisecond)
-			runner.RetryAfter(5 * time.Second)
-		}()
-	})
+	// Run and request a retry
+	obj.setRetry(true)
 	runner.Run()
 	waitForRunWithRetry("fourth run", t, timer, obj, 5*time.Second)
 
