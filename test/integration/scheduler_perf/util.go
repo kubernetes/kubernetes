@@ -241,6 +241,11 @@ func makeBaseNode(nodeNamePrefix string) *v1.Node {
 				v1.ResourceCPU:    resource.MustParse("4"),
 				v1.ResourceMemory: resource.MustParse("32Gi"),
 			},
+			Allocatable: v1.ResourceList{
+				v1.ResourcePods:   *resource.NewQuantity(110, resource.DecimalSI),
+				v1.ResourceCPU:    resource.MustParse("4"),
+				v1.ResourceMemory: resource.MustParse("32Gi"),
+			},
 			Phase: v1.NodeRunning,
 			Conditions: []v1.NodeCondition{
 				{Type: v1.NodeReady, Status: v1.ConditionTrue},
