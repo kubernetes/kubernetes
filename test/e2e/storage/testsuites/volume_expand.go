@@ -492,12 +492,14 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 func VerifyRecoveryRelatedFields(pvc *v1.PersistentVolumeClaim) error {
 	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
 	if resizeStatus != "" {
-		return fmt.Errorf("pvc %q had %s resize status", pvc.Name, resizeStatus)
+		return fmt.Errorf("pvc %q had %s resize status, expected none", pvc.Name, resizeStatus)
 	}
 
 	allocatedSize := pvc.Status.AllocatedResources[v1.ResourceStorage]
-	if allocatedSize.Cmp(pvc.Spec.Resources.Requests[v1.ResourceStorage]) != 0 {
-		return fmt.Errorf("pvc %q had %s allocated size", pvc.Name, allocatedSize.String())
+	requestedSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+	// at this point allocatedSize should be greater than pvc resource request
+	if allocatedSize.Cmp(requestedSize) < 0 {
+		return fmt.Errorf("pvc %q had %s allocated size, expected %s", pvc.Name, allocatedSize.String(), requestedSize.String())
 	}
 	return nil
 }
