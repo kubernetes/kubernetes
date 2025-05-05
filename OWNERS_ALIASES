@@ -487,7 +487,8 @@ aliases:
   # emeritus:
   # - mm4tt
   sig-scheduling-api-reviewers:
-    - alculquicondor
+  # emeritus:
+  # - alculquicondor
   sig-storage-api-reviewers:
     - deads2k
     - saad-ali
