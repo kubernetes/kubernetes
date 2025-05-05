@@ -3,15 +3,18 @@ WORKDIR /go/src/k8s.io/kubernetes
 COPY . .
 RUN make WHAT=openshift-hack/e2e/k8s-e2e.test; \
     make WHAT=vendor/github.com/onsi/ginkgo/v2/ginkgo; \
+    make WHAT=openshift-hack/cmd/k8s-tests-ext; \
     mkdir -p /tmp/build; \
     cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/k8s-e2e.test /tmp/build/; \
     cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/ginkgo /tmp/build/; \
+    cp /go/src/k8s.io/kubernetes/_output/local/bin/linux/$(go env GOARCH)/k8s-tests-ext /tmp/build/; \
     cp /go/src/k8s.io/kubernetes/openshift-hack/test-kubernetes-e2e.sh /tmp/build/; \
     cp /go/src/k8s.io/kubernetes/openshift-hack/images/kube-proxy/test-kube-proxy.sh /tmp/build/
 
 FROM registry.ci.openshift.org/ocp/4.19:tools
 COPY --from=builder /tmp/build/k8s-e2e.test /usr/bin/
 COPY --from=builder /tmp/build/ginkgo /usr/bin/
+COPY --from=builder /tmp/build/k8s-tests-ext /usr/bin/
 COPY --from=builder /tmp/build/test-kubernetes-e2e.sh /usr/bin/
 COPY --from=builder /tmp/build/test-kube-proxy.sh /usr/bin/
 RUN yum install --setopt=tsflags=nodocs -y git gzip util-linux && yum clean all && rm -rf /var/cache/yum/* && \

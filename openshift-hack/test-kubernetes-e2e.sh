@@ -54,12 +54,13 @@ esac
 # -skip and -focus.
 KUBE_E2E_TEST_ARGS="${KUBE_E2E_TEST_ARGS:-${DEFAULT_TEST_ARGS}}"
 
-# k8s-e2e.test and ginkgo are expected to be in the path in
+# k8s-e2e.test, ginkgo, and k8s-tests-ext are expected to be in the path in
 # CI. Outside of CI, ensure k8s-e2e.test and ginkgo are built and
 # available in PATH.
 if ! which k8s-e2e.test &> /dev/null; then
   make WHAT=vendor/github.com/onsi/ginkgo/v2/ginkgo
   make WHAT=openshift-hack/e2e/k8s-e2e.test
+  make WHAT=openshift-hack/cmd/k8s-tests-ext
   ROOT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.."; pwd -P)"
   PATH="${ROOT_PATH}/_output/local/bin/$(go env GOHOSTOS)/$(go env GOARCH):${PATH}"
   export PATH
