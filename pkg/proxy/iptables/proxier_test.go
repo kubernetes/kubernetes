@@ -144,7 +144,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		},
 	}
 	p.setInitialized(true)
-	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute)
 	return p
 }
 
