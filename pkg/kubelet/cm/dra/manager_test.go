@@ -344,7 +344,7 @@ func TestGetResources(t *testing.T) {
 				},
 			},
 			pod:       genTestPod(),
-			claimInfo: genTestClaimInfo(nil, false),
+			claimInfo: genTestClaimInfo([]string{podUID}, false),
 		},
 		{
 			description: "nil claiminfo",
@@ -613,7 +613,7 @@ func TestPrepareResources(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			claimInfo, ok := manager.cache.get(*claimName, test.pod.Namespace)
+			claimInfo, ok := manager.cache.get(*claimName, test.pod.Namespace, test.pod.UID)
 			if !ok {
 				t.Fatalf("claimInfo not found in cache for claim %s", *claimName)
 			}
@@ -755,7 +755,7 @@ func TestUnprepareResources(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if manager.cache.contains(*claimName, test.pod.Namespace) {
+			if manager.cache.contains(*claimName, test.pod.Namespace, podUID) {
 				t.Fatalf("claimInfo still found in cache after calling UnprepareResources")
 			}
 		})
@@ -779,8 +779,8 @@ func TestPodMightNeedToUnprepareResources(t *testing.T) {
 		ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
 	}
 	manager.cache.add(claimInfo)
-	if !manager.cache.contains(claimName, namespace) {
-		t.Fatalf("failed to get claimInfo from cache for claim name %s, namespace %s: err:%v", claimName, namespace, err)
+	if !manager.cache.contains(claimName, namespace, podUID) {
+		t.Fatalf("failed to get claimInfo from cache for claim name %s, namespace %s: pod UID: %s, err:%v", claimName, namespace, podUID, err)
 	}
 	claimInfo.addPodReference(types.UID(podUID))
 	needsUnprepare := manager.PodMightNeedToUnprepareResources(types.UID(podUID))

@@ -46,6 +46,7 @@ const (
 	claimName     = "test-claim"
 	claimUID      = types.UID(claimName + "-uid")
 	podUID        = "test-pod-uid"
+	anotherPodUID = "test-pod-uid-2"
 )
 
 var (
@@ -256,7 +257,7 @@ func TestClaimInfoAddPodReference(t *testing.T) {
 			description: "first pod reference",
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					PodUIDs: sets.New[string](podUID),
+					PodUIDs: sets.New(podUID),
 				},
 			},
 			expectedLen: 1,
@@ -265,7 +266,7 @@ func TestClaimInfoAddPodReference(t *testing.T) {
 			description: "second pod reference",
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					PodUIDs: sets.New[string]("pod-uid1"),
+					PodUIDs: sets.New(anotherPodUID),
 				},
 			},
 			expectedLen: 2,
@@ -297,10 +298,19 @@ func TestClaimInfoHasPodReference(t *testing.T) {
 			description: "claim references pod",
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					PodUIDs: sets.New[string](podUID),
+					PodUIDs: sets.New(podUID),
 				},
 			},
 			expectedResult: true,
+		},
+		{
+			description: "claim references another pod",
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(anotherPodUID),
+				},
+			},
+			expectedResult: false,
 		},
 		{
 			description: "empty claim info",
@@ -330,7 +340,15 @@ func TestClaimInfoDeletePodReference(t *testing.T) {
 			description: "claim references pod",
 			claimInfo: &ClaimInfo{
 				ClaimInfoState: state.ClaimInfoState{
-					PodUIDs: sets.New[string](podUID),
+					PodUIDs: sets.New(podUID),
+				},
+			},
+		},
+		{
+			description: "claim references 2 pods",
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(podUID, anotherPodUID),
 				},
 			},
 		},
@@ -361,6 +379,18 @@ func TestClaimInfoSetPrepared(t *testing.T) {
 			description: "claim info is prepared",
 			claimInfo: &ClaimInfo{
 				prepared: true,
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(podUID),
+				},
+			},
+		},
+		{
+			description: "claim info is prepared for two pods",
+			claimInfo: &ClaimInfo{
+				prepared: true,
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(podUID, anotherPodUID),
+				},
 			},
 		},
 		{
@@ -369,8 +399,8 @@ func TestClaimInfoSetPrepared(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			test.claimInfo.setPrepared()
-			assert.True(t, test.claimInfo.isPrepared())
+			test.claimInfo.setPrepared(podUID)
+			assert.True(t, test.claimInfo.isPrepared(podUID))
 		})
 	}
 }
@@ -392,8 +422,31 @@ func TestClaimInfoIsPrepared(t *testing.T) {
 			description: "claim info is prepared",
 			claimInfo: &ClaimInfo{
 				prepared: true,
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(podUID),
+				},
 			},
 			expectedResult: true,
+		},
+		{
+			description: "claim info is prepared for two pods",
+			claimInfo: &ClaimInfo{
+				prepared: true,
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(podUID, anotherPodUID),
+				},
+			},
+			expectedResult: true,
+		},
+		{
+			description: "claim info is prepared for another pod",
+			claimInfo: &ClaimInfo{
+				prepared: true,
+				ClaimInfoState: state.ClaimInfoState{
+					PodUIDs: sets.New(anotherPodUID),
+				},
+			},
+			expectedResult: false,
 		},
 		{
 			description:    "empty claim info",
@@ -402,7 +455,7 @@ func TestClaimInfoIsPrepared(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			assert.Equal(t, test.expectedResult, test.claimInfo.isPrepared())
+			assert.Equal(t, test.expectedResult, test.claimInfo.isPrepared(podUID))
 		})
 	}
 }
@@ -578,6 +631,7 @@ func TestClaimInfoCacheAdd(t *testing.T) {
 				ClaimInfoState: state.ClaimInfoState{
 					ClaimName: claimName,
 					Namespace: namespace,
+					PodUIDs:   sets.New(podUID),
 				},
 			},
 		},
@@ -587,7 +641,7 @@ func TestClaimInfoCacheAdd(t *testing.T) {
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
 			cache.add(test.claimInfo)
-			assert.True(t, cache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace))
+			assert.True(t, cache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace, types.UID(podUID)))
 		})
 	}
 }
@@ -607,6 +661,7 @@ func TestClaimInfoCacheContains(t *testing.T) {
 						ClaimInfoState: state.ClaimInfoState{
 							ClaimName: claimName,
 							Namespace: namespace,
+							PodUIDs:   sets.New(podUID),
 						},
 					},
 				},
@@ -615,6 +670,7 @@ func TestClaimInfoCacheContains(t *testing.T) {
 				ClaimInfoState: state.ClaimInfoState{
 					ClaimName: claimName,
 					Namespace: namespace,
+					PodUIDs:   sets.New(podUID),
 				},
 			},
 			expectedResult: true,
@@ -626,6 +682,7 @@ func TestClaimInfoCacheContains(t *testing.T) {
 				ClaimInfoState: state.ClaimInfoState{
 					ClaimName: claimName,
 					Namespace: namespace,
+					PodUIDs:   sets.New(podUID),
 				},
 			},
 		},
@@ -638,7 +695,7 @@ func TestClaimInfoCacheContains(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			assert.Equal(t, test.expectedResult, test.claimInfoCache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace))
+			assert.Equal(t, test.expectedResult, test.claimInfoCache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace, podUID))
 		})
 	}
 }
@@ -658,6 +715,7 @@ func TestClaimInfoCacheGet(t *testing.T) {
 						ClaimInfoState: state.ClaimInfoState{
 							ClaimName: claimName,
 							Namespace: namespace,
+							PodUIDs:   sets.New(podUID),
 						},
 					},
 				},
@@ -665,13 +723,28 @@ func TestClaimInfoCacheGet(t *testing.T) {
 			expectedExists: true,
 		},
 		{
-			description:    "cache miss",
+			description:    "cache miss: empty cache",
 			claimInfoCache: &claimInfoCache{},
 			expectedNil:    true,
 		},
+		{
+			description: "cache miss: another pod uid",
+			claimInfoCache: &claimInfoCache{
+				claimInfo: map[string]*ClaimInfo{
+					namespace + "/" + claimName: {
+						ClaimInfoState: state.ClaimInfoState{
+							ClaimName: claimName,
+							Namespace: namespace,
+							PodUIDs:   sets.New(anotherPodUID),
+						},
+					},
+				},
+			},
+			expectedNil: true,
+		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			result, exists := test.claimInfoCache.get(claimName, namespace)
+			result, exists := test.claimInfoCache.get(claimName, namespace, podUID)
 			assert.Equal(t, test.expectedExists, exists)
 			assert.Equal(t, test.expectedNil, result == nil)
 		})
@@ -679,31 +752,52 @@ func TestClaimInfoCacheGet(t *testing.T) {
 }
 
 func TestClaimInfoCacheDelete(t *testing.T) {
+	key := namespace + "/" + claimName
 	for _, test := range []struct {
 		description    string
 		claimInfoCache *claimInfoCache
+		keyExists      bool
 	}{
 		{
-			description: "item in cache",
+			description: "item with one pod ref in cache",
 			claimInfoCache: &claimInfoCache{
 				claimInfo: map[string]*ClaimInfo{
-					claimName + namespace: {
+					key: {
 						ClaimInfoState: state.ClaimInfoState{
 							ClaimName: claimName,
 							Namespace: namespace,
+							PodUIDs:   sets.New(podUID),
 						},
 					},
 				},
 			},
+			keyExists: false,
+		},
+		{
+			description: "item with two pod refs in cache",
+			claimInfoCache: &claimInfoCache{
+				claimInfo: map[string]*ClaimInfo{
+					key: {
+						ClaimInfoState: state.ClaimInfoState{
+							ClaimName: claimName,
+							Namespace: namespace,
+							PodUIDs:   sets.New(podUID, anotherPodUID),
+						},
+					},
+				},
+			},
+			keyExists: true,
 		},
 		{
 			description:    "item not in cache",
 			claimInfoCache: &claimInfoCache{},
+			keyExists:      false,
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			test.claimInfoCache.delete(claimName, namespace)
-			assert.False(t, test.claimInfoCache.contains(claimName, namespace))
+			test.claimInfoCache.delete(claimName, namespace, podUID)
+			assert.False(t, test.claimInfoCache.contains(claimName, namespace, podUID))
+			assert.Equal(t, test.keyExists, test.claimInfoCache.claimInfo[key] != nil)
 		})
 	}
 }
@@ -730,7 +824,21 @@ func TestClaimInfoCacheHasPodReference(t *testing.T) {
 			expectedResult: true,
 		},
 		{
-			description:    "uid is not referenced",
+			description: "uid is not referenced",
+			claimInfoCache: &claimInfoCache{
+				claimInfo: map[string]*ClaimInfo{
+					claimName + namespace: {
+						ClaimInfoState: state.ClaimInfoState{
+							ClaimName: claimName,
+							Namespace: namespace,
+							PodUIDs:   sets.New(anotherPodUID),
+						},
+					},
+				},
+			},
+		},
+		{
+			description:    "empty cache",
 			claimInfoCache: &claimInfoCache{},
 		},
 	} {

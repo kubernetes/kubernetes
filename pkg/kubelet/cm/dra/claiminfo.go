@@ -102,13 +102,17 @@ func (info *ClaimInfo) deletePodReference(podUID types.UID) {
 }
 
 // setPrepared marks the claim info as prepared.
-func (info *ClaimInfo) setPrepared() {
+func (info *ClaimInfo) setPrepared(podUID types.UID) {
 	info.prepared = true
+	if info.PodUIDs == nil {
+		info.PodUIDs = sets.New[string]()
+	}
+	info.addPodReference(podUID)
 }
 
 // isPrepared checks if claim info is prepared or not.
-func (info *ClaimInfo) isPrepared() bool {
-	return info.prepared
+func (info *ClaimInfo) isPrepared(podUID types.UID) bool {
+	return info.prepared && info.hasPodReference(podUID)
 }
 
 // newClaimInfoCache creates a new claim info cache object, pre-populated from a checkpoint (if present).
@@ -162,20 +166,30 @@ func (cache *claimInfoCache) add(info *ClaimInfo) *ClaimInfo {
 }
 
 // contains checks to see if a specific claim info object is already in the cache.
-func (cache *claimInfoCache) contains(claimName, namespace string) bool {
-	_, exists := cache.claimInfo[namespace+"/"+claimName]
-	return exists
+func (cache *claimInfoCache) contains(claimName, namespace string, podUID types.UID) bool {
+	info, exists := cache.claimInfo[namespace+"/"+claimName]
+	return exists && info.hasPodReference(podUID)
 }
 
 // get gets a specific claim info object from the cache.
-func (cache *claimInfoCache) get(claimName, namespace string) (*ClaimInfo, bool) {
+func (cache *claimInfoCache) get(claimName, namespace string, podUID types.UID) (*ClaimInfo, bool) {
 	info, exists := cache.claimInfo[namespace+"/"+claimName]
-	return info, exists
+	if exists && info.hasPodReference(podUID) {
+		return info, true
+	}
+	return nil, false
 }
 
 // delete deletes a specific claim info object from the cache.
-func (cache *claimInfoCache) delete(claimName, namespace string) {
-	delete(cache.claimInfo, namespace+"/"+claimName)
+func (cache *claimInfoCache) delete(claimName, namespace string, podUID types.UID) {
+	key := namespace + "/" + claimName
+	info, exists := cache.claimInfo[key]
+	if exists {
+		info.deletePodReference(podUID)
+		if info.PodUIDs.Len() == 0 {
+			delete(cache.claimInfo, key)
+		}
+	}
 }
 
 // hasPodReference checks if there is at least one claim

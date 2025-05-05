@@ -225,7 +225,7 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		err = m.cache.withLock(func() error {
 			// Get a reference to the claim info for this claim from the cache.
 			// If there isn't one yet, then add it to the cache.
-			claimInfo, exists := m.cache.get(resourceClaim.Name, resourceClaim.Namespace)
+			claimInfo, exists := m.cache.get(resourceClaim.Name, resourceClaim.Namespace, pod.UID)
 			if !exists {
 				ci, err := newClaimInfoFromClaim(resourceClaim)
 				if err != nil {
@@ -249,7 +249,7 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			}
 
 			// If this claim is already prepared, there is no need to prepare it again.
-			if claimInfo.isPrepared() {
+			if claimInfo.isPrepared(pod.UID) {
 				logger.V(5).Info("Resources already prepared", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim))
 				return nil
 			}
@@ -302,9 +302,9 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 
 			// Add the prepared CDI devices to the claim info
 			err := m.cache.withLock(func() error {
-				info, exists := m.cache.get(claim.Name, claim.Namespace)
+				info, exists := m.cache.get(claim.Name, claim.Namespace, pod.UID)
 				if !exists {
-					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claim.Name, claim.Namespace)
+					return fmt.Errorf("unable to get claim info for claim %s pod UID %s in namespace %s", claim.Name, pod.UID, claim.Namespace)
 				}
 				for _, device := range result.GetDevices() {
 					info.addDevice(driverName, state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CDIDeviceIDs})
@@ -326,11 +326,11 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	err := m.cache.withLock(func() error {
 		// Mark all pod claims as prepared.
 		for _, claim := range resourceClaims {
-			info, exists := m.cache.get(claim.Name, claim.Namespace)
+			info, exists := m.cache.get(claim.Name, claim.Namespace, pod.UID)
 			if !exists {
-				return fmt.Errorf("unable to get claim info for claim %s in namespace %s", claim.Name, claim.Namespace)
+				return fmt.Errorf("unable to get claim info for claim %s pod UID %s in namespace %s", claim.Name, pod.UID, claim.Namespace)
 			}
-			info.setPrepared()
+			info.setPrepared(pod.UID)
 		}
 
 		// Checkpoint to ensure all prepared claims are tracked with their list
@@ -380,9 +380,9 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 			}
 
 			err := m.cache.withRLock(func() error {
-				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+				claimInfo, exists := m.cache.get(*claimName, pod.Namespace, pod.UID)
 				if !exists {
-					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", *claimName, pod.Namespace)
+					return fmt.Errorf("unable to get claim info for claim %s pod UID %s in namespace %s", *claimName, pod.UID, pod.Namespace)
 				}
 
 				// As of Kubernetes 1.31, CDI device IDs are not passed via annotations anymore.
@@ -433,7 +433,7 @@ func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, 
 		// Atomically perform some operations on the claimInfo cache.
 		err := m.cache.withLock(func() error {
 			// Get the claim info from the cache
-			claimInfo, exists := m.cache.get(claimName, namespace)
+			claimInfo, exists := m.cache.get(claimName, namespace, podUID)
 
 			// Skip calling NodeUnprepareResource if claim info is not cached
 			if !exists {
@@ -508,9 +508,9 @@ func (m *ManagerImpl) unprepareResources(ctx context.Context, podUID types.UID, 
 	err := m.cache.withLock(func() error {
 		// Delete all claimInfos from the cache that have just been unprepared.
 		for _, claimName := range claimNamesMap {
-			claimInfo, _ := m.cache.get(claimName, namespace)
-			m.cache.delete(claimName, namespace)
-			logger.V(6).Info("Deleted claim info cache entry", "claim", klog.KRef(namespace, claimName), "claimInfoEntry", claimInfo)
+			claimInfo, _ := m.cache.get(claimName, namespace, podUID)
+			m.cache.delete(claimName, namespace, podUID)
+			logger.V(6).Info("Deleted claim info cache entry", "claim", klog.KRef(namespace, claimName), "podUID", podUID, "claimInfoEntry", claimInfo)
 		}
 
 		// Atomically sync the cache back to the checkpoint.
@@ -550,9 +550,9 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 			}
 
 			err := m.cache.withRLock(func() error {
-				claimInfo, exists := m.cache.get(*claimName, pod.Namespace)
+				claimInfo, exists := m.cache.get(*claimName, pod.Namespace, pod.UID)
 				if !exists {
-					return fmt.Errorf("unable to get claim info for claim %s in namespace %s", *claimName, pod.Namespace)
+					return fmt.Errorf("unable to get claim info for claim %s and pod UID %s in namespace %s", *claimName, pod.UID, pod.Namespace)
 				}
 				claimInfos = append(claimInfos, claimInfo.DeepCopy())
 				return nil
