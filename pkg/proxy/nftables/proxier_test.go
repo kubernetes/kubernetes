@@ -142,7 +142,7 @@ func NewFakeProxier(ipFamily v1.IPFamily) (*knftables.Fake, *Proxier) {
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
 	}
 	p.setInitialized(true)
-	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute)
+	p.syncRunner = runner.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, 30*time.Second, time.Minute)
 
 	return nft, p
 }

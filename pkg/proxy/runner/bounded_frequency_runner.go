@@ -28,21 +28,19 @@ import (
 
 // BoundedFrequencyRunner manages runs of a user-provided work function.
 type BoundedFrequencyRunner struct {
-	name        string        // the name of this instance
-	minInterval time.Duration // the min time between runs
-	maxInterval time.Duration // the max time between runs
+	name string // the name of this instance
+
+	minInterval   time.Duration // the min time between runs
+	retryInterval time.Duration // the time between a run and a retry
+	maxInterval   time.Duration // the max time between runs
 
 	run chan struct{} // try an async run
 
-	mu      sync.Mutex  // guards runs of fn and all mutations
-	fn      func()      // the work function
-	lastRun time.Time   // time of last run
-	timer   timer       // timer for deferred runs
-	limiter rateLimiter // rate limiter for on-demand runs
-
-	retry     chan struct{} // schedule a retry
-	retryMu   sync.Mutex    // guards retryTime
-	retryTime time.Time     // when to retry
+	mu      sync.Mutex   // guards runs of fn and all mutations
+	fn      func() error // the work function
+	lastRun time.Time    // time of last run
+	timer   timer        // timer for deferred runs
+	limiter rateLimiter  // rate limiter for on-demand runs
 }
 
 // designed so that flowcontrol.RateLimiter satisfies
@@ -140,26 +138,32 @@ var _ timer = &realTimer{}
 //
 // `maxInterval` must be greater than or equal to `minInterval`; otherwise,
 // this function will panic.
-func NewBoundedFrequencyRunner(name string, fn func(), minInterval, maxInterval time.Duration) *BoundedFrequencyRunner {
+//
+// If `fn` returns an error, then it will be run again no later than `retryInterval`
+// (unless another trigger, like `Run()` or `maxInterval`, causes it to run sooner). Any
+// successful run will abort the retry attempt.
+func NewBoundedFrequencyRunner(name string, fn func() error, minInterval, retryInterval, maxInterval time.Duration) *BoundedFrequencyRunner {
 	timer := &realTimer{timer: time.NewTimer(0)} // will tick immediately
 	<-timer.C()                                  // consume the first tick
-	return construct(name, fn, minInterval, maxInterval, timer)
+	return construct(name, fn, minInterval, retryInterval, maxInterval, timer)
 }
 
 // Make an instance with dependencies injected.
-func construct(name string, fn func(), minInterval, maxInterval time.Duration, timer timer) *BoundedFrequencyRunner {
+func construct(name string, fn func() error, minInterval, retryInterval, maxInterval time.Duration, timer timer) *BoundedFrequencyRunner {
 	if maxInterval < minInterval {
 		panic(fmt.Sprintf("%s: maxInterval (%v) must be >= minInterval (%v)", name, maxInterval, minInterval))
 	}
 
 	bfr := &BoundedFrequencyRunner{
-		name:        name,
-		fn:          fn,
-		minInterval: minInterval,
-		maxInterval: maxInterval,
-		run:         make(chan struct{}, 1),
-		retry:       make(chan struct{}, 1),
-		timer:       timer,
+		name: name,
+		fn:   fn,
+
+		minInterval:   minInterval,
+		retryInterval: retryInterval,
+		maxInterval:   maxInterval,
+
+		run:   make(chan struct{}, 1),
+		timer: timer,
 	}
 	if minInterval == 0 {
 		bfr.limiter = nullLimiter{}
@@ -185,8 +189,6 @@ func (bfr *BoundedFrequencyRunner) Loop(stop <-chan struct{}) {
 			bfr.tryRun()
 		case <-bfr.run:
 			bfr.tryRun()
-		case <-bfr.retry:
-			bfr.doRetry()
 		}
 	}
 }
@@ -203,36 +205,6 @@ func (bfr *BoundedFrequencyRunner) Run() {
 	}
 }
 
-// RetryAfter ensures that the function will run again after no later than interval. This
-// can be called from inside a run of the BoundedFrequencyRunner's function, or
-// asynchronously.
-func (bfr *BoundedFrequencyRunner) RetryAfter(interval time.Duration) {
-	// This could be called either with or without bfr.mu held, so we can't grab that
-	// lock, and therefore we can't update the timer directly.
-
-	// If the Loop thread is currently running fn then it may be a while before it
-	// processes our retry request. But we want to retry at interval from now, not at
-	// interval from "whenever doRetry eventually gets called". So we convert to
-	// absolute time.
-	retryTime := bfr.timer.Now().Add(interval)
-
-	// We can't just write retryTime to a channel because there could be multiple
-	// RetryAfter calls before Loop gets a chance to read from the channel. So we
-	// record the soonest requested retry time in bfr.retryTime and then only signal
-	// the Loop thread once, just like Run does.
-	bfr.retryMu.Lock()
-	defer bfr.retryMu.Unlock()
-	if !bfr.retryTime.IsZero() && bfr.retryTime.Before(retryTime) {
-		return
-	}
-	bfr.retryTime = retryTime
-
-	select {
-	case bfr.retry <- struct{}{}:
-	default:
-	}
-}
-
 // assumes the lock is not held
 func (bfr *BoundedFrequencyRunner) stop() {
 	bfr.mu.Lock()
@@ -242,38 +214,25 @@ func (bfr *BoundedFrequencyRunner) stop() {
 }
 
 // assumes the lock is not held
-func (bfr *BoundedFrequencyRunner) doRetry() {
-	bfr.mu.Lock()
-	defer bfr.mu.Unlock()
-	bfr.retryMu.Lock()
-	defer bfr.retryMu.Unlock()
-
-	if bfr.retryTime.IsZero() {
-		return
-	}
-
-	// Timer wants an interval not an absolute time, so convert retryTime back now
-	retryInterval := bfr.retryTime.Sub(bfr.timer.Now())
-	bfr.retryTime = time.Time{}
-	if retryInterval < bfr.timer.Remaining() {
-		klog.V(3).InfoS("retrying", "runner", bfr.name, "interval", retryInterval)
-		bfr.timer.Stop()
-		bfr.timer.Reset(retryInterval)
-	}
-}
-
-// assumes the lock is not held
 func (bfr *BoundedFrequencyRunner) tryRun() {
 	bfr.mu.Lock()
 	defer bfr.mu.Unlock()
 
 	if bfr.limiter.TryAccept() {
 		// We're allowed to run the function right now.
-		bfr.fn()
+		err := bfr.fn()
+
 		bfr.lastRun = bfr.timer.Now()
 		bfr.timer.Stop()
-		bfr.timer.Reset(bfr.maxInterval)
-		klog.V(3).InfoS("ran", "runner", bfr.name, "minInterval", bfr.minInterval, "maxInternval", bfr.maxInterval)
+
+		nextInterval := bfr.maxInterval
+		if err != nil {
+			// an error will schedule a retry after the retryInterval,
+			// any successful run before that will stop the retry attempt.
+			nextInterval = bfr.retryInterval
+			klog.V(3).InfoS("scheduling retry", "runner", bfr.name, "interval", nextInterval, "error", err)
+		}
+		bfr.timer.Reset(nextInterval)
 		return
 	}
 
