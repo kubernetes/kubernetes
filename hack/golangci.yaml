@@ -91,6 +91,17 @@ linters:
         text: should not use Add, use AddVersioned instead
         path: _test.go$
 
+      # The Kubernetes naming convention for conversion functions uses underscores
+      # and intentionally deviates from normal Go conventions to make those function
+      # names more readable. Same for SetDefaults_*.
+      #
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
+      - linters:
+          - staticcheck
+          - revive
+        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+
       # TODO(https://github.com/kubernetes/kubernetes/issues/131475): Remove these excluded directories and fix findings. Due to large amount of findings in different components
       # with different owners it's hard to fix everything in a single pr. This will therefore be done in multiple prs.
       - path: (pkg/volume/*|test/*|azure/*|pkg/cmd/wait*|request/bearertoken/*|metrics/*|filters/*)
