@@ -93,6 +93,14 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 			return
 		}(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SliceSetPrimitiveField }))...)
 
+	// field ImmutableStruct.SliceSetFalselyComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []FalselyComparableStruct) (errs field.ErrorList) {
+			errs = append(errs, validate.UniqueByReflect(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.ImmutableByReflect)...)
+			return
+		}(fldPath.Child("sliceSetFalselyComparableField"), obj.SliceSetFalselyComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []FalselyComparableStruct { return oldObj.SliceSetFalselyComparableField }))...)
+
 	return errs
 }
 
@@ -126,6 +134,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			errs = append(errs, validate.UniqueByReflect(ctx, op, fldPath, obj, oldObj)...)
 			return
 		}(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.SliceNonComparableField }))...)
+
+	// field Struct.SliceFalselyComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []FalselyComparableStruct) (errs field.ErrorList) {
+			errs = append(errs, validate.UniqueByReflect(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}(fldPath.Child("sliceFalselyComparableField"), obj.SliceFalselyComparableField, safe.Field(oldObj, func(oldObj *Struct) []FalselyComparableStruct { return oldObj.SliceFalselyComparableField }))...)
 
 	return errs
 }
