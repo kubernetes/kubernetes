@@ -356,9 +356,7 @@ func runGuPodTest(ctx context.Context, f *framework.Framework, cpuCount int, str
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
-		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		cpus := getContainerAllowedCPUsFromLogs(pod.Name, cnt.Name, logs)
 
 		gomega.Expect(cpus.Size()).To(gomega.Equal(cpuCount), "expected cpu set size == %d, got %q", cpuCount, cpus.String())
 		gomega.Expect(cpus.Intersection(strictReservedCPUs).IsEmpty()).To(gomega.BeTrueBecause("cpuset %q should not contain strict reserved cpus %q", cpus.String(), strictReservedCPUs.String()))
@@ -1128,27 +1126,21 @@ func runCPUManagerTests(f *framework.Framework) {
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.InitContainers[0].Name)
 		framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
-		reusableCPUs, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+		reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
 
 		gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", reusableCPUs.String())
 
 		logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.InitContainers[1].Name)
 		framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[1].Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
-		nonReusableCPUs, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", pod.Spec.InitContainers[1].Name, pod.Name)
+		nonReusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[1].Name, logs)
 
 		gomega.Expect(nonReusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", nonReusableCPUs.String())
 
 		logs, err = e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", pod.Spec.Containers[0].Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
-		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", pod.Spec.Containers[0].Name, pod.Name)
+		cpus := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.Containers[0].Name, logs)
 
 		gomega.Expect(cpus.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", cpus.String())
 
@@ -1210,9 +1202,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
 			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
-			framework.Logf("got pod logs: %v", logs)
-			cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-			framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+			cpus := getContainerAllowedCPUsFromLogs(pod.Name, cnt.Name, logs)
 
 			validateSMTAlignment(cpus, smtLevel, pod, &cnt)
 			gomega.Expect(cpus).To(BePackedCPUs())
@@ -1289,9 +1279,7 @@ func runCPUManagerTests(f *framework.Framework) {
 			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
 			framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
-			framework.Logf("got pod logs: %v", logs)
-			cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-			framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+			cpus := getContainerAllowedCPUsFromLogs(pod.Name, cnt.Name, logs)
 
 			validateSMTAlignment(cpus, smtLevel, pod, &cnt)
 			// We expect a perfectly even spilit i.e. equal distribution across NUMA Node as the CPU Request is 4*smtLevel*numaNodeNum.
@@ -1369,9 +1357,7 @@ func runSMTAlignmentPositiveTests(ctx context.Context, f *framework.Framework, s
 		logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, pod.Name, cnt.Name)
 		framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]", cnt.Name, pod.Name)
 
-		framework.Logf("got pod logs: %v", logs)
-		cpus, err := cpuset.Parse(strings.TrimSpace(logs))
-		framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cnt.Name, pod.Name)
+		cpus := getContainerAllowedCPUsFromLogs(pod.Name, cnt.Name, logs)
 
 		gomega.Expect(cpus.Intersection(strictReservedCPUs).IsEmpty()).To(gomega.BeTrueBecause("cpuset %q should not contain strict reserved cpus %q", cpus.String(), strictReservedCPUs.String()))
 		validateSMTAlignment(cpus, smtLevel, pod, &cnt)
@@ -1437,6 +1423,13 @@ func getNumaNodeCPUs() (map[int]cpuset.CPUSet, error) {
 	}
 
 	return numaNodes, nil
+}
+
+func getContainerAllowedCPUsFromLogs(podName, cntName, logs string) cpuset.CPUSet {
+	framework.Logf("got pod logs: <%v>", logs)
+	cpus, err := cpuset.Parse(strings.TrimSpace(logs))
+	framework.ExpectNoError(err, "parsing cpuset from logs for [%s] of pod [%s]", cntName, podName)
+	return cpus
 }
 
 // computeNUMADistribution calculates CPU distribution per NUMA node.

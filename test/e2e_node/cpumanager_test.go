@@ -255,7 +255,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			gomega.Expect(podGu).To(HaveContainerCPUsASubsetOf("gu-container", onlineCPUs))
 			gomega.Expect(podGu).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
 
-			exclusiveCPUs, err := getContainerAllowedCPUs(podGu, "gu-container")
+			exclusiveCPUs, err := getContainerAllowedCPUs(podGu, "gu-container", false)
 			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", podGu.Namespace, podGu.Name)
 			expectedSharedCPUs := onlineCPUs.Difference(exclusiveCPUs)
 			gomega.Expect(podBu).To(HaveContainerCPUsEqualTo("non-gu-container", expectedSharedCPUs))
@@ -658,7 +658,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			gomega.Expect(podGu).To(HaveContainerCPUsASubsetOf("gu-container", usableCPUs))
 			gomega.Expect(podGu).ToNot(HaveContainerCPUsOverlapWith("gu-container", reservedCPUs))
 
-			exclusiveCPUs, err := getContainerAllowedCPUs(podGu, "gu-container")
+			exclusiveCPUs, err := getContainerAllowedCPUs(podGu, "gu-container", false)
 			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", podGu.Namespace, podGu.Name)
 			expectedSharedCPUs := usableCPUs.Difference(exclusiveCPUs)
 			gomega.Expect(podBu).To(HaveContainerCPUsEqualTo("non-gu-container", expectedSharedCPUs))
@@ -977,7 +977,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 					ginkgo.By(fmt.Sprintf("validating the container %s on pod %s", cnt.Name, pod.Name))
 
 					gomega.Expect(pod).To(HaveContainerCPUsAlignedTo(cnt.Name, smtLevel))
-					cpus, err := getContainerAllowedCPUs(pod, cnt.Name)
+					cpus, err := getContainerAllowedCPUs(pod, cnt.Name, false)
 					framework.ExpectNoError(err, "cannot get cpus allocated to pod %s/%s cnt %s", pod.Namespace, pod.Name, cnt.Name)
 
 					siblingsCPUs := makeThreadSiblingCPUSet(cpus)
@@ -1128,6 +1128,73 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			gomega.Expect(pod).To(HaveContainerQuota("gu-container-int-values", "max"))
 		})
 	})
+
+	f.Context("When checking the sidecar containers", feature.SidecarContainers, func() {
+		var cpuAlloc int64
+		var reservedCPUs cpuset.CPUSet
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+
+			localNode = getLocalNode(ctx, f)
+			cpuAllocQty := localNode.Status.Allocatable[v1.ResourceCPU]
+			cpuAlloc = cpuAllocQty.Value()
+		})
+
+		ginkgo.It("should reuse init container exclusive CPUs, but not sidecar container exclusive CPUS", func(ctx context.Context) {
+			cpuCount := 2 // total
+
+			cpuReq := int64(cpuCount + reservedCPUs.Size())
+			if cpuAlloc < cpuReq {
+				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
+			}
+
+			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
+
+			ctrAttrs := []ctnAttribute{
+				{
+					ctnName:    "init-container1",
+					cpuRequest: "1000m",
+					cpuLimit:   "1000m",
+				},
+				{
+					ctnName:       "sidecar-container",
+					cpuRequest:    "1000m",
+					cpuLimit:      "1000m",
+					restartPolicy: &containerRestartPolicyAlways,
+				},
+			}
+			pod := makeCPUManagerInitContainersPod("gu-pod", ctrAttrs)
+			ginkgo.By("running a Gu pod with a regular init container and a restartable init container")
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			podMap[string(pod.UID)] = pod
+
+			// when we get there the real initcontainer terminated, so we can only check its logs
+			ginkgo.By("checking if the expected cpuset was assigned")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, pod.Namespace, pod.Name, pod.Spec.InitContainers[0].Name)
+			framework.ExpectNoError(err, "expected log not found in init container [%s] of pod [%s]", pod.Spec.InitContainers[0].Name, pod.Name)
+
+			reusableCPUs := getContainerAllowedCPUsFromLogs(pod.Name, pod.Spec.InitContainers[0].Name, logs)
+			gomega.Expect(reusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", reusableCPUs.String())
+
+			nonReusableCPUs, err := getContainerAllowedCPUs(pod, pod.Spec.InitContainers[1].Name, true)
+			framework.ExpectNoError(err, "cannot get exclusive CPUs for pod %s/%s", pod.Namespace, pod.Name)
+
+			gomega.Expect(nonReusableCPUs.Size()).To(gomega.Equal(1), "expected cpu set size == 1, got %q", nonReusableCPUs.String())
+			gomega.Expect(reusableCPUs.Equals(nonReusableCPUs)).To(gomega.BeTrueBecause("expected reusable cpuset [%s] to be equal to non-reusable cpuset [%s]", reusableCPUs.String(), nonReusableCPUs.String()))
+
+			appContainerName := pod.Spec.Containers[0].Name
+			gomega.Expect(pod).To(HaveContainerCPUsCount(appContainerName, 1))
+			gomega.Expect(pod).To(HaveContainerCPUsASubsetOf(appContainerName, onlineCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, reservedCPUs))
+			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith(appContainerName, nonReusableCPUs))
+		})
+	})
 })
 
 // Matching helpers
@@ -1159,7 +1226,7 @@ func HaveContainerCPUsCount(ctnName string, val int) types.GomegaMatcher {
 		Count: val,
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1175,7 +1242,7 @@ func HaveContainerCPUsAlignedTo(ctnName string, val int) types.GomegaMatcher {
 		Aligned: val,
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1191,7 +1258,7 @@ func HaveContainerCPUsOverlapWith(ctnName string, ref cpuset.CPUSet) types.Gomeg
 		ExpectedCPUs: ref.String(),
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1208,7 +1275,7 @@ func HaveContainerCPUsASubsetOf(ctnName string, ref cpuset.CPUSet) types.GomegaM
 		ExpectedCPUs: ref.String(),
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1224,7 +1291,7 @@ func HaveContainerCPUsEqualTo(ctnName string, expectedCPUs cpuset.CPUSet) types.
 		ExpectedCPUs: expectedCPUs.String(),
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1260,7 +1327,7 @@ func HaveContainerQuota(ctnName, expectedQuota string) types.GomegaMatcher {
 		ExpectedQuota: expectedQuota,
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		quota, err := getContainerCFSQuota(actual, ctnName)
+		quota, err := getContainerCFSQuota(actual, ctnName, false)
 		md.CurrentQuota = quota
 		if err != nil {
 			framework.Logf("getContainerCFSQuota(%s) failed: %v", ctnName, err)
@@ -1279,7 +1346,7 @@ func HaveContainerCPUsThreadSiblings(ctnName string) types.GomegaMatcher {
 		Name: ctnName,
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1297,7 +1364,7 @@ func HaveContainerCPUsQuasiThreadSiblings(ctnName string, toleration int) types.
 		Count: toleration,
 	}
 	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
-		cpus, err := getContainerAllowedCPUs(actual, ctnName)
+		cpus, err := getContainerAllowedCPUs(actual, ctnName, false)
 		md.CurrentCPUs = cpus.String()
 		if err != nil {
 			framework.Logf("getContainerAllowedCPUs(%s) failed: %v", ctnName, err)
@@ -1314,8 +1381,8 @@ func HaveContainerCPUsQuasiThreadSiblings(ctnName string, toleration int) types.
 
 // Other helpers
 
-func getContainerAllowedCPUs(pod *v1.Pod, ctnName string) (cpuset.CPUSet, error) {
-	cgPath, err := makeCgroupPathForContainer(pod, ctnName)
+func getContainerAllowedCPUs(pod *v1.Pod, ctnName string, isInit bool) (cpuset.CPUSet, error) {
+	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit)
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
@@ -1340,8 +1407,8 @@ func getSandboxCFSQuota(pod *v1.Pod) (string, error) {
 	return quota, nil
 }
 
-func getContainerCFSQuota(pod *v1.Pod, ctnName string) (string, error) {
-	cgPath, err := makeCgroupPathForContainer(pod, ctnName)
+func getContainerCFSQuota(pod *v1.Pod, ctnName string, isInit bool) (string, error) {
+	cgPath, err := makeCgroupPathForContainer(pod, ctnName, isInit)
 	if err != nil {
 		return "", err
 	}
@@ -1380,12 +1447,12 @@ func makeCgroupPathForPod(pod *v1.Pod) string {
 	return filepath.Join(kubeCgroupRoot, cgroupFsName)
 }
 
-func makeCgroupPathForContainer(pod *v1.Pod, ctnName string) (string, error) {
-	cntSt := findContainerStatusByName(pod, ctnName)
-	if cntSt == nil {
+func makeCgroupPathForContainer(pod *v1.Pod, ctnName string, isInit bool) (string, error) {
+	fullCntID, ok := findContainerIDByName(pod, ctnName, isInit)
+	if !ok {
 		return "", fmt.Errorf("cannot find status for container %q", ctnName)
 	}
-	cntID, err := parseContainerID(cntSt.ContainerID)
+	cntID, err := parseContainerID(fullCntID)
 	if err != nil {
 		return "", err
 	}
@@ -1415,14 +1482,17 @@ func parseContainerID(fullID string) (string, error) {
 	return cntID, nil
 }
 
-func findContainerStatusByName(pod *v1.Pod, ctnName string) *v1.ContainerStatus {
-	for idx := range pod.Status.ContainerStatuses {
-		cntSt := &pod.Status.ContainerStatuses[idx] // shortcat
-		if cntSt.Name == ctnName {
-			return cntSt
+func findContainerIDByName(pod *v1.Pod, ctnName string, isInit bool) (string, bool) {
+	cntStatuses := pod.Status.ContainerStatuses
+	if isInit {
+		cntStatuses = pod.Status.InitContainerStatuses
+	}
+	for idx := range cntStatuses {
+		if cntStatuses[idx].Name == ctnName {
+			return cntStatuses[idx].ContainerID, true
 		}
 	}
-	return nil
+	return "", false
 }
 
 func makeThreadSiblingCPUSet(cpus cpuset.CPUSet) cpuset.CPUSet {
