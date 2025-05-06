@@ -417,10 +417,15 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHan
 	// From here onwards, hostUsers=false and the feature gate is enabled.
 
 	// if the pod requested a user namespace and the runtime doesn't support user namespaces then return an error.
-	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil {
-		return nil, err
-	} else if !handlerSupportsUserns {
-		return nil, fmt.Errorf("RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+	if handlerSupportsUserns, err := m.kl.HandlerSupportsUserNamespaces(runtimeHandler); err != nil || !handlerSupportsUserns {
+		msg := "can't set `spec.hostUsers: false`, runtime does not support user namespaces"
+		if runtimeHandler != "" {
+			msg = fmt.Sprintf("can't set `spec.hostUsers: false`, RuntimeClass handler %q does not support user namespaces", runtimeHandler)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("%v: %w", msg, err)
+		}
+		return nil, fmt.Errorf("%v", msg)
 	}
 
 	m.lock.Lock()
