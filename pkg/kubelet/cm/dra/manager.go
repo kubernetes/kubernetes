@@ -226,14 +226,17 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			// Get a reference to the claim info for this claim from the cache.
 			// If there isn't one yet, then add it to the cache.
 			claimInfo, exists := m.cache.get(resourceClaim.Name, resourceClaim.Namespace)
-			if !exists {
+			switch {
+			case !exists:
 				ci, err := newClaimInfoFromClaim(resourceClaim)
 				if err != nil {
 					return fmt.Errorf("claim %s: %w", klog.KObj(resourceClaim), err)
 				}
 				claimInfo = m.cache.add(ci)
 				logger.V(6).Info("Created new claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
-			} else {
+			case claimInfo.ClaimUID != resourceClaim.UID:
+				return fmt.Errorf("old claim with same name %s and different UID %s still exists (previous pod force-deleted?!)", klog.KObj(resourceClaim), claimInfo.ClaimUID)
+			default:
 				logger.V(6).Info("Found existing claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
 
