@@ -264,8 +264,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 	ginkgo.When("running guaranteed pod tests", ginkgo.Label("guaranteed", "exclusive-cpus"), func() {
 		var cpuAlloc int64
+		var reservedCPUs cpuset.CPUSet
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
+			reservedCPUs = cpuset.New(0)
+
 			localNode = getLocalNode(ctx, f)
 			cpuAllocQty := localNode.Status.Allocatable[v1.ResourceCPU]
 			cpuAlloc = cpuAllocQty.Value()
@@ -273,7 +276,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively a CPU to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 1
-			reservedCPUs := cpuset.New(0)
 
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
@@ -304,7 +306,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively a even number of CPUs to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 2
-			reservedCPUs := cpuset.New(0)
 
 			cpuReq := int64(cpuCount + reservedCPUs.Size())
 			if cpuAlloc < cpuReq {
@@ -339,7 +340,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively a odd number of CPUs to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 3
-			reservedCPUs := cpuset.New(0)
 
 			cpuReq := int64(cpuCount + reservedCPUs.Size())
 			if cpuAlloc < cpuReq {
@@ -375,7 +375,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively CPUs to a multi-container pod (1+2)", func(ctx context.Context) {
 			cpuCount := 3 // total
-			reservedCPUs := cpuset.New(0)
 
 			cpuReq := int64(cpuCount + reservedCPUs.Size())
 			if cpuAlloc < cpuReq {
@@ -419,7 +418,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively CPUs to a multi-container pod (3+2)", func(ctx context.Context) {
 			cpuCount := 5 // total
-			reservedCPUs := cpuset.New(0)
 
 			cpuReq := int64(cpuCount + reservedCPUs.Size())
 			if cpuAlloc < cpuReq {
@@ -464,7 +462,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively CPUs to a multi-container pod (4+2)", func(ctx context.Context) {
 			cpuCount := 6 // total
-			reservedCPUs := cpuset.New(0)
 
 			cpuReq := int64(cpuCount + reservedCPUs.Size())
 			if cpuAlloc < cpuReq {
@@ -508,7 +505,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should allocate exclusively a CPU to multiple 1-container pods", func(ctx context.Context) {
 			cpuCount := 4 // total
-			reservedCPUs := cpuset.New(0)
 
 			cpuReq := int64(cpuCount + reservedCPUs.Size())
 			if cpuAlloc < cpuReq {
