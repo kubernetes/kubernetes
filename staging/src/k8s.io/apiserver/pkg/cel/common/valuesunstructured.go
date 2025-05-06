@@ -598,13 +598,17 @@ func (t *unstructuredMap) Equal(other ref.Val) ref.Val {
 	if t.Size() != oMap.Size() {
 		return types.False
 	}
+
 	for key, value := range t.value {
-		if propSchema, ok := t.propSchema(key); ok {
-			ov, found := oMap.Find(types.String(key))
-			if !found {
+		if _, ok := t.propSchema(key); ok {
+			v, found := t.Find(types.String(key))
+			ov, oFound := oMap.Find(types.String(key))
+			if found != oFound {
 				return types.False
 			}
-			v := UnstructuredToVal(value, propSchema)
+			if !found {
+				continue
+			}
 			vEq := v.Equal(ov)
 			if vEq != types.True {
 				return vEq // either false or error

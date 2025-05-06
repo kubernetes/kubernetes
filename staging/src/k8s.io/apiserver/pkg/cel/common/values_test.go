@@ -319,6 +319,16 @@ func TestToValue(t *testing.T) {
 			},
 		},
 		{
+			name:       "compare: identical complex structs",
+			expression: "c1 == c2",
+			activation: map[string]typedValue{"c1": complex1, "c2": complex1Again},
+		},
+		{
+			name:       "compare: different complex structs",
+			expression: "c1 != c2",
+			activation: map[string]typedValue{"c1": complex1, "c2": complex2},
+		},
+		{
 			name:       "compare: struct and pointer to identical struct",
 			expression: "s1 == s1_ptr",
 			activation: map[string]typedValue{
