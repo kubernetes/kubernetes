@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/utils/ptr"
 )
 
 var matchEverythingRules = []registrationv1.RuleWithOperations{{
@@ -895,6 +896,40 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 			ErrorContains:    "invalid character",
 			ExpectAnnotations: map[string]string{
 				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "invalidMutation", false),
+			},
+		},
+		{
+			Name: "match & invalid patch",
+			Webhooks: []registrationv1.MutatingWebhook{{
+				Name:                    "invalidPatch",
+				ClientConfig:            ccfgSVC("invalidPatch"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "unexpected end of JSON input",
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "invalidPatch", false),
+			},
+		},
+		{
+			Name: "match & invalid patch fail open",
+			Webhooks: []registrationv1.MutatingWebhook{{
+				Name:                    "invalidPatch",
+				ClientConfig:            ccfgSVC("invalidPatch"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+				FailurePolicy:           ptr.To(registrationv1.Ignore),
+			}},
+			ExpectAllow:      true,
+			ExpectStatusCode: http.StatusOK,
+			ExpectAnnotations: map[string]string{
+				"failed-open.mutation.webhook.admission.k8s.io/round_0_index_0": "invalidPatch",
+				"mutation.webhook.admission.k8s.io/round_0_index_0":             mutationAnnotationValue(configurationName, "invalidPatch", false),
 			},
 		},
 		{
