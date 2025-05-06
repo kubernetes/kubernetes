@@ -110,6 +110,13 @@ var (
  * Final rule of thumb: if the nesting of the context description starts to read awkward or funny or stop making sense
  * if read as english sentence, then the nesting is likely too deep.
  */
+
+/*
+ * About reserved CPUs:
+ * all the tests assume the first available CPUID is 0, which is pretty fair and most of time correct.
+ * A better approach would be check what we do have in the node. This is deferred to a later stage alongside
+ * other improvements.
+ */
 var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), feature.CPUManager, func() {
 	f := framework.NewDefaultFramework("cpumanager-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
@@ -188,8 +195,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should let the container access all the online CPUs when using a reserved CPUs set", func(ctx context.Context) {
 			reservedCPUs := cpuset.New(0)
-			// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-			// check what we do have in the node.
 
 			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
@@ -215,8 +220,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should let the container access all the online non-exclusively-allocated CPUs when using a reserved CPUs set", ginkgo.Label("guaranteed", "exclusive-cpus"), func(ctx context.Context) {
 			cpuCount := 1
 			reservedCPUs := cpuset.New(0)
-			// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-			// check what we do have in the node.
 
 			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
@@ -263,8 +266,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively a CPU to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 1
 			reservedCPUs := cpuset.New(0)
-			// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-			// check what we do have in the node. -- note this snippet is repeated multiple time over the tests
 
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
@@ -535,8 +536,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			reservedCPUs = cpuset.New(0)
-			// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-			// check what we do have in the node.
 		})
 
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
@@ -654,8 +653,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			}
 
 			reservedCPUs := cpuset.New(0)
-			// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-			// check what we do have in the node.
 
 			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
@@ -752,9 +749,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			})
 
 			ginkgo.It("should reject workload asking non-SMT-multiple of cpus", func(ctx context.Context) {
-				// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-				// check what we do have in the node.
-
 				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
 					reservedSystemCPUs:      reservedCPUs,
@@ -801,9 +795,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			})
 
 			ginkgo.It("should admit workload asking SMT-multiple of cpus", func(ctx context.Context) {
-				// TODO: we assume the first available CPUID is 0, which is pretty fair, but we should probably
-				// check what we do have in the node.
-
 				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
 					reservedSystemCPUs:      reservedCPUs,
