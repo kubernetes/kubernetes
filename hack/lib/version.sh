@@ -66,7 +66,19 @@ kube::version::get_version_vars() {
     fi
 
     # Use git describe to find the version based on tags.
-    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
+    if [[ -n ${KUBE_GIT_VERSION-} ]]; then
+      true
+    else
+      KUBE_GIT_VERSION=$("${git[@]}" describe --tags --match='v*' --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null) || true
+      # Fallback to /build/build-image/cross/VERSION if git describe fails
+      version_file="${KUBE_ROOT}/build/build-image/cross/VERSION"
+      if [[ -z "${KUBE_GIT_VERSION}" && -f "${version_file}" ]]; then
+        file_version=$(cut -d '-' -f1 <"${version_file}")
+        # ensure it starts with 'v'
+        [[ "${file_version}" =~ ^v ]] || file_version="v${file_version}"
+        KUBE_GIT_VERSION="${file_version}+${KUBE_GIT_COMMIT:0:14}"
+        KUBE_GIT_TREE_STATE="archive"
+      fi   
       # This translates the "git describe" to an actual semver.org
       # compatible semantic version that looks something like this:
       #   v1.1.0-alpha.0.6+84c76d1142ea4d
