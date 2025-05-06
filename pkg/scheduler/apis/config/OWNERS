@@ -4,7 +4,6 @@ approvers:
   - api-approvers
 reviewers:
   - api-reviewers
-  - sig-scheduling-api-reviewers
   - sig-scheduling-api-approvers
 labels:
   - kind/api-change
