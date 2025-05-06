@@ -481,6 +481,53 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			gomega.Expect(pod).ToNot(HaveContainerCPUsOverlapWith("gu-container-2", reservedCPUs))
 			gomega.Expect(pod).To(HaveContainerCPUsThreadSiblings("gu-container-2"))
 		})
+
+		ginkgo.It("should allocate exclusively a CPU to multiple 1-container pods", func(ctx context.Context) {
+			cpuCount := 4 // total
+			reservedCPUs := cpuset.New(0)
+
+			skipIfNotEnoughAllocatableCPUs(ctx, f, cpuCount+reservedCPUs.Size(), onlineCPUs)
+
+			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				policyName:         string(cpumanager.PolicyStatic),
+				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
+			}))
+
+			pod1 := makeCPUManagerPod("gu-pod-1", []ctnAttribute{
+				{
+					ctnName:    "gu-container-1",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			})
+			ginkgo.By("creating the test pod 1")
+			pod1 = e2epod.NewPodClient(f).CreateSync(ctx, pod1)
+			podMap[string(pod1.UID)] = pod1
+
+			pod2 := makeCPUManagerPod("gu-pod-2", []ctnAttribute{
+				{
+					ctnName:    "gu-container-2",
+					cpuRequest: "2000m",
+					cpuLimit:   "2000m",
+				},
+			})
+			ginkgo.By("creating the test pod 2")
+			pod2 = e2epod.NewPodClient(f).CreateSync(ctx, pod2)
+			podMap[string(pod2.UID)] = pod2
+
+			ginkgo.By("checking if the expected cpuset was assigned")
+
+			// we cannot nor we should predict which CPUs the container gets
+			gomega.Expect(pod1).To(HaveContainerCPUsCount("gu-container-1", 2))
+			gomega.Expect(pod1).To(HaveContainerCPUsASubsetOf("gu-container-1", onlineCPUs))
+			gomega.Expect(pod1).ToNot(HaveContainerCPUsOverlapWith("gu-container-1", reservedCPUs))
+			gomega.Expect(pod1).To(HaveContainerCPUsThreadSiblings("gu-container-1"))
+
+			gomega.Expect(pod2).To(HaveContainerCPUsCount("gu-container-2", 2))
+			gomega.Expect(pod2).To(HaveContainerCPUsASubsetOf("gu-container-2", onlineCPUs))
+			gomega.Expect(pod2).ToNot(HaveContainerCPUsOverlapWith("gu-container-2", reservedCPUs))
+			gomega.Expect(pod2).To(HaveContainerCPUsThreadSiblings("gu-container-2"))
+		})
 	})
 
 	ginkgo.When("running with strict CPU reservation", ginkgo.Label("strict-cpu-reservation"), func() {
