@@ -26,8 +26,6 @@ import (
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/config"
 )
 
@@ -898,51 +896,49 @@ func TestApplyOverride(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			if test.expectedErr == nil && err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if test.expectedErr != nil {
+				if test.expectedErr.Error() != err.Error() {
+					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
 				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				_, err := pref.Apply(rootCmd, test.args, errWriter)
-				if test.expectedErr == nil && err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-				if test.expectedErr != nil {
-					if test.expectedErr.Error() != err.Error() {
-						t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
-					}
-					return
-				}
+				return
+			}
 
-				actualCmd, _, err := rootCmd.Find(test.args[1:])
-				if err != nil {
-					t.Fatalf("unable to find the command %v\n", err)
-				}
+			actualCmd, _, err := rootCmd.Find(test.args[1:])
+			if err != nil {
+				t.Fatalf("unable to find the command %v\n", err)
+			}
 
-				err = actualCmd.ParseFlags(test.args[1:])
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
+			err = actualCmd.ParseFlags(test.args[1:])
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
 
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
 
-				for _, expectedFlag := range test.expectedFlags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					if actualFlag.Value.String() != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
-					}
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				if actualFlag.Value.String() != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-			})
+			}
 		})
 	}
 }
@@ -1140,48 +1136,46 @@ func TestApplOverrideBool(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
-				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				_, err := pref.Apply(rootCmd, test.args, errWriter)
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			_, err := pref.Apply(rootCmd, test.args, errWriter)
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			actualCmd, _, err := rootCmd.Find(test.args[1:])
+			if err != nil {
+				t.Fatalf("unable to find the command %v\n", err)
+			}
+
+			err = actualCmd.ParseFlags(test.args[1:])
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
+
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
 				if err != nil {
 					t.Fatalf("unexpected error %v\n", err)
 				}
-				actualCmd, _, err := rootCmd.Find(test.args[1:])
-				if err != nil {
-					t.Fatalf("unable to find the command %v\n", err)
+				if actualValue != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
-
-				err = actualCmd.ParseFlags(test.args[1:])
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
-
-				for _, expectedFlag := range test.expectedFlags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					actualValue, err := strconv.ParseBool(actualFlag.Value.String())
-					if err != nil {
-						t.Fatalf("unexpected error %v\n", err)
-					}
-					if actualValue != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
-					}
-				}
-			})
+			}
 		})
 	}
 }
@@ -1427,72 +1421,70 @@ func TestApplyAliasBool(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			if test.expectedErr == nil && err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if test.expectedErr != nil {
+				if test.expectedErr.Error() != err.Error() {
+					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
 				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
-				if test.expectedErr == nil && err != nil {
+				return
+			}
+
+			actualCmd, _, err := rootCmd.Find(lastArgs[1:])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = actualCmd.ParseFlags(lastArgs)
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
+
+			if test.expectedCmd != actualCmd.Name() {
+				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
+			}
+
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				actualValue, err := strconv.ParseBool(actualFlag.Value.String())
+				if err != nil {
 					t.Fatalf("unexpected error %v\n", err)
 				}
-				if test.expectedErr != nil {
-					if test.expectedErr.Error() != err.Error() {
-						t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
-					}
-					return
+				if actualValue != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
+			}
 
-				actualCmd, _, err := rootCmd.Find(lastArgs[1:])
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				err = actualCmd.ParseFlags(lastArgs)
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
-
-				if test.expectedCmd != actualCmd.Name() {
-					t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
-				}
-
-				for _, expectedFlag := range test.expectedFlags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					actualValue, err := strconv.ParseBool(actualFlag.Value.String())
-					if err != nil {
-						t.Fatalf("unexpected error %v\n", err)
-					}
-					if actualValue != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %t actual %s", expectedFlag.value, actualFlag.Value.String())
+			for _, expectedArg := range test.expectedArgs {
+				found := false
+				for _, actualArg := range lastArgs {
+					if actualArg == expectedArg {
+						found = true
+						break
 					}
 				}
-
-				for _, expectedArg := range test.expectedArgs {
-					found := false
-					for _, actualArg := range lastArgs {
-						if actualArg == expectedArg {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected arg %s can not be found", expectedArg)
-					}
+				if !found {
+					t.Fatalf("expected arg %s can not be found", expectedArg)
 				}
-			})
+			}
 		})
 	}
 }
@@ -2572,68 +2564,66 @@ func TestApplyAlias(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cmdtesting.WithAlphaEnvs([]util.FeatureGate{util.KubeRC}, t, func(t *testing.T) {
-				rootCmd := &cobra.Command{
-					Use: "root",
+			rootCmd := &cobra.Command{
+				Use: "root",
+			}
+			prefHandler := NewPreferences()
+			prefHandler.AddFlags(rootCmd.PersistentFlags())
+			pref, ok := prefHandler.(*Preferences)
+			if !ok {
+				t.Fatal("unexpected type. Expected *Preferences")
+			}
+			addCommands(rootCmd, test.nestedCmds)
+			pref.getPreferencesFunc = test.getPreferencesFunc
+			errWriter := &bytes.Buffer{}
+			lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
+			if test.expectedErr == nil && err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
+			if test.expectedErr != nil {
+				if test.expectedErr.Error() != err.Error() {
+					t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
 				}
-				prefHandler := NewPreferences()
-				prefHandler.AddFlags(rootCmd.PersistentFlags())
-				pref, ok := prefHandler.(*Preferences)
-				if !ok {
-					t.Fatal("unexpected type. Expected *Preferences")
-				}
-				addCommands(rootCmd, test.nestedCmds)
-				pref.getPreferencesFunc = test.getPreferencesFunc
-				errWriter := &bytes.Buffer{}
-				lastArgs, err := pref.Apply(rootCmd, test.args, errWriter)
-				if test.expectedErr == nil && err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
-				if test.expectedErr != nil {
-					if test.expectedErr.Error() != err.Error() {
-						t.Fatalf("error %s expected but actual is %s", test.expectedErr, err)
-					}
-					return
-				}
+				return
+			}
 
-				actualCmd, _, err := rootCmd.Find(lastArgs[1:])
-				if err != nil {
-					t.Fatal(err)
-				}
+			actualCmd, _, err := rootCmd.Find(lastArgs[1:])
+			if err != nil {
+				t.Fatal(err)
+			}
 
-				err = actualCmd.ParseFlags(lastArgs)
-				if err != nil {
-					t.Fatalf("unexpected error %v\n", err)
-				}
+			err = actualCmd.ParseFlags(lastArgs)
+			if err != nil {
+				t.Fatalf("unexpected error %v\n", err)
+			}
 
-				if errWriter.String() != "" {
-					t.Fatalf("unexpected error message %s\n", errWriter.String())
-				}
+			if errWriter.String() != "" {
+				t.Fatalf("unexpected error message %s\n", errWriter.String())
+			}
 
-				if test.expectedCmd != actualCmd.Name() {
-					t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
-				}
+			if test.expectedCmd != actualCmd.Name() {
+				t.Fatalf("unexpected command expected %s actual %s", test.expectedCmd, actualCmd.Name())
+			}
 
-				for _, expectedFlag := range test.expectedFlags {
-					actualFlag := actualCmd.Flag(expectedFlag.name)
-					if actualFlag.Value.String() != expectedFlag.value {
-						t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
-					}
+			for _, expectedFlag := range test.expectedFlags {
+				actualFlag := actualCmd.Flag(expectedFlag.name)
+				if actualFlag.Value.String() != expectedFlag.value {
+					t.Fatalf("unexpected flag value expected %s actual %s", expectedFlag.value, actualFlag.Value.String())
 				}
+			}
 
-				for _, expectedArg := range test.expectedArgs {
-					found := false
-					for _, actualArg := range lastArgs {
-						if actualArg == expectedArg {
-							found = true
-							break
-						}
-					}
-					if !found {
-						t.Fatalf("expected arg %s can not be found", expectedArg)
+			for _, expectedArg := range test.expectedArgs {
+				found := false
+				for _, actualArg := range lastArgs {
+					if actualArg == expectedArg {
+						found = true
+						break
 					}
 				}
-			})
+				if !found {
+					t.Fatalf("expected arg %s can not be found", expectedArg)
+				}
+			}
 		})
 	}
 }
