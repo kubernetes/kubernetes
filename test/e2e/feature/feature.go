@@ -28,6 +28,22 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	APIServerIdentity = framework.WithFeature(framework.ValidFeatures.Add("APIServerIdentity"))
 
+	// Owner: sig-testing
+	// This label is used for tests which need the following:
+	// - the beta api group to be enabled.
+	// - the beta feature gate to be enabled.
+	//
+	// The following test-infra jobs runs tests with this label:
+	// - pull-kubernetes-e2e-kind-alpha-beta-features
+	// - ci-kubernetes-e2e-kind-alpha-beta-features
+	// - pull-kubernetes-e2e-kind-beta-features
+	// - ci-kubernetes-e2e-kind-beta-features
+	//
+	// Please consider using feature.WithFeatureGate instead. You should use this label if and
+	// only if e2e tests have a dependency on the beta api group but the feature-gate is promoted
+	// to GA.
+	Beta = framework.WithFeature(framework.ValidFeatures.Add("Beta"))
+
 	// Owner: sig-lifecycle
 	// This label is used for tests which need the following controllers to be enabled:
 	// - bootstrap-signer-controller
