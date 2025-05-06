@@ -405,7 +405,15 @@ var iptablesCleanupOnlyChains = []iptablesJumpChain{}
 
 // CleanupLeftovers removes all iptables rules and chains created by the Proxier
 // It returns true if an error was encountered. Errors are logged.
-func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounteredError bool) {
+func CleanupLeftovers(ctx context.Context) (encounteredError bool) {
+	ipts := utiliptables.NewDualStack()
+	for _, ipt := range ipts {
+		encounteredError = cleanupLeftoversForFamily(ctx, ipt) || encounteredError
+	}
+	return
+}
+
+func cleanupLeftoversForFamily(ctx context.Context, ipt utiliptables.Interface) (encounteredError bool) {
 	logger := klog.FromContext(ctx)
 	// Unlink our chains
 	for _, jump := range append(iptablesJumpChains, iptablesCleanupOnlyChains...) {
@@ -432,7 +440,7 @@ func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounte
 		natRules := proxyutil.NewLineBuffer()
 		natChains.Write("*nat")
 		// Start with chains we know we need to remove.
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain, kubeProxyCanaryChain} {
 			if existingNATChains.Has(chain) {
 				chainString := string(chain)
 				natChains.Write(utiliptables.MakeChainLine(chain)) // flush
@@ -468,7 +476,7 @@ func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounte
 		filterChains := proxyutil.NewLineBuffer()
 		filterRules := proxyutil.NewLineBuffer()
 		filterChains.Write("*filter")
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeExternalServicesChain, kubeForwardChain, kubeNodePortsChain, kubeProxyFirewallChain, kubeProxyCanaryChain} {
 			if existingFilterChains.Has(chain) {
 				chainString := string(chain)
 				filterChains.Write(utiliptables.MakeChainLine(chain))
@@ -484,6 +492,10 @@ func CleanupLeftovers(ctx context.Context, ipt utiliptables.Interface) (encounte
 			encounteredError = true
 		}
 	}
+
+	// Remove our "-t mangle" canary chain; ignore errors since it may not exist.
+	_ = ipt.DeleteChain(utiliptables.TableMangle, kubeProxyCanaryChain)
+
 	return encounteredError
 }
 

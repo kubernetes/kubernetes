@@ -491,14 +491,8 @@ func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanup
 
 	// Clean up iptables and ipvs rules if switching to nftables, or if cleanupAndExit
 	if !isIPTablesBased(mode) || cleanupAndExit {
-		ipts := utiliptables.NewDualStack()
-		ipsetInterface := utilipset.New()
-		ipvsInterface := utilipvs.New()
-
-		for _, ipt := range ipts {
-			encounteredError = iptables.CleanupLeftovers(ctx, ipt) || encounteredError
-			encounteredError = ipvs.CleanupLeftovers(ctx, ipvsInterface, ipt, ipsetInterface) || encounteredError
-		}
+		encounteredError = iptables.CleanupLeftovers(ctx) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(ctx) || encounteredError
 	}
 
 	// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit
