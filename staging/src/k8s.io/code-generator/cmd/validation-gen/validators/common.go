@@ -50,19 +50,54 @@ func isNilableType(t *types.Type) bool {
 	return false
 }
 
-func realType(t *types.Type) *types.Type {
+// nativeType returns the Go native type of the argument type, with any
+// intermediate typedefs removed. Go itself already flattens typedefs, but this
+// handles it in the unlikely event that we ever fix that.
+//
+// Examples:
+// * Trivial:
+//   - given `int`, returns `int`
+//   - given `*int`, returns `*int`
+//   - given `[]int`, returns `[]int`
+//
+// * Typedefs
+//   - given `type X int; X`, returns `int`
+//   - given `type X int; []X`, returns `[]X`
+//
+// * Typedefs and pointers:
+//   - given `type X int; *X`, returns `*int`
+//   - given `type X *int; *X`, returns `**int`
+//   - given `type X []int; X`, returns `[]int`
+//   - given `type X []int; *X`, returns `*[]int`
+func nativeType(t *types.Type) *types.Type {
+	ptrs := 0
 	for {
 		if t.Kind == types.Alias {
 			t = t.Underlying
 		} else if t.Kind == types.Pointer {
+			ptrs++
 			t = t.Elem
 		} else {
 			break
 		}
 	}
+	for range ptrs {
+		t = types.PointerTo(t)
+	}
 	return t
 }
 
+// nonPointer returns the value-type of a possibly pointer type. If type is not
+// a pointer, it returns the input type.
+func nonPointer(t *types.Type) *types.Type {
+	for t.Kind == types.Pointer {
+		t = t.Elem
+	}
+	return t
+}
+
+// rootTypeString returns a string representation of the relationship between
+// src and dst types, for use in error messages.
 func rootTypeString(src, dst *types.Type) string {
 	if src == dst {
 		return src.String()
