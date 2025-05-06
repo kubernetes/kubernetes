@@ -25,9 +25,6 @@ run_kuberc_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kuberc"
 
-  # Enable KUBERC feature
-  export KUBECTL_KUBERC=true
-
   cat > "${TMPDIR:-/tmp}"/kuberc_file << EOF
 apiVersion: kubectl.config.k8s.io/v1alpha1
 kind: Preference
@@ -188,8 +185,6 @@ EOF
   # assure that explicit value supersedes
   output_message=$(kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
   kube::test::if_has_string "${output_message}" 'namespace "test-kuberc-ns" deleted'
-
-  unset KUBECTL_KUBERC
 
   set +o nounset
   set +o errexit

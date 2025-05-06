@@ -363,7 +363,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	flags.BoolVar(&warningsAsErrors, "warnings-as-errors", warningsAsErrors, "Treat warnings received from the server as errors and exit with a non-zero exit code")
 
 	pref := kuberc.NewPreferences()
-	if cmdutil.KubeRC.IsEnabled() {
+	if !cmdutil.KubeRC.IsDisabled() {
 		pref.AddFlags(flags)
 	}
 
@@ -499,7 +499,7 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 	// add the klog flags later.
 	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
-	if cmdutil.KubeRC.IsEnabled() {
+	if !cmdutil.KubeRC.IsDisabled() {
 		_, err := pref.Apply(cmds, o.Arguments, o.IOStreams.ErrOut)
 		if err != nil {
 			fmt.Fprintf(o.IOStreams.ErrOut, "error occurred while applying preferences %v\n", err)

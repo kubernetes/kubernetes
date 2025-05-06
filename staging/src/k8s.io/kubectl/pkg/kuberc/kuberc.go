@@ -86,7 +86,7 @@ type aliasing struct {
 
 // AddFlags adds kuberc related flags into the command.
 func (p *Preferences) AddFlags(flags *pflag.FlagSet) {
-	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false.")
+	flags.String("kuberc", "", "Path to the kuberc file to use for preferences. This can be disabled by exporting KUBECTL_KUBERC=false feature gate or turning off the feature KUBERC=off.")
 }
 
 // Apply firstly applies the aliases in the preferences file and secondly overrides
