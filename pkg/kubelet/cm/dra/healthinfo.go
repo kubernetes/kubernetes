@@ -92,7 +92,7 @@ func (cache *healthInfoCache) saveToCheckpoint() error {
 
 // getHealthInfo returns the current health info, adjusting for timeouts.
 func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealthString {
-	var res state.DeviceHealthString = "Unknown"
+	var res state.DeviceHealthString = state.DeviceHealthStringUnknown
 	now := time.Now()
 
 	cache.withRLock(func() error {
@@ -100,7 +100,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 			for _, device := range driver.Devices {
 				if device.PoolName == poolName && device.DeviceName == deviceName {
 					if now.Sub(device.LastUpdated) > healthTimeout {
-						res = "Unknown"
+						res = state.DeviceHealthStringUnknown
 					} else {
 						res = device.Health
 					}
@@ -148,10 +148,11 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 				// Remove from reported device list
 				delete(reported, key)
 				// If device surpasses health timeout set to unknown
-			} else if existing.Health != "Unknown" && now.Sub(existing.LastUpdated) > healthTimeout {
-				existing.Health = "Unknown"
+			} else if existing.Health != state.DeviceHealthStringUnknown && now.Sub(existing.LastUpdated) > healthTimeout {
+				existing.Health = state.DeviceHealthStringUnknown
 				existing.LastUpdated = now
 				changed = true
+				changedDevices = append(changedDevices, existing)
 				newDevices = append(newDevices, existing)
 				// Within the health timeout consider healthy and add as new device
 			} else {

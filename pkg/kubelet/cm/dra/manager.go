@@ -597,47 +597,86 @@ func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.Pod
 				continue
 			}
 
-			// Initialize AllocatedResourcesStatus if nil
-			if containerStatus.AllocatedResourcesStatus == nil {
+			// Ensure the slice exists. Use a map for efficient updates by resource name.
+			resourceStatusMap := make(map[v1.ResourceName]*v1.ResourceStatus)
+			if status.ContainerStatuses[i].AllocatedResourcesStatus != nil {
+				for idx := range status.ContainerStatuses[i].AllocatedResourcesStatus {
+					// Store pointers to modify in place
+					resourceStatusMap[status.ContainerStatuses[i].AllocatedResourcesStatus[idx].Name] = &status.ContainerStatuses[i].AllocatedResourcesStatus[idx]
+				}
+			} else {
 				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
 			}
 
 			// Loop through each claim associated with the container
 			for _, claimInfo := range claimInfos {
+				resourceName := v1.ResourceName(claimInfo.ClaimName)
+
+				// Get or create the ResourceStatus entry for this claim
+				resStatus, ok := resourceStatusMap[resourceName]
+
+				if !ok {
+					// Create a new entry and add it to the map and the slice
+					newStatus := v1.ResourceStatus{
+						Name:      resourceName,
+						Resources: []v1.ResourceHealth{}, // Initialize the slice
+					}
+					status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, newStatus)
+					// Get pointer to the newly added element *after* appending
+					resStatus = &status.ContainerStatuses[i].AllocatedResourcesStatus[len(status.ContainerStatuses[i].AllocatedResourcesStatus)-1]
+					resourceStatusMap[resourceName] = resStatus
+				}
+
+				// Clear previous health entries for this resource before adding current ones
+				// Ensures we only report current health for allocated devices.
+				resStatus.Resources = []v1.ResourceHealth{}
+
 				// Iterate through the map holding the state specific to each driver
 				for driverName, driverState := range claimInfo.DriverState {
 					// Iterate through each specific device allocated by this driver
 					for _, device := range driverState.Devices {
 						m.healthInfoMutex.Lock()
-						health := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
 						m.healthInfoMutex.Unlock()
 
-						// Create resource status
-						resourceStatus := v1.ResourceStatus{
-							Name: claimInfo.ClaimName,
-							Health: v1.ResourceHealth{
-								Health: string(health),
-							},
-						}
-						if len(device.CDIDeviceIDs) > 0 {
-							resourceStatus.ID = device.CDIDeviceIDs[0]
+						// Convert internal health string to API type
+						var health v1.ResourceHealthStatus
+						switch healthStr {
+						case "Healthy":
+							health = v1.ResourceHealthStatusHealthy
+						case "Unhealthy":
+							health = v1.ResourceHealthStatusUnhealthy
+						default: // Catches "Unknown" or any other case
+							health = v1.ResourceHealthStatusUnknown
 						}
 
-						// Update or append to AllocatedResourcesStatus
-						found := false
-						for j, existing := range status.ContainerStatuses[i].AllocatedResourcesStatus {
-							if existing.Name == resourceStatus.Name {
-								status.ContainerStatuses[i].AllocatedResourcesStatus[j] = resourceStatus
-								found = true
-								break
-							}
+						// Create the ResourceHealth entry
+						resourceHealth := v1.ResourceHealth{
+							Health: health,
 						}
-						if !found {
-							status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, resourceStatus)
+
+						// Use first CDI device ID as ResourceID, with fallback
+						if len(device.CDIDeviceIDs) > 0 {
+							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
+						} else {
+							// Fallback ID if no CDI ID is present
+							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
 						}
+
+						// Append the health status for this specific device/resource ID
+						resStatus.Resources = append(resStatus.Resources, resourceHealth)
 					}
 				}
 			}
+			// Rebuild the slice from the map values to ensure correctness
+			finalStatuses := make([]v1.ResourceStatus, 0, len(resourceStatusMap))
+			for _, rs := range resourceStatusMap {
+				// Only add if it actually has resource health entries populated
+				if len(rs.Resources) > 0 {
+					finalStatuses = append(finalStatuses, *rs)
+				}
+			}
+			status.ContainerStatuses[i].AllocatedResourcesStatus = finalStatuses
 		}
 	}
 }

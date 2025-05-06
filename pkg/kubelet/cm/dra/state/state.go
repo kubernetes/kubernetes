@@ -70,6 +70,15 @@ type DriverHealthState struct {
 
 type DeviceHealthString string
 
+const (
+	// DeviceHealthStringHealthy represents a healthy device.
+	DeviceHealthStringHealthy DeviceHealthString = "Healthy"
+	// DeviceHealthStringUnhealthy represents an unhealthy device.
+	DeviceHealthStringUnhealthy DeviceHealthString = "Unhealthy"
+	// DeviceHealthStringUnknown represents a device with unknown health status.
+	DeviceHealthStringUnknown DeviceHealthString = "Unknown"
+)
+
 // DeviceHealth is used to store health information of a device.
 type DeviceHealth struct {
 	// PoolName is the name of the pool where the device is allocated.
