@@ -17,7 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package podresize
+package cgroups
 
 import (
 	"testing"
@@ -71,13 +71,9 @@ func TestGetCPULimitCgroupExpectations(t *testing.T) {
 		},
 	}
 
-	originalPodOnCgroupv2Node := podOnCgroupv2Node
-	t.Cleanup(func() { podOnCgroupv2Node = originalPodOnCgroupv2Node })
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			podOnCgroupv2Node = &tc.podOnCgroupv2Node
-			actual := GetCPULimitCgroupExpectations(tc.cpuLimit)
+			actual := getCPULimitCgroupExpectations(tc.cpuLimit, tc.podOnCgroupv2Node)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}
