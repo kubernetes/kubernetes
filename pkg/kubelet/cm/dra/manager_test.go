@@ -388,6 +388,7 @@ func getFakeNode() (*v1.Node, error) {
 func TestPrepareResources(t *testing.T) {
 	claimName := claimName
 	fakeKubeClient := fake.NewSimpleClientset()
+	anotherClaimUID := types.UID("another-claim-uid")
 
 	for _, test := range []struct {
 		description         string
@@ -545,6 +546,14 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			}},
+		},
+		{
+			description:    "claim UIDs mismatch",
+			driverName:     driverName,
+			pod:            genTestPod(),
+			claim:          genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:      genTestClaimInfo(anotherClaimUID, []string{podUID}, false),
+			expectedErrMsg: fmt.Sprintf("old claim with same name %s/%s and different UID %s still exists", namespace, claimName, anotherClaimUID),
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
