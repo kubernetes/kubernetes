@@ -267,28 +267,23 @@ aliases:
     - ffromani
     - tallclair
   sig-network-approvers:
-    - andrewsykim
     - aojea
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
+  # emeritus:
+  # - andrewsykim
+  # - caseydavenport
+  # - dcbw
+  # - freehan
+  # - khenidak
+  # - mrhohn
   sig-network-reviewers:
-    - andrewsykim
     - aojea
     - aroradaman
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
     - tnqn
