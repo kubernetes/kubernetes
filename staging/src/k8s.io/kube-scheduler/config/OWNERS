@@ -5,8 +5,8 @@ options:
   no_parent_owners: true
 approvers:
   - api-approvers
+  - sig-scheduling-api-approvers
 reviewers:
   - api-reviewers
-  - sig-scheduling-api-approvers
 labels:
   - kind/api-change
