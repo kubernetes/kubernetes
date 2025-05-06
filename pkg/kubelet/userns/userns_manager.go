@@ -440,12 +440,12 @@ func (m *UsernsManager) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHan
 	if string(content) != "" {
 		userNs, err = m.parseUserNsFileAndRecord(pod.UID, content)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("user namespace: %w", err)
 		}
 	} else {
 		userNs, err = m.createUserNs(pod)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("create user namespace: %w", err)
 		}
 	}
 
@@ -496,7 +496,7 @@ func (m *UsernsManager) CleanupOrphanedPodUsernsAllocations(pods []*v1.Pod, runn
 	allFound := sets.New[string]()
 	found, err := m.kl.ListPodsFromDisk()
 	if err != nil {
-		return err
+		return fmt.Errorf("user namespace: read pods from disk: %w", err)
 	}
 
 	for _, podUID := range found {
