@@ -30,8 +30,8 @@ var (
 
 	// Owner: sig-testing
 	// This label is used for tests which need the following:
-	// - the beta api group to be enabled.
-	// - the beta feature gate to be enabled.
+	// - All beta API groups must be enabled.
+	// - All beta feature gate must be enabled.
 	//
 	// The following test-infra jobs runs tests with this label:
 	// - pull-kubernetes-e2e-kind-alpha-beta-features
