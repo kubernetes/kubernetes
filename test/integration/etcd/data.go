@@ -410,6 +410,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, removeAl
 		gvr("storage.k8s.io", "v1", "volumeattributesclasses"): {
 			Stub:              `{"metadata": {"name": "vac3"}, "driverName": "example.com/driver", "parameters": {"foo": "bar"}}`,
 			ExpectedEtcdPath:  "/registry/volumeattributesclasses/vac3",
+			ExpectedGVK:       gvkP("storage.k8s.io", "v1beta1", "VolumeAttributesClass"),
 			IntroducedVersion: "1.34",
 		},
 		// --
