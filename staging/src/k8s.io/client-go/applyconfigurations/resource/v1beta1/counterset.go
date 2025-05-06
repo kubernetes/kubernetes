@@ -23,6 +23,7 @@ package v1beta1
 type CounterSetApplyConfiguration struct {
 	Name     *string                              `json:"name,omitempty"`
 	Counters map[string]CounterApplyConfiguration `json:"counters,omitempty"`
+	Includes []string                             `json:"includes,omitempty"`
 }
 
 // CounterSetApplyConfiguration constructs a declarative configuration of the CounterSet type for use with
@@ -49,6 +50,16 @@ func (b *CounterSetApplyConfiguration) WithCounters(entries map[string]CounterAp
 	}
 	for k, v := range entries {
 		b.Counters[k] = v
+	}
+	return b
+}
+
+// WithIncludes adds the given value to the Includes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the Includes field.
+func (b *CounterSetApplyConfiguration) WithIncludes(values ...string) *CounterSetApplyConfiguration {
+	for i := range values {
+		b.Includes = append(b.Includes, values[i])
 	}
 	return b
 }
