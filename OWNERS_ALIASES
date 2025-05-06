@@ -486,8 +486,9 @@ aliases:
     - wojtek-t
   # emeritus:
   # - mm4tt
-  sig-scheduling-api-reviewers:
-    - alculquicondor
+  # sig-scheduling-api-reviewers:
+  # emeritus:
+  # - alculquicondor
   sig-storage-api-reviewers:
     - deads2k
     - saad-ali
