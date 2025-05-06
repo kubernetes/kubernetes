@@ -378,8 +378,9 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
-// AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
-// when a single segment is passed.
+// AbsPath overwrites an existing path with the segments provided.
+// Trailing slashes are preserved when a single segment is passed.
+// Any path in the request's REST client's base URL is preserved as a prefix.
 func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
@@ -392,8 +393,8 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	return r
 }
 
-// RequestURI overwrites existing path and parameters with the value of the provided server relative
-// URI.
+// RequestURI overwrites existing path and parameters with the value of the provided server relative URI.
+// This is equivalent to clearing params, then calling AbsPath() + Param() for each query parameter.
 func (r *Request) RequestURI(uri string) *Request {
 	if r.err != nil {
 		return r
@@ -403,14 +404,17 @@ func (r *Request) RequestURI(uri string) *Request {
 		r.err = err
 		return r
 	}
-	r.pathPrefix = locator.Path
+	// AbsPath handles prepending r.c.base.Path, if set
+	r.AbsPath(locator.Path)
 	if len(locator.Query()) > 0 {
-		if r.params == nil {
-			r.params = make(url.Values)
-		}
+		// clear any existing params
+		r.params = make(url.Values)
 		for k, v := range locator.Query() {
 			r.params[k] = v
 		}
+	} else {
+		// clear any existing params
+		r.params = nil
 	}
 	return r
 }
