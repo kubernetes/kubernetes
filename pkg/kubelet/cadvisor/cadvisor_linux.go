@@ -93,14 +93,11 @@ func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots [
 		cadvisormetrics.AppMetrics:          struct{}{},
 		cadvisormetrics.ProcessMetrics:      struct{}{},
 		cadvisormetrics.OOMMetrics:          struct{}{},
+		cadvisormetrics.DiskUsageMetrics:    struct{}{},
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPSI) {
 		includedMetrics[cadvisormetrics.PressureMetrics] = struct{}{}
-	}
-
-	if usingLegacyStats || localStorageCapacityIsolation {
-		includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
 	}
 
 	duration := maxHousekeepingInterval
