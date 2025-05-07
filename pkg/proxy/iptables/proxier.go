@@ -26,7 +26,6 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -624,74 +623,14 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.syncProxyRules()
 }
 
-// OnNodeAdd is called whenever creation of new node object
-// is observed.
-func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	// we are only interested in node topology labels.
-	topologyLabels := proxy.ExtractTopologyLabels(node.Labels)
-	if reflect.DeepEqual(proxier.topologyLabels, topologyLabels) {
-		return
-	}
-
+// OnTopologyChange is called whenever this node's proxy relevant topology-related labels change.
+func (proxier *Proxier) OnTopologyChange(topologyLabels map[string]string) {
 	proxier.mu.Lock()
 	proxier.topologyLabels = topologyLabels
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
+	proxier.logger.V(4).Info("Updated proxier node topology labels", "labels", topologyLabels)
 	proxier.Sync()
-}
-
-// OnNodeUpdate is called whenever modification of an existing
-// node object is observed.
-func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	// we are only interested in node topology labels.
-	topologyLabels := proxy.ExtractTopologyLabels(node.Labels)
-	if reflect.DeepEqual(proxier.topologyLabels, topologyLabels) {
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.topologyLabels = topologyLabels
-	proxier.needFullSync = true
-	proxier.mu.Unlock()
-	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
-
-	proxier.Sync()
-}
-
-// OnNodeDelete is called whenever deletion of an existing node
-// object is observed.
-func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
-	if node.Name != proxier.nodeName {
-		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.nodeName)
-		return
-	}
-
-	proxier.mu.Lock()
-	proxier.topologyLabels = nil
-	proxier.needFullSync = true
-	proxier.mu.Unlock()
-
-	proxier.Sync()
-}
-
-// OnNodeSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnNodeSynced() {
 }
 
 // OnServiceCIDRsChanged is called whenever a change is observed
