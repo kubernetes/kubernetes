@@ -76,8 +76,8 @@ type ManagerImpl struct {
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
-	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
+func NewManagerImpl(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
+	claimInfoCache, err := newClaimInfoCache(logger, stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create claimInfo cache: %w", err)
 	}

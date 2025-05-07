@@ -20,13 +20,18 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
+
+	"github.com/go-logr/logr"
 
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // ClaimInfo holds information required
@@ -39,6 +44,7 @@ type ClaimInfo struct {
 
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
 type claimInfoCache struct {
+	logger klog.Logger
 	sync.RWMutex
 	checkpointer state.Checkpointer
 	claimInfo    map[string]*ClaimInfo
@@ -111,8 +117,25 @@ func (info *ClaimInfo) isPrepared() bool {
 	return info.prepared
 }
 
+// cdiDevicesAsList returns a list of CDIDevices from the provided claim info.
+// When the request name is non-empty, only devices relevant for that request
+// are returned.
+func (info *ClaimInfo) cdiDevicesAsList(requestName string) []kubecontainer.CDIDevice {
+	var cdiDevices []kubecontainer.CDIDevice
+	for _, driverData := range info.DriverState {
+		for _, device := range driverData.Devices {
+			if requestName == "" || len(device.RequestNames) == 0 || slices.Contains(device.RequestNames, requestName) {
+				for _, cdiDeviceID := range device.CDIDeviceIDs {
+					cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: cdiDeviceID})
+				}
+			}
+		}
+	}
+	return cdiDevices
+}
+
 // newClaimInfoCache creates a new claim info cache object, pre-populated from a checkpoint (if present).
-func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
+func newClaimInfoCache(logger klog.Logger, stateDir, checkpointName string) (*claimInfoCache, error) {
 	checkpointer, err := state.NewCheckpointer(stateDir, checkpointName)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %w", err)
@@ -124,6 +147,7 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 	}
 
 	cache := &claimInfoCache{
+		logger:       logger,
 		checkpointer: checkpointer,
 		claimInfo:    make(map[string]*ClaimInfo),
 	}
@@ -142,9 +166,42 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 }
 
 // withLock runs a function while holding the claimInfoCache lock.
+// It keeps the DRAResourceClaimsInUse metric up-to-date and logs changes.
+//
+// Updating the metrics on each change could be avoided with a collector,
+// but implementing and registering one is tricky. We also wouldn't
+// get the logging. The overhead should be small (entirely local operations)
+// compared to the work that the kubelet needs to do when preparing or
+// unpreparing claims (gRPC calls).
 func (cache *claimInfoCache) withLock(f func() error) error {
 	cache.Lock()
 	defer cache.Unlock()
+
+	claimsInUseBefore := cache.claimsInUse()
+	defer func() {
+		claimsInUseAfter := cache.claimsInUse()
+		delta := claimsInUseDelta(claimsInUseBefore, claimsInUseAfter)
+
+		changed := false
+		for _, inUse := range delta {
+			switch {
+			case inUse.Count == 0 && inUse.DriverName != "":
+				// Remove gauge for driver which has no claim in use.
+				// It might be gone permanently.
+				metrics.DRAResourceClaimsInUse.Delete(map[string]string{"driver_name": inUse.DriverName})
+			default:
+				metrics.DRAResourceClaimsInUse.WithLabelValues(inUse.DriverName).Set(float64(inUse.Count))
+			}
+			if inUse.Delta != 0 {
+				changed = true
+			}
+		}
+
+		if changed {
+			cache.logger.V(5).Info("ResourceClaim usage changed", "claimsInUse", delta)
+		}
+	}()
+
 	return f()
 }
 
@@ -204,19 +261,81 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 	return cache.checkpointer.Store(checkpoint)
 }
 
-// cdiDevicesAsList returns a list of CDIDevices from the provided claim info.
-// When the request name is non-empty, only devices relevant for that request
-// are returned.
-func (info *ClaimInfo) cdiDevicesAsList(requestName string) []kubecontainer.CDIDevice {
-	var cdiDevices []kubecontainer.CDIDevice
-	for _, driverData := range info.DriverState {
-		for _, device := range driverData.Devices {
-			if requestName == "" || len(device.RequestNames) == 0 || slices.Contains(device.RequestNames, requestName) {
-				for _, cdiDeviceID := range device.CDIDeviceIDs {
-					cdiDevices = append(cdiDevices, kubecontainer.CDIDevice{Name: cdiDeviceID})
-				}
-			}
+// claimsInUse computes the the current counter vector for DRAResourceClaimsInUse.
+// It returns a map of driver name to number of claims which have been prepared using
+// the driver. The empty key stands for all prepared claims.
+//
+// Must be called while the rlock is held.
+func (cache *claimInfoCache) claimsInUse() map[string]int {
+	counts := make(map[string]int)
+	total := 0
+	for _, claimInfo := range cache.claimInfo {
+		if !claimInfo.isPrepared() {
+			continue
+		}
+		total++
+
+		for driverName := range claimInfo.DriverState {
+			counts[driverName]++
 		}
 	}
-	return cdiDevices
+	counts[""] = total
+	return counts
+}
+
+// claimsInUseDelta compares two maps returned by claimsInUse.
+// The type can be used as value in structured logging.
+func claimsInUseDelta(before, after map[string]int) ClaimsInUseDelta {
+	var delta ClaimsInUseDelta
+	for driverName, count := range before {
+		if _, stillSet := after[driverName]; !stillSet {
+			delta = append(delta, ClaimsInUse{DriverName: driverName, Count: 0, Delta: -count})
+		}
+	}
+	for driverName, count := range after {
+		delta = append(delta, ClaimsInUse{DriverName: driverName, Count: count, Delta: count - before[driverName]})
+	}
+	return delta
+}
+
+// ClaimsInUseDelta provides String (for text logging) and MarshalLog (for structured logging).
+type ClaimsInUseDelta []ClaimsInUse
+
+var _ fmt.Stringer = ClaimsInUseDelta{}
+var _ logr.Marshaler = ClaimsInUseDelta{}
+
+func (d ClaimsInUseDelta) String() string {
+	d = d.sort()
+	var buffer strings.Builder
+	for i, inUse := range d {
+		if i > 0 {
+			buffer.WriteByte('\n')
+		}
+		driverName := inUse.DriverName
+		if driverName == "" {
+			driverName = "<any>"
+		}
+		buffer.WriteString(fmt.Sprintf("%s: %d (%+d)", driverName, inUse.Count, inUse.Delta))
+	}
+	return buffer.String()
+}
+
+func (d ClaimsInUseDelta) MarshalLog() any {
+	d = d.sort()
+	return []ClaimsInUse(d)
+}
+
+// sort returns a sorted copy of the slice.
+func (d ClaimsInUseDelta) sort() ClaimsInUseDelta {
+	d = slices.Clone(d)
+	slices.SortFunc(d, func(a, b ClaimsInUse) int {
+		return strings.Compare(a.DriverName, b.DriverName)
+	})
+	return d
+}
+
+type ClaimsInUse struct {
+	DriverName string
+	Count      int
+	Delta      int
 }
