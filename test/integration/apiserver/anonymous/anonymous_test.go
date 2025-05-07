@@ -80,8 +80,6 @@ func TestStructuredAuthenticationConfig(t *testing.T) {
 	t.Log("Testing anonymous authenticator with authentication config")
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnonymousAuthConfigurableEndpoints, true)
-
 	testCases := []struct {
 		desc            string
 		authConfig      string
