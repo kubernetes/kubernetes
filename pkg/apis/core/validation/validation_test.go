@@ -23816,7 +23816,7 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 				},
 			},
 		}},
-		wantFieldErrors: nil,
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Child("matchLabelKeys").Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
 		opts: PodValidationOptions{
 			AllowMatchLabelKeysInPodTopologySpread:              false,
 			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
