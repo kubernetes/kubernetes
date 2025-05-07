@@ -91,6 +91,17 @@ linters:
         text: should not use Add, use AddVersioned instead
         path: _test.go$
 
+      # The Kubernetes naming convention for conversion functions uses underscores
+      # and intentionally deviates from normal Go conventions to make those function
+      # names more readable. Same for SetDefaults_*.
+      #
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1507028627
+      # https://github.com/kubernetes/kubernetes/issues/117288#issuecomment-1514201592
+      - linters:
+          - staticcheck
+          - revive
+        text: "(ST1003: should not use underscores in Go names; func ([cC]onvert_.*_To_.*|[sS]etDefaults_)|exported: exported function (Convert|SetDefaults)_.* should be of the form)"
+
       - path: (.+)\.go$
         # staticcheck: Developers tend to write in C-style with an explicit 'break' in a 'switch', so it's ok to ignore
         text: ineffective break statement. Did you mean to break out of the outer loop

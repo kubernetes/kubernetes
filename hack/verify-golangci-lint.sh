@@ -184,7 +184,13 @@ run () {
   # Only output on stderr indicates a real error and gets the "ERROR: " prefix for
   # highlighting in Spyglass. Stdout contains statistics and shouldn't get that prefix.
   # To avoid interleaving, it gets collected and dumped separately at the end.
-  "${golangci[@]}" "${targets[@]}" 2> >(sed -e 's;^;ERROR: ;') >"${KUBE_TEMP}/golangci-stdout.log" || res=$?
+  #
+  # This is done with some bash magic:
+  # - save original stdout in FD 3
+  # - redirect stdout to file
+  # - redirect stderr to original stdout in FD 3
+  # - pipe stderr via stdout into sed for on-the-fly processing, writing to stderr again
+  "${golangci[@]}" "${targets[@]}" 3>&1 >"${KUBE_TEMP}/golangci-stdout.log" 2>&3 | sed -e 's;^;ERROR: ;' >&2 || res=$?
   cat "${KUBE_TEMP}/golangci-stdout.log"
 }
 # First run with normal output.
