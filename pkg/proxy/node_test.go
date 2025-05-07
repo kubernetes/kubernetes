@@ -17,12 +17,24 @@ limitations under the License.
 package proxy
 
 import (
+	"net"
 	"strconv"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	netutils "k8s.io/utils/net"
+	"k8s.io/utils/ptr"
+)
+
+const (
+	testNodeName = "test-node"
 )
 
 func TestNodePodCIDRHandlerAdd(t *testing.T) {
@@ -148,4 +160,118 @@ func TestNodePodCIDRHandlerUpdate(t *testing.T) {
 
 func customExit(exitCode int) {
 	panic(strconv.Itoa(exitCode))
+}
+
+type nodeTweak func(n *v1.Node)
+
+func makeNode(tweaks ...nodeTweak) *v1.Node {
+	n := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNodeName,
+		},
+	}
+	for _, tw := range tweaks {
+		tw(n)
+	}
+	return n
+}
+
+func tweakNodeIPs(nodeIPs ...string) nodeTweak {
+	return func(n *v1.Node) {
+		for _, ip := range nodeIPs {
+			n.Status.Addresses = append(n.Status.Addresses, v1.NodeAddress{Type: v1.NodeInternalIP, Address: ip})
+		}
+	}
+}
+
+func TestNewNodeManager(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	client := clientsetfake.NewClientset()
+	nodeIP := "192.168.1.10"
+
+	go func() {
+		// wait for node manager setup
+		time.Sleep(time.Millisecond)
+
+		// node object doesn't exist
+		// wait for 1.5µs for 1µs poll interval to finish
+		time.Sleep(1500 * time.Nanosecond)
+
+		// node initially has no IP
+		_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+
+		// wait for 1.5µs for 1µs poll interval to finish
+		time.Sleep(1500 * time.Nanosecond)
+
+		// node updated with IP
+		_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(tweakNodeIPs(nodeIP)), metav1.UpdateOptions{})
+	}()
+
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, func(_ int) {}, time.Microsecond, time.Second)
+	require.NoError(t, err)
+	require.Equal(t, []net.IP{netutils.ParseIPSloppy(nodeIP)}, nodeManager.NodeIPs())
+}
+
+func TestNodeManagerOnNodeChange(t *testing.T) {
+	tests := []struct {
+		name             string
+		initialNodeIPs   []string
+		updatedNodeIPs   []string
+		expectedExitCode *int
+	}{
+		{
+			name:             "no initial NodeIPs and node updated without NodeIPs",
+			expectedExitCode: nil,
+		},
+		{
+			name:             "no initial NodeIPs and node updated with NodeIPs",
+			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			expectedExitCode: ptr.To(1),
+		},
+		{
+			name:             "node updated with same NodeIPs",
+			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			expectedExitCode: nil,
+		},
+		{
+			name:             "node updated with different NodeIPs",
+			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedNodeIPs:   []string{"10.0.1.1", "fd00:3:2:1::2"},
+			expectedExitCode: ptr.To(1),
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			var exitCode *int
+			exitFunc := func(code int) {
+				exitCode = &code
+			}
+
+			client := clientsetfake.NewClientset()
+			_, err := client.CoreV1().Nodes().Create(ctx, makeNode(tweakNodeIPs(tc.initialNodeIPs...)), metav1.CreateOptions{})
+			require.NoError(t, err)
+
+			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, exitFunc, time.Nanosecond, time.Nanosecond)
+			require.NoError(t, err)
+
+			nodeManager.onNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...)))
+			require.Equal(t, tc.expectedExitCode, exitCode)
+		})
+	}
+}
+
+func TestNodeManagerOnNodeDelete(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	var exitCode *int
+	exitFunc := func(code int) {
+		exitCode = &code
+	}
+	client := clientsetfake.NewClientset()
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, exitFunc, time.Nanosecond, time.Nanosecond)
+	require.NoError(t, err)
+
+	nodeManager.OnNodeDelete(makeNode())
+	require.Equal(t, ptr.To(1), exitCode)
 }

@@ -29,11 +29,13 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/events"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/utils/ptr"
 )
 
 type HollowProxy struct {
+	NodeName    string
 	ProxyServer *proxyapp.ProxyServer
 }
 
@@ -62,6 +64,7 @@ func NewHollowProxy(
 	recorder events.EventRecorder,
 ) *HollowProxy {
 	return &HollowProxy{
+		NodeName: nodeName,
 		ProxyServer: &proxyapp.ProxyServer{
 			Config: &proxyconfigapi.KubeProxyConfiguration{
 				Mode:             proxyconfigapi.ProxyMode("fake"),
@@ -86,7 +89,12 @@ func NewHollowProxy(
 }
 
 func (hp *HollowProxy) Run() error {
+	nodeManager, err := proxy.NewNodeManager(context.TODO(), hp.ProxyServer.Client, 30*time.Second, hp.NodeName, false)
+	if err != nil {
+		return err
+	}
 
+	hp.ProxyServer.NodeManager = nodeManager
 	if err := hp.ProxyServer.Run(context.TODO()); err != nil {
 		return fmt.Errorf("Error while running proxy: %w", err)
 	}
