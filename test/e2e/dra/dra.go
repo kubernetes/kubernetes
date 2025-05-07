@@ -1842,7 +1842,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			mustDelete(f.ClientSet, "admin", createdClusterSlice)
 		})
 
-		f.It("must manage ResourceSlices", f.WithSlow(), func(ctx context.Context) {
+		f.It("must manage ResourceSlices", func(ctx context.Context) {
 			driverName := driver.Name
 
 			// Now check for exactly the right set of objects for all nodes.
@@ -1871,9 +1871,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 						// for PRs (it's slow) and don't want CI breaks when fields get added or renamed.
 						"Spec": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 							"Driver":       gomega.Equal(driver.Name),
-							"NodeName":     gomega.Equal(nodeName),
+							"NodeName":     gomega.Equal(ptr.To(nodeName)),
 							"NodeSelector": gomega.BeNil(),
-							"AllNodes":     gomega.BeFalseBecause("slice should be using NodeName"),
+							"AllNodes":     gomega.BeNil(),
 							"Pool": gstruct.MatchAllFields(gstruct.Fields{
 								"Name":               gomega.Equal(nodeName),
 								"Generation":         gstruct.Ignore(),
