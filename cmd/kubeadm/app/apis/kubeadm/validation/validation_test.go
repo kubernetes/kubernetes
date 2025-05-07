@@ -615,6 +615,29 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
 			}, true},
+		{"valid InitConfiguration using ECDSA P384 algorithm",
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: "1.2.3.4",
+					BindPort:         3446,
+				},
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					ImageRepository: "registry.k8s.io",
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
+							DataDir: "/some/path",
+						},
+					},
+					Networking: kubeadmapi.Networking{
+						ServiceSubnet: "10.96.0.1/12",
+						DNSDomain:     "cluster.local",
+						PodSubnet:     "10.0.1.15/16",
+					},
+					CertificatesDir:     "/some/other/cert/dir",
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
+				},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: criPath},
+			}, true},
 	}
 	for _, rt := range tests {
 		actual := ValidateInitConfiguration(rt.s)

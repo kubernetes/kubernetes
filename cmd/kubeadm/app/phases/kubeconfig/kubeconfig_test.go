@@ -90,6 +90,14 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 		{
 			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+				CertificatesDir:     pkidir,
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
+			},
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: "valid-node-name"},
+		},
+		{
+			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
+			ClusterConfiguration: kubeadmapi.ClusterConfiguration{
 				ControlPlaneEndpoint: "api.k8s.io",
 				CertificatesDir:      pkidir,
 			},
