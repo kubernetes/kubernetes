@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,19 +29,23 @@ import (
 	"github.com/google/go-cmp/cmp" //nolint:depguard
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	resourceinformers "k8s.io/client-go/informers/resource/v1beta1"
+	watch "k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	cgocore "k8s.io/client-go/kubernetes/typed/core/v1"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 )
@@ -74,16 +79,18 @@ const (
 // resources. A DRA driver for node-local resources typically runs this
 // controller as part of its kubelet plugin.
 type Controller struct {
-	cancel     func(cause error)
-	driverName string
-	owner      *Owner
-	kubeClient kubernetes.Interface
-	wg         sync.WaitGroup
+	cancel         func(cause error)
+	driverName     string
+	owner          *Owner
+	resourceClient cgoresource.ResourceV1beta2Interface
+	coreClient     cgocore.CoreV1Interface
+	wg             sync.WaitGroup
 	// The queue is keyed with the pool name that needs work.
 	queue            workqueue.TypedRateLimitingInterface[string]
 	sliceStore       cache.MutationCache
 	mutationCacheTTL time.Duration
 	syncDelay        time.Duration
+	errorHandler     func(ctx context.Context, err error, msg string)
 
 	// Must use atomic access...
 	numCreates int64
@@ -111,7 +118,7 @@ type DriverResources struct {
 // Pool is the collection of devices belonging to the same pool.
 type Pool struct {
 	// NodeSelector may be different for each pool. Must not get set together
-	// with Resources.NodeName. It nil and Resources.NodeName is not set,
+	// with Resources.NodeName. If nil and Resources.NodeName is not set,
 	// then devices are available on all nodes.
 	NodeSelector *v1.NodeSelector
 
@@ -195,7 +202,7 @@ type Options struct {
 	// a driver uninstall because garbage collection won't work.
 	Owner *Owner
 
-	// This is the initial desired set of slices.
+	// This is the initial desired set of slices. Nil means "no resources".
 	Resources *DriverResources
 
 	// Queue can be used to override the default work queue implementation.
@@ -213,7 +220,66 @@ type Options struct {
 	// redundant delete API calls) and not too long that a human mistake
 	// doesn't get fixed while that human is waiting for it.
 	SyncDelay *time.Duration
+
+	// ErrorHandler will get called whenever the controller encounters
+	// a problem while trying to publish ResourceSlices. The controller
+	// will retry once the handler returns. What the handler does with
+	// that information is up to the handler. It could log the error,
+	// replace the slices if they cannot be published (see below),
+	// or force the program running the controller to fail by exiting.
+	//
+	// If some fields were dropped because the cluster does not support
+	// the feature they depend on, then the error is or wraps an
+	// [DroppedFieldsError] instance. Use [errors.As] to convert to that
+	// type:
+	//    var droppedFields *resourceslice.DroppedFieldsError
+	//    if errors.As(err, &droppedFields) { ... do something with droppedFields ... }
+	//
+	// The default is [utilruntime.HandleErrorWithContext] which just logs
+	// the problem.
+	ErrorHandler func(ctx context.Context, err error, msg string)
 }
+
+// DroppedFieldsError is reported through the ErrorHandler in [Options] if
+// a slice could not be published exactly as desired by the driver.
+type DroppedFieldsError struct {
+	PoolName                  string
+	SliceIndex                int
+	DesiredSlice, ActualSlice *resourceapi.ResourceSlice
+}
+
+func (err *DroppedFieldsError) Error() string {
+	// We cannot depend on go-cmp to include a diff here (not suitable for production code).
+	// The diff might be too large, too. But we can make some educated guesses....
+	disabled := err.DisabledFeatures()
+	if len(disabled) == 0 {
+		// If we get here, DisabledFeatures needs to be updated.
+		disabled = []string{"unknown"}
+	}
+	return fmt.Sprintf("pool %q, slice #%d: some fields were dropped by the apiserver, probably because these features are disabled: %s", err.PoolName, err.SliceIndex, strings.Join(disabled, " "))
+}
+
+func (err *DroppedFieldsError) DisabledFeatures() []string {
+	var disabled []string
+
+	// Both slices should have the same number of devices, but better check it.
+	for i := 0; i < len(err.DesiredSlice.Spec.Devices) && i < len(err.ActualSlice.Spec.Devices); i++ {
+		if len(err.DesiredSlice.Spec.Devices[i].Taints) > len(err.ActualSlice.Spec.Devices[i].Taints) {
+			disabled = append(disabled, "DRADeviceTaints")
+			break
+		}
+	}
+
+	// Dropped fields for partitionable devices can be detected without looking at the devices themselves.
+	if ptr.Deref(err.DesiredSlice.Spec.PerDeviceNodeSelection, false) && !ptr.Deref(err.ActualSlice.Spec.PerDeviceNodeSelection, false) ||
+		len(err.DesiredSlice.Spec.SharedCounters) > len(err.ActualSlice.Spec.SharedCounters) {
+		disabled = append(disabled, "DRAPartitionableDevices")
+	}
+
+	return disabled
+}
+
+var _ error = &DroppedFieldsError{}
 
 // Stop cancels all background activity and blocks until the controller has stopped.
 func (c *Controller) Stop() {
@@ -227,21 +293,46 @@ func (c *Controller) Stop() {
 // Update sets the new desired state of the resource information.
 //
 // The controller is doing a deep copy, so the caller may update
-// the instance once Update returns.
+// the instance once Update returns. Nil is valid and the same
+// as an empty resources struct.
 func (c *Controller) Update(resources *DriverResources) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
 	// Sync all old pools..
-	for poolName := range c.resources.Pools {
-		c.queue.Add(poolName)
+	if c.resources != nil {
+		for poolName := range c.resources.Pools {
+			c.queue.Add(poolName)
+		}
 	}
 
-	c.resources = resources.DeepCopy()
+	if resources == nil {
+		c.resources = &DriverResources{}
+	} else {
+		c.resources = resources.DeepCopy()
+		roundTaintTimeAdded(c.resources)
+	}
 
 	// ... and the new ones (might be the same).
 	for poolName := range c.resources.Pools {
 		c.queue.Add(poolName)
+	}
+}
+
+// roundTaintTimeAdded rounds all timestamps to seconds because that is all
+// that we can store. Without this we would get semantic differences between
+// desired and actual stored slice.
+func roundTaintTimeAdded(resources *DriverResources) {
+	for _, pool := range resources.Pools {
+		for _, slice := range pool.Slices {
+			for _, device := range slice.Devices {
+				for _, taint := range device.Taints {
+					if taint.TimeAdded != nil {
+						taint.TimeAdded.Time = taint.TimeAdded.Time.Round(time.Second)
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -272,21 +363,19 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 	if options.DriverName == "" {
 		return nil, errors.New("DRA driver name is empty")
 	}
-	if options.Resources == nil {
-		return nil, errors.New("DriverResources are nil")
-	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	c := &Controller{
 		cancel:           cancel,
-		kubeClient:       options.KubeClient,
+		resourceClient:   draclient.New(options.KubeClient),
+		coreClient:       options.KubeClient.CoreV1(),
 		driverName:       options.DriverName,
 		owner:            options.Owner.DeepCopy(),
 		queue:            options.Queue,
-		resources:        options.Resources.DeepCopy(),
 		mutationCacheTTL: ptr.Deref(options.MutationCacheTTL, defaultMutationCacheTTL),
 		syncDelay:        ptr.Deref(options.SyncDelay, defaultSyncDelay),
+		errorHandler:     options.ErrorHandler,
 	}
 	if c.queue == nil {
 		c.queue = workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -294,14 +383,16 @@ func newController(ctx context.Context, options Options) (*Controller, error) {
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "node_resource_slices"},
 		)
 	}
+	if c.errorHandler == nil {
+		c.errorHandler = func(ctx context.Context, err error, msg string) {
+			utilruntime.HandleErrorWithContext(ctx, err, msg)
+		}
+	}
 	if err := c.initInformer(ctx); err != nil {
 		return nil, err
 	}
 
-	// Sync each desired pool once.
-	for poolName := range options.Resources.Pools {
-		c.queue.Add(poolName)
-	}
+	c.Update(options.Resources)
 
 	return c, nil
 }
@@ -318,7 +409,10 @@ func (c *Controller) initInformer(ctx context.Context) error {
 	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		selector[resourceapi.ResourceSliceSelectorNodeName] = c.owner.Name
 	}
-	informer := resourceinformers.NewFilteredResourceSliceInformer(c.kubeClient, resyncPeriod, cache.Indexers{
+	tweakListOptions := func(options *metav1.ListOptions) {
+		options.FieldSelector = selector.String()
+	}
+	indexers := cache.Indexers{
 		poolNameIndex: func(obj interface{}) ([]string, error) {
 			slice, ok := obj.(*resourceapi.ResourceSlice)
 			if !ok {
@@ -326,9 +420,22 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			}
 			return []string{slice.Spec.Pool.Name}, nil
 		},
-	}, func(options *metav1.ListOptions) {
-		options.FieldSelector = selector.String()
-	})
+	}
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				tweakListOptions(&options)
+				return c.resourceClient.ResourceSlices().List(ctx, options)
+			},
+			WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				tweakListOptions(&options)
+				return c.resourceClient.ResourceSlices().Watch(ctx, options)
+			},
+		},
+		&resourceapi.ResourceSlice{},
+		resyncPeriod,
+		indexers,
+	)
 	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(logger, informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
 	handler, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -405,19 +512,9 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	defer c.queue.Done(poolName)
 	logger := klog.FromContext(ctx)
 
-	// Panics are caught and treated like errors.
-	var err error
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("internal error: %v", r)
-			}
-		}()
-		err = c.syncPool(klog.NewContext(ctx, klog.LoggerWithValues(logger, "poolName", poolName)), poolName)
-	}()
-
+	err := c.syncPool(klog.NewContext(ctx, klog.LoggerWithValues(logger, "poolName", poolName)), poolName)
 	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "processing ResourceSlice objects")
+		c.errorHandler(ctx, err, "processing ResourceSlice objects")
 		c.queue.AddRateLimited(poolName)
 
 		// Return without removing the work item from the queue.
@@ -451,6 +548,19 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	resources = c.resources
 	c.mutex.RUnlock()
 
+	pool, ok := resources.Pools[poolName]
+	if !ok {
+		if len(slices) > 0 {
+			// All are obsolete, pool does not exist anymore.
+			logger.V(5).Info("Removing resource slices after pool removal")
+			if err := c.removeSlices(ctx, slices); err != nil {
+				return fmt.Errorf("remove slices: %w", err)
+			}
+		}
+		// Pool does not exist anymore, nothing more to do.
+		return nil
+	}
+
 	// Retrieve node object to get UID?
 	// The result gets cached and is expected to not change while
 	// the controller runs.
@@ -458,7 +568,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	if c.owner != nil && c.owner.APIVersion == "v1" && c.owner.Kind == "Node" {
 		nodeName = c.owner.Name
 		if c.owner.UID == "" {
-			node, err := c.kubeClient.CoreV1().Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
+			node, err := c.coreClient.Nodes().Get(ctx, c.owner.Name, metav1.GetOptions{})
 			if err != nil {
 				return fmt.Errorf("retrieve node %q: %w", c.owner.Name, err)
 			}
@@ -489,225 +599,212 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	}
 	logger.V(5).Info("Existing slices", "obsolete", klog.KObjSlice(obsoleteSlices), "current", klog.KObjSlice(currentSlices))
 
-	if pool, ok := resources.Pools[poolName]; ok {
-		// Match each existing slice against the desired slices.
-		// Two slices "match" if they contain exactly the
-		// same device IDs, in an arbitrary order. As a
-		// special case, slices are also considered
-		// "matched" in the scenario where there's a single
-		// existing slice and a single desired slice. Such a
-		// matched slice gets updated with the desired
-		// content if there is a difference.
-		//
-		// In the case where there is more than one existing
-		// or desired slices, adding or removing devices is
-		// done by deleting the old slice and creating a new one.
-		//
-		// This is primarily a simplification of the code:
-		// to support adding or removing devices from
-		// existing slices, we would have to identify "most
-		// similar" slices (= minimal editing distance).
-		//
-		// In currentSliceForDesiredSlice we keep track of
-		// which desired slice has a matched slice.
-		//
-		// At the end of the loop, each current slice is either
-		// a match or obsolete.
-		currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
-		if len(currentSlices) == 1 && len(pool.Slices) == 1 {
-			// If there's just one existing slice and one desired slice, assume
-			// they "matched" such that if required, it is the existing slice
-			// which gets updated and we avoid an unnecessary deletion and
-			// recreation of the slice.
-			currentSliceForDesiredSlice[0] = currentSlices[0]
-		} else {
-			for _, currentSlice := range currentSlices {
-				matched := false
-				for i := range pool.Slices {
-					if _, ok := currentSliceForDesiredSlice[i]; ok {
-						// Already has a match.
-						continue
-					}
-					if sameSlice(currentSlice, &pool.Slices[i]) {
-						currentSliceForDesiredSlice[i] = currentSlice
-						logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
-						matched = true
-						break
-					}
+	// Match each existing slice against the desired slices.
+	// Two slices "match" if they contain exactly the
+	// same device IDs, in an arbitrary order. As a
+	// special case, slices are also considered
+	// "matched" in the scenario where there's a single
+	// existing slice and a single desired slice. Such a
+	// matched slice gets updated with the desired
+	// content if there is a difference.
+	//
+	// In the case where there is more than one existing
+	// or desired slices, adding or removing devices is
+	// done by deleting the old slice and creating a new one.
+	//
+	// This is primarily a simplification of the code:
+	// to support adding or removing devices from
+	// existing slices, we would have to identify "most
+	// similar" slices (= minimal editing distance).
+	//
+	// In currentSliceForDesiredSlice we keep track of
+	// which desired slice has a matched slice.
+	//
+	// At the end of the loop, each current slice is either
+	// a match or obsolete.
+	currentSliceForDesiredSlice := make(map[int]*resourceapi.ResourceSlice, len(pool.Slices))
+	if len(currentSlices) == 1 && len(pool.Slices) == 1 {
+		// If there's just one existing slice and one desired slice, assume
+		// they "matched" such that if required, it is the existing slice
+		// which gets updated and we avoid an unnecessary deletion and
+		// recreation of the slice.
+		currentSliceForDesiredSlice[0] = currentSlices[0]
+	} else {
+		for _, currentSlice := range currentSlices {
+			matched := false
+			for i := range pool.Slices {
+				if _, ok := currentSliceForDesiredSlice[i]; ok {
+					// Already has a match.
+					continue
 				}
-				if !matched {
-					obsoleteSlices = append(obsoleteSlices, currentSlice)
-					logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
+				if sameSlice(currentSlice, &pool.Slices[i]) {
+					currentSliceForDesiredSlice[i] = currentSlice
+					logger.V(5).Info("Matched existing slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
+					matched = true
+					break
 				}
 			}
-		}
-
-		// Desired metadata which must be set in each slice.
-		resourceSliceCount := len(pool.Slices)
-		numMatchedSlices := len(currentSliceForDesiredSlice)
-		numNewSlices := resourceSliceCount - numMatchedSlices
-		desiredPool := resourceapi.ResourcePool{
-			Name:               poolName,
-			Generation:         generation, // May get updated later.
-			ResourceSliceCount: int64(resourceSliceCount),
-		}
-		desiredAllNodes := pool.NodeSelector == nil && nodeName == ""
-
-		// Now for each desired slice, figure out which of them are changed.
-		changedDesiredSlices := sets.New[int]()
-		for i, currentSlice := range currentSliceForDesiredSlice {
-			// Reordering entries is a difference and causes an update even if the
-			// entries are the same.
-			if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
-				!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
-				currentSlice.Spec.AllNodes != desiredAllNodes ||
-				!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
-				!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
-				!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
-				changedDesiredSlices.Insert(i)
-				logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
+			if !matched {
+				obsoleteSlices = append(obsoleteSlices, currentSlice)
+				logger.V(5).Info("Unmatched existing slice", "slice", klog.KObj(currentSlice))
 			}
 		}
-		logger.V(5).Info("Completed comparison",
-			"numObsolete", len(obsoleteSlices),
-			"numMatchedSlices", len(currentSliceForDesiredSlice),
-			"numChangedMatchedSlices", len(changedDesiredSlices),
-			"numNewSlices", numNewSlices,
-		)
-
-		bumpedGeneration := false
-		switch {
-		case pool.Generation > generation:
-			// Bump up the generation if the driver asked for it, or
-			// start with a non-zero generation.
-			generation = pool.Generation
-			bumpedGeneration = true
-			logger.V(5).Info("Bumped generation to driver-provided generation", "generation", generation)
-		case numNewSlices == 0 && len(changedDesiredSlices) <= 1:
-			logger.V(5).Info("Kept generation because at most one update API call is necessary", "generation", generation)
-		default:
-			generation++
-			bumpedGeneration = true
-			logger.V(5).Info("Bumped generation by one", "generation", generation)
-		}
-		desiredPool.Generation = generation
-
-		// Update existing slices.
-		for i, currentSlice := range currentSliceForDesiredSlice {
-			if !changedDesiredSlices.Has(i) && !bumpedGeneration {
-				continue
-			}
-			slice := currentSlice.DeepCopy()
-			slice.Spec.Pool = desiredPool
-			// No need to set the node name. If it was different, we wouldn't
-			// have listed the existing slice.
-			slice.Spec.NodeSelector = pool.NodeSelector
-			slice.Spec.AllNodes = desiredAllNodes
-			slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
-			slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
-			// Preserve TimeAdded from existing device, if there is a matching device and taint.
-			slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
-
-			logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
-			slice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
-			if err != nil {
-				return fmt.Errorf("update resource slice: %w", err)
-			}
-			atomic.AddInt64(&c.numUpdates, 1)
-			c.sliceStore.Mutation(slice)
-
-			// Some fields may have been dropped. When we receive
-			// the updated slice through the informer, the
-			// DeepEqual fails and the controller would try to
-			// update again, etc.  To break that cycle, update our
-			// desired state of the world so that it matches what
-			// we can store.
-			//
-			// TODO (https://github.com/kubernetes/kubernetes/issues/130856): check for dropped fields and report them to the DRA driver.
-			pool.Slices[i].Devices = slice.Spec.Devices
-		}
-
-		// Create new slices.
-		added := false
-		for i := 0; i < len(pool.Slices); i++ {
-			if _, ok := currentSliceForDesiredSlice[i]; ok {
-				// Was handled above through an update.
-				continue
-			}
-			var ownerReferences []metav1.OwnerReference
-			if c.owner != nil {
-				ownerReferences = append(ownerReferences,
-					metav1.OwnerReference{
-						APIVersion: c.owner.APIVersion,
-						Kind:       c.owner.Kind,
-						Name:       c.owner.Name,
-						UID:        c.owner.UID,
-						Controller: ptr.To(true),
-					},
-				)
-			}
-			generateName := c.driverName + "-"
-			if c.owner != nil {
-				generateName = c.owner.Name + "-" + generateName
-			}
-			slice := &resourceapi.ResourceSlice{
-				ObjectMeta: metav1.ObjectMeta{
-					OwnerReferences: ownerReferences,
-					GenerateName:    generateName,
-				},
-				Spec: resourceapi.ResourceSliceSpec{
-					Driver:                 c.driverName,
-					Pool:                   desiredPool,
-					NodeName:               nodeName,
-					NodeSelector:           pool.NodeSelector,
-					AllNodes:               desiredAllNodes,
-					Devices:                pool.Slices[i].Devices,
-					SharedCounters:         pool.Slices[i].SharedCounters,
-					PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
-				},
-			}
-
-			// It can happen that we create a missing slice, some
-			// other change than the create causes another sync of
-			// the pool, and then a second slice for the same set
-			// of devices would get created because the controller has
-			// no copy of the first slice instance in its informer
-			// cache yet.
-			//
-			// Using a https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache
-			// avoids that.
-			logger.V(5).Info("Creating new resource slice")
-			slice, err := c.kubeClient.ResourceV1beta1().ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
-			if err != nil {
-				return fmt.Errorf("create resource slice: %w", err)
-			}
-			atomic.AddInt64(&c.numCreates, 1)
-			c.sliceStore.Mutation(slice)
-			added = true
-
-			// Some fields may have been dropped. When we receive
-			// the created slice through the informer, the
-			// DeepEqual fails and the controller would try to
-			// update, which again suffers from dropped fields,
-			// etc. To break that cycle, update our desired state
-			// of the world so that it matches what we can store.
-			//
-			// TODO (https://github.com/kubernetes/kubernetes/issues/130856): check for dropped fields and report them to the DRA driver.
-			pool.Slices[i].Devices = slice.Spec.Devices
-		}
-		if added {
-			// Check that the recently added slice(s) really exist even
-			// after they expired from the mutation cache.
-			c.queue.AddAfter(poolName, c.mutationCacheTTL)
-		}
-	} else if len(slices) > 0 {
-		// All are obsolete, pool does not exist anymore.
-		obsoleteSlices = slices
-		logger.V(5).Info("Removing resource slices after pool removal")
 	}
 
-	// Remove stale slices.
-	for _, slice := range obsoleteSlices {
+	// Desired metadata which must be set in each slice.
+	resourceSliceCount := len(pool.Slices)
+	numMatchedSlices := len(currentSliceForDesiredSlice)
+	numNewSlices := resourceSliceCount - numMatchedSlices
+	desiredPool := resourceapi.ResourcePool{
+		Name:               poolName,
+		Generation:         generation, // May get updated later.
+		ResourceSliceCount: int64(resourceSliceCount),
+	}
+	desiredAllNodes := pool.NodeSelector == nil && nodeName == ""
+
+	// Now for each desired slice, figure out which of them are changed.
+	changedDesiredSlices := sets.New[int]()
+	for i, currentSlice := range currentSliceForDesiredSlice {
+		// Reordering entries is a difference and causes an update even if the
+		// entries are the same.
+		if !apiequality.Semantic.DeepEqual(&currentSlice.Spec.Pool, &desiredPool) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.NodeSelector, pool.NodeSelector) ||
+			ptr.Deref(currentSlice.Spec.AllNodes, false) != desiredAllNodes ||
+			!DevicesDeepEqual(currentSlice.Spec.Devices, pool.Slices[i].Devices) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.SharedCounters, pool.Slices[i].SharedCounters) ||
+			!apiequality.Semantic.DeepEqual(currentSlice.Spec.PerDeviceNodeSelection, pool.Slices[i].PerDeviceNodeSelection) {
+			changedDesiredSlices.Insert(i)
+			logger.V(5).Info("Need to update slice", "slice", klog.KObj(currentSlice), "matchIndex", i)
+		}
+	}
+	logger.V(5).Info("Completed comparison",
+		"numObsolete", len(obsoleteSlices),
+		"numMatchedSlices", len(currentSliceForDesiredSlice),
+		"numChangedMatchedSlices", len(changedDesiredSlices),
+		"numNewSlices", numNewSlices,
+	)
+
+	bumpedGeneration := false
+	switch {
+	case pool.Generation > generation:
+		// Bump up the generation if the driver asked for it, or
+		// start with a non-zero generation.
+		generation = pool.Generation
+		bumpedGeneration = true
+		logger.V(5).Info("Bumped generation to driver-provided generation", "generation", generation)
+	case numNewSlices == 0 && len(changedDesiredSlices) <= 1:
+		logger.V(5).Info("Kept generation because at most one update API call is necessary", "generation", generation)
+	default:
+		generation++
+		bumpedGeneration = true
+		logger.V(5).Info("Bumped generation by one", "generation", generation)
+	}
+	desiredPool.Generation = generation
+
+	// First delete obsolete slices. If the desired slices are faulty, then it's still better to
+	// remove devices that the driver no longer has, even if we cannot publish the new ones.
+	if err := c.removeSlices(ctx, obsoleteSlices); err != nil {
+		return fmt.Errorf("remove slices: %w", err)
+	}
+
+	// Update existing slices.
+	for i, currentSlice := range currentSliceForDesiredSlice {
+		if !changedDesiredSlices.Has(i) && !bumpedGeneration {
+			continue
+		}
+		slice := currentSlice.DeepCopy()
+		slice.Spec.Pool = desiredPool
+		// No need to set the node name. If it was different, we wouldn't
+		// have listed the existing slice.
+		//
+		// When adding new fields here, then also extend sliceStored.
+		slice.Spec.NodeSelector = pool.NodeSelector
+		slice.Spec.AllNodes = refIfNotZero(desiredAllNodes)
+		slice.Spec.SharedCounters = pool.Slices[i].SharedCounters
+		slice.Spec.PerDeviceNodeSelection = pool.Slices[i].PerDeviceNodeSelection
+		// Preserve TimeAdded from existing device, if there is a matching device and taint.
+		slice.Spec.Devices = copyTaintTimeAdded(slice.Spec.Devices, pool.Slices[i].Devices)
+
+		logger.V(5).Info("Updating existing resource slice", "slice", klog.KObj(slice))
+		actualSlice, err := c.resourceClient.ResourceSlices().Update(ctx, slice, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("update resource slice: %w", err)
+		}
+		atomic.AddInt64(&c.numUpdates, 1)
+		c.sliceStored(ctx, "update ResourceSlice", poolName, pool, i, slice, actualSlice)
+	}
+
+	// Create new slices.
+	added := false
+	for i := 0; i < len(pool.Slices); i++ {
+		if _, ok := currentSliceForDesiredSlice[i]; ok {
+			// Was handled above through an update.
+			continue
+		}
+		var ownerReferences []metav1.OwnerReference
+		if c.owner != nil {
+			ownerReferences = append(ownerReferences,
+				metav1.OwnerReference{
+					APIVersion: c.owner.APIVersion,
+					Kind:       c.owner.Kind,
+					Name:       c.owner.Name,
+					UID:        c.owner.UID,
+					Controller: ptr.To(true),
+				},
+			)
+		}
+		generateName := c.driverName + "-"
+		if c.owner != nil {
+			generateName = c.owner.Name + "-" + generateName
+		}
+		slice := &resourceapi.ResourceSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				OwnerReferences: ownerReferences,
+				GenerateName:    generateName,
+			},
+			Spec: resourceapi.ResourceSliceSpec{
+				Driver:                 c.driverName,
+				Pool:                   desiredPool,
+				NodeName:               refIfNotZero(nodeName),
+				NodeSelector:           pool.NodeSelector,
+				AllNodes:               refIfNotZero(desiredAllNodes),
+				Devices:                pool.Slices[i].Devices,
+				SharedCounters:         pool.Slices[i].SharedCounters,
+				PerDeviceNodeSelection: pool.Slices[i].PerDeviceNodeSelection,
+			},
+		}
+
+		// It can happen that we create a missing slice, some
+		// other change than the create causes another sync of
+		// the pool, and then a second slice for the same set
+		// of devices would get created because the controller has
+		// no copy of the first slice instance in its informer
+		// cache yet.
+		//
+		// Using a https://pkg.go.dev/k8s.io/client-go/tools/cache#MutationCache
+		// avoids that.
+		logger.V(5).Info("Creating new resource slice")
+		actualSlice, err := c.resourceClient.ResourceSlices().Create(ctx, slice, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("create resource slice: %w", err)
+		}
+		atomic.AddInt64(&c.numCreates, 1)
+		added = true
+		c.sliceStored(ctx, "create ResourceSlice", poolName, pool, i, slice, actualSlice)
+	}
+	if added {
+		// Check that the recently added slice(s) really exist even
+		// after they expired from the mutation cache.
+		c.queue.AddAfter(poolName, c.mutationCacheTTL)
+	}
+
+	return nil
+}
+
+func (c *Controller) removeSlices(ctx context.Context, slices []*resourceapi.ResourceSlice) error {
+	logger := klog.FromContext(ctx)
+
+	for _, slice := range slices {
 		options := metav1.DeleteOptions{
 			Preconditions: &metav1.Preconditions{
 				UID:             &slice.UID,
@@ -723,7 +820,7 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 		// changes on the server. The only downside is the extra API
 		// call. This isn't as bad as extra creates.
 		logger.V(5).Info("Deleting obsolete resource slice", "slice", klog.KObj(slice), "deleteOptions", options)
-		err := c.kubeClient.ResourceV1beta1().ResourceSlices().Delete(ctx, slice.Name, options)
+		err := c.resourceClient.ResourceSlices().Delete(ctx, slice.Name, options)
 		switch {
 		case err == nil:
 			atomic.AddInt64(&c.numDeletes, 1)
@@ -735,6 +832,59 @@ func (c *Controller) syncPool(ctx context.Context, poolName string) error {
 	}
 
 	return nil
+}
+
+// sliceStored gets called after creating or updating a slice.
+// The slice might have been modified during the roundtrip
+// through the apiserver.
+func (c *Controller) sliceStored(ctx context.Context, msg string, poolName string, pool Pool, sliceIndex int, desiredSlice, actualSlice *resourceapi.ResourceSlice) {
+	c.sliceStore.Mutation(actualSlice)
+
+	// One difference is normal: the apiserver may have added TimeAdded to taints.
+	// This mutates desiredSlice for the DeepEqual below.
+	if copyServerDefaults(desiredSlice, actualSlice) {
+		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
+	}
+
+	// Some fields may have been dropped. When we receive
+	// the updated slice through the informer, the
+	// DeepEqual fails and the controller would try to
+	// update again, etc.  To break that cycle, update our
+	// desired state of the world so that it matches what
+	// we can store.
+	if !apiequality.Semantic.DeepEqual(desiredSlice.Spec.PerDeviceNodeSelection, actualSlice.Spec.PerDeviceNodeSelection) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.SharedCounters, actualSlice.Spec.SharedCounters) ||
+		!apiequality.Semantic.DeepEqual(desiredSlice.Spec.Devices, actualSlice.Spec.Devices) {
+		pool.Slices[sliceIndex].PerDeviceNodeSelection = actualSlice.Spec.PerDeviceNodeSelection
+		pool.Slices[sliceIndex].SharedCounters = actualSlice.Spec.SharedCounters
+		pool.Slices[sliceIndex].Devices = actualSlice.Spec.Devices
+
+		err := &DroppedFieldsError{
+			PoolName:     poolName,
+			SliceIndex:   sliceIndex,
+			DesiredSlice: desiredSlice.DeepCopy(),
+			ActualSlice:  actualSlice.DeepCopy(),
+		}
+		c.errorHandler(ctx, err, msg)
+	}
+}
+
+func copyServerDefaults(desiredSlice, actualSlice *resourceapi.ResourceSlice) bool {
+	copied := false
+
+	// Should have the same length and entries in the same order.
+	for i := 0; i < len(desiredSlice.Spec.Devices) && i < len(actualSlice.Spec.Devices); i++ {
+		for e := 0; e < len(desiredSlice.Spec.Devices[i].Taints) && e < len(actualSlice.Spec.Devices[i].Taints); e++ {
+			if desiredSlice.Spec.Devices[i].Taints[e].TimeAdded == nil && actualSlice.Spec.Devices[i].Taints[e].TimeAdded != nil {
+				if !copied {
+					desiredSlice.Spec = *desiredSlice.Spec.DeepCopy()
+					copied = true
+				}
+				desiredSlice.Spec.Devices[i].Taints[e].TimeAdded = actualSlice.Spec.Devices[i].Taints[e].TimeAdded
+			}
+		}
+	}
+	return copied
 }
 
 func sameSlice(existingSlice *resourceapi.ResourceSlice, desiredSlice *Slice) bool {
@@ -770,16 +920,13 @@ func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
 			continue
 		}
 		fromDevice := from[index]
-		if fromDevice.Basic == nil || toDevice.Basic == nil {
-			continue
-		}
-		for j, toTaint := range toDevice.Basic.Taints {
+		for j, toTaint := range toDevice.Taints {
 			if toTaint.TimeAdded != nil {
 				// Already set.
 				continue
 			}
 			// Preserve the old TimeAdded if all other fields are the same.
-			index := slices.IndexFunc(fromDevice.Basic.Taints, func(fromTaint resourceapi.DeviceTaint) bool {
+			index := slices.IndexFunc(fromDevice.Taints, func(fromTaint resourceapi.DeviceTaint) bool {
 				return toTaint.Key == fromTaint.Key &&
 					toTaint.Value == fromTaint.Value &&
 					toTaint.Effect == fromTaint.Effect
@@ -792,7 +939,7 @@ func copyTaintTimeAdded(from, to []resourceapi.Device) []resourceapi.Device {
 			// taints.  Just clone the entire device before we
 			// motify it, it's unlikely that we do this more than once.
 			to[i] = *toDevice.DeepCopy()
-			to[i].Basic.Taints[j].TimeAdded = fromDevice.Basic.Taints[index].TimeAdded
+			to[i].Taints[j].TimeAdded = fromDevice.Taints[index].TimeAdded
 		}
 	}
 	return to
@@ -825,4 +972,12 @@ func deviceTaintEqual(a, b resourceapi.DeviceTaint) bool {
 	return a.Key == b.Key &&
 		a.Value == b.Value &&
 		a.Effect == b.Effect
+}
+
+func refIfNotZero[T comparable](t T) *T {
+	var zero T
+	if t == zero {
+		return nil
+	}
+	return &t
 }
