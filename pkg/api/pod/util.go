@@ -366,6 +366,28 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 	return false
 }
 
+// hasInvalidTopologySpreadConstrainMatchLabelKeys return true if spec.TopologySpreadConstraints have any entry with invalid MatchLabelKeys
+func hasInvalidTopologySpreadConstrainMatchLabelKeys(spec *api.PodSpec) bool {
+	for _, constraint := range spec.TopologySpreadConstraints {
+		errs := apivalidation.ValidateMatchLabelKeysAndMismatchLabelKeys(nil, constraint.MatchLabelKeys, nil, constraint.LabelSelector)
+		if len(errs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys return true if spec.TopologySpreadConstraints have any entry with invalid MatchLabelKeys against legacy validation
+func hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys(spec *api.PodSpec) bool {
+	for _, constraint := range spec.TopologySpreadConstraints {
+		errs := apivalidation.ValidateMatchLabelKeysInTopologySpread(nil, constraint.MatchLabelKeys, constraint.LabelSelector)
+		if len(errs) != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // hasNonLocalProjectedTokenPath return true if spec.Volumes have any entry with non-local projected token path
 func hasNonLocalProjectedTokenPath(spec *api.PodSpec) bool {
 	for _, volume := range spec.Volumes {
@@ -390,15 +412,19 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 	opts := apivalidation.PodValidationOptions{
 		AllowInvalidPodDeletionCost: !utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost),
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
-		AllowIndivisibleHugePagesValues:                   false,
-		AllowInvalidLabelValueInSelector:                  false,
-		AllowInvalidTopologySpreadConstraintLabelSelector: false,
-		AllowNamespacedSysctlsForHostNetAndHostIPC:        false,
-		AllowNonLocalProjectedTokenPath:                   false,
-		AllowPodLifecycleSleepActionZeroValue:             utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
-		PodLevelResourcesEnabled:                          utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
-		AllowInvalidLabelValueInRequiredNodeAffinity:      false,
-		AllowSidecarResizePolicy:                          utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		AllowIndivisibleHugePagesValues:                     false,
+		AllowInvalidLabelValueInSelector:                    false,
+		AllowInvalidTopologySpreadConstraintLabelSelector:   false,
+		AllowNamespacedSysctlsForHostNetAndHostIPC:          false,
+		AllowNonLocalProjectedTokenPath:                     false,
+		AllowPodLifecycleSleepActionZeroValue:               utilfeature.DefaultFeatureGate.Enabled(features.PodLifecycleSleepActionAllowZero),
+		PodLevelResourcesEnabled:                            utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		AllowInvalidLabelValueInRequiredNodeAffinity:        false,
+		AllowSidecarResizePolicy:                            utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling),
+		AllowMatchLabelKeysInPodTopologySpread:              utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
+		AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: utilfeature.DefaultFeatureGate.Enabled(features.MatchLabelKeysInPodTopologySpreadSelectorMerge),
+		OldPodViolatesMatchLabelKeysValidation:              false,
+		OldPodViolatesLegacyMatchLabelKeysValidation:        false,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -416,6 +442,15 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		opts.AllowInvalidLabelValueInRequiredNodeAffinity = hasInvalidLabelValueInRequiredNodeAffinity(oldPodSpec)
 		// if old spec has invalid labelSelector in topologySpreadConstraint, we must allow it
 		opts.AllowInvalidTopologySpreadConstraintLabelSelector = hasInvalidTopologySpreadConstraintLabelSelector(oldPodSpec)
+		if opts.AllowMatchLabelKeysInPodTopologySpread {
+			if opts.AllowMatchLabelKeysInPodTopologySpreadSelectorMerge {
+				// If old spec has invalid MatchLabelKeys, we must set true
+				opts.OldPodViolatesMatchLabelKeysValidation = hasInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
+			} else {
+				// If old spec has invalid MatchLabelKeys against legacy validation, we must set true
+				opts.OldPodViolatesLegacyMatchLabelKeysValidation = hasLegacyInvalidTopologySpreadConstrainMatchLabelKeys(oldPodSpec)
+			}
+		}
 		// if old spec has an invalid projected token volume path, we must allow it
 		opts.AllowNonLocalProjectedTokenPath = hasNonLocalProjectedTokenPath(oldPodSpec)
 

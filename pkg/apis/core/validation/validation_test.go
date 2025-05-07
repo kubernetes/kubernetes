@@ -23497,8 +23497,57 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
 		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
 	}, {
-		name: "key exists in both matchLabelKeys and labelSelector",
+		name: "key in MatchLabelKeys isn't correctly defined when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			LabelSelector:     &metav1.LabelSelector{},
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"/simple"},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("labelKey"),
+		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+		},
+	}, {
+		name: "key exists in both MatchLabelKeys and LabelSelector",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		// TODO: This expected message is not perfect, and will be fixed in #129900.
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
+	}, {
+		name: "key exists in both MatchLabelKeys and LabelSelector when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23515,10 +23564,14 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			},
 		}},
 		wantFieldErrors: field.ErrorList{
-			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("overlappingKeys"),
+			field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("duplicatedLabelKeys"),
+		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
 		},
 	}, {
-		name: "key in MatchLabelKeys is forbidden to be specified when labelSelector is not set",
+		name: "key in MatchLabelKeys is forbidden to be specified when LabelSelector is not set",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23528,8 +23581,27 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Forbidden(fieldPathMatchLabelKeys, ""),
 		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
 	}, {
-		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
+		name: "key in MatchLabelKeys is forbidden to be specified when LabelSelector is not set and AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+		}},
+		wantFieldErrors: field.ErrorList{
+			field.Forbidden(fieldPathMatchLabelKeys, ""),
+		},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+		},
+	}, {
+		name: "invalid MatchLabels set on LabelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23540,9 +23612,13 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 		wantFieldErrors: field.ErrorList{
 			field.Invalid(labelSelectorField.Child("matchLabels"), nil, "").WithOrigin("labelKey"),
 		},
-		opts: PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			AllowInvalidTopologySpreadConstraintLabelSelector:   false,
+		},
 	}, {
-		name: "invalid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
+		name: "invalid MatchLabels set on LabelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is true",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23551,9 +23627,13 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "foo"}},
 		}},
 		wantFieldErrors: nil,
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: true},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			AllowInvalidTopologySpreadConstraintLabelSelector:   true,
+		},
 	}, {
-		name: "valid matchLabels set on labelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
+		name: "valid MatchLabels set on LabelSelector when AllowInvalidTopologySpreadConstraintLabelSelector is false",
 		constraints: []core.TopologySpreadConstraint{{
 			MaxSkew:           1,
 			TopologyKey:       "k8s.io/zone",
@@ -23562,8 +23642,187 @@ func TestValidateTopologySpreadConstraints(t *testing.T) {
 			LabelSelector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "foo"}},
 		}},
 		wantFieldErrors: nil,
-		opts:            PodValidationOptions{AllowInvalidTopologySpreadConstraintLabelSelector: false},
-	}}
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			AllowInvalidTopologySpreadConstraintLabelSelector:   false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when OldPodViolatesMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		// TODO: This expected message is not perfect, and will be fixed in #129900.
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			OldPodViolatesMatchLabelKeysValidation:              false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when OldPodViolatesMatchLabelKeysValidation is true",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Child("matchLabelKeys").Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			OldPodViolatesMatchLabelKeysValidation:              true,
+		},
+	}, {
+		name: "valid MatchLabelKeys when OldPodViolatesMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: nil,
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+			OldPodViolatesMatchLabelKeysValidation:              false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false and OldPodViolatesLegacyMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{field.Invalid(fieldPathMatchLabelKeys.Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+			OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false and OldPodViolatesLegacyMatchLabelKeysValidation is true",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					// This one should be created from MatchLabelKeys.
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: nil,
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+			OldPodViolatesLegacyMatchLabelKeysValidation:        true,
+		},
+	}, {
+		name: "valid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is false and OldPodViolatesLegacyMatchLabelKeysValidation is false",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{},
+			},
+		}},
+		wantFieldErrors: nil,
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              true,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: false,
+			OldPodViolatesLegacyMatchLabelKeysValidation:        false,
+		},
+	}, {
+		name: "invalid MatchLabelKeys when AllowMatchLabelKeysInPodTopologySpread is false and AllowMatchLabelKeysInPodTopologySpreadSelectorMerge is true",
+		constraints: []core.TopologySpreadConstraint{{
+			MaxSkew:           1,
+			TopologyKey:       "k8s.io/zone",
+			WhenUnsatisfiable: core.DoNotSchedule,
+			MatchLabelKeys:    []string{"foo"},
+			LabelSelector: &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value1"},
+					},
+					{
+						Key:      "foo",
+						Operator: metav1.LabelSelectorOpNotIn,
+						Values:   []string{"value2", "value3"},
+					},
+				},
+			},
+		}},
+		wantFieldErrors: field.ErrorList{field.Invalid(subFldPath0.Child("matchLabelKeys").Index(0), nil, "").WithOrigin("duplicatedLabelKeys")},
+		opts: PodValidationOptions{
+			AllowMatchLabelKeysInPodTopologySpread:              false,
+			AllowMatchLabelKeysInPodTopologySpreadSelectorMerge: true,
+		},
+	},
+	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

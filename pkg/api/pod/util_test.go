@@ -2721,6 +2721,140 @@ func TestValidateTopologySpreadConstraintLabelSelectorOption(t *testing.T) {
 	}
 }
 
+func TestOldPodViolatesMatchLabelKeysValidationOption(t *testing.T) {
+	testCases := []struct {
+		name                               string
+		oldPodSpec                         *api.PodSpec
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
+		wantOption                         bool
+	}{
+		{
+			name:                               "Create",
+			oldPodSpec:                         &api.PodSpec{},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			wantOption:                         false,
+		},
+		{
+			name: "UpdateInvalidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value2", "value3"},
+							},
+						},
+					},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			wantOption:                         true,
+		},
+		{
+			name: "UpdateValidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			wantOption:                         false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.OldPodViolatesMatchLabelKeysValidation {
+				t.Errorf("Got OldPodViolatesMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesMatchLabelKeysValidation, tc.wantOption)
+			}
+		})
+	}
+}
+
+func TestOldPodViolatesLegacyMatchLabelKeysValidationOption(t *testing.T) {
+	testCases := []struct {
+		name                               string
+		oldPodSpec                         *api.PodSpec
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
+		wantOption                         bool
+	}{
+		{
+			name:                               "Create",
+			oldPodSpec:                         &api.PodSpec{},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			wantOption:                         false,
+		},
+		{
+			name: "UpdateInvalidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{"value1"},
+							},
+						},
+					},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			wantOption:                         true,
+		},
+		{
+			name: "UpdateValidMatchLabelKeys",
+			oldPodSpec: &api.PodSpec{
+				TopologySpreadConstraints: []api.TopologySpreadConstraint{{
+					MatchLabelKeys: []string{"foo"},
+					LabelSelector:  &metav1.LabelSelector{},
+				}},
+			},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			wantOption:                         false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+			gotOptions := GetValidationOptionsFromPodSpecAndMeta(&api.PodSpec{}, tc.oldPodSpec, nil, nil)
+			if tc.wantOption != gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation {
+				t.Errorf("Got OldPodViolatesLegacyMatchLabelKeysValidation=%t, want %t", gotOptions.OldPodViolatesLegacyMatchLabelKeysValidation, tc.wantOption)
+			}
+		})
+	}
+}
 func TestValidateAllowNonLocalProjectedTokenPathOption(t *testing.T) {
 	testCases := []struct {
 		name       string
