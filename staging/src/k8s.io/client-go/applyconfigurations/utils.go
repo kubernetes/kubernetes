@@ -1622,6 +1622,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.CounterApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("CounterSet"):
 		return &resourcev1alpha3.CounterSetApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("CounterSetMixin"):
+		return &resourcev1alpha3.CounterSetMixinApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("Device"):
 		return &resourcev1alpha3.DeviceApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1646,6 +1648,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceConstraintApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
 		return &resourcev1alpha3.DeviceCounterConsumptionApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceCounterConsumptionMixin"):
+		return &resourcev1alpha3.DeviceCounterConsumptionMixinApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("DeviceMixin"):
+		return &resourcev1alpha3.DeviceMixinApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &resourcev1alpha3.DeviceRequestApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
@@ -1684,6 +1690,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.ResourcePoolApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &resourcev1alpha3.ResourceSliceApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceMixins"):
+		return &resourcev1alpha3.ResourceSliceMixinsApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &resourcev1alpha3.ResourceSliceSpecApplyConfiguration{}
 
@@ -1700,6 +1708,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.CounterApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1beta1.CounterSetApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("CounterSetMixin"):
+		return &applyconfigurationsresourcev1beta1.CounterSetMixinApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1beta1.DeviceApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1726,6 +1736,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceConstraintApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
 		return &applyconfigurationsresourcev1beta1.DeviceCounterConsumptionApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceCounterConsumptionMixin"):
+		return &applyconfigurationsresourcev1beta1.DeviceCounterConsumptionMixinApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceMixin"):
+		return &applyconfigurationsresourcev1beta1.DeviceMixinApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &applyconfigurationsresourcev1beta1.DeviceRequestApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
@@ -1758,6 +1772,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.ResourcePoolApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &applyconfigurationsresourcev1beta1.ResourceSliceApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSliceMixins"):
+		return &applyconfigurationsresourcev1beta1.ResourceSliceMixinsApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1beta1.ResourceSliceSpecApplyConfiguration{}
 
@@ -1772,6 +1788,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.CounterApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterSet"):
 		return &applyconfigurationsresourcev1beta2.CounterSetApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("CounterSetMixin"):
+		return &applyconfigurationsresourcev1beta2.CounterSetMixinApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("Device"):
 		return &applyconfigurationsresourcev1beta2.DeviceApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceAllocationConfiguration"):
@@ -1798,6 +1816,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.DeviceConstraintApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceCounterConsumption"):
 		return &applyconfigurationsresourcev1beta2.DeviceCounterConsumptionApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceCounterConsumptionMixin"):
+		return &applyconfigurationsresourcev1beta2.DeviceCounterConsumptionMixinApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceMixin"):
+		return &applyconfigurationsresourcev1beta2.DeviceMixinApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceRequest"):
 		return &applyconfigurationsresourcev1beta2.DeviceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("DeviceRequestAllocationResult"):
@@ -1832,6 +1854,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ResourcePoolApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSlice"):
 		return &applyconfigurationsresourcev1beta2.ResourceSliceApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSliceMixins"):
+		return &applyconfigurationsresourcev1beta2.ResourceSliceMixinsApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceSliceSpec"):
 		return &applyconfigurationsresourcev1beta2.ResourceSliceSpecApplyConfiguration{}
 

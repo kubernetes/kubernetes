@@ -1088,6 +1088,21 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 			continue
 		}
 		counterShared := make(map[string]draapi.Counter, len(counterSet.Counters))
+		// Handle mixins first since any counters on the counter set should override mixins.
+		for _, mixinRef := range counterSet.Includes {
+			index := slices.IndexFunc(slice.Spec.Mixins.CounterSet, func(cs draapi.CounterSetMixin) bool {
+				return cs.Name.String() == mixinRef
+			})
+			if index > 0 {
+				// API validation logic makes sure that all references should resolve.
+				continue
+			}
+			mixin := slice.Spec.Mixins.CounterSet[index]
+			for name, cap := range mixin.Counters {
+				counterShared[name] = cap
+			}
+		}
+		// Handle counters defined directly on the counter set.
 		for name, cap := range counterSet.Counters {
 			counterShared[name] = cap
 		}
@@ -1104,6 +1119,8 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 		if !alloc.allocatedDevices.Has(deviceID) && !alloc.allocatingDevices[deviceID] {
 			continue
 		}
+		consumedCounters := make(map[string]draapi.Counter)
+
 		for _, consumedCounter := range device.Basic.ConsumesCounters {
 			counterShared := availableCounters[consumedCounter.CounterSet]
 			for name, cap := range consumedCounter.Counters {
