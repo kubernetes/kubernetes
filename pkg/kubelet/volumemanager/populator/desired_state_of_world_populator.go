@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -528,15 +529,21 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
 	}
 
-	// Pods that uses a PVC that is being deleted must not be started.
+	// Pods that uses a PVC that is being deleted and not protected by
+	// kubernetes.io/pvc-protection must not be started.
 	//
-	// In case an old kubelet is running without this check or some kubelets
-	// have this feature disabled, the worst that can happen is that such
-	// pod is scheduled. This was the default behavior in 1.8 and earlier
-	// and users should not be that surprised.
+	// 1) In case an old kubelet is running without this check, the worst
+	// that can happen is that such pod is scheduled. This was the default
+	// behavior in 1.8 and earlier and users should not be that surprised.
 	// It should happen only in very rare case when scheduler schedules
 	// a pod and user deletes a PVC that's used by it at the same time.
-	if pvc.ObjectMeta.DeletionTimestamp != nil {
+	//
+	// 2) Adding a check for kubernetes.io/pvc-protection here to prevent
+	// the existing running pods from being affected during the rebuild of
+	// the desired state of the world cache when the kubelet is restarted.
+	// It is safe for kubelet to add this check here because the PVC will
+	// be stuck in Terminating state until the pod is deleted.
+	if pvc.ObjectMeta.DeletionTimestamp != nil && !slices.Contains(pvc.Finalizers, util.PVCProtectionFinalizer) {
 		return nil, errors.New("PVC is being deleted")
 	}
 
