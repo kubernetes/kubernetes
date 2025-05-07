@@ -129,6 +129,26 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, hostn
 	return proxier
 }
 
+func getHcnMock(networkType string) *fakehcn.HcnMock {
+	var remoteSubnets []*remoteSubnetInfo
+	rs := &remoteSubnetInfo{
+		destinationPrefix: destinationPrefix,
+		isolationID:       4096,
+		providerAddress:   providerAddress,
+		drMacAddress:      macAddress,
+	}
+	remoteSubnets = append(remoteSubnets, rs)
+	hnsNetworkInfo := &hnsNetworkInfo{
+		id:            strings.ToUpper(guid),
+		name:          testNetwork,
+		networkType:   networkType,
+		remoteSubnets: remoteSubnets,
+	}
+	hnsNetwork := newHnsNetwork(hnsNetworkInfo)
+	hcnMock := fakehcn.NewHcnMock(hnsNetwork)
+	return hcnMock
+}
+
 func TestCreateServiceVip(t *testing.T) {
 	syncPeriod := 30 * time.Second
 	proxier := NewFakeProxier(syncPeriod, syncPeriod, "testhost", netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_OVERLAY)
