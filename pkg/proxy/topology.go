@@ -41,12 +41,16 @@ import (
 // "Usable endpoints" means Ready endpoints by default, but will fall back to
 // Serving-Terminating endpoints (independently for Cluster and Local) if no Ready
 // endpoints are available.
-func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName string, nodeLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
+//
+// Note: NodeTopologyConfig.handleNodeEvent (pkg/proxy/config) filters topology labels
+// before notifying proxiers. If you modify the logic over here to  watch other endpoint
+// types or labels, ensure the filtering logic in NodeTopologyConfig is updated accordingly.
+func CategorizeEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeName string, topologyLabels map[string]string) (clusterEndpoints, localEndpoints, allReachableEndpoints []Endpoint, hasAnyEndpoints bool) {
 	var topologyMode string
 	var useServingTerminatingEndpoints bool
 
 	if svcInfo.UsesClusterEndpoints() {
-		zone := nodeLabels[v1.LabelTopologyZone]
+		zone := topologyLabels[v1.LabelTopologyZone]
 		topologyMode = topologyModeFromHints(svcInfo, endpoints, nodeName, zone)
 		clusterEndpoints = filterEndpoints(endpoints, func(ep Endpoint) bool {
 			if !ep.IsReady() {
