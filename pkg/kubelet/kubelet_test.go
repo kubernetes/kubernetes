@@ -3187,7 +3187,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 
 				now := kubelet.clock.Now()
 				// Put the container in backoff so we can confirm backoff is reset.
-				backoffKey := kuberuntime.GetStableKey(originalPod, originalCtr)
+				backoffKey := kuberuntime.GetBackoffKey(originalPod, originalCtr)
 				kubelet.crashLoopBackOff.Next(backoffKey, now)
 
 				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)

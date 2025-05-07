@@ -3005,14 +3005,14 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 
 		for i, container := range pod.Spec.Containers {
 			if !apiequality.Semantic.DeepEqual(container.Resources, podFromAllocation.Spec.Containers[i].Resources) {
-				key := kuberuntime.GetStableKey(pod, &container)
+				key := kuberuntime.GetBackoffKey(pod, &container)
 				kl.crashLoopBackOff.Reset(key)
 			}
 		}
 		for i, container := range pod.Spec.InitContainers {
 			if podutil.IsRestartableInitContainer(&container) {
 				if !apiequality.Semantic.DeepEqual(container.Resources, podFromAllocation.Spec.InitContainers[i].Resources) {
-					key := kuberuntime.GetStableKey(pod, &container)
+					key := kuberuntime.GetBackoffKey(pod, &container)
 					kl.crashLoopBackOff.Reset(key)
 				}
 			}

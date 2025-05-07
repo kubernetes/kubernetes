@@ -175,10 +175,10 @@ func isInitContainerFailed(status *kubecontainer.Status) bool {
 	return false
 }
 
-// GetStableKey generates a key (string) to uniquely identify a
+// GetBackoffKey generates a key (string) to uniquely identify a
 // (pod, container) tuple. The key should include the content of the
 // container, so that any change to the container generates a new key.
-func GetStableKey(pod *v1.Pod, container *v1.Container) string {
+func GetBackoffKey(pod *v1.Pod, container *v1.Container) string {
 	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
 }

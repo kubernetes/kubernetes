@@ -122,11 +122,11 @@ func TestStableKey(t *testing.T) {
 			Containers: []v1.Container{*container},
 		},
 	}
-	oldKey := GetStableKey(pod, container)
+	oldKey := GetBackoffKey(pod, container)
 
 	// Updating the container image should change the key.
 	container.Image = "foo/image:v2"
-	newKey := GetStableKey(pod, container)
+	newKey := GetBackoffKey(pod, container)
 	assert.NotEqual(t, oldKey, newKey)
 }
 
