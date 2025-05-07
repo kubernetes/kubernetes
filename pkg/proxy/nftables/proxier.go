@@ -151,10 +151,10 @@ type Proxier struct {
 	endpointsChanges *proxy.EndpointsChangeTracker
 	serviceChanges   *proxy.ServiceChangeTracker
 
-	mu           sync.Mutex // protects the following fields
-	svcPortMap   proxy.ServicePortMap
-	endpointsMap proxy.EndpointsMap
-	nodeLabels   map[string]string
+	mu             sync.Mutex // protects the following fields
+	svcPortMap     proxy.ServicePortMap
+	endpointsMap   proxy.EndpointsMap
+	topologyLabels map[string]string
 	// endpointSlicesSynced, and servicesSynced are set to true
 	// when corresponding objects are synced after startup. This is used to avoid
 	// updating nftables with some partial data after kube-proxy restart.
@@ -848,15 +848,14 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 		return
 	}
 
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+	// we are only interested in node topology labels.
+	topologyLabels := proxy.ExtractTopologyLabels(node.Labels)
+	if reflect.DeepEqual(proxier.topologyLabels, topologyLabels) {
 		return
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
+	proxier.topologyLabels = topologyLabels
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
 	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
@@ -873,15 +872,14 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 		return
 	}
 
-	if reflect.DeepEqual(proxier.nodeLabels, node.Labels) {
+	// we are only interested in node topology labels.
+	topologyLabels := proxy.ExtractTopologyLabels(node.Labels)
+	if reflect.DeepEqual(proxier.topologyLabels, topologyLabels) {
 		return
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = map[string]string{}
-	for k, v := range node.Labels {
-		proxier.nodeLabels[k] = v
-	}
+	proxier.topologyLabels = topologyLabels
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
 	proxier.logger.V(4).Info("Updated proxier node labels", "labels", node.Labels)
@@ -899,7 +897,7 @@ func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = nil
+	proxier.topologyLabels = nil
 	proxier.needFullSync = true
 	proxier.mu.Unlock()
 
@@ -1310,7 +1308,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// from this node, given the service's traffic policies. hasEndpoints is true
 		// if the service has any usable endpoints on any node, not just this one.
 		allEndpoints := proxier.endpointsMap[svcName]
-		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
 
 		// skipServiceUpdate is used for all service-related chains and their elements.
 		// If no changes were done to the service or its endpoints, these objects may be skipped.

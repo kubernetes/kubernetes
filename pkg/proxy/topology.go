@@ -229,3 +229,13 @@ func filterEndpoints(endpoints []Endpoint, predicate func(Endpoint) bool) []Endp
 
 	return filteredEndpoints
 }
+
+// ExtractTopologyLabels consumes node labels and extract topology related labels
+// that we are currently using for proxying.
+func ExtractTopologyLabels(nodeLabels map[string]string) map[string]string {
+	topologyLabels := make(map[string]string)
+	if zone, ok := nodeLabels[v1.LabelTopologyZone]; ok {
+		topologyLabels[v1.LabelTopologyZone] = zone
+	}
+	return topologyLabels
+}
