@@ -133,7 +133,7 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 				Pod: st.MakePod().Name("pod0").Obj(),
 			},
 			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
-			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		"pod1": {
@@ -141,22 +141,22 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 				Pod: st.MakePod().Name("pod1").Obj(),
 			},
 			Timestamp:            fakeClock.Now().Add(time.Second),
-			Attempts:             1,
+			UnschedulableCount:   1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
 		"pod2": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Obj(),
 			},
-			Timestamp: fakeClock.Now().Add(-2 * time.Second),
-			Attempts:  1,
+			Timestamp:          fakeClock.Now().Add(-2 * time.Second),
+			UnschedulableCount: 1,
 		},
 		"pod3": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Obj(),
 			},
-			Timestamp: fakeClock.Now().Add(time.Second),
-			Attempts:  1,
+			Timestamp:          fakeClock.Now().Add(time.Second),
+			UnschedulableCount: 1,
 		},
 	}
 	tests := []struct {

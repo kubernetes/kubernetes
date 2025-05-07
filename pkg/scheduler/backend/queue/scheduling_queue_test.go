@@ -1855,7 +1855,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 }
 
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.T) {
-	now := time.Now()
+	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	p := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
 	tests := []struct {
 		name    string
@@ -1881,10 +1881,13 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			expectedQ: backoffQ,
 		},
 		{
-			name:      "Queue queues pod to activeQ if Pod is not backing off",
-			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
-			hint:      queueHintReturnQueue,
-			duration:  DefaultPodInitialBackoffDuration, // backoff is finished
+			name:    "Queue queues pod to activeQ if Pod is not backing off",
+			podInfo: &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
+			hint:    queueHintReturnQueue,
+			// The pod is assumed to failed the scheduling cycle once, which would get DefaultPodInitialBackoffDuration as the penalty.
+			// To finish the backoff, waiting for DefaultPodInitialBackoffDuration isn't enough, need to wait for +1
+			// because the pod is determined to be still backing off if `{backoff expiration time} == trancate({current time})`
+			duration:  DefaultPodInitialBackoffDuration + time.Second,
 			expectedQ: activeQ,
 		},
 		{

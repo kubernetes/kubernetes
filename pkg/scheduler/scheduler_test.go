@@ -292,7 +292,7 @@ func TestFailureHandler(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(*recorder), internalqueue.WithPodMaxBackoffDuration(0), internalqueue.WithPodInitialBackoffDuration(0))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())), internalqueue.WithMetricsRecorder(*recorder))
 			schedulerCache := internalcache.New(ctx, 30*time.Second)
 
 			queue.Add(logger, testPod)
@@ -320,11 +320,11 @@ func TestFailureHandler(t *testing.T) {
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
-				head, e := queue.Pop(logger)
-				if e != nil {
-					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
+				pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace)
+				if !ok {
+					t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
 				}
-				got = head.Pod
+				got = pInfo.Pod
 			} else {
 				got = getPodFromPriorityQueue(queue, testPod)
 			}
