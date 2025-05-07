@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -35,13 +36,14 @@ import (
 func Test_readCredentialProviderConfigFile(t *testing.T) {
 	testcases := []struct {
 		name       string
-		configData string
+		configData []string // Array to support multiple files for directory tests
+		isDir      bool     // Whether to create a directory with multiple files
 		config     *kubeletconfig.CredentialProviderConfig
 		expectErr  string
 	}{
 		{
 			name: "config with 1 plugin and 1 image matcher",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
@@ -54,7 +56,7 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config: &kubeletconfig.CredentialProviderConfig{
 				Providers: []kubeletconfig.CredentialProvider{
 					{
@@ -75,7 +77,7 @@ providers:
 		},
 		{
 			name: "config with 1 plugin and a wildcard image match",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
@@ -88,7 +90,7 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config: &kubeletconfig.CredentialProviderConfig{
 				Providers: []kubeletconfig.CredentialProvider{
 					{
@@ -109,7 +111,7 @@ providers:
 		},
 		{
 			name: "config with 1 plugin and multiple image matchers",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
@@ -123,7 +125,7 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config: &kubeletconfig.CredentialProviderConfig{
 				Providers: []kubeletconfig.CredentialProvider{
 					{
@@ -144,7 +146,7 @@ providers:
 		},
 		{
 			name: "config with multiple providers",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
@@ -162,7 +164,7 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 
 			config: &kubeletconfig.CredentialProviderConfig{
 				Providers: []kubeletconfig.CredentialProvider{
@@ -190,7 +192,7 @@ providers:
 		},
 		{
 			name: "v1beta1 config with multiple providers",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1beta1
 providers:
@@ -208,7 +210,7 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 
 			config: &kubeletconfig.CredentialProviderConfig{
 				Providers: []kubeletconfig.CredentialProvider{
@@ -236,7 +238,7 @@ providers:
 		},
 		{
 			name: "v1 config with multiple providers",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
@@ -254,7 +256,7 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 
 			config: &kubeletconfig.CredentialProviderConfig{
 				Providers: []kubeletconfig.CredentialProvider{
@@ -282,7 +284,7 @@ providers:
 		},
 		{
 			name: "config with wrong Kind",
-			configData: `---
+			configData: []string{`---
 kind: WrongKind
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
@@ -295,13 +297,13 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config:    nil,
 			expectErr: `no kind "WrongKind" is registered for version "kubelet.config.k8s.io/v1alpha1"`,
 		},
 		{
 			name: "config with wrong apiversion",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: foobar/v1alpha1
 providers:
@@ -314,13 +316,13 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config:    nil,
 			expectErr: `no kind "CredentialProviderConfig" is registered for version "foobar/v1alpha1`,
 		},
 		{
 			name: "config with invalid typo",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1
 providers:
@@ -334,13 +336,13 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config:    nil,
 			expectErr: `strict decoding error: unknown field "providers[0].unknownField"`,
 		},
 		{
 			name: "v1alpha1 config with token attributes should fail",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1alpha1
 providers:
@@ -355,13 +357,13 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config:    nil,
 			expectErr: `strict decoding error: unknown field "providers[0].tokenAttributes"`,
 		},
 		{
 			name: "v1beta1 config with token attributes should fail",
-			configData: `---
+			configData: []string{`---
 kind: CredentialProviderConfig
 apiVersion: kubelet.config.k8s.io/v1beta1
 providers:
@@ -376,25 +378,166 @@ providers:
     - --v=5
     env:
     - name: FOO
-      value: BAR`,
+      value: BAR`},
 			config:    nil,
 			expectErr: `strict decoding error: unknown field "providers[0].tokenAttributes"`,
+		},
+		{
+			name: "directory with multiple config files in lexicographic order",
+			configData: []string{
+				`---
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: test1
+    matchImages:
+    - "registry.io/one"
+    defaultCacheDuration: 10m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1`,
+				`---
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: test2
+    matchImages:
+    - "registry.io/two"
+    defaultCacheDuration: 5m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1`,
+			},
+			isDir: true,
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "test1",
+						MatchImages:          []string{"registry.io/one"},
+						DefaultCacheDuration: &metav1.Duration{Duration: 10 * time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+					},
+					{
+						Name:                 "test2",
+						MatchImages:          []string{"registry.io/two"},
+						DefaultCacheDuration: &metav1.Duration{Duration: 5 * time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+					},
+				},
+			},
+		},
+		{
+			name: "directory with mixed API versions in config files",
+			configData: []string{
+				`---
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1beta1
+providers:
+  - name: test-beta
+    matchImages:
+    - "beta.registry.io/*"
+    defaultCacheDuration: 15m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1beta1`,
+				`---
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: test-v1
+    matchImages:
+    - "v1.registry.io/*"
+    defaultCacheDuration: 20m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1`,
+			},
+			isDir: true,
+			config: &kubeletconfig.CredentialProviderConfig{
+				Providers: []kubeletconfig.CredentialProvider{
+					{
+						Name:                 "test-beta",
+						MatchImages:          []string{"beta.registry.io/*"},
+						DefaultCacheDuration: &metav1.Duration{Duration: 15 * time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1beta1",
+					},
+					{
+						Name:                 "test-v1",
+						MatchImages:          []string{"v1.registry.io/*"},
+						DefaultCacheDuration: &metav1.Duration{Duration: 20 * time.Minute},
+						APIVersion:           "credentialprovider.kubelet.k8s.io/v1",
+					},
+				},
+			},
+		},
+		{
+			name: "directory with one invalid config file",
+			configData: []string{
+				`---
+kind: CredentialProviderConfig
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: test1
+    matchImages:
+    - "registry.io/one"
+    defaultCacheDuration: 10m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1`,
+				`---
+kind: WrongKind
+apiVersion: kubelet.config.k8s.io/v1
+providers:
+  - name: test2
+    matchImages:
+    - "registry.io/two"
+    defaultCacheDuration: 5m
+    apiVersion: credentialprovider.kubelet.k8s.io/v1`,
+			},
+			isDir:     true,
+			config:    nil,
+			expectErr: `no kind "WrongKind" is registered for version "kubelet.config.k8s.io/v1"`,
 		},
 	}
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			file, err := os.CreateTemp("", "config.yaml")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer utiltesting.CloseAndRemove(t, file)
+			var configPath string
+			var err error
 
-			if _, err = file.WriteString(testcase.configData); err != nil {
-				t.Fatal(err)
+			if testcase.isDir {
+				// Create a temporary directory for multiple config files
+				tempDir, err := os.MkdirTemp("", "config-dir")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer os.RemoveAll(tempDir)
+
+				for i, configData := range testcase.configData {
+					fileName := fmt.Sprintf("config-%03d.json", i)
+					filePath := fmt.Sprintf("%s/%s", tempDir, fileName)
+
+					file, err := os.Create(filePath)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					if _, err = file.WriteString(configData); err != nil {
+						file.Close()
+						t.Fatal(err)
+					}
+					file.Close()
+				}
+
+				configPath = tempDir
+			} else {
+				// Create a single temporary file
+				file, err := os.CreateTemp("", "config.yaml")
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer utiltesting.CloseAndRemove(t, file)
+
+				if len(testcase.configData) > 0 {
+					if _, err = file.WriteString(testcase.configData[0]); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				configPath = file.Name()
 			}
 
-			authConfig, err := readCredentialProviderConfigFile(file.Name())
+			authConfig, err := readCredentialProviderConfig(configPath)
 			if err != nil {
 				if len(testcase.expectErr) == 0 {
 					t.Fatal(err)
