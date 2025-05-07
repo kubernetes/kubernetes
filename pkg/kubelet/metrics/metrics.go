@@ -1028,6 +1028,16 @@ var (
 		[]string{"driver_name", "method_name", "grpc_status_code"},
 	)
 
+	DRAResourceClaimsInUse = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      DRASubsystem,
+			Name:           "resource_claims_in_use",
+			Help:           "The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"driver_name"},
+	)
+
 	// AdmissionRejectionsTotal tracks the number of failed admission times, currently, just record it for pod additions
 	AdmissionRejectionsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -1164,8 +1174,11 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(CgroupVersion)
 
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-			legacyregistry.MustRegister(DRAOperationsDuration)
-			legacyregistry.MustRegister(DRAGRPCOperationsDuration)
+			legacyregistry.MustRegister(
+				DRAOperationsDuration,
+				DRAGRPCOperationsDuration,
+				DRAResourceClaimsInUse,
+			)
 		}
 
 		legacyregistry.MustRegister(AdmissionRejectionsTotal)

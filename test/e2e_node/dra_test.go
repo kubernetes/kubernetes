@@ -36,7 +36,9 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
+	"github.com/prometheus/common/model"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -382,6 +384,43 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Eventually(kubeletPlugin2.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdriver.NodeUnprepareResourcesSucceeded)
 		})
 
+		ginkgo.It("must provide metrics", func(ctx context.Context) {
+			kubeletPlugin1, kubeletPlugin2 := start(ctx)
+
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "pausepod", false, []string{kubeletPlugin1Name, kubeletPlugin2Name})
+
+			ginkgo.By("wait for pod to succeed")
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err)
+			gomega.Expect(kubeletPlugin1.GetGRPCCalls()).Should(testdriver.NodePrepareResourcesSucceeded, "Plugin 1 should have prepared resources.")
+			gomega.Expect(kubeletPlugin2.GetGRPCCalls()).Should(testdriver.NodePrepareResourcesSucceeded, "Plugin 2 should have prepared resources.")
+			driverName := func(element any) string {
+				el := element.(*model.Sample)
+				return string(el.Metric[model.LabelName("driver_name")])
+			}
+
+			gomega.Expect(getKubeletMetrics(ctx)).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"dra_resource_claims_in_use": gstruct.MatchAllElements(driverName, gstruct.Elements{
+					"":                 timelessSample(1),
+					kubeletPlugin1Name: timelessSample(1),
+					kubeletPlugin2Name: timelessSample(1),
+				}),
+			}), "metrics while pod is running")
+
+			ginkgo.By("delete pod")
+			err = f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			err = e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete)
+			framework.ExpectNoError(err)
+			gomega.Expect(kubeletPlugin1.GetGRPCCalls()).Should(testdriver.NodeUnprepareResourcesSucceeded, "Plugin 2 should have unprepared resources.")
+			gomega.Expect(kubeletPlugin2.GetGRPCCalls()).Should(testdriver.NodeUnprepareResourcesSucceeded, "Plugin 2 should have unprepared resources.")
+			gomega.Expect(getKubeletMetrics(ctx)).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
+				"dra_resource_claims_in_use": gstruct.MatchAllElements(driverName, gstruct.Elements{
+					"": timelessSample(0),
+				}),
+			}), "metrics while pod is running")
+		})
+
 		ginkgo.It("must run pod if NodePrepareResources fails for one plugin and then succeeds", func(ctx context.Context) {
 			_, kubeletPlugin2 := start(ctx)
 
@@ -655,6 +694,10 @@ func createTestObjects(ctx context.Context, clientSet kubernetes.Interface, node
 			},
 			RestartPolicy: v1.RestartPolicyNever,
 		},
+	}
+	if podName == "pausepod" {
+		// Pod must be deleted to terminate.
+		pod.Spec.Containers[0].Command[2] = e2epod.InfiniteSleepCommand
 	}
 	createdPod, err := clientSet.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
