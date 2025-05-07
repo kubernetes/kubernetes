@@ -579,9 +579,7 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 		p.metricsRecorder.ObservePluginDurationAsync(preEnqueue, pl.Name(), s.Code().String(), p.clock.Since(startTime).Seconds())
 	}
 	if s.IsSuccess() {
-		// This plugin passed, remove it from the unschedulable plugins.
 		// No need to change GatingPlugin; it's overwritten by the next PreEnqueue plugin if they gate this pod, or it's overwritten with an empty string if all PreEnqueue plugins pass.
-		pInfo.UnschedulablePlugins.Delete(pl.Name())
 		return s
 	}
 	pInfo.UnschedulablePlugins.Insert(pl.Name())
