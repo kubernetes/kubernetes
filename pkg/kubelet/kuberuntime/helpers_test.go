@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -107,27 +108,83 @@ func TestIsInitContainerFailed(t *testing.T) {
 	}
 }
 
-func TestStableKey(t *testing.T) {
-	container := &v1.Container{
-		Name:  "test_container",
-		Image: "foo/image:v1",
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test_pod",
-			Namespace: "test_pod_namespace",
-			UID:       "test_pod_uid",
+func TestGetBackoffKey(t *testing.T) {
+	testSpecs := map[string]v1.PodSpec{
+		"empty resources": {
+			Containers: []v1.Container{{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+			}},
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{*container},
+		"with resources": {
+			Containers: []v1.Container{{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			}},
 		},
 	}
-	oldKey := GetBackoffKey(pod, container)
 
-	// Updating the container image should change the key.
-	container.Image = "foo/image:v2"
-	newKey := GetBackoffKey(pod, container)
-	assert.NotEqual(t, oldKey, newKey)
+	for name, spec := range testSpecs {
+		t.Run(name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test_pod",
+					Namespace: "test_pod_namespace",
+					UID:       "test_pod_uid",
+				},
+				Spec: spec,
+			}
+			secondContainer := v1.Container{
+				Name:  "second_container",
+				Image: "registry.k8s.io/pause",
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, secondContainer)
+			originalKey := GetBackoffKey(pod, &pod.Spec.Containers[0])
+
+			podCopy := pod.DeepCopy()
+			podCopy.Spec.ActiveDeadlineSeconds = int64Ptr(1)
+			assert.Equal(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Unrelated change should not change the key")
+
+			podCopy = pod.DeepCopy()
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[1]),
+				"Different container change should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Name = "other-pod"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Different pod name should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Namespace = "other-namespace"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Different pod namespace should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Spec.Containers[0].Image = "foo/image:v2"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the container image should change the key")
+
+			podCopy = pod.DeepCopy()
+			c := &podCopy.Spec.Containers[0]
+			if c.Resources.Requests == nil {
+				c.Resources.Requests = v1.ResourceList{}
+			}
+			c.Resources.Requests[v1.ResourceCPU] = resource.MustParse("200m")
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the resources should change the key")
+		})
+	}
 }
 
 func TestToKubeContainer(t *testing.T) {

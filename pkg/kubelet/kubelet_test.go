@@ -2917,7 +2917,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 		expectedAllocatedReqs v1.ResourceList
 		expectedAllocatedLims v1.ResourceList
 		expectedResize        []*v1.PodCondition
-		expectBackoffReset    bool
 		annotations           map[string]string
 	}{
 		{
@@ -2925,7 +2924,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem500M},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -2939,7 +2937,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem500M},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -2953,7 +2950,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu500m, v1.ResourceMemory: mem1500M},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -3064,7 +3060,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu2m},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1000m},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -3078,7 +3073,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu2m},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu2m},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -3095,7 +3089,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			newLimits:             v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m")},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("20m")},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -3112,7 +3105,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 			newLimits:             v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
 			expectedAllocatedLims: v1.ResourceList{v1.ResourceCPU: resource.MustParse("10m")},
-			expectBackoffReset:    true,
 
 			expectedResize: []*v1.PodCondition{
 				{
@@ -3185,11 +3177,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					setContainerStatus(podStatus, &c, i+len(originalPod.Spec.InitContainers))
 				}
 
-				now := kubelet.clock.Now()
-				// Put the container in backoff so we can confirm backoff is reset.
-				backoffKey := kuberuntime.GetBackoffKey(originalPod, originalCtr)
-				kubelet.crashLoopBackOff.Next(backoffKey, now)
-
 				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
 				require.NoError(t, err)
 
@@ -3218,13 +3205,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					resizeStatus[i].Message = tt.expectedResize[i].Message
 				}
 				assert.Equal(t, tt.expectedResize, resizeStatus)
-
-				isInBackoff := kubelet.crashLoopBackOff.IsInBackOffSince(backoffKey, now)
-				if tt.expectBackoffReset {
-					assert.False(t, isInBackoff, "container backoff should be reset")
-				} else {
-					assert.True(t, isInBackoff, "container backoff should not be reset")
-				}
 			})
 		}
 	}

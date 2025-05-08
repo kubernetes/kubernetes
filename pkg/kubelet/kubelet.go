@@ -51,7 +51,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -3003,20 +3002,6 @@ func (kl *Kubelet) handlePodResourcesResize(pod *v1.Pod, podStatus *kubecontaine
 		// added back as needed in the defer block, but this prevents old errors from being preserved.
 		kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
 
-		for i, container := range pod.Spec.Containers {
-			if !apiequality.Semantic.DeepEqual(container.Resources, podFromAllocation.Spec.Containers[i].Resources) {
-				key := kuberuntime.GetBackoffKey(pod, &container)
-				kl.crashLoopBackOff.Reset(key)
-			}
-		}
-		for i, container := range pod.Spec.InitContainers {
-			if podutil.IsRestartableInitContainer(&container) {
-				if !apiequality.Semantic.DeepEqual(container.Resources, podFromAllocation.Spec.InitContainers[i].Resources) {
-					key := kuberuntime.GetBackoffKey(pod, &container)
-					kl.crashLoopBackOff.Reset(key)
-				}
-			}
-		}
 		return pod, nil
 	}
 

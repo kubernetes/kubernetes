@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -175,12 +176,23 @@ func isInitContainerFailed(status *kubecontainer.Status) bool {
 	return false
 }
 
-// GetBackoffKey generates a key (string) to uniquely identify a
-// (pod, container) tuple. The key should include the content of the
-// container, so that any change to the container generates a new key.
+// GetBackoffKey generates a key (string) to uniquely identify a (pod, container) tuple for tracking
+// container backoff. The key should include any content of the container that is tied to the
+// backoff, so that any change generates a new key.
 func GetBackoffKey(pod *v1.Pod, container *v1.Container) string {
-	hash := strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	return fmt.Sprintf("%s_%s_%s_%s_%s", pod.Name, pod.Namespace, string(pod.UID), container.Name, hash)
+	// Include stable identifiers (name, namespace, uid) as well as any
+	// fields that should reset the backoff when changed.
+	key := []string{
+		pod.Name,
+		pod.Namespace,
+		string(pod.UID),
+		container.Name,
+		container.Image,
+		container.Resources.String(),
+	}
+	hash := fnv.New64a()
+	hash.Write([]byte(strings.Join(key, "/")))
+	return strconv.FormatUint(hash.Sum64(), 16)
 }
 
 // logPathDelimiter is the delimiter used in the log path.
