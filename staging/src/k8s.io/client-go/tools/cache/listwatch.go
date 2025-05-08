@@ -141,28 +141,36 @@ type ListWithContextFunc func(ctx context.Context, options metav1.ListOptions) (
 
 // WatchFunc knows how to watch resources
 //
-// Deprecated: use WatchFuncWithContext instead.
+// Deprecated: use WatchWithContextFunc instead.
 type WatchFunc func(options metav1.ListOptions) (watch.Interface, error)
 
 // WatchFuncWithContext knows how to watch resources
+//
+// Deprecated: use WatchWithContextFunc instead.
 type WatchFuncWithContext func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error)
+
+// WatchWithContextFunc knows how to watch resources
+type WatchWithContextFunc func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error)
 
 // ListWatch knows how to list and watch a set of apiserver resources.
 // It satisfies the ListerWatcher and ListerWatcherWithContext interfaces.
 // It is a convenience function for users of NewReflector, etc.
-// ListFunc or ListWithContextFunc must be set. Same for WatchFunc and WatchFuncWithContext.
-// ListWithContextFunc and WatchFuncWithContext are preferred if
+// ListFunc or ListWithContextFunc must be set. Same for WatchFunc and WatchWithContextFunc.
+// ListWithContextFunc and WatchWithContextFunc are preferred if
 // a context is available, otherwise ListFunc and WatchFunc.
 //
 // NewFilteredListWatchFromClient sets all of the functions to ensure that callers
 // which only know about ListFunc and WatchFunc continue to work.
 type ListWatch struct {
-	// Deprecated: use ListWithContext instead.
+	// Deprecated: use ListWithContextFunc instead.
 	ListFunc ListFunc
-	// Deprecated: use WatchWithContext instead.
+	// Deprecated: use WatchWithContextFunc instead.
 	WatchFunc WatchFunc
 
 	ListWithContextFunc  ListWithContextFunc
+	WatchWithContextFunc WatchWithContextFunc
+
+	// Deprecated: use WatchWithContextFunc instead.
 	WatchFuncWithContext WatchFuncWithContext
 
 	// DisableChunking requests no chunking for this list watcher.
@@ -220,7 +228,7 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 			Do(ctx).
 			Get()
 	}
-	watchFuncWithContext := func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+	watchWithContextFunc := func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 		options.Watch = true
 		optionsModifier(&options)
 		return c.Get().
@@ -233,7 +241,7 @@ func NewFilteredListWatchFromClient(c Getter, resource string, namespace string,
 		ListFunc:             listFunc,
 		WatchFunc:            watchFunc,
 		ListWithContextFunc:  listFuncWithContext,
-		WatchFuncWithContext: watchFuncWithContext,
+		WatchWithContextFunc: watchWithContextFunc,
 	}
 }
 
@@ -266,11 +274,17 @@ func (lw *ListWatch) Watch(options metav1.ListOptions) (watch.Interface, error) 
 	if lw.WatchFunc != nil {
 		return lw.WatchFunc(options)
 	}
-	return lw.WatchFuncWithContext(context.Background(), options)
+	if lw.WatchFuncWithContext != nil {
+		return lw.WatchFuncWithContext(context.Background(), options)
+	}
+	return lw.WatchWithContextFunc(context.Background(), options)
 }
 
 // Watch a set of apiserver resources
 func (lw *ListWatch) WatchWithContext(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+	if lw.WatchWithContextFunc != nil {
+		return lw.WatchWithContextFunc(ctx, options)
+	}
 	if lw.WatchFuncWithContext != nil {
 		return lw.WatchFuncWithContext(ctx, options)
 	}
