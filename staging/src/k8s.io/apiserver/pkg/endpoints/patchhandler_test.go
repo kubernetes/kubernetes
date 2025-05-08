@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 )
@@ -46,7 +47,7 @@ func TestPatch(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	request, err := http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -81,22 +82,22 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	req, err := http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
-	_, err = client.Do(request)
+	req.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
+	_, err = client.Do(req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	request, err = http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=true", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	req, err = http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=true", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
-	response, err := client.Do(request)
+	req.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
+	response, err := client.Do(req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -104,12 +105,12 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
-	request, err = http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=false", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	req, err = http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=false", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	request.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
-	response, err = client.Do(request)
+	req.Header.Set("Content-Type", "application/merge-patch+json; charset=UTF-8")
+	response, err = client.Do(req)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -136,7 +137,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest("PATCH", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
+	request, err := http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
