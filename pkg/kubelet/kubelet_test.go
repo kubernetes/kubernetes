@@ -3350,7 +3350,7 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 			expectedConditions: []*v1.PodCondition{{
 				Type:               v1.PodResizeInProgress,
 				Status:             "True",
-				ObservedGeneration: 3,
+				ObservedGeneration: 1,
 			}},
 		},
 
@@ -3362,7 +3362,18 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 			expectedConditions: []*v1.PodCondition{{
 				Type:               v1.PodResizeInProgress,
 				Status:             "True",
-				ObservedGeneration: 4,
+				ObservedGeneration: 1,
+			}},
+		},
+		{
+			name:       "allocate a new resize",
+			cpu:        cpu500m,
+			mem:        mem500M,
+			generation: 5,
+			expectedConditions: []*v1.PodCondition{{
+				Type:               v1.PodResizeInProgress,
+				Status:             "True",
+				ObservedGeneration: 5,
 			}},
 		},
 	}
@@ -3381,7 +3392,7 @@ func TestHandlePodResourcesResizeMultipleConditions(t *testing.T) {
 			_, err := kubelet.handlePodResourcesResize(testPod, podStatus)
 			require.NoError(t, err)
 			conditions := kubelet.statusManager.GetPodResizeConditions(testPod.UID)
-			require.Equal(t, len(tc.expectedConditions), len(conditions))
+			require.Len(t, conditions, len(tc.expectedConditions))
 			for _, c := range conditions {
 				c.LastProbeTime = metav1.Time{}
 				c.LastTransitionTime = metav1.Time{}

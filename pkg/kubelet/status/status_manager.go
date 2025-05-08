@@ -272,18 +272,14 @@ func (m *manager) SetPodResizePendingCondition(podUID types.UID, reason, message
 
 // SetPodResizeInProgressCondition caches the last PodResizeInProgress condition for the pod.
 func (m *manager) SetPodResizeInProgressCondition(podUID types.UID, reason, message string, observedGeneration int64, allowReasonToBeCleared bool) {
-	oldConditions := m.GetPodResizeConditions(podUID)
-
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
 	if !allowReasonToBeCleared && reason == "" && message == "" {
 		// Preserve the old reason and message if there is one.
-		for _, c := range oldConditions {
-			if c.Type == v1.PodResizeInProgress {
-				reason = c.Reason
-				message = c.Message
-			}
+		if c := m.podResizeConditions[podUID].PodResizeInProgress; c != nil {
+			reason = c.Reason
+			message = c.Message
 		}
 	}
 

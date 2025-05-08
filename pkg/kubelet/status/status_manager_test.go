@@ -2183,7 +2183,6 @@ func TestPodResizeConditions(t *testing.T) {
 			updateFunc: func(podUID types.UID) {
 				m.ClearPodResizePendingCondition(podUID)
 			},
-			expectedList: nil,
 		},
 	}
 
