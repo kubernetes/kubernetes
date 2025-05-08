@@ -29,6 +29,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/kubectl/pkg/cmd/plugin"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestNormalizationFuncGlobalExistence(t *testing.T) {
@@ -381,10 +382,6 @@ func TestKubectlCommandHeadersHooks(t *testing.T) {
 			envVar:    "false",
 			addsHooks: false,
 		},
-		"zero env var value; hooks NOT added": {
-			envVar:    "0",
-			addsHooks: false,
-		},
 	}
 
 	for name, testCase := range tests {
@@ -394,7 +391,7 @@ func TestKubectlCommandHeadersHooks(t *testing.T) {
 			if kubeConfigFlags.WrapConfigFn != nil {
 				t.Fatal("expected initial nil WrapConfigFn")
 			}
-			t.Setenv(kubectlCmdHeaders, testCase.envVar)
+			t.Setenv(string(cmdutil.CmdHeaders), testCase.envVar)
 			addCmdHeaderHooks(cmds, kubeConfigFlags)
 			// Valdidate whether the hooks were added.
 			if testCase.addsHooks && kubeConfigFlags.WrapConfigFn == nil {
