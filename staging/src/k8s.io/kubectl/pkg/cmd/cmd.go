@@ -83,8 +83,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/kustomize"
 )
 
-const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
-
 type KubectlOptions struct {
 	PluginHandler PluginHandler
 	Arguments     []string
@@ -522,12 +520,9 @@ func NewKubectlCommand(o KubectlOptions) *cobra.Command {
 //
 //	https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
 func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
-	// If the feature gate env var is set to "false", then do no add kubectl command headers.
-	if value, exists := os.LookupEnv(kubectlCmdHeaders); exists {
-		if value == "false" || value == "0" {
-			klog.V(5).Infoln("kubectl command headers turned off")
-			return
-		}
+	if cmdutil.CmdHeaders.IsDisabled() {
+		klog.V(5).Infoln("kubectl command headers turned off")
+		return
 	}
 	klog.V(5).Infoln("kubectl command headers turned on")
 	crt := &genericclioptions.CommandHeaderRoundTripper{}

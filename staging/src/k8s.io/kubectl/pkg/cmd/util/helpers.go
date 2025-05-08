@@ -427,6 +427,7 @@ type FeatureGate string
 const (
 	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
 	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+	CmdHeaders FeatureGate = "KUBECTL_COMMAND_HEADERS"
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
 	KubeRC                  FeatureGate = "KUBECTL_KUBERC"
