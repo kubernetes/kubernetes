@@ -583,3 +583,29 @@ func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory)
 			return utilcomp.ListUsersInConfig(toComplete), cobra.ShellCompDirectiveNoFileComp
 		}))
 }
+
+// GetLogVerbosity parses the provided command-line arguments to determine
+// the verbosity level for logging. Returns string representing the verbosity
+// level, or 0 if no verbosity flag is specified.
+func GetLogVerbosity(args []string) string {
+	for i, arg := range args {
+		if arg == "--" {
+			// flags after "--" does not represent any flag of
+			// the command. We should short cut the iteration in here.
+			break
+		}
+
+		if arg == "--v" || arg == "-v" {
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		} else if strings.Contains(arg, "--v=") || strings.Contains(arg, "-v=") {
+			parg := strings.Split(arg, "=")
+			if len(parg) > 1 && parg[1] != "" {
+				return parg[1]
+			}
+		}
+	}
+
+	return "0"
+}
