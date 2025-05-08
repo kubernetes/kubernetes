@@ -22,6 +22,27 @@ should end with a DNS domain that is unique for the plugin. Each time a plugin
 starts, it has to delete old sockets if they exist and listen anew under the
 same filename.
 
+## Monitoring plugin connection
+
+Kubelet monitors gRPC connection to a plugin using stats connection monitoring
+handler https://github.com/grpc/grpc-go/blob/master/examples/features/stats_monitoring/README.md
+that allows to hook on connection start and stop events. If plugin drops
+connection with Kubelet, it gets automatically unregistered and its resources
+are cleaned up.
+
+The kubelet monitors the gRPC connection to a plugin's
+service socket using a [stats connection monitoring
+handler](https://github.com/grpc/grpc-go/blob/master/examples/features/stats_monitoring/README.md).
+Such a handler can observe connection start and stop events.
+If a plugin drops the connection with the kubelet, it gets
+automatically unregistered immediately and its resources
+are cleaned up. This works because the connection is
+using a reliable Unix Domain stream, so loosing the connection
+is guaranteed to mean that the peer closed its side of
+the connection and not some intermittent network timeout.
+
+**Warning**: Monitoring the plugin connection is only supported for DRA at the moment.
+
 ## Seamless Upgrade
 
 To avoid downtime of a plugin on a node, it would be nice to support running an
