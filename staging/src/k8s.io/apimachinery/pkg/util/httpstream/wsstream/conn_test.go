@@ -369,7 +369,7 @@ func TestIsWebSocketRequestWithStreamCloseProtocol(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		req, err := http.NewRequest("GET", "http://www.example.com/", nil)
+		req, err := http.NewRequest(http.MethodGet, "http://www.example.com/", nil)
 		require.NoError(t, err)
 		for key, value := range test.headers {
 			req.Header.Add(key, value)
