@@ -27,11 +27,13 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/api/operation"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
+	runtimetestingv1 "k8s.io/apimachinery/pkg/runtime/testing/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1114,3 +1116,72 @@ type TestType2 struct {
 func (TestType2) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
 
 func (TestType2) DeepCopyObject() runtime.Object { return nil }
+
+func TestToOpenAPIDefinitionName(t *testing.T) {
+	testCases := []struct {
+		name        string
+		registerGvk *schema.GroupVersionKind // defaults to gvk unless set
+		registerObj runtime.Object
+		gvk         schema.GroupVersionKind
+		out         string
+		wantErr     error
+	}{
+		{
+			name:        "built-registerObj type",
+			registerObj: &runtimetestingv1.ExternalSimple{},
+			gvk:         schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Simple"},
+			out:         "io.k8s.apimachinery.pkg.runtime.testing.v1.ExternalSimple",
+		},
+		{
+			name:        "unstructured type",
+			registerObj: &unstructured.Unstructured{},
+			gvk:         schema.GroupVersionKind{Group: "stable.example.com", Version: "v1", Kind: "CronTab"},
+			out:         "com.example.stable.v1.CronTab",
+		},
+		{
+			name:        "unregistered type: empty group",
+			registerObj: &unstructured.Unstructured{},
+			gvk:         schema.GroupVersionKind{Version: "v1", Kind: "CronTab"},
+			wantErr:     fmt.Errorf("unable to convert GroupVersionKind with empty fields to unstructured type to an OpenAPI definition name: %v", schema.GroupVersionKind{Version: "v1", Kind: "CronTab"}),
+		},
+		{
+			name:        "unregistered type: empty version",
+			registerObj: &unstructured.Unstructured{},
+			registerGvk: &schema.GroupVersionKind{Group: "stable.example.com", Version: "v1", Kind: "CronTab"},
+			gvk:         schema.GroupVersionKind{Group: "stable.example.com", Kind: "CronTab"},
+			wantErr:     fmt.Errorf("version is required on all types: %v", schema.GroupVersionKind{Group: "stable.example.com", Kind: "CronTab"}),
+		},
+		{
+			name:        "unregistered type: empty kind",
+			registerObj: &unstructured.Unstructured{},
+			gvk:         schema.GroupVersionKind{Group: "stable.example.com", Version: "v1"},
+			wantErr:     fmt.Errorf("unable to convert GroupVersionKind with empty fields to unstructured type to an OpenAPI definition name: %v", schema.GroupVersionKind{Group: "stable.example.com", Version: "v1"}),
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			if test.registerGvk == nil {
+				test.registerGvk = &test.gvk
+			}
+
+			scheme := runtime.NewScheme()
+			scheme.AddKnownTypeWithName(*test.registerGvk, test.registerObj)
+			utilruntime.Must(runtimetesting.RegisterConversions(scheme))
+
+			out, err := scheme.ToOpenAPIDefinitionName(test.gvk)
+			if test.wantErr != nil {
+				if err == nil || err.Error() != test.wantErr.Error() {
+					t.Errorf("expected error: %v but got %v", test.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if out != test.out {
+				t.Errorf("expected %s, got %s", test.out, out)
+			}
+		})
+	}
+}

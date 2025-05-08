@@ -133,19 +133,6 @@ func gvkConvert(gvk schema.GroupVersionKind) v1.GroupVersionKind {
 	}
 }
 
-func friendlyName(name string) string {
-	nameParts := strings.Split(name, "/")
-	// Reverse first part. e.g., io.k8s... instead of k8s.io...
-	if len(nameParts) > 0 && strings.Contains(nameParts[0], ".") {
-		parts := strings.Split(nameParts[0], ".")
-		for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
-			parts[i], parts[j] = parts[j], parts[i]
-		}
-		nameParts[0] = strings.Join(parts, ".")
-	}
-	return strings.Join(nameParts, ".")
-}
-
 func typeName(t reflect.Type) string {
 	path := t.PkgPath()
 	if strings.Contains(path, "/vendor/") {
@@ -183,9 +170,9 @@ func NewDefinitionNamer(schemes ...*runtime.Scheme) *DefinitionNamer {
 // GetDefinitionName returns the name and tags for a given definition
 func (d *DefinitionNamer) GetDefinitionName(name string) (string, spec.Extensions) {
 	if groupVersionKinds, ok := d.typeGroupVersionKinds[name]; ok {
-		return friendlyName(name), spec.Extensions{
+		return util.ToRESTFriendlyName(name), spec.Extensions{
 			extensionGVK: groupVersionKinds.JSON(),
 		}
 	}
-	return friendlyName(name), nil
+	return util.ToRESTFriendlyName(name), nil
 }
