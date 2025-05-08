@@ -425,12 +425,36 @@ func GetPodRunningTimeoutFlag(cmd *cobra.Command) (time.Duration, error) {
 type FeatureGate string
 
 const (
-	ApplySet                FeatureGate = "KUBECTL_APPLYSET"
-	OpenAPIV3Patch          FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+	// owner: @soltysh
+	// kep: https://kep.k8s.io/859
+	//
+	// HTTP headers with command name and flags used.
 	CmdHeaders FeatureGate = "KUBECTL_COMMAND_HEADERS"
+
+	// owner: @ardaguclu
+	// kep: https://kep.k8s.io/3104
+	//
+	// Separate kubectl user preferences.
+	KubeRC FeatureGate = "KUBECTL_KUBERC"
+
+	// owner: @soltysh
+	// kep: https://kep.k8s.io/3515
+	//
+	// Improved kubectl apply --prune behavior.
+	OpenAPIV3Patch FeatureGate = "KUBECTL_OPENAPIV3_PATCH"
+
+	// owner: @justinb
+	// kep: https://kep.k8s.io/3659
+	//
+	// Improved kubectl apply --prune behavior.
+	ApplySet FeatureGate = "KUBECTL_APPLYSET"
+
+	// owner: @seans
+	// kep: https://kep.k8s.io/4006
+	//
+	// Transition to WebSockets.
 	RemoteCommandWebsockets FeatureGate = "KUBECTL_REMOTE_COMMAND_WEBSOCKETS"
 	PortForwardWebsockets   FeatureGate = "KUBECTL_PORT_FORWARD_WEBSOCKETS"
-	KubeRC                  FeatureGate = "KUBECTL_KUBERC"
 )
 
 // IsEnabled returns true iff environment variable is set to true.
