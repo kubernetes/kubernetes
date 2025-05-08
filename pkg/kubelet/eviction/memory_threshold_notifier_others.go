@@ -46,7 +46,7 @@ var _ ThresholdNotifier = &linuxMemoryThresholdNotifier{}
 
 // NewMemoryThresholdNotifier creates a ThresholdNotifier which is designed to respond to the given threshold.
 // UpdateThreshold must be called once before the threshold will be active.
-func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot string, factory NotifierFactory, handler func(string)) (ThresholdNotifier, error) {
+func NewMemoryThresholdNotifier(logger klog.Logger, threshold evictionapi.Threshold, cgroupRoot string, factory NotifierFactory, handler func(string)) (ThresholdNotifier, error) {
 	cgroups, err := cm.GetCgroupSubsystems()
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func NewMemoryThresholdNotifier(threshold evictionapi.Threshold, cgroupRoot stri
 	}, nil
 }
 
-func (m *linuxMemoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary) error {
+func (m *linuxMemoryThresholdNotifier) UpdateThreshold(logger klog.Logger, summary *statsapi.Summary) error {
 	memoryStats := summary.Node.Memory
 	if isAllocatableEvictionThreshold(m.threshold) {
 		allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods)
@@ -88,22 +88,21 @@ func (m *linuxMemoryThresholdNotifier) UpdateThreshold(summary *statsapi.Summary
 	memcgThreshold := capacity.DeepCopy()
 	memcgThreshold.Sub(*evictionThresholdQuantity)
 	memcgThreshold.Add(*inactiveFile)
-
-	klog.V(3).InfoS("Eviction manager: setting notifier to capacity", "notifier", m.Description(), "capacity", memcgThreshold.String())
+	logger.V(3).Info("Eviction manager: setting notifier to capacity", "notifier", m.Description(), "capacity", memcgThreshold.String())
 	if m.notifier != nil {
 		m.notifier.Stop()
 	}
-	newNotifier, err := m.factory.NewCgroupNotifier(m.cgroupPath, memoryUsageAttribute, memcgThreshold.Value())
+	newNotifier, err := m.factory.NewCgroupNotifier(logger, m.cgroupPath, memoryUsageAttribute, memcgThreshold.Value())
 	if err != nil {
 		return err
 	}
 	m.notifier = newNotifier
-	go m.notifier.Start(m.events)
+	go m.notifier.Start(logger, m.events)
 	return nil
 }
 
-func (m *linuxMemoryThresholdNotifier) Start() {
-	klog.InfoS("Eviction manager: created memoryThresholdNotifier", "notifier", m.Description())
+func (m *linuxMemoryThresholdNotifier) Start(logger klog.Logger) {
+	logger.Info("Eviction manager: created memoryThresholdNotifier", "notifier", m.Description())
 	for range m.events {
 		m.handler(fmt.Sprintf("eviction manager: %s crossed", m.Description()))
 	}
