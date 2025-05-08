@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -42,7 +43,7 @@ type Manager interface {
 	// owning device plugin to allow setup procedures to take place, and for
 	// the device plugin to provide runtime settings to use the device
 	// (environment variables, mount points and device files).
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 
 	// UpdatePluginResources updates node resources based on devices already
 	// allocated to pods. The node object is provided for the device manager to
@@ -55,7 +56,7 @@ type Manager interface {
 	// GetDeviceRunContainerOptions checks whether we have cached containerDevices
 	// for the passed-in <pod, container> and returns its DeviceRunContainerOptions
 	// for the found one. An empty struct is returned in case no cached state is found.
-	GetDeviceRunContainerOptions(pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error)
+	GetDeviceRunContainerOptions(ctx context.Context, pod *v1.Pod, container *v1.Container) (*DeviceRunContainerOptions, error)
 
 	// GetCapacity returns the amount of available device plugin resource capacity, resource allocatable
 	// and inactive device plugin resources previously registered on the node.
@@ -81,11 +82,11 @@ type Manager interface {
 
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(ctx context.Context, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// TopologyManager HintProvider provider indicates the Device Manager implements the Topology Manager Interface
 	// and is consulted to make Topology aware resource alignments per Pod
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()

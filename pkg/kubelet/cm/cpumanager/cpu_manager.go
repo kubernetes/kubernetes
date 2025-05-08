@@ -59,7 +59,7 @@ type Manager interface {
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
 	// e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the CPU allocation during the container removal
@@ -76,7 +76,7 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(context.Context, *v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// GetExclusiveCPUs implements the podresources.CPUsProvider interface to provide
 	// exclusively allocated cpus for the container
@@ -85,7 +85,7 @@ type Manager interface {
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
@@ -252,7 +252,7 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	return nil
 }
 
-func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
+func (m *manager) Allocate(ctx context.Context, p *v1.Pod, c *v1.Container) error {
 	// Garbage collect any stranded resources before allocating CPUs.
 	m.removeStaleState()
 
@@ -260,7 +260,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(m.state, p, c)
+	err := m.policy.Allocate(ctx, m.state, p, c)
 	if err != nil {
 		klog.ErrorS(err, "Allocate error")
 		return err
@@ -320,18 +320,18 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(ctx context.Context, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(m.state, pod, container)
+	return m.policy.GetTopologyHints(ctx, m.state, pod, container)
 }
 
-func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(m.state, pod)
+	return m.policy.GetPodTopologyHints(ctx, m.state, pod)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {

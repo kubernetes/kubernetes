@@ -17,6 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -84,14 +85,14 @@ type HintProvider interface {
 	// this function for each hint provider, and merges the hints to produce
 	// a consensus "best" hint. The hint providers may subsequently query the
 	// topology manager to influence actual resource assignment.
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
+	GetTopologyHints(ctx context.Context, pod *v1.Pod, container *v1.Container) map[string][]TopologyHint
 	// GetPodTopologyHints returns a map of resource names to a list of possible
 	// concrete resource allocations per Pod in terms of NUMA locality hints.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]TopologyHint
+	GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]TopologyHint
 	// Allocate triggers resource allocation to occur on the HintProvider after
 	// all hints have been gathered and the aggregated Hint is available via a
 	// call to Store.GetAffinity().
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 }
 
 // Store interface is to allow Hint Providers to retrieve pod affinity
@@ -221,12 +222,12 @@ func (m *manager) RemoveContainer(containerID string) error {
 	return m.scope.RemoveContainer(containerID)
 }
 
-func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *manager) Admit(ctx context.Context, attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	klog.V(4).InfoS("Topology manager admission check", "pod", klog.KObj(attrs.Pod))
 	metrics.TopologyManagerAdmissionRequestsTotal.Inc()
 
 	startTime := time.Now()
-	podAdmitResult := m.scope.Admit(attrs.Pod)
+	podAdmitResult := m.scope.Admit(ctx, attrs.Pod)
 	metrics.TopologyManagerAdmissionDuration.Observe(float64(time.Since(startTime).Milliseconds()))
 
 	klog.V(4).InfoS("Pod Admit Result", "Message", podAdmitResult.Message, "pod", klog.KObj(attrs.Pod))

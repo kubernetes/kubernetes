@@ -28,6 +28,7 @@ import (
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // monitorCallback is the function called when a device's health state changes,
@@ -195,7 +196,7 @@ func TestAllocate(t *testing.T) {
 		t.FailNow()
 	}
 
-	respOut, err := e.allocate([]string{"ADeviceId"})
+	respOut, err := e.allocate(ktesting.Init(t), []string{"ADeviceId"})
 	require.NoError(t, err)
 	require.Equal(t, resp, respOut)
 }
@@ -229,7 +230,8 @@ func TestGetPreferredAllocation(t *testing.T) {
 		t.FailNow()
 	}
 
-	respOut, err := e.getPreferredAllocation([]string{}, []string{}, -1)
+	ctx := ktesting.Init(t)
+	respOut, err := e.getPreferredAllocation(ctx, []string{}, []string{}, -1)
 	require.NoError(t, err)
 	require.Equal(t, resp, respOut)
 }

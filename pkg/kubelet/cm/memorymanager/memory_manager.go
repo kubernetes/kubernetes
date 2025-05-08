@@ -65,7 +65,7 @@ type Manager interface {
 
 	// Allocate is called to pre-allocate memory resources during Pod admission.
 	// This must be called at some point prior to the AddContainer() call for a container, e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error
 
 	// RemoveContainer is called after Kubelet decides to kill or delete a
 	// container. After this call, any memory allocated to the container is freed.
@@ -77,12 +77,12 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(*v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(context.Context, *v1.Pod, *v1.Container) map[string][]topologymanager.TopologyHint
 
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetPodTopologyHints(*v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(context.Context, *v1.Pod) map[string][]topologymanager.TopologyHint
 
 	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
 	GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Set[int]
@@ -258,7 +258,7 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 }
 
 // Allocate is called to pre-allocate memory resources during Pod admission.
-func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
+func (m *manager) Allocate(ctx context.Context, pod *v1.Pod, container *v1.Container) error {
 	// Garbage collect any stranded resources before allocation
 	m.removeStaleState()
 
@@ -296,19 +296,19 @@ func (m *manager) State() state.Reader {
 }
 
 // GetPodTopologyHints returns the topology hints for the topology manager
-func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetPodTopologyHints(ctx context.Context, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(m.state, pod)
+	return m.policy.GetPodTopologyHints(ctx, m.state, pod)
 }
 
 // GetTopologyHints returns the topology hints for the topology manager
-func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(ctx context.Context, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState()
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(m.state, pod, container)
+	return m.policy.GetTopologyHints(ctx, m.state, pod, container)
 }
 
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers

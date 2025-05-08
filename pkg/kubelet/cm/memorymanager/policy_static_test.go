@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -3735,7 +3736,8 @@ func TestStaticPolicyGetTopologyHints(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			topologyHints := p.GetTopologyHints(s, testCase.pod, &testCase.pod.Spec.Containers[0])
+			ctx := ktesting.Init(t)
+			topologyHints := p.GetTopologyHints(ctx, s, testCase.pod, &testCase.pod.Spec.Containers[0])
 			if !reflect.DeepEqual(topologyHints, testCase.expectedTopologyHints) {
 				t.Fatalf("The actual topology hints: '%+v' are different from the expected one: '%+v'", topologyHints, testCase.expectedTopologyHints)
 			}

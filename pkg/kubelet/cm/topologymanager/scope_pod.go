@@ -17,7 +17,9 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -44,8 +46,8 @@ func NewPodScope(policy Policy) Scope {
 	}
 }
 
-func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
-	bestHint, admit := s.calculateAffinity(pod)
+func (s *podScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
+	bestHint, admit := s.calculateAffinity(ctx, pod)
 	klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	if !admit {
 		if IsAlignmentGuaranteed(s.policy) {
@@ -60,7 +62,7 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 		klog.InfoS("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
 		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
 
-		err := s.allocateAlignedResources(pod, &container)
+		err := s.allocateAlignedResources(ctx, pod, &container)
 		if err != nil {
 			metrics.TopologyManagerAdmissionErrorsTotal.Inc()
 			return admission.GetPodAdmitResult(err)
@@ -74,20 +76,20 @@ func (s *podScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
 	return admission.GetPodAdmitResult(nil)
 }
 
-func (s *podScope) accumulateProvidersHints(pod *v1.Pod) []map[string][]TopologyHint {
+func (s *podScope) accumulateProvidersHints(ctx context.Context, pod *v1.Pod) []map[string][]TopologyHint {
 	var providersHints []map[string][]TopologyHint
 
 	for _, provider := range s.hintProviders {
 		// Get the TopologyHints for a Pod from a provider.
-		hints := provider.GetPodTopologyHints(pod)
+		hints := provider.GetPodTopologyHints(ctx, pod)
 		providersHints = append(providersHints, hints)
 		klog.InfoS("TopologyHints", "hints", hints, "pod", klog.KObj(pod))
 	}
 	return providersHints
 }
 
-func (s *podScope) calculateAffinity(pod *v1.Pod) (TopologyHint, bool) {
-	providersHints := s.accumulateProvidersHints(pod)
+func (s *podScope) calculateAffinity(ctx context.Context, pod *v1.Pod) (TopologyHint, bool) {
+	providersHints := s.accumulateProvidersHints(ctx, pod)
 	bestHint, admit := s.policy.Merge(providersHints)
 	klog.InfoS("PodTopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
 	return bestHint, admit

@@ -38,6 +38,7 @@ import (
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )
@@ -722,8 +723,9 @@ func TestMemoryPressure(t *testing.T) {
 
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
+	ctx := ktesting.Init(t)
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -816,7 +818,7 @@ func TestMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -844,7 +846,7 @@ func TestMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -872,7 +874,7 @@ func TestMemoryPressure(t *testing.T) {
 	// all pods should admit now
 	expected = []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -990,8 +992,10 @@ func TestPIDPressure(t *testing.T) {
 				t.Fatalf("Manager should not report PID pressure")
 			}
 
+			ctx := ktesting.Init(t)
+
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -1085,7 +1089,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1110,7 +1114,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1134,7 +1138,7 @@ func TestPIDPressure(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -1150,8 +1154,9 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	}
 
 	expected := []bool{true, true, true}
+	ctx := ktesting.Init(t)
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1159,7 +1164,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure}
 	expected = []bool{true, true, false}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1167,7 +1172,7 @@ func TestAdmitUnderNodeConditions(t *testing.T) {
 	manager.nodeConditions = []v1.NodeConditionType{v1.NodeMemoryPressure, v1.NodeDiskPressure}
 	expected = []bool{false, false, false}
 	for i, pod := range pods {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -1368,7 +1373,8 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			ctx := ktesting.Init(t)
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -1473,7 +1479,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1498,7 +1504,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -1523,7 +1529,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -2347,7 +2353,8 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			ctx := ktesting.Init(t)
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 
@@ -2437,7 +2444,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -2462,7 +2469,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should fail)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
 			}
 
@@ -2487,7 +2494,7 @@ func TestInodePressureFsInodes(t *testing.T) {
 			}
 
 			// try to admit our pod (should succeed)
-			if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+			if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 				t.Fatalf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
 			}
 		})
@@ -2819,8 +2826,9 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 
 	// try to admit our pods (they should succeed)
 	expected := []bool{true, true}
+	ctx := ktesting.Init(t)
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2856,7 +2864,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2889,7 +2897,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// the best-effort pod should not admit, burstable should
 	expected = []bool{false, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}
@@ -2917,7 +2925,7 @@ func TestAllocatableMemoryPressure(t *testing.T) {
 	// all pods should admit now
 	expected = []bool{true, true}
 	for i, pod := range []*v1.Pod{bestEffortPodToAdmit, burstablePodToAdmit} {
-		if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
+		if result := manager.Admit(ctx, &lifecycle.PodAdmitAttributes{Pod: pod}); expected[i] != result.Admit {
 			t.Errorf("Admit pod: %v, expected: %v, actual: %v", pod, expected[i], result.Admit)
 		}
 	}

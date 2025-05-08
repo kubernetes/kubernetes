@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestContainerCalculateAffinity(t *testing.T) {
@@ -130,7 +131,8 @@ func TestContainerCalculateAffinity(t *testing.T) {
 			},
 		}
 
-		ctnScope.calculateAffinity(&v1.Pod{}, &v1.Container{})
+		ctx := ktesting.Init(t)
+		ctnScope.calculateAffinity(ctx, &v1.Pod{}, &v1.Container{})
 		actual := ctnScope.policy.(*mockPolicy).ph
 		if !reflect.DeepEqual(tc.expected, actual) {
 			t.Errorf("Test Case: %s", tc.name)
@@ -260,7 +262,8 @@ func TestContainerAccumulateProvidersHints(t *testing.T) {
 				hintProviders: tc.hp,
 			},
 		}
-		actual := ctnScope.accumulateProvidersHints(&v1.Pod{}, &v1.Container{})
+		ctx := ktesting.Init(t)
+		actual := ctnScope.accumulateProvidersHints(ctx, &v1.Pod{}, &v1.Container{})
 		if !reflect.DeepEqual(actual, tc.expected) {
 			t.Errorf("Test Case %s: Expected NUMANodeAffinity in result to be %v, got %v", tc.name, tc.expected, actual)
 		}

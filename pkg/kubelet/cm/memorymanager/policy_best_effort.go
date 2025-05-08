@@ -17,6 +17,7 @@ limitations under the License.
 package memorymanager
 
 import (
+	"context"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 
 	v1 "k8s.io/api/core/v1"
@@ -67,12 +68,12 @@ func (p *bestEffortPolicy) RemoveContainer(s state.State, podUID string, contain
 	p.static.RemoveContainer(s, podUID, containerName)
 }
 
-func (p *bestEffortPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	return p.static.GetPodTopologyHints(s, pod)
+func (p *bestEffortPolicy) GetPodTopologyHints(ctx context.Context, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return p.static.GetPodTopologyHints(ctx, s, pod)
 }
 
-func (p *bestEffortPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	return p.static.GetTopologyHints(s, pod, container)
+func (p *bestEffortPolicy) GetTopologyHints(ctx context.Context, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	return p.static.GetTopologyHints(ctx, s, pod, container)
 }
 
 func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {

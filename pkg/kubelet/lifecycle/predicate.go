@@ -17,6 +17,7 @@ limitations under the License.
 package lifecycle
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 
@@ -113,7 +114,7 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 	}
 }
 
-func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+func (w *predicateAdmitHandler) Admit(ctx context.Context, attrs *PodAdmitAttributes) PodAdmitResult {
 	node, err := w.getNodeAnyWayFunc()
 	if err != nil {
 		klog.ErrorS(err, "Cannot get Node info")

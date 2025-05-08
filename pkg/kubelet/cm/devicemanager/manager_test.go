@@ -17,6 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 const (
@@ -443,7 +445,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	// preStartContainer calls return errors.
 	e2.client.Disconnect()
 	as.False(e2.stopTime.IsZero())
-	_, err = e2.allocate([]string{"Device1"})
+	_, err = e2.allocate(ktesting.Init(t), []string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
 	_, err = e2.preStartContainer([]string{"Device1"})
 	reflect.DeepEqual(err, fmt.Errorf(errEndpointStopped, e2))
@@ -789,14 +791,14 @@ func (m *MockEndpoint) preStartContainer(devs []string) (*pluginapi.PreStartCont
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-func (m *MockEndpoint) getPreferredAllocation(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
+func (m *MockEndpoint) getPreferredAllocation(ctx context.Context, available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error) {
 	if m.getPreferredAllocationFunc != nil {
 		return m.getPreferredAllocationFunc(available, mustInclude, size)
 	}
 	return nil, nil
 }
 
-func (m *MockEndpoint) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+func (m *MockEndpoint) allocate(ctx context.Context, devs []string) (*pluginapi.AllocateResponse, error) {
 	if m.allocateFunc != nil {
 		return m.allocateFunc(devs)
 	}
@@ -1060,12 +1062,13 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		pod := testCase.testPod
 		activePods = append(activePods, pod)
 		podsStub.updateActivePods(activePods)
-		err := testManager.Allocate(pod, &pod.Spec.Containers[0])
+		ctx := ktesting.Init(t)
+		err := testManager.Allocate(ctx, pod, &pod.Spec.Containers[0])
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("DevicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
 		}
-		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(ctx, pod, &pod.Spec.Containers[0])
 		if testCase.expErr == nil {
 			as.NoError(err)
 		}
@@ -1176,7 +1179,8 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
+		ctx := ktesting.Init(t)
+		allocDevices, err := testManager.devicesToAllocate(ctx, testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
 		if !reflect.DeepEqual(err, testCase.expErr) {
 			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
 				testCase.description, testCase.expErr, err)
@@ -1244,7 +1248,8 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 		waitUpdateAllocatedDevicesChan <- struct{}{}
 	}()
 
-	set, err := testManager.devicesToAllocate(podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
+	ctx := ktesting.Init(t)
+	set, err := testManager.devicesToAllocate(ctx, podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
 	assert.NoError(t, err)
 	assert.Equal(t, set, sets.New[string](deviceID))
 }
@@ -1290,13 +1295,14 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	activePods := []*v1.Pod{pod1, pod2}
 	podsStub.updateActivePods(activePods)
 
-	err = testManager.Allocate(pod1, &pod1.Spec.Containers[0])
+	ctx := ktesting.Init(t)
+	err = testManager.Allocate(ctx, pod1, &pod1.Spec.Containers[0])
 	as.NoError(err)
-	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	err = testManager.Allocate(ctx, pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
 
 	// when pod is in activePods, GetDeviceRunContainerOptions should return
-	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
+	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(ctx, pod1, &pod1.Spec.Containers[0])
 	as.NoError(err)
 	as.Len(runContainerOpts.Devices, 3)
 	as.Len(runContainerOpts.Mounts, 2)
@@ -1307,7 +1313,7 @@ func TestGetDeviceRunContainerOptions(t *testing.T) {
 	testManager.UpdateAllocatedDevices()
 
 	// when pod is removed from activePods,G etDeviceRunContainerOptions should return error
-	runContainerOpts, err = testManager.GetDeviceRunContainerOptions(pod1, &pod1.Spec.Containers[0])
+	runContainerOpts, err = testManager.GetDeviceRunContainerOptions(ctx, pod1, &pod1.Spec.Containers[0])
 	as.NoError(err)
 	as.Nil(runContainerOpts)
 }
@@ -1386,12 +1392,13 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 			},
 		},
 	}
+	ctx := ktesting.Init(t)
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInInitContainers})
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+		err = testManager.Allocate(ctx, podWithPluginResourcesInInitContainers, &container)
 	}
 	for _, container := range podWithPluginResourcesInInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInInitContainers, &container)
+		err = testManager.Allocate(ctx, podWithPluginResourcesInInitContainers, &container)
 	}
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInInitContainers.UID)
@@ -1497,11 +1504,12 @@ func TestRestartableInitContainerDeviceAllocation(t *testing.T) {
 		},
 	}
 	podsStub.updateActivePods([]*v1.Pod{podWithPluginResourcesInRestartableInitContainers})
+	ctx := ktesting.Init(t)
 	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.InitContainers {
-		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+		err = testManager.Allocate(ctx, podWithPluginResourcesInRestartableInitContainers, &container)
 	}
 	for _, container := range podWithPluginResourcesInRestartableInitContainers.Spec.Containers {
-		err = testManager.Allocate(podWithPluginResourcesInRestartableInitContainers, &container)
+		err = testManager.Allocate(ctx, podWithPluginResourcesInRestartableInitContainers, &container)
 	}
 	as.NoError(err)
 	podUID := string(podWithPluginResourcesInRestartableInitContainers.UID)
@@ -1630,9 +1638,10 @@ func TestDevicePreStartContainer(t *testing.T) {
 	activePods := []*v1.Pod{}
 	activePods = append(activePods, pod)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod, &pod.Spec.Containers[0])
+	ctx := ktesting.Init(t)
+	err = testManager.Allocate(ctx, pod, &pod.Spec.Containers[0])
 	as.NoError(err)
-	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
+	runContainerOpts, err := testManager.GetDeviceRunContainerOptions(ctx, pod, &pod.Spec.Containers[0])
 	as.NoError(err)
 	var initializedDevs []string
 	select {
@@ -1658,9 +1667,9 @@ func TestDevicePreStartContainer(t *testing.T) {
 		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
 	activePods = append(activePods, pod2)
 	podsStub.updateActivePods(activePods)
-	err = testManager.Allocate(pod2, &pod2.Spec.Containers[0])
+	err = testManager.Allocate(ktesting.Init(t), pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
-	_, err = testManager.GetDeviceRunContainerOptions(pod2, &pod2.Spec.Containers[0])
+	_, err = testManager.GetDeviceRunContainerOptions(ctx, pod2, &pod2.Spec.Containers[0])
 	as.NoError(err)
 	select {
 	case <-time.After(time.Millisecond):
@@ -1798,6 +1807,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 	topology := []cadvisorapi.Node{
 		{Id: 0},
 	}
+	ctx := ktesting.Init(t)
 	testCases := []struct {
 		description string
 		count       int
@@ -1809,7 +1819,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.GetTopologyHints(testPod, &testPod.Spec.Containers[0])
+				manager.GetTopologyHints(ctx, testPod, &testPod.Spec.Containers[0])
 			},
 		},
 		{
@@ -1817,7 +1827,7 @@ func TestGetTopologyHintsWithUpdates(t *testing.T) {
 			count:       10,
 			devices:     devs,
 			testfunc: func(manager *wrappedManagerImpl) {
-				manager.GetPodTopologyHints(testPod)
+				manager.GetPodTopologyHints(ctx, testPod)
 			},
 		},
 	}
