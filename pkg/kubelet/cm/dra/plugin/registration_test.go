@@ -75,7 +75,7 @@ func getFakeClient(t *testing.T, nodeName, pluginName string, slice *resourceapi
 			sort.Strings(requirements)
 			return strings.Join(requirements, ",")
 		}
-		assert.Equal(t, "", restrictions.Labels.String(), "label selector in DeleteCollection")
+		assert.Empty(t, restrictions.Labels.String(), "label selector in DeleteCollection")
 		assert.Equal(t, normalize(fieldsSelector.String()), normalize(restrictions.Fields.String()), "field selector in DeleteCollection")
 
 		// There's only one object that could get matched, so delete it.
