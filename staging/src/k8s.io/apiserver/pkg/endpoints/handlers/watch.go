@@ -26,6 +26,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream/wsstream"
@@ -35,36 +36,21 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-// nothing will ever be sent down this channel
-var neverExitWatch <-chan time.Time = make(chan time.Time)
-
-// timeoutFactory abstracts watch timeout logic for testing
-type TimeoutFactory interface {
-	TimeoutCh() (<-chan time.Time, func() bool)
-}
-
-// realTimeoutFactory implements timeoutFactory
-type realTimeoutFactory struct {
-	timeout time.Duration
-}
-
-// TimeoutCh returns a channel which will receive something when the watch times out,
-// and a cleanup function to call when this happens.
-func (w *realTimeoutFactory) TimeoutCh() (<-chan time.Time, func() bool) {
-	if w.timeout == 0 {
-		return neverExitWatch, func() bool { return false }
-	}
-	t := time.NewTimer(w.timeout)
-	return t.C, t.Stop
-}
-
 // serveWatchHandler returns a handle to serve a watch response.
 // TODO: the functionality in this method and in WatchServer.Serve is not cleanly decoupled.
-func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, req *http.Request, w http.ResponseWriter, timeout time.Duration, metricsScope string, initialEventsListBlueprint runtime.Object) (http.Handler, error) {
+func serveWatchHandler(ctx context.Context, req *http.Request, w http.ResponseWriter, rw rest.Watcher, watchOpts *metainternalversion.ListOptions, scope *RequestScope, mediaTypeOptions negotiation.MediaTypeOptions, timeout time.Duration, initialEventsListBlueprint runtime.Object) (http.Handler, error) {
+	// Start the server-side request timeout clock now.
+	// Use a separate context so that timeout doesn't send a DeadlineExceeded error back to the client.
+	// TODO(karlkfi): The watch server probably SHOULD send a DeadlineExceeded error, but historically there was a race condition between DeadlineExceeded & EOF.
+	timeoutCtx, timeoutCancel := withOptionalTimeout(ctx, timeout)
+	defer func() { timeoutCancel() }()
+	// TODO: req = req.WithContext(ctx) IFF we use the same context
+
 	options, err := optionsForTransform(mediaTypeOptions, req)
 	if err != nil {
 		return nil, err
@@ -101,8 +87,6 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	default:
 		mediaType += ";stream=watch"
 	}
-
-	ctx := req.Context()
 
 	// locate the appropriate embedded encoder based on the transform
 	var negotiatedEncoder runtime.Encoder
@@ -153,13 +137,34 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	}
 
 	var serverShuttingDownCh <-chan struct{}
-	if signals := apirequest.ServerShutdownSignalFrom(req.Context()); signals != nil {
+	if signals := apirequest.ServerShutdownSignalFrom(ctx); signals != nil {
 		serverShuttingDownCh = signals.ShuttingDown()
 	}
 
+	// Start watching the resource storage.
+	doneCh := make(chan struct{})
+	watcher, err := rw.Watch(ctx, watchOpts)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil, err
+	}
+	// Invalidate timeoutCancel() to defer until ServeHTTP() is done.
+	deferredTimeoutCancel := timeoutCancel
+	timeoutCancel = func() {}
+	// Cleanup after ServeHTTP() is done.
+	go func() {
+		defer watcher.Stop()
+		defer deferredTimeoutCancel()
+		for range doneCh {
+		}
+	}()
+
 	server := &WatchServer{
-		Watching: watcher,
-		Scope:    scope,
+		RequestContext: ctx,
+		TimeoutContext: timeoutCtx,
+		Scope:          scope,
+		Watcher:        watcher,
+		DoneChannel:    doneCh,
 
 		UseTextFraming:  useTextFraming,
 		MediaType:       mediaType,
@@ -170,10 +175,9 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 		watchListTransformerFn: newWatchListTransformer(initialEventsListBlueprint, mediaTypeOptions.Convert, negotiatedEncoder).transform,
 
 		MemoryAllocator:      memoryAllocator,
-		TimeoutFactory:       &realTimeoutFactory{timeout},
 		ServerShuttingDownCh: serverShuttingDownCh,
 
-		metricsScope: metricsScope,
+		metricsScope: metrics.CleanListScope(ctx, watchOpts),
 	}
 
 	if wsstream.IsWebSocketRequest(req) {
@@ -183,11 +187,26 @@ func serveWatchHandler(watcher watch.Interface, scope *RequestScope, mediaTypeOp
 	return http.HandlerFunc(server.HandleHTTP), nil
 }
 
+func withOptionalTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout > 0 {
+		return context.WithTimeout(parent, timeout)
+	}
+	return context.WithCancel(parent)
+}
+
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.
 type WatchServer struct {
-	Watching watch.Interface
-	Scope    *RequestScope
-
+	// RequestContext of the request
+	RequestContext context.Context
+	// TimeoutContext of the request
+	TimeoutContext context.Context
+	// Scope of the request
+	Scope *RequestScope
+	// Watcher of the resource storage
+	Watcher watch.Interface
+	// DoneChannel is closed by the handler before returning, to allow the
+	// caller to clean up the WatchServer.
+	DoneChannel chan<- struct{}
 	// true if websocket messages should use text framing (as opposed to binary framing)
 	UseTextFraming bool
 	// the media type this watch is being served with
@@ -204,7 +223,6 @@ type WatchServer struct {
 	watchListTransformerFn watchListTransformerFunction
 
 	MemoryAllocator      runtime.MemoryAllocator
-	TimeoutFactory       TimeoutFactory
 	ServerShuttingDownCh <-chan struct{}
 
 	metricsScope string
@@ -213,6 +231,7 @@ type WatchServer struct {
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
 // or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
+	defer close(s.DoneChannel)
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -236,9 +255,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
-	defer cleanup()
+	// Ensure the for loop stops when the context is done (cancel or timeout).
+	ctx, cancel := context.WithCancel(s.RequestContext)
+	// Ensure the watch encoder context is stopped when the handler returns.
+	defer cancel()
 
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
@@ -246,10 +266,14 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
-	kind := s.Scope.Kind
-	watchEncoder := newWatchEncoder(req.Context(), kind, s.EmbeddedEncoder, s.Encoder, framer, s.watchListTransformerFn)
-	ch := s.Watching.ResultChan()
-	done := req.Context().Done()
+	gvk := s.Scope.Kind
+	watchEncoder := newWatchEncoder(ctx, gvk, s.EmbeddedEncoder, s.Encoder, framer, s.watchListTransformerFn)
+
+	// Avoid calling Done & ResultChan multiple times,
+	// to reduce locking, unlocking, and memory allocations.
+	reqDoneCh := ctx.Done()
+	timeoutCh := s.TimeoutContext.Done()
+	resultCh := s.Watcher.ResultChan()
 
 	for {
 		select {
@@ -262,16 +286,16 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			// client(s) try to reestablish the WATCH on the other
 			// available apiserver instance(s).
 			return
-		case <-done:
-			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-ch:
+		case <-reqDoneCh:
+			return
+		case event, ok := <-resultCh:
 			if !ok {
 				// End of results.
 				return
 			}
-			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
+			metrics.WatchEvents.WithContext(ctx).WithLabelValues(gvk.Group, gvk.Version, gvk.Kind).Inc()
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(event)
 
 			if err := watchEncoder.Encode(event); err != nil {
@@ -280,11 +304,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 				return
 			}
 
-			if len(ch) == 0 {
+			if len(resultCh) == 0 {
 				flusher.Flush()
 			}
 			if isWatchListLatencyRecordingRequired {
-				metrics.RecordWatchListLatency(req.Context(), s.Scope.Resource, s.metricsScope)
+				metrics.RecordWatchListLatency(ctx, s.Scope.Resource, s.metricsScope)
 			}
 		}
 	}
@@ -292,6 +316,7 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 // HandleWS serves a series of encoded events over a websocket connection.
 func (s *WatchServer) HandleWS(ws *websocket.Conn) {
+	defer close(s.DoneChannel)
 	defer func() {
 		if s.MemoryAllocator != nil {
 			runtime.AllocatorPool.Put(s.MemoryAllocator)
@@ -299,33 +324,40 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	}()
 
 	defer ws.Close()
-	done := make(chan struct{})
-	// ensure the connection times out
-	timeoutCh, cleanup := s.TimeoutFactory.TimeoutCh()
-	defer cleanup()
+
+	// Ensure the for loop stops when the context is done (cancel or timeout).
+	ctx, cancel := context.WithCancel(s.RequestContext)
+	// Ensure the watch encoder context is stopped when the handler returns.
+	defer cancel()
 
 	go func() {
 		defer utilruntime.HandleCrash()
-		// This blocks until the connection is closed.
-		// Client should not send anything.
+		// Block until client request is closed (EOF) or reading errors.
+		// The watch client should not send the server anything after the
+		// initial request, so it's safe to ignore incoming messages.
 		wsstream.IgnoreReceives(ws, 0)
-		// Once the client closes, we should also close
-		close(done)
+		// Signal done to stop writing response events
+		cancel()
 	}()
 
 	framer := newWebsocketFramer(ws, s.UseTextFraming)
 
-	kind := s.Scope.Kind
-	watchEncoder := newWatchEncoder(context.TODO(), kind, s.EmbeddedEncoder, s.Encoder, framer, s.watchListTransformerFn)
-	ch := s.Watching.ResultChan()
+	gvk := s.Scope.Kind
+	watchEncoder := newWatchEncoder(ctx, gvk, s.EmbeddedEncoder, s.Encoder, framer, s.watchListTransformerFn)
+
+	// Avoid calling Done & ResultChan multiple times,
+	// to reduce locking, unlocking, and memory allocations.
+	reqDoneCh := ctx.Done()
+	timeoutCh := s.TimeoutContext.Done()
+	resultCh := s.Watcher.ResultChan()
 
 	for {
 		select {
-		case <-done:
-			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-ch:
+		case <-reqDoneCh:
+			return
+		case event, ok := <-resultCh:
 			if !ok {
 				// End of results.
 				return
