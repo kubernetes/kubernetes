@@ -3024,6 +3024,36 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device1, false),
 			)},
 		},
+		"prioritized-list-allocation-mode-all": {
+			features: Features{
+				PrioritizedList: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					requestWithPrioritizedList(req0,
+						resourceapi.DeviceSubRequest{
+							Name:            subReq0,
+							AllocationMode:  resourceapi.DeviceAllocationModeAll,
+							DeviceClassName: classA,
+						},
+						subRequest(subReq1, classA, 1),
+					),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1, nil, nil),
+				device(device2, nil, nil),
+			)),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device2),
+			},
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0SubReq1, driverA, pool1, device1, false),
+			)},
+		},
 	}
 
 	for name, tc := range testcases {

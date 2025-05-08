@@ -759,7 +759,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		// For "all" devices we already know which ones we need. We
 		// just need to check whether we can use them.
 		deviceWithID := requestData.allDevices[r.deviceIndex]
-		success, _, err := alloc.allocateDevice(r, deviceWithID, true)
+		success, deallocate, err := alloc.allocateDevice(r, deviceWithID, true)
 		if err != nil {
 			return false, err
 		}
@@ -775,6 +775,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		}
 		if !done {
 			// Backtrack.
+			deallocate()
 			return false, nil
 		}
 		return done, nil
