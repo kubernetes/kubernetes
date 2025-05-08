@@ -81,16 +81,13 @@ const (
 	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
 
-	// updatePodOther is a update for pod's other fields.
-	// It's used only for the internal event handling, and thus unexported.
-	updatePodOther
-
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+
 	// none is a special ActionType that is only used internally.
-	none ActionType = 0
+	None ActionType = 0
 )
 
 var (
@@ -128,8 +125,6 @@ func (a ActionType) String() string {
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:
 		return "UpdatePodGeneratedResourceClaim"
-	case updatePodOther:
-		return "Update"
 	case All:
 		return "All"
 	case Update:
