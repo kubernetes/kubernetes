@@ -835,7 +835,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
-		sw.Do("  if len(op.Request.Subresources) == 0 {\n", targs)
+		sw.Do("  if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == \"scale\") {\n", targs)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
 		sw.Do("               op, ", targs)

@@ -17,10 +17,11 @@ limitations under the License.
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
-	errors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -54,7 +55,7 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-	defer storage.Controller.Store.DestroyFunc()
+	defer storage.Controller.DestroyFunc()
 	_, err := createController(storage.Controller, *validController, t)
 	if err != nil {
 		t.Fatalf("error setting new replication controller %v: %v", *validController, err)
@@ -86,24 +87,24 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 					} else {
 						imperativeErrs = errs
 					}
-					// The errOutputMatcher is used to verify the output matches the expected errors in test cases.
+					// The errOutputMatcher is used to verify the output matches the expected apierrors in test cases.
 					//
-					// The Origin is not checked because the storage layer returns errors as
-					// errors.StatusError, which does not have access to the Origin field. See
+					// The Origin is not checked because the storage layer returns apierrors as
+					// apierrors.StatusError, which does not have access to the Origin field. See
 					// errorListFromStatusError for details.
 					errOutputMatcher := field.ErrorMatcher{}.ByType().ByField()
 					if len(tc.expectedErrs) > 0 {
 						errOutputMatcher.Test(t, tc.expectedErrs, errs)
 					} else if len(errs) != 0 {
-						t.Errorf("expected no errors, but got: %v", errs)
+						t.Errorf("expected no apierrors, but got: %v", errs)
 					}
 				})
 			}
-			// The equivalenceMatcher is used to verify the output errors from handwritten imperative validation
-			// are equivalent to the output errors when DeclarativeValidationTakeover is enabled.
+			// The equivalenceMatcher is used to verify the output apierrors from handwritten imperative validation
+			// are equivalent to the output apierrors when DeclarativeValidationTakeover is enabled.
 			//
-			// The Origin is not checked because the storage layer returns errors as
-			// errors.StatusError, which does not have access to the Origin field. See
+			// The Origin is not checked because the storage layer returns apierrors as
+			// apierrors.StatusError, which does not have access to the Origin field. See
 			// errorListFromStatusError for details.
 			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField()
 			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
@@ -139,14 +140,14 @@ func setScaleSpecReplicas(val int32) func(rc *autoscaling.Scale) {
 // that is not aware of the internal Origin field.
 func errorListFromStatusError(t *testing.T, err error) field.ErrorList {
 	if err != nil {
-		switch e := err.(type) {
-		case *errors.StatusError:
+		var e *apierrors.StatusError
+		if errors.As(err, &e) {
 			list := make(field.ErrorList, len(e.Status().Details.Causes))
 			for i, c := range e.Status().Details.Causes {
 				list[i] = &field.Error{Type: field.ErrorType(c.Type), Field: c.Field, Detail: c.Message}
 			}
 			return list
-		default:
+		} else {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	}
