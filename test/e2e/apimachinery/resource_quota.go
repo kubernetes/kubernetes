@@ -502,7 +502,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the ResourceClaim. Deletion MUST succeed and resource usage count against the ResourceClaim object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] alpha feature
 	*/
-	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", feature.DynamicResourceAllocation, func(ctx context.Context) {
+	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", f.WithFeatureGate(features.DynamicResourceAllocation), f.WithLabel("DRA"), func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)

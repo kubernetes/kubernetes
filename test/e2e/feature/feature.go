@@ -101,64 +101,23 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	Downgrade = framework.WithFeature(framework.ValidFeatures.Add("Downgrade"))
 
-	// owning-sig: sig-node
-	// kep: https://kep.k8s.io/4817
-	// test-infra jobs:
-	// - "dra-alpha" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
-	//
-	// This label is used for tests which need:
-	// - the DynamicResourceAllocation *and* DRAResourceClaimDeviceStatus feature gates
-	DRAResourceClaimDeviceStatus = framework.WithFeature(framework.ValidFeatures.Add("DRAResourceClaimDeviceStatus"))
-
-	// owning-sig: sig-node
-	// kep: https://kep.k8s.io/4381
-	// test-infra jobs:
-	// - "dra-alpha" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
-	//
-	// This label is used for tests which need:
-	// - the DynamicResourceAllocation *and* DRAAdminAccess feature gates
-	// - the resource.k8s.io API group
-	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
-	//   is enabled such that passing CDI device IDs through CRI fields is supported
-	DRAAdminAccess = framework.WithFeature(framework.ValidFeatures.Add("DRAAdminAccess"))
-
-	// owning-sig: sig-scheduling
-	// kep: https://kep.k8s.io/5055
-	// test-infra jobs:
-	// - "ci-kind-dra-all" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
-	//
-	// This label is used for tests which need:
-	// - the DynamicResourceAllocation *and* DRADeviceTaints feature gates
-	// - the resource.k8s.io API group, including version v1alpha3
-	DRADeviceTaints = framework.WithFeature(framework.ValidFeatures.Add("DRADeviceTaints"))
-
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	// OWNER: sig-node
 	// Testing downward API huge pages
 	DownwardAPIHugePages = framework.WithFeature(framework.ValidFeatures.Add("DownwardAPIHugePages"))
 
-	// owning-sig: sig-scheduling
-	// kep: https://kep.k8s.io/4816
-	// test-infra jobs:
-	// - "ci-kind-dra-all" in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
-	//
-	// This label is used for tests which need:
-	// - the DynamicResourceAllocation *and* DRAPrioritizedList feature gates
-	// - the resource.k8s.io API group
-	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
-	//   is enabled such that passing CDI device IDs through CRI fields is supported
-	DRAPrioritizedList = framework.WithFeature(framework.ValidFeatures.Add("DRAPrioritizedList"))
-
 	// owning-sig: sig-node
 	// kep: https://kep.k8s.io/4381
 	// test-infra jobs:
-	// - the non-"classic-dra" jobs in https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
+	// - https://testgrid.k8s.io/sig-node-dynamic-resource-allocation
 	//
-	// This label is used for tests which need:
-	// - *only* the DynamicResourceAllocation feature gate
-	// - the resource.k8s.io API group
+	// This feature label is used for tests which need:
+	// - kubelet support for plugins with the "usual" paths under /var/lib/kubelet
 	// - a container runtime where support for CDI (https://github.com/cncf-tags/container-device-interface)
 	//   is enabled such that passing CDI device IDs through CRI fields is supported
+	//
+	// In addition, tests must be labeled with framework.WithFeatureGate to document
+	// their dependency on specific feature gates and the corresponding API groups.
 	DynamicResourceAllocation = framework.WithFeature(framework.ValidFeatures.Add("DynamicResourceAllocation"))
 
 	// owning-sig: sig-node
