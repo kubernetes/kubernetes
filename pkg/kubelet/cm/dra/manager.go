@@ -697,6 +697,15 @@ func (m *ManagerImpl) watchResources(ctx context.Context, pluginName string, p *
 // HandleWatchResourcesStream processes health updates from the DRA plugin.
 func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.NodeHealth_WatchResourcesClient, pluginName string) error {
 	logger := klog.FromContext(ctx)
+
+	defer func() {
+		logger.Info("Clearing health cache for driver upon stream exit", "pluginName", pluginName)
+		// Use a separate context for clearDriver if needed, though background should be fine.
+		if err := m.healthInfoCache.clearDriver(pluginName); err != nil {
+			logger.Error(err, "Failed to clear health info cache for driver", "pluginName", pluginName)
+		}
+	}()
+
 	go func() {
 		for {
 			select {
@@ -761,6 +770,13 @@ func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream dra
 
 			}
 		}
+
 	}()
 	return nil
+}
+
+// Updates returns the channel that provides resource updates.
+func (m *ManagerImpl) Updates() <-chan resourceupdates.Update {
+	// Return the internal channel that HandleWatchResourcesStream writes to.
+	return m.update
 }
