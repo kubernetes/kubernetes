@@ -59,6 +59,9 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/gstruct"
+	gomegatypes "github.com/onsi/gomega/types"
 )
 
 const (
@@ -2480,26 +2483,24 @@ func countResourceQuota(ctx context.Context, c clientset.Interface, namespace st
 	})
 }
 
-// wait for resource quota status to show the expected used resources value
+// Wait for resource quota status to show the expected used resources value.
+// Other resources are ignored.
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
-	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		// used may not yet be calculated
-		if resourceQuota.Status.Used == nil {
-			return false, nil
-		}
-		// verify that the quota shows the expected used resource values
-		for k, v := range used {
-			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
-				framework.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
-				return false, nil
-			}
-		}
-		return true, nil
-	})
+	keys := gstruct.Keys{}
+	for k, v := range used {
+		keys[k] = matchQuantity(v)
+	}
+	haveUsedResources := gomega.HaveField("Status.Used", gstruct.MatchKeys(gstruct.IgnoreExtras, keys))
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources)
+	return err
+}
+
+func matchQuantity(expected resource.Quantity) gomegatypes.GomegaMatcher {
+	// resource.Quantity has its own Cmp method. It does not implement fmt.Stringer for values.
+	// ToUnstructured can be used instead to get a readable string.
+	return gcustom.MakeMatcher(func(actual resource.Quantity) (bool, error) {
+		return expected.Cmp(actual) == 0, nil
+	}).WithTemplate(`Expected {{.Actual.ToUnstructured}} {{.To}} equal {{.Data.ToUnstructured}}`).WithTemplateData(expected)
 }
 
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated
