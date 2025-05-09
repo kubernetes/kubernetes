@@ -142,7 +142,7 @@ func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRul
 	if !ok {
 		requestReceivedTimestamp = time.Now()
 	}
-	audit.LogRequestMetadata(ctx, req, requestReceivedTimestamp, rac.Level, attribs)
+	audit.LogRequestMetadata(ctx, req, requestReceivedTimestamp, attribs)
 
 	return ac, nil
 }

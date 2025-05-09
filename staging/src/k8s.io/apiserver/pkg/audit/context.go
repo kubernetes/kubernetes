@@ -46,8 +46,6 @@ type AuditContext struct {
 	// initialized indicates whether requestAuditConfig and sink have been populated and are safe to read unguarded.
 	// This should only be set via Init().
 	initialized atomic.Bool
-	// initialize wraps setting requestAuditConfig and sink, and is only called via Init().
-	initialize sync.Once
 	// requestAuditConfig is the audit configuration that applies to the request.
 	// This should only be written via Init(RequestAuditConfig, Sink), and only read when initialized.Load() is true.
 	requestAuditConfig RequestAuditConfig
@@ -81,16 +79,15 @@ func (ac *AuditContext) Enabled() bool {
 }
 
 func (ac *AuditContext) Init(requestAuditConfig RequestAuditConfig, sink Sink) error {
-	initialized := false
-	ac.initialize.Do(func() {
-		ac.requestAuditConfig = requestAuditConfig
-		ac.sink = sink
-		ac.initialized.Store(true)
-		initialized = true
-	})
-	if !initialized {
+	ac.lock.Lock()
+	defer ac.lock.Unlock()
+	if ac.initialized.Load() {
 		return errors.New("audit context was already initialized")
 	}
+	ac.requestAuditConfig = requestAuditConfig
+	ac.sink = sink
+	ac.event.Level = requestAuditConfig.Level
+	ac.initialized.Store(true)
 	return nil
 }
 
@@ -196,12 +193,6 @@ func (ac *AuditContext) GetEventLevel() auditinternal.Level {
 		level = event.Level
 	})
 	return level
-}
-
-func (ac *AuditContext) SetEventLevel(level auditinternal.Level) {
-	ac.visitEvent(func(event *auditinternal.Event) {
-		event.Level = level
-	})
 }
 
 func (ac *AuditContext) SetEventStage(stage auditinternal.Stage) {

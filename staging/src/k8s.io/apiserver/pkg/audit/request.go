@@ -40,7 +40,7 @@ const (
 	userAgentTruncateSuffix = "...TRUNCATED"
 )
 
-func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) {
+func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedTimestamp time.Time, attribs authorizer.Attributes) {
 	ac := AuditContextFrom(ctx)
 	if !ac.Enabled() {
 		return
@@ -51,7 +51,6 @@ func LogRequestMetadata(ctx context.Context, req *http.Request, requestReceivedT
 		ev.Verb = attribs.GetVerb()
 		ev.RequestURI = req.URL.RequestURI()
 		ev.UserAgent = maybeTruncateUserAgent(req)
-		ev.Level = level
 
 		ips := utilnet.SourceIPs(req)
 		ev.SourceIPs = make([]string, len(ips))

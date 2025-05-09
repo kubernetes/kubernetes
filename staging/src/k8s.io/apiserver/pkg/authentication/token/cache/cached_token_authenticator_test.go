@@ -35,7 +35,6 @@ import (
 
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -546,8 +545,6 @@ func (s *singleBenchmark) bench(b *testing.B) {
 // extraction.
 func withAudit(ctx context.Context) context.Context {
 	ctx = audit.WithAuditContext(ctx)
-	ac := audit.AuditContextFrom(ctx)
-	ac.SetEventLevel(auditinternal.LevelMetadata)
 	return ctx
 }
 

@@ -30,7 +30,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	auditapi "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
@@ -247,7 +246,6 @@ func TestCheckForHostnameError(t *testing.T) {
 			}
 			req = req.WithContext(audit.WithAuditContext(req.Context()))
 			auditCtx := audit.AuditContextFrom(req.Context())
-			auditCtx.SetEventLevel(auditapi.LevelMetadata)
 
 			_, err = client.Transport.RoundTrip(req)
 
@@ -390,7 +388,6 @@ func TestCheckForInsecureAlgorithmError(t *testing.T) {
 			}
 			req = req.WithContext(audit.WithAuditContext(req.Context()))
 			auditCtx := audit.AuditContextFrom(req.Context())
-			auditCtx.SetEventLevel(auditapi.LevelMetadata)
 
 			// can't use tlsServer.Client() as it contains the server certificate
 			// in tls.Config.Certificates. The signatures are, however, only checked
