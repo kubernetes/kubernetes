@@ -4618,6 +4618,19 @@ type PodStatus struct {
 	// +featureGate=DRAExtendedResource
 	// +optional
 	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatus
+
+	// AllocatedResources is the total requests allocated for this pod by the node.
+	// If pod-level requests are not set, this will be the total requests aggregated
+	// across containers in the pod.
+	// +featureGate=InPlacePodLevelResourcesVerticalScaling
+	// +optional
+	AllocatedResources ResourceList
+
+	// Resources represents the compute resource requests and limits that have been
+	// applied at the pod level
+	// +featureGate=InPlacePodLevelResourcesVerticalScaling
+	// +optional
+	Resources *ResourceRequirements
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

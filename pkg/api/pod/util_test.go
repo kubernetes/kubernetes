@@ -6591,3 +6591,145 @@ func TestValidateRestartAllContainersOption(t *testing.T) {
 		})
 	}
 }
+
+func TestDropDisabledPodStatusFields_InPlacePodLevelResourcesVerticalScaling(t *testing.T) {
+	testCases := []struct {
+		description                                string
+		hasInPlacePodLevelResourcesVerticalScaling bool
+		pod                                        func() *api.Pod
+	}{
+		{
+			description: "without pod-level status resources",
+			hasInPlacePodLevelResourcesVerticalScaling: false,
+			pod: func() *api.Pod {
+				return &api.Pod{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  "c1",
+								Image: "image",
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+									Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+								},
+								ResizePolicy: []api.ContainerResizePolicy{
+									{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+									{ResourceName: api.ResourceMemory, RestartPolicy: api.RestartContainer},
+								},
+							},
+						},
+					},
+					Status: api.PodStatus{
+						Resize: api.PodResizeStatusInProgress,
+						ContainerStatuses: []api.ContainerStatus{
+							{
+								Name:               "c1",
+								Image:              "image",
+								AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Resources: &api.ResourceRequirements{
+									Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+									Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			description: "with pod-level status resources",
+			hasInPlacePodLevelResourcesVerticalScaling: true,
+			pod: func() *api.Pod {
+				return &api.Pod{
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  "c1",
+								Image: "image",
+								Resources: api.ResourceRequirements{
+									Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+									Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+								},
+								ResizePolicy: []api.ContainerResizePolicy{
+									{ResourceName: api.ResourceCPU, RestartPolicy: api.NotRequired},
+									{ResourceName: api.ResourceMemory, RestartPolicy: api.RestartContainer},
+								},
+							},
+						},
+					},
+					Status: api.PodStatus{
+						Resources: &api.ResourceRequirements{
+							Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+							Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+						},
+						AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+						Resize:             api.PodResizeStatusInProgress,
+						ContainerStatuses: []api.ContainerStatus{
+							{
+								Name:               "c1",
+								Image:              "image",
+								AllocatedResources: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+								Resources: &api.ResourceRequirements{
+									Requests: api.ResourceList{api.ResourceCPU: resource.MustParse("200m")},
+									Limits:   api.ResourceList{api.ResourceCPU: resource.MustParse("300m")},
+								},
+							},
+						},
+					},
+				}
+			},
+		},
+		{
+			description: "is nil",
+			hasInPlacePodLevelResourcesVerticalScaling: false,
+			pod: func() *api.Pod { return nil },
+		},
+	}
+	for _, ippvsEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("InPlacePodLevelResourcesVerticalScaling=%t", ippvsEnabled), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, ippvsEnabled)
+			for _, oldPodInfo := range testCases {
+				for _, newPodInfo := range testCases {
+					oldPodHasInPlacePodLevelResourcesVerticalScaling, oldPod := oldPodInfo.hasInPlacePodLevelResourcesVerticalScaling, oldPodInfo.pod()
+					newPodHasInPlacePodLevelResourcesVerticalScaling, newPod := newPodInfo.hasInPlacePodLevelResourcesVerticalScaling, newPodInfo.pod()
+					if newPod == nil {
+						continue
+					}
+					t.Run(fmt.Sprintf("old pod %v, new pod %v", oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+						var oldPodSpec *api.PodSpec
+						var oldPodStatus *api.PodStatus
+						if oldPod != nil {
+							oldPodSpec = &oldPod.Spec
+							oldPodStatus = &oldPod.Status
+						}
+						dropDisabledPodStatusFields(&newPod.Status, oldPodStatus, &newPod.Spec, oldPodSpec)
+
+						// old pod should never be changed
+						if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+							t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+						}
+
+						switch {
+						case ippvsEnabled || oldPodHasInPlacePodLevelResourcesVerticalScaling:
+							// new pod shouldn't change if feature enabled
+							expected := newPodInfo.pod()
+							if !reflect.DeepEqual(newPod, expected) {
+								t.Errorf("new pod changed: %v %t", cmp.Diff(newPod, expected), ippvsEnabled)
+							}
+						case newPodHasInPlacePodLevelResourcesVerticalScaling:
+							// new pod should be changed
+							if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod was not changed")
+							}
+						default:
+							// new pod should not need to be changed
+							if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+								t.Errorf("new pod changed: %v %t", cmp.Diff(newPod, newPodInfo.pod()), newPodHasInPlacePodLevelResourcesVerticalScaling)
+							}
+						}
+					})
+				}
+			}
+		})
+	}
+}
