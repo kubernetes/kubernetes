@@ -343,6 +343,58 @@ var _ = SIGDescribe("Pods Extended", func() {
 				framework.Failf("error waiting for pod to be evicted: %v", err)
 			}
 
+			err = e2epod.EnsureValidContainerTerminatedReason(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "bar", 2*time.Minute)
+			if err != nil {
+				framework.Failf("error waiting for a valid terminated reason: %v", err)
+			}
+		})
+
+		// This test is similar to the one above, but it sleeps for a shorter time
+		// before being evicted. This is to test the case where the pod exists before
+		// the pod is evicted for ephemeral storage.
+		ginkgo.It("evicted pods should be terminal(failing)", func(ctx context.Context) {
+			ginkgo.By("creating the pod that should be evicted")
+
+			name := "pod-should-be-evicted" + string(uuid.NewUUID())
+			image := imageutils.GetE2EImage(imageutils.BusyBox)
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: name,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyOnFailure,
+					Containers: []v1.Container{
+						{
+							Name:  "bar",
+							Image: image,
+							Command: []string{
+								"/bin/sh", "-c", "sleep 10; dd if=/dev/zero of=file bs=1M count=10; exit 1",
+							},
+							Resources: v1.ResourceRequirements{
+								Limits: v1.ResourceList{
+									"ephemeral-storage": resource.MustParse("5Mi"),
+								},
+							}},
+					},
+				},
+			}
+
+			ginkgo.By("submitting the pod to kubernetes")
+			podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) error {
+				ginkgo.By("deleting the pod")
+				return podClient.Delete(ctx, pod.Name, metav1.DeleteOptions{})
+			})
+
+			err := e2epod.WaitForPodTerminatedInNamespace(ctx, f.ClientSet, pod.Name, "Evicted", f.Namespace.Name)
+			if err != nil {
+				framework.Failf("error waiting for pod to be evicted: %v", err)
+			}
+
+			err = e2epod.EnsureValidContainerTerminatedReason(ctx, f.ClientSet, f.Namespace.Name, pod.Name, "bar", 2*time.Minute)
+			if err != nil {
+				framework.Failf("error waiting for a valid terminated reason: %v", err)
+			}
 		})
 	})
 
