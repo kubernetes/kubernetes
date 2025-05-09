@@ -34,7 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/metrics"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -209,8 +209,7 @@ func NewCommand() *cobra.Command {
 		devices := make([]resourceapi.Device, *numDevices)
 		for i := 0; i < *numDevices; i++ {
 			devices[i] = resourceapi.Device{
-				Name:  fmt.Sprintf("device-%02d", i),
-				Basic: &resourceapi.BasicDevice{},
+				Name: fmt.Sprintf("device-%02d", i),
 			}
 		}
 		driverResources := resourceslice.DriverResources{
