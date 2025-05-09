@@ -218,7 +218,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			partitionableDevices: true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithPartitionableDevices.DeepCopy()
-				obj.ObjectMeta.Generation = 1
+				obj.Generation = 1
 				return obj
 			}(),
 		},
@@ -228,7 +228,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			deviceStatus:      false,
 			expectObj: func() *resource.ResourceSlice {
 				obj := slice.DeepCopy()
-				obj.ObjectMeta.Generation = 1
+				obj.Generation = 1
 				return obj
 			}(),
 		},
@@ -238,7 +238,7 @@ func TestResourceSliceStrategyCreate(t *testing.T) {
 			deviceStatus:      true,
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithBindingConditions.DeepCopy()
-				obj.ObjectMeta.Generation = 1
+				obj.Generation = 1
 				return obj
 			}(),
 		},
@@ -456,7 +456,7 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			expectObj: func() *resource.ResourceSlice {
 				obj := slice.DeepCopy()
 				obj.ResourceVersion = "4"
-				obj.ObjectMeta.Generation = 1
+				obj.Generation = 1
 				return obj
 			}(),
 			bindingConditions: false,
@@ -473,7 +473,6 @@ func TestResourceSliceStrategyUpdate(t *testing.T) {
 			expectObj: func() *resource.ResourceSlice {
 				obj := sliceWithBindingConditions.DeepCopy()
 				obj.ResourceVersion = "4"
-				obj.ObjectMeta.Generation = 1
 				obj.Generation = 1
 				return obj
 			}(),
