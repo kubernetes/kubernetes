@@ -804,13 +804,14 @@ type DeviceSubRequest struct {
 	// +optional
 	AllocationMode DeviceAllocationMode `json:"allocationMode,omitempty" protobuf:"bytes,4,opt,name=allocationMode"`
 
-	// Count is used only when the count mode is "ExactCount". Must be greater than zero
-	// unless the subrequest is the last entry in the FirstAvailable list. For the last entry,
-	// a count of zero is allowed.
-	// If AllocationMode is ExactCount and this field is not specified, the default is one.
+	// Count is used only when the AllocationMode is "ExactCount". Must be greater than zero
+	// unless the subrequest is the last entry in the FirstAvailable list and there are at least
+	// two subrequests in the FirstAvailable list.
+	//
+	// If AllocationMode is ExactCount and Count is zero, it will be defaulted to one unless
+	// the subrequests meets the criteria for having a zero count described above.
 	//
 	// +optional
-	// +oneOf=AllocationMode
 	Count int64 `json:"count,omitempty" protobuf:"bytes,5,opt,name=count"`
 
 	// If specified, the request's tolerations.

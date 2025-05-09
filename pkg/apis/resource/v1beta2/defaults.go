@@ -28,17 +28,24 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_ExactDeviceRequest(obj *resourceapi.ExactDeviceRequest) {
-	if obj.AllocationMode == "" {
-		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
-	}
+func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
+	for i := range obj.FirstAvailable {
+		if obj.FirstAvailable[i].AllocationMode == "" {
+			obj.FirstAvailable[i].AllocationMode = resourceapi.DeviceAllocationModeExactCount
+		}
 
-	if obj.AllocationMode == resourceapi.DeviceAllocationModeExactCount && obj.Count == 0 {
-		obj.Count = 1
+		// We allow the count to be zero for the last entry in the FirstAvailable list
+		// unless it is the only subrequest. So for other situations, we default the Count
+		// to 1 if it set to zero and the allocationMode is ExactCount.
+		if len(obj.FirstAvailable) == 1 || i < len(obj.FirstAvailable)-1 {
+			if obj.FirstAvailable[i].AllocationMode == resourceapi.DeviceAllocationModeExactCount && obj.FirstAvailable[i].Count == 0 {
+				obj.FirstAvailable[i].Count = 1
+			}
+		}
 	}
 }
 
-func SetDefaults_DeviceSubRequest(obj *resourceapi.DeviceSubRequest) {
+func SetDefaults_ExactDeviceRequest(obj *resourceapi.ExactDeviceRequest) {
 	if obj.AllocationMode == "" {
 		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
 	}
