@@ -65,8 +65,8 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			}
 
 			fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
-			_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
-			smtLevel = getSMTLevel()
+			_, cpuAlloc, _ := getLocalNodeCPUDetails(ctx, f)
+			smtLevel = smtLevelFromSysFS()
 
 			// strict SMT alignment is trivially verified and granted on non-SMT systems
 			if smtLevel < 2 {
@@ -408,7 +408,7 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 			updateKubeletConfig(ctx, f, newCfg, true)
 
 			ginkgo.By("Checking the cpumanager allocation per NUMA metric right after the kubelet restart, with no pods running")
-			numaNodes, _, _ := hostCheck()
+			numaNodes, _, _, _ := hostCheck()
 
 			framework.Logf("numaNodes on the system %d", numaNodes)
 
@@ -432,7 +432,6 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 		})
 
 		ginkgo.It("should report allocation per NUMA metric when handling guaranteed pods", func(ctx context.Context) {
-			var cpusNumPerNUMA, coresNumPerNUMA, numaNodes, threadsPerCore int
 			cpuPolicyOptions := map[string]string{
 				cpumanager.DistributeCPUsAcrossNUMAOption: "true",
 				cpumanager.FullPCPUsOnlyOption:            "true",
@@ -448,15 +447,9 @@ var _ = SIGDescribe("CPU Manager Metrics", framework.WithSerial(), feature.CPUMa
 
 			updateKubeletConfig(ctx, f, newCfg, true)
 
-			numaNodes, coresNumPerNUMA, threadsPerCore = hostCheck()
-			cpusNumPerNUMA = coresNumPerNUMA * threadsPerCore
+			numaNodes, _, _, cpusNumPerNUMA := hostCheck()
 
-			framework.Logf("numaNodes on the system %d", numaNodes)
-			framework.Logf("Cores per NUMA on the system %d", coresNumPerNUMA)
-			framework.Logf("Threads per Core on the system %d", threadsPerCore)
-			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
-
-			smtLevel = getSMTLevel()
+			smtLevel = smtLevelFromSysFS()
 			framework.Logf("SMT Level on the system %d", smtLevel)
 
 			ginkgo.By("Querying the podresources endpoint to get the baseline")

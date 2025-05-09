@@ -42,7 +42,7 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 	ginkgo.Context("when querying /metrics", func() {
 		var oldCfg *kubeletconfig.KubeletConfiguration
 		var testPod *v1.Pod
-		var cpusNumPerNUMA, coresNumPerNUMA, numaNodes, threadsPerCore int
+		var cpusNumPerNUMA int
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			var err error
@@ -51,17 +51,7 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 				framework.ExpectNoError(err)
 			}
 
-			numaNodes, coresNumPerNUMA, threadsPerCore = hostCheck()
-			cpusNumPerNUMA = coresNumPerNUMA * threadsPerCore
-
-			// It is safe to assume that the CPUs are distributed equally across
-			// NUMA nodes and therefore number of CPUs on all NUMA nodes are same
-			// so we just check the CPUs on the first NUMA node
-
-			framework.Logf("numaNodes on the system %d", numaNodes)
-			framework.Logf("Cores per NUMA on the system %d", coresNumPerNUMA)
-			framework.Logf("Threads per Core on the system %d", threadsPerCore)
-			framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
+			_, _, _, cpusNumPerNUMA = hostCheck()
 
 			policy := topologymanager.PolicySingleNumaNode
 			scope := podScopeTopology
@@ -196,7 +186,7 @@ var _ = SIGDescribe("Topology Manager Metrics", framework.WithSerial(), feature.
 	})
 })
 
-func hostCheck() (int, int, int) {
+func hostCheck() (int, int, int, int) {
 	// this is a very rough check. We just want to rule out system that does NOT have
 	// multi-NUMA nodes or at least 4 cores
 
@@ -212,7 +202,18 @@ func hostCheck() (int, int, int) {
 
 	threadsPerCore := detectThreadPerCore()
 
-	return numaNodes, coreCount, threadsPerCore
+	cpusNumPerNUMA := coreCount * threadsPerCore
+
+	// It is safe to assume that the CPUs are distributed equally across
+	// NUMA nodes and therefore number of CPUs on all NUMA nodes are same
+	// so we just check the CPUs on the first NUMA node
+
+	framework.Logf("numaNodes on the system %d", numaNodes)
+	framework.Logf("Cores per NUMA on the system %d", coreCount)
+	framework.Logf("Threads per Core on the system %d", threadsPerCore)
+	framework.Logf("CPUs per NUMA on the system %d", cpusNumPerNUMA)
+
+	return numaNodes, coreCount, threadsPerCore, cpusNumPerNUMA
 }
 
 func checkMetricValueGreaterThan(value interface{}) types.GomegaMatcher {
