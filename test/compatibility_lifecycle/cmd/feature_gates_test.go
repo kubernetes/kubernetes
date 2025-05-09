@@ -895,6 +895,79 @@ func TestVerifyFeatureRemoval(t *testing.T) {
 	}
 }
 
+func TestVerifyFeatureCleanup(t *testing.T) {
+	tests := []struct {
+		name                    string
+		featureList             []featureInfo
+		currentVersion          *version.Version
+		expectErr               bool
+		expectErrMsgContains    []string
+		expectErrMsgNotContains []string
+	}{
+		{
+			name: "multiple features needing cleanup",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
+				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
+			},
+			currentVersion:       version.MustParse("1.7"),
+			expectErr:            true,
+			expectErrMsgContains: []string{"FeatureA", "FeatureB"},
+		},
+		{
+			name: "some but not all features needing cleanup",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.4", PreRelease: "Beta"}, {Version: "1.5", PreRelease: "GA", LockToDefault: true}}},
+				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
+			},
+			currentVersion:          version.MustParse("1.7"),
+			expectErr:               true,
+			expectErrMsgContains:    []string{"FeatureB"},
+			expectErrMsgNotContains: []string{"FeatureA"},
+		},
+		{
+			name: "locked feature not needing cleanup yet",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
+			},
+			currentVersion: version.MustParse("1.6"),
+			expectErr:      false,
+		},
+		{
+			name: "feature that is not locked",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA"}}},
+			},
+			currentVersion: version.MustParse("1.7"),
+			expectErr:      false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := verifyFeatureCleanup(tc.featureList, tc.currentVersion)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				for _, msg := range tc.expectErrMsgContains {
+					if !strings.Contains(err.Error(), msg) {
+						t.Fatalf("expected error message to contain %q, got %q", msg, err.Error())
+					}
+				}
+				for _, msg := range tc.expectErrMsgNotContains {
+					if strings.Contains(err.Error(), msg) {
+						t.Fatalf("expected error message to not contain %q, got %q", msg, err.Error())
+					}
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			}
+		})
+	}
+}
+
 func TestVerifyAlphaFeatures(t *testing.T) {
 	tests := []struct {
 		name           string
