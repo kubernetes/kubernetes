@@ -343,6 +343,17 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 			{"foo": "bar"},
 			{"baz": "biz"},
 		}},
+		// First document is JSON, second is YAML but with smaller size.
+		{"{\"foo\": \"bar\"}\n---\na: b", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"a": "b"},
+		}},
+		// First document is JSON, second is YAML,but with smaller size and
+		// trailing whitespace.
+		{"{\"foo\": \"bar\"}    \n---\na: b", 100, false, false, []generic{
+			{"foo": "bar"},
+			{"a": "b"},
+		}},
 		// First document is JSON, second is YAML, longer than the buffer
 		{"{\"foo\": \"bar\"}\n---\n{baz: biz0123456780123456780123456780123456780123456789}", 20, false, false, []generic{
 			{"foo": "bar"},
