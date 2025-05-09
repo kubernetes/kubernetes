@@ -561,6 +561,38 @@ func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestExternalPerPodMetricReplicaOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  1,
+		expectedReplicas: math.MaxInt32,
+		metric: &metricInfo{
+			name:              "qps",
+			levels:            []int64{math.MaxInt64},
+			perPodTargetUsage: 1, // Set to 1 to test replica calculation when targeting a 1:1 ratio between metric value and number of pods
+			metricType:        externalPerPodMetric,
+			expectedUsage:     math.MaxInt64,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestExternalPerPodMetricUsageOverflow(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  1,
+		expectedReplicas: 1,
+		metric: &metricInfo{
+			name:              "qps",
+			levels:            []int64{math.MaxInt64},
+			perPodTargetUsage: math.MaxInt64, // Set to a high value to test replica calculation when targeting a high value:1 ratio between metric value and number of pods
+			metricType:        externalPerPodMetric,
+			expectedUsage:     math.MaxInt64,
+			selector:          &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestReplicaCalcScaleHotCpuNoScale(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
