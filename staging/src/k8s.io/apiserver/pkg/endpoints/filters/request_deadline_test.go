@@ -70,7 +70,8 @@ func TestParseTimeout(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request, err := http.NewRequest(http.MethodGet, test.url, nil)
+			ctx := t.Context()
+			request, err := http.NewRequestWithContext(ctx, http.MethodGet, test.url, nil)
 			if err != nil {
 				t.Fatalf("failed to create new http request - %v", err)
 			}
@@ -442,12 +443,12 @@ func TestWithFailedRequestAudit(t *testing.T) {
 }
 
 func newRequest(t *testing.T, requestURL string) *http.Request {
-	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
+	ctx := t.Context()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, requestURL, nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
-	ctx := audit.WithAuditContext(req.Context())
-	return req.WithContext(ctx)
+	return req.WithContext(audit.WithAuditContext(req.Context()))
 }
 
 func message(err error) string {

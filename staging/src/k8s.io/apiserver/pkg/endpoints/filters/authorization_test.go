@@ -209,11 +209,12 @@ func TestGetAuthorizerAttributes(t *testing.T) {
 
 	for k, tc := range testcases {
 		t.Run(k, func(t *testing.T) {
+			ctx := t.Context()
 			if tc.EnableAuthorizationSelector {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, true)
 			}
 
-			req, _ := http.NewRequest(tc.Verb, tc.Path, nil)
+			req, _ := http.NewRequestWithContext(ctx, tc.Verb, tc.Path, nil)
 			req.RemoteAddr = "127.0.0.1"
 
 			var attribs authorizer.Attributes
@@ -282,10 +283,11 @@ func TestAuditAnnotation(t *testing.T) {
 	scheme := runtime.NewScheme()
 	negotiatedSerializer := serializer.NewCodecFactory(scheme).WithoutConversion()
 	for k, tc := range testcases {
+		ctx := t.Context()
 		handler := WithAuthorization(&fakeHTTPHandler{}, tc.authorizer, negotiatedSerializer)
 		// TODO: fake audit injector
 
-		req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespaces/default/pods", nil)
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces/default/pods", nil)
 		req = withTestContext(req, nil, &auditinternal.Event{Level: auditinternal.LevelMetadata})
 		ae := audit.AuditContextFrom(req.Context())
 		req.RemoteAddr = "127.0.0.1"

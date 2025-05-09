@@ -216,6 +216,7 @@ func TestDeleteCollection(t *testing.T) {
 }
 
 func TestDeleteCollectionWithNoContextDeadlineEnforced(t *testing.T) {
+	ctx := t.Context()
 	var invokedGot, hasDeadlineGot int32
 	fakeDeleterFn := func(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
 		// we expect CollectionDeleter to be executed once
@@ -237,7 +238,7 @@ func TestDeleteCollectionWithNoContextDeadlineEnforced(t *testing.T) {
 	}
 	handler := DeleteCollection(fakeCollectionDeleterFunc(fakeDeleterFn), false, scope, nil)
 
-	request, err := http.NewRequest(request.MethodGet, "/test", nil)
+	request, err := http.NewRequestWithContext(ctx, request.MethodGet, "/test", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

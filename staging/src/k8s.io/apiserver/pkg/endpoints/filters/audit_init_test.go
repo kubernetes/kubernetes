@@ -62,6 +62,7 @@ func TestWithAuditID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
 			const auditKey = "Audit-ID"
 			var (
 				innerHandlerCallCount int
@@ -83,7 +84,7 @@ func TestWithAuditID(t *testing.T) {
 				wrapped = withAuditInit(handler, test.newAuditIDFunc)
 			}
 
-			testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+			testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 			if err != nil {
 				t.Fatalf("failed to create new http request - %v", err)
 			}

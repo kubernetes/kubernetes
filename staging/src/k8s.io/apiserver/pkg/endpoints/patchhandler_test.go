@@ -30,6 +30,7 @@ import (
 )
 
 func TestPatch(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &genericapitesting.Simple{
@@ -47,7 +48,7 @@ func TestPatch(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	request, err := http.NewRequestWithContext(ctx, request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -65,6 +66,7 @@ func TestPatch(t *testing.T) {
 }
 
 func TestForbiddenForceOnNonApply(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &genericapitesting.Simple{
@@ -82,7 +84,7 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	req, err := http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	req, err := http.NewRequestWithContext(ctx, request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -92,7 +94,7 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	req, err = http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=true", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	req, err = http.NewRequestWithContext(ctx, request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=true", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -105,7 +107,7 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 		t.Errorf("Unexpected response %#v", response)
 	}
 
-	req, err = http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=false", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
+	req, err = http.NewRequestWithContext(ctx, request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID+"?force=false", bytes.NewReader([]byte(`{"labels":{"foo":"bar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -120,6 +122,7 @@ func TestForbiddenForceOnNonApply(t *testing.T) {
 }
 
 func TestPatchRequiresMatchingName(t *testing.T) {
+	ctx := t.Context()
 	storage := map[string]rest.Storage{}
 	ID := "id"
 	item := &genericapitesting.Simple{
@@ -137,7 +140,7 @@ func TestPatchRequiresMatchingName(t *testing.T) {
 	defer server.Close()
 
 	client := http.Client{}
-	request, err := http.NewRequest(request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
+	request, err := http.NewRequestWithContext(ctx, request.MethodPatch, server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, bytes.NewReader([]byte(`{"metadata":{"name":"idbar"}}`)))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

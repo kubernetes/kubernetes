@@ -706,6 +706,7 @@ func TestAudit(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
+			ctx := t.Context()
 			sink := &fakeAuditSink{}
 			fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, test.omitStages)
 			handler := WithAudit(http.HandlerFunc(test.handler), sink, fakeRuleEvaluator, func(r *http.Request, ri *request.RequestInfo) bool {
@@ -714,7 +715,7 @@ func TestAudit(t *testing.T) {
 			})
 			handler = WithAuditInit(handler)
 
-			req, _ := http.NewRequest(test.verb, test.path, nil)
+			req, _ := http.NewRequestWithContext(ctx, test.verb, test.path, nil)
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 			if test.auditID != "" {
 				req.Header.Add("Audit-ID", test.auditID)
@@ -777,15 +778,17 @@ func TestAudit(t *testing.T) {
 }
 
 func TestAuditNoPanicOnNilUser(t *testing.T) {
+	ctx := t.Context()
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithAudit(&fakeHTTPHandler{}, &fakeAuditSink{}, fakeRuleEvaluator, nil)
-	req, _ := http.NewRequest(request.MethodGet, "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req = withTestContext(req, nil, nil)
 	req.RemoteAddr = "127.0.0.1"
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 }
 
 func TestAuditLevelNone(t *testing.T) {
+	ctx := t.Context()
 	sink := &fakeAuditSink{}
 	var handler http.Handler
 	handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -794,7 +797,7 @@ func TestAuditLevelNone(t *testing.T) {
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelNone, nil)
 	handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 
-	req, _ := http.NewRequest(request.MethodGet, "/api/v1/namespaces/default/pods", nil)
+	req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 
@@ -841,6 +844,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 		},
 	} {
 		t.Run(test.desc, func(t *testing.T) {
+			ctx := t.Context()
 			sink := &fakeAuditSink{}
 			var handler http.Handler
 			handler = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -850,7 +854,7 @@ func TestAuditIDHttpHeader(t *testing.T) {
 			handler = WithAudit(handler, sink, fakeRuleEvaluator, nil)
 			handler = WithAuditInit(handler)
 
-			req, _ := http.NewRequest(request.MethodGet, "/api/v1/namespaces/default/pods", nil)
+			req, _ := http.NewRequestWithContext(ctx, request.MethodGet, "/api/v1/namespaces/default/pods", nil)
 			req.RemoteAddr = "127.0.0.1"
 			req = withTestContext(req, &user.DefaultInfo{Name: "admin"}, nil)
 			if test.requestHeader != "" {
