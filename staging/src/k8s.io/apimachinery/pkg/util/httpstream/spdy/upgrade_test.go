@@ -68,7 +68,7 @@ func TestUpgradeResponse(t *testing.T) {
 		}))
 		defer server.Close()
 
-		req, err := http.NewRequest("GET", server.URL, nil)
+		req, err := http.NewRequest(http.MethodGet, server.URL, nil)
 		if err != nil {
 			t.Fatalf("%d: error creating request: %s", i, err)
 		}
