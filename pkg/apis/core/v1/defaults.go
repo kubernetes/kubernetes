@@ -198,6 +198,10 @@ func SetDefaults_Pod(obj *v1.Pod) {
 		defaultPodRequests(obj)
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+		defaultPodStatusAllocatedResources(obj)
+	}
+
 	if obj.Spec.EnableServiceLinks == nil {
 		enableServiceLinks := v1.DefaultEnableServiceLinks
 		obj.Spec.EnableServiceLinks = &enableServiceLinks
@@ -523,5 +527,16 @@ func defaultHugePagePodLimits(pod *v1.Pod) {
 	// contains entries after collecting container-level limits and pod-level limits for hugepages.
 	if len(podLims) > 0 {
 		pod.Spec.Resources.Limits = podLims
+	}
+}
+
+func defaultPodStatusAllocatedResources(obj *v1.Pod) {
+	if obj.Spec.Resources == nil {
+		return
+	}
+
+	obj.Status.AllocatedResources = make(v1.ResourceList)
+	for name, quantity := range obj.Spec.Resources.Requests {
+		obj.Status.AllocatedResources[name] = quantity.DeepCopy()
 	}
 }
