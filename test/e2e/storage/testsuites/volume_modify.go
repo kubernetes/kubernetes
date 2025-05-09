@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -66,8 +65,8 @@ func InitCustomVolumeModifyTestSuite(patterns []storageframework.TestPattern) st
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
-			// TODO: Remove feature.Beta once the csi driver is promoted to GA and the manifest is updated.
-			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass), feature.Beta},
+			// TODO: Remove feature.OffByDefault once the csi driver is promoted to GA and the manifest is updated.
+			TestTags: []interface{}{feature.OffByDefault},
 		},
 	}
 }
