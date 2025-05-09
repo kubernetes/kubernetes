@@ -95,7 +95,12 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		err = waitForMemoryPressureTaintRemoval(ctx, f, node.Name, 10*time.Minute)
 		framework.ExpectNoError(err, "Timed out waiting for memory-pressure taint to be removed from node %q", node.Name)
 
-		cleanupImagePullerPods(ctx, f)
+		// Delete img-puller pods if they exist because eviction manager keeps selecting them for eviction first
+		// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
+		// image pre-pulling was enabled.
+		cleanupPods(ctx, f, "img-puller")
+
+		cleanupPods(ctx, f, "reboot-host-test-windows")
 
 		ginkgo.DeferCleanup(f.DeleteNamespace, f.Namespace.Name)
 
@@ -173,9 +178,11 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		if ginkgo.CurrentSpecReport().Failed() {
-			logNodeMemoryDebugInfo(ctx, f, node.Name, f.Namespace.Name, "pod2")
-		}
+		defer func() {
+			if ginkgo.CurrentSpecReport().Failed() {
+				logNodeMemoryDebugInfo(ctx, f, node.Name, f.Namespace.Name, "pod2")
+			}
+		}()
 
 		ginkgo.By("Waiting for pod2 to start running")
 		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2)
@@ -237,14 +244,11 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 	})
 }))
 
-// Delete img-puller pods if they exist because eviction manager keeps selecting them for eviction first
-// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
-// image pre-pulling was enabled.
-func cleanupImagePullerPods(ctx context.Context, f *framework.Framework) {
+func cleanupPods(ctx context.Context, f *framework.Framework, namespace string) {
 	nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	for _, ns := range nsList.Items {
-		if strings.Contains(ns.Name, "img-puller") {
+		if strings.Contains(ns.Name, namespace) {
 			framework.Logf("Deleting pods in namespace %s", ns.Name)
 			podList, err := f.ClientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
 			framework.ExpectNoError(err)
