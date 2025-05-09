@@ -1842,7 +1842,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			mustDelete(f.ClientSet, "admin", createdClusterSlice)
 		})
 
-		f.It("must manage ResourceSlices", f.WithSlow(), func(ctx context.Context) {
+		f.It("must manage ResourceSlices", func(ctx context.Context) {
 			driverName := driver.Name
 
 			// Now check for exactly the right set of objects for all nodes.
@@ -1871,9 +1871,9 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 						// for PRs (it's slow) and don't want CI breaks when fields get added or renamed.
 						"Spec": gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
 							"Driver":       gomega.Equal(driver.Name),
-							"NodeName":     gomega.Equal(nodeName),
+							"NodeName":     gomega.Equal(ptr.To(nodeName)),
 							"NodeSelector": gomega.BeNil(),
-							"AllNodes":     gomega.BeFalseBecause("slice should be using NodeName"),
+							"AllNodes":     gomega.BeNil(),
 							"Pool": gstruct.MatchAllFields(gstruct.Fields{
 								"Name":               gomega.Equal(nodeName),
 								"Generation":         gstruct.Ignore(),
@@ -2087,12 +2087,16 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		b.testPod(ctx, f, pod)
 
 		// The slices should have survived the update, but only if it happened
-		// quickly enough. If it took too long, the kubelet considered the driver
-		// gone and removed them.
-		if updateDuration <= 3*time.Minute {
+		// quickly enough. If it took too long (= wipingDelay of 30 seconds in pkg/kubelet/cm/dra/manager.go,
+		// https://github.com/kubernetes/kubernetes/blob/03763fd1abdf0f5d3dfceb3a6b138bb643e37411/pkg/kubelet/cm/dra/manager.go#L113),
+		// the kubelet considered the driver gone and removed them.
+		if updateDuration <= 25*time.Second {
+			framework.Logf("Checking resource slices after downtime of %s.", updateDuration)
 			newSlices, err := listSlices(ctx)
 			framework.ExpectNoError(err, "list slices again")
-			gomega.Expect(newSlices.Items).To(gomega.ConsistOf(oldSlices.Items))
+			gomega.Expect(newSlices.Items).To(gomega.ConsistOf(oldSlices.Items), "Old slice should have survived a downtime of %s.", updateDuration)
+		} else {
+			framework.Logf("Not checking resource slices, downtime was too long with %s.", updateDuration)
 		}
 
 		// We need to clean up explicitly because the normal
