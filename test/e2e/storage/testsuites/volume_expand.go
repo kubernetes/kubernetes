@@ -312,6 +312,78 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while verifying recovery related fields")
 		})
 
+		ginkgo.It("should resize volume when PVC is edited and the pod is re-created on the same node after controller resize is finished", func(ctx context.Context) {
+			init(ctx)
+			ginkgo.DeferCleanup(cleanup)
+
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support online volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
+
+			var err error
+			ginkgo.By("Creating a pod with dynamically provisioned volume")
+			podConfig := e2epod.Config{
+				NS:            f.Namespace.Name,
+				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel:  e2epod.GetLinuxLabel(),
+				NodeSelection: l.config.ClientNodeSelection,
+				ImageID:       e2epod.GetDefaultTestImageID(),
+			}
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, &podConfig, f.Timeouts.PodStart)
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod)
+			framework.ExpectNoError(err, "While creating pods for resizing")
+
+			// We expand the PVC while l.pod is using it for online expansion.
+			ginkgo.By("Expanding current pvc")
+			currentPvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			newSize := currentPvcSize.DeepCopy()
+			newSize.Add(resource.MustParse("1Gi"))
+			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
+			newPVC, err := ExpandPVCSize(ctx, l.resource.Pvc, newSize, f.ClientSet)
+			framework.ExpectNoError(err, "While updating pvc for more size")
+			l.resource.Pvc = newPVC
+			gomega.Expect(l.resource.Pvc).NotTo(gomega.BeNil())
+
+			pvcSize := l.resource.Pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			if pvcSize.Cmp(newSize) != 0 {
+				framework.Failf("error updating pvc size %q", l.resource.Pvc.Name)
+			}
+
+			ginkgo.By("Waiting for cloudprovider resize to finish")
+			err = WaitForControllerVolumeResize(ctx, l.resource.Pvc, f.ClientSet, totalResizeWaitPeriod)
+			framework.ExpectNoError(err, "While waiting for pvc resize to finish")
+
+			ginkgo.By("Deleting the pod")
+			nodeName := l.pod.Spec.NodeName
+			err = e2epod.DeletePodWithWait(ctx, f.ClientSet, l.pod)
+			framework.ExpectNoError(err, "while deleting pod for resizing")
+			l.pod = nil
+
+			ginkgo.By("Creating a new pod with same volume on the same node")
+			podConfig = e2epod.Config{
+				NS:           f.Namespace.Name,
+				PVCs:         []*v1.PersistentVolumeClaim{l.resource.Pvc},
+				SeLinuxLabel: e2epod.GetLinuxLabel(),
+				// The reason we use this node selection is because we do not want pod to move to different node when pod is deleted.
+				// Keeping pod on same node reproduces the scenario that volume might already be mounted when resize is attempted.
+				// We should consider adding a unit test that exercises this better.
+				NodeSelection: e2epod.NodeSelection{Name: nodeName},
+				ImageID:       e2epod.GetDefaultTestImageID(),
+			}
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(ctx, f.ClientSet, &podConfig, f.Timeouts.PodStart)
+			ginkgo.DeferCleanup(e2epod.DeletePodWithWait, f.ClientSet, l.pod2)
+			framework.ExpectNoError(err, "while creating pod for resizing")
+
+			ginkgo.By("Waiting for file system resize to finish")
+			l.resource.Pvc, err = WaitForFSResize(ctx, l.resource.Pvc, f.ClientSet)
+			framework.ExpectNoError(err, "while waiting for fs resize to finish")
+
+			pvcConditions := l.resource.Pvc.Status.Conditions
+			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+
+			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
+			framework.ExpectNoError(err, "while verifying recovery related fields")
+		})
 	}
 }
 
