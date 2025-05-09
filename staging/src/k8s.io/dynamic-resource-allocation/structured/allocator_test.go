@@ -443,8 +443,8 @@ func allocationResult(selector *v1.NodeSelector, results ...resourceapi.DeviceRe
 			"Results": gomega.ConsistOf(results), // Order is irrelevant.
 			"Config":  gomega.BeNil(),
 		}),
-		"NodeSelector":     matchNodeSelector(selector),
-		"BindingStartTime": gomega.BeNil(),
+		"NodeSelector":        matchNodeSelector(selector),
+		"AllocationTimestamp": gomega.BeNil(),
 	})
 }
 

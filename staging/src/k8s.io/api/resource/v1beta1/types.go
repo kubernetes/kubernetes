@@ -343,11 +343,11 @@ type BasicDevice struct {
 	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	UsageRestrictedToNode *bool `json:"usageRestrictedToNode,omitempty" protobuf:"varint,8,opt,name=usageRestrictedToNode"`
 
 	// BindingConditions defines the conditions for proceeding with binding.
@@ -359,12 +359,12 @@ type BasicDevice struct {
 	//
 	// The conditions must be a valid condition type string.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,9,rep,name=bindingConditions"`
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -375,12 +375,12 @@ type BasicDevice struct {
 	//
 	// The conditions must be a valid condition type string.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,10,rep,name=bindingFailureConditions"`
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
@@ -390,11 +390,11 @@ type BasicDevice struct {
 	// No matter what timeouts were specified by the driver, the scheduler will not wait
 	// longer than 20 minutes. This may change.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,11,opt,name=bindingTimeoutSeconds"`
 }
 
@@ -1259,14 +1259,15 @@ type AllocationResult struct {
 	// supported.
 	// Controller string `json:"controller,omitempty" protobuf:"bytes,4,opt,name=controller"`
 
-	// BindingStartTime is the time when the binding was
-	// started. This is used to determine whether the allocation
-	// timed out. It is set by the scheduler when it starts
-	// allocating the claim.
+	// AllocationTimestamp stores the time when the resources were allocated.
+	// This field is not guaranteed to be set, in which case that time is unknown.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gate.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
-	BindingStartTime *metav1.Time `json:"bindingStartTime,omitempty" protobuf:"bytes,5,opt,name=bindingStartTime"`
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	AllocationTimestamp *metav1.Time `json:"allocationTimestamp,omitempty" protobuf:"bytes,5,opt,name=allocationTimestamp"`
 }
 
 // DeviceAllocationResult is the result of allocating devices.
@@ -1360,33 +1361,33 @@ type DeviceRequestAllocationResult struct {
 	// BindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingConditions []string `json:"bindingConditions,omitempty" protobuf:"bytes,7,rep,name=bindingConditions"`
 
 	// BindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingFailureConditions []string `json:"bindingFailureConditions,omitempty" protobuf:"bytes,8,rep,name=bindingFailureConditions"`
 
 	// BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingTimeoutSeconds *int64 `json:"bindingTimeoutSeconds,omitempty" protobuf:"varint,9,opt,name=bindingTimeoutSeconds"`
 }
 

@@ -212,7 +212,8 @@ func dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice *resource.Reso
 }
 
 func dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice *resource.ResourceSlice) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
+		draBindingConditionsFeatureInUse(oldSlice) {
 		return
 	}
 
@@ -239,6 +240,22 @@ func draPartitionableDevicesFeatureInUse(slice *resource.ResourceSlice) bool {
 			return true
 		}
 		if device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func draBindingConditionsFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.BindingConditions) > 0 ||
+			len(device.BindingFailureConditions) > 0 ||
+			device.BindingTimeoutSeconds != nil ||
+			device.UsageRestrictedToNode != nil {
 			return true
 		}
 	}
