@@ -510,6 +510,7 @@ func autoConvert_v1alpha3_AllocationResult_To_resource_AllocationResult(in *reso
 		return err
 	}
 	out.NodeSelector = (*core.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllocationTimestamp = (*v1.Time)(unsafe.Pointer(in.AllocationTimestamp))
 	return nil
 }
 
@@ -523,6 +524,7 @@ func autoConvert_resource_AllocationResult_To_v1alpha3_AllocationResult(in *reso
 		return err
 	}
 	out.NodeSelector = (*corev1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
+	out.AllocationTimestamp = (*v1.Time)(unsafe.Pointer(in.AllocationTimestamp))
 	return nil
 }
 

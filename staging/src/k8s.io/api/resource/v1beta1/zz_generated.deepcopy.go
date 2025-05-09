@@ -69,6 +69,10 @@ func (in *AllocationResult) DeepCopyInto(out *AllocationResult) {
 		*out = new(corev1.NodeSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AllocationTimestamp != nil {
+		in, out := &in.AllocationTimestamp, &out.AllocationTimestamp
+		*out = (*in).DeepCopy()
+	}
 	return
 }
 

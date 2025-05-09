@@ -12605,6 +12605,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1alpha3.AllocationResult
   map:
     fields:
+    - name: allocationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1alpha3.DeviceAllocationResult
@@ -13262,6 +13265,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta1.AllocationResult
   map:
     fields:
+    - name: allocationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1beta1.DeviceAllocationResult
@@ -13877,6 +13883,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.resource.v1beta2.AllocationResult
   map:
     fields:
+    - name: allocationTimestamp
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
     - name: devices
       type:
         namedType: io.k8s.api.resource.v1beta2.DeviceAllocationResult

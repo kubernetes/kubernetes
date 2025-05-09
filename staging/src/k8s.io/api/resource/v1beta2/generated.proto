@@ -94,6 +94,16 @@ message AllocationResult {
   //
   // +optional
   optional .k8s.io.api.core.v1.NodeSelector nodeSelector = 3;
+
+  // AllocationTimestamp stores the time when the resources were allocated.
+  // This field is not guaranteed to be set, in which case that time is unknown.
+  //
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gate.
+  //
+  // +optional
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time allocationTimestamp = 5;
 }
 
 // CELDeviceSelector contains a CEL expression for selecting a device.
@@ -273,11 +283,11 @@ message Device {
   // UsageRestrictedToNode indicates if the usage of an allocation involving this device
   // has to be limited to exactly the node that was chosen when allocating the claim.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   optional bool usageRestrictedToNode = 9;
 
   // BindingConditions defines the conditions for proceeding with binding.
@@ -289,12 +299,12 @@ message Device {
   //
   // The conditions must be a valid condition type string.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
   // +listType=atomic
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   repeated string bindingConditions = 10;
 
   // BindingFailureConditions defines the conditions for binding failure.
@@ -305,12 +315,12 @@ message Device {
   //
   // The conditions must be a valid condition type string.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
   // +listType=atomic
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   repeated string bindingFailureConditions = 11;
 
   // BindingTimeoutSeconds indicates the prepare timeout period.
@@ -320,11 +330,11 @@ message Device {
   // No matter what timeouts were specified by the driver, the scheduler will not wait
   // longer than 20 minutes. This may change.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   optional int64 bindingTimeoutSeconds = 12;
 }
 
@@ -687,33 +697,33 @@ message DeviceRequestAllocationResult {
   // BindingConditions contains a copy of the BindingConditions
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
   // +listType=atomic
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   repeated string bindingConditions = 7;
 
   // BindingFailureConditions contains a copy of the BindingFailureConditions
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
   // +listType=atomic
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   repeated string bindingFailureConditions = 8;
 
   // BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds
   // from the corresponding ResourceSlice at the time of allocation.
   //
-  // This is an alpha field and requires enabling the DRADeviceBindingConditions
-  // feature gate.
+  // This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+  // feature gates.
   //
   // +optional
-  // +featureGate=DRADeviceBindingConditions
+  // +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
   optional int64 bindingTimeoutSeconds = 9;
 }
 

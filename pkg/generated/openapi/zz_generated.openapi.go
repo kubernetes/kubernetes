@@ -47284,11 +47284,17 @@ func schema_k8sio_api_resource_v1alpha3_AllocationResult(ref common.ReferenceCal
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"allocationTimestamp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAllocationResult"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1alpha3.DeviceAllocationResult", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -47388,7 +47394,7 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 					},
 					"usageRestrictedToNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -47400,7 +47406,7 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -47420,7 +47426,7 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -47434,8 +47440,13 @@ func schema_k8sio_api_resource_v1alpha3_BasicDevice(ref common.ReferenceCallback
 						},
 					},
 					"bindingTimeoutSeconds": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -48269,7 +48280,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -48289,7 +48300,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -48304,7 +48315,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceRequestAllocationResult(ref common
 					},
 					"bindingTimeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -49469,11 +49480,17 @@ func schema_k8sio_api_resource_v1beta1_AllocationResult(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"allocationTimestamp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAllocationResult"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta1.DeviceAllocationResult", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -49574,7 +49591,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 					},
 					"usageRestrictedToNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -49586,7 +49603,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49606,7 +49623,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49621,7 +49638,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 					},
 					"bindingTimeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -50477,7 +50494,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -50497,7 +50514,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -50512,7 +50529,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 					},
 					"bindingTimeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -51491,11 +51508,17 @@ func schema_k8sio_api_resource_v1beta2_AllocationResult(ref common.ReferenceCall
 							Ref:         ref("k8s.io/api/core/v1.NodeSelector"),
 						},
 					},
+					"allocationTimestamp": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.DeviceAllocationResult"},
+			"k8s.io/api/core/v1.NodeSelector", "k8s.io/api/resource/v1beta2.DeviceAllocationResult", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 
@@ -51687,7 +51710,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 					},
 					"usageRestrictedToNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -51699,7 +51722,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51719,7 +51742,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51734,7 +51757,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 					},
 					"bindingTimeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -52417,7 +52440,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52437,7 +52460,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52452,7 +52475,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 					},
 					"bindingTimeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+							Description: "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

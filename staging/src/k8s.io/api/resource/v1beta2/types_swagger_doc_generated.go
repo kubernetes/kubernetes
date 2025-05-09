@@ -42,9 +42,10 @@ func (AllocatedDeviceStatus) SwaggerDoc() map[string]string {
 }
 
 var map_AllocationResult = map[string]string{
-	"":             "AllocationResult contains attributes of an allocated resource.",
-	"devices":      "Devices is the result of allocating devices.",
-	"nodeSelector": "NodeSelector defines where the allocated resources are available. If unset, they are available everywhere.",
+	"":                    "AllocationResult contains attributes of an allocated resource.",
+	"devices":             "Devices is the result of allocating devices.",
+	"nodeSelector":        "NodeSelector defines where the allocated resources are available. If unset, they are available everywhere.",
+	"allocationTimestamp": "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
 }
 
 func (AllocationResult) SwaggerDoc() map[string]string {
@@ -89,10 +90,10 @@ var map_Device = map[string]string{
 	"nodeSelector":             "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"allNodes":                 "AllNodes indicates that all nodes have access to the device.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
 	"taints":                   "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 4.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-	"usageRestrictedToNode":    "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
-	"bindingConditions":        "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
-	"bindingFailureConditions": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
-	"bindingTimeoutSeconds":    "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+	"usageRestrictedToNode":    "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+	"bindingConditions":        "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+	"bindingFailureConditions": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+	"bindingTimeoutSeconds":    "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 }
 
 func (Device) SwaggerDoc() map[string]string {
@@ -246,9 +247,9 @@ var map_DeviceRequestAllocationResult = map[string]string{
 	"device":                   "Device references one device instance via its name in the driver's resource pool. It must be a DNS label.",
 	"adminAccess":              "AdminAccess indicates that this device was allocated for administrative access. See the corresponding request field for a definition of mode.\n\nThis is an alpha field and requires enabling the DRAAdminAccess feature gate. Admin access is disabled if this field is unset or set to false, otherwise it is enabled.",
 	"tolerations":              "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
-	"bindingConditions":        "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
-	"bindingFailureConditions": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
-	"bindingTimeoutSeconds":    "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+	"bindingConditions":        "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+	"bindingFailureConditions": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+	"bindingTimeoutSeconds":    "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 }
 
 func (DeviceRequestAllocationResult) SwaggerDoc() map[string]string {

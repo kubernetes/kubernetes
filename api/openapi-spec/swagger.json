@@ -14992,6 +14992,10 @@
     "io.k8s.api.resource.v1alpha3.AllocationResult": {
       "description": "AllocationResult contains attributes of an allocated resource.",
       "properties": {
+        "allocationTimestamp": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+          "description": "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate."
+        },
         "devices": {
           "$ref": "#/definitions/io.k8s.api.resource.v1alpha3.DeviceAllocationResult",
           "description": "Devices is the result of allocating devices."
@@ -15018,7 +15022,7 @@
           "type": "object"
         },
         "bindingConditions": {
-          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -15026,7 +15030,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingFailureConditions": {
-          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -15034,9 +15038,10 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingTimeoutSeconds": {
-          "description": "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "format": "int64",
-          "type": "integer"
+          "type": "integer",
+          "x-kubernetes-list-type": "atomic"
         },
         "capacity": {
           "additionalProperties": {
@@ -15070,7 +15075,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "usageRestrictedToNode": {
-          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "type": "boolean"
         }
       },
@@ -15458,7 +15463,7 @@
           "type": "boolean"
         },
         "bindingConditions": {
-          "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -15466,7 +15471,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingFailureConditions": {
-          "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -15474,7 +15479,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingTimeoutSeconds": {
-          "description": "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "format": "int64",
           "type": "integer"
         },
@@ -16186,6 +16191,10 @@
     "io.k8s.api.resource.v1beta1.AllocationResult": {
       "description": "AllocationResult contains attributes of an allocated resource.",
       "properties": {
+        "allocationTimestamp": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+          "description": "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate."
+        },
         "devices": {
           "$ref": "#/definitions/io.k8s.api.resource.v1beta1.DeviceAllocationResult",
           "description": "Devices is the result of allocating devices."
@@ -16212,7 +16221,7 @@
           "type": "object"
         },
         "bindingConditions": {
-          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -16220,7 +16229,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingFailureConditions": {
-          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -16228,7 +16237,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingTimeoutSeconds": {
-          "description": "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "format": "int64",
           "type": "integer"
         },
@@ -16264,7 +16273,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "usageRestrictedToNode": {
-          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "type": "boolean"
         }
       },
@@ -16665,7 +16674,7 @@
           "type": "boolean"
         },
         "bindingConditions": {
-          "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -16673,7 +16682,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingFailureConditions": {
-          "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -16681,7 +16690,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingTimeoutSeconds": {
-          "description": "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "format": "int64",
           "type": "integer"
         },
@@ -17279,6 +17288,10 @@
     "io.k8s.api.resource.v1beta2.AllocationResult": {
       "description": "AllocationResult contains attributes of an allocated resource.",
       "properties": {
+        "allocationTimestamp": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
+          "description": "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate."
+        },
         "devices": {
           "$ref": "#/definitions/io.k8s.api.resource.v1beta2.DeviceAllocationResult",
           "description": "Devices is the result of allocating devices."
@@ -17352,7 +17365,7 @@
           "type": "object"
         },
         "bindingConditions": {
-          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -17360,7 +17373,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingFailureConditions": {
-          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -17368,7 +17381,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingTimeoutSeconds": {
-          "description": "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingTimeoutSeconds indicates the prepare timeout period. If the timeout period is exceeded before all BindingConditions reach a True state, the scheduler clears the allocation in the ResourceClaim and reschedules the Pod.\n\nNo matter what timeouts were specified by the driver, the scheduler will not wait longer than 20 minutes. This may change.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "format": "int64",
           "type": "integer"
         },
@@ -17408,7 +17421,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "usageRestrictedToNode": {
-          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "UsageRestrictedToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "type": "boolean"
         }
       },
@@ -17719,7 +17732,7 @@
           "type": "boolean"
         },
         "bindingConditions": {
-          "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -17727,7 +17740,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingFailureConditions": {
-          "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "items": {
             "type": "string"
           },
@@ -17735,7 +17748,7 @@
           "x-kubernetes-list-type": "atomic"
         },
         "bindingTimeoutSeconds": {
-          "description": "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions feature gate.",
+          "description": "BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
           "format": "int64",
           "type": "integer"
         },

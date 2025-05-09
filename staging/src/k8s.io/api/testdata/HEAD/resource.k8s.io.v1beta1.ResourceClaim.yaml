@@ -81,6 +81,7 @@ spec:
         value: valueValue
 status:
   allocation:
+    allocationTimestamp: "2005-01-01T01:01:01Z"
     devices:
       config:
       - opaque:
