@@ -48289,7 +48289,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceSubRequest(ref common.ReferenceCal
 					},
 					"count": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Count is used only when the count mode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list. For the last entry, a count of zero is allowed. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+							Description: "Count is used only when the AllocationMode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list and there are at least two subrequests in the FirstAvailable list.\n\nIf AllocationMode is ExactCount and Count is zero, it will be defaulted to one unless the subrequests meets the criteria for having a zero count described above.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -50396,7 +50396,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref common.ReferenceCall
 					},
 					"count": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Count is used only when the count mode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list. For the last entry, a count of zero is allowed. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+							Description: "Count is used only when the AllocationMode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list and there are at least two subrequests in the FirstAvailable list.\n\nIf AllocationMode is ExactCount and Count is zero, it will be defaulted to one unless the subrequests meets the criteria for having a zero count described above.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
@@ -52235,7 +52235,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceSubRequest(ref common.ReferenceCall
 					},
 					"count": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Count is used only when the count mode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list. For the last entry, a count of zero is allowed. If AllocationMode is ExactCount and this field is not specified, the default is one.",
+							Description: "Count is used only when the AllocationMode is \"ExactCount\". Must be greater than zero unless the subrequest is the last entry in the FirstAvailable list and there are at least two subrequests in the FirstAvailable list.\n\nIf AllocationMode is ExactCount and Count is zero, it will be defaulted to one unless the subrequests meets the criteria for having a zero count described above.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},

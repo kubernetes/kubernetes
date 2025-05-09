@@ -49,7 +49,6 @@ func SetObjectDefaults_ResourceClaim(in *resourcev1beta1.ResourceClaim) {
 		SetDefaults_DeviceRequest(a)
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
-			SetDefaults_DeviceSubRequest(b)
 			for k := range b.Tolerations {
 				c := &b.Tolerations[k]
 				if c.Operator == "" {
@@ -90,7 +89,6 @@ func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1beta1.ResourceClaimTe
 		SetDefaults_DeviceRequest(a)
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
-			SetDefaults_DeviceSubRequest(b)
 			for k := range b.Tolerations {
 				c := &b.Tolerations[k]
 				if c.Operator == "" {

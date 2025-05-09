@@ -46,6 +46,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 func SetObjectDefaults_ResourceClaim(in *resourcev1beta2.ResourceClaim) {
 	for i := range in.Spec.Devices.Requests {
 		a := &in.Spec.Devices.Requests[i]
+		SetDefaults_DeviceRequest(a)
 		if a.Exactly != nil {
 			SetDefaults_ExactDeviceRequest(a.Exactly)
 			for j := range a.Exactly.Tolerations {
@@ -57,7 +58,6 @@ func SetObjectDefaults_ResourceClaim(in *resourcev1beta2.ResourceClaim) {
 		}
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
-			SetDefaults_DeviceSubRequest(b)
 			for k := range b.Tolerations {
 				c := &b.Tolerations[k]
 				if c.Operator == "" {
@@ -89,6 +89,7 @@ func SetObjectDefaults_ResourceClaimList(in *resourcev1beta2.ResourceClaimList) 
 func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1beta2.ResourceClaimTemplate) {
 	for i := range in.Spec.Spec.Devices.Requests {
 		a := &in.Spec.Spec.Devices.Requests[i]
+		SetDefaults_DeviceRequest(a)
 		if a.Exactly != nil {
 			SetDefaults_ExactDeviceRequest(a.Exactly)
 			for j := range a.Exactly.Tolerations {
@@ -100,7 +101,6 @@ func SetObjectDefaults_ResourceClaimTemplate(in *resourcev1beta2.ResourceClaimTe
 		}
 		for j := range a.FirstAvailable {
 			b := &a.FirstAvailable[j]
-			SetDefaults_DeviceSubRequest(b)
 			for k := range b.Tolerations {
 				c := &b.Tolerations[k]
 				if c.Operator == "" {
