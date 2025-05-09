@@ -66,8 +66,8 @@ func InitCustomVolumeModifyTestSuite(patterns []storageframework.TestPattern) st
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Gi",
 			},
-			// TODO: Remove feature.Beta once the csi driver is promoted to GA and the manifest is updated.
-			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass), feature.Beta},
+			// TODO: Remove feature.OffByDefault once the csi driver is promoted to GA and the manifest is updated.
+			TestTags: []interface{}{framework.WithFeatureGate(features.VolumeAttributesClass), feature.OffByDefault},
 		},
 	}
 }
