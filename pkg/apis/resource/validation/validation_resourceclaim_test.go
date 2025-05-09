@@ -739,7 +739,10 @@ func TestValidateClaim(t *testing.T) {
 			}(),
 		},
 		"prioritized-list-subrequests-last-entry-count": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("spec", "devices", "requests").Index(1).Child("firstAvailable").Index(0).Child("count"), int64(-1), "must be zero or greater")},
+			wantFailures: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(1).Child("firstAvailable").Index(0).Child("count"), int64(-1), "must be greater than zero"),
+				field.Invalid(field.NewPath("spec", "devices", "requests").Index(2).Child("firstAvailable").Index(0).Child("count"), int64(0), "must be greater than zero"),
+			},
 			claim: func() *resource.ResourceClaim {
 				claim := testClaim(goodName, goodNS, validClaimSpecWithFirstAvailable)
 				claim.Spec.Devices.Requests[0].FirstAvailable = []resource.DeviceSubRequest{
@@ -764,6 +767,17 @@ func TestValidateClaim(t *testing.T) {
 							DeviceClassName: goodName,
 							AllocationMode:  resource.DeviceAllocationModeExactCount,
 							Count:           -1,
+						},
+					},
+				})
+				claim.Spec.Devices.Requests = append(claim.Spec.Devices.Requests, resource.DeviceRequest{
+					Name: "some-name",
+					FirstAvailable: []resource.DeviceSubRequest{
+						{
+							Name:            goodName,
+							DeviceClassName: goodName,
+							AllocationMode:  resource.DeviceAllocationModeExactCount,
+							Count:           0,
 						},
 					},
 				})

@@ -89,6 +89,14 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 							},
 						},
 					},
+					{
+						Name: "req-2",
+						FirstAvailable: []v1beta2.DeviceSubRequest{
+							{
+								Name: "subReq-1",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -96,6 +104,7 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 
 	defaultMode := v1beta2.DeviceAllocationModeExactCount
 	defaultCount := int64(1)
+	zeroCount := int64(0)
 	output := roundTrip(t, runtime.Object(claim)).(*v1beta2.ResourceClaim)
 	// the exactly field is not set.
 	assert.Nil(t, output.Spec.Devices.Requests[0].Exactly)
@@ -103,7 +112,9 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 	assert.Equal(t, defaultMode, output.Spec.Devices.Requests[0].FirstAvailable[0].AllocationMode)
 	assert.Equal(t, defaultCount, output.Spec.Devices.Requests[0].FirstAvailable[0].Count)
 	assert.Equal(t, defaultMode, output.Spec.Devices.Requests[0].FirstAvailable[1].AllocationMode)
-	assert.Equal(t, defaultCount, output.Spec.Devices.Requests[0].FirstAvailable[1].Count)
+	assert.Equal(t, zeroCount, output.Spec.Devices.Requests[0].FirstAvailable[1].Count)
+	assert.Equal(t, defaultMode, output.Spec.Devices.Requests[1].FirstAvailable[0].AllocationMode)
+	assert.Equal(t, defaultCount, output.Spec.Devices.Requests[1].FirstAvailable[0].Count)
 
 	// field should not change
 	nonDefaultMode := v1beta2.DeviceAllocationModeExactCount
@@ -111,21 +122,33 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 	claim = &v1beta2.ResourceClaim{
 		Spec: v1beta2.ResourceClaimSpec{
 			Devices: v1beta2.DeviceClaim{
-				Requests: []v1beta2.DeviceRequest{{
-					Name: "req-1",
-					FirstAvailable: []v1beta2.DeviceSubRequest{
-						{
-							Name:           "subReq-1",
-							AllocationMode: nonDefaultMode,
-							Count:          nonDefaultCount,
-						},
-						{
-							Name:           "subReq-2",
-							AllocationMode: nonDefaultMode,
-							Count:          nonDefaultCount,
+				Requests: []v1beta2.DeviceRequest{
+					{
+						Name: "req-1",
+						FirstAvailable: []v1beta2.DeviceSubRequest{
+							{
+								Name:           "subReq-1",
+								AllocationMode: nonDefaultMode,
+								Count:          nonDefaultCount,
+							},
+							{
+								Name:           "subReq-2",
+								AllocationMode: nonDefaultMode,
+								Count:          nonDefaultCount,
+							},
 						},
 					},
-				}},
+					{
+						Name: "req-2",
+						FirstAvailable: []v1beta2.DeviceSubRequest{
+							{
+								Name:           "subReq-1",
+								AllocationMode: nonDefaultMode,
+								Count:          nonDefaultCount,
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -134,6 +157,8 @@ func TestSetDefaultAllocationModeWithSubRequests(t *testing.T) {
 	assert.Equal(t, nonDefaultCount, output.Spec.Devices.Requests[0].FirstAvailable[0].Count)
 	assert.Equal(t, nonDefaultMode, output.Spec.Devices.Requests[0].FirstAvailable[1].AllocationMode)
 	assert.Equal(t, nonDefaultCount, output.Spec.Devices.Requests[0].FirstAvailable[1].Count)
+	assert.Equal(t, nonDefaultMode, output.Spec.Devices.Requests[1].FirstAvailable[0].AllocationMode)
+	assert.Equal(t, nonDefaultCount, output.Spec.Devices.Requests[1].FirstAvailable[0].Count)
 }
 
 func TestSetDefaultDeviceTaint(t *testing.T) {

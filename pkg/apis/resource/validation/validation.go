@@ -178,8 +178,11 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 		numDeviceRequestType++
 		allErrs = append(allErrs, validateSetWithIndex(request.FirstAvailable, resource.FirstAvailableDeviceRequestMaxSize,
 			func(subRequest resource.DeviceSubRequest, fldPath *field.Path, index int) field.ErrorList {
-				lastInList := index == len(request.FirstAvailable)-1
-				return validateDeviceSubRequest(subRequest, fldPath, stored, lastInList)
+				var allowZeroCount bool
+				if len(request.FirstAvailable) > 1 && index == len(request.FirstAvailable)-1 {
+					allowZeroCount = true
+				}
+				return validateDeviceSubRequest(subRequest, fldPath, stored, allowZeroCount)
 			},
 			func(subRequest resource.DeviceSubRequest) (string, string) {
 				return subRequest.Name, "name"
@@ -202,11 +205,11 @@ func validateDeviceRequest(request resource.DeviceRequest, fldPath *field.Path, 
 	return allErrs
 }
 
-func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored, lastInList bool) field.ErrorList {
+func validateDeviceSubRequest(subRequest resource.DeviceSubRequest, fldPath *field.Path, stored, allowZeroCount bool) field.ErrorList {
 	allErrs := validateRequestName(subRequest.Name, fldPath.Child("name"))
 	allErrs = append(allErrs, validateDeviceClass(subRequest.DeviceClassName, fldPath.Child("deviceClassName"))...)
 	allErrs = append(allErrs, validateSelectorSlice(subRequest.Selectors, fldPath.Child("selectors"), stored)...)
-	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"), lastInList)...)
+	allErrs = append(allErrs, validateDeviceAllocationMode(subRequest.AllocationMode, subRequest.Count, fldPath.Child("allocationMode"), fldPath.Child("count"), allowZeroCount)...)
 	for i, toleration := range subRequest.Tolerations {
 		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
 	}
