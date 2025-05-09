@@ -68,24 +68,24 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []Clu
 		r = unschedulablePod
 	}
 
-	podChangeExtracters := []podChangeExtractor{
+	podChangeExtractors := []podChangeExtractor{
 		extractPodLabelsChange,
 		extractPodScaleDown,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		podChangeExtracters = append(podChangeExtracters, extractPodGeneratedResourceClaimChange)
+		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
 	}
 
-	for _, fn := range podChangeExtracters {
+	for _, fn := range podChangeExtractors {
 		if event := fn(newPod, oldPod); event != None {
 			events = append(events, ClusterEvent{Resource: r, ActionType: event})
 		}
 	}
 
 	if len(events) == 0 {
-		// When no specific event is found, we use AssignedPodOtherUpdate,
+		// When no specific event is found, we use the general Update action,
 		// which should only trigger plugins registering a general Pod/Update event.
 		events = append(events, ClusterEvent{Resource: r, ActionType: Update})
 	}
