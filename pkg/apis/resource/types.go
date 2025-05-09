@@ -328,11 +328,11 @@ type Device struct {
 	// UsageRestrictedToNode indicates if the usage of an allocation involving this device
 	// has to be limited to exactly the node that was chosen when allocating the claim.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	UsageRestrictedToNode *bool
 
 	// BindingConditions defines the conditions for proceeding with binding.
@@ -344,12 +344,12 @@ type Device struct {
 	//
 	// The conditions must be a valid condition type string.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingConditions []string
 
 	// BindingFailureConditions defines the conditions for binding failure.
@@ -360,12 +360,12 @@ type Device struct {
 	//
 	// The conditions must be a valid condition type string.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingFailureConditions []string
 
 	// BindingTimeoutSeconds indicates the prepare timeout period.
@@ -377,11 +377,12 @@ type Device struct {
 	// No matter what timeouts were specified by the driver, the scheduler will not wait
 	// longer than 20 minutes. This may change.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
+	// +listType=atomic
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingTimeoutSeconds *int64
 }
 
@@ -1245,14 +1246,15 @@ type AllocationResult struct {
 	// supported.
 	// Controller string
 
-	// BindingStartTime is the time when the binding was
-	// started. This is used to determine whether the allocation
-	// timed out. It is set by the scheduler when it starts
-	// allocating the claim.
+	// AllocationTimestamp stores the time when the resources were allocated.
+	// This field is not guaranteed to be set, in which case that time is unknown.
+	//
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gate.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
-	BindingStartTime *metav1.Time
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
+	AllocationTimestamp *metav1.Time
 }
 
 // DeviceAllocationResult is the result of allocating devices.
@@ -1345,33 +1347,33 @@ type DeviceRequestAllocationResult struct {
 	// BindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingConditions []string
 
 	// BindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
 	// +listType=atomic
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingFailureConditions []string
 
 	// BindingTimeoutSeconds contains a copy of the BindingTimeoutSeconds
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions
-	// feature gate.
+	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// feature gates.
 	//
 	// +optional
-	// +featureGate=DRADeviceBindingConditions
+	// +featureGate=DRADeviceBindingConditions,DRAResourceClaimDeviceStatus
 	BindingTimeoutSeconds *int64
 }
 

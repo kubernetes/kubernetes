@@ -937,8 +937,8 @@ func (pl *DynamicResources) bindClaim(ctx context.Context, state *stateData, ind
 		// preconditions. The apiserver will tell us with a
 		// non-conflict error if this isn't possible.
 		claim.Status.ReservedFor = append(claim.Status.ReservedFor, resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: pod.Name, UID: pod.UID})
-		if pl.enableDeviceBindingConditions && pl.enableDeviceStatus && claim.Status.Allocation.BindingStartTime == nil {
-			claim.Status.Allocation.BindingStartTime = &metav1.Time{Time: time.Now()}
+		if pl.enableDeviceBindingConditions && pl.enableDeviceStatus && claim.Status.Allocation.AllocationTimestamp == nil {
+			claim.Status.Allocation.AllocationTimestamp = &metav1.Time{Time: time.Now()}
 		}
 		updatedClaim, err := pl.clientset.ResourceV1beta1().ResourceClaims(claim.Namespace).UpdateStatus(ctx, claim, metav1.UpdateOptions{})
 		if err != nil {
@@ -999,7 +999,7 @@ func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) boo
 	if !pl.enableDeviceBindingConditions && !pl.enableDeviceStatus {
 		return false
 	}
-	if claim.Status.Allocation == nil || claim.Status.Allocation.BindingStartTime == nil {
+	if claim.Status.Allocation == nil || claim.Status.Allocation.AllocationTimestamp == nil {
 		return false
 	}
 	// check if the binding timeout is reached
@@ -1007,7 +1007,7 @@ func (pl *DynamicResources) isClaimTimeout(claim *resourceapi.ResourceClaim) boo
 		if deviceRequest.BindingTimeoutSeconds == nil {
 			continue
 		}
-		if claim.Status.Allocation.BindingStartTime.Add(time.Duration(ptr.Deref(deviceRequest.BindingTimeoutSeconds, 0)) * time.Second).Before(time.Now()) {
+		if claim.Status.Allocation.AllocationTimestamp.Add(time.Duration(ptr.Deref(deviceRequest.BindingTimeoutSeconds, 0)) * time.Second).Before(time.Now()) {
 			return true
 		}
 	}
