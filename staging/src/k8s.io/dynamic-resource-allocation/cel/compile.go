@@ -41,6 +41,7 @@ import (
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
+	draapi "k8s.io/dynamic-resource-allocation/api"
 )
 
 const (
@@ -100,8 +101,8 @@ type Device struct {
 	// have a domain prefix. If set, then it is also made available as a
 	// string attribute.
 	Driver     string
-	Attributes map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
-	Capacity   map[resourceapi.QualifiedName]resourceapi.DeviceCapacity
+	Attributes map[draapi.QualifiedName]draapi.DeviceAttribute
+	Capacity   map[draapi.QualifiedName]draapi.DeviceCapacity
 }
 
 type compiler struct {
@@ -204,7 +205,7 @@ func (c *compiler) newCostEstimator() *library.CostEstimator {
 // getAttributeValue returns the native representation of the one value that
 // should be stored in the attribute, otherwise an error. An error is
 // also returned when there is no supported value.
-func getAttributeValue(attr resourceapi.DeviceAttribute) (any, error) {
+func getAttributeValue(attr draapi.DeviceAttribute) (any, error) {
 	switch {
 	case attr.IntValue != nil:
 		return *attr.IntValue, nil
@@ -342,7 +343,7 @@ func withMaxElements(in *apiservercel.DeclType, maxElements uint64) *apiserverce
 
 // parseQualifiedName splits into domain and identified, using the default domain
 // if the name does not contain one.
-func parseQualifiedName(name resourceapi.QualifiedName, defaultDomain string) (string, string) {
+func parseQualifiedName(name draapi.QualifiedName, defaultDomain string) (string, string) {
 	sep := strings.Index(string(name), "/")
 	if sep == -1 {
 		return defaultDomain, string(name)
