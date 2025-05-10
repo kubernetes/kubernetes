@@ -225,6 +225,7 @@ spec:
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
+            - "--enable-snapshot-metadata"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
@@ -367,6 +368,23 @@ spec:
             - mountPath: /csi
               name: socket-dir
 
+        - name: csi-snapshot-metadata
+          image: gcr.io/k8s-staging-sig-storage/csi-snapshot-metadata:canary
+          imagePullPolicy: IfNotPresent
+          args:
+          - --csi-address=/csi/csi.sock
+          - --tls-cert=/tmp/certificates/tls.crt
+          - --tls-key=/tmp/certificates/tls.key
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /csi
+            name: socket-dir
+          - mountPath: /tmp/certificates
+            name: csi-snapshot-metadata-server-certs
+            readOnly: true
+
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-hostpath
@@ -394,3 +412,7 @@ spec:
             path: /dev
             type: Directory
           name: dev-dir
+        - name: csi-snapshot-metadata-server-certs
+          secret:
+            defaultMode: 420
+            secretName: csi-snapshot-metadata-server-certs
