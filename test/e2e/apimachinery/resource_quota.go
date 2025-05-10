@@ -59,6 +59,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
 )
 
 const (
@@ -502,7 +503,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the ResourceClaim. Deletion MUST succeed and resource usage count against the ResourceClaim object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] alpha feature
 	*/
-	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", feature.DynamicResourceAllocation, func(ctx context.Context) {
+	f.It("should create a ResourceQuota and capture the life of a ResourceClaim", f.WithFeatureGate(features.DynamicResourceAllocation), f.WithLabel("DRA"), func(ctx context.Context) {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -2480,13 +2481,13 @@ func countResourceQuota(ctx context.Context, c clientset.Interface, namespace st
 	})
 }
 
-// wait for resource quota status to show the expected used resources value
+// Wait for resource quota status to show the expected used resources value.
+// Other resources are ignored.
 func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string, used v1.ResourceList) error {
-	return wait.PollUntilContextTimeout(ctx, framework.Poll, resourceQuotaTimeout, false, func(ctx context.Context) (bool, error) {
-		resourceQuota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
+	// The template emits the actual ResourceQuota object as YAML.
+	// In particular the ManagedFields are interesting because both
+	// kube-apiserver and kube-controller-manager set the status.
+	haveUsedResources := gcustom.MakeMatcher(func(resourceQuota *v1.ResourceQuota) (bool, error) {
 		// used may not yet be calculated
 		if resourceQuota.Status.Used == nil {
 			return false, nil
@@ -2494,12 +2495,13 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 		// verify that the quota shows the expected used resource values
 		for k, v := range used {
 			if actualValue, found := resourceQuota.Status.Used[k]; !found || (actualValue.Cmp(v) != 0) {
-				framework.Logf("resource %s, expected %s, actual %s", k, v.String(), actualValue.String())
 				return false, nil
 			}
 		}
 		return true, nil
-	})
+	}).WithTemplate("Expected:\n{{.FormattedActual}}\n{{.To}} have the following .status.used entries:\n{{range $key, $value := .Data}}    {{$key}}: \"{{$value.ToUnstructured}}\"\n{{end}}").WithTemplateData(used /* Formatting of the map is done inside the template. */)
+	err := framework.Gomega().Eventually(ctx, framework.GetObject(c.CoreV1().ResourceQuotas(ns).Get, quotaName, metav1.GetOptions{})).Should(haveUsedResources)
+	return err
 }
 
 // updateResourceQuotaUntilUsageAppears updates the resource quota object until the usage is populated

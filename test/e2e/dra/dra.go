@@ -78,7 +78,11 @@ func perNode(maxAllocations int, nodes *Nodes) func() Resources {
 	}
 }
 
-var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
+// TODO: remove feature.DynamicResourceAllocation here and add it only for those tests
+// which really need node-level support for DRA.
+//
+// The "DRA" label is used to select tests related to DRA in a Ginkgo label filter.
+var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.DynamicResourceAllocation, framework.WithFeatureGate(features.DynamicResourceAllocation), func() {
 	f := framework.NewDefaultFramework("dra")
 
 	// The driver containers have to run with sufficient privileges to
@@ -403,7 +407,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
 		})
 
-		f.It("must be possible for the driver to update the ResourceClaim.Status.Devices once allocated", feature.DRAResourceClaimDeviceStatus, framework.WithFeatureGate(features.DRAResourceClaimDeviceStatus), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
+		f.It("must be possible for the driver to update the ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
 			pod := b.podExternal()
 			claim := b.externalClaim()
 			b.create(ctx, claim, pod)
@@ -891,7 +895,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		b2 := newBuilder(f, driver2)
 		b2.classParameters = driver2Params
 
-		f.It("selects the first subrequest that can be satisfied", feature.DRAPrioritizedList, func(ctx context.Context) {
+		f.It("selects the first subrequest that can be satisfied", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
 			name := "external-multiclaim"
 			params := `{"a":"b"}`
 			claim := &resourceapi.ResourceClaim{
@@ -963,7 +967,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Expect(results[1].Request).To(gomega.Equal("request-1/sub-request-2"))
 		})
 
-		f.It("uses the config for the selected subrequest", feature.DRAPrioritizedList, func(ctx context.Context) {
+		f.It("uses the config for the selected subrequest", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
 			name := "external-multiclaim"
 			parentReqParams, parentReqEnv := `{"a":"b"}`, []string{"user_a", "b"}
 			subReq1Params := `{"c":"d"}`
@@ -1045,7 +1049,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b1.testPod(ctx, f, pod, expectedEnv...)
 		})
 
-		f.It("chooses the correct subrequest subject to constraints", feature.DRAPrioritizedList, func(ctx context.Context) {
+		f.It("chooses the correct subrequest subject to constraints", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
 			name := "external-multiclaim"
 			params := `{"a":"b"}`
 			claim := &resourceapi.ResourceClaim{
@@ -1131,7 +1135,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			gomega.Expect(results[1].Request).To(gomega.Equal("request-2"))
 		})
 
-		f.It("filters config correctly for multiple devices", feature.DRAPrioritizedList, func(ctx context.Context) {
+		f.It("filters config correctly for multiple devices", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
 			name := "external-multiclaim"
 			req1Params, req1Env := `{"a":"b"}`, []string{"user_a", "b"}
 			req1subReq1Params, _ := `{"c":"d"}`, []string{"user_d", "d"}
@@ -1286,7 +1290,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
-		f.It("supports requests with alternatives", feature.DRAPrioritizedList, func(ctx context.Context) {
+		f.It("supports requests with alternatives", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
 			claimName := "external-multiclaim"
 			parameters, _ := b.parametersEnv()
 			claim := &resourceapi.ResourceClaim{
@@ -1368,7 +1372,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		v1beta2Tests()
 	})
 
-	framework.Context("with device taints", feature.DRADeviceTaints, framework.WithFeatureGate(features.DRADeviceTaints), func() {
+	framework.Context("with device taints", f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, func() Resources {
 			return Resources{
@@ -1547,7 +1551,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 		driver := NewDriver(f, nodes, networkResources)
 		b := newBuilder(f, driver)
 
-		f.It("validate ResourceClaimTemplate and ResourceClaim for admin access", feature.DRAAdminAccess, framework.WithFeatureGate(features.DRAAdminAccess), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
+		f.It("validate ResourceClaimTemplate and ResourceClaim for admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			// Attempt to create claim and claim template with admin access. Must fail eventually.
 			claim := b.externalClaim()
 			claim.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
@@ -1651,7 +1655,7 @@ var _ = framework.SIGDescribe("node")("DRA", feature.DynamicResourceAllocation, 
 			}).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
 		})
 
-		f.It("DaemonSet with admin access", feature.DRAAdminAccess, framework.WithFeatureGate(features.DRAAdminAccess), framework.WithFeatureGate(features.DynamicResourceAllocation), func(ctx context.Context) {
+		f.It("DaemonSet with admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			// Ensure namespace has the dra admin label.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
 				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
