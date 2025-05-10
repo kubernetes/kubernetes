@@ -458,14 +458,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
-		volumeMounter, newMounterErr := volumePlugin.NewMounter(
-			volumeToMount.VolumeSpec,
-			volumeToMount.Pod)
-		if newMounterErr != nil {
-			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
-			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-		}
-
 		mountCheckError := checkMountOptionSupport(og, volumeToMount, volumePlugin)
 		if mountCheckError != nil {
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountOptionSupport check failed", mountCheckError)
@@ -576,6 +568,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
 			resizeOptions.DeviceStagePath = deviceStagePath
+		}
+
+		volumeMounter, newMounterErr := volumePlugin.NewMounter(
+			volumeToMount.VolumeSpec,
+			volumeToMount.Pod)
+		if newMounterErr != nil {
+			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.NewMounter initialization failed", newMounterErr)
+			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
 		// Execute mount
