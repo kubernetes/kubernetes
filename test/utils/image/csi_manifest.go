@@ -44,7 +44,7 @@ func appendCSIImageConfigs(configs map[ImageID]Config) {
 		}
 	}
 
-	err := fs.WalkDir(embeddedFS, "storage-csi", func(path string, d fs.DirEntry, err error) error {
+	walkDirFn := func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -97,10 +97,13 @@ func appendCSIImageConfigs(configs map[ImageID]Config) {
 
 		}
 		return nil
+	}
 
-	})
-	if err != nil {
-		panic(err)
+	for _, dir := range []string{"storage-csi", "dra"} {
+		err := fs.WalkDir(embeddedFS, dir, walkDirFn)
+		if err != nil {
+			panic(fmt.Errorf("error while extracting CSI image configs from directory: %q - %w", dir, err))
+		}
 	}
 }
 
