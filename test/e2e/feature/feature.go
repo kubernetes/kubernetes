@@ -429,6 +429,11 @@ var (
 	ResourceHealthStatus = framework.WithFeature(framework.ValidFeatures.Add("ResourceHealthStatus"))
 
 	// Owner: sig-node
+	// KEP 4438
+	// KEP 753 (SidecarContainers)
+	RestartContainerDuringTermination = framework.WithFeature(framework.ValidFeatures.Add("RestartContaineDuringTermination"))
+
+	// Owner: sig-node
 	// Runtime Handler
 	RuntimeHandler = framework.WithFeature(framework.ValidFeatures.Add("RuntimeHandler"))
 
