@@ -187,7 +187,7 @@ func (h *RegistrationHandler) wipeResourceSlices(ctx context.Context, delay time
 // name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
 // in advance which version to use resp. which optional services the plugin
 // supports.
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration, desiredStateOfTheWorld cache.DesiredStateOfWorld) error {
 	// Prepare a context with its own logger for the plugin.
 	//
 	// The lifecycle of the plugin's background activities is tied to our
@@ -217,13 +217,15 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	pluginInstance := &Plugin{
-		name:              pluginName,
-		backgroundCtx:     ctx,
-		cancel:            cancel,
-		conn:              nil,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: timeout,
+		name:                pluginName,
+		backgroundCtx:       ctx,
+		cancel:              cancel,
+		conn:                nil,
+		endpoint:            endpoint,
+		chosenService:       chosenService,
+		clientCallTimeout:   timeout,
+		registrationHandler: h,
+		desiredStateOfWorld: desiredStateOfTheWorld,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key

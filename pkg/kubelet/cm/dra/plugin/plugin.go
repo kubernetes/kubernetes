@@ -27,12 +27,14 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
 // NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
@@ -57,11 +59,13 @@ type Plugin struct {
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
-	mutex             sync.Mutex
-	conn              *grpc.ClientConn
-	endpoint          string
-	chosenService     string // e.g. drapbv1beta1.DRAPluginService
-	clientCallTimeout time.Duration
+	mutex               sync.Mutex
+	conn                *grpc.ClientConn
+	endpoint            string
+	chosenService       string // e.g. drapbv1beta1.DRAPluginService
+	registrationHandler *RegistrationHandler
+	desiredStateOfWorld cache.DesiredStateOfWorld
+	clientCallTimeout   time.Duration
 }
 
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
@@ -89,6 +93,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
 		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
+		grpc.WithStatsHandler(p),
 	)
 	if err != nil {
 		return nil, err
@@ -179,3 +184,31 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 		return err
 	}
 }
+
+func (p *Plugin) HandleConn(ctx context.Context, connStats stats.ConnStats) {
+	logger := klog.FromContext(ctx)
+	switch connStats.(type) {
+	case *stats.ConnBegin:
+		logger.V(2).Info("Connection begin", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
+	case *stats.ConnEnd:
+		logger.V(2).Info("Connection end", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
+		p.mutex.Lock()
+		registrationHandler := p.registrationHandler
+		desiredStateOfWorld := p.desiredStateOfWorld
+		p.mutex.Unlock()
+		if registrationHandler == nil {
+			logger.V(2).Info("Can't unregister plugin on connection drop: registration handler is nil", "plugin", p.name, "endpoint", p.endpoint)
+		} else {
+			registrationHandler.DeRegisterPlugin(p.name, p.endpoint)
+		}
+		if desiredStateOfWorld == nil {
+			logger.V(2).Info("Can't remove plugin from desired state of world on connection drop: desired state of world is nil", "plugin", p.name, "endpoint", p.endpoint)
+		} else {
+			desiredStateOfWorld.RemovePlugin(p.endpoint)
+		}
+	}
+}
+
+func (p *Plugin) HandleRPC(ctx context.Context, stats stats.RPCStats)                  {}
+func (p *Plugin) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context { return ctx }
+func (p *Plugin) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context   { return ctx }
