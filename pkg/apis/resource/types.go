@@ -1367,6 +1367,11 @@ type DeviceClassSpec struct {
 	// it got removed. May be reused once decoding v1alpha3 is no longer
 	// supported.
 	// SuitableNodes *core.NodeSelector
+
+	// ExtendedResourceName is the extended resource name for the devices of this class
+	//
+	// +optional
+	ExtendedResourceName *string
 }
 
 // DeviceClassConfiguration is used in DeviceClass.

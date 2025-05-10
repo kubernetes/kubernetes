@@ -113,16 +113,17 @@ func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 // additional value. A name can also be useful because log messages do not
 // have a common prefix. V(5) is used for one-time log entries, V(6) for important
 // progress reports, and V(7) for detailed debug output.
-func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error) {
+func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, extendedResourceClaim *resourceapi.ResourceClaim) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
-		Allocator:            a,
-		ctx:                  ctx, // all methods share the same a and thus ctx
-		logger:               klog.FromContext(ctx),
-		node:                 node,
-		deviceMatchesRequest: make(map[matchKey]bool),
-		constraints:          make([][]constraint, len(a.claimsToAllocate)),
-		requestData:          make(map[requestIndices]requestData),
-		result:               make([]internalAllocationResult, len(a.claimsToAllocate)),
+		Allocator:             a,
+		ctx:                   ctx, // all methods share the same a and thus ctx
+		logger:                klog.FromContext(ctx),
+		node:                  node,
+		deviceMatchesRequest:  make(map[matchKey]bool),
+		constraints:           make([][]constraint, len(a.claimsToAllocate)),
+		requestData:           make(map[requestIndices]requestData),
+		result:                make([]internalAllocationResult, len(a.claimsToAllocate)),
+		extendedResourceClaim: extendedResourceClaim,
 	}
 	alloc.logger.V(5).Info("Starting allocation", "numClaims", len(alloc.claimsToAllocate))
 	defer alloc.logger.V(5).Info("Done with allocation", "success", len(finalResult) == len(alloc.claimsToAllocate), "err", finalErr)
@@ -160,6 +161,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	// claim cannot be allocated.
 	minDevicesTotal := 0
 	for claimIndex, claim := range alloc.claimsToAllocate {
+		if alloc.extendedResourceClaim != nil && claim.UID == alloc.extendedResourceClaim.UID {
+			claim = alloc.extendedResourceClaim
+		}
 		minDevicesPerClaim := 0
 
 		// If we have any any request that wants "all" devices, we need to
@@ -290,6 +294,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	result := make([]resourceapi.AllocationResult, len(alloc.result))
 	for claimIndex, internalResult := range alloc.result {
 		claim := alloc.claimsToAllocate[claimIndex]
+		if alloc.extendedResourceClaim != nil && claim.UID == alloc.extendedResourceClaim.UID {
+			claim = alloc.extendedResourceClaim
+		}
 		allocationResult := &result[claimIndex]
 		allocationResult.Devices.Results = make([]resourceapi.DeviceRequestAllocationResult, len(internalResult.devices))
 		for i, internal := range internalResult.devices {
@@ -375,6 +382,9 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 
 func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
 	claim := a.claimsToAllocate[requestKey.claimIndex]
+	if a.extendedResourceClaim != nil && claim.UID == a.extendedResourceClaim.UID {
+		claim = a.extendedResourceClaim
+	}
 	requestData := requestData{
 		request:       request,
 		parentRequest: parentRequest,
@@ -461,15 +471,16 @@ var errStop = errors.New("stop allocation")
 // goroutine works with it, so there is no need for locking.
 type allocator struct {
 	*Allocator
-	ctx                  context.Context
-	logger               klog.Logger
-	node                 *v1.Node
-	pools                []*Pool
-	deviceMatchesRequest map[matchKey]bool
-	constraints          [][]constraint                 // one list of constraints per claim
-	requestData          map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
-	allocatingDevices    map[DeviceID]bool
-	result               []internalAllocationResult
+	ctx                   context.Context
+	logger                klog.Logger
+	node                  *v1.Node
+	pools                 []*Pool
+	deviceMatchesRequest  map[matchKey]bool
+	constraints           [][]constraint                 // one list of constraints per claim
+	requestData           map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
+	allocatingDevices     map[DeviceID]bool
+	result                []internalAllocationResult
+	extendedResourceClaim *resourceapi.ResourceClaim
 }
 
 // matchKey identifies a device/request pair.
@@ -686,6 +697,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 	}
 
 	claim := alloc.claimsToAllocate[r.claimIndex]
+	if alloc.extendedResourceClaim != nil && claim.UID == alloc.extendedResourceClaim.UID {
+		claim = alloc.extendedResourceClaim
+	}
 	if r.requestIndex >= len(claim.Spec.Devices.Requests) {
 		// Done with the claim, continue with the next one.
 		return alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex + 1}, false)
@@ -966,6 +980,9 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.BasicDev
 // restore the previous state.
 func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, must bool) (bool, func(), error) {
 	claim := alloc.claimsToAllocate[r.claimIndex]
+	if alloc.extendedResourceClaim != nil && claim.UID == alloc.extendedResourceClaim.UID {
+		claim = alloc.extendedResourceClaim
+	}
 	requestKey := requestIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, subRequestIndex: r.subRequestIndex}
 	requestData := alloc.requestData[requestKey]
 	request := requestData.request

@@ -3098,7 +3098,7 @@ func TestAllocator(t *testing.T) {
 			allocator, err := NewAllocator(ctx, tc.features, unwrap(claimsToAllocate...), sets.New(allocatedDevices...), classLister, slices, cel.NewCache(1))
 			g.Expect(err).ToNot(gomega.HaveOccurred())
 
-			results, err := allocator.Allocate(ctx, tc.node)
+			results, err := allocator.Allocate(ctx, tc.node, nil)
 			matchError := tc.expectError
 			if matchError == nil {
 				matchError = gomega.Not(gomega.HaveOccurred())
