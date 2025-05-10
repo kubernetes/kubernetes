@@ -41,7 +41,6 @@ FROM $BASEIMAGE
 # - CoreDNS: used in some DNS tests.
 # from hostexec image
 # installed necessary packages:
-# - curl, nc: used by a lot of e2e tests (inherited from BASEIMAGE)
 # from iperf image
 # install necessary packages: iperf
 COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
@@ -50,7 +49,7 @@ COPY --from=prep /iperf /iperf
 COPY --from=prep /wincoreutils/sync.exe /bin/sync.exe
 
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
-ENV PATH="C:\dig\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
+ENV PATH="C:\dig\;C:\bin\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"
 
 # PORT 80 needed by: test-webserver
 # PORT 8080 needed by: netexec, nettest
