@@ -32,21 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/pkg/features"
-	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestExternalJWTSigningAndAuth(t *testing.T) {
-	// Enable feature gate for external JWT signer.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
-
 	// Prep some keys to use with test.
 	key1, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -64,7 +58,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	// create and start mock signer.
 	socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
-	mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+	mockSigner := v1testing.NewMockSigner(t, socketPath)
 	defer mockSigner.CleanUp()
 
 	// Start Api server configured with external signer.
@@ -133,11 +127,11 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				mockSigner.SigningKey = key1
 				mockSigner.SigningKeyID = "updated-kid-1"
 
-				cpy := make(map[string]v1alpha1testing.KeyT)
+				cpy := make(map[string]v1testing.KeyT)
 				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
-				cpy["updated-kid-1"] = v1alpha1testing.KeyT{
+				cpy["updated-kid-1"] = v1testing.KeyT{
 					Key:                      pubKey1Bytes,
 					ExcludeFromOidcDiscovery: true,
 				}
@@ -176,7 +170,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				mockSigner.SigningKey = key1
 			},
 			preValidationSignerUpdate: func(_ *testing.T) {
-				mockSigner.SetSupportedKeys(map[string]v1alpha1testing.KeyT{})
+				mockSigner.SetSupportedKeys(map[string]v1testing.KeyT{})
 			},
 			shouldPassAuth: false,
 		},
@@ -187,11 +181,11 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			},
 			preValidationSignerUpdate: func(t *testing.T) {
 				t.Helper()
-				cpy := make(map[string]v1alpha1testing.KeyT)
+				cpy := make(map[string]v1testing.KeyT)
 				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
-				cpy["kid-1"] = v1alpha1testing.KeyT{Key: pubKey1Bytes}
+				cpy["kid-1"] = v1testing.KeyT{Key: pubKey1Bytes}
 				mockSigner.SetSupportedKeys(cpy)
 				waitForDataTimestamp(t, client, time.Now())
 			},
@@ -280,9 +274,6 @@ func waitForDataTimestamp(t *testing.T, client kubernetes.Interface, minimumData
 }
 
 func TestDelayedStartForSigner(t *testing.T) {
-	// Enable feature gate for external JWT signer.
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)
-
 	tCtx := ktesting.Init(t)
 	ctx, cancel := context.WithCancel(tCtx)
 	defer cancel()
@@ -292,7 +283,7 @@ func TestDelayedStartForSigner(t *testing.T) {
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	go func() {
 		time.Sleep(20 * time.Second)
-		v1alpha1testing.NewMockSigner(t, socketPath)
+		v1testing.NewMockSigner(t, socketPath)
 	}()
 
 	// Start Api server configured with external signer.
