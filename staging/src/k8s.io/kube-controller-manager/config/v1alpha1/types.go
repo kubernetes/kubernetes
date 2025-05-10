@@ -104,6 +104,9 @@ type KubeControllerManagerConfiguration struct {
 	// DeploymentControllerConfiguration holds configuration for
 	// DeploymentController related features.
 	DeploymentController DeploymentControllerConfiguration
+	// DisruptionControllerConfiguration holds configuration for DisruptionController
+	// related features.
+	DisruptionController DisruptionControllerConfiguration
 	// StatefulSetControllerConfiguration holds configuration for
 	// StatefulSetController related features.
 	StatefulSetController StatefulSetControllerConfiguration
@@ -487,4 +490,16 @@ type ValidatingAdmissionPolicyStatusControllerConfiguration struct {
 	// but more CPU (and network) load.
 	// The default value is 5.
 	ConcurrentPolicySyncs int32
+}
+
+// DisruptionControllerConfiguration contains elements describing DisruptionController.
+type DisruptionControllerConfiguration struct {
+	// ConcurrentDisruptionSyncs is the number of PDB objects that are allowed to sync
+	// concurrently. Larger number = more responsive PDB updates, but more CPU
+	// (and network) load.
+	ConcurrentDisruptionSyncs int32
+
+	// ConcurrentStalePodSyncs is the number of stale pod disruption workers
+	// that are allowed to run concurrently.
+	ConcurrentDisruptionStalePodSyncs int32
 }
