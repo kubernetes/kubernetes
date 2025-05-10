@@ -282,7 +282,7 @@ func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClai
 }
 
 // genTestClaimInfo generates claim info object
-func genTestClaimInfo(podUIDs []string, prepared bool) *ClaimInfo {
+func genTestClaimInfo(claimUID types.UID, podUIDs []string, prepared bool) *ClaimInfo {
 	return &ClaimInfo{
 		ClaimInfoState: state.ClaimInfoState{
 			ClaimUID:  claimUID,
@@ -344,7 +344,7 @@ func TestGetResources(t *testing.T) {
 				},
 			},
 			pod:       genTestPod(),
-			claimInfo: genTestClaimInfo(nil, false),
+			claimInfo: genTestClaimInfo(claimUID, nil, false),
 		},
 		{
 			description: "nil claiminfo",
@@ -388,6 +388,7 @@ func getFakeNode() (*v1.Node, error) {
 func TestPrepareResources(t *testing.T) {
 	claimName := claimName
 	fakeKubeClient := fake.NewSimpleClientset()
+	anotherClaimUID := types.UID("another-claim-uid")
 
 	for _, test := range []struct {
 		description         string
@@ -482,7 +483,7 @@ func TestPrepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedClaimInfoState: genClaimInfoState(cdiID),
 			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
 				string(claimUID): {
@@ -531,7 +532,7 @@ func TestPrepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedClaimInfoState: genClaimInfoState(cdiID),
 			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
 				string(claimUID): {
@@ -545,6 +546,14 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			}},
+		},
+		{
+			description:    "claim UIDs mismatch",
+			driverName:     driverName,
+			pod:            genTestPod(),
+			claim:          genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:      genTestClaimInfo(anotherClaimUID, []string{podUID}, false),
+			expectedErrMsg: fmt.Sprintf("old claim with same name %s/%s and different UID %s still exists", namespace, claimName, anotherClaimUID),
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -645,21 +654,21 @@ func TestUnprepareResources(t *testing.T) {
 			description:    "unknown driver",
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
-			claimInfo:      genTestClaimInfo([]string{podUID}, true),
+			claimInfo:      genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedErrMsg: "plugin name test-driver not found in the list of registered DRA plugins",
 		},
 		{
 			description:         "resource claim referenced by other pod(s)",
 			driverName:          driverName,
 			pod:                 genTestPod(),
-			claimInfo:           genTestClaimInfo([]string{podUID, "another-pod-uid"}, true),
+			claimInfo:           genTestClaimInfo(claimUID, []string{podUID, "another-pod-uid"}, true),
 			wantResourceSkipped: true,
 		},
 		{
 			description:            "should timeout",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
 			expectedErrMsg:         "context deadline exceeded",
@@ -668,7 +677,7 @@ func TestUnprepareResources(t *testing.T) {
 			description:            "should fail when driver returns empty response",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}},
 			expectedUnprepareCalls: 1,
 			expectedErrMsg:         "NodeUnprepareResources left out 1 claims",
@@ -678,7 +687,7 @@ func TestUnprepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, false),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, false),
 			expectedUnprepareCalls: 1,
 		},
 		{
@@ -686,14 +695,14 @@ func TestUnprepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedUnprepareCalls: 1,
 		},
 		{
 			description:            "should unprepare resource when driver returns nil value",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{string(claimUID): nil}},
 			expectedUnprepareCalls: 1,
 		},
@@ -800,7 +809,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			description:       "should get claim info",
 			expectedClaimName: claimName,
 			pod:               genTestPod(),
-			claimInfo:         genTestClaimInfo([]string{podUID}, false),
+			claimInfo:         genTestClaimInfo(claimUID, []string{podUID}, false),
 		},
 		{
 			description:    "should fail when claim info not found",
@@ -836,7 +845,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 					},
 				},
 			},
-			claimInfo:      genTestClaimInfo([]string{podUID}, false),
+			claimInfo:      genTestClaimInfo(claimUID, []string{podUID}, false),
 			expectedErrMsg: "none of the supported fields are set",
 		},
 		{
