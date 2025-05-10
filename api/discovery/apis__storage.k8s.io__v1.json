@@ -101,6 +101,26 @@
         "patch",
         "update"
       ]
+    },
+    {
+      "kind": "VolumeAttributesClass",
+      "name": "volumeattributesclasses",
+      "namespaced": false,
+      "shortNames": [
+        "vac"
+      ],
+      "singularName": "volumeattributesclass",
+      "storageVersionHash": "Bl3MtjZ/n/s=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
     }
   ]
 }
