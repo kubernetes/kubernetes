@@ -89,7 +89,7 @@ func init() {
 
 // RegisterCredentialProviderPlugins is called from kubelet to register external credential provider
 // plugins according to the CredentialProviderConfig config file.
-func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string,
+func RegisterCredentialProviderPlugins(pluginConfigPath, pluginBinDir string,
 	getServiceAccountToken getServiceAccountTokenFunc,
 	getServiceAccount GetServiceAccountFunc,
 ) error {
@@ -101,7 +101,7 @@ func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string,
 		return fmt.Errorf("error inspecting binary directory %s: %w", pluginBinDir, err)
 	}
 
-	credentialProviderConfig, err := readCredentialProviderConfigFile(pluginConfigFile)
+	credentialProviderConfig, err := readCredentialProviderConfig(pluginConfigPath)
 	if err != nil {
 		return err
 	}
