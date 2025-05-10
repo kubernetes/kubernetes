@@ -111,7 +111,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Subsystem: APIServerComponent,
 			Name:      "request_slo_duration_seconds",
-			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, group, version, resource, subresource, scope and component.",
+			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request duration excluding webhooks as they are mostly
 			// dependant on user configuration.
@@ -120,13 +120,13 @@ var (
 			StabilityLevel:    compbasemetrics.ALPHA,
 			DeprecatedVersion: "1.27.0",
 		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	requestSliLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Subsystem: APIServerComponent,
 			Name:      "request_sli_duration_seconds",
-			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, group, version, resource, subresource, scope and component.",
+			Help:      "Response latency distribution (not counting webhook duration and priority & fairness queue wait times) in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
 			// This metric is supplementary to the requestLatencies metric.
 			// It measures request duration excluding webhooks as they are mostly
 			// dependant on user configuration.
@@ -134,7 +134,7 @@ var (
 				4, 5, 6, 8, 10, 15, 20, 30, 45, 60},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
 	fieldValidationRequestLatencies = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
@@ -619,8 +619,8 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 	if wd, ok := request.LatencyTrackersFrom(req.Context()); ok {
 		sliLatency := elapsedSeconds - (wd.MutatingWebhookTracker.GetLatency() + wd.ValidatingWebhookTracker.GetLatency() + wd.APFQueueWaitTracker.GetLatency()).Seconds()
-		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
-		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(sliLatency)
+		requestSloLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(sliLatency)
+		requestSliLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(sliLatency)
 	}
 	// We are only interested in response sizes of read requests.
 	if verb == MethodGet || verb == MethodList {
