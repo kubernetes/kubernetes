@@ -31,11 +31,7 @@ func (s *stringArrayValue) Append(val string) error {
 func (s *stringArrayValue) Replace(val []string) error {
 	out := make([]string, len(val))
 	for i, d := range val {
-		var err error
 		out[i] = d
-		if err != nil {
-			return err
-		}
 	}
 	*s.value = out
 	return nil

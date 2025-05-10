@@ -28,7 +28,9 @@ var (
 			Subsystem: "store",
 			Name:      "reads_total",
 			Help:      "Total number of reads action by (get/getRecursive), local to this member.",
-		}, []string{"action"})
+		},
+		[]string{"action"},
+	)
 
 	writeCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -36,7 +38,9 @@ var (
 			Subsystem: "store",
 			Name:      "writes_total",
 			Help:      "Total number of writes (e.g. set/compareAndDelete) seen by this member.",
-		}, []string{"action"})
+		},
+		[]string{"action"},
+	)
 
 	readFailedCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -44,7 +48,9 @@ var (
 			Subsystem: "store",
 			Name:      "reads_failed_total",
 			Help:      "Failed read actions by (get/getRecursive), local to this member.",
-		}, []string{"action"})
+		},
+		[]string{"action"},
+	)
 
 	writeFailedCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -52,7 +58,9 @@ var (
 			Subsystem: "store",
 			Name:      "writes_failed_total",
 			Help:      "Failed write actions (e.g. set/compareAndDelete), seen by this member.",
-		}, []string{"action"})
+		},
+		[]string{"action"},
+	)
 
 	expireCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
@@ -60,7 +68,8 @@ var (
 			Subsystem: "store",
 			Name:      "expires_total",
 			Help:      "Total number of expired keys.",
-		})
+		},
+	)
 
 	watchRequests = prometheus.NewCounter(
 		prometheus.CounterOpts{
@@ -68,7 +77,8 @@ var (
 			Subsystem: "store",
 			Name:      "watch_requests_total",
 			Help:      "Total number of incoming watch requests (new or reestablished).",
-		})
+		},
+	)
 
 	watcherCount = prometheus.NewGauge(
 		prometheus.GaugeOpts{
@@ -76,7 +86,8 @@ var (
 			Subsystem: "store",
 			Name:      "watchers",
 			Help:      "Count of currently active watchers.",
-		})
+		},
+	)
 )
 
 const (
