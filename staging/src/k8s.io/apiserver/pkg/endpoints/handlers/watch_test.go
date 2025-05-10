@@ -28,14 +28,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/apitesting"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
-	apitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	endpointstesting "k8s.io/apiserver/pkg/endpoints/testing"
 	"k8s.io/client-go/dynamic"
 	restclient "k8s.io/client-go/rest"
 )
@@ -50,8 +51,8 @@ var testCodecV2 = codecs.LegacyCodec(testGroupV2)
 
 func addTestTypesV2() {
 	scheme.AddKnownTypes(testGroupV2,
-		&apitesting.Simple{},
-		&apitesting.SimpleList{},
+		&endpointstesting.Simple{},
+		&endpointstesting.SimpleList{},
 	)
 	metav1.AddToGroupVersion(scheme, testGroupV2)
 }
@@ -97,7 +98,10 @@ func TestWatchHTTPErrors(t *testing.T) {
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
+	defer apitesting.Close(t, resp.Body)
+
+	// Send error to server from storage
+	errStatus := apierrors.NewInternalError(fmt.Errorf("we got an error")).Status()
 	watcher.Error(&errStatus)
 	watcher.Stop()
 
@@ -152,7 +156,7 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, doneCh},
 	}
 
-	statusErr := errors.NewInternalError(fmt.Errorf("we got an error"))
+	statusErr := apierrors.NewInternalError(fmt.Errorf("we got an error"))
 	errStatus := statusErr.Status()
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, statusErr))
@@ -167,6 +171,7 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
+	defer apitesting.Close(t, resp.Body)
 
 	// We had already got an error before watch serve started
 	decoder := json.NewDecoder(resp.Body)
@@ -265,7 +270,10 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	client := http.Client{}
 	resp, err := client.Do(req)
 	require.NoError(t, err)
-	watcher.Add(&apitesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: testGroupV2.String()}})
+	defer apitesting.Close(t, resp.Body)
+
+	// Send object added event to server from storage
+	watcher.Add(&endpointstesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: testGroupV2.String()}})
 
 	// Make sure we can actually watch an endpoint
 	decoder := json.NewDecoder(resp.Body)
