@@ -18,6 +18,7 @@ package endpoints
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -251,10 +252,13 @@ func TestWatchClientClose(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Errorf("watcher did not close when client closed")
 	}
+
+	// Validate read after close errors
+	_, err = io.Copy(io.Discard, response.Body)
+	apitesting.AssertReadOnClosedBodyError(t, err)
 }
 
 func TestWatchRead(t *testing.T) {
-	ctx := t.Context()
 	simpleStorage := &SimpleRESTStorage{}
 	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
 	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
@@ -265,7 +269,7 @@ func TestWatchRead(t *testing.T) {
 	dest.Path = "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version + "/simples"
 	dest.RawQuery = "watch=1"
 
-	connectHTTP := func(accept string) (io.ReadCloser, string) {
+	connectHTTP := func(ctx context.Context, accept string) (io.ReadCloser, string) {
 		client := http.Client{}
 		request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
 		if err != nil {
@@ -285,7 +289,7 @@ func TestWatchRead(t *testing.T) {
 		return response.Body, response.Header.Get("Content-Type")
 	}
 
-	connectWebSocket := func(accept string) (io.ReadCloser, string) {
+	connectWebSocket := func(ctx context.Context, accept string) (io.ReadCloser, string) {
 		dest := *dest
 		dest.Scheme = "ws" // Required by websocket, though the server never sees it.
 		config, err := websocket.NewConfig(dest.String(), "http://localhost")
@@ -293,7 +297,7 @@ func TestWatchRead(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		config.Header.Add("Accept", accept)
-		ws, err := websocket.DialConfig(config)
+		ws, err := config.DialContext(ctx)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -337,22 +341,23 @@ func TestWatchRead(t *testing.T) {
 	protocols := []struct {
 		name        string
 		selfFraming bool
-		fn          func(string) (io.ReadCloser, string)
+		fn          func(context.Context, string) (io.ReadCloser, string)
 	}{
 		{name: "http", fn: connectHTTP},
 		{name: "websocket", selfFraming: true, fn: connectWebSocket},
 	}
 
 	for _, protocol := range protocols {
-		for _, test := range testCases {
-			func() {
+		for textIndex, test := range testCases {
+			t.Run(fmt.Sprintf("%s-%d", protocol.name, textIndex), func(t *testing.T) {
+				ctx := t.Context()
 				info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), test.MediaType)
 				if !ok || info.StreamSerializer == nil {
 					t.Fatal(info)
 				}
 				streamSerializer := info.StreamSerializer
 
-				r, contentType := protocol.fn(test.Accept)
+				r, contentType := protocol.fn(ctx, test.Accept)
 				defer r.Close()
 
 				if contentType != "__default__" && contentType != test.ExpectedContentType {
@@ -403,7 +408,7 @@ func TestWatchRead(t *testing.T) {
 				if err == nil {
 					t.Errorf("Unexpected non-error")
 				}
-			}()
+			})
 		}
 	}
 }
@@ -519,35 +524,36 @@ func TestWatchParamParsing(t *testing.T) {
 		},
 	}
 
-	for _, item := range table {
-		ctx := t.Context()
-		simpleStorage.requestedLabelSelector = labels.Everything()
-		simpleStorage.requestedFieldSelector = fields.Everything()
-		simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
-		simpleStorage.requestedResourceNamespace = ""
-		dest.Path = item.path
-		dest.RawQuery = item.rawQuery
+	for testIndex, item := range table {
+		t.Run(fmt.Sprintf("%d", testIndex), func(t *testing.T) {
+			ctx := t.Context()
+			simpleStorage.requestedLabelSelector = labels.Everything()
+			simpleStorage.requestedFieldSelector = fields.Everything()
+			simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
+			simpleStorage.requestedResourceNamespace = ""
+			dest.Path = item.path
+			dest.RawQuery = item.rawQuery
 
-		req, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
-		require.NoError(t, err)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Errorf("%v: unexpected error: %v", item.rawQuery, err)
-			continue
-		}
-		resp.Body.Close()
-		if e, a := item.namespace, simpleStorage.requestedResourceNamespace; e != a {
-			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-		}
-		if e, a := item.resourceVersion, simpleStorage.requestedResourceVersion; e != a {
-			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-		}
-		if e, a := item.labelSelector, simpleStorage.requestedLabelSelector.String(); e != a {
-			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-		}
-		if e, a := item.fieldSelector, simpleStorage.requestedFieldSelector.String(); e != a {
-			t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
-		}
+			req, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
+			require.NoError(t, err)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("%v: unexpected error: %v", item.rawQuery, err)
+			}
+			resp.Body.Close()
+			if e, a := item.namespace, simpleStorage.requestedResourceNamespace; e != a {
+				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+			}
+			if e, a := item.resourceVersion, simpleStorage.requestedResourceVersion; e != a {
+				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+			}
+			if e, a := item.labelSelector, simpleStorage.requestedLabelSelector.String(); e != a {
+				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+			}
+			if e, a := item.fieldSelector, simpleStorage.requestedFieldSelector.String(); e != a {
+				t.Errorf("%v: expected %v, got %v", item.rawQuery, e, a)
+			}
+		})
 	}
 }
 
@@ -574,29 +580,32 @@ func TestWatchProtocolSelection(t *testing.T) {
 	}
 
 	for _, item := range table {
-		ctx := t.Context()
-		request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		request.Header.Set("Connection", item.connHeader)
-		request.Header.Set("Upgrade", "websocket")
+		name := fmt.Sprintf("websocket:%v header:%s", item.isWebsocket, item.connHeader)
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			request, err := http.NewRequestWithContext(ctx, request.MethodGet, dest.String(), nil)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			request.Header.Set("Connection", item.connHeader)
+			request.Header.Set("Upgrade", "websocket")
 
-		response, err := client.Do(request)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
+			response, err := client.Do(request)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
 
-		// The requests recognized as websocket requests based on connection
-		// and upgrade headers will not also have the necessary Sec-Websocket-*
-		// headers so it is expected to throw a 400
-		if item.isWebsocket && response.StatusCode != http.StatusBadRequest {
-			t.Errorf("Unexpected response %#v", response)
-		}
+			// The requests recognized as websocket requests based on connection
+			// and upgrade headers will not also have the necessary Sec-Websocket-*
+			// headers so it is expected to throw a 400
+			if item.isWebsocket && response.StatusCode != http.StatusBadRequest {
+				t.Errorf("Unexpected response %#v", response)
+			}
 
-		if !item.isWebsocket && response.StatusCode != http.StatusOK {
-			t.Errorf("Unexpected response %#v", response)
-		}
+			if !item.isWebsocket && response.StatusCode != http.StatusOK {
+				t.Errorf("Unexpected response %#v", response)
+			}
+		})
 	}
 
 }
