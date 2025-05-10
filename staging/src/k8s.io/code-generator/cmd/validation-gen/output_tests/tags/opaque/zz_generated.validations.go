@@ -38,31 +38,31 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	scheme.AddValidationFunc((*OtherString)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		if len(op.Request.Subresources) == 0 {
+		if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "scale") {
 			return Validate_OtherString(ctx, op, nil /* fldPath */, obj.(*OtherString), safe.Cast[*OtherString](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, op.Request.Subresources))}
 	})
 	scheme.AddValidationFunc((*OtherStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		if len(op.Request.Subresources) == 0 {
+		if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "scale") {
 			return Validate_OtherStruct(ctx, op, nil /* fldPath */, obj.(*OtherStruct), safe.Cast[*OtherStruct](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, op.Request.Subresources))}
 	})
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		if len(op.Request.Subresources) == 0 {
+		if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "scale") {
 			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, op.Request.Subresources))}
 	})
 	scheme.AddValidationFunc((TypedefMapOther)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		if len(op.Request.Subresources) == 0 {
+		if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "scale") {
 			return Validate_TypedefMapOther(ctx, op, nil /* fldPath */, obj.(TypedefMapOther), safe.Cast[TypedefMapOther](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, op.Request.Subresources))}
 	})
 	scheme.AddValidationFunc((TypedefSliceOther)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		if len(op.Request.Subresources) == 0 {
+		if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == "scale") {
 			return Validate_TypedefSliceOther(ctx, op, nil /* fldPath */, obj.(TypedefSliceOther), safe.Cast[TypedefSliceOther](oldObj))
 		}
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, op.Request.Subresources))}
