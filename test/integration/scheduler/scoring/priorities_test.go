@@ -296,17 +296,17 @@ func TestNodeResourcesScoring(t *testing.T) {
 // works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForScoringTests(t, nodeaffinity.Name, nodeaffinity.Name)
-	// Add a few nodes.
-	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
-	if err != nil {
-		t.Fatal(err)
-	}
 	// Add a label to one of the nodes.
 	labelKey := "kubernetes.io/node-topologyKey"
 	labelValue := "topologyvalue"
 	labeledNode, err := createNode(testCtx.ClientSet, st.MakeNode().Name("testnode-4").Label(labelKey, labelValue).Obj())
 	if err != nil {
 		t.Fatalf("Cannot create labeled node: %v", err)
+	}
+	// Add a few nodes.
+	_, err = createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create a pod with node affinity.
@@ -744,6 +744,9 @@ func TestPodAffinityScoring(t *testing.T) {
 					t.Fatalf("failed to create node: %v", err)
 				}
 			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("failed to wait for nodes in cache: %v", err)
+			}
 
 			for _, p := range tt.existingPods {
 				if _, err := runPausePod(testCtx.ClientSet, initPausePod(p)); err != nil {
@@ -837,6 +840,9 @@ func TestTaintTolerationScoring(t *testing.T) {
 				if _, err := createNode(testCtx.ClientSet, n); err != nil {
 					t.Fatalf("Failed to create node: %v", err)
 				}
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 			pod, err := runPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{
 				Name:        fmt.Sprintf("test-pod-%v", i),
@@ -1102,6 +1108,9 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 					t.Fatalf("Cannot create node: %v", err)
 				}
 			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
+			}
 
 			// set namespace to pods
 			for i := range tt.existingPods {
@@ -1149,9 +1158,10 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 	testCtx := initTestSchedulerForScoringTests(t, podtopologyspread.Name, podtopologyspread.Name)
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
+	nodeNum := 300
 
 	zoneForNode := make(map[string]string)
-	for i := 0; i < 300; i++ {
+	for i := 0; i < nodeNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		zone := fmt.Sprintf("zone-%d", i%3)
 		zoneForNode[nodeName] = zone
@@ -1159,6 +1169,9 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Cannot create node: %v", err)
 		}
+	}
+	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, nodeNum); err != nil {
+		t.Fatalf("Failed to wait for nodes in cache: %v", err)
 	}
 
 	serviceName := "test-service"
