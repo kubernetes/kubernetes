@@ -122,7 +122,8 @@ func NewMonitor(informersStarted <-chan struct{}, informerFactory informerfactor
 
 // monitor runs a Controller with a local stop channel.
 type monitor struct {
-	controller cache.Controller
+	controller        cache.Controller
+	handlerUnregister func() error
 
 	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
 	// not yet started.
@@ -133,6 +134,7 @@ type monitor struct {
 // error.
 func (m *monitor) Run() {
 	m.controller.Run(m.stopCh)
+	utilruntime.HandleError(m.handlerUnregister())
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
@@ -140,7 +142,7 @@ type monitors map[schema.GroupVersionResource]*monitor
 // UpdateFilter is a function that returns true if the update event should be added to the resourceChanges queue.
 type UpdateFilter func(resource schema.GroupVersionResource, oldObj, newObj interface{}) bool
 
-func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, error) {
+func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.GroupVersionResource) (cache.Controller, func() error, error) {
 	logger := klog.FromContext(ctx)
 
 	handlers := cache.ResourceEventHandlerFuncs{
@@ -169,16 +171,21 @@ func (qm *QuotaMonitor) controllerFor(ctx context.Context, resource schema.Group
 		},
 	}
 	shared, err := qm.informerFactory.ForResource(resource)
-	if err == nil {
-		logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
-		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
-		return shared.Informer().GetController(), nil
+	if err != nil {
+		logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
+		// TODO: if we can share storage with garbage collector, it may make sense to support other resources
+		// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
+		return nil, nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
 	}
-	logger.V(4).Error(err, "QuotaMonitor unable to use a shared informer", "resource", resource.String())
 
-	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
-	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
-	return nil, fmt.Errorf("unable to monitor quota for resource %q", resource.String())
+	logger.V(4).Info("QuotaMonitor using a shared informer", "resource", resource.String())
+	handler, err := shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+	if err != nil {
+		logger.V(4).Error(err, "QuotaMonitor unable to register event handler", "resource", resource.String())
+		return nil, nil, fmt.Errorf("unable to register event handler for resource %q", resource.String())
+	}
+
+	return shared.Informer().GetController(), func() error { return shared.Informer().RemoveEventHandler(handler) }, nil
 }
 
 // SyncMonitors rebuilds the monitor set according to the supplied resources,
@@ -211,7 +218,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 			kept++
 			continue
 		}
-		c, err := qm.controllerFor(ctx, resource)
+		c, handlerUnregister, err := qm.controllerFor(ctx, resource)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
@@ -228,7 +235,7 @@ func (qm *QuotaMonitor) SyncMonitors(ctx context.Context, resources map[schema.G
 		}
 
 		// track the monitor
-		current[resource] = &monitor{controller: c}
+		current[resource] = &monitor{controller: c, handlerUnregister: handlerUnregister}
 		added++
 	}
 	qm.monitors = current
@@ -274,6 +281,19 @@ func (qm *QuotaMonitor) StartMonitors(ctx context.Context) {
 	klog.FromContext(ctx).V(4).Info("QuotaMonitor finished starting monitors", "new", started, "total", len(monitors))
 }
 
+func (qm *QuotaMonitor) StopMonitors() {
+	qm.monitorLock.Lock()
+	defer qm.monitorLock.Unlock()
+
+	monitors := qm.monitors
+	for resource, monitor := range monitors {
+		if monitor.stopCh != nil {
+			close(monitor.stopCh)
+		}
+		delete(qm.monitors, resource)
+	}
+}
+
 // IsSynced returns true if any monitors exist AND all those monitors'
 // controllers HasSynced functions return true. This means IsSynced could return
 // true at one time, and then later return false if all monitors were
@@ -302,6 +322,7 @@ func (qm *QuotaMonitor) IsSynced(ctx context.Context) bool {
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
+	defer qm.ShutDown()
 
 	logger := klog.FromContext(ctx)
 
@@ -318,28 +339,18 @@ func (qm *QuotaMonitor) Run(ctx context.Context) {
 	// closed.
 	qm.StartMonitors(ctx)
 
-	// The following workers are hanging forever until the queue is
-	// shutted down, so we need to shut it down in a separate goroutine.
-	go func() {
-		defer utilruntime.HandleCrash()
-		defer qm.resourceChanges.ShutDown()
-
-		<-ctx.Done()
-	}()
 	wait.UntilWithContext(ctx, qm.runProcessResourceChanges, 1*time.Second)
 
-	// Stop any running monitors.
+	<-ctx.Done()
+
 	qm.monitorLock.Lock()
-	defer qm.monitorLock.Unlock()
-	monitors := qm.monitors
-	stopped := 0
-	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
-			stopped++
-			close(monitor.stopCh)
-		}
-	}
-	logger.Info("QuotaMonitor stopped monitors", "stopped", stopped, "total", len(monitors))
+	qm.running = false
+	qm.monitorLock.Unlock()
+}
+
+func (qm *QuotaMonitor) ShutDown() {
+	qm.StopMonitors()
+	qm.resourceChanges.ShutDown()
 }
 
 func (qm *QuotaMonitor) runProcessResourceChanges(ctx context.Context) {

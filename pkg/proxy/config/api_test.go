@@ -139,7 +139,10 @@ func TestNewEndpointsSourceApi_UpdatesAndMultipleEndpoints(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	endpointsliceConfig := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	endpointsliceConfig, err := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	if err != nil {
+		t.Fatalf("failed to create endpointslice config: %v", err)
+	}
 	endpointsliceConfig.RegisterEventHandler(handler)
 	sharedInformers.Start(stopCh)
 	go endpointsliceConfig.Run(stopCh)
@@ -199,7 +202,10 @@ func TestInitialSync(t *testing.T) {
 	svcHandler := NewServiceHandlerMock()
 	svcConfig.RegisterEventHandler(svcHandler)
 
-	epsConfig := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), 0)
+	epsConfig, err := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), 0)
+	if err != nil {
+		t.Fatalf("failed to create endpointslice config: %v", err)
+	}
 	epsHandler := NewEndpointSliceHandlerMock()
 	epsConfig.RegisterEventHandler(epsHandler)
 
@@ -207,15 +213,14 @@ func TestInitialSync(t *testing.T) {
 	defer close(stopCh)
 	sharedInformers.Start(stopCh)
 
-	err := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
+	if err := wait.PollImmediate(time.Millisecond*10, wait.ForeverTestTimeout, func() (bool, error) {
 		svcHandler.lock.Lock()
 		defer svcHandler.lock.Unlock()
 		if reflect.DeepEqual(svcHandler.state, expectedSvcState) {
 			return true, nil
 		}
 		return false, nil
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatal("Timed out waiting for the completion of handler `OnServiceAdd`")
 	}
 
@@ -232,7 +237,7 @@ func TestInitialSync(t *testing.T) {
 	}
 
 	svcConfig.Run(stopCh)
-	epsConfig.Run(stopCh)
+	go epsConfig.Run(stopCh)
 
 	gotSvc := <-svcHandler.updated
 	gotSvcState := make(map[types.NamespacedName]*v1.Service, len(gotSvc))
