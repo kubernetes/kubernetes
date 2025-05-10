@@ -363,6 +363,21 @@ lint:
 	hack/verify-golangci-lint.sh
 endif
 
+define KUBE_API_LINTER_HELP_INFO
+# Run kube-api-linter
+#
+# Example:
+#   make lint-api
+endef
+.PHONY: lint-api
+ifeq ($(PRINT_HELP),y)
+lint-api:
+	echo "$$KUBE_API_LINTER_HELP_INFO"
+else
+lint-api:
+	hack/verify-kube-api-linter.sh
+endif
+
 define RELEASE_HELP_INFO
 # Build a release
 # Use the 'release-in-a-container' target to build the release when already in

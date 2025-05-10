@@ -1,45 +1,54 @@
 # See the OWNERS docs at https://go.k8s.io/owners
-
-options:
-  # make root approval non-recursive
-  no_parent_owners: true
-reviewers:
-  - bentheelder
-  - cblecker
-  - dchen1107
-  - justaugustus
-  - liggitt
-  - mikedanese
-  - pohly
-  - SataQiu
-  - smarterclayton
-  - spiffxp
-  - sttts
-  - thockin
-  - wojtek-t
-approvers:
-  - bentheelder
-  - cblecker
-  - dchen1107
-  - deads2k
-  - dims # for local-up-cluster related files
-  - enj # for sig-auth related stuff like cert testdata
-  - liggitt
-  - mikedanese
-  - pohly # for logging and linting
-  - pwittrock
-  - SataQiu
-  - smarterclayton
-  - soltysh # for sig-cli related stuff
-  - spiffxp
-  - sttts
-  - thockin
-  - wojtek-t
-emeritus_approvers:
-  - eparis
-  - fejta
-  - ixdy
-  - jbeda
-  - lavalamp
-  - zmerlynn
-  - vishh
+filters:
+  ".*": # All files unless otherwise specified
+    options:
+      # make root approval non-recursive
+      no_parent_owners: true
+    reviewers:
+      - bentheelder
+      - cblecker
+      - dchen1107
+      - justaugustus
+      - liggitt
+      - mikedanese
+      - pohly
+      - SataQiu
+      - smarterclayton
+      - spiffxp
+      - sttts
+      - thockin
+      - wojtek-t
+    approvers:
+      - bentheelder
+      - cblecker
+      - dchen1107
+      - deads2k
+      - dims # for local-up-cluster related files
+      - enj # for sig-auth related stuff like cert testdata
+      - liggitt
+      - mikedanese
+      - pohly # for logging and linting
+      - pwittrock
+      - SataQiu
+      - smarterclayton
+      - soltysh # for sig-cli related stuff
+      - spiffxp
+      - sttts
+      - thockin
+      - wojtek-t
+    emeritus_approvers:
+      - eparis
+      - fejta
+      - ixdy
+      - jbeda
+      - lavalamp
+      - zmerlynn
+      - vishh
+  "^kube-api-linter.yaml$":
+      options:
+        no_parent_owners: true
+      reviewers:
+        - api-approvers
+        - JoelSpeed
+      approvers:
+        - api-approvers
