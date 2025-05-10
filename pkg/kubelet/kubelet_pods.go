@@ -1130,6 +1130,15 @@ func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Po
 // are updated with a fixed UID (most should use a dynamic UID), and no config
 // updates are delivered to the pod workers while this method is running.
 func (kl *Kubelet) HandlePodCleanups(ctx context.Context) error {
+	kl.podCleanupTracker.Range(func(key, value interface{}) bool {
+		podUID := key.(types.UID)
+		if _, ok := kl.podManager.GetPodByUID(podUID); !ok {
+			kl.podCleanupTracker.Delete(podUID)
+			klog.V(4).InfoS("Cleaned up tracking record for removed pod", "podUID", podUID)
+		}
+		return true
+	})
+
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
