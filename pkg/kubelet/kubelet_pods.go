@@ -1834,7 +1834,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		resizeStatus := kl.determinePodResizeStatus(pod, podIsTerminal)
 		for _, c := range resizeStatus {
-			c.ObservedGeneration = podutil.GetPodObservedGenerationIfEnabledOnCondition(&oldPodStatus, pod.Generation, c.Type)
+			c.ObservedGeneration = podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, c.Type)
 			s.Conditions = append(s.Conditions, *c)
 		}
 	}
@@ -1858,7 +1858,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	s.Conditions = append(s.Conditions, status.GenerateContainersReadyCondition(pod, &oldPodStatus, allContainerStatuses, s.Phase))
 	s.Conditions = append(s.Conditions, v1.PodCondition{
 		Type:               v1.PodScheduled,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(&oldPodStatus, pod.Generation, v1.PodScheduled),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&oldPodStatus, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionTrue,
 	})
 	// set HostIP/HostIPs and initialize PodIP/PodIPs for host network pods

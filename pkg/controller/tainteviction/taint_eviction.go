@@ -134,7 +134,7 @@ func addConditionAndDeletePod(ctx context.Context, c clientset.Interface, name, 
 	newStatus := pod.Status.DeepCopy()
 	updated := apipod.UpdatePodCondition(newStatus, &v1.PodCondition{
 		Type:               v1.DisruptionTarget,
-		ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&pod.Status, pod.Generation, v1.DisruptionTarget),
+		ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.DisruptionTarget),
 		Status:             v1.ConditionTrue,
 		Reason:             "DeletionByTaintManager",
 		Message:            "Taint manager: deleting due to NoExecute taint",
