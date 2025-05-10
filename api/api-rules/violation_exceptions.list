@@ -234,6 +234,7 @@ API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,N
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,NodeEvictionRate
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,NodeMonitorGracePeriod
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,NodeStartupGracePeriod
+API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,PauseEvictionOnFullDisruption
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,PodEvictionTimeout
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,SecondaryNodeEvictionRate
 API rule violation: names_match,k8s.io/kube-controller-manager/config/v1alpha1,NodeLifecycleControllerConfiguration,UnhealthyZoneThreshold
