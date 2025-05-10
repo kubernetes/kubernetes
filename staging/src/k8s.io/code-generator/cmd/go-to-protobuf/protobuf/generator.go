@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -748,11 +750,7 @@ func assembleProtoFile(w io.Writer, f *generator.File) {
 	}
 
 	if len(f.Imports) > 0 {
-		imports := []string{}
-		for i := range f.Imports {
-			imports = append(imports, i)
-		}
-		sort.Strings(imports)
+		imports := slices.Sorted(maps.Keys(f.Imports))
 		for _, s := range imports {
 			fmt.Fprintf(w, "import %q;\n", s)
 		}

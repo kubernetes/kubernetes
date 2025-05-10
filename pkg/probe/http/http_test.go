@@ -19,12 +19,13 @@ package http
 import (
 	"bytes"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -111,12 +112,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 	// Handler that returns the keys of request headers in the body
 	headerKeysNamesHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		keys := make([]string, 0, len(r.Header))
-		for k := range r.Header {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-
+		keys := slices.Sorted(maps.Keys(r.Header))
 		w.Write([]byte(strings.Join(keys, "\n")))
 	}
 
