@@ -307,7 +307,12 @@ func addColumns(pos columnAddPosition, table *metav1.Table, columns []metav1.Tab
 // does not expose metadata). It returns an error if the table cannot
 // be decorated.
 func decorateTable(table *metav1.Table, options PrintOptions) error {
-	width := len(table.ColumnDefinitions) + len(options.ColumnLabels)
+	columnDefinitionsLen := len(table.ColumnDefinitions)
+	columnLabelsLen := len(options.ColumnLabels)
+	if columnDefinitionsLen > (int(^uint(0) >> 1)) - columnLabelsLen - 2 {
+		return fmt.Errorf("table is too large to process")
+	}
+	width := columnDefinitionsLen + columnLabelsLen
 	if options.WithNamespace {
 		width++
 	}
