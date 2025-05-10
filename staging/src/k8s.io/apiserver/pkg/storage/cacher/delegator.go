@@ -157,7 +157,7 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 	// fresh as the given resourceVersion.
 	getRV, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 	// Do not create a trace - it's not for free and there are tons
 	// of Get requests. We can add it if it will be really needed.
