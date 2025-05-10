@@ -600,6 +600,7 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
+	reportVersionSkewInfo(req)
 	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, codeToString(httpCode)).Inc()
 	// MonitorRequest happens after authentication, so we can trust the username given by the request
 	info, ok := request.UserFrom(req.Context())
@@ -971,5 +972,12 @@ func codeToString(s int) string {
 
 	default:
 		return strconv.Itoa(s)
+	}
+}
+
+func reportVersionSkewInfo(req *http.Request) {
+	userAgent := req.UserAgent()
+	if strings.Contains(userAgent, "scheduler") {
+		fmt.Printf("\nRICHAAAA header: %v\n", req.Header)
 	}
 }
