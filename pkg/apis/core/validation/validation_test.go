@@ -12941,6 +12941,17 @@ func TestValidatePodUpdate(t *testing.T) {
 			err:  "spec: Forbidden: pod updates may not change fields",
 			test: "port change",
 		}, {
+			new: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerSecurityContext(core.SecurityContext{Capabilities: &core.Capabilities{}}))),
+			),
+			old: *podtest.MakePod("pod",
+				podtest.SetContainers(podtest.MakeContainer("container",
+					podtest.SetContainerSecurityContext(core.SecurityContext{Capabilities: &core.Capabilities{Add: []core.Capability{"CAP_SYS_ADMIN"}}}))),
+			),
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "capabilities update",
+		}, {
 			new:  *podtest.MakePod("foo", podtest.SetLabels(map[string]string{"foo": "bar"})),
 			old:  *podtest.MakePod("foo", podtest.SetLabels(map[string]string{"bar": "foo"})),
 			err:  "",
@@ -13109,6 +13120,17 @@ func TestValidatePodUpdate(t *testing.T) {
 			),
 			err:  "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
 			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
+		}, {
+			new: *podtest.MakePod("foo",
+				podtest.SetOS(core.Windows),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+			),
+			old: *podtest.MakePod("foo",
+				podtest.SetOS(core.Linux),
+				podtest.SetSecurityContext(&core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}),
+			),
+			err:  "spec.securityContext.seLinuxOptions: Forbidden",
+			test: "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
 		}, {
 			new: *podtest.MakePod("foo",
 				podtest.SetOS(core.Windows),
@@ -22141,6 +22163,10 @@ func TestValidateSecurityContext(t *testing.T) {
 	capSysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"CAP_SYS_ADMIN"}
 	capSysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
 
+	sysAdminWithoutEscalation := fullValidSC()
+	sysAdminWithoutEscalation.Capabilities.Add = []core.Capability{"SYS_ADMIN"}
+	sysAdminWithoutEscalation.AllowPrivilegeEscalation = ptr.To(false)
+
 	errorCases := map[string]struct {
 		sc           *core.SecurityContext
 		errorType    field.ErrorType
@@ -22161,6 +22187,11 @@ func TestValidateSecurityContext(t *testing.T) {
 			sc:          capSysAdminWithoutEscalation,
 			errorType:   "FieldValueInvalid",
 			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN",
+		},
+		"with SYS_ADMIN and allowPrivilegeEscalation false": {
+			sc:          sysAdminWithoutEscalation,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` SYS_ADMIN",
 		},
 		"with privileged and allowPrivilegeEscalation false": {
 			sc:           privWithoutEscalation,
