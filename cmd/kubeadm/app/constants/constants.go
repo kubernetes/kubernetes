@@ -495,10 +495,10 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		30: "3.5.21-0",
 		31: "3.5.21-0",
 		32: "3.5.21-0",
 		33: "3.5.21-0",
+		34: "3.5.21-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
