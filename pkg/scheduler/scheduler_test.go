@@ -65,7 +65,7 @@ import (
 )
 
 func init() {
-	metrics.Register()
+	metrics.Register(true)
 }
 
 func TestSchedulerCreation(t *testing.T) {
@@ -252,7 +252,6 @@ func TestSchedulerCreation(t *testing.T) {
 }
 
 func TestFailureHandler(t *testing.T) {
-	metrics.Register()
 	testPod := st.MakePod().Name("test-pod").Namespace(v1.NamespaceDefault).Obj()
 	testPodUpdated := testPod.DeepCopy()
 	testPodUpdated.Labels = map[string]string{"foo": ""}

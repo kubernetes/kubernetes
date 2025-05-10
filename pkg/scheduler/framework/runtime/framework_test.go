@@ -67,10 +67,6 @@ const (
 	injectFilterReason = "injected filter status"
 )
 
-func init() {
-	metrics.Register()
-}
-
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
 var _ framework.ScorePlugin = &TestScoreWithNormalizePlugin{}
@@ -501,6 +497,7 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			initMetrics(t)
 			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
@@ -3036,10 +3033,9 @@ func TestRecordingMetrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			initMetrics(t)
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
-			metrics.FrameworkExtensionPointDuration.Reset()
-			metrics.PluginExecutionDuration.Reset()
 
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
@@ -3091,6 +3087,20 @@ func TestRecordingMetrics(t *testing.T) {
 			collectAndComparePluginMetrics(t, tt.wantExtensionPoint, testPlugin, tt.wantStatus)
 		})
 	}
+}
+
+// The reason for having this function instead of init(): Some of the metrics tested in this file are registered conditionally,
+// depending on the feature gate SchedulerHighPrecisionMetrics, which is disabled by default. To register the metrics, the feature
+// gate needs to be enabled for testing.
+// It is not sufficient to set the feature gate only in test cases actually testing the metrics, because metrics.Register()
+// is only executed once, and all subsequent calls are ignored. Therefore the feature gate needs to be set before the first test
+// is executed, and since test are executed in random order, it needs to be done at the beginning of every test case.
+// TODO: Refactor tests to use mocks instead of a real metric registry.
+func initMetrics(t *testing.T) {
+	metrics.Register(true /* exportHighPrecisionMetrics*/)
+	metrics.FrameworkExtensionPointDuration.Reset()
+	metrics.PluginExecutionDuration.Reset()
+	metrics.PermitWaitDuration.Reset()
 }
 
 func TestRunBindPlugins(t *testing.T) {
@@ -3162,8 +3172,7 @@ func TestRunBindPlugins(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metrics.FrameworkExtensionPointDuration.Reset()
-			metrics.PluginExecutionDuration.Reset()
+			initMetrics(t)
 
 			pluginSet := config.PluginSet{}
 			r := make(Registry)
@@ -3227,8 +3236,8 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			initMetrics(t)
 			_, ctx := ktesting.NewTestContext(t)
-			metrics.PermitWaitDuration.Reset()
 
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)

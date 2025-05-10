@@ -64,7 +64,7 @@ var (
 )
 
 func init() {
-	metrics.Register()
+	metrics.Register(true)
 }
 
 func (p *criticalPaths) sort() {
