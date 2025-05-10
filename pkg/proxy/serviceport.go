@@ -84,6 +84,7 @@ type BaseServicePortInfo struct {
 	healthCheckNodePort      int
 	externalPolicyLocal      bool
 	internalPolicyLocal      bool
+	isHeadless              bool
 }
 
 var _ ServicePort = &BaseServicePortInfo{}
@@ -160,6 +161,12 @@ func (bsvcPortInfo *BaseServicePortInfo) ExternallyAccessible() bool {
 
 // UsesClusterEndpoints is part of ServicePort interface.
 func (bsvcPortInfo *BaseServicePortInfo) UsesClusterEndpoints() bool {
+	// Headless services bypass normal service proxying mechanisms
+	// so they don't need cluster endpoints
+	if bsvcPortInfo.isHeadless {
+		return false
+	}
+
 	// The service port uses Cluster endpoints if the internal traffic policy is "Cluster",
 	// or if it accepts external traffic at all. (Even if the external traffic policy is
 	// "Local", we need Cluster endpoints to implement short circuiting.)
@@ -191,6 +198,7 @@ func newBaseServiceInfo(service *v1.Service, ipFamily v1.IPFamily, port *v1.Serv
 		stickyMaxAgeSeconds: stickyMaxAgeSeconds,
 		externalPolicyLocal: externalPolicyLocal,
 		internalPolicyLocal: internalPolicyLocal,
+		isHeadless:         service.Spec.ClusterIP == v1.ClusterIPNone,
 	}
 
 	// Filter ExternalIPs to correct IP family
