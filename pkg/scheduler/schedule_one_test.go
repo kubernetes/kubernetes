@@ -1477,7 +1477,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	failedNodeStatues := framework.NewDefaultNodeToStatus()
 	for _, node := range nodes {
 		failedNodeStatues.Set(node.Name, framework.NewStatus(
-			framework.Unschedulable,
+			framework.UnschedulableAndUnresolvable,
 			fmt.Sprintf("Insufficient %v", v1.ResourceCPU),
 			fmt.Sprintf("Insufficient %v", v1.ResourceMemory),
 		).WithPlugin(noderesources.Name))
