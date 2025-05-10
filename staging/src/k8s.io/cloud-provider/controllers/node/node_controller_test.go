@@ -39,6 +39,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	fakecloud "k8s.io/cloud-provider/fake"
+	nodeutil "k8s.io/component-helpers/node/util"
 	_ "k8s.io/controller-manager/pkg/features/register"
 
 	"github.com/google/go-cmp/cmp"
@@ -1042,7 +1043,7 @@ func Test_syncNode(t *testing.T) {
 					},
 				},
 				Spec: v1.NodeSpec{
-					Taints: []v1.Taint{},
+					Taints: nil,
 				},
 			},
 		},
@@ -2223,7 +2224,7 @@ func TestNodeAddressesChangeDetected(t *testing.T) {
 }
 
 // Test updateNodeAddress with instanceV2, same test case with TestNodeAddressesNotUpdate.
-func TestNodeAddressesNotUpdateV2(t *testing.T) {
+func TestNodeAddressesDoUpdateV2(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -2245,6 +2246,7 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 			},
 		},
 		Spec: v1.NodeSpec{
+			ProviderID: "fake://node0",
 			Taints: []v1.Taint{
 				{
 					Key:    cloudproviderapi.TaintExternalCloudProvider,
@@ -2285,19 +2287,31 @@ func TestNodeAddressesNotUpdateV2(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(ctx, existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceMetadata(ctx, existingNode, scopeReconcile)
 	if err != nil {
 		t.Errorf("get instance metadata with error %v", err)
 	}
-	cloudNodeController.updateNodeAddress(ctx, existingNode, instanceMeta)
+
+	nodeModifiers, err := cloudNodeController.getNodeModifiersForInstanceMetadata(ctx, instanceMeta)
+	if err != nil {
+		t.Errorf("get node modifiers with error: %v", err)
+	}
+
+	newNode := existingNode.DeepCopy()
+	for _, modify := range nodeModifiers {
+		modify(newNode)
+	}
+	if _, _, err := nodeutil.PatchNode(clientset.CoreV1(), types.NodeName(existingNode.Name), existingNode, newNode); err != nil {
+		t.Errorf("failed to patch node: %v", err)
+	}
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error getting updated nodes: %v", err)
 	}
 
-	if len(updatedNode.Status.Addresses) > 0 {
-		t.Errorf("Node addresses should not be updated")
+	if len(updatedNode.Status.Addresses) == 0 {
+		t.Errorf("Node addresses should be updated")
 	}
 }
 
@@ -2365,19 +2379,32 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	instanceMeta, err := cloudNodeController.getInstanceNodeAddresses(ctx, existingNode)
+	instanceMeta, err := cloudNodeController.getInstanceMetadata(ctx, existingNode, scopeReconcile)
 	if err != nil {
 		t.Errorf("get instance metadata with error %v", err)
 	}
-	cloudNodeController.updateNodeAddress(ctx, existingNode, instanceMeta)
+
+	nodeModifiers, err := cloudNodeController.getNodeModifiersForInstanceMetadata(ctx, instanceMeta)
+	if err != nil {
+		t.Errorf("failed to get node modifiers: %v", err)
+	}
+
+	newNode := existingNode.DeepCopy()
+	for _, modify := range nodeModifiers {
+		modify(newNode)
+	}
+
+	if _, _, err := nodeutil.PatchNode(clientset.CoreV1(), types.NodeName(existingNode.Name), existingNode, newNode); err != nil {
+		t.Errorf("failed to patch node: %v", err)
+	}
 
 	updatedNode, err := clientset.CoreV1().Nodes().Get(ctx, existingNode.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error getting updated nodes: %v", err)
 	}
 
-	if len(updatedNode.Status.Addresses) > 0 {
-		t.Errorf("Node addresses should not be updated")
+	if len(updatedNode.Status.Addresses) == 0 {
+		t.Errorf("Node addresses should be updated")
 	}
 }
 
@@ -2690,7 +2717,7 @@ func TestGetInstanceMetadata(t *testing.T) {
 				cloud: test.fakeCloud,
 			}
 
-			metadata, err := cloudNodeController.getInstanceMetadata(ctx, test.existingNode)
+			metadata, err := cloudNodeController.getInstanceMetadata(ctx, test.existingNode, scopeInitialSync)
 			if (err != nil) != test.expectErr {
 				t.Fatalf("error expected %v got: %v", test.expectErr, err)
 			}

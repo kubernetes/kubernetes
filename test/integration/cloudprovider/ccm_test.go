@@ -120,9 +120,10 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 	ccm := ccmservertesting.StartTestServerOrDie(ctx, args)
 	defer ccm.TearDownFn()
 
+	var n *v1.Node
 	// There should be only the taint TaintNodeNotReady, added by the admission plugin TaintNodesByCondition
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 50*time.Second, true, func(ctx context.Context) (done bool, err error) {
-		n, err := client.CoreV1().Nodes().Get(ctx, "node0", metav1.GetOptions{})
+		n, err = client.CoreV1().Nodes().Get(ctx, "node0", metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -139,7 +140,7 @@ func Test_RemoveExternalCloudProviderTaint(t *testing.T) {
 	})
 	if err != nil {
 		t.Logf("Fake Cloud Provider calls: %v", fakeCloud.Calls)
-		t.Fatalf("expected node to not have Taint: %v", err)
+		t.Fatalf("expected node to not have Taint: %v: %+v", err, n)
 	}
 }
 
