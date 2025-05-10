@@ -671,7 +671,7 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 			}
 		}
 
-		results := GetHugepageLimitsFromResources(test.resources)
+		results := GetHugepageLimitsFromResources(&v1.Pod{}, test.resources)
 		if !reflect.DeepEqual(expectedHugepages, results) {
 			t.Errorf("%s test failed. Expected %v but got %v", test.name, expectedHugepages, results)
 		}
