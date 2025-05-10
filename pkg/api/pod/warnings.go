@@ -435,7 +435,6 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 		}
 
 		if v.Projected != nil {
-			var sourcePaths []pathAndSource
 			var allPaths []pathAndSource
 
 			for _, source := range v.Projected.Sources {
@@ -444,6 +443,7 @@ func warningsForOverlappingVirtualPaths(volumes []api.Volume) []string {
 					continue
 				}
 
+				var sourcePaths []pathAndSource
 				switch {
 				case source.ConfigMap != nil && source.ConfigMap.Items != nil:
 					sourcePaths = extractPaths(source.ConfigMap.Items, fmt.Sprintf("ConfigMap %q", source.ConfigMap.Name))
