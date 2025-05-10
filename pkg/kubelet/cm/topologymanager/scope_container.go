@@ -17,7 +17,7 @@ limitations under the License.
 package topologymanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
@@ -44,7 +44,7 @@ func NewContainerScope(policy Policy) Scope {
 	}
 }
 
-func (s *containerScope) Admit(pod *v1.Pod) lifecycle.PodAdmitResult {
+func (s *containerScope) Admit(pod *v1.Pod) (lifecycle.PodAdmitResult, error) {
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 		bestHint, admit := s.calculateAffinity(pod, &container)
 		klog.InfoS("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
