@@ -462,6 +462,7 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validateDriverName(result.Driver, fldPath.Child("driver"))...)
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool"))...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
+	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, result.BindingTimeoutSeconds, fldPath)...)
 	return allErrs
 }
 
@@ -788,6 +789,8 @@ func validateDevice(device resource.Device, fldPath *field.Path, sharedCounterTo
 	} else if (perDeviceNodeSelection == nil || !*perDeviceNodeSelection) && (device.NodeName != nil || device.NodeSelector != nil || device.AllNodes != nil) {
 		allErrs = append(allErrs, field.Invalid(fldPath, nil, "`nodeName`, `nodeSelector` and `allNodes` can only be set if `perDeviceNodeSelection` is set to true in the ResourceSlice spec"))
 	}
+
+	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, device.BindingTimeoutSeconds, fldPath)...)
 	return allErrs
 }
 
@@ -825,6 +828,10 @@ var (
 		// optional dot-separated build identifier segments (e.g. +build.id.20240305)
 		`(\+` + buildIdentifier + `(\.` + buildIdentifier + `)*)?` +
 		`$`)
+
+	conditionTypeRegex = regexp.MustCompile(
+		`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`,
+	)
 )
 
 func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.Path) field.ErrorList {
@@ -1188,6 +1195,38 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 	// There's no metav1validation.ValidateLabelValue.
 	for _, msg := range validation.IsValidLabelValue(value) {
 		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+
+	return allErrs
+}
+
+func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, bindingTimeoutSeconds *int64, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	if len(bindingConditions) > resource.BindingConditionsMaxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("bindingConditions"), len(bindingConditions), resource.BindingConditionsMaxSize))
+	}
+
+	for i, condition := range bindingConditions {
+		fieldPath := fldPath.Child("bindingConditions").Index(i)
+		if !conditionTypeRegex.MatchString(condition) {
+			allErrs = append(allErrs, field.Invalid(fieldPath, condition, "must match condition type format"))
+		}
+	}
+
+	if len(bindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
+		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("bindingFailureConditions"), len(bindingFailureConditions), resource.BindingFailureConditionsMaxSize))
+	}
+
+	for i, condition := range bindingFailureConditions {
+		fieldPath := fldPath.Child("bindingFailureConditions").Index(i)
+		if !conditionTypeRegex.MatchString(condition) {
+			allErrs = append(allErrs, field.Invalid(fieldPath, condition, "must match condition type format"))
+		}
+	}
+
+	if bindingTimeoutSeconds != nil && *bindingTimeoutSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), bindingTimeoutSeconds, "must be greater than zero"))
 	}
 
 	return allErrs
