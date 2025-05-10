@@ -259,16 +259,12 @@ func DumpAllPodInfoForNamespace(ctx context.Context, c clientset.Interface, name
 	logPodLogs(ctx, c, namespace, pods.Items, reportDir)
 }
 
-// FilterNonRestartablePods filters out pods that will never get recreated if
+// FilterRecreatablePods retains only pods that will get recreated if
 // deleted after termination.
-func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
+func FilterRecreatablePods(pods []*v1.Pod) []*v1.Pod {
 	var results []*v1.Pod
 	for _, p := range pods {
-		if isNotRestartAlwaysMirrorPod(p) {
-			// Mirror pods with restart policy == Never will not get
-			// recreated if they are deleted after the pods have
-			// terminated. For now, we discount such pods.
-			// https://github.com/kubernetes/kubernetes/issues/34003
+		if !isPodRecreatedIfDeleted(p) {
 			continue
 		}
 		results = append(results, p)
@@ -276,12 +272,25 @@ func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
 	return results
 }
 
-func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
-	// Check if the pod is a mirror pod
-	if _, ok := p.Annotations[v1.MirrorPodAnnotationKey]; !ok {
-		return false
+// isPodRecreatedIfDeleted returns true if the pod would be recreated if deleted.
+func isPodRecreatedIfDeleted(p *v1.Pod) bool {
+	// Check if it's a mirror pod
+	if _, isMirrorPod := p.Annotations[v1.MirrorPodAnnotationKey]; isMirrorPod {
+		// Mirror pods with restart policy == Always will get recreated
+		// https://github.com/kubernetes/kubernetes/issues/130288
+		return p.Spec.RestartPolicy == v1.RestartPolicyAlways
 	}
-	return p.Spec.RestartPolicy != v1.RestartPolicyAlways
+
+	// Check if it's a Job pod (Jobs don't recreate pods that are deleted)
+	for _, owner := range p.OwnerReferences {
+		if owner.Kind == v1.SchemeGroupVersion.WithKind("Job").Kind {
+			return false
+		}
+	}
+
+	// A pod with an owner reference will be recreated by its controller
+	// Naked pods (without owner references) won't be recreated
+	return len(p.OwnerReferences) > 0
 }
 
 // NewAgnhostPod returns a pod that uses the agnhost image. The image's binary supports various subcommands
