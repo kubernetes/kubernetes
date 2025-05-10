@@ -2866,19 +2866,26 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
 func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
-	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
-		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
+
+	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
+	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
+
+	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
+		cpuAllocated := resource.GetResourceAllocated(pod, v1.ResourceCPU)
+		needsCpuResize := cpuRequests > cpuAllocated
+		if kl.containerManager.GetNodeConfig().CPUManagerPolicy == "static" && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) && needsCpuResize {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
 			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
 			return false, v1.PodReasonInfeasible, msg
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) {
-			if kl.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" {
-				msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
-				klog.V(3).InfoS(msg, "pod", format.Pod(pod))
-				return false, v1.PodReasonInfeasible, msg
 
-			}
+		memAllocated := resource.GetResourceAllocated(pod, v1.ResourceMemory)
+		needsMemoryResize := memRequests > memAllocated
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryManager) && kl.containerManager.GetNodeConfig().MemoryManagerPolicy == "Static" && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingStaticMemoryPolicy) && needsMemoryResize {
+			msg := "Resize is infeasible for Guaranteed Pods alongside Memory Manager static policy"
+			klog.V(3).InfoS(msg, "pod", format.Pod(pod))
+			return false, v1.PodReasonInfeasible, msg
+
 		}
 	}
 
@@ -2889,8 +2896,6 @@ func (kl *Kubelet) canResizePod(pod *v1.Pod) (bool, string, string) {
 	}
 	cpuAvailable := node.Status.Allocatable.Cpu().MilliValue()
 	memAvailable := node.Status.Allocatable.Memory().Value()
-	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
-	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
 		var msg string
 		if memRequests > memAvailable {
