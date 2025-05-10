@@ -233,7 +233,9 @@ for repo in $(kube::util::list_staging_repos); do
   (
     echo "=== tidying k8s.io/${repo}"
     cd "staging/src/k8s.io/${repo}"
+    sed -E -i 's/^go 1\.(.*)$/go 1.21.0/' go.mod
     go mod tidy -v
+    sed -i '/^toolchain /d' go.mod
     group_directives
   )
 done
