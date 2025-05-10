@@ -280,6 +280,7 @@ aliases:
   # - khenidak
   # - mrhohn
   sig-network-reviewers:
+    - adrianmoisey
     - aojea
     - aroradaman
     - bowei
