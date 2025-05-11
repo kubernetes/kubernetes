@@ -171,18 +171,8 @@ func (n *NodeManager) NodeInformer() v1informers.NodeInformer {
 	return n.nodeInformer
 }
 
-// OnNodeAdd is a handler for Node creates.
-func (n *NodeManager) OnNodeAdd(node *v1.Node) {
-	n.onNodeChange(node)
-}
-
-// OnNodeUpdate is a handler for Node updates.
-func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
-	n.onNodeChange(node)
-}
-
-// onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
-func (n *NodeManager) onNodeChange(node *v1.Node) {
+// OnNodeChange is a handler for Node creation and update.
+func (n *NodeManager) OnNodeChange(node *v1.Node) {
 	// update the node object
 	n.mu.Lock()
 	n.node = node

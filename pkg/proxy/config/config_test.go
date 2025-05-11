@@ -454,14 +454,7 @@ func NewNodeHandlerMock() *NodeHandlerMock {
 	return h
 }
 
-func (h *NodeHandlerMock) OnNodeAdd(node *v1.Node) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-	h.state[node.Name] = node
-	h.sendNodes()
-}
-
-func (h *NodeHandlerMock) OnNodeUpdate(oldNode, node *v1.Node) {
+func (h *NodeHandlerMock) OnNodeChange(node *v1.Node) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.state[node.Name] = node
