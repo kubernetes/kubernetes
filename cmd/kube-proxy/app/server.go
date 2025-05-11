@@ -208,12 +208,14 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	// NodeManager makes an informer that selects for the node where this kube-proxy is running
-	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.Config.ConfigSyncPeriod.Duration, s.NodeName)
+	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.Config.ConfigSyncPeriod.Duration,
+		s.NodeName, s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR)
 	if err != nil {
 		return nil, err
 	}
 
 	rawNodeIPs := s.NodeManager.NodeIPs()
+	s.podCIDRs = s.NodeManager.PodCIDRs()
 	logger.Info("Successfully retrieved NodeIPs", "NodeIPs", rawNodeIPs)
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 
@@ -602,10 +604,7 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	serviceInformerFactory.Start(wait.NeverStop)
 
 	nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-	// https://issues.k8s.io/111321
-	if s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR {
-		nodeConfig.RegisterEventHandler(proxy.NewNodePodCIDRHandler(ctx, s.podCIDRs))
-	}
+
 	nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
 		HealthServer: s.HealthzServer,
 	})

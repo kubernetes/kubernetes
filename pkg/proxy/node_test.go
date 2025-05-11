@@ -17,8 +17,8 @@ limitations under the License.
 package proxy
 
 import (
+	"context"
 	"net"
-	"strconv"
 	"testing"
 	"time"
 
@@ -26,8 +26,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
@@ -36,131 +36,6 @@ import (
 const (
 	testNodeName = "test-node"
 )
-
-func TestNodePodCIDRHandlerAdd(t *testing.T) {
-	oldKlogOsExit := klog.OsExit
-	defer func() {
-		klog.OsExit = oldKlogOsExit
-	}()
-	klog.OsExit = customExit
-
-	tests := []struct {
-		name            string
-		oldNodePodCIDRs []string
-		newNodePodCIDRs []string
-		expectPanic     bool
-	}{
-		{
-			name: "both empty",
-		},
-		{
-			name:            "initialized correctly",
-			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-		},
-		{
-			name:            "already initialized and same node",
-			oldNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-		},
-		{
-			name:            "already initialized and different node",
-			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-			expectPanic:     true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := &NodePodCIDRHandler{
-				podCIDRs: tt.oldNodePodCIDRs,
-			}
-			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-node",
-					ResourceVersion: "1",
-				},
-				Spec: v1.NodeSpec{
-					PodCIDRs: tt.newNodePodCIDRs,
-				},
-			}
-			defer func() {
-				r := recover()
-				if r == nil && tt.expectPanic {
-					t.Errorf("The code did not panic")
-				} else if r != nil && !tt.expectPanic {
-					t.Errorf("The code did panic")
-				}
-			}()
-
-			n.OnNodeAdd(node)
-		})
-	}
-}
-
-func TestNodePodCIDRHandlerUpdate(t *testing.T) {
-	oldKlogOsExit := klog.OsExit
-	defer func() {
-		klog.OsExit = oldKlogOsExit
-	}()
-	klog.OsExit = customExit
-
-	tests := []struct {
-		name            string
-		oldNodePodCIDRs []string
-		newNodePodCIDRs []string
-		expectPanic     bool
-	}{
-		{
-			name: "both empty",
-		},
-		{
-			name:            "initialize",
-			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-		},
-		{
-			name:            "same node",
-			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-			newNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-		},
-		{
-			name:            "different nodes",
-			oldNodePodCIDRs: []string{"192.168.1.0/24", "fd00:1:2:3::/64"},
-			newNodePodCIDRs: []string{"10.0.0.0/24", "fd00:3:2:1::/64"},
-			expectPanic:     true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			n := &NodePodCIDRHandler{
-				podCIDRs: tt.oldNodePodCIDRs,
-			}
-			oldNode := &v1.Node{}
-			node := &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "test-node",
-					ResourceVersion: "1",
-				},
-				Spec: v1.NodeSpec{
-					PodCIDRs: tt.newNodePodCIDRs,
-				},
-			}
-			defer func() {
-				r := recover()
-				if r == nil && tt.expectPanic {
-					t.Errorf("The code did not panic")
-				} else if r != nil && !tt.expectPanic {
-					t.Errorf("The code did panic")
-				}
-			}()
-
-			n.OnNodeUpdate(oldNode, node)
-		})
-	}
-}
-
-func customExit(exitCode int) {
-	panic(strconv.Itoa(exitCode))
-}
 
 type nodeTweak func(n *v1.Node)
 
@@ -184,60 +59,209 @@ func tweakNodeIPs(nodeIPs ...string) nodeTweak {
 	}
 }
 
+func tweakPodCIDRs(podCIDRs ...string) nodeTweak {
+	return func(n *v1.Node) {
+		n.Spec.PodCIDRs = append(n.Spec.PodCIDRs, podCIDRs...)
+	}
+}
+
 func TestNewNodeManager(t *testing.T) {
-	_, ctx := ktesting.NewTestContext(t)
-	client := clientsetfake.NewClientset()
-	nodeIP := "192.168.1.10"
+	testCases := []struct {
+		name             string
+		watchPodCIDRs    bool
+		storeUpdateFuncs []func(ctx context.Context, client clientset.Interface)
+		expectedNodeIPs  []net.IP
+		expectedPodCIDRs []string
+		expectError      bool
+	}{
+		{
+			name: "without watch pod cidrs",
+			storeUpdateFuncs: []func(ctx context.Context, client clientset.Interface){
+				func(ctx context.Context, client clientset.Interface) {
+					// node object doesn't exist
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node initially has no IP
+					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node updated with NodeIPs
+					_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(
+						tweakNodeIPs("192.168.1.1"),
+					), metav1.UpdateOptions{})
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node updated with NodeIPs and PodCIDRs
+					_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(
+						tweakNodeIPs("192.168.1.1"),
+						tweakPodCIDRs("10.0.0.0/24"),
+					), metav1.UpdateOptions{})
 
-	go func() {
-		// wait for node manager setup
-		time.Sleep(time.Millisecond)
+				},
+			},
+			watchPodCIDRs:    false,
+			expectedNodeIPs:  []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
+			expectedPodCIDRs: nil,
+			expectError:      false,
+		},
+		{
+			name: "with watch pod cidrs",
+			storeUpdateFuncs: []func(ctx context.Context, client clientset.Interface){
+				func(ctx context.Context, client clientset.Interface) {
+					// node object doesn't exist
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node initially has no IP
+					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node updated with PodCIDRs
+					_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(
+						tweakPodCIDRs("10.0.0.0/24"),
+					), metav1.UpdateOptions{})
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node updated with NodeIPs and PodCIDRs
+					_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(
+						tweakPodCIDRs("10.0.0.0/24"),
+						tweakNodeIPs("192.168.1.1"),
+					), metav1.UpdateOptions{})
+				},
+			},
+			watchPodCIDRs:    true,
+			expectedNodeIPs:  []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
+			expectedPodCIDRs: []string{"10.0.0.0/24"},
+			expectError:      false,
+		},
+		{
+			name: "with watch pod cidrs and without node update for PodCIDRs",
+			storeUpdateFuncs: []func(ctx context.Context, client clientset.Interface){
+				func(ctx context.Context, client clientset.Interface) {
+					// node object doesn't exist
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node initially has no IP
+					_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+				},
+				func(ctx context.Context, client clientset.Interface) {
+					// node updated with NodeIPs
+					_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(
+						tweakNodeIPs("192.168.1.1"),
+					), metav1.UpdateOptions{})
+				},
+			},
+			watchPodCIDRs:    true,
+			expectedNodeIPs:  nil,
+			expectedPodCIDRs: nil,
+			expectError:      true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			client := clientsetfake.NewClientset()
 
-		// node object doesn't exist
-		// wait for 1.5µs for 1µs poll interval to finish
-		time.Sleep(1500 * time.Nanosecond)
+			// call the store update functions in go routine, we add 1.5µs sleep in between
+			// each update function to wait for the 1µs poll interval to finish
+			go func() {
+				// wait for node manager setup
+				time.Sleep(time.Millisecond)
 
-		// node initially has no IP
-		_, _ = client.CoreV1().Nodes().Create(ctx, makeNode(), metav1.CreateOptions{})
+				for _, update := range tc.storeUpdateFuncs {
+					update(ctx, client)
+					// wait for 1.5µs for 1µs poll interval to finish
+					time.Sleep(1500 * time.Nanosecond)
+				}
+			}()
 
-		// wait for 1.5µs for 1µs poll interval to finish
-		time.Sleep(1500 * time.Nanosecond)
-
-		// node updated with IP
-		_, _ = client.CoreV1().Nodes().Update(ctx, makeNode(tweakNodeIPs(nodeIP)), metav1.UpdateOptions{})
-	}()
-
-	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, func(_ int) {}, time.Microsecond, time.Second)
-	require.NoError(t, err)
-	require.Equal(t, []net.IP{netutils.ParseIPSloppy(nodeIP)}, nodeManager.NodeIPs())
+			nodeManager, err := newNodeManager(ctx, client, time.Second, testNodeName, tc.watchPodCIDRs, func(i int) {}, time.Microsecond, time.Second)
+			if tc.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expectedNodeIPs, nodeManager.NodeIPs())
+				require.Equal(t, tc.expectedPodCIDRs, nodeManager.PodCIDRs())
+			}
+		})
+	}
 }
 
 func TestNodeManagerOnNodeChange(t *testing.T) {
 	tests := []struct {
 		name             string
 		initialNodeIPs   []string
+		initialPodCIDRs  []string
 		updatedNodeIPs   []string
+		updatedPodCIDRs  []string
+		watchPodCIDRs    bool
 		expectedExitCode *int
 	}{
 		{
 			name:             "no initial NodeIPs and node updated without NodeIPs",
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
 			expectedExitCode: nil,
 		},
 		{
 			name:             "no initial NodeIPs and node updated with NodeIPs",
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
 			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
 			expectedExitCode: ptr.To(1),
 		},
 		{
-			name:             "node updated with same NodeIPs",
+			name:             "without watchPodCIDR and node updated with same NodeIPs and PodCIDRs",
 			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
 			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			watchPodCIDRs:    false,
 			expectedExitCode: nil,
 		},
 		{
-			name:             "node updated with different NodeIPs",
+			name:             "with watchPodCIDR and node updated with same NodeIPs and PodCIDRs",
 			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
-			updatedNodeIPs:   []string{"10.0.1.1", "fd00:3:2:1::2"},
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			watchPodCIDRs:    true,
+			expectedExitCode: nil,
+		},
+		{
+			name:             "without watchPodCIDR and node updated with different NodeIPs and same PodCIDRs",
+			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedNodeIPs:   []string{"172.16.10.10", "fd00:3:2:1::1"},
+			updatedPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			watchPodCIDRs:    false,
+			expectedExitCode: ptr.To(1),
+		},
+		{
+			name:             "with watchPodCIDR and node updated with different NodeIPs and same PodCIDRs",
+			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedNodeIPs:   []string{"172.16.10.10", "fd00:3:2:1::1"},
+			updatedPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			watchPodCIDRs:    true,
+			expectedExitCode: ptr.To(1),
+		},
+		{
+
+			name:             "without watchPodCIDR and node updated with same NodeIPs and different PodCIDRs",
+			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedPodCIDRs:  []string{"172.16.10.0/24", "fd01:5422::/64"},
+			watchPodCIDRs:    false,
+			expectedExitCode: nil,
+		},
+		{
+			name:             "with watchPodCIDR and node updated with same NodeIPs and different PodCIDRs",
+			initialNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			initialPodCIDRs:  []string{"10.0.0.0/8", "fd01:2345::/64"},
+			updatedNodeIPs:   []string{"192.168.1.1", "fd00:1:2:3::1"},
+			updatedPodCIDRs:  []string{"172.16.10.0/24", "fd01:5422::/64"},
+			watchPodCIDRs:    true,
 			expectedExitCode: ptr.To(1),
 		},
 	}
@@ -250,13 +274,16 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 			}
 
 			client := clientsetfake.NewClientset()
-			_, err := client.CoreV1().Nodes().Create(ctx, makeNode(tweakNodeIPs(tc.initialNodeIPs...)), metav1.CreateOptions{})
+			_, err := client.CoreV1().Nodes().Create(ctx, makeNode(
+				tweakNodeIPs(tc.initialNodeIPs...),
+				tweakPodCIDRs(tc.initialPodCIDRs...),
+			), metav1.CreateOptions{})
 			require.NoError(t, err)
 
-			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, exitFunc, time.Nanosecond, time.Nanosecond)
+			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, tc.watchPodCIDRs, exitFunc, time.Nanosecond, time.Nanosecond)
 			require.NoError(t, err)
 
-			nodeManager.onNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...)))
+			nodeManager.onNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...), tweakPodCIDRs(tc.updatedPodCIDRs...)))
 			require.Equal(t, tc.expectedExitCode, exitCode)
 		})
 	}
@@ -269,7 +296,7 @@ func TestNodeManagerOnNodeDelete(t *testing.T) {
 		exitCode = &code
 	}
 	client := clientsetfake.NewClientset()
-	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, exitFunc, time.Nanosecond, time.Nanosecond)
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, false, exitFunc, time.Nanosecond, time.Nanosecond)
 	require.NoError(t, err)
 
 	nodeManager.OnNodeDelete(makeNode())
