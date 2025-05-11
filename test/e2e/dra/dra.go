@@ -1407,25 +1407,15 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		})
 	}
 
-	ginkgo.Context("on single node", func() {
-		singleNodeTests()
-	})
+	ginkgo.Context("on single node", singleNodeTests)
 
-	ginkgo.Context("on multiple nodes", func() {
-		multiNodeTests()
-	})
+	ginkgo.Context("on multiple nodes", multiNodeTests)
 
-	framework.Context(f.WithFeatureGate(features.DRAPrioritizedList), func() {
-		prioritizedListTests()
-	})
+	framework.Context(f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
 
-	ginkgo.Context("with v1beta2 API", func() {
-		v1beta2Tests()
-	})
+	ginkgo.Context("with v1beta2 API", v1beta2Tests)
 
-	ginkgo.Context("with partitionable devices", func() {
-		partitionableDevicesTests()
-	})
+	ginkgo.Context("with partitionable devices", partitionableDevicesTests)
 
 	framework.Context(f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
@@ -2609,7 +2599,7 @@ func networkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 			}
 			devices = append(devices, device)
 		}
-		driverResources[networkPool] = resourceslice.DriverResources{
+		driverResources[multiHostDriverResources] = resourceslice.DriverResources{
 			Pools: map[string]resourceslice.Pool{
 				"network": {
 					Slices: []resourceslice.Slice{{

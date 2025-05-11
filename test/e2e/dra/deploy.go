@@ -173,7 +173,10 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 }
 
 const (
-	networkPool = "network-pool"
+	// multi-host identifies DriverResources that are associated with multiple devices, i.e.
+	// is not managed by a driver. So any Pools and ResourceSlices will be published directly
+	// to the cluster, rather than through the driver.
+	multiHostDriverResources = "multi-host"
 )
 
 // driverResourcesGenFunc defines the callback that will be invoked by the driver to generate the
@@ -292,13 +295,13 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 	d.ctx = ctx
 	d.cleanup = append(d.cleanup, func(context.Context) { cancel() })
 
-	driverResource, found := driverResources[networkPool]
-	// If found, we create a network ResourcSlice, i.e. one that is not
-	// associated with a specific node.
+	driverResource, found := driverResources[multiHostDriverResources]
+	// If found, we create ResourceSlices that are associated with multiple nodes
+	// through the node selector. Thus, the ResourceSlices are published here
+	// rather than through the driver on a specific node.
 	if found {
 		for poolName, pool := range driverResource.Pools {
 			for i, slice := range pool.Slices {
-				// Publish one resource pool with "network-attached" devices.
 				resourceSlice := &resourceapi.ResourceSlice{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("%s-%d", d.Name, i), // globally unique
@@ -398,9 +401,6 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 
 	// Run registrar and plugin for each of the pods.
 	for _, pod := range pods.Items {
-		// Need a local variable, not the loop variable, for the anonymous
-		// callback functions below.
-		pod := pod
 		nodename := pod.Spec.NodeName
 
 		// Authenticate the plugin so that it has the exact same
