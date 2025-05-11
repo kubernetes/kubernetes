@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,22 +41,6 @@ import (
 // a test failure. By default, if there are no Pods with this label, only the first 5 Pods will
 // have their logs fetched.
 const LabelLogOnPodFailure = "log-on-pod-failure"
-
-// TODO: Move to its own subpkg.
-// expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
-func expectNoError(err error, explain ...interface{}) {
-	expectNoErrorWithOffset(1, err, explain...)
-}
-
-// TODO: Move to its own subpkg.
-// expectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
-// (for example, for call chain f -> g -> expectNoErrorWithOffset(1, ...) error would be logged for "f").
-func expectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
-	if err != nil {
-		framework.Logf("Unexpected error occurred: %v", err)
-	}
-	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
-}
 
 // PodsCreatedByLabel returns a created pod list matched by the given label.
 func PodsCreatedByLabel(ctx context.Context, c clientset.Interface, ns, name string, replicas int32, label labels.Selector) (*v1.PodList, error) {
@@ -364,9 +347,9 @@ func CreateExecPodOrFail(ctx context.Context, client clientset.Interface, ns, ge
 		tweak(pod)
 	}
 	execPod, err := client.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{})
-	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
+	framework.ExpectNoErrorWithOffset(1, err, "failed to create new exec pod in namespace: %s", ns)
 	err = WaitForPodNameRunningInNamespace(ctx, client, execPod.Name, execPod.Namespace)
-	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
+	framework.ExpectNoErrorWithOffset(1, err, "failed to create new exec pod in namespace: %s", ns)
 	return execPod
 }
 
