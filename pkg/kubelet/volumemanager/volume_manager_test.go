@@ -275,7 +275,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 		manager)
 
 	// delayed claim binding
-	go delayClaimBecomesBound(ctx, kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
+	go delayClaimBecomesBound(t, kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
 	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
 		err = manager.WaitForAttachAndMount(ctx, pod)
@@ -541,17 +541,24 @@ func simulateVolumeInUseUpdate(volumeName v1.UniqueVolumeName, stopCh <-chan str
 }
 
 func delayClaimBecomesBound(
-	ctx context.Context,
+	t *testing.T,
 	kubeClient clientset.Interface,
 	namespace, claimName string,
 ) {
+	_, ctx := ktesting.NewTestContext(t)
 	time.Sleep(500 * time.Millisecond)
-	volumeClaim, _ :=
+	volumeClaim, err :=
 		kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Failed to get PVC: %v", err)
+	}
 	volumeClaim.Status = v1.PersistentVolumeClaimStatus{
 		Phase: v1.ClaimBound,
 	}
-	kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(ctx, volumeClaim, metav1.UpdateOptions{})
+	_, err = kubeClient.CoreV1().PersistentVolumeClaims(namespace).Update(ctx, volumeClaim, metav1.UpdateOptions{})
+	if err != nil {
+		t.Errorf("Failed to update PVC: %v", err)
+	}
 }
 
 func TestWaitForAllPodsUnmount(t *testing.T) {
