@@ -22,7 +22,6 @@ import (
 	"net"
 	"os"
 	"reflect"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,69 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
-
-// NodePodCIDRHandler handles the life cycle of kube-proxy based on the node PodCIDR assigned
-// Implements the config.NodeHandler interface
-// https://issues.k8s.io/111321
-type NodePodCIDRHandler struct {
-	mu       sync.Mutex
-	podCIDRs []string
-	logger   klog.Logger
-}
-
-func NewNodePodCIDRHandler(ctx context.Context, podCIDRs []string) *NodePodCIDRHandler {
-	return &NodePodCIDRHandler{
-		podCIDRs: podCIDRs,
-		logger:   klog.FromContext(ctx),
-	}
-}
-
-var _ config.NodeHandler = &NodePodCIDRHandler{}
-
-// OnNodeAdd is a handler for Node creates.
-func (n *NodePodCIDRHandler) OnNodeAdd(node *v1.Node) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	podCIDRs := node.Spec.PodCIDRs
-	// initialize podCIDRs
-	if len(n.podCIDRs) == 0 && len(podCIDRs) > 0 {
-		n.logger.Info("Setting current PodCIDRs", "podCIDRs", podCIDRs)
-		n.podCIDRs = podCIDRs
-		return
-	}
-	if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
-		n.logger.Error(nil, "Using NodeCIDR LocalDetector mode, current PodCIDRs are different than previous PodCIDRs, restarting",
-			"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-}
-
-// OnNodeUpdate is a handler for Node updates.
-func (n *NodePodCIDRHandler) OnNodeUpdate(_, node *v1.Node) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	podCIDRs := node.Spec.PodCIDRs
-	// initialize podCIDRs
-	if len(n.podCIDRs) == 0 && len(podCIDRs) > 0 {
-		n.logger.Info("Setting current PodCIDRs", "podCIDRs", podCIDRs)
-		n.podCIDRs = podCIDRs
-		return
-	}
-	if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
-		n.logger.Error(nil, "Using NodeCIDR LocalDetector mode, current PodCIDRs are different than previous PodCIDRs, restarting",
-			"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPODCIDRs", n.podCIDRs)
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-}
-
-// OnNodeDelete is a handler for Node deletes.
-func (n *NodePodCIDRHandler) OnNodeDelete(node *v1.Node) {
-	n.logger.Error(nil, "Current Node is being deleted", "node", klog.KObj(node))
-}
-
-// OnNodeSynced is a handler for Node syncs.
-func (n *NodePodCIDRHandler) OnNodeSynced() {}
 
 // NodeEligibleHandler handles the life cycle of the Node's eligibility, as
 // determined by the health server for directing load balancer traffic.
@@ -123,24 +59,32 @@ func (n *NodeEligibleHandler) OnNodeDelete(node *v1.Node) { n.HealthServer.SyncN
 // OnNodeSynced is a handler for Node syncs.
 func (n *NodeEligibleHandler) OnNodeSynced() {}
 
-// NodeManager handles the life cycle of kube-proxy based on the NodeIPs, handles node watch events
-// and crashes kube-proxy if there are any changes in NodeIPs.
+// NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
+// node watch events and crashes kube-proxy if there are any changes in NodeIPs or PodCIDRs.
+// Note: It only crashes on change on PodCIDR when watchPodCIDRs is set to true.
 type NodeManager struct {
-	nodeInformer v1informers.NodeInformer
-	nodeLister   corelisters.NodeLister
-	nodeIPs      []net.IP
-	exitFunc     func(exitCode int)
+	nodeInformer  v1informers.NodeInformer
+	nodeLister    corelisters.NodeLister
+	nodeIPs       []net.IP
+	podCIDRs      []string
+	watchPodCIDRs bool
+	exitFunc      func(exitCode int)
 }
 
-// NewNodeManager initializes node informer that selects for the given node, waits for cache sync
-// and returns NodeManager after waiting for the node object to exist and have NodeIPs.
-// Note: NewNodeManager doesn't return any error if failed to retrieve NodeIPs.
-func NewNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration, nodeName string) (*NodeManager, error) {
-	return newNodeManager(ctx, client, resyncInterval, nodeName, os.Exit, time.Second, 30*time.Second)
+// NewNodeManager initializes node informer that selects for the given node, waits for cache
+// sync and returns NodeManager after waiting for the node object to exist and have NodeIPs
+// and PodCIDRs (if watchPodCIDRs is enabled).
+func NewNodeManager(ctx context.Context, client clientset.Interface,
+	resyncInterval time.Duration, nodeName string, watchPodCIDRs bool,
+) (*NodeManager, error) {
+	// we wait for at most 5 minutes for allocators to assign a PodCIDR to the node after it is registered.
+	return newNodeManager(ctx, client, resyncInterval, nodeName, watchPodCIDRs, os.Exit, time.Second, 5*time.Minute)
 }
 
 // newNodeManager implements NewNodeManager with configurable exit function, poll interval and timeout.
-func newNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration, nodeName string, exitFunc func(int), pollInterval, pollTimeout time.Duration) (*NodeManager, error) {
+func newNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration,
+	nodeName string, watchPodCIDRs bool, exitFunc func(int), pollInterval, pollTimeout time.Duration,
+) (*NodeManager, error) {
 	// make an informer that selects for the given node
 	thisNodeInformerFactory := informers.NewSharedInformerFactoryWithOptions(client, resyncInterval,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
@@ -158,8 +102,9 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 	var node *v1.Node
 	var err error
 	var nodeIPs []net.IP
+	var podCIDRs []string
 
-	// wait for the node object to exist and have NodeIPs.
+	// wait for the node object to exist and have NodeIPs and PodCIDRs
 	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
 	defer cancel()
 	pollErr := wait.PollUntilContextCancel(ctx, pollInterval, true, func(context.Context) (bool, error) {
@@ -172,6 +117,16 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		if err != nil {
 			return false, nil
 		}
+
+		// we only wait for PodCIDRs if NodeManager is configured with watchPodCIDRs
+		if watchPodCIDRs && len(podCIDRs) == 0 {
+			if len(node.Spec.PodCIDRs) > 0 {
+				podCIDRs = node.Spec.PodCIDRs
+			} else {
+				err = fmt.Errorf("node %q does not have any PodCIDR allocated", nodeName)
+				return false, nil
+			}
+		}
 		return true, nil
 	})
 
@@ -180,16 +135,23 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		return nil, err
 	}
 	return &NodeManager{
-		nodeInformer: nodeInformer,
-		nodeLister:   nodeLister,
-		nodeIPs:      nodeIPs,
-		exitFunc:     exitFunc,
+		nodeInformer:  nodeInformer,
+		nodeLister:    nodeLister,
+		nodeIPs:       nodeIPs,
+		podCIDRs:      podCIDRs,
+		watchPodCIDRs: watchPodCIDRs,
+		exitFunc:      exitFunc,
 	}, nil
 }
 
 // NodeIPs returns the NodeIPs polled in NewNodeManager().
 func (n *NodeManager) NodeIPs() []net.IP {
 	return n.nodeIPs
+}
+
+// PodCIDRs returns the PodCIDRs polled in NewNodeManager().
+func (n *NodeManager) PodCIDRs() []string {
+	return n.podCIDRs
 }
 
 // NodeInformer returns the NodeInformer.
@@ -209,6 +171,18 @@ func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
 
 // onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
 func (n *NodeManager) onNodeChange(node *v1.Node) {
+	// We exit whenever there is a change in PodCIDRs detected initially, and PodCIDRs received
+	// on node watch event if the node manager is configured with watchPodCIDRs.
+	if n.watchPodCIDRs {
+		podCIDRs := node.Spec.PodCIDRs
+		if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
+			klog.InfoS("PodCIDRs changed for the node",
+				"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
+			klog.Flush()
+			n.exitFunc(1)
+		}
+	}
+
 	nodeIPs, err := utilnode.GetNodeHostIPs(node)
 	if err != nil {
 		klog.ErrorS(err, "Failed to retrieve NodeIPs")

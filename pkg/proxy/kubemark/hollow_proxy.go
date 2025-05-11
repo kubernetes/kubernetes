@@ -63,7 +63,7 @@ func NewHollowProxy(
 	broadcaster events.EventBroadcaster,
 	recorder events.EventRecorder,
 ) (*HollowProxy, error) {
-	nodeManager, err := proxy.NewNodeManager(context.TODO(), client, 30*time.Second, nodeName)
+	nodeManager, err := proxy.NewNodeManager(context.TODO(), client, 30*time.Second, nodeName, false)
 	if err != nil {
 		return nil, err
 	}
