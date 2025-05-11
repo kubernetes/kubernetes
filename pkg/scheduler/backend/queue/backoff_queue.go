@@ -239,15 +239,11 @@ func (bq *backoffQueue) calculateBackoffDuration(podInfo *framework.QueuedPodInf
 		return 0
 	}
 
-	duration := bq.podInitialBackoff
-	for i := 1; i < podInfo.Attempts; i++ {
-		// Use subtraction instead of addition or multiplication to avoid overflow.
-		if duration > bq.podMaxBackoff-duration {
-			return bq.podMaxBackoff
-		}
-		duration += duration
+	shift := podInfo.Attempts - 1
+	if bq.podInitialBackoff > bq.podMaxBackoff>>shift {
+		return bq.podMaxBackoff
 	}
-	return duration
+	return time.Duration(bq.podInitialBackoff << shift)
 }
 
 func (bq *backoffQueue) popAllBackoffCompletedWithQueue(logger klog.Logger, queue *heap.Heap[*framework.QueuedPodInfo]) []*framework.QueuedPodInfo {
