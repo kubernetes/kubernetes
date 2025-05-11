@@ -65,6 +65,12 @@ func tweakPodCIDRs(podCIDRs ...string) nodeTweak {
 	}
 }
 
+func tweakResourceVersion(resourceVersion string) nodeTweak {
+	return func(n *v1.Node) {
+		n.ResourceVersion = resourceVersion
+	}
+}
+
 func TestNewNodeManager(t *testing.T) {
 	testCases := []struct {
 		name             string
@@ -101,7 +107,7 @@ func TestNewNodeManager(t *testing.T) {
 			},
 			watchPodCIDRs:    false,
 			expectedNodeIPs:  []net.IP{netutils.ParseIPSloppy("192.168.1.1")},
-			expectedPodCIDRs: nil,
+			expectedPodCIDRs: []string{"10.0.0.0/24"},
 			expectError:      false,
 		},
 		{
@@ -301,4 +307,20 @@ func TestNodeManagerOnNodeDelete(t *testing.T) {
 
 	nodeManager.OnNodeDelete(makeNode())
 	require.Equal(t, ptr.To(1), exitCode)
+}
+
+func TestNodeManagerNode(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	client := clientsetfake.NewClientset()
+	_, err := client.CoreV1().Nodes().Create(ctx, makeNode(tweakResourceVersion("1")), metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, false, func(i int) {}, time.Nanosecond, time.Nanosecond)
+	require.NoError(t, err)
+	require.Equal(t, "1", nodeManager.Node().ResourceVersion)
+
+	nodeManager.OnNodeUpdate(nil, makeNode(tweakResourceVersion("2")))
+	require.NoError(t, err)
+	require.Equal(t, "2", nodeManager.Node().ResourceVersion)
 }
