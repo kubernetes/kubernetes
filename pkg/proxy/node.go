@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,39 +35,17 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
-
-// NodeEligibleHandler handles the life cycle of the Node's eligibility, as
-// determined by the health server for directing load balancer traffic.
-type NodeEligibleHandler struct {
-	HealthServer *healthcheck.ProxyHealthServer
-}
-
-var _ config.NodeHandler = &NodeEligibleHandler{}
-
-// OnNodeAdd is a handler for Node creates.
-func (n *NodeEligibleHandler) OnNodeAdd(node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeUpdate is a handler for Node updates.
-func (n *NodeEligibleHandler) OnNodeUpdate(_, node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeDelete is a handler for Node deletes.
-func (n *NodeEligibleHandler) OnNodeDelete(node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeSynced is a handler for Node syncs.
-func (n *NodeEligibleHandler) OnNodeSynced() {}
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
 // node watch events and crashes kube-proxy if there are any changes in NodeIPs or PodCIDRs.
 // Note: It only crashes on change on PodCIDR when watchPodCIDRs is set to true.
 type NodeManager struct {
+	mu            sync.Mutex
+	node          *v1.Node
 	nodeInformer  v1informers.NodeInformer
 	nodeLister    corelisters.NodeLister
-	nodeIPs       []net.IP
-	podCIDRs      []string
 	watchPodCIDRs bool
 	exitFunc      func(exitCode int)
 }
@@ -101,8 +80,6 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 
 	var node *v1.Node
 	var err error
-	var nodeIPs []net.IP
-	var podCIDRs []string
 
 	// wait for the node object to exist and have NodeIPs and PodCIDRs
 	ctx, cancel := context.WithTimeout(ctx, pollTimeout)
@@ -113,19 +90,15 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 			return false, nil
 		}
 
-		nodeIPs, err = utilnode.GetNodeHostIPs(node)
+		_, err = utilnode.GetNodeHostIPs(node)
 		if err != nil {
 			return false, nil
 		}
 
 		// we only wait for PodCIDRs if NodeManager is configured with watchPodCIDRs
-		if watchPodCIDRs && len(podCIDRs) == 0 {
-			if len(node.Spec.PodCIDRs) > 0 {
-				podCIDRs = node.Spec.PodCIDRs
-			} else {
-				err = fmt.Errorf("node %q does not have any PodCIDR allocated", nodeName)
-				return false, nil
-			}
+		if watchPodCIDRs && len(node.Spec.PodCIDRs) == 0 {
+			err = fmt.Errorf("node %q does not have any PodCIDR allocated", nodeName)
+			return false, nil
 		}
 		return true, nil
 	})
@@ -137,8 +110,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 	return &NodeManager{
 		nodeInformer:  nodeInformer,
 		nodeLister:    nodeLister,
-		nodeIPs:       nodeIPs,
-		podCIDRs:      podCIDRs,
+		node:          node,
 		watchPodCIDRs: watchPodCIDRs,
 		exitFunc:      exitFunc,
 	}, nil
@@ -146,12 +118,17 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 
 // NodeIPs returns the NodeIPs polled in NewNodeManager().
 func (n *NodeManager) NodeIPs() []net.IP {
-	return n.nodeIPs
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	nodeIPs, _ := utilnode.GetNodeHostIPs(n.node)
+	return nodeIPs
 }
 
 // PodCIDRs returns the PodCIDRs polled in NewNodeManager().
 func (n *NodeManager) PodCIDRs() []string {
-	return n.podCIDRs
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.node.Spec.PodCIDRs
 }
 
 // NodeInformer returns the NodeInformer.
@@ -171,13 +148,19 @@ func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
 
 // onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
 func (n *NodeManager) onNodeChange(node *v1.Node) {
+	// update the node object
+	n.mu.Lock()
+	oldNodeIPs, _ := utilnode.GetNodeHostIPs(n.node)
+	oldPodCIDRs := n.node.Spec.PodCIDRs
+	n.node = node
+	n.mu.Unlock()
+
 	// We exit whenever there is a change in PodCIDRs detected initially, and PodCIDRs received
 	// on node watch event if the node manager is configured with watchPodCIDRs.
 	if n.watchPodCIDRs {
-		podCIDRs := node.Spec.PodCIDRs
-		if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
+		if !reflect.DeepEqual(oldPodCIDRs, node.Spec.PodCIDRs) {
 			klog.InfoS("PodCIDRs changed for the node",
-				"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
+				"node", klog.KObj(node), "newPodCIDRs", node.Spec.PodCIDRs, "oldPodCIDRs", oldPodCIDRs)
 			klog.Flush()
 			n.exitFunc(1)
 		}
@@ -191,9 +174,9 @@ func (n *NodeManager) onNodeChange(node *v1.Node) {
 
 	// We exit whenever there is a change in NodeIPs detected initially, and NodeIPs received
 	// on node watch event.
-	if !reflect.DeepEqual(n.nodeIPs, nodeIPs) {
+	if !reflect.DeepEqual(oldNodeIPs, nodeIPs) {
 		klog.InfoS("NodeIPs changed for the node",
-			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", n.nodeIPs)
+			"node", klog.KObj(node), "newNodeIPs", nodeIPs, "oldNodeIPs", oldNodeIPs)
 		klog.Flush()
 		n.exitFunc(1)
 	}
@@ -208,3 +191,10 @@ func (n *NodeManager) OnNodeDelete(node *v1.Node) {
 
 // OnNodeSynced is called after the cache is synced and all pre-existing Nodes have been reported
 func (n *NodeManager) OnNodeSynced() {}
+
+// Node returns the deep copy of the latest node object.
+func (n *NodeManager) Node() *v1.Node {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.node.DeepCopy()
+}
