@@ -287,7 +287,7 @@ func TestNodeManagerOnNodeChange(t *testing.T) {
 			nodeManager, err := newNodeManager(ctx, client, 30*time.Second, testNodeName, tc.watchPodCIDRs, exitFunc, 10*time.Millisecond, time.Second)
 			require.NoError(t, err)
 
-			nodeManager.onNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...), tweakPodCIDRs(tc.updatedPodCIDRs...)))
+			nodeManager.OnNodeChange(makeNode(tweakNodeIPs(tc.updatedNodeIPs...), tweakPodCIDRs(tc.updatedPodCIDRs...)))
 			require.Equal(t, tc.expectedExitCode, exitCode)
 		})
 	}
@@ -321,7 +321,7 @@ func TestNodeManagerNode(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "1", nodeManager.Node().ResourceVersion)
 
-	nodeManager.OnNodeUpdate(nil, makeNode(tweakResourceVersion("2")))
+	nodeManager.OnNodeChange(makeNode(tweakResourceVersion("2")))
 	require.NoError(t, err)
 	require.Equal(t, "2", nodeManager.Node().ResourceVersion)
 }
