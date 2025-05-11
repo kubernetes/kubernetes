@@ -241,7 +241,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	if len(config.HealthzBindAddress) > 0 {
-		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration)
+		s.HealthzServer = healthcheck.NewProxyHealthServer(config.HealthzBindAddress, 2*config.SyncPeriod.Duration, s.NodeManager)
 	}
 
 	err = s.platformSetup(ctx)
@@ -606,9 +606,6 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.
 	if s.NodeManager != nil {
 		nodeConfig := config.NewNodeConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
-		nodeConfig.RegisterEventHandler(&proxy.NodeEligibleHandler{
-			HealthServer: s.HealthzServer,
-		})
 		nodeConfig.RegisterEventHandler(s.NodeManager)
 		nodeTopologyConfig := config.NewNodeTopologyConfig(ctx, s.NodeManager.NodeInformer(), s.Config.ConfigSyncPeriod.Duration)
 		nodeTopologyConfig.RegisterEventHandler(s.Proxier)
