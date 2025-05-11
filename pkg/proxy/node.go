@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"reflect"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,30 +35,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
-
-// NodeEligibleHandler handles the life cycle of the Node's eligibility, as
-// determined by the health server for directing load balancer traffic.
-type NodeEligibleHandler struct {
-	HealthServer *healthcheck.ProxyHealthServer
-}
-
-var _ config.NodeHandler = &NodeEligibleHandler{}
-
-// OnNodeAdd is a handler for Node creates.
-func (n *NodeEligibleHandler) OnNodeAdd(node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeUpdate is a handler for Node updates.
-func (n *NodeEligibleHandler) OnNodeUpdate(_, node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeDelete is a handler for Node deletes.
-func (n *NodeEligibleHandler) OnNodeDelete(node *v1.Node) { n.HealthServer.SyncNode(node) }
-
-// OnNodeSynced is a handler for Node syncs.
-func (n *NodeEligibleHandler) OnNodeSynced() {}
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
 // node watch events and crashes kube-proxy if there are any changes in NodeIPs or PodCIDRs.
@@ -68,8 +47,12 @@ type NodeManager struct {
 	exitFunc      func(exitCode int)
 	watchPodCIDRs bool
 
+	// These are constant after construct time
 	nodeIPs  []net.IP
 	podCIDRs []string
+
+	mu   sync.Mutex
+	node *v1.Node
 }
 
 // NewNodeManager initializes node informer that selects for the given node, waits for cache sync
@@ -146,6 +129,7 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 		exitFunc:      exitFunc,
 		watchPodCIDRs: watchPodCIDRs,
 
+		node:     node,
 		nodeIPs:  nodeIPs,
 		podCIDRs: podCIDRs,
 	}, nil
@@ -171,6 +155,17 @@ func (n *NodeManager) PodCIDRs() []string {
 	return n.podCIDRs
 }
 
+// Node returns a copy of the latest node object, or nil if the Node has not yet been seen.
+func (n *NodeManager) Node() *v1.Node {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.node == nil {
+		return nil
+	}
+	return n.node.DeepCopy()
+}
+
 // NodeInformer returns the NodeInformer.
 func (n *NodeManager) NodeInformer() v1informers.NodeInformer {
 	return n.nodeInformer
@@ -188,13 +183,17 @@ func (n *NodeManager) OnNodeUpdate(_, node *v1.Node) {
 
 // onNodeChange functions helps to implement OnNodeAdd and OnNodeUpdate.
 func (n *NodeManager) onNodeChange(node *v1.Node) {
+	// update the node object
+	n.mu.Lock()
+	n.node = node
+	n.mu.Unlock()
+
 	// We exit whenever there is a change in PodCIDRs detected initially, and PodCIDRs received
 	// on node watch event if the node manager is configured with watchPodCIDRs.
 	if n.watchPodCIDRs {
-		podCIDRs := node.Spec.PodCIDRs
-		if !reflect.DeepEqual(n.podCIDRs, podCIDRs) {
+		if !reflect.DeepEqual(n.podCIDRs, node.Spec.PodCIDRs) {
 			klog.InfoS("PodCIDRs changed for the node",
-				"node", klog.KObj(node), "newPodCIDRs", podCIDRs, "oldPodCIDRs", n.podCIDRs)
+				"node", klog.KObj(node), "newPodCIDRs", node.Spec.PodCIDRs, "oldPodCIDRs", n.podCIDRs)
 			klog.Flush()
 			n.exitFunc(1)
 		}
