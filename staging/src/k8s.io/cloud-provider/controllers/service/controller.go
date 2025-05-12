@@ -832,8 +832,8 @@ func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 	klog.V(2).Infof("Updating backends for load balancer %s/%s with %d nodes: %v", service.Namespace, service.Name, len(hosts), loggableNodeNames(hosts))
 
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
-	err := c.balancer.UpdateLoadBalancer(context.TODO(), c.clusterName, service, hosts)
-	if err == nil {
+	updateErr := c.balancer.UpdateLoadBalancer(context.TODO(), c.clusterName, service, hosts)
+	if updateErr == nil {
 		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 		if len(hosts) == 0 {
 			c.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
@@ -842,21 +842,21 @@ func (c *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 		}
 		return nil
 	}
-	if err == cloudprovider.ImplementedElsewhere {
+	if updateErr == cloudprovider.ImplementedElsewhere {
 		// ImplementedElsewhere indicates that the UpdateLoadBalancer is a nop and the
 		// functionality is implemented by a different controller.  In this case, we
 		// return immediately without doing anything.
 		return nil
 	}
 	// It's only an actual error if the load balancer still exists.
-	if _, exists, err := c.balancer.GetLoadBalancer(context.TODO(), c.clusterName, service); err != nil {
-		runtime.HandleError(fmt.Errorf("failed to check if load balancer exists for service %s/%s: %v", service.Namespace, service.Name, err))
+	if _, exists, getErr := c.balancer.GetLoadBalancer(context.TODO(), c.clusterName, service); getErr != nil {
+		runtime.HandleError(fmt.Errorf("failed to check if load balancer exists for service %s/%s: %v", service.Namespace, service.Name, getErr))
 	} else if !exists {
 		return nil
 	}
 
-	c.eventRecorder.Eventf(service, v1.EventTypeWarning, "UpdateLoadBalancerFailed", "Error updating load balancer with new hosts %v [node names limited, total number of nodes: %d], error: %v", loggableNodeNames(hosts), len(hosts), err)
-	return err
+	c.eventRecorder.Eventf(service, v1.EventTypeWarning, "UpdateLoadBalancerFailed", "Error updating load balancer with new hosts %v [node names limited, total number of nodes: %d], error: %v", loggableNodeNames(hosts), len(hosts), updateErr)
+	return updateErr
 }
 
 func wantsLoadBalancer(service *v1.Service) bool {
