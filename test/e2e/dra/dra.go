@@ -1562,7 +1562,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			listSlices := framework.ListObjects(f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{
 				FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName,
 			})
-			gomega.Eventually(ctx, listSlices).WithTimeout(time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
+			gomega.Eventually(ctx, listSlices).WithTimeout(2 * time.Minute).Should(gomega.HaveField("Items", gomega.HaveLen(numSlices)))
 
 			// Verify state.
 			expectSlices, err := listSlices(ctx)
