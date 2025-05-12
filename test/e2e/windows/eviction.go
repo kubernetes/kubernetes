@@ -36,7 +36,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	metrics "k8s.io/metrics/pkg/client/clientset/versioned"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -99,8 +98,6 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
 		// image pre-pulling was enabled.
 		cleanupPods(ctx, f, "img-puller")
-
-		cleanupPods(ctx, f, "reboot-host-test-windows")
 
 		ginkgo.DeferCleanup(f.DeleteNamespace, f.Namespace.Name)
 
@@ -177,12 +174,6 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		}
 		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-
-		defer func() {
-			if ginkgo.CurrentSpecReport().Failed() {
-				logNodeMemoryDebugInfo(ctx, f, node.Name, f.Namespace.Name, "pod2")
-			}
-		}()
 
 		ginkgo.By("Waiting for pod2 to start running")
 		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2)
@@ -305,74 +296,4 @@ func waitForMemoryPressureTaintRemoval(ctx context.Context, f *framework.Framewo
 		}
 		return false, nil
 	})
-}
-
-func logNodeMemoryDebugInfo(ctx context.Context, f *framework.Framework, nodeName string, namespace string, podName string) {
-	framework.Logf("========== DEBUG INFO FOR NODE: %q ==========", nodeName)
-
-	// Node description
-	node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	if err != nil {
-		framework.Logf("Error fetching node %q: %v", nodeName, err)
-	} else {
-		for _, cond := range node.Status.Conditions {
-			if cond.Type == v1.NodeMemoryPressure {
-				framework.Logf("Node condition - MemoryPressure: %v (Reason: %s, Message: %s, LastHeartbeat: %s)",
-					cond.Status, cond.Reason, cond.Message, cond.LastHeartbeatTime)
-			}
-		}
-		for _, taint := range node.Spec.Taints {
-			if taint.Key == v1.TaintNodeMemoryPressure {
-				framework.Logf("Node taint - memory-pressure: Effect=%s, TimeAdded=%v", taint.Effect, taint.TimeAdded)
-			}
-		}
-	}
-
-	// Pods on node
-	pods, err := f.ClientSet.CoreV1().Pods("").List(ctx, metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("spec.nodeName=%s", nodeName),
-	})
-	if err != nil {
-		framework.Logf("Error listing pods on node %q: %v", nodeName, err)
-	} else {
-		for _, p := range pods.Items {
-			framework.Logf("Pod %q in ns %q is in phase: %s", p.Name, p.Namespace, p.Status.Phase)
-		}
-	}
-
-	metricsClient, err := metrics.NewForConfig(f.ClientConfig())
-	if err == nil {
-		// Node metrics
-		nodeMetrics, err := metricsClient.MetricsV1beta1().NodeMetricses().Get(ctx, nodeName, metav1.GetOptions{})
-		if err == nil {
-			memUsage := nodeMetrics.Usage.Memory().ScaledValue(resource.Mega)
-			framework.Logf("Node %q is using %d Mi of memory", nodeName, memUsage)
-		}
-
-		// Pod metrics
-		podMetricsList, err := metricsClient.MetricsV1beta1().PodMetricses(namespace).List(ctx, metav1.ListOptions{})
-		if err == nil {
-			for _, podMetrics := range podMetricsList.Items {
-				if podMetrics.Name == podName {
-					var totalMem int64
-					for _, c := range podMetrics.Containers {
-						totalMem += c.Usage.Memory().ScaledValue(resource.Mega)
-					}
-					framework.Logf("Pod %q is using %d Mi of memory", podMetrics.Name, totalMem)
-				}
-			}
-		}
-	}
-
-	// Events in pod's namespace
-	events, err := f.ClientSet.CoreV1().Events(namespace).List(ctx, metav1.ListOptions{})
-	if err == nil {
-		for _, e := range events.Items {
-			if strings.Contains(e.Message, podName) || e.InvolvedObject.Name == podName {
-				framework.Logf("Event for pod %q: Type=%s, Reason=%s, Message=%q", podName, e.Type, e.Reason, e.Message)
-			}
-		}
-	}
-
-	framework.Logf("========== END DEBUG INFO FOR NODE: %q ==========", nodeName)
 }
