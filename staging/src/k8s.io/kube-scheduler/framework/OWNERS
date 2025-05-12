@@ -1,8 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - sig-scheduling-approvers
+  - sig-scheduling-api-approvers
+  - sig-scheduling
 reviewers:
-  - sig-scheduling-reviewers
+  - sig-scheduling
 labels:
   - sig/scheduling
