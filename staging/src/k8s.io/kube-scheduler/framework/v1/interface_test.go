@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package v1
 
 import (
 	"errors"
@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -262,9 +263,9 @@ func TestIsStatusEqual(t *testing.T) {
 	}
 }
 
-type nodeInfoLister []*NodeInfo
+type nodeInfoLister []*framework.NodeInfo
 
-func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
+func (nodes nodeInfoLister) Get(nodeName string) (*framework.NodeInfo, error) {
 	for _, node := range nodes {
 		if node != nil && node.Node().Name == nodeName {
 			return node, nil
@@ -273,15 +274,15 @@ func (nodes nodeInfoLister) Get(nodeName string) (*NodeInfo, error) {
 	return nil, fmt.Errorf("unable to find node: %s", nodeName)
 }
 
-func (nodes nodeInfoLister) List() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) List() ([]*framework.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
 	return nodes, nil
 }
 
-func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error) {
+func (nodes nodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
 	return nodes, nil
 }
 
@@ -356,7 +357,7 @@ func TestNodesForStatusCode(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var nodeInfos nodeInfoLister
 			for _, name := range nodeNames {
-				ni := NewNodeInfo()
+				ni := framework.NewNodeInfo()
 				ni.SetNode(st.MakeNode().Name(name).Obj())
 				nodeInfos = append(nodeInfos, ni)
 			}

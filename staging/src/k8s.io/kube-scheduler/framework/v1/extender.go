@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package v1
 
 import (
 	v1 "k8s.io/api/core/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // Extender is an interface for external processes to influence scheduling
@@ -33,12 +34,12 @@ type Extender interface {
 	// The failedNodes and failedAndUnresolvableNodes optionally contains the list
 	// of failed nodes and failure reasons, except nodes in the latter are
 	// unresolvable.
-	Filter(pod *v1.Pod, nodes []*NodeInfo) (filteredNodes []*NodeInfo, failedNodesMap extenderv1.FailedNodesMap, failedAndUnresolvable extenderv1.FailedNodesMap, err error)
+	Filter(pod *v1.Pod, nodes []*framework.NodeInfo) (filteredNodes []*framework.NodeInfo, failedNodesMap extenderv1.FailedNodesMap, failedAndUnresolvable extenderv1.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
 	// the scores computed by Kubernetes scheduler. The total scores are used to do the host selection.
-	Prioritize(pod *v1.Pod, nodes []*NodeInfo) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error)
+	Prioritize(pod *v1.Pod, nodes []*framework.NodeInfo) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error)
 
 	// Bind delegates the action of binding a pod to a node to the extender.
 	Bind(binding *v1.Binding) error

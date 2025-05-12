@@ -14,25 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package v1
 
 import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
 type NodeInfoLister interface {
 	// List returns the list of NodeInfos.
-	List() ([]*NodeInfo, error)
+	List() ([]*framework.NodeInfo, error)
 	// HavePodsWithAffinityList returns the list of NodeInfos of nodes with pods with affinity terms.
-	HavePodsWithAffinityList() ([]*NodeInfo, error)
+	HavePodsWithAffinityList() ([]*framework.NodeInfo, error)
 	// HavePodsWithRequiredAntiAffinityList returns the list of NodeInfos of nodes with pods with required anti-affinity terms.
-	HavePodsWithRequiredAntiAffinityList() ([]*NodeInfo, error)
+	HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error)
 	// Get returns the NodeInfo of the given node name.
-	Get(nodeName string) (*NodeInfo, error)
+	Get(nodeName string) (*framework.NodeInfo, error)
 }
 
 // StorageInfoLister interface represents anything that handles storage-related operations and resources.
