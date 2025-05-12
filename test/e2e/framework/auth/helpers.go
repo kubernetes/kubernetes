@@ -46,11 +46,12 @@ type bindingsGetter interface {
 
 // WaitForAuthzUpdate checks if the give user can perform named verb and action
 // on a resource or subresource.
-func WaitForAuthzUpdate(ctx context.Context, c v1authorization.SubjectAccessReviewsGetter, user string, ra *authorizationv1.ResourceAttributes, allowed bool) error {
+func WaitForAuthzUpdate(ctx context.Context, c v1authorization.SubjectAccessReviewsGetter, user string, groups []string, ra *authorizationv1.ResourceAttributes, allowed bool) error {
 	review := &authorizationv1.SubjectAccessReview{
 		Spec: authorizationv1.SubjectAccessReviewSpec{
 			ResourceAttributes: ra,
 			User:               user,
+			Groups:             groups,
 		},
 	}
 
