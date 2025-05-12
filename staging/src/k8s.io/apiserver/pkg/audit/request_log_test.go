@@ -97,60 +97,85 @@ func TestLogResponseObjectWithPod(t *testing.T) {
 }
 
 func TestLogResponseObjectWithStatus(t *testing.T) {
-	// Create a status object to test ResponseStatus handling
-	testStatus := &metav1.Status{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "Status",
+	testCases := []struct {
+		name               string
+		level              auditinternal.Level
+		status             *metav1.Status
+		shouldEncode       bool
+		expectResponseObj  bool
+		expectStatusFields bool
+	}{
+		{
+			name:               "RequestResponse level should encode and log status fields",
+			level:              auditinternal.LevelRequestResponse,
+			status:             &metav1.Status{Status: "Success", Message: "Test message", Code: 200},
+			shouldEncode:       true,
+			expectResponseObj:  true,
+			expectStatusFields: true,
 		},
-		Status:  "Success",
-		Message: "Test status message",
-		Reason:  "TestReason",
-		Code:    200,
+		{
+			name:               "Metadata level should log status fields without encoding",
+			level:              auditinternal.LevelMetadata,
+			status:             &metav1.Status{Status: "Success", Message: "Test message", Code: 200},
+			shouldEncode:       false,
+			expectResponseObj:  false,
+			expectStatusFields: true,
+		},
 	}
 
-	scheme := runtime.NewScheme()
-	err := metav1.AddMetaToScheme(scheme)
-	if err != nil {
-		t.Fatalf("Failed to add meta to scheme: %v", err)
-	}
-	scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &metav1.Status{})
-	codecs := serializer.NewCodecFactory(scheme)
-	negotiatedSerializer := codecs.WithoutConversion()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			if err := metav1.AddMetaToScheme(scheme); err != nil {
+				t.Fatalf("Failed to add meta to scheme: %v", err)
+			}
+			scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &metav1.Status{})
+			codecs := serializer.NewCodecFactory(scheme)
+			negotiatedSerializer := codecs.WithoutConversion()
 
-	ctx := WithAuditContext(context.Background())
-	ac := AuditContextFrom(ctx)
+			ctx := WithAuditContext(context.Background())
+			ac := AuditContextFrom(ctx)
 
-	captureSink := &capturingAuditSink{}
-	if err := ac.Init(RequestAuditConfig{Level: auditinternal.LevelRequestResponse}, captureSink); err != nil {
-		t.Fatalf("Failed to initialize audit context: %v", err)
-	}
+			captureSink := &capturingAuditSink{}
+			if err := ac.Init(RequestAuditConfig{Level: tc.level}, captureSink); err != nil {
+				t.Fatalf("Failed to initialize audit context: %v", err)
+			}
 
-	LogResponseObject(ctx, testStatus, schema.GroupVersion{Group: "", Version: "v1"}, negotiatedSerializer)
-	ac.ProcessEventStage(ctx, auditinternal.StageResponseComplete)
+			LogResponseObject(ctx, tc.status, schema.GroupVersion{Group: "", Version: "v1"}, negotiatedSerializer)
+			ac.ProcessEventStage(ctx, auditinternal.StageResponseComplete)
 
-	if len(captureSink.events) != 1 {
-		t.Fatalf("Expected one audit event to be captured, got %d", len(captureSink.events))
-	}
-	event := captureSink.events[0]
+			if len(captureSink.events) != 1 {
+				t.Fatalf("Expected one audit event to be captured, got %d", len(captureSink.events))
+			}
+			event := captureSink.events[0]
 
-	if event.ResponseObject == nil {
-		t.Fatal("Expected ResponseObject to be set, but it was nil")
-	}
-	if event.ResponseStatus == nil {
-		t.Fatal("Expected ResponseStatus to be set for Status object, but it was nil")
-	}
-	if event.ResponseStatus.Status != "Success" {
-		t.Errorf("Expected ResponseStatus.Status to be 'Success', got %q", event.ResponseStatus.Status)
-	}
-	if event.ResponseStatus.Message != "Test status message" {
-		t.Errorf("Expected ResponseStatus.Message to be 'Test status message', got %q", event.ResponseStatus.Message)
-	}
-	if event.ResponseStatus.Reason != "TestReason" {
-		t.Errorf("Expected ResponseStatus.Reason to be 'TestReason', got %q", event.ResponseStatus.Reason)
-	}
-	if event.ResponseStatus.Code != 200 {
-		t.Errorf("Expected ResponseStatus.Code to be 200, got %d", event.ResponseStatus.Code)
+			if tc.expectResponseObj {
+				if event.ResponseObject == nil {
+					t.Error("Expected ResponseObject to be set, but it was nil")
+				}
+			} else {
+				if event.ResponseObject != nil {
+					t.Error("Expected ResponseObject to be nil")
+				}
+			}
+
+			if tc.expectStatusFields {
+				if event.ResponseStatus == nil {
+					t.Fatal("Expected ResponseStatus to be set, but it was nil")
+				}
+				if event.ResponseStatus.Status != tc.status.Status {
+					t.Errorf("Expected ResponseStatus.Status to be %q, got %q", tc.status.Status, event.ResponseStatus.Status)
+				}
+				if event.ResponseStatus.Message != tc.status.Message {
+					t.Errorf("Expected ResponseStatus.Message to be %q, got %q", tc.status.Message, event.ResponseStatus.Message)
+				}
+				if event.ResponseStatus.Code != tc.status.Code {
+					t.Errorf("Expected ResponseStatus.Code to be %d, got %d", tc.status.Code, event.ResponseStatus.Code)
+				}
+			} else if event.ResponseStatus != nil {
+				t.Error("Expected ResponseStatus to be nil")
+			}
+		})
 	}
 }
 
@@ -178,6 +203,18 @@ func TestLogResponseObjectLevelCheck(t *testing.T) {
 			shouldEncode:       false,
 			expectResponseObj:  false,
 			expectStatusFields: false,
+		},
+		{
+			name:  "Metadata level with Status should log status fields without encoding",
+			level: auditinternal.LevelMetadata,
+			obj: &metav1.Status{
+				Status:  "Success",
+				Message: "Test message",
+				Code:    200,
+			},
+			shouldEncode:       false,
+			expectResponseObj:  false,
+			expectStatusFields: true,
 		},
 		{
 			name:               "Request level with Pod should not encode or log",
@@ -270,10 +307,8 @@ func TestLogResponseObjectLevelCheck(t *testing.T) {
 						t.Errorf("Expected ResponseStatus.Code to be %d, got %d", status.Code, event.ResponseStatus.Code)
 					}
 				}
-			} else {
-				if event.ResponseStatus != nil {
-					t.Error("Expected ResponseStatus to be nil")
-				}
+			} else if event.ResponseStatus != nil {
+				t.Error("Expected ResponseStatus to be nil")
 			}
 		})
 	}
