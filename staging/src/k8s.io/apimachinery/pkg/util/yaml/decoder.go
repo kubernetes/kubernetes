@@ -338,10 +338,10 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.yaml != nil {
 		err := d.yaml.Decode(into)
 		if err == nil {
+			d.count++
 			consumed := int64(d.yaml.InputOffset()) - d.yamlConsumed
 			d.stream.Consume(int(consumed))
 			d.yamlConsumed += consumed
-			d.count++
 			return nil
 		}
 		if err == io.EOF { //nolint:errorlint
@@ -374,6 +374,7 @@ func (d *YAMLOrJSONDecoder) consumeWhitespace() error {
 			d.stream.Consume(consumed)
 			return nil
 		}
+		consumed += sz
 		if r == '\n' {
 			d.stream.Consume(consumed)
 			return nil
@@ -381,7 +382,6 @@ func (d *YAMLOrJSONDecoder) consumeWhitespace() error {
 		if err == io.EOF { //nolint:errorlint
 			break
 		}
-		consumed += sz
 	}
 	return io.EOF
 }
