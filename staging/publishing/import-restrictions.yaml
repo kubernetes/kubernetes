@@ -219,6 +219,9 @@
   - k8s.io/klog
   - k8s.io/kube-scheduler
   - k8s.io/utils
+  # TODO The lines below should be removed when other scheduler interfaces are moved to staging
+  - k8s.io/kubernetes/pkg/scheduler/apis/config
+  - k8s.io/kubernetes/pkg/scheduler/framework
 
 - baseImportPath: "./staging/src/k8s.io/kubelet"
   allowedImports:
