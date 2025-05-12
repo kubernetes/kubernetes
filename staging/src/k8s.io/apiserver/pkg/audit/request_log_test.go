@@ -156,56 +156,124 @@ func TestLogResponseObjectWithStatus(t *testing.T) {
 
 func TestLogResponseObjectLevelCheck(t *testing.T) {
 	testCases := []struct {
-		name         string
-		level        auditinternal.Level
-		shouldEncode bool
+		name               string
+		level              auditinternal.Level
+		obj                runtime.Object
+		shouldEncode       bool
+		expectResponseObj  bool
+		expectStatusFields bool
 	}{
 		{
-			name:         "None level should not encode",
-			level:        auditinternal.LevelNone,
-			shouldEncode: false,
+			name:               "None level should not encode or log anything",
+			level:              auditinternal.LevelNone,
+			obj:                &corev1.Pod{},
+			shouldEncode:       false,
+			expectResponseObj:  false,
+			expectStatusFields: false,
 		},
 		{
-			name:         "Metadata level should not encode",
-			level:        auditinternal.LevelMetadata,
-			shouldEncode: false,
+			name:               "Metadata level should not encode or log anything",
+			level:              auditinternal.LevelMetadata,
+			obj:                &corev1.Pod{},
+			shouldEncode:       false,
+			expectResponseObj:  false,
+			expectStatusFields: false,
 		},
 		{
-			name:         "Request level should not encode",
-			level:        auditinternal.LevelRequest,
-			shouldEncode: false,
+			name:               "Request level with Pod should not encode or log",
+			level:              auditinternal.LevelRequest,
+			obj:                &corev1.Pod{},
+			shouldEncode:       false,
+			expectResponseObj:  false,
+			expectStatusFields: false,
 		},
 		{
-			name:         "RequestResponse level should encode",
-			level:        auditinternal.LevelRequestResponse,
-			shouldEncode: true,
+			name:  "Request level with Status should log status fields without encoding",
+			level: auditinternal.LevelRequest,
+			obj: &metav1.Status{
+				Status:  "Success",
+				Message: "Test message",
+				Code:    200,
+			},
+			shouldEncode:       false,
+			expectResponseObj:  false,
+			expectStatusFields: true,
+		},
+		{
+			name:               "RequestResponse level with Pod should encode",
+			level:              auditinternal.LevelRequestResponse,
+			obj:                &corev1.Pod{},
+			shouldEncode:       true,
+			expectResponseObj:  true,
+			expectStatusFields: false,
+		},
+		{
+			name:  "RequestResponse level with Status should encode and log status fields",
+			level: auditinternal.LevelRequestResponse,
+			obj: &metav1.Status{
+				Status:  "Success",
+				Message: "Test message",
+				Code:    200,
+			},
+			shouldEncode:       true,
+			expectResponseObj:  true,
+			expectStatusFields: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create a test object
-			testObj := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-pod",
-					Namespace: "test-namespace",
-				},
-			}
-
-			// Create audit context with the specified level
 			ctx := WithAuditContext(context.Background())
 			ac := AuditContextFrom(ctx)
-			ac.Init(RequestAuditConfig{Level: tc.level}, nil)
 
-			// Create a mock serializer that tracks if encoding was attempted
+			captureSink := &capturingAuditSink{}
+			if err := ac.Init(RequestAuditConfig{Level: tc.level}, captureSink); err != nil {
+				t.Fatalf("Failed to initialize audit context: %v", err)
+			}
+
 			mockSerializer := &mockNegotiatedSerializer{}
+			LogResponseObject(ctx, tc.obj, schema.GroupVersion{Group: "", Version: "v1"}, mockSerializer)
+			ac.ProcessEventStage(ctx, auditinternal.StageResponseComplete)
 
-			// Call the function under test
-			LogResponseObject(ctx, testObj, schema.GroupVersion{Group: "", Version: "v1"}, mockSerializer)
-
-			// Check if encoding was attempted as expected
 			if mockSerializer.encodeCalled != tc.shouldEncode {
 				t.Errorf("Expected encoding to be called: %v, but got: %v", tc.shouldEncode, mockSerializer.encodeCalled)
+			}
+
+			if len(captureSink.events) != 1 {
+				t.Fatalf("Expected one audit event to be captured, got %d", len(captureSink.events))
+			}
+			event := captureSink.events[0]
+
+			if tc.expectResponseObj {
+				if event.ResponseObject == nil {
+					t.Error("Expected ResponseObject to be set, but it was nil")
+				}
+			} else {
+				if event.ResponseObject != nil {
+					t.Error("Expected ResponseObject to be nil")
+				}
+			}
+
+			// Check ResponseStatus for Status objects
+			status, isStatus := tc.obj.(*metav1.Status)
+			if isStatus && tc.expectStatusFields {
+				if event.ResponseStatus == nil {
+					t.Error("Expected ResponseStatus to be set for Status object, but it was nil")
+				} else {
+					if event.ResponseStatus.Status != status.Status {
+						t.Errorf("Expected ResponseStatus.Status to be %q, got %q", status.Status, event.ResponseStatus.Status)
+					}
+					if event.ResponseStatus.Message != status.Message {
+						t.Errorf("Expected ResponseStatus.Message to be %q, got %q", status.Message, event.ResponseStatus.Message)
+					}
+					if event.ResponseStatus.Code != status.Code {
+						t.Errorf("Expected ResponseStatus.Code to be %d, got %d", status.Code, event.ResponseStatus.Code)
+					}
+				}
+			} else {
+				if event.ResponseStatus != nil {
+					t.Error("Expected ResponseStatus to be nil")
+				}
 			}
 		})
 	}

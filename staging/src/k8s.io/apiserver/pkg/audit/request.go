@@ -171,11 +171,13 @@ func LogRequestPatch(ctx context.Context, patch []byte) {
 // will be converted to the given gv.
 func LogResponseObject(ctx context.Context, obj runtime.Object, gv schema.GroupVersion, s runtime.NegotiatedSerializer) {
 	ac := AuditContextFrom(WithAuditContext(ctx))
-	if ac.GetEventLevel().Less(auditinternal.LevelRequestResponse) {
+	status, _ := obj.(*metav1.Status)
+	if ac.GetEventLevel().Less(auditinternal.LevelMetadata) {
+		return
+	} else if ac.GetEventLevel().Less(auditinternal.LevelRequestResponse) {
+		ac.LogResponseObject(status, nil)
 		return
 	}
-
-	status, _ := obj.(*metav1.Status)
 
 	if shouldOmitManagedFields(ac) {
 		copy, ok, err := copyWithoutManagedFields(obj)
