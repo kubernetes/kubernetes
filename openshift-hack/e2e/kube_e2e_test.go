@@ -1,5 +1,7 @@
 package e2e
 
+//go:generate go run -mod vendor ./annotate/cmd -- ./annotate/generated/zz_generated.annotations.go
+
 // This file duplicates most of test/e2e/e2e_test.go but limits the included
 // tests (via include.go) to tests that are relevant to openshift.
 
@@ -17,6 +19,7 @@ import (
 
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"gopkg.in/yaml.v2"
+
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
 	// directory contains a Ginkgo test suite.
