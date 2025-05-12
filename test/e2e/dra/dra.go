@@ -1371,7 +1371,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		))
 		b := newBuilder(f, driver)
 
-		f.It("must consume and free up counters", feature.DRAPartitionableDevices, func(ctx context.Context) {
+		f.It("must consume and free up counters", func(ctx context.Context) {
 			// The first pod will use one of the devices. Since both devices are
 			// available, there should be sufficient counters left to allocate
 			// a device.
@@ -1415,7 +1415,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	ginkgo.Context("with v1beta2 API", v1beta2Tests)
 
-	ginkgo.Context("with partitionable devices", partitionableDevicesTests)
+	framework.Context(f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
 
 	framework.Context(f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
