@@ -173,7 +173,7 @@ func validateClaim(claim *resourceapi.ResourceClaim) {
 }
 
 const (
-	// multi-host identifies DriverResources that are associated with multiple devices, i.e.
+	// multiHostDriverResources identifies DriverResources that are associated with multiple devices, i.e.
 	// is not managed by a driver. So any Pools and ResourceSlices will be published directly
 	// to the cluster, rather than through the driver.
 	multiHostDriverResources = "multi-host"
@@ -183,6 +183,8 @@ const (
 // DriverResources that will be used to construct the ResourceSlices.
 type driverResourcesGenFunc func(nodes *Nodes) map[string]resourceslice.DriverResources
 
+// driverResourcesMutatorFunc defines the function signature for mutators that will
+// update the DriverResources after they have been generated.
 type driverResourcesMutatorFunc func(map[string]resourceslice.DriverResources)
 
 // NewDriver sets up controller (as client of the cluster) and
