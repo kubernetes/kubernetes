@@ -895,7 +895,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		b2 := newBuilder(f, driver2)
 		b2.classParameters = driver2Params
 
-		f.It("selects the first subrequest that can be satisfied", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
+		f.It("selects the first subrequest that can be satisfied", func(ctx context.Context) {
 			name := "external-multiclaim"
 			params := `{"a":"b"}`
 			claim := &resourceapi.ResourceClaim{
@@ -967,7 +967,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Expect(results[1].Request).To(gomega.Equal("request-1/sub-request-2"))
 		})
 
-		f.It("uses the config for the selected subrequest", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
+		f.It("uses the config for the selected subrequest", func(ctx context.Context) {
 			name := "external-multiclaim"
 			parentReqParams, parentReqEnv := `{"a":"b"}`, []string{"user_a", "b"}
 			subReq1Params := `{"c":"d"}`
@@ -1049,7 +1049,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			b1.testPod(ctx, f, pod, expectedEnv...)
 		})
 
-		f.It("chooses the correct subrequest subject to constraints", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
+		f.It("chooses the correct subrequest subject to constraints", func(ctx context.Context) {
 			name := "external-multiclaim"
 			params := `{"a":"b"}`
 			claim := &resourceapi.ResourceClaim{
@@ -1135,7 +1135,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Expect(results[1].Request).To(gomega.Equal("request-2"))
 		})
 
-		f.It("filters config correctly for multiple devices", f.WithFeatureGate(features.DRAPrioritizedList), func(ctx context.Context) {
+		f.It("filters config correctly for multiple devices", func(ctx context.Context) {
 			name := "external-multiclaim"
 			req1Params, req1Env := `{"a":"b"}`, []string{"user_a", "b"}
 			req1subReq1Params, _ := `{"c":"d"}`, []string{"user_d", "d"}
@@ -1360,11 +1360,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		multiNodeTests()
 	})
 
-	ginkgo.Context("with prioritized list", func() {
-		prioritizedListTests()
-	})
-
-	ginkgo.Context("with prioritized list", func() {
+	framework.Context(f.WithFeatureGate(features.DRAPrioritizedList), func() {
 		prioritizedListTests()
 	})
 
@@ -1372,7 +1368,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		v1beta2Tests()
 	})
 
-	framework.Context("with device taints", f.WithFeatureGate(features.DRADeviceTaints), func() {
+	framework.Context(f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
 		driver := NewDriver(f, nodes, func() Resources {
 			return Resources{
