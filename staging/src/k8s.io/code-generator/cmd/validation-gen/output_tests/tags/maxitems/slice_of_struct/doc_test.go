@@ -60,4 +60,16 @@ func Test(t *testing.T) {
 		"max0TypedefField":  []string{`Too many:.*must have at most 0 items`},
 		"max10TypedefField": []string{`Too many:.*must have at most 10 items`},
 	})
+	// Test validation ratcheting
+	st.Value(&Struct{
+		Max0Field:         make([]OtherStruct, 1),
+		Max10Field:        make([]OtherStruct, 11),
+		Max0TypedefField:  make([]OtherTypedefStruct, 1),
+		Max10TypedefField: make([]OtherTypedefStruct, 11),
+	}).OldValue(&Struct{
+		Max0Field:         make([]OtherStruct, 1),
+		Max10Field:        make([]OtherStruct, 11),
+		Max0TypedefField:  make([]OtherTypedefStruct, 1),
+		Max10TypedefField: make([]OtherTypedefStruct, 11),
+	}).ExpectValid()
 }
