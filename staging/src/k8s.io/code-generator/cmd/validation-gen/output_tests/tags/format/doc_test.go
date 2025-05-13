@@ -44,14 +44,34 @@ func Test(t *testing.T) {
 		DNSLabelTypedefField: "1234",
 	}).ExpectValid()
 
-	st.Value(&Struct{
+	invalidStruct := &Struct{
 		IPField:              "",
 		IPPtrField:           ptr.To(""),
 		IPTypedefField:       "",
 		DNSLabelField:        "",
 		DNSLabelPtrField:     ptr.To(""),
 		DNSLabelTypedefField: "",
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+	}
+	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
+	})
+	// Test validation ratcheting
+	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()
+
+	invalidStruct = &Struct{
+		IPField:              "Not an IP",
+		IPPtrField:           ptr.To("Not an IP"),
+		IPTypedefField:       "Not an IP",
+		DNSLabelField:        "Not a DNS label",
+		DNSLabelPtrField:     ptr.To("Not a DNS label"),
+		DNSLabelTypedefField: "Not a DNS label",
+	}
+	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
 		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
 		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
 		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
@@ -60,19 +80,6 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
 	})
 
-	st.Value(&Struct{
-		IPField:              "Not an IP",
-		IPPtrField:           ptr.To("Not an IP"),
-		IPTypedefField:       "Not an IP",
-		DNSLabelField:        "Not a DNS label",
-		DNSLabelPtrField:     ptr.To("Not a DNS label"),
-		DNSLabelTypedefField: "Not a DNS label",
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
-		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
-		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
-	})
+	// Test validation ratcheting
+	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()
 }
