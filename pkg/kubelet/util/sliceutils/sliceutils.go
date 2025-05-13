@@ -67,19 +67,15 @@ func (s PodsByPriority) Less(i, j int) bool {
 	iPrio := getPodPriority(s[i])
 	jPrio := getPodPriority(s[j])
 
-	if iPrio > jPrio {
-		return true
-	}
 	if iPrio == jPrio {
 		return s[i].CreationTimestamp.Before(&s[j].CreationTimestamp)
 	}
-	return false
+	return iPrio > jPrio
 }
 
 func getPodPriority(pod *v1.Pod) int32 {
 	if pod == nil || pod.Spec.Priority == nil {
 		return 0
 	}
-
 	return *pod.Spec.Priority
 }
