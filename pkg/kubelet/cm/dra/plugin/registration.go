@@ -183,8 +183,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		clientCallTimeout: timeout,
 	}
 
-	// --- Start Health Stream Logic ---
-	// Create a separate context derived from the plugin's context for the stream attempt/lifecycle
+	// Create a separate context derived from the plugin's context for the stream attempt/lifecycle.
 	streamCtx, streamAttemptCancel := context.WithCancel(ctx)
 	stream, err := pluginInstance.WatchResources(streamCtx)
 	if err != nil {
@@ -194,7 +193,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		pluginInstance.SetHealthStream(nil, nil)
 
 	} else {
-		// Stream started successfully!
+		// Stream started successfully.
 		logger.Info("Successfully started WatchResources health stream")
 		// Store the stream's specific context and its cancel function
 		pluginInstance.SetHealthStream(streamCtx, streamAttemptCancel)
