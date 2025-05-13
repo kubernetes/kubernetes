@@ -1,3 +1,6 @@
+//go:build linux
+// +build linux
+
 /*
 Copyright 2024 The Kubernetes Authors.
 
@@ -19,120 +22,196 @@ package e2enode
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"sort"
 	"time"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
+
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+
 	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/apis/config"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = SIGDescribe(framework.WithSerial(), "Pod Restart Order [testFocusHere2]", func() {
-	f := framework.NewDefaultFramework("pod-restart-order-serial")
+var _ = SIGDescribe("Pod Restart with PodStartingOrderByPriority Featuregate [testFocusHere2]", func() {
+	f := framework.NewDefaultFramework("pod-restart-order")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	f.Context("restart and get the target node order [testFocusHere2]", func() {
+	f.Context("restart node and check pods are becoming running [testFocusHere2]", func() {
 
 		const (
-			podAmount       = int32(5)
-			podRetryTimeout = 5 * time.Minute
+			podAmount                    = int32(6)
+			pollInterval                 = 1 * time.Second
+			podStatusUpdateTimeout       = 30 * time.Second
+			nodeStatusUpdateTimeout      = 30 * time.Second
+			priorityClassesCreateTimeout = 10 * time.Second
+			nodeShutdownGracePeriod      = 30 * time.Second
 		)
 
-		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *config.KubeletConfiguration) {
-			initialConfig.FeatureGates = map[string]bool{
-				string(features.PodStartingOrderByPriority): true,
-			}
-		})
+		var (
+			customClassHigh = getPriorityClass("high-priority", 1000000)
+			customClassLow  = getPriorityClass("low-priority", -1000000)
+		)
 
-		var podCli *e2epod.PodClient
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			initialConfig.FeatureGates = map[string]bool{
+				string(features.GracefulNodeShutdown):                   true,
+				string(features.GracefulNodeShutdownBasedOnPodPriority): false,
+			}
+			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
+		})
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			ginkgo.By("Wait for the node to be ready")
 			waitForNodeReady(ctx)
-			ginkgo.By("Create priorityclasses")
-			for i := range podAmount {
-				f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, getPriorityClassDef(i), metav1.CreateOptions{})
+			customClasses := []*schedulingv1.PriorityClass{customClassHigh, customClassLow}
+			// Create priority classes
+			for _, customClass := range customClasses {
+				_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, customClass, metav1.CreateOptions{})
+				if err != nil && !apierrors.IsAlreadyExists(err) {
+					framework.ExpectNoError(err)
+				}
 			}
-			podCli = e2epod.NewPodClient(f)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				for _, customClass := range customClasses {
+					_, err := f.ClientSet.SchedulingV1().PriorityClasses().Get(ctx, customClass.Name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}, priorityClassesCreateTimeout, pollInterval).Should(gomega.Succeed())
 		})
 
-		ginkgo.It("Should [testFocusHere2]", func(ctx context.Context) {
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
+			err := emitSignalPrepareForShutdown(false)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should shutdown pods and node [testFocusHere2]", func(ctx context.Context) {
 			nodeName := getNodeName(ctx, f)
+			nodeSelector := fields.Set{
+				"spec.nodeName": nodeName,
+			}.AsSelector().String()
+
+			// Create pods with custom priority classes
 			pods := []*v1.Pod{}
 			for i := range podAmount {
-				pods = append(pods, getPodWithPriority(fmt.Sprintf("%d", i), nodeName, fmt.Sprintf("%d", i)))
+				newLowPriorityPod := getPodWithPriority(fmt.Sprintf("pod-low-%d", i), nodeName, customClassLow.Name)
+				newHighPriorityPod := getPodWithPriority(fmt.Sprintf("pod-high-%d", i), nodeName, customClassHigh.Name)
+				pods = append(pods, newLowPriorityPod, newHighPriorityPod)
 			}
-			podCli.CreateBatch(ctx, pods)
 
-			podList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err, "should be able to list pods")
-			gomega.Expect(podList.Items).To(gomega.HaveLen(int(podAmount)))
-			orderedPodList := podList.Items
-			sort.Slice(orderedPodList, func(a, b int) bool {
-				return orderedPodList[a].CreationTimestamp.Before(&orderedPodList[b].CreationTimestamp)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			ginkgo.By("Creating batch pods")
+			e2epod.NewPodClient(f).CreateBatch(ctx, pods)
+
+			list, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
+				FieldSelector: nodeSelector,
 			})
-			gomega.Expect(orderedPodList).To(gomega.Equal(podList.Items))
 
-			restartKubelet(ctx, true)
+			framework.ExpectNoError(err)
+			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
 
-			waitForKubeletToStart(ctx, f)
-
-			waitForNodeReady(ctx)
-
-			exec.Command(sleepCommand(120))
-
-			postRestartPods := waitForPodsCondition(ctx, f, int(podAmount), podRetryTimeout, testutils.PodRunningReadyOrSucceeded)
-
-			gomega.Expect(postRestartPods).To(gomega.HaveLen(int(podAmount)))
-
-			gomega.Expect(getRestartCount(*postRestartPods[0])).ToNot(gomega.BeZero()) //Fails, pods have not been restarted
-
-			restartedOrderedPods := postRestartPods
-			sort.Slice(restartedOrderedPods, func(a, b int) bool {
-				return restartedOrderedPods[a].CreationTimestamp.Before(&restartedOrderedPods[b].CreationTimestamp)
+			list, err = e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
+				FieldSelector: nodeSelector,
 			})
-			gomega.Expect(restartedOrderedPods).To(gomega.Equal(postRestartPods))
+			if err != nil {
+				framework.Failf("Failed to start batch pod: %q", err)
+			}
+			gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
+
+			for _, pod := range list.Items {
+				framework.Logf("Pod (%v/%v) status conditions: %q", pod.Namespace, pod.Name, &pod.Status.Conditions)
+			}
+
+			ginkgo.By("Verifying batch pods are running")
+			for _, pod := range list.Items {
+				if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
+					framework.Failf("Failed to start batch pod: (%v/%v)", pod.Namespace, pod.Name)
+				}
+			}
+
+			ginkgo.By("Emitting shutdown signal")
+			err = emitSignalPrepareForShutdown(true)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Verifying that all pods are shutdown")
+			// All pod should be shutdown
+			gomega.Eventually(func() error {
+				list, err = e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
+					FieldSelector: nodeSelector,
+				})
+				if err != nil {
+					return err
+				}
+				gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
+
+				for _, pod := range list.Items {
+					if !isPodShutdown(&pod) {
+						framework.Logf("Expecting pod to be shutdown, but it's not currently. Pod: (%v/%v), Pod Status Phase: %q, Pod Status Reason: %q", pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Reason)
+						return fmt.Errorf("pod should be shutdown, phase: %s", pod.Status.Phase)
+					}
+				}
+				return nil
+			}, podStatusUpdateTimeout+(nodeShutdownGracePeriod), pollInterval).Should(gomega.BeNil())
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				isReady := getNodeReadyStatus(ctx, f)
+				if isReady {
+					return fmt.Errorf("node did not become shutdown as expected")
+				}
+				return nil
+			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.Succeed())
+
+			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
+			err = emitSignalPrepareForShutdown(false)
+			framework.ExpectNoError(err)
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				isReady := getNodeReadyStatus(ctx, f)
+				if !isReady {
+					return fmt.Errorf("node did not recover as expected")
+				}
+				return nil
+			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.Succeed())
+
+			ginkgo.By("Verifying that all pods are running after shutdown is cancelled")
+			// All pods should be running
+			gomega.Eventually(func() error {
+				list, err = e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{
+					FieldSelector: nodeSelector,
+				})
+				if err != nil {
+					return err
+				}
+				gomega.Expect(list.Items).To(gomega.HaveLen(len(pods)), "the number of pods is not as expected")
+
+				for _, pod := range list.Items {
+					if podReady, err := testutils.PodRunningReady(&pod); err != nil || !podReady {
+						framework.Logf("Expecting pod to be running, but it's not currently. Pod: (%v/%v), Pod Status Phase: %q, Pod Status Reason: %q", pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Reason)
+						return fmt.Errorf("pod should be running, phase: %s", pod.Status.Phase)
+					}
+				}
+				return nil
+			}, podStatusUpdateTimeout+(nodeShutdownGracePeriod), pollInterval).Should(gomega.BeNil())
 		})
 	})
 })
 
-// getRestartCount return the restart count of given pod (total number of its containers restarts).
-// Copied over from dashboard
-func getRestartCount(pod v1.Pod) int32 {
-	var restartCount int32 = 0
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		restartCount += containerStatus.RestartCount
-	}
-	return restartCount
-}
-
-func getPriorityClassDef(priority int32) *schedulingv1.PriorityClass {
-	prio := &schedulingv1.PriorityClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PriorityClass",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%d", priority),
-		},
-		Value:         priority,
-		GlobalDefault: false,
-		Description:   "Test priority",
-	}
-	return prio
-}
-
 func getPodWithPriority(name string, node string, priority string) *v1.Pod {
+	gracePeriod := int64(30)
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -144,13 +223,26 @@ func getPodWithPriority(name string, node string, priority string) *v1.Pod {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  name,
-					Image: imageutils.GetPauseImageName(),
+					Name:    name,
+					Image:   busyboxImage,
+					Command: []string{"sh", "-c"},
+					Args: []string{`
+					sleep 9999999 &
+					PID=$!
+					_term() {
+						echo "Caught SIGTERM signal!"
+						wait $PID
+					}
+					
+					trap _term SIGTERM
+					wait $PID
+					`},
 				},
 			},
-			PriorityClassName: priority,
-			NodeName:          node,
-			RestartPolicy:     "Always",
+			PriorityClassName:             priority,
+			TerminationGracePeriodSeconds: &gracePeriod,
+			NodeName:                      node,
+			RestartPolicy:                 "Always",
 		},
 	}
 	return pod

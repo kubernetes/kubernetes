@@ -565,7 +565,7 @@ const (
 	// sandbox creation and network configuration completes successfully
 	PodReadyToStartContainersCondition featuregate.Feature = "PodReadyToStartContainersCondition"
 
-	// owner: @Huutomerkki
+	// owner: @Huutomerkki, @peppi-lotta
 	//
 	// Enables pods starting in the order of their priorities
 	PodStartingOrderByPriority featuregate.Feature = "PodStartingOrderByPriority"
@@ -1603,6 +1603,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	PodReadyToStartContainersCondition: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	PodStartingOrderByPriority: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PodLifecycleSleepActionAllowZero: {
