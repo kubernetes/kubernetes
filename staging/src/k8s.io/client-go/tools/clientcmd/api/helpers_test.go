@@ -225,7 +225,6 @@ func Example_minifyAndShorten() {
 	//     cluster: cow-cluster
 	//     user: red-user
 	// current-context: federal-context
-	// preferences: {}
 	// users:
 	//   red-user:
 	//     client-certificate-data: DATA+OMITTED

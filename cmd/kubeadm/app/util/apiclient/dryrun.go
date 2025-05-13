@@ -607,7 +607,6 @@ clusters:
 contexts: null
 current-context: ""
 kind: Config
-preferences: {}
 users: null
 `)
 	data := map[string]string{

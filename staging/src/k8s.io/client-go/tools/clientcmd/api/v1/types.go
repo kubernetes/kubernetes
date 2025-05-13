@@ -37,7 +37,8 @@ type Config struct {
 	// +optional
 	APIVersion string `json:"apiVersion,omitempty"`
 	// Preferences holds general information to be use for cli interactions
-	Preferences Preferences `json:"preferences"`
+	// Deprecated: this field is deprecated in v1.34. It is not used by any of the Kubernetes components.
+	Preferences Preferences `json:"preferences,omitzero"`
 	// Clusters is a map of referencable names to cluster configs
 	Clusters []NamedCluster `json:"clusters"`
 	// AuthInfos is a map of referencable names to user configs
@@ -51,6 +52,7 @@ type Config struct {
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
 
+// Deprecated: this structure is deprecated in v1.34. It is not used by any of the Kubernetes components.
 type Preferences struct {
 	// +optional
 	Colors bool `json:"colors,omitempty"`
