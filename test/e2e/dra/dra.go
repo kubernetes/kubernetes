@@ -60,24 +60,6 @@ const (
 	podStartTimeout = 5 * time.Minute
 )
 
-// networkResources can be passed to NewDriver directly.
-func networkResources() Resources {
-	return Resources{}
-}
-
-// perNode returns a function which can be passed to NewDriver. The nodes
-// parameter has be instantiated, but not initialized yet, so the returned
-// function has to capture it and use it when being called.
-func perNode(maxAllocations int, nodes *Nodes) func() Resources {
-	return func() Resources {
-		return Resources{
-			NodeLocal:      true,
-			MaxAllocations: maxAllocations,
-			Nodes:          nodes.NodeNames,
-		}
-	}
-}
-
 // TODO: remove feature.DynamicResourceAllocation here and add it only for those tests
 // which really need node-level support for DRA.
 //
@@ -91,7 +73,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	ginkgo.Context("kubelet", func() {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, networkResources)
+		driver := NewDriver(f, nodes, networkResources(10, false))
 		b := newBuilder(f, driver)
 
 		ginkgo.It("registers plugin", func() {
@@ -480,11 +462,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		nodes := NewNodes(f, 1, 1)
 		maxAllocations := 1
 		numPods := 10
-		generateResources := func() Resources {
-			resources := perNode(maxAllocations, nodes)()
-			return resources
-		}
-		driver := NewDriver(f, nodes, generateResources) // All tests get their own driver instance.
+		driver := NewDriver(f, nodes, driverResources(maxAllocations)) // All tests get their own driver instance.
 		b := newBuilder(f, driver)
 		// We have to set the parameters *before* creating the class.
 		b.classParameters = `{"x":"y"}`
@@ -650,7 +628,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 					},
 				},
 			}
-			driver := NewDriver(f, nodes, perNode(-1, nodes), devicesPerNode...)
+			driver := NewDriver(f, nodes, driverResources(-1, devicesPerNode...))
 			b := newBuilder(f, driver)
 
 			ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
@@ -708,7 +686,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		})
 
 		ginkgo.Context("with node-local resources", func() {
-			driver := NewDriver(f, nodes, perNode(1, nodes))
+			driver := NewDriver(f, nodes, driverResources(1))
 			b := newBuilder(f, driver)
 
 			ginkgo.It("uses all resources", func(ctx context.Context) {
@@ -750,7 +728,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		})
 
 		ginkgo.Context("with network-attached resources", func() {
-			driver := NewDriver(f, nodes, networkResources)
+			driver := NewDriver(f, nodes, networkResources(10, false))
 			b := newBuilder(f, driver)
 
 			f.It("supports sharing a claim sequentially", f.WithSlow(), func(ctx context.Context) {
@@ -867,7 +845,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		driver1Params, driver1Env := `{"driver":"1"}`, []string{"admin_driver", "1"}
 		driver2Params, driver2Env := `{"driver":"2"}`, []string{"admin_driver", "2"}
 
-		driver1 := NewDriver(f, nodes, perNode(-1, nodes), []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+		driver1 := NewDriver(f, nodes, driverResources(-1, []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 			{
 				"device-1-1": {
 					"dra.example.com/version":  {StringValue: ptr.To("1.0.0")},
@@ -878,19 +856,19 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 					"dra.example.com/pcieRoot": {StringValue: ptr.To("foo")},
 				},
 			},
-		}...)
+		}...))
 		driver1.NameSuffix = "-1"
 		b1 := newBuilder(f, driver1)
 		b1.classParameters = driver1Params
 
-		driver2 := NewDriver(f, nodes, perNode(-1, nodes), []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+		driver2 := NewDriver(f, nodes, driverResources(-1, []map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 			{
 				"device-2-1": {
 					"dra.example.com/version":  {StringValue: ptr.To("1.0.0")},
 					"dra.example.com/pcieRoot": {StringValue: ptr.To("foo")},
 				},
 			},
-		}...)
+		}...))
 		driver2.NameSuffix = "-2"
 		b2 := newBuilder(f, driver2)
 		b2.classParameters = driver2Params
@@ -1273,10 +1251,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 	v1beta2Tests := func() {
 		nodes := NewNodes(f, 1, 1)
 		maxAllocations := 1
-		generateResources := func() Resources {
-			return perNode(maxAllocations, nodes)()
-		}
-		driver := NewDriver(f, nodes, generateResources) // All tests get their own driver instance.
+		driver := NewDriver(f, nodes, driverResources(maxAllocations))
 		b := newBuilder(f, driver)
 		// We have to set the parameters *before* creating the class.
 		b.classParameters = `{"x":"y"}`
@@ -1352,29 +1327,103 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		})
 	}
 
-	ginkgo.Context("on single node", func() {
-		singleNodeTests()
-	})
+	partitionableDevicesTests := func() {
+		nodes := NewNodes(f, 1, 1)
+		driver := NewDriver(f, nodes, toDriverResources(
+			[]resourceapi.CounterSet{
+				{
+					Name: "counter-1",
+					Counters: map[string]resourceapi.Counter{
+						"memory": {
+							Value: resource.MustParse("6Gi"),
+						},
+					},
+				},
+			},
+			[]resourceapi.Device{
+				{
+					Name: "device-1",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-1",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+				{
+					Name: "device-2",
+					ConsumesCounters: []resourceapi.DeviceCounterConsumption{
+						{
+							CounterSet: "counter-1",
+							Counters: map[string]resourceapi.Counter{
+								"memory": {
+									Value: resource.MustParse("4Gi"),
+								},
+							},
+						},
+					},
+				},
+			}...,
+		))
+		b := newBuilder(f, driver)
 
-	ginkgo.Context("on multiple nodes", func() {
-		multiNodeTests()
-	})
+		f.It("must consume and free up counters", func(ctx context.Context) {
+			// The first pod will use one of the devices. Since both devices are
+			// available, there should be sufficient counters left to allocate
+			// a device.
+			claim := b.externalClaim()
+			pod := b.podExternal()
+			pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+			b.create(ctx, claim, pod)
+			b.testPod(ctx, f, pod)
 
-	framework.Context(f.WithFeatureGate(features.DRAPrioritizedList), func() {
-		prioritizedListTests()
-	})
+			// For the second pod, there should not be sufficient counters left, so
+			// it should not succeed. This means the pod should remain in the pending state.
+			claim2 := b.externalClaim()
+			pod2 := b.podExternal()
+			pod2.Spec.ResourceClaims[0].ResourceClaimName = &claim2.Name
+			b.create(ctx, claim2, pod2)
 
-	ginkgo.Context("with v1beta2 API", func() {
-		v1beta2Tests()
-	})
+			gomega.Consistently(ctx, func(ctx context.Context) error {
+				testPod, err := b.f.ClientSet.CoreV1().Pods(pod2.Namespace).Get(ctx, pod2.Name, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("expected the test pod %s to exist: %w", pod2.Name, err)
+				}
+				if testPod.Status.Phase != v1.PodPending {
+					return fmt.Errorf("pod %s: unexpected status %s, expected status: %s", pod2.Name, testPod.Status.Phase, v1.PodPending)
+				}
+				return nil
+			}, 20*time.Second, 200*time.Millisecond).Should(gomega.Succeed())
+
+			// Delete the first pod
+			b.deletePodAndWaitForNotFound(ctx, pod)
+
+			// There shoud not be available devices for pod2.
+			b.testPod(ctx, f, pod2)
+		})
+	}
+
+	ginkgo.Context("on single node", singleNodeTests)
+
+	ginkgo.Context("on multiple nodes", multiNodeTests)
+
+	framework.Context(f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
+
+	ginkgo.Context("with v1beta2 API", v1beta2Tests)
+
+	framework.Context(f.WithFeatureGate(features.DRAPartitionableDevices), partitionableDevicesTests)
 
 	framework.Context(f.WithFeatureGate(features.DRADeviceTaints), func() {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, func() Resources {
-			return Resources{
-				Tainted: true,
-			}
-		})
+		driver := NewDriver(f, nodes, networkResources(10, false), taintAllDevices(resourceapi.DeviceTaint{
+			Key:    "example.com/taint",
+			Value:  "tainted",
+			Effect: resourceapi.DeviceTaintEffectNoSchedule,
+		}))
 		b := newBuilder(f, driver)
 
 		f.It("DeviceTaint keeps pod pending", func(ctx context.Context) {
@@ -1544,7 +1593,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 1)
-		driver := NewDriver(f, nodes, networkResources)
+		driver := NewDriver(f, nodes, networkResources(10, false))
 		b := newBuilder(f, driver)
 
 		f.It("validate ResourceClaimTemplate and ResourceClaim for admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
@@ -1697,7 +1746,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	ginkgo.Context("cluster", func() {
 		nodes := NewNodes(f, 1, 4)
-		driver := NewDriver(f, nodes, perNode(1, nodes))
+		driver := NewDriver(f, nodes, driverResources(1))
 
 		f.It("must apply per-node permission checks", func(ctx context.Context) {
 			// All of the operations use the client set of a kubelet plugin for
@@ -1901,11 +1950,11 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 	multipleDrivers := func(nodeV1beta1 bool) {
 		nodes := NewNodes(f, 1, 4)
-		driver1 := NewDriver(f, nodes, perNode(2, nodes))
+		driver1 := NewDriver(f, nodes, driverResources(2))
 		driver1.NodeV1beta1 = nodeV1beta1
 		b1 := newBuilder(f, driver1)
 
-		driver2 := NewDriver(f, nodes, perNode(2, nodes))
+		driver2 := NewDriver(f, nodes, driverResources(2))
 		driver2.NodeV1beta1 = nodeV1beta1
 		driver2.NameSuffix = "-other"
 		b2 := newBuilder(f, driver2)
@@ -1952,7 +2001,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace))
 
 		// Set up driver, which makes devices available.
-		driver.Run(nodes, perNode(1, nodes))
+		driver.Run(nodes, driverResourcesNow(nodes, 1))
 
 		// Now it should run.
 		b.testPod(ctx, f, pod)
@@ -1970,7 +2019,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		oldDriver := NewDriverInstance(f)
 		oldDriver.InstanceSuffix = "-old"
 		oldDriver.RollingUpdate = true
-		oldDriver.Run(nodes, perNode(1, nodes))
+		oldDriver.Run(nodes, driverResourcesNow(nodes, 1))
 
 		// We expect one ResourceSlice per node from the driver.
 		getSlices := oldDriver.NewGetSlices()
@@ -1982,7 +2031,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		newDriver := NewDriverInstance(f)
 		newDriver.InstanceSuffix = "-new"
 		newDriver.RollingUpdate = true
-		newDriver.Run(nodes, perNode(1, nodes))
+		newDriver.Run(nodes, driverResourcesNow(nodes, 1))
 
 		// Stop old driver instance.
 		oldDriver.TearDown(ctx)
@@ -2012,7 +2061,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		oldDriver := NewDriverInstance(f)
 		oldDriver.InstanceSuffix = "-old"
 		oldDriver.RollingUpdate = true
-		oldDriver.Run(nodes, perNode(1, nodes))
+		oldDriver.Run(nodes, driverResourcesNow(nodes, 1))
 
 		// We expect one ResourceSlice per node from the driver.
 		getSlices := oldDriver.NewGetSlices()
@@ -2024,7 +2073,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		newDriver := NewDriverInstance(f)
 		newDriver.InstanceSuffix = "-new"
 		newDriver.RollingUpdate = true
-		newDriver.Run(nodes, perNode(1, nodes))
+		newDriver.Run(nodes, driverResourcesNow(nodes, 1))
 
 		// Stop new driver instance, simulating the failure of the new instance.
 		// The kubelet should still have the old instance.
@@ -2055,7 +2104,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		// Same driver name, same socket path.
 		oldDriver := NewDriverInstance(f)
 		oldDriver.InstanceSuffix = "-old"
-		oldDriver.Run(nodes, perNode(1, nodes))
+		oldDriver.Run(nodes, driverResourcesNow(nodes, 1))
 
 		// Collect set of resource slices for that driver.
 		listSlices := framework.ListObjects(f.ClientSet.ResourceV1beta2().ResourceSlices().List, metav1.ListOptions{
@@ -2076,7 +2125,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		oldDriver.TearDown(ctx)
 		newDriver := NewDriverInstance(f)
 		newDriver.InstanceSuffix = "-new"
-		newDriver.Run(nodes, perNode(1, nodes))
+		newDriver.Run(nodes, driverResourcesNow(nodes, 1))
 		updateDuration := time.Since(start)
 
 		// Build behaves the same for both driver instances.
@@ -2375,6 +2424,13 @@ func (b *builder) create(ctx context.Context, objs ...klog.KMetadata) []klog.KMe
 	return createdObjs
 }
 
+func (b *builder) deletePodAndWaitForNotFound(ctx context.Context, pod *v1.Pod) {
+	err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
+	framework.ExpectNoErrorWithOffset(1, err, "delete %T", pod)
+	err = e2epod.WaitForPodNotFoundInNamespace(ctx, b.f.ClientSet, pod.Name, pod.Namespace, b.f.Timeouts.PodDelete)
+	framework.ExpectNoErrorWithOffset(1, err, "terminate %T", pod)
+}
+
 // testPod runs pod and checks if container logs contain expected environment variables
 func (b *builder) testPod(ctx context.Context, f *framework.Framework, pod *v1.Pod, env ...string) {
 	ginkgo.GinkgoHelper()
@@ -2510,4 +2566,127 @@ func (b *builder) listTestPods(ctx context.Context) ([]v1.Pod, error) {
 		testPods = append(testPods, pod)
 	}
 	return testPods, nil
+}
+
+func taintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFunc {
+	return func(resources map[string]resourceslice.DriverResources) {
+		for i := range resources {
+			for j := range resources[i].Pools {
+				for k := range resources[i].Pools[j].Slices {
+					for l := range resources[i].Pools[j].Slices[k].Devices {
+						resources[i].Pools[j].Slices[k].Devices[l].Taints = append(resources[i].Pools[j].Slices[k].Devices[l].Taints, taints...)
+					}
+				}
+			}
+		}
+	}
+}
+
+func networkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		driverResources := make(map[string]resourceslice.DriverResources)
+		devices := make([]resourceapi.Device, 0)
+		for i := 0; i < maxAllocations; i++ {
+			device := resourceapi.Device{
+				Name: fmt.Sprintf("device-%d", i),
+			}
+			if tainted {
+				device.Taints = []resourceapi.DeviceTaint{{
+					Key:    "example.com/taint",
+					Value:  "tainted",
+					Effect: resourceapi.DeviceTaintEffectNoSchedule,
+				}}
+			}
+			devices = append(devices, device)
+		}
+		driverResources[multiHostDriverResources] = resourceslice.DriverResources{
+			Pools: map[string]resourceslice.Pool{
+				"network": {
+					Slices: []resourceslice.Slice{{
+						Devices: devices,
+					}},
+					NodeSelector: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							// MatchExpressions allow multiple values,
+							// MatchFields don't.
+							MatchExpressions: []v1.NodeSelectorRequirement{{
+								Key:      "kubernetes.io/hostname",
+								Operator: v1.NodeSelectorOpIn,
+								Values:   nodes.NodeNames,
+							}},
+						}},
+					},
+					Generation: 1,
+				},
+			},
+		}
+		return driverResources
+	}
+}
+
+func driverResources(maxAllocations int, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		return driverResourcesNow(nodes, maxAllocations, devicesPerNode...)
+	}
+}
+
+func driverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) map[string]resourceslice.DriverResources {
+	driverResources := make(map[string]resourceslice.DriverResources)
+	for i, nodename := range nodes.NodeNames {
+		if i < len(devicesPerNode) {
+			devices := make([]resourceapi.Device, 0)
+			for deviceName, attributes := range devicesPerNode[i] {
+				devices = append(devices, resourceapi.Device{
+					Name:       deviceName,
+					Attributes: attributes,
+				})
+			}
+			driverResources[nodename] = resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodename: {
+						Slices: []resourceslice.Slice{{
+							Devices: devices,
+						}},
+					},
+				},
+			}
+		} else if maxAllocations >= 0 {
+			devices := make([]resourceapi.Device, maxAllocations)
+			for i := 0; i < maxAllocations; i++ {
+				devices[i] = resourceapi.Device{
+					Name: fmt.Sprintf("device-%02d", i),
+				}
+			}
+			driverResources[nodename] = resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodename: {
+						Slices: []resourceslice.Slice{{
+							Devices: devices,
+						}},
+					},
+				},
+			}
+		}
+	}
+	return driverResources
+}
+
+func toDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi.Device) driverResourcesGenFunc {
+	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
+		nodename := nodes.NodeNames[0]
+		return map[string]resourceslice.DriverResources{
+			nodename: {
+				Pools: map[string]resourceslice.Pool{
+					nodename: {
+						Slices: []resourceslice.Slice{
+							{
+								SharedCounters: counters,
+								Devices:        devices,
+							},
+						},
+					},
+				},
+			},
+		}
+	}
 }
