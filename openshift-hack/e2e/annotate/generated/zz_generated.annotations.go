@@ -2311,6 +2311,8 @@ var Annotations = map[string]string{
 
 	"[sig-storage] CSI Mock volume storage capacity storage capacity unlimited": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[sig-storage] CSI Mock when kubelet restart [Serial] [Disruptive] should not umount volume when the pvc is terminating but still used by a running pod": " [Suite:k8s]",
+
 	"[sig-storage] CSI Mock workload info CSI PodInfoOnMount Update should be passed when update from false to true": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[sig-storage] CSI Mock workload info CSI PodInfoOnMount Update should not be passed when update from true to false": " [Suite:openshift/conformance/parallel] [Suite:k8s]",
