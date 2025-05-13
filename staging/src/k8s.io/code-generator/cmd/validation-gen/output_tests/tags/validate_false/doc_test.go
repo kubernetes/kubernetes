@@ -28,10 +28,18 @@ func Test(t *testing.T) {
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"stringField": {"field Struct.StringField"},
 	})
+	// Test validation ratcheting
+	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
 
 	st.Value(&Struct{
 		StringField: "abc",
 	}).ExpectValidateFalseByPath(map[string][]string{
 		"stringField": {"field Struct.StringField"},
 	})
+	// Test validation ratcheting
+	st.Value(&Struct{
+		StringField: "abc",
+	}).OldValue(&Struct{
+		StringField: "abc",
+	}).ExpectValid()
 }
