@@ -84,4 +84,33 @@ func Test(t *testing.T) {
 		"max10ValidatedTypedefField":      []string{`Invalid value:.*must be no more than 10 bytes`},
 		"max10ValidatedTypedefPtrField":   []string{`Invalid value:.*must be no more than 10 bytes`},
 	})
+
+	// Test validation ratcheting
+	st.Value(&Struct{
+		Max0Field:                       strings.Repeat("x", 1),
+		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
+		Max10Field:                      strings.Repeat("x", 11),
+		Max10PtrField:                   ptr.To(strings.Repeat("x", 11)),
+		Max0UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 1)),
+		Max0UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 11)),
+		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Max0ValidatedTypedefField:       Max0Type(strings.Repeat("x", 1)),
+		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
+		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
+		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+	}).OldValue(&Struct{
+		Max0Field:                       strings.Repeat("x", 1),
+		Max0PtrField:                    ptr.To(strings.Repeat("x", 1)),
+		Max10Field:                      strings.Repeat("x", 11),
+		Max10PtrField:                   ptr.To(strings.Repeat("x", 11)),
+		Max0UnvalidatedTypedefField:     UnvalidatedStringType(strings.Repeat("x", 1)),
+		Max0UnvalidatedTypedefPtrField:  ptr.To(UnvalidatedStringType(strings.Repeat("x", 1))),
+		Max10UnvalidatedTypedefField:    UnvalidatedStringType(strings.Repeat("x", 11)),
+		Max10UnvalidatedTypedefPtrField: ptr.To(UnvalidatedStringType(strings.Repeat("x", 11))),
+		Max0ValidatedTypedefField:       Max0Type(strings.Repeat("x", 1)),
+		Max0ValidatedTypedefPtrField:    ptr.To(Max0Type(strings.Repeat("x", 1))),
+		Max10ValidatedTypedefField:      Max10Type(strings.Repeat("x", 11)),
+		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
+	}).ExpectValid()
 }
