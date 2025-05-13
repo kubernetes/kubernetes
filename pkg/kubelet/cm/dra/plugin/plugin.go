@@ -116,7 +116,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	logger.V(4).Info("Successfully established gRPC connection", "endpoint", p.endpoint)
 	p.conn = conn
-	// Initialize clients now that connection is established
+	// Initialize clients now that connection is established.
 	p.healthClient = drahealthv1alpha1.NewNodeHealthClient(p.conn)
 
 	return p.conn, nil
