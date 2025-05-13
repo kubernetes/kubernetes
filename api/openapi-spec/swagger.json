@@ -11796,7 +11796,7 @@
         },
         "timeAdded": {
           "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Time",
-          "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints."
+          "description": "TimeAdded represents the time at which the taint was added."
         },
         "value": {
           "description": "The taint value corresponding to the taint key.",
