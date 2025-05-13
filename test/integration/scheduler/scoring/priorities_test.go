@@ -296,6 +296,11 @@ func TestNodeResourcesScoring(t *testing.T) {
 // works correctly.
 func TestNodeAffinityScoring(t *testing.T) {
 	testCtx := initTestSchedulerForScoringTests(t, nodeaffinity.Name, nodeaffinity.Name)
+	// Add a few nodes.
+	_, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Add a label to one of the nodes.
 	labelKey := "kubernetes.io/node-topologyKey"
 	labelValue := "topologyvalue"
@@ -303,10 +308,8 @@ func TestNodeAffinityScoring(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Cannot create labeled node: %v", err)
 	}
-	// Add a few nodes.
-	_, err = createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode(), 4)
-	if err != nil {
-		t.Fatal(err)
+	if err = testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 5); err != nil {
+		t.Fatalf("failed to wait for nodes in cache: %v", err)
 	}
 
 	// Create a pod with node affinity.
