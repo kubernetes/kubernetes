@@ -43,6 +43,9 @@ func Test(t *testing.T) {
 		"mapTypedefField":       []string{"Required value"},
 	})
 
+	// Test validation ratcheting
+	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
+
 	st.Value(&Struct{
 		StringPtrField:        ptr.To(""),             // satisfies required
 		StringTypedefPtrField: ptr.To(StringType("")), // satisfies required
@@ -67,6 +70,23 @@ func Test(t *testing.T) {
 		"mapField":              []string{"Required value"},
 		"mapTypedefField":       []string{"Required value"},
 	})
+	// Test validation ratcheting
+	st.Value(&Struct{
+		StringPtrField:        ptr.To(""),             // satisfies required
+		StringTypedefPtrField: ptr.To(StringType("")), // satisfies required
+		IntPtrField:           ptr.To(0),              // satisfies required
+		IntTypedefPtrField:    ptr.To(IntType(0)),     // satisfies required
+		SliceField:            []string{},             // does not satisfy required
+		SliceTypedefField:     []string{},             // does not satisfy required
+		MapField:              map[string]string{},    // does not satisfy required
+		MapTypedefField:       map[string]string{},    // does not satisfy required
+	}).OldValue(&Struct{
+		StringPtrField:        ptr.To(""),             // satisfies required
+		StringTypedefPtrField: ptr.To(StringType("")), // satisfies required
+		IntPtrField:           ptr.To(0),              // satisfies required
+		IntTypedefPtrField:    ptr.To(IntType(0)),     // satisfies required
+		// nil and empty slices are considered equivalent.
+	}).ExpectValid()
 
 	st.Value(&Struct{
 		StringField:           "abc",
@@ -97,4 +117,34 @@ func Test(t *testing.T) {
 		"mapField":              []string{"field Struct.MapField"},
 		"mapTypedefField":       []string{"field Struct.MapTypedefField", "type MapType"},
 	})
+	// Test validation ratcheting
+	st.Value(&Struct{
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
+		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
+	}).OldValue(&Struct{
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
+		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
+	}).ExpectValid()
 }
