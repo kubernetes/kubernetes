@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coordclientset "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	"k8s.io/utils/clock"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"k8s.io/klog/v2"
 )
@@ -221,13 +221,14 @@ func (c *controller) newLease(base *coordinationv1.Lease) (*coordinationv1.Lease
 				Namespace: c.leaseNamespace,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity:       pointer.StringPtr(c.holderIdentity),
-				LeaseDurationSeconds: pointer.Int32Ptr(c.leaseDurationSeconds),
+				HolderIdentity: ptr.To(c.holderIdentity),
 			},
 		}
 	} else {
 		lease = base.DeepCopy()
 	}
+	// update the duration, the controller's config may have changed since lease creation
+	lease.Spec.LeaseDurationSeconds = ptr.To(c.leaseDurationSeconds)
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
 
 	if c.newLeasePostProcessFunc != nil {
