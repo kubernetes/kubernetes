@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -255,7 +256,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -551,7 +552,7 @@ func validDuration(duration time.Duration, low, high int64) bool {
 	return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
 }
 
-var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
+var _ = SIGDescribe(feature.PodLifecycleSleepAction, framework.WithFeatureGate(features.PodLifecycleSleepAction), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -630,7 +631,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 	})
 })
 
-var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
+var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, framework.WithFeatureGate(features.PodLifecycleSleepActionAllowZero), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -663,7 +664,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
 	})
 })
 
-var _ = SIGDescribe(feature.ContainerStopSignals, func() {
+var _ = SIGDescribe(feature.ContainerStopSignals, framework.WithFeatureGate(features.ContainerStopSignals), func() {
 	f := framework.NewDefaultFramework("container-stop-signals")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
