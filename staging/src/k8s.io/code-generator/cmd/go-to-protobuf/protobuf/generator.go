@@ -322,11 +322,11 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 					}
 				}
 			default:
-				if !b.omitGogo || !strings.HasPrefix(key, "(gogoproto.") {
-					if key == "(gogoproto.goproto_stringer)" && v[0] == "false" {
+				if !b.omitGogo || !strings.HasPrefix(key, "gogoproto.") {
+					if key == "gogoproto.goproto_stringer" && v[0] == "false" {
 						options = append(options, "(gogoproto.stringer) = false")
 					}
-					options = append(options, fmt.Sprintf("%s = %s", key, v[0]))
+					options = append(options, fmt.Sprintf("(%s) = %s", key, v[0]))
 				}
 			}
 		// protobuf.as allows a type to have the same message contents as another Go type

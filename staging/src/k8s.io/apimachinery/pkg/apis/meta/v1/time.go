@@ -29,7 +29,7 @@ import (
 //
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type Time struct {
 	time.Time `protobuf:"-"`
 }

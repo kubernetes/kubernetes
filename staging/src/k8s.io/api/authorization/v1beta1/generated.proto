@@ -31,7 +31,7 @@ option go_package = "k8s.io/api/authorization/v1beta1";
 
 // ExtraValue masks the value so protobuf can generate
 // +protobuf.nullable=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message ExtraValue {
   // items, if empty, will result in an empty slice
 

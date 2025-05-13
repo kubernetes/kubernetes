@@ -96,7 +96,7 @@ import (
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 // +k8s:deepcopy-gen=true
 // +k8s:openapi-gen=true
 type Quantity struct {
@@ -856,7 +856,7 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 // +protobuf=true
 // +protobuf.embed=string
 // +protobuf.options.marshal=false
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 // +k8s:deepcopy-gen=true
 type QuantityValue struct {
 	Quantity

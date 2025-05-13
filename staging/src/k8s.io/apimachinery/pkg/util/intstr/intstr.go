@@ -36,7 +36,7 @@ import (
 // TODO: Rename to Int32OrString
 //
 // +protobuf=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 // +k8s:openapi-gen=true
 type IntOrString struct {
 	Type   Type   `protobuf:"varint,1,opt,name=type,casttype=Type"`

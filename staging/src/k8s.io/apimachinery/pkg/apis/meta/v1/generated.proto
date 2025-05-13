@@ -124,7 +124,7 @@ message APIResourceList {
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message APIVersions {
   // versions are the api versions that are available.
@@ -369,7 +369,7 @@ message FieldSelectorRequirement {
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message FieldsV1 {
   // Raw is the underlying serialization of this object.
   optional bytes Raw = 1;
@@ -389,7 +389,7 @@ message GetOptions {
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message GroupKind {
   optional string group = 1;
 
@@ -399,7 +399,7 @@ message GroupKind {
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message GroupResource {
   optional string group = 1;
 
@@ -408,7 +408,7 @@ message GroupResource {
 
 // GroupVersion contains the "group" and the "version", which uniquely identifies the API.
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message GroupVersion {
   optional string group = 1;
 
@@ -429,7 +429,7 @@ message GroupVersionForDiscovery {
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
 // to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message GroupVersionKind {
   optional string group = 1;
 
@@ -441,7 +441,7 @@ message GroupVersionKind {
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
 // to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message GroupVersionResource {
   optional string group = 1;
 
@@ -691,7 +691,7 @@ message ManagedFieldsEntry {
 //
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message MicroTime {
   // Represents seconds of UTC time since Unix epoch
   // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
@@ -1129,7 +1129,7 @@ message TableOptions {
 //
 // +protobuf.options.marshal=false
 // +protobuf.as=Timestamp
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message Time {
   // Represents seconds of UTC time since Unix epoch
   // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
@@ -1223,7 +1223,7 @@ message UpdateOptions {
 // Verbs masks the value so protobuf can generate
 //
 // +protobuf.nullable=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message Verbs {
   // items, if empty, will result in an empty slice
 

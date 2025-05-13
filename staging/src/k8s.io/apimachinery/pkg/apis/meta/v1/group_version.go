@@ -27,7 +27,7 @@ import (
 // GroupResource specifies a Group and a Resource, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type GroupResource struct {
 	Group    string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	Resource string `json:"resource" protobuf:"bytes,2,opt,name=resource"`
@@ -46,7 +46,7 @@ func (gr *GroupResource) String() string {
 // GroupVersionResource unambiguously identifies a resource.  It doesn't anonymously include GroupVersion
 // to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type GroupVersionResource struct {
 	Group    string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	Version  string `json:"version" protobuf:"bytes,2,opt,name=version"`
@@ -63,7 +63,7 @@ func (gvr *GroupVersionResource) String() string {
 // GroupKind specifies a Group and a Kind, but does not force a version.  This is useful for identifying
 // concepts during lookup stages without having partially valid types
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type GroupKind struct {
 	Group string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	Kind  string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
@@ -82,7 +82,7 @@ func (gk *GroupKind) String() string {
 // GroupVersionKind unambiguously identifies a kind.  It doesn't anonymously include GroupVersion
 // to avoid automatic coercion.  It doesn't use a GroupVersion to avoid custom marshalling
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type GroupVersionKind struct {
 	Group   string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`
@@ -95,7 +95,7 @@ func (gvk GroupVersionKind) String() string {
 
 // GroupVersion contains the "group" and the "version", which uniquely identifies the API.
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type GroupVersion struct {
 	Group   string `json:"group" protobuf:"bytes,1,opt,name=group"`
 	Version string `json:"version" protobuf:"bytes,2,opt,name=version"`

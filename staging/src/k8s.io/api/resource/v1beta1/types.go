@@ -450,7 +450,7 @@ const DeviceTaintsMaxLength = 4
 // any claim which does not tolerate the taint and, through the claim,
 // to pods using the claim.
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type DeviceTaint struct {
 	// The taint key to be applied to a device.
 	// Must be a label name.

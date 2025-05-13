@@ -840,7 +840,7 @@ message DeviceSubRequest {
 // any claim which does not tolerate the taint and, through the claim,
 // to pods using the claim.
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 message DeviceTaint {
   // The taint key to be applied to a device.
   // Must be a label name.

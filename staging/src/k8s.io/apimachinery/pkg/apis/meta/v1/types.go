@@ -1107,7 +1107,7 @@ type List struct {
 // APIVersions lists the versions that are available, to allow clients to
 // discover the API at /api, which is the root path of the legacy v1 API.
 //
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type APIVersions struct {
 	TypeMeta `json:",inline"`
@@ -1223,7 +1223,7 @@ type APIResource struct {
 // Verbs masks the value so protobuf can generate
 //
 // +protobuf.nullable=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type Verbs []string
 
 func (vs Verbs) String() string {
@@ -1410,7 +1410,7 @@ const (
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type FieldsV1 struct {
 	// Raw is the underlying serialization of this object.
 	Raw []byte `json:"-" protobuf:"bytes,1,opt,name=Raw"`

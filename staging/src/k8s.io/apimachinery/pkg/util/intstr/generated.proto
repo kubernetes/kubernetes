@@ -31,7 +31,7 @@ option go_package = "k8s.io/apimachinery/pkg/util/intstr";
 // TODO: Rename to Int32OrString
 //
 // +protobuf=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 // +k8s:openapi-gen=true
 message IntOrString {
   optional int64 type = 1;

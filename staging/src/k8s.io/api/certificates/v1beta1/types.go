@@ -163,7 +163,7 @@ const (
 
 // ExtraValue masks the value so protobuf can generate
 // +protobuf.nullable=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
+// +protobuf.options.gogoproto.goproto_stringer=false
 type ExtraValue []string
 
 func (t ExtraValue) String() string {
