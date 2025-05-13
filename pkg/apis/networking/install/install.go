@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	v1 "k8s.io/kubernetes/pkg/apis/networking/v1"
-	"k8s.io/kubernetes/pkg/apis/networking/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/networking/v1beta1"
 )
 
@@ -37,6 +36,5 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(networking.AddToScheme(scheme))
 	utilruntime.Must(v1.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion))
 }

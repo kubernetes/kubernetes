@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+// TODO: remove --emulated-version and --feature-gates in 1.37
 func TestEnableDisableServiceCIDR(t *testing.T) {
 	svc := func(i int) *v1.Service {
 		return &v1.Service{
@@ -49,9 +50,9 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 	s1 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=false",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
+			"--emulated-version=1.33",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
 		etcdOptions)
 
@@ -82,10 +83,8 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	// apiserver with the feature enabled
 	s2 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=true",
 			"--service-cluster-ip-range=10.0.0.0/24",
-			"--disable-admission-plugins=ServiceAccount",
-			fmt.Sprintf("--feature-gates=%s=true", features.MultiCIDRServiceAllocator)},
+			"--disable-admission-plugins=ServiceAccount"},
 		etcdOptions)
 
 	client2, err := clientset.NewForConfig(s2.ClientConfig)
@@ -113,9 +112,9 @@ func TestEnableDisableServiceCIDR(t *testing.T) {
 	// start an apiserver with the feature disabled
 	s3 := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions,
 		[]string{
-			"--runtime-config=networking.k8s.io/v1beta1=false",
 			"--service-cluster-ip-range=10.0.0.0/24",
 			"--disable-admission-plugins=ServiceAccount",
+			"--emulated-version=1.33",
 			fmt.Sprintf("--feature-gates=%s=false", features.MultiCIDRServiceAllocator)},
 		etcdOptions)
 	defer s3.TearDownFn()

@@ -50,15 +50,18 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=10.0.0.0/16",
+					"--advertise-address=10.1.1.1",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=10.0.0.0/16",
-						"--advertise-address=10.1.1.1",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -294,15 +297,18 @@ func TestCreateServiceSingleStackIPv6(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=2001:db8:1::/108",
+					"--advertise-address=2001:db8::10",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=2001:db8:1::/108",
-						"--advertise-address=2001:db8::10",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -525,15 +531,18 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
+					"--advertise-address=10.0.0.1",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
-						"--advertise-address=10.0.0.1",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -804,15 +813,18 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
+					"--advertise-address=2001:db8::10",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
-						"--advertise-address=2001:db8::10",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 

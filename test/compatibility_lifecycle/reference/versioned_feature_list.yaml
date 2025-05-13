@@ -409,6 +409,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.34"
 - name: DisableCPUQuotaWithExclusiveCPUs
   versionedSpecs:
   - default: true
@@ -899,6 +903,10 @@
     lockToDefault: false
     preRelease: GA
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: MutableCSINodeAllocatableCount
   versionedSpecs:
   - default: false
