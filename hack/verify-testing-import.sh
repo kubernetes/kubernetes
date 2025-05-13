@@ -30,7 +30,8 @@ cd "${KUBE_ROOT}"
 
 kube::golang::setup_env
 
-RELEASE_BIN_PKGS=(
+BIN_PKGS=(
+  # release binaries
   "${KUBE_ROOT}/cmd/cloud-controller-manager"
   "${KUBE_ROOT}/cmd/kube-apiserver"
   "${KUBE_ROOT}/cmd/kube-controller-manager"
@@ -40,10 +41,12 @@ RELEASE_BIN_PKGS=(
   "${KUBE_ROOT}/cmd/kubectl-convert"
   "${KUBE_ROOT}/cmd/kubelet"
   "${KUBE_ROOT}/cmd/kubeadm"
+  # code generators
+  "${KUBE_ROOT}"/staging/src/k8s.io/code-generator/cmd/*/
 )
 
 pkgs_with_testing_import=()
-for file in "${RELEASE_BIN_PKGS[@]}"
+for file in "${BIN_PKGS[@]}"
 do
   if [ "$(go list -json "${file}" | jq 'any(.Deps[]; . == "testing")')" == "true" ]
   then
