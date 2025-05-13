@@ -2696,6 +2696,15 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				// (for cpu & memory) from checkpoint store. If found, that is the source of truth.
 				allocatedPod, _ := kl.allocationManager.UpdatePodFromAllocation(pod)
 
+				for _, c := range pod.Status.Conditions {
+					switch c.Type {
+					case v1.PodResizePending:
+						kl.statusManager.SetPodResizePendingCondition(pod.UID, c.Reason, c.Message)
+					case v1.PodResizeInProgress:
+						kl.statusManager.SetPodResizeInProgressCondition(pod.UID, c.Reason, c.Message, true)
+					}
+				}
+
 				// Check if we can admit the pod; if not, reject it.
 				if ok, reason, message := kl.canAdmitPod(allocatedPods, allocatedPod); !ok {
 					kl.rejectPod(pod, reason, message)
