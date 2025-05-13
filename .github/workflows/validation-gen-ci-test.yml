@@ -3,7 +3,7 @@ name: validation-gen CI Tests
 on:
   pull_request:
     branches:
-      - "validation-gen"
+      - "main"
 
 jobs:
   test:
