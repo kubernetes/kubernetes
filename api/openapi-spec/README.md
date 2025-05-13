@@ -65,39 +65,39 @@ Annotates an array to further describe its topology. This extension must only be
 
 - `atomic`: the list is treated as a single entity, like a scalar. Atomic lists will be entirely replaced when updated. This extension may be used on any type of list (struct, scalar, ...).
 - `set`: Sets are lists that must not have multiple items with the same value. Each value must be a scalar, an object with x-kubernetes-map-type `atomic` or an array with x-kubernetes-list-type `atomic`.
-- `map`: These lists are like maps in that their elements have a non-index key used to identify them. Order is preserved upon merge. The map tag must only be used on a list with elements of type object.\nDefaults to atomic for arrays.
+- `map`: These lists are like maps in that their elements have a non-index key used to identify them. Order is preserved upon merge. The map tag must only be used on a list with elements of type object. By default, arrays are often treated as atomic, but actual behavior depends on the API and patch strategy.
 
 
 For example:
 
 ``` json
 "paths": {
-    ...  
-    "/api/v1/namespaces/{namespace}/pods/{name}": {  
-        ...  
-        "put": {  
-            ...  
-            "schema": {  
-                "properties": {  
-                    "spec": {  
-                        "properties": {  
-                            "containers": {  
-                                "items": {  
-                                    "properties": {  
-                                        "volumeMounts": {  
-                                            "type": "array",  
-                                            "x-kubernetes-list-type": "map",  
-                                            "x-kubernetes-list-map-keys": ["mountPath"]  
-                                        }  
-                                    }  
-                                }  
-                            }  
-                        }  
-                    }  
-                }  
-            }  
-        }  
-    }  
+    ...
+    "/api/v1/namespaces/{namespace}/pods/{name}": {
+        ...
+        "put": {
+            ...
+            "schema": {
+                "properties": {
+                    "spec": {
+                        "properties": {
+                            "containers": {
+                                "items": {
+                                    "properties": {
+                                        "volumeMounts": {
+                                            "type": "array",
+                                            "x-kubernetes-list-type": "map",
+                                            "x-kubernetes-list-map-keys": ["mountPath"]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 ```
 
@@ -112,22 +112,22 @@ Annotates an object to further describe its topology. This extension must only b
 For example:
 
 ``` json
-"paths": {  
-    ...  
-    "/api/v1/namespaces/{namespace}/pods/{name}": {  
-        ...  
-        "put": {  
-            ...  
-            "schema": {  
-                "properties": {  
-                    "spec": {  
-                        "type": "object",  
-                        "x-kubernetes-map-type": "atomic"  
-                    }  
-                }  
-            }  
-        }  
-    }  
+"paths": {
+    ...
+    "/api/v1/namespaces/{namespace}/pods/{name}": {
+        ...
+        "put": {
+            ...
+            "schema": {
+                "properties": {
+                    "spec": {
+                        "type": "object",
+                        "x-kubernetes-map-type": "atomic"
+                    }
+                }
+            }
+        }
+    }
 }
 ```
 
@@ -143,35 +143,35 @@ For example:
 
 ``` json
 "paths": {  
-    ...  
-    "/api/v1/namespaces/{namespace}/pods/{name}": {  
-        ...  
-        "put": {  
-            ...  
-            "schema": {  
-                "properties": {  
-                    "spec": {  
-                        "properties": {  
-                            "securityContext": {  
-                                "properties": {  
-                                    "appArmorProfile": {  
-                                        "type": "object",  
-                                        "x-kubernetes-unions": [  
-                                            {  
-                                                "discriminator": "type",  
-                                                "fields-to-discriminateBy": {  
-                                                    "localhostProfile": "LocalhostProfile"  
-                                                }  
-                                            }  
-                                        ]  
-                                    }  
-                                }  
-                            }  
-                        }  
-                    }  
-                }  
-            }  
-        }  
-    }  
+    ...
+    "/api/v1/namespaces/{namespace}/pods/{name}": {
+        ...
+        "put": {
+            ...
+            "schema": {
+                "properties": {
+                    "spec": {
+                        "properties": {
+                            "securityContext": {
+                                "properties": {
+                                    "appArmorProfile": {
+                                        "type": "object",
+                                        "x-kubernetes-unions": [
+                                            {
+                                                "discriminator": "type",
+                                                "fields-to-discriminateBy": {
+                                                    "localhostProfile": "LocalhostProfile"
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 ```
