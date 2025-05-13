@@ -1127,6 +1127,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.30"
+- name: PodStartingOrderByPriority
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: PodTopologyLabelsAdmission
   versionedSpecs:
   - default: false

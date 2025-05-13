@@ -628,11 +628,6 @@ const (
 	// Enables specifying resources at pod-level.
 	PodLevelResources featuregate.Feature = "PodLevelResources"
 
-	// owner: @Huutomerkki
-	//
-	// Enables pods starting in the order of their priorities
-	PodStartingOrderByPriority featuregate.Feature = "PodStartingOrderByPriority"
-
 	// owner: @AxeZhan
 	// kep: http://kep.k8s.io/3960
 	//
@@ -668,6 +663,11 @@ const (
 	//
 	// Enable users to specify when a Pod is ready for scheduling.
 	PodSchedulingReadiness featuregate.Feature = "PodSchedulingReadiness"
+
+	// owner: @Huutomerkki, @peppi-lotta
+	//
+	// Enables pods starting in the order of their priorities
+	PodStartingOrderByPriority featuregate.Feature = "PodStartingOrderByPriority"
 
 	// owner: @munnerz
 	// kep: https://kep.k8s.io/4742
@@ -1483,6 +1483,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.30; remove in 1.32
+	},
+
+	PodStartingOrderByPriority: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	PodTopologyLabelsAdmission: {
