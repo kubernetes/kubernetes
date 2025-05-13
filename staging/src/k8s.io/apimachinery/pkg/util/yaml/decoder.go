@@ -247,10 +247,12 @@ func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err 
 // finding a non-YAML-delimited series of objects), it will not switch to YAML.
 // Once it switches to YAML it will not switch back to JSON.
 type YAMLOrJSONDecoder struct {
-	json   *json.Decoder
-	yaml   *YAMLToJSONDecoder
-	stream *StreamReader
-	count  int // how many objects have been decoded
+	json         *json.Decoder
+	jsonConsumed int64 // of the stream total, how much was JSON?
+	yaml         *YAMLToJSONDecoder
+	yamlConsumed int64 // of the stream total, how much was YAML?
+	stream       *StreamReader
+	count        int // how many objects have been decoded
 }
 
 type JSONSyntaxError struct {
@@ -299,8 +301,10 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.json != nil {
 		err := d.json.Decode(into)
 		if err == nil {
-			d.stream.Consume(int(d.json.InputOffset()) - d.stream.Consumed())
 			d.count++
+			consumed := d.json.InputOffset() - d.jsonConsumed
+			d.stream.Consume(int(consumed))
+			d.jsonConsumed += consumed
 			return nil
 		}
 		if err == io.EOF { //nolint:errorlint
@@ -334,7 +338,9 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 	if d.yaml != nil {
 		err := d.yaml.Decode(into)
 		if err == nil {
-			d.stream.Consume(d.yaml.InputOffset() - d.stream.Consumed())
+			consumed := int64(d.yaml.InputOffset()) - d.yamlConsumed
+			d.stream.Consume(int(consumed))
+			d.yamlConsumed += consumed
 			d.count++
 			return nil
 		}
@@ -375,6 +381,7 @@ func (d *YAMLOrJSONDecoder) consumeWhitespace() error {
 		if err == io.EOF { //nolint:errorlint
 			break
 		}
+		consumed += sz
 	}
 	return io.EOF
 }
