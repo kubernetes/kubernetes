@@ -28,10 +28,11 @@ import (
 	resourceapi "k8s.io/api/resource/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 // ClaimInfo holds information required
@@ -45,6 +46,7 @@ type ClaimInfo struct {
 // claimInfoCache is a cache of processed resource claims keyed by namespace/claimname.
 type claimInfoCache struct {
 	logger klog.Logger
+
 	sync.RWMutex
 	checkpointer state.Checkpointer
 	claimInfo    map[string]*ClaimInfo
@@ -166,41 +168,30 @@ func newClaimInfoCache(logger klog.Logger, stateDir, checkpointName string) (*cl
 }
 
 // withLock runs a function while holding the claimInfoCache lock.
-// It keeps the DRAResourceClaimsInUse metric up-to-date and logs changes.
-//
-// Updating the metrics on each change could be avoided with a collector,
-// but implementing and registering one is tricky. We also wouldn't
-// get the logging. The overhead should be small (entirely local operations)
-// compared to the work that the kubelet needs to do when preparing or
-// unpreparing claims (gRPC calls).
+// It logs changes.
 func (cache *claimInfoCache) withLock(f func() error) error {
 	cache.Lock()
 	defer cache.Unlock()
 
-	claimsInUseBefore := cache.claimsInUse()
-	defer func() {
-		claimsInUseAfter := cache.claimsInUse()
-		delta := claimsInUseDelta(claimsInUseBefore, claimsInUseAfter)
+	if loggerV := cache.logger.V(5); loggerV.Enabled() {
+		claimsInUseBefore := cache.claimsInUse()
+		defer func() {
+			claimsInUseAfter := cache.claimsInUse()
+			delta := claimsInUseDelta(claimsInUseBefore, claimsInUseAfter)
 
-		changed := false
-		for _, inUse := range delta {
-			switch {
-			case inUse.Count == 0 && inUse.DriverName != "":
-				// Remove gauge for driver which has no claim in use.
-				// It might be gone permanently.
-				metrics.DRAResourceClaimsInUse.Delete(map[string]string{"driver_name": inUse.DriverName})
-			default:
-				metrics.DRAResourceClaimsInUse.WithLabelValues(inUse.DriverName).Set(float64(inUse.Count))
+			changed := false
+			for _, inUse := range delta {
+				if inUse.Delta != 0 {
+					changed = true
+					break
+				}
 			}
-			if inUse.Delta != 0 {
-				changed = true
-			}
-		}
 
-		if changed {
-			cache.logger.V(5).Info("ResourceClaim usage changed", "claimsInUse", delta)
-		}
-	}()
+			if changed {
+				cache.logger.V(5).Info("ResourceClaim usage changed", "claimsInUse", delta)
+			}
+		}()
+	}
 
 	return f()
 }
@@ -338,4 +329,38 @@ type ClaimsInUse struct {
 	DriverName string
 	Count      int
 	Delta      int
+}
+
+// claimInfoCollector provides metrics for a claimInfoCache.
+type claimInfoCollector struct {
+	metrics.BaseStableCollector
+	cache *claimInfoCache
+}
+
+var _ metrics.StableCollector = &claimInfoCollector{}
+
+// DescribeWithStability implements the metrics.StableCollector interface.
+func (collector *claimInfoCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
+	ch <- kubeletmetrics.DRAResourceClaimsInUseDesc
+}
+
+// CollectWithStability implements the metrics.StableCollector interface.
+func (collector *claimInfoCollector) CollectWithStability(ch chan<- metrics.Metric) {
+	var claimsInUse map[string]int
+	_ = collector.cache.withRLock(func() error {
+		claimsInUse = collector.cache.claimsInUse()
+		return nil
+	})
+
+	// Only currently known drivers are listed. If a driver had active
+	// claims in the past, no longer does and then gets uninstalled, it no
+	// longer shows up. This avoids the memory leak problem in a normal
+	// GaugeVec which could grow over time unless obsolete drivers are
+	// actively deleted.
+	//
+	// The empty driver name provides the overall count of all active
+	// ResourceClaims regardless of the driver.
+	for driverName, count := range claimsInUse {
+		ch <- metrics.NewLazyConstMetric(kubeletmetrics.DRAResourceClaimsInUseDesc, metrics.GaugeValue, float64(count), driverName)
+	}
 }

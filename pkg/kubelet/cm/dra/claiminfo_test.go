@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
@@ -659,19 +658,18 @@ dra_resource_claims_in_use{driver_name="test-driver"} 2
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			metrics.DRAResourceClaimsInUse.Reset()
 			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), "test-checkpoint")
 			for _, claimInfo := range test.initialClaimInfo {
 				cache.add(claimInfo)
 			}
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
-			cache.withLock(func() error {
+			_ = cache.withLock(func() error {
 				cache.add(test.claimInfo)
 				return nil
 			})
 			assert.True(t, cache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace))
-			testClaimsInUseMetric(tCtx, test.expectMetrics)
+			testClaimsInUseMetric(tCtx, cache, test.expectMetrics)
 			logOutput := tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer()
 			assert.Equal(t, test.expectLog, logOutput.String())
 		})
@@ -822,14 +820,13 @@ dra_resource_claims_in_use{driver_name=""} 0
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			metrics.DRAResourceClaimsInUse.Reset()
 			test.claimInfoCache.logger = tCtx.Logger()
-			test.claimInfoCache.withLock(func() error {
+			_ = test.claimInfoCache.withLock(func() error {
 				test.claimInfoCache.delete(claimName, namespace)
 				return nil
 			})
 			assert.False(t, test.claimInfoCache.contains(claimName, namespace))
-			testClaimsInUseMetric(tCtx, test.expectMetrics)
+			testClaimsInUseMetric(tCtx, test.claimInfoCache, test.expectMetrics)
 			logOutput := tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer()
 			assert.Equal(t, test.expectLog, logOutput.String())
 		})

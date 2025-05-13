@@ -19,22 +19,16 @@ package dra
 import (
 	"strings"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
-func init() {
-	// Metrics must be registered before they can be set and retrieved.
-	utilfeature.DefaultMutableFeatureGate.SetFromMap(map[string]bool{string(features.DynamicResourceAllocation): true})
-	metrics.Register()
-}
-
-func testClaimsInUseMetric(tCtx ktesting.TContext, expectedMetric string) {
+func testClaimsInUseMetric(tCtx ktesting.TContext, claimInfoCache *claimInfoCache, expectedMetric string) {
 	tCtx.Helper()
-	err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(expectedMetric), metrics.DRAResourceClaimsInUse.FQName())
+	// Must simulate registration which calls Create, otherwise collection crashes.
+	collector := &claimInfoCollector{cache: claimInfoCache}
+	collector.Create(nil, collector)
+	err := testutil.CollectAndCompare(collector, strings.NewReader(expectedMetric), "dra_resource_claims_in_use")
 	if err != nil {
 		tCtx.Error(err)
 	}
