@@ -46,18 +46,18 @@ BIN_PKGS=(
 )
 
 pkgs_with_testing_import=()
-for file in "${BIN_PKGS[@]}"
+for pkg in "${BIN_PKGS[@]}"
 do
-  if [ "$(go list -json "${file}" | jq 'any(.Deps[]; . == "testing")')" == "true" ]
+  if [ "$(go list -json "${pkg}" | jq 'any(.Deps[]; . == "testing")')" == "true" ]
   then
-    pkgs_with_testing_import+=( "${file}" )
+    pkgs_with_testing_import+=( "${pkg}" )
   fi
 done
 
 if [ ${#pkgs_with_testing_import[@]} -ne 0 ]; then
   printf "%s\n" "Testing package imported in:"
-  for file in "${pkgs_with_testing_import[@]}"; do
-    printf "\t%s\n" "${file}"
+  for pkg in "${pkgs_with_testing_import[@]}"; do
+    printf "\t%s\n" "${pkg}"
   done
   exit 1
 fi
