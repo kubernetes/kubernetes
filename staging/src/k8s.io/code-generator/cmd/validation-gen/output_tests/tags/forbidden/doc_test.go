@@ -58,4 +58,35 @@ func Test(t *testing.T) {
 		"mapField":              []string{"Forbidden"},
 		"mapTypedefField":       []string{"Forbidden"},
 	})
+
+	// Test validation ratcheting
+	st.Value(&Struct{
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
+		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
+	}).OldValue(&Struct{
+		StringField:           "abc",
+		StringPtrField:        ptr.To("xyz"),
+		StringTypedefField:    StringType("abc"),
+		StringTypedefPtrField: ptr.To(StringType("xyz")),
+		IntField:              123,
+		IntPtrField:           ptr.To(456),
+		IntTypedefField:       IntType(123),
+		IntTypedefPtrField:    ptr.To(IntType(456)),
+		OtherStructPtrField:   &OtherStruct{},
+		SliceField:            []string{"a", "b"},
+		SliceTypedefField:     SliceType([]string{"a", "b"}),
+		MapField:              map[string]string{"a": "b", "c": "d"},
+		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
+	}).ExpectValid()
 }
