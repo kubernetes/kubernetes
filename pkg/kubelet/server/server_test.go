@@ -89,7 +89,6 @@ type fakeKubelet struct {
 	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
-	hostnameFunc      func() string
 	resyncInterval    time.Duration
 	loopEntryTime     time.Time
 	plegHealth        bool
@@ -130,10 +129,6 @@ func (fk *fakeKubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 
 func (fk *fakeKubelet) GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
 	return fk.containerLogsFunc(ctx, podFullName, containerName, logOptions, stdout, stderr)
-}
-
-func (fk *fakeKubelet) GetHostname() string {
-	return fk.hostnameFunc()
 }
 
 func (fk *fakeKubelet) RunInContainer(_ context.Context, podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error) {
@@ -344,9 +339,6 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
-		hostnameFunc: func() string {
-			return "127.0.0.1"
-		},
 		podByNameFunc: func(namespace, name string) (*v1.Pod, bool) {
 			return &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -507,17 +499,7 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	fw.fakeKubelet.hostnameFunc = func() string {
-		return "127.0.0.1"
-	}
 
-	// Test with correct hostname, Docker version
-	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
-
-	// Test with incorrect hostname
-	fw.fakeKubelet.hostnameFunc = func() string {
-		return "fake"
-	}
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")
 }
 
@@ -816,9 +798,6 @@ func TestAuthorizationSuccess(t *testing.T) {
 func TestSyncLoopCheck(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
-	fw.fakeKubelet.hostnameFunc = func() string {
-		return "127.0.0.1"
-	}
 
 	fw.fakeKubelet.resyncInterval = time.Minute
 	fw.fakeKubelet.loopEntryTime = time.Now()
@@ -1958,11 +1937,7 @@ func TestFineGrainedAuthz(t *testing.T) {
 }
 
 func TestNewServerRegistersMetricsSLIsEndpointTwice(t *testing.T) {
-	host := &fakeKubelet{
-		hostnameFunc: func() string {
-			return "127.0.0.1"
-		},
-	}
+	host := &fakeKubelet{}
 	resourceAnalyzer := stats.NewResourceAnalyzer(nil, time.Minute, &record.FakeRecorder{})
 
 	server1 := NewServer(host, resourceAnalyzer, []healthz.HealthChecker{}, flagz.NamedFlagSetsReader{}, nil, nil)

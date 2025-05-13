@@ -99,10 +99,6 @@ func TestKubeletDirs(t *testing.T) {
 	exp = filepath.Join(root, "pod-resources")
 	assert.Equal(t, exp, got)
 
-	got = kubelet.GetHostname()
-	exp = "127.0.0.1"
-	assert.Equal(t, exp, got)
-
 	got = kubelet.getPodVolumeSubpathsDir("abc123")
 	exp = filepath.Join(root, "pods/abc123/volume-subpaths")
 	assert.Equal(t, exp, got)
