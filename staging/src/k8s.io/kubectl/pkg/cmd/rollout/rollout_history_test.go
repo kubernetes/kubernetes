@@ -401,6 +401,88 @@ replicaset.apps/rev2
 	}
 }
 
+func TestRolloutHistoryErrors(t *testing.T) {
+	ns := scheme.Codecs.WithoutConversion()
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	encoder := ns.EncoderForVersion(info.Serializer, rolloutPauseGroupVersionEncoder)
+
+	tf.Client = &RolloutPauseRESTClient{
+		RESTClient: &fake.RESTClient{
+			GroupVersion:         rolloutPauseGroupVersionEncoder,
+			NegotiatedSerializer: ns,
+			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == "/namespaces/test/deployments/foo" && m == "GET":
+					responseDeployment := &appsv1.Deployment{}
+					responseDeployment.Name = "foo"
+					body := io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(encoder, responseDeployment))))
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			}),
+		},
+	}
+
+	testCases := map[string]struct {
+		revision      int64
+		outputFormat  string
+		expectedError string
+	}{
+		"get non-existing revision as yaml": {
+			revision:      999,
+			outputFormat:  "yaml",
+			expectedError: "unable to find the specified revision",
+		},
+		"get non-existing revision as json": {
+			revision:      999,
+			outputFormat:  "json",
+			expectedError: "unable to find the specified revision",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fhv := setupFakeHistoryViewer(t)
+			fhv.getHistoryFn = func(namespace, name string) (map[int64]runtime.Object, error) {
+				return map[int64]runtime.Object{
+					1: &appsv1.ReplicaSet{ObjectMeta: v1.ObjectMeta{Name: "rev1"}},
+					2: &appsv1.ReplicaSet{ObjectMeta: v1.ObjectMeta{Name: "rev2"}},
+				}, nil
+			}
+
+			streams := genericiooptions.NewTestIOStreamsDiscard()
+			o := NewRolloutHistoryOptions(streams)
+
+			printFlags := &genericclioptions.PrintFlags{
+				JSONYamlPrintFlags: &genericclioptions.JSONYamlPrintFlags{
+					ShowManagedFields: true,
+				},
+				OutputFormat: &tc.outputFormat,
+				OutputFlagSpecified: func() bool {
+					return true
+				},
+			}
+
+			o.PrintFlags = printFlags
+			o.Revision = tc.revision
+
+			if err := o.Complete(tf, nil, []string{"deployment/foo"}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			err := o.Run()
+			if err != nil && err.Error() != tc.expectedError {
+				t.Fatalf("expected '%s' error, but got: %v", tc.expectedError, err)
+			}
+		})
+	}
+}
+
 func TestValidate(t *testing.T) {
 	opts := RolloutHistoryOptions{
 		Revision:  0,
