@@ -923,6 +923,19 @@ func (nc *Controller) tryUpdateNodeHealth(ctx context.Context, node *v1.Node) (t
 	}
 
 	if nc.now().After(nodeHealth.probeTimestamp.Add(gracePeriod)) {
+		// Reconfirm the node lease directly.
+		name := node.Name
+		nodeLease, err := nc.kubeClient.CoordinationV1().Leases(v1.NamespaceNodeLease).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			logger.Error(err, "Failed while getting a NodeLease to reconfirm node health. Probably Node was deleted or initializing", "node", klog.KRef(v1.NamespaceNodeLease, name))
+		} else {
+			if !nc.now().After(nodeLease.Spec.RenewTime.Add(gracePeriod)) {
+				nodeHealth.lease = nodeLease
+				nodeHealth.probeTimestamp = nc.now()
+				return gracePeriod, observedReadyCondition, currentReadyCondition, nil
+			}
+		}
+
 		// NodeReady condition or lease was last set longer ago than gracePeriod, so
 		// update it to Unknown (regardless of its current value) in the master.
 
