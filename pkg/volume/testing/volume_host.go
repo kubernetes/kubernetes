@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -181,11 +180,6 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 // Returns the hostname of the host kubelet is running on
 func (f *fakeVolumeHost) GetHostName() string {
 	return "fakeHostName"
-}
-
-// Returns host IP or nil in the case of error.
-func (f *fakeVolumeHost) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not implemented")
 }
 
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {

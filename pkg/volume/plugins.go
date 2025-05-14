@@ -19,7 +19,6 @@ package volume
 import (
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"sync"
 
@@ -392,9 +391,6 @@ type VolumeHost interface {
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
-
-	// Returns host IP or nil in the case of error.
-	GetHostIP() (net.IP, error)
 
 	// Returns node allocatable.
 	GetNodeAllocatable() (v1.ResourceList, error)
