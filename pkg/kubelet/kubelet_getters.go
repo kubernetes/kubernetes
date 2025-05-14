@@ -280,11 +280,6 @@ func (kl *Kubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) {
 	return nil, false
 }
 
-// GetHostname Returns the hostname as the kubelet sees it.
-func (kl *Kubelet) GetHostname() string {
-	return kl.hostname
-}
-
 // getRuntime returns the current Runtime implementation in use by the kubelet.
 func (kl *Kubelet) getRuntime() kubecontainer.Runtime {
 	return kl.containerRuntime
