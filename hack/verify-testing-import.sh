@@ -29,6 +29,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 cd "${KUBE_ROOT}"
 
 kube::golang::setup_env
+kube::util::require-jq
 
 BIN_PKGS=(
   # release binaries
