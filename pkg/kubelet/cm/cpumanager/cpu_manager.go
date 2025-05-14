@@ -450,9 +450,21 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				// which may be in the process of being restarted.  That would result
 				// in the container losing any exclusively-allocated CPUs that it
 				// was allocated.
-				_, _, err := m.containerMap.GetContainerRef(containerID)
+				podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
 				if err == nil {
-					klog.V(4).InfoS("ReconcileState: ignoring terminated container", "pod", klog.KObj(pod), "containerID", containerID)
+					// Check if the container is an non-restartable init container.
+					// If so, release its cpuset.
+					if podutil.IsInitContainer(&pod.Spec, &container) && !podutil.IsRestartableInitContainer(&container) {
+						err = m.policy.RemoveContainer(m.state, podUID, containerName)
+						if err != nil {
+							klog.V(5).InfoS("ReconcileState: failed to remove container", "pod", klog.KObj(pod), "containerID", containerID)
+							failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+							continue
+						}
+						klog.V(4).InfoS("ReconcileState: terminated non-restartable init container release cpuset", "pod", klog.KObj(pod), "containerID", containerID)
+					} else {
+						klog.V(4).InfoS("ReconcileState: ignoring terminated container", "pod", klog.KObj(pod), "containerID", containerID)
+					}
 				}
 				m.Unlock()
 				continue
