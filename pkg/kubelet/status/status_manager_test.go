@@ -2075,21 +2075,22 @@ func TestPodResizeConditions(t *testing.T) {
 	podUID := types.UID("12345")
 
 	testCases := []struct {
-		name       string
-		updateFunc func(types.UID)
-		expected   []*v1.PodCondition
+		name               string
+		updateFunc         func(types.UID)
+		expectedList       []*v1.PodCondition
+		expectedInProgress *v1.PodCondition
 	}{
 		{
-			name:       "initial empty conditions",
-			updateFunc: nil,
-			expected:   nil,
+			name:         "initial empty conditions",
+			updateFunc:   nil,
+			expectedList: nil,
 		},
 		{
 			name: "set pod resize in progress condition with reason and message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", false)
+				m.SetPodResizeInProgressCondition(podUID, "some-reason", "some-message", 0, false)
 			},
-			expected: []*v1.PodCondition{
+			expectedList: []*v1.PodCondition{
 				{
 					Type:    v1.PodResizeInProgress,
 					Status:  v1.ConditionTrue,
@@ -2097,39 +2098,56 @@ func TestPodResizeConditions(t *testing.T) {
 					Message: "some-message",
 				},
 			},
+			expectedInProgress: &v1.PodCondition{
+				Type:    v1.PodResizeInProgress,
+				Status:  v1.ConditionTrue,
+				Reason:  "some-reason",
+				Message: "some-message",
+			},
 		},
+
 		{
 			name: "set pod resize in progress condition without reason and message/allowReasonToBeCleared=false",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "", "", false)
+				m.SetPodResizeInProgressCondition(podUID, "", "", 0, false)
 			},
-			expected: []*v1.PodCondition{
+			expectedList: []*v1.PodCondition{
 				{
 					Type:    v1.PodResizeInProgress,
 					Status:  v1.ConditionTrue,
 					Reason:  "some-reason",
 					Message: "some-message",
 				},
+			},
+			expectedInProgress: &v1.PodCondition{
+				Type:    v1.PodResizeInProgress,
+				Status:  v1.ConditionTrue,
+				Reason:  "some-reason",
+				Message: "some-message",
 			},
 		},
 		{
 			name: "set pod resize in progress condition without reason and message/allowReasonToBeCleared=true",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizeInProgressCondition(podUID, "", "", true)
+				m.SetPodResizeInProgressCondition(podUID, "", "", 0, true)
 			},
-			expected: []*v1.PodCondition{
+			expectedList: []*v1.PodCondition{
 				{
 					Type:   v1.PodResizeInProgress,
 					Status: v1.ConditionTrue,
 				},
 			},
+			expectedInProgress: &v1.PodCondition{
+				Type:   v1.PodResizeInProgress,
+				Status: v1.ConditionTrue,
+			},
 		},
 		{
 			name: "set pod resize pending condition with reason and message",
 			updateFunc: func(podUID types.UID) {
-				m.SetPodResizePendingCondition(podUID, "some-reason", "some-message")
+				m.SetPodResizePendingCondition(podUID, "some-reason", "some-message", 0)
 			},
-			expected: []*v1.PodCondition{
+			expectedList: []*v1.PodCondition{
 				{
 					Type:    v1.PodResizePending,
 					Status:  v1.ConditionTrue,
@@ -2141,13 +2159,17 @@ func TestPodResizeConditions(t *testing.T) {
 					Status: v1.ConditionTrue,
 				},
 			},
+			expectedInProgress: &v1.PodCondition{
+				Type:   v1.PodResizeInProgress,
+				Status: v1.ConditionTrue,
+			},
 		},
 		{
 			name: "clear pod resize in progress condition",
 			updateFunc: func(podUID types.UID) {
 				m.ClearPodResizeInProgressCondition(podUID)
 			},
-			expected: []*v1.PodCondition{
+			expectedList: []*v1.PodCondition{
 				{
 					Type:    v1.PodResizePending,
 					Status:  v1.ConditionTrue,
@@ -2161,7 +2183,6 @@ func TestPodResizeConditions(t *testing.T) {
 			updateFunc: func(podUID types.UID) {
 				m.ClearPodResizePendingCondition(podUID)
 			},
-			expected: nil,
 		},
 	}
 
@@ -2171,7 +2192,8 @@ func TestPodResizeConditions(t *testing.T) {
 				tc.updateFunc(podUID)
 			}
 			resizeConditions := m.GetPodResizeConditions(podUID)
-			if tc.expected == nil {
+			inProgressCondition := m.GetPodResizeInProgressCondition(podUID)
+			if tc.expectedList == nil {
 				require.Nil(t, resizeConditions)
 			} else {
 				// ignore the last probe and transition times
@@ -2179,7 +2201,12 @@ func TestPodResizeConditions(t *testing.T) {
 					c.LastProbeTime = metav1.Time{}
 					c.LastTransitionTime = metav1.Time{}
 				}
-				require.Equal(t, tc.expected, resizeConditions)
+				if inProgressCondition != nil {
+					inProgressCondition.LastProbeTime = metav1.Time{}
+					inProgressCondition.LastTransitionTime = metav1.Time{}
+				}
+				require.Equal(t, tc.expectedList, resizeConditions)
+				require.Equal(t, tc.expectedInProgress, inProgressCondition)
 			}
 		})
 	}
