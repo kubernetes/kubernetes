@@ -32,32 +32,32 @@ kube::golang::setup_env
 
 BIN_PKGS=(
   # release binaries
-  "${KUBE_ROOT}/cmd/cloud-controller-manager"
-  "${KUBE_ROOT}/cmd/kube-apiserver"
-  "${KUBE_ROOT}/cmd/kube-controller-manager"
-  "${KUBE_ROOT}/cmd/kube-proxy"
-  "${KUBE_ROOT}/cmd/kube-scheduler"
-  "${KUBE_ROOT}/cmd/kubectl"
-  "${KUBE_ROOT}/cmd/kubectl-convert"
-  "${KUBE_ROOT}/cmd/kubelet"
-  "${KUBE_ROOT}/cmd/kubeadm"
+  ./cmd/cloud-controller-manager
+  ./cmd/kube-apiserver
+  ./cmd/kube-controller-manager
+  ./cmd/kube-proxy
+  ./cmd/kube-scheduler
+  ./cmd/kubectl
+  ./cmd/kubectl-convert
+  ./cmd/kubelet
+  ./cmd/kubeadm
   # code generators
-  "${KUBE_ROOT}"/staging/src/k8s.io/code-generator/cmd/*/
+  ./staging/src/k8s.io/code-generator/cmd/*/
 )
 
 pkgs_with_testing_import=()
 for pkg in "${BIN_PKGS[@]}"
 do
-  if [ "$(go list -json "${pkg}" | jq 'any(.Deps[]; . == "testing")')" == "true" ]
-  then
-    pkgs_with_testing_import+=( "${pkg}" )
+  testing_deps="$(go list -json "${pkg}" | jq -r '[.Deps[] | select(endswith("testing")) ]| join(", ")')"
+  if [ -n "${testing_deps}" ]; then
+    pkgs_with_testing_import+=( "${pkg}: ${testing_deps}" )
   fi
 done
 
 if [ ${#pkgs_with_testing_import[@]} -ne 0 ]; then
-  printf "%s\n" "Testing package imported in:"
+  printf "%s\n" "Testing packages are imported in:"
   for pkg in "${pkgs_with_testing_import[@]}"; do
-    printf "\t%s\n" "${pkg}"
+    printf "  %s\n" "${pkg}"
   done
   exit 1
 fi
