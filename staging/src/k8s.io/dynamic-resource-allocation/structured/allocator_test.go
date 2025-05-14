@@ -1160,6 +1160,104 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req0, driverA, pool1, device2, true),
 			)},
 		},
+		"all-devices-some-allocating-admin-access": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claimWithRequests(claim0, nil, request(req0, classA, 1), request(req1, classA, 1))
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				// Second request for `All` cannot be fulfilled because
+				// the first request claims a device.
+				c.Spec.Devices.Requests[1].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[1].AllocationMode = resourceapi.DeviceAllocationModeAll
+				return []wrapResourceClaim{c}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: objects(
+				slice(slice1, node1, pool1, driverA, device(device1, nil, nil), device(device2, nil, nil)),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"count-devices-some-allocated-admin-access": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c := claim(claim0, req0, classA)
+				c.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				c.Spec.Devices.Requests[0].AllocationMode = resourceapi.DeviceAllocationModeExactCount
+				c.Spec.Devices.Requests[0].Count = 2
+				return []wrapResourceClaim{c}
+			}(),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			classes: objects(class(classA, driverA)),
+			slices: objects(
+				slice(slice1, node1, pool1, driverA, device(device1, nil, nil), device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device1, true),
+				deviceAllocationResult(req0, driverA, pool1, device2, true),
+			)},
+		},
+		"separate-claims-share-device-admin-access": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				c1 := claim(claim0, req0, classA)
+				c1.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+
+				c2 := claim(claim1, req0, classA)
+				c2.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				return []wrapResourceClaim{c1, c2}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: objects(
+				slice(slice1, node1, pool1, driverA, device(device1, nil, nil), device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+				),
+			},
+		},
+		"admin-access-claims-device-allocating-for-non-admin-access": {
+			features: Features{
+				AdminAccess: true,
+			},
+			claimsToAllocate: func() []wrapResourceClaim {
+				admin := claim(claim1, req0, classA)
+				admin.Spec.Devices.Requests[0].AdminAccess = ptr.To(true)
+				return []wrapResourceClaim{claim(claim0, req0, classA), admin}
+			}(),
+			classes: objects(class(classA, driverA)),
+			slices: objects(
+				slice(slice1, node1, pool1, driverA, device(device1, nil, nil), device(device2, nil, nil)),
+			),
+			node: node(node1, region1),
+			expectResults: []any{
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, false),
+				),
+				allocationResult(
+					localNodeSelector(node1),
+					deviceAllocationResult(req0, driverA, pool1, device1, true),
+				),
+			},
+		},
 		"all-devices-slice-without-devices-prioritized-list": {
 			features: Features{
 				PrioritizedList: true,

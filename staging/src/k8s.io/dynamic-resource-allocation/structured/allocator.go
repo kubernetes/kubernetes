@@ -259,7 +259,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	alloc.deviceMatchesRequest = make(map[matchKey]bool)
 
 	// We can estimate the size based on what we need to allocate.
-	alloc.allocatingDevices = make(map[DeviceID]bool, minDevicesTotal)
+	alloc.allocatingDevices = make(map[DeviceID]sets.Set[int], minDevicesTotal)
 
 	alloc.logger.V(6).Info("Gathered information about devices", "numAllocated", len(alloc.allocatedDevices), "minDevicesToBeAllocated", minDevicesTotal)
 
@@ -468,8 +468,13 @@ type allocator struct {
 	deviceMatchesRequest map[matchKey]bool
 	constraints          [][]constraint                 // one list of constraints per claim
 	requestData          map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
-	allocatingDevices    map[DeviceID]bool
-	result               []internalAllocationResult
+	// allocatingDevices tracks which devices will be newly allocated for a
+	// particular attempt to find a solution. The map is indexed by device
+	// and its values represent for which of a pod's claims the device will
+	// be allocated.
+	// Claims are identified by their index in claimsToAllocate.
+	allocatingDevices map[DeviceID]sets.Set[int]
+	result            []internalAllocationResult
 }
 
 // matchKey identifies a device/request pair.
@@ -795,7 +800,11 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 				deviceID := DeviceID{Driver: pool.Driver, Pool: pool.Pool, Device: slice.Spec.Devices[deviceIndex].Name}
 
 				// Checking for "in use" is cheap and thus gets done first.
-				if !request.adminAccess() && (alloc.allocatedDevices.Has(deviceID) || alloc.allocatingDevices[deviceID]) {
+				if request.adminAccess() && alloc.allocatingDeviceForClaim(deviceID, r.claimIndex) {
+					alloc.logger.V(7).Info("Device in use in same claim", "device", deviceID)
+					continue
+				}
+				if !request.adminAccess() && alloc.deviceInUse(deviceID) {
 					alloc.logger.V(7).Info("Device in use", "device", deviceID)
 					continue
 				}
@@ -969,7 +978,11 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	requestKey := requestIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, subRequestIndex: r.subRequestIndex}
 	requestData := alloc.requestData[requestKey]
 	request := requestData.request
-	if !request.adminAccess() && (alloc.allocatedDevices.Has(device.id) || alloc.allocatingDevices[device.id]) {
+	if request.adminAccess() && alloc.allocatingDeviceForClaim(device.id, r.claimIndex) {
+		alloc.logger.V(7).Info("Device in use in same claim", "device", device.id)
+		return false, nil, nil
+	}
+	if !request.adminAccess() && alloc.deviceInUse(device.id) {
 		alloc.logger.V(7).Info("Device in use", "device", device.id)
 		return false, nil, nil
 	}
@@ -1026,9 +1039,12 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 	// All constraints satisfied. Mark as in use (unless we do admin access)
 	// and record the result.
 	alloc.logger.V(7).Info("Device allocated", "device", device.id)
-	if !request.adminAccess() {
-		alloc.allocatingDevices[device.id] = true
+
+	if alloc.allocatingDevices[device.id] == nil {
+		alloc.allocatingDevices[device.id] = make(sets.Set[int])
 	}
+	alloc.allocatingDevices[device.id].Insert(r.claimIndex)
+
 	result := internalDeviceResult{
 		request:       request.name(),
 		parentRequest: parentRequestName,
@@ -1046,9 +1062,7 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		for _, constraint := range alloc.constraints[r.claimIndex] {
 			constraint.remove(baseRequestName, subRequestName, device.basic, device.id)
 		}
-		if !request.adminAccess() {
-			alloc.allocatingDevices[device.id] = false
-		}
+		alloc.allocatingDevices[device.id].Delete(r.claimIndex)
 		// Truncate, but keep the underlying slice.
 		alloc.result[r.claimIndex].devices = alloc.result[r.claimIndex].devices[:previousNumResults]
 		alloc.logger.V(7).Info("Device deallocated", "device", device.id)
@@ -1103,7 +1117,7 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 			Pool:   slice.Spec.Pool.Name,
 			Device: device.Name,
 		}
-		if !alloc.allocatedDevices.Has(deviceID) && !alloc.allocatingDevices[deviceID] {
+		if !alloc.allocatedDevices.Has(deviceID) && !alloc.allocatingDeviceForAnyClaim(deviceID) {
 			continue
 		}
 		for _, consumedCounter := range device.Basic.ConsumesCounters {
@@ -1141,6 +1155,18 @@ func (alloc *allocator) checkAvailableCapacity(device deviceWithID) (bool, error
 	}
 
 	return true, nil
+}
+
+func (alloc *allocator) deviceInUse(deviceID DeviceID) bool {
+	return alloc.allocatedDevices.Has(deviceID) || alloc.allocatingDeviceForAnyClaim(deviceID)
+}
+
+func (alloc *allocator) allocatingDeviceForAnyClaim(deviceID DeviceID) bool {
+	return alloc.allocatingDevices[deviceID].Len() > 0
+}
+
+func (alloc *allocator) allocatingDeviceForClaim(deviceID DeviceID, claimIndex int) bool {
+	return alloc.allocatingDevices[deviceID].Has(claimIndex)
 }
 
 // createNodeSelector constructs a node selector for the allocation, if needed,
