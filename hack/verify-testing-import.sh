@@ -62,6 +62,3 @@ if [ ${#pkgs_with_testing_import[@]} -ne 0 ]; then
   done
   exit 1
 fi
-
-exit 0
-
