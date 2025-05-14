@@ -339,9 +339,10 @@ claims:
 		}
 
 		allocator, err := structured.NewAllocator(tCtx, structured.Features{
-			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			DeviceTaints:    utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+			PrioritizedList:      utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
+			AdminAccess:          utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
+			DeviceTaints:         utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
+			PartitionableDevices: utilfeature.DefaultFeatureGate.Enabled(features.DRAPartitionableDevices),
 		}, []*resourceapi.ResourceClaim{claim}, allocatedDevices, draManager.DeviceClasses(), slices, celCache)
 		tCtx.ExpectNoError(err, "create allocator")
 
