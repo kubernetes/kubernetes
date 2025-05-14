@@ -48,6 +48,13 @@ func TestBackoffQueue_calculateBackoffDuration(t *testing.T) {
 		},
 		{
 			name:                   "normal",
+			initialBackoffDuration: 3 * time.Nanosecond,
+			maxBackoffDuration:     1000 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 5},
+			want:                   48 * time.Nanosecond, // 3 * 2^4 = 48
+		},
+		{
+			name:                   "hitting max backoff duration",
 			initialBackoffDuration: 1 * time.Nanosecond,
 			maxBackoffDuration:     32 * time.Nanosecond,
 			podInfo:                &framework.QueuedPodInfo{Attempts: 16},
