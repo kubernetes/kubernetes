@@ -2075,6 +2075,11 @@ func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVo
 	featureGateStatus := utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure)
 
 	if !featureGateStatus {
+		// even though RecoverVolumeExpansionFailure feature-gate is disabled, we should consider it enabled
+		// if resizeStatus is not empty or allocatedresources is set
+		if resizeStatus != "" || allocatedResource != nil {
+			return true
+		}
 		return false
 	}
 
