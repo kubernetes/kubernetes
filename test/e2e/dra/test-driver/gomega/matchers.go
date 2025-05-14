@@ -34,6 +34,17 @@ var BeRegistered = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (
 	return false, nil
 }).WithMessage("contain successful NotifyRegistrationStatus call")
 
+func GetInfoFailed() gcustom.CustomGomegaMatcher {
+	return gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
+		for _, call := range actualCalls {
+			if call.FullMethod == "/pluginregistration.Registration/GetInfo" && call.Err != nil {
+				return true, nil
+			}
+		}
+		return false, nil
+	}).WithMessage("contain unsuccessful GetInfo call")
+}
+
 // NodePrepareResoucesSucceeded checks that NodePrepareResources API has been called and succeeded
 var NodePrepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {

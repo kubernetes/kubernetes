@@ -518,3 +518,13 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
 	return ex.resourceClient.ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
 }
+
+// SetGetInfoError sets an error to be returned by the plugin's GetInfo call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when GetInfo fails.
+//
+// To restore normal GetInfo behavior, call SetGetInfoError(nil).
+func (ex *ExamplePlugin) SetGetInfoError(err error) {
+	ex.d.SetGetInfoError(err)
+}
