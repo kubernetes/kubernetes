@@ -432,6 +432,16 @@ func IsRestartableInitContainer(initContainer *v1.Container) bool {
 	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
 
+// IsInitContainer returns true if the container is an InitContainer.
+func IsInitContainer(spec *v1.PodSpec, container *v1.Container) bool {
+    for _, initContainer := range spec.InitContainers {
+        if container.Name == initContainer.Name {
+            return true
+        }
+    }
+    return false
+}
+
 // We will emit status.observedGeneration if the feature is enabled OR if status.observedGeneration is already set.
 // This protects against an infinite loop of kubelet trying to clear the value after the FG is turned off, and
 // the API server preserving existing values when an incoming update tries to clear it.
