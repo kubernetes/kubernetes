@@ -99,7 +99,7 @@ var (
 )
 
 func init() {
-	metrics.Register()
+	metrics.Register(true)
 }
 
 func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
@@ -1554,7 +1554,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 }
 
 func TestPreempt(t *testing.T) {
-	metrics.Register()
+	metrics.Register(true)
 	tests := []struct {
 		name           string
 		pod            *v1.Pod
