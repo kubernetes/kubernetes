@@ -37,7 +37,7 @@ import (
 
 var (
 	alphabeticalOrder        bool
-	k8RootPath               string
+	k8sRootPath              string
 	versionedFeatureListFile = "test/compatibility_lifecycle/reference/versioned_feature_list.yaml"
 	// thresholdVersion is the version after which we require emulation support for feature removal
 	// 1.31 is when we introduced emulation version support
@@ -75,7 +75,7 @@ func NewFeatureGatesCommand() *cobra.Command {
 	if err != nil {
 		panic(err)
 	}
-	cmd.Flags().StringVar(&k8RootPath, "root-path", defaultRootPath, "absolute path of the k8s repository")
+	cmd.Flags().StringVar(&k8sRootPath, "root-path", defaultRootPath, "absolute path of the k8s repository")
 
 	cmd.AddCommand(NewVerifyFeatureListCommand())
 	cmd.AddCommand(NewUpdateFeatureListCommand())
@@ -86,7 +86,7 @@ func NewFeatureGatesCommand() *cobra.Command {
 func NewVerifyFeatureListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "verify",
-		Short: "Verifies feature list files are up to date.",
+		Short: "Verify feature list files are up to date",
 		Run:   verifyFeatureListFunc,
 	}
 	cmd.Flags().BoolVar(&alphabeticalOrder, "alphabetical-order", false, "if true, verify all features in any FeatureSpec map are ordered aphabetically")
@@ -96,7 +96,7 @@ func NewVerifyFeatureListCommand() *cobra.Command {
 func NewUpdateFeatureListCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "update",
-		Short: "updates feature list files.",
+		Short: "Update feature list files",
 		Run:   updateFeatureListFunc,
 	}
 	return &cmd
@@ -113,7 +113,7 @@ func NewVerifyFeatureCleanupCommand() *cobra.Command {
 
 func verifyFeatureListFunc(cmd *cobra.Command, args []string) {
 	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
-	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, currentVersion, false); err != nil {
+	if err := verifyOrUpdateFeatureList(k8sRootPath, versionedFeatureListFile, currentVersion, false); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to verify versioned feature list: \n%s", err)
 		os.Exit(1)
 	}
@@ -121,14 +121,14 @@ func verifyFeatureListFunc(cmd *cobra.Command, args []string) {
 
 func updateFeatureListFunc(cmd *cobra.Command, args []string) {
 	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
-	if err := verifyOrUpdateFeatureList(k8RootPath, versionedFeatureListFile, currentVersion, true); err != nil {
+	if err := verifyOrUpdateFeatureList(k8sRootPath, versionedFeatureListFile, currentVersion, true); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to update versioned feature list: \n%s", err)
 		os.Exit(1)
 	}
 }
 
 func verifyFeatureCleanupFunc(cmd *cobra.Command, args []string) {
-	if err := getFeaturesAndVerifyCleanup(k8RootPath); err != nil {
+	if err := getFeaturesAndVerifyCleanup(k8sRootPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to verify that feature gates have been cleaned up: \n%s", err)
 		os.Exit(1)
 	}
