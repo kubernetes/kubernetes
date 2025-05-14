@@ -82,6 +82,11 @@ type Manager interface {
 	// SetAllocatedResources checkpoints the resources allocated to a pod's containers.
 	SetAllocatedResources(allocatedPod *v1.Pod) error
 
+	SetAllocatedResourcesFromAllocateCpus(podUID types.UID, containerName string, request int64) error
+
+	// GetAllocatedResources checkpoints the resources allocated to a pod's containers.
+	GetAllocatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
+
 	// SetActuatedResources records the actuated resources of the given container (or the entire
 	// pod, if actuatedContainer is nil).
 	SetActuatedResources(allocatedPod *v1.Pod, actuatedContainer *v1.Container) error
@@ -523,6 +528,15 @@ func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
 	return m.allocated.SetPodResourceInfo(pod.UID, allocationFromPod(pod))
 }
 
+func (m *manager) GetAllocatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool) {
+	return m.allocated.GetContainerResources(podUID, containerName)
+}
+
+// SetAllocatedResources checkpoints the resources allocated to a pod's containers
+func (m *manager) SetAllocatedResourcesFromAllocateCpus(podUID types.UID, containerName string, request int64) error {
+	return m.allocated.SetContainerCPUResources(podUID, containerName, request)
+}
+
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
@@ -532,10 +546,8 @@ func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	}
 
 	for _, container := range pod.Spec.InitContainers {
-		if podutil.IsRestartableInitContainer(&container) {
-			alloc := *container.Resources.DeepCopy()
-			podAlloc.ContainerResources[container.Name] = alloc
-		}
+		alloc := *container.Resources.DeepCopy()
+		podAlloc.ContainerResources[container.Name] = alloc
 	}
 
 	return podAlloc
