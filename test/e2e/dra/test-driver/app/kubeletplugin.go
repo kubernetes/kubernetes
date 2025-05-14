@@ -504,6 +504,15 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 	return calls
 }
 
+// ResetGRPCCalls clears the internal tracking of GRPC calls made to the plugin.
+// This is useful in tests to start with a clean slate when verifying plugin
+// registration behavior, particularly when testing registration retry scenarios.
+func (ex *ExamplePlugin) ResetGRPCCalls() {
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	ex.gRPCCalls = nil
+}
+
 // CountCalls counts GRPC calls with the given method suffix.
 func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 	count := 0
