@@ -50,7 +50,7 @@ func isNilableType(t *types.Type) bool {
 	return false
 }
 
-// nativeType returns the Go native type of the argument type, with any
+// NativeType returns the Go native type of the argument type, with any
 // intermediate typedefs removed. Go itself already flattens typedefs, but this
 // handles it in the unlikely event that we ever fix that.
 //
@@ -69,7 +69,7 @@ func isNilableType(t *types.Type) bool {
 //   - given `type X *int; *X`, returns `**int`
 //   - given `type X []int; X`, returns `[]int`
 //   - given `type X []int; *X`, returns `*[]int`
-func nativeType(t *types.Type) *types.Type {
+func NativeType(t *types.Type) *types.Type {
 	ptrs := 0
 	for {
 		if t.Kind == types.Alias {
@@ -87,9 +87,9 @@ func nativeType(t *types.Type) *types.Type {
 	return t
 }
 
-// nonPointer returns the value-type of a possibly pointer type. If type is not
+// NonPointer returns the value-type of a possibly pointer type. If type is not
 // a pointer, it returns the input type.
-func nonPointer(t *types.Type) *types.Type {
+func NonPointer(t *types.Type) *types.Type {
 	for t.Kind == types.Pointer {
 		t = t.Elem
 	}
