@@ -276,32 +276,36 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		// is a distributed system eventually consistent, so there is a propagation
 		// delay until this information is present on the nodes and a programming delay
 		// until the corresponding node components program the information on the dataplane.
-		err = wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
-			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
-			stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)
+		// Require at least two consecutive hits on the green pod to avoid flakiness during
+		// the transition of endpoint slices states and dataplane programming.
+		for i := 0; i < 2; i++ {
+			err = wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
+				cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
+				stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)
+				if err != nil {
+					framework.Logf("expected error when trying to connect to cluster IP : %v", err)
+					return false, nil
+				}
+				if strings.TrimSpace(stdout) == "" {
+					framework.Logf("got empty stdout, retry until timeout")
+					return false, nil
+				}
+				// Ensure we're comparing hostnames and not FQDNs
+				targetHostname := strings.Split(greenPod.Name, ".")[0]
+				hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
+				if hostname != targetHostname {
+					framework.Logf("expecting hostname %s got %s", targetHostname, hostname)
+					return false, nil
+				}
+				return true, nil
+			})
 			if err != nil {
-				framework.Logf("expected error when trying to connect to cluster IP : %v", err)
-				return false, nil
+				framework.Failf("can not connect to pod %s on address %s : %v", greenPod.Name, scvAddress, err)
 			}
-			if strings.TrimSpace(stdout) == "" {
-				framework.Logf("got empty stdout, retry until timeout")
-				return false, nil
-			}
-			// Ensure we're comparing hostnames and not FQDNs
-			targetHostname := strings.Split(greenPod.Name, ".")[0]
-			hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
-			if hostname != targetHostname {
-				framework.Logf("expecting hostname %s got %s", targetHostname, hostname)
-				return false, nil
-			}
-			return true, nil
-		})
-		if err != nil {
-			framework.Failf("can not connect to pod %s on address %s : %v", greenPod.Name, scvAddress, err)
 		}
 
 		ginkgo.By("Try to connect to the green pod through the service")
-		// assert 5 times that we can connect only to the green pod
+		// assert 5 times that we can connect ONLY to the green pod
 		for i := 0; i < 5; i++ {
 			err := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
 				cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
