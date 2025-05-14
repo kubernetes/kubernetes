@@ -236,6 +236,27 @@ func MarkFSResizeFinished(
 	return updatedPVC, err
 }
 
+func MarkNodeExpansionFinishedWithRecovery(
+	pvc *v1.PersistentVolumeClaim,
+	newSize resource.Quantity,
+	kubeClient clientset.Interface) (*v1.PersistentVolumeClaim, error) {
+	newPVC := pvc.DeepCopy()
+
+	newPVC.Status.Capacity[v1.ResourceStorage] = newSize
+
+	allocatedResourceStatusMap := newPVC.Status.AllocatedResourceStatuses
+	delete(allocatedResourceStatusMap, v1.ResourceStorage)
+	if len(allocatedResourceStatusMap) == 0 {
+		newPVC.Status.AllocatedResourceStatuses = nil
+	} else {
+		newPVC.Status.AllocatedResourceStatuses = allocatedResourceStatusMap
+	}
+
+	newPVC = MergeResizeConditionOnPVC(newPVC, []v1.PersistentVolumeClaimCondition{}, false /* keepOldResizeConditions */)
+	updatedPVC, err := PatchPVCStatus(pvc /*oldPVC*/, newPVC, kubeClient)
+	return updatedPVC, err
+}
+
 // MarkNodeExpansionInfeasible marks a PVC for node expansion as failed. Kubelet should not retry expansion
 // of volumes which are in failed state.
 func MarkNodeExpansionInfeasible(pvc *v1.PersistentVolumeClaim, kubeClient clientset.Interface, err error) (*v1.PersistentVolumeClaim, error) {
