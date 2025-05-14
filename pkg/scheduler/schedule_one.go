@@ -1090,7 +1090,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(&pod.Status, pod.Generation, v1.PodScheduled),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionFalse,
 		Reason:             reason,
 		Message:            errMsg,

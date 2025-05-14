@@ -432,20 +432,25 @@ func IsRestartableInitContainer(initContainer *v1.Container) bool {
 	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
 }
 
-// We will emit status.observedGeneration if the feature is enabled OR if status.observedGeneration is already set.
+// CalculatePodStatusObservedGeneration calculates the observedGeneration for the pod status.
+// This is used to track the generation of the pod that was observed by the kubelet.
+// The observedGeneration is set to the pod's generation when the feature gate
+// PodObservedGenerationTracking is enabled OR if status.observedGeneration is already set.
 // This protects against an infinite loop of kubelet trying to clear the value after the FG is turned off, and
 // the API server preserving existing values when an incoming update tries to clear it.
-func GetPodObservedGenerationIfEnabled(pod *v1.Pod) int64 {
+func CalculatePodStatusObservedGeneration(pod *v1.Pod) int64 {
 	if pod.Status.ObservedGeneration != 0 || utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) {
 		return pod.Generation
 	}
 	return 0
 }
 
-// We will emit condition.observedGeneration if the feature is enabled OR if condition.observedGeneration is already set.
+// CalculatePodConditionObservedGeneration calculates the observedGeneration for a particular pod condition.
+// The observedGeneration is set to the pod's generation when the feature gate
+// PodObservedGenerationTracking is enabled OR if condition[].observedGeneration is already set.
 // This protects against an infinite loop of kubelet trying to clear the value after the FG is turned off, and
 // the API server preserving existing values when an incoming update tries to clear it.
-func GetPodObservedGenerationIfEnabledOnCondition(podStatus *v1.PodStatus, generation int64, conditionType v1.PodConditionType) int64 {
+func CalculatePodConditionObservedGeneration(podStatus *v1.PodStatus, generation int64, conditionType v1.PodConditionType) int64 {
 	if podStatus == nil {
 		return 0
 	}
