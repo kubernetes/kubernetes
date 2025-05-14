@@ -127,6 +127,29 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
 		})
 
+		// Test that the kubelet plugin manager retries plugin registration
+		// when the GetInfo call fails, and succeeds once the call passes.
+		ginkgo.It("must recover and register after registration failure", func(ctx context.Context) {
+			kubeletPlugin := newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			ginkgo.By("set GetInfo failure mode")
+			kubeletPlugin.SetGetInfoError(fmt.Errorf("simulated GetInfo failure"))
+			kubeletPlugin.ResetGRPCCalls()
+
+			ginkgo.By("restart Kubelet")
+			restartKubelet(ctx, true)
+
+			ginkgo.By("wait for Registration call to fail")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.GetInfoFailed())
+			gomega.Expect(kubeletPlugin.GetGRPCCalls()).ShouldNot(testdrivergomega.BeRegistered, "Expect plugin not to be registered due to GetInfo failure")
+
+			ginkgo.By("unset registration failure mode")
+			kubeletPlugin.SetGetInfoError(nil)
+
+			ginkgo.By("wait for Kubelet plugin re-registration")
+			gomega.Eventually(kubeletPlugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+		})
+
 		ginkgo.It("must process pod created when kubelet is not running", func(ctx context.Context) {
 			newKubeletPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
 
