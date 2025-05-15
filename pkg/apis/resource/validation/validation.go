@@ -1203,16 +1203,7 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, bindingTimeoutSeconds *int64, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	if len(bindingConditions) > resource.BindingConditionsMaxSize {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("bindingConditions"), len(bindingConditions), resource.BindingConditionsMaxSize))
-	}
-
-	for i, condition := range bindingConditions {
-		fieldPath := fldPath.Child("bindingConditions").Index(i)
-		if !conditionTypeRegex.MatchString(condition) {
-			allErrs = append(allErrs, field.Invalid(fieldPath, condition, "must match condition type format"))
-		}
-	}
+	allErrs = append(allErrs, validateSlice(bindingConditions, resource.BindingConditionsMaxSize, metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"))...)
 
 	if len(bindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
 		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("bindingFailureConditions"), len(bindingFailureConditions), resource.BindingFailureConditionsMaxSize))
