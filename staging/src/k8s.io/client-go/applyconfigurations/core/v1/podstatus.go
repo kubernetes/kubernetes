@@ -26,23 +26,24 @@ import (
 // PodStatusApplyConfiguration represents a declarative configuration of the PodStatus type for use
 // with apply.
 type PodStatusApplyConfiguration struct {
-	ObservedGeneration         *int64                                     `json:"observedGeneration,omitempty"`
-	Phase                      *corev1.PodPhase                           `json:"phase,omitempty"`
-	Conditions                 []PodConditionApplyConfiguration           `json:"conditions,omitempty"`
-	Message                    *string                                    `json:"message,omitempty"`
-	Reason                     *string                                    `json:"reason,omitempty"`
-	NominatedNodeName          *string                                    `json:"nominatedNodeName,omitempty"`
-	HostIP                     *string                                    `json:"hostIP,omitempty"`
-	HostIPs                    []HostIPApplyConfiguration                 `json:"hostIPs,omitempty"`
-	PodIP                      *string                                    `json:"podIP,omitempty"`
-	PodIPs                     []PodIPApplyConfiguration                  `json:"podIPs,omitempty"`
-	StartTime                  *metav1.Time                               `json:"startTime,omitempty"`
-	InitContainerStatuses      []ContainerStatusApplyConfiguration        `json:"initContainerStatuses,omitempty"`
-	ContainerStatuses          []ContainerStatusApplyConfiguration        `json:"containerStatuses,omitempty"`
-	QOSClass                   *corev1.PodQOSClass                        `json:"qosClass,omitempty"`
-	EphemeralContainerStatuses []ContainerStatusApplyConfiguration        `json:"ephemeralContainerStatuses,omitempty"`
-	Resize                     *corev1.PodResizeStatus                    `json:"resize,omitempty"`
-	ResourceClaimStatuses      []PodResourceClaimStatusApplyConfiguration `json:"resourceClaimStatuses,omitempty"`
+	ObservedGeneration          *int64                                            `json:"observedGeneration,omitempty"`
+	Phase                       *corev1.PodPhase                                  `json:"phase,omitempty"`
+	Conditions                  []PodConditionApplyConfiguration                  `json:"conditions,omitempty"`
+	Message                     *string                                           `json:"message,omitempty"`
+	Reason                      *string                                           `json:"reason,omitempty"`
+	NominatedNodeName           *string                                           `json:"nominatedNodeName,omitempty"`
+	HostIP                      *string                                           `json:"hostIP,omitempty"`
+	HostIPs                     []HostIPApplyConfiguration                        `json:"hostIPs,omitempty"`
+	PodIP                       *string                                           `json:"podIP,omitempty"`
+	PodIPs                      []PodIPApplyConfiguration                         `json:"podIPs,omitempty"`
+	StartTime                   *metav1.Time                                      `json:"startTime,omitempty"`
+	InitContainerStatuses       []ContainerStatusApplyConfiguration               `json:"initContainerStatuses,omitempty"`
+	ContainerStatuses           []ContainerStatusApplyConfiguration               `json:"containerStatuses,omitempty"`
+	QOSClass                    *corev1.PodQOSClass                               `json:"qosClass,omitempty"`
+	EphemeralContainerStatuses  []ContainerStatusApplyConfiguration               `json:"ephemeralContainerStatuses,omitempty"`
+	Resize                      *corev1.PodResizeStatus                           `json:"resize,omitempty"`
+	ResourceClaimStatuses       []PodResourceClaimStatusApplyConfiguration        `json:"resourceClaimStatuses,omitempty"`
+	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatusApplyConfiguration `json:"extendedResourceClaimStatus,omitempty"`
 }
 
 // PodStatusApplyConfiguration constructs a declarative configuration of the PodStatus type for use with
@@ -219,5 +220,13 @@ func (b *PodStatusApplyConfiguration) WithResourceClaimStatuses(values ...*PodRe
 		}
 		b.ResourceClaimStatuses = append(b.ResourceClaimStatuses, *values[i])
 	}
+	return b
+}
+
+// WithExtendedResourceClaimStatus sets the ExtendedResourceClaimStatus field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExtendedResourceClaimStatus field is set to the value of the last call.
+func (b *PodStatusApplyConfiguration) WithExtendedResourceClaimStatus(value *PodExtendedResourceClaimStatusApplyConfiguration) *PodStatusApplyConfiguration {
+	b.ExtendedResourceClaimStatus = value
 	return b
 }
