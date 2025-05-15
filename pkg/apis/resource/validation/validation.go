@@ -828,10 +828,6 @@ var (
 		// optional dot-separated build identifier segments (e.g. +build.id.20240305)
 		`(\+` + buildIdentifier + `(\.` + buildIdentifier + `)*)?` +
 		`$`)
-
-	conditionTypeRegex = regexp.MustCompile(
-		`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`,
-	)
 )
 
 func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.Path) field.ErrorList {
@@ -1203,17 +1199,20 @@ func validateLabelValue(value string, fldPath *field.Path) field.ErrorList {
 func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions []string, bindingTimeoutSeconds *int64, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	allErrs = append(allErrs, validateSlice(bindingConditions, resource.BindingConditionsMaxSize, metav1validation.ValidateLabelName, fldPath.Child("bindingConditions"))...)
-
+	if len(bindingConditions) > resource.BindingConditionsMaxSize {
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingConditions"), len(bindingConditions), resource.BindingConditionsMaxSize))
+	}
+	for i, condition := range bindingConditions {
+		fieldPath := fldPath.Child("bindingConditions").Index(i)
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(condition, fieldPath)...)
+	}
 	if len(bindingFailureConditions) > resource.BindingFailureConditionsMaxSize {
-		allErrs = append(allErrs, field.TooLongMaxLength(fldPath.Child("bindingFailureConditions"), len(bindingFailureConditions), resource.BindingFailureConditionsMaxSize))
+		allErrs = append(allErrs, field.TooMany(fldPath.Child("bindingFailureConditions"), len(bindingFailureConditions), resource.BindingFailureConditionsMaxSize))
 	}
 
 	for i, condition := range bindingFailureConditions {
 		fieldPath := fldPath.Child("bindingFailureConditions").Index(i)
-		if !conditionTypeRegex.MatchString(condition) {
-			allErrs = append(allErrs, field.Invalid(fieldPath, condition, "must match condition type format"))
-		}
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(condition, fieldPath)...)
 	}
 
 	if bindingTimeoutSeconds != nil && *bindingTimeoutSeconds <= 0 {
