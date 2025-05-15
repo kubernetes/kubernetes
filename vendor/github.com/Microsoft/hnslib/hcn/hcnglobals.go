@@ -87,8 +87,10 @@ var (
 
 	//HNS 15.1 allows support for DisableHostPort flag.
 	DisableHostPortVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 15, Minor: 1}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
-	// HNS 15.4 allows for Modify Loadbalancer support
-	ModifyLoadbalancerVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 15, Minor: 4}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
+	// HNS 15.5+ allows for Modify Loadbalancer support in Zn
+	ModifyLoadbalancerVersion = VersionRanges{
+		VersionRange{MinVersion: Version{Major: 15, Minor: 5}, MaxVersion: Version{Major: 15, Minor: math.MaxInt32}},
+	}
 	// HNS 15.4 allows for Accelnet support
 	AccelnetVersion = VersionRanges{VersionRange{MinVersion: Version{Major: 15, Minor: 4}, MaxVersion: Version{Major: math.MaxInt32, Minor: math.MaxInt32}}}
 )
