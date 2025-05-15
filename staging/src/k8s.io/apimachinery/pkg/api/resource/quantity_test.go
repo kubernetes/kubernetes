@@ -1824,49 +1824,65 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 
 func TestMilliChecked(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		q           *Quantity
-		expectError bool
+		name            string
+		q               *Quantity
+		expectOverflow  bool
+		expectUnderflow bool
 	}{
 		{
-			name:        "peta overflow",
-			q:           func() *Quantity { q := MustParse("16Pi"); return &q }(),
-			expectError: true,
+			name:           "peta overflow",
+			q:              func() *Quantity { q := MustParse("16Pi"); return &q }(),
+			expectOverflow: true,
 		},
 		{
-			name:        "exa overflow",
-			q:           func() *Quantity { q := MustParse("42Ei"); return &q }(),
-			expectError: true,
+			name:           "exa overflow",
+			q:              func() *Quantity { q := MustParse("42Ei"); return &q }(),
+			expectOverflow: true,
 		},
 		{
-			name:        "tera overflow",
-			q:           func() *Quantity { q := MustParse("420000Ti"); return &q }(),
-			expectError: true,
+			name:           "tera overflow",
+			q:              func() *Quantity { q := MustParse("420000Ti"); return &q }(),
+			expectOverflow: true,
 		},
 		{
-			name:        "1 SI",
-			q:           NewQuantity(1, BinarySI),
-			expectError: false,
+			name:            "peta underflow",
+			q:               func() *Quantity { q := MustParse("-16Pi"); return &q }(),
+			expectUnderflow: true,
 		},
 		{
-			name:        "0 SI",
-			q:           NewQuantity(0, BinarySI),
-			expectError: false,
+			name:            "exa underflow",
+			q:               func() *Quantity { q := MustParse("-42Ei"); return &q }(),
+			expectUnderflow: true,
 		},
 		{
-			name:        "-1 SI",
-			q:           NewQuantity(-1, BinarySI),
-			expectError: false,
+			name:            "tera underflow",
+			q:               func() *Quantity { q := MustParse("-420000Ti"); return &q }(),
+			expectUnderflow: true,
+		},
+		{
+			name: "1 SI",
+			q:    NewQuantity(1, BinarySI),
+		},
+		{
+			name: "0 SI",
+			q:    NewQuantity(0, BinarySI),
+		},
+		{
+			name: "-1 SI",
+			q:    NewQuantity(-1, BinarySI),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := tc.q.CheckedMilliValue()
-			if err == nil && tc.expectError {
-				t.Error("expected error but got none")
-			} else if err != nil && !tc.expectError {
-				t.Errorf("expected no error error but got %v", err)
-			} else if tc.expectError && !errors.Is(err, ErrOverflow) {
-				t.Errorf("expected overflow error but got %v", err)
+			expectErr := tc.expectOverflow || tc.expectUnderflow
+			if err == nil && expectErr {
+				t.Errorf("expected error but got none for %v", tc.q)
+			} else if err != nil && !expectErr {
+				t.Errorf("expected no error error but got %v for %v", err, tc.q)
+			} else if tc.expectOverflow && !errors.Is(err, ErrOverflow) {
+				t.Errorf("expected overflow error but got %v for %v", err, tc.q)
+			} else if tc.expectUnderflow && !errors.Is(err, ErrUnderflow) {
+				t.Errorf("expected underflow error but got %v for %v", err, tc.q)
 			}
 		})
 	}

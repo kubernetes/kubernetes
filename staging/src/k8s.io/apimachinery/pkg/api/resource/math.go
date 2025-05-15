@@ -47,6 +47,9 @@ var (
 	// Compare with the return value of Quantity.Value() to
 	// see if it's safe to use Quantity.MilliValue().
 	MaxMilliValue = int64(((1 << 63) - 1) / 1000)
+	MinMilliValue = int64((-(1 << 63)) / 1000)
+
+	minMilliValueDec = inf.NewDec(MinMilliValue, inf.Scale(0))
 )
 
 const mostNegative = -(mostPositive + 1)

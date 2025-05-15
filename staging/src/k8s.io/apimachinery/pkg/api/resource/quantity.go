@@ -824,16 +824,20 @@ func (q *Quantity) MilliValue() int64 {
 }
 
 var (
-	ErrOverflow = errors.New("cannot convert without overflow")
+	ErrOverflow  = errors.New("cannot convert without overflow")
+	ErrUnderflow = errors.New("cannot convert without underflow")
 )
 
 // CheckedMilliValue returns the value of ceil(q * 1000);
 // This may not fit in an int64 this could overflow an int64, in which case an error will be returned.
-// You can check errors.Is(err, ErrOverflow)
+// You can check errors.Is(err, ErrOverflow) and errors.Is(err, ErrUnderflow)
 func (q *Quantity) CheckedMilliValue() (int64, error) {
-	// TODO: check underflow?
 	if q.Value() > MaxMilliValue {
 		return 0, fmt.Errorf("value %v overflows MilliValue: %w", q.Value(), ErrOverflow)
+	}
+	// TODO: q.Value() underflow errors? We have to also check q.d.Dec
+	if q.Value() < MinMilliValue || (q.d.Dec != nil && q.d.Dec.Cmp(minMilliValueDec) == -1) {
+		return 0, fmt.Errorf("value %v underflows MilliValue: %w", q.Value(), ErrUnderflow)
 	}
 	return q.ScaledValue(Milli), nil
 }
