@@ -415,6 +415,7 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		Attempts:                pqi.Attempts,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
+		BackoffExpiration:       pqi.BackoffExpiration,
 		GatingPlugin:            pqi.GatingPlugin,
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
