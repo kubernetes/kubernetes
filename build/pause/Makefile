@@ -134,23 +134,11 @@ container: .container-${OS}-$(ARCH)
 
 .container-windows-$(ARCH): SHELL:=/bin/bash
 .container-windows-$(ARCH): $(foreach binary, ${BIN}, bin/${binary}-${OS}-${ARCH})
-	set -x; \
-	# osversionImageDigests maps the container images digests for different Windows Server partial os.version from image manifest list
-	# osversionImageDigests["20348"]="sha256:8f49c039657e67cb54861d82acdb907104e268009f1bea4f75b3dec6c6b3d52d"
-	declare -A osversionImageDigests; \
 	declare -A tagToKernelVersionMap=( ['1809']='17763' ['ltsc2022']='20348' ); \
-	image_manifest=`docker manifest inspect ${BASE.windows}`; \
-	for images in $$(echo $${image_manifest} | jq '.manifests' | jq -c '.[]'); do \
-			partial_osversion=`echo $${images} | jq '.platform."os.version"' | awk -F. '{print $$3}'`; \
-			image_digest=`echo $${images} | jq '.digest' | awk -F\" '{print $$2}'`; \
-			osversionImageDigests[$${partial_osversion}]=$${image_digest}; \
-	done; \
-	for osversion in ${ALL_OSVERSIONS.windows}; do \
-			osversion_image_digest="$${osversionImageDigests[$${tagToKernelVersionMap[$$osversion]}]}"; \
-			osversion_image_name=`echo ${BASE.windows} | awk -F: '{print $$1}'`@$${osversion_image_digest}; \
-			docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
-			-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-$${osversion} --build-arg BASE=$${osversion_image_name} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .; \
-	done; \
+	kernel_version=$${tagToKernelVersionMap[$$OSVERSION]}; \
+	kernel_version_image_name=$$(./make-pause-windows.sh ${BASE.windows} $$kernel_version); \
+	docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
+    		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=$${kernel_version_image_name} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
 	touch $@
 
 # Useful for testing, not automatically included in container image
