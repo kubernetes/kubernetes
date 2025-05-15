@@ -599,7 +599,7 @@ func containerResourcesFromRequirements(requirements *v1.ResourceRequirements) c
 // Returns whether to keep (true) or restart (false) the container.
 // TODO(vibansal): Make this function to be agnostic to whether it is dealing with a restartable init container or not (i.e. remove the argument `isRestartableInitContainer`).
 func (m *kubeGenericRuntimeManager) computePodResizeAction(pod *v1.Pod, containerIdx int, isRestartableInitContainer bool, kubeContainerStatus *kubecontainer.Status, changes *podActions) (keepContainer bool) {
-	if resizable, _ := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
+	if resizable, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		return true
 	}
 
@@ -986,7 +986,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	if resizable, _ := IsInPlacePodVerticalScalingAllowed(pod); resizable {
+	if resizable, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
@@ -1404,7 +1404,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 	}
 
 	// Step 7: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
-	if resizable, _ := IsInPlacePodVerticalScalingAllowed(pod); resizable {
+	if resizable, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
 		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources {
 			result.SyncResults = append(result.SyncResults, m.doPodResizeAction(pod, podContainerChanges))
 		}
