@@ -162,7 +162,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			IntroducedVersion: "1.9",
 		},
 		gvr("apps", "v1", "statefulsets"): {
-			Stub:              `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}}}}`,
+			Stub:              `{"metadata": {"name": "ss3"}, "spec": {"selector": {"matchLabels": {"a": "b"}}, "template": {"metadata": {"labels": {"a": "b"}}, "spec": {"restartPolicy": "Always", "terminationGracePeriodSeconds": 30, "containers": [{"image": "` + image + `", "name": "container6", "terminationMessagePolicy": "File"}]}}}}`,
 			ExpectedEtcdPath:  "/registry/statefulsets/" + namespace + "/ss3",
 			IntroducedVersion: "1.9",
 		},
