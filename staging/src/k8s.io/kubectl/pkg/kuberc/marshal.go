@@ -88,13 +88,14 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		}
 
 		// we have a usable preferences to return
-		klog.V(5).Infof("kuberc: successfully decoded entry %d in %s", attemptedItems, kubercFile)
+		klog.V(5).Infof("kuberc: using entry %d (%s) in %s", attemptedItems, gvk.GroupVersion(), kubercFile)
 		return preferences, strictDecodeErr
-
 	}
+
 	if attemptedItems > 0 {
 		return nil, fmt.Errorf("no valid preferences found in %s, use --v=5 to see details", kubercFile)
 	}
+
 	// empty doc
 	klog.V(5).Infof("kuberc: no preferences found in %s", kubercFile)
 	return nil, nil
