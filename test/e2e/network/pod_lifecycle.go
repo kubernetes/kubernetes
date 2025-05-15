@@ -276,38 +276,49 @@ var _ = common.SIGDescribe("Connectivity Pod Lifecycle", func() {
 		// is a distributed system eventually consistent, so there is a propagation
 		// delay until this information is present on the nodes and a programming delay
 		// until the corresponding node components program the information on the dataplane.
-		// Require at least two consecutive hits on the green pod to avoid flakiness during
-		// the transition of endpoint slices states and dataplane programming.
-		for i := 0; i < 2; i++ {
-			err = wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
-				cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
-				stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)
-				if err != nil {
-					framework.Logf("expected error when trying to connect to cluster IP : %v", err)
-					return false, nil
-				}
-				if strings.TrimSpace(stdout) == "" {
-					framework.Logf("got empty stdout, retry until timeout")
-					return false, nil
-				}
-				// Ensure we're comparing hostnames and not FQDNs
-				targetHostname := strings.Split(greenPod.Name, ".")[0]
-				hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
-				if hostname != targetHostname {
-					framework.Logf("expecting hostname %s got %s", targetHostname, hostname)
-					return false, nil
-				}
-				return true, nil
-			})
+		// Since there are only two backends, we need to ensure that only one is active,
+		// the chance of hitting any backend is 50% and each request is independent.
+		// We can use binomial probability to calculate the probability of hitting only
+		// the new pod despite there are two active pods, using 6 requests gives us
+		// a 0.5^6=0.015625,  1.5625% of chances of not able to detect the transition.
+		consecutiveHits := 0
+		expectedHits := 6
+		err = wait.PollUntilContextTimeout(ctx, 3*time.Second, e2eservice.ServiceReachabilityShortPollTimeout, true, func(ctx context.Context) (done bool, err error) {
+			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
+			stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)
 			if err != nil {
-				framework.Failf("can not connect to pod %s on address %s : %v", greenPod.Name, scvAddress, err)
+				framework.Logf("expected error when trying to connect to cluster IP : %v", err)
+				consecutiveHits = 0
+				return false, nil
 			}
+			if strings.TrimSpace(stdout) == "" {
+				framework.Logf("got empty stdout, retry until timeout")
+				consecutiveHits = 0
+				return false, nil
+			}
+			// Ensure we're comparing hostnames and not FQDNs
+			targetHostname := strings.Split(greenPod.Name, ".")[0]
+			hostname := strings.TrimSpace(strings.Split(stdout, ".")[0])
+			if hostname != targetHostname {
+				framework.Logf("expecting hostname %s got %s", targetHostname, hostname)
+				consecutiveHits = 0
+				return false, nil
+			}
+			consecutiveHits++
+			if consecutiveHits < expectedHits {
+				framework.Logf("got %s %d times, needs %d hits to ensure the dataplane is programmed with more 98.5 percent accuracy", targetHostname, consecutiveHits, expectedHits)
+				return false, nil
+			}
+			return true, nil
+		})
+		if err != nil {
+			framework.Failf("can not connect to pod %s on address %s : %v", greenPod.Name, scvAddress, err)
 		}
 
 		ginkgo.By("Try to connect to the green pod through the service")
 		// assert 5 times that we can connect ONLY to the green pod
 		for i := 0; i < 5; i++ {
-			err := wait.PollUntilContextTimeout(ctx, 3*time.Second, 30*time.Second, true, func(ctx context.Context) (done bool, err error) {
+			err := wait.PollUntilContextTimeout(ctx, 3*time.Second, e2eservice.KubeProxyEndpointLagTimeout, true, func(ctx context.Context) (done bool, err error) {
 				cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, scvAddress)
 				stdout, err := e2eoutput.RunHostCmd(clientPod.Namespace, clientPod.Name, cmd)
 				if err != nil {
