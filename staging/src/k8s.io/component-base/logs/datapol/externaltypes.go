@@ -17,14 +17,15 @@ limitations under the License.
 package datapol
 
 import (
-	"fmt"
+	"crypto/x509"
+	"net/http"
 	"reflect"
 )
 
-const (
-	httpHeader      = "net/http.Header"
-	httpCookie      = "net/http.Cookie"
-	x509Certificate = "crypto/x509.Certificate"
+var (
+	httpHeader      = reflect.TypeOf(http.Header{})
+	httpCookie      = reflect.TypeOf(http.Cookie{})
+	x509Certificate = reflect.TypeOf(x509.Certificate{})
 )
 
 // GlobalDatapolicyMapping returns the list of sensitive datatypes are embedded
@@ -34,8 +35,7 @@ func GlobalDatapolicyMapping(v interface{}) []string {
 }
 
 func byType(t reflect.Type) []string {
-	// Use string representation of the type to prevent taking a depency on the actual type.
-	switch fmt.Sprintf("%s.%s", t.PkgPath(), t.Name()) {
+	switch t {
 	case httpHeader:
 		return []string{"password", "token"}
 	case httpCookie:
@@ -45,5 +45,4 @@ func byType(t reflect.Type) []string {
 	default:
 		return nil
 	}
-
 }
