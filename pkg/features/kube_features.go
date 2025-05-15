@@ -268,6 +268,9 @@ const (
 	//
 	// Enables support for delaying the binding of pods
 	// which depend on devices with binding conditions.
+	//
+	// DRAResourceClaimDeviceStatus also needs to be
+	// enabled.
 	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
 
 	// owner: @lauralorenz
