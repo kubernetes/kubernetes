@@ -89,7 +89,7 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []int) (errs field.ErrorList) {
 			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a int, b int) bool { return a == b }, validate.ImmutableByCompare)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.ImmutableByCompare)...)
 			return
 		}(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SliceSetPrimitiveField }))...)
 

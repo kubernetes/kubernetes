@@ -92,7 +92,7 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 // will only compare pointer values.  It does not compare the pointed-to
 // values.
 func UniqueByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
-	return unique(fldPath, newSlice, func(a, b T) bool { return a == b })
+	return unique(fldPath, newSlice, DirectEqual)
 }
 
 // UniqueByReflect verifies that each element of newSlice is unique. Unlike
@@ -137,4 +137,10 @@ func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.Er
 // It can be used by any other function that needs to call DeepEqual.
 func SemanticDeepEqual[T any](a, b T) bool {
 	return equality.Semantic.DeepEqual(a, b)
+}
+
+// DirectEqual is a CompareFunc that uses the == operator to compare two values.
+// It can be used by any other function that needs to compare two values directly.
+func DirectEqual[T comparable](a, b T) bool {
+	return a == b
 }
