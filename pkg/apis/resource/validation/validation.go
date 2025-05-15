@@ -1226,7 +1226,7 @@ func validateDeviceBindingParameters(bindingConditions, bindingFailureConditions
 	}
 
 	if bindingTimeoutSeconds != nil && *bindingTimeoutSeconds <= 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeout"), bindingTimeoutSeconds, "must be greater than zero"))
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("bindingTimeoutSeconds"), bindingTimeoutSeconds, "must be greater than zero"))
 	}
 
 	return allErrs
