@@ -476,6 +476,11 @@ func (in *DeviceClassSpec) DeepCopyInto(out *DeviceClassSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.ExtendedResourceName != nil {
+		in, out := &in.ExtendedResourceName, &out.ExtendedResourceName
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
