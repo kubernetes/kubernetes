@@ -16,7 +16,7 @@ package otelrestful // import "go.opentelemetry.io/contrib/instrumentation/githu
 
 // Version is the current release version of the go-restful instrumentation.
 func Version() string {
-	return "0.42.0"
+	return "0.44.0"
 	// This string is updated by the pre_release.sh script during release
 }
 
