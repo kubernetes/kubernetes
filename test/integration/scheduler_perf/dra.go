@@ -350,7 +350,7 @@ claims:
 			nodes[i], nodes[j] = nodes[j], nodes[i]
 		})
 		for _, node := range nodes {
-			result, err := allocator.Allocate(tCtx, node)
+			result, err := allocator.Allocate(tCtx, node, nil)
 			tCtx.ExpectNoError(err, "allocate claim")
 			if result != nil {
 				claim = claim.DeepCopy()

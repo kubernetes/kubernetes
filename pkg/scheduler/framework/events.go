@@ -148,7 +148,8 @@ func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) Ac
 }
 
 func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
-	if !resourceclaim.PodStatusEqual(newPod.Status.ResourceClaimStatuses, oldPod.Status.ResourceClaimStatuses) {
+	if !resourceclaim.PodStatusEqual(newPod.Status.ResourceClaimStatuses, oldPod.Status.ResourceClaimStatuses) ||
+		!resourceclaim.PodExtendedStatusEqual(newPod.Status.ExtendedResourceClaimStatus, oldPod.Status.ExtendedResourceClaimStatus) {
 		return UpdatePodGeneratedResourceClaim
 	}
 
