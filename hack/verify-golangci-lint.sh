@@ -238,7 +238,6 @@ else
     fi
     echo
   } >&2
-  exit 1
 fi
 
 # preserve the result

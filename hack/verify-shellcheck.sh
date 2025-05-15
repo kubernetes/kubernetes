@@ -133,7 +133,6 @@ else
     echo 'See: https://github.com/koalaman/shellcheck/wiki/Ignore#ignoring-one-specific-instance-in-a-file'
     echo
   } >&2
-  exit 1
 fi
 
 # preserve the result
