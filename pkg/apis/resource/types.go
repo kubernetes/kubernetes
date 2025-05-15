@@ -356,9 +356,9 @@ type Device struct {
 	// They may be set in the per-device status conditions.
 	// If any is true, a binding failure occurred.
 	//
-	// The maximum number of binding failure conditions is 4.
-	//
-	// The conditions must be a valid condition type string.
+	// The maximum number of binding conditions is 4.
+	// All entries are condition types, which means
+	// they must be labels.
 	//
 	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
