@@ -2928,6 +2928,9 @@ func ValidateVolumeMounts(mounts []core.VolumeMount, voldevices map[string]strin
 		if len(mnt.Name) == 0 {
 			allErrs = append(allErrs, field.Required(idxPath.Child("name"), ""))
 		}
+		if opts.AllowVolumeNotFoundInVolumeMounts && !IsMatchedVolume(mnt.Name, volumes) {
+			continue
+		}
 		if !IsMatchedVolume(mnt.Name, volumes) {
 			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), mnt.Name))
 		}
@@ -4114,6 +4117,8 @@ type PodValidationOptions struct {
 	OldPodViolatesMatchLabelKeysValidation bool
 	// OldPod has invalid MatchLabelKeys in TopologySpreadConstraints against legacy(<v1.34) validation
 	OldPodViolatesLegacyMatchLabelKeysValidation bool
+	// Allow volume not found in volumeMounts for sts VolumeClaimTemplates
+	AllowVolumeNotFoundInVolumeMounts bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
