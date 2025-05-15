@@ -96,7 +96,8 @@ var (
 			},
 		},
 	}
-	validClaim = testClaim(goodName, goodNS, validClaimSpec)
+	validClaim                    = testClaim(goodName, goodNS, validClaimSpec)
+	conditionValidationErrMessage = "name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"
 )
 
 func TestValidateClaim(t *testing.T) {
@@ -1713,8 +1714,8 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 							Pool:                     goodName,
 							Device:                   goodName,
 							AdminAccess:              ptr.To(false),
-							BindingConditions:        []string{"condition1", "condition2"},
-							BindingFailureConditions: []string{"condition3", "condition4"},
+							BindingConditions:        []string{"condition1", "condition2", "condition3", "condition4"},
+							BindingFailureConditions: []string{"condition5", "condition6", "condition7", "condition8"},
 						}},
 					},
 				}
@@ -1722,7 +1723,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"too-many-binding-conditions": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), 5, 4)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions"), 5, 4)},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{
@@ -1742,7 +1743,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"too-many-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.TooLongMaxLength(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), 5, 4)},
+			wantFailures: field.ErrorList{field.TooMany(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions"), 5, 4)},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{
@@ -1762,7 +1763,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-binding-conditions": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions").Index(1), "condition2!", "must match condition type format")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingConditions").Index(1), "condition2!", conditionValidationErrMessage)},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{
@@ -1782,7 +1783,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"invalid-binding-failure-conditions": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions").Index(1), "condition4!", "must match condition type format")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingFailureConditions").Index(1), "condition4!", conditionValidationErrMessage)},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{
@@ -1822,7 +1823,7 @@ func TestValidateClaimStatusUpdate(t *testing.T) {
 			},
 		},
 		"bad-binding-timeout": {
-			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingTimeout"), ptr.To(int64(-10)), "must be greater than zero")},
+			wantFailures: field.ErrorList{field.Invalid(field.NewPath("status", "allocation", "devices", "results").Index(0).Child("bindingTimeoutSeconds"), ptr.To(int64(-10)), "must be greater than zero")},
 			oldClaim:     validClaim,
 			update: func(claim *resource.ResourceClaim) *resource.ResourceClaim {
 				claim.Status.Allocation = &resource.AllocationResult{
