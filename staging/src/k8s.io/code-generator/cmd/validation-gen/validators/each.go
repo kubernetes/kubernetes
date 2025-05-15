@@ -231,6 +231,7 @@ var (
 	validateEachSliceVal      = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
 	validateEachMapVal        = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 	validateSemanticDeepEqual = types.Name{Package: libValidationPkg, Name: "SemanticDeepEqual"}
+	validateDirectEqual       = types.Name{Package: libValidationPkg, Name: "DirectEqual"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -333,15 +334,8 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 				// pointer fields, which are directly comparable but not what we need.
 				//
 				// Note: This compares the pointee, not the pointer itself.
-				elemType := util.NativeType(t.Elem)
-				if elemType.IsComparable() {
-					// TODO: encapsulate this in a function (validate.DirectEqual)
-					// for readibility.
-					cmpArg = FunctionLiteral{
-						Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
-						Results:    []ParamResult{{"", types.Bool}},
-						Body:       "return a == b",
-					}
+				if util.NonPointer(util.NativeType(t.Elem)).Kind == types.Builtin {
+					cmpArg = Identifier(validateDirectEqual)
 				} else {
 					cmpArg = Identifier(validateSemanticDeepEqual)
 				}

@@ -75,7 +75,7 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil // no changes
 			}
 			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a ComparableStruct, b ComparableStruct) bool { return a == b }, validate.ImmutableByReflect)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.ImmutableByReflect)...)
 			return
 		}(fldPath.Child("sliceSetComparableField"), obj.SliceSetComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []ComparableStruct { return oldObj.SliceSetComparableField }))...)
 
@@ -117,7 +117,7 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil // no changes
 			}
 			errs = append(errs, validate.UniqueByCompare(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a int, b int) bool { return a == b }, validate.ImmutableByCompare)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.ImmutableByCompare)...)
 			return
 		}(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SliceSetPrimitiveField }))...)
 
@@ -128,7 +128,7 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return nil // no changes
 			}
 			errs = append(errs, validate.UniqueByReflect(ctx, op, fldPath, obj, oldObj)...)
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a FalselyComparableStruct, b FalselyComparableStruct) bool { return a == b }, validate.ImmutableByReflect)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.ImmutableByReflect)...)
 			return
 		}(fldPath.Child("sliceSetFalselyComparableField"), obj.SliceSetFalselyComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []FalselyComparableStruct { return oldObj.SliceSetFalselyComparableField }))...)
 
