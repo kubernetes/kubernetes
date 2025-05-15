@@ -167,6 +167,12 @@ status:
       name: nameValue
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
+  extendedResourceClaimStatus:
+    requestMapping:
+    - containerName: containerNameValue
+      extendedResourceName: extendedResourceNameValue
+      requestName: requestNameValue
+    resourceClaimName: resourceClaimNameValue
   hostIP: hostIPValue
   hostIPs:
   - ip: ipValue

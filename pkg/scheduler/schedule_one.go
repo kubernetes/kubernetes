@@ -31,12 +31,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -405,6 +407,27 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 	defer trace.LogIfLong(100 * time.Millisecond)
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
 		return result, err
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
+		draManager := fwk.SharedDRAManager()
+		classes, err := draManager.DeviceClasses().List()
+		if err != nil {
+			return result, err
+		}
+		dynamicResources := make(map[v1.ResourceName]string)
+		for _, c := range classes {
+			if c.Spec.ExtendedResourceName == nil {
+				dynamicResources[v1.ResourceName("deviceclass.resource.kubernetes.io/"+c.Name)] = c.Name
+			} else {
+				dynamicResources[v1.ResourceName(*c.Spec.ExtendedResourceName)] = c.Name
+			}
+		}
+		if len(dynamicResources) != 0 {
+			allNodes, _ := sched.nodeInfoSnapshot.List()
+			for _, n := range allNodes {
+				n.Allocatable.DynamicResources = dynamicResources
+			}
+		}
 	}
 	trace.Step("Snapshotting scheduler cache and node infos done")
 

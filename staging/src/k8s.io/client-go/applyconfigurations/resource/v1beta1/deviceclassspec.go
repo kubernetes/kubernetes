@@ -21,8 +21,9 @@ package v1beta1
 // DeviceClassSpecApplyConfiguration represents a declarative configuration of the DeviceClassSpec type for use
 // with apply.
 type DeviceClassSpecApplyConfiguration struct {
-	Selectors []DeviceSelectorApplyConfiguration           `json:"selectors,omitempty"`
-	Config    []DeviceClassConfigurationApplyConfiguration `json:"config,omitempty"`
+	Selectors            []DeviceSelectorApplyConfiguration           `json:"selectors,omitempty"`
+	Config               []DeviceClassConfigurationApplyConfiguration `json:"config,omitempty"`
+	ExtendedResourceName *string                                      `json:"extendedResourceName,omitempty"`
 }
 
 // DeviceClassSpecApplyConfiguration constructs a declarative configuration of the DeviceClassSpec type for use with
@@ -54,5 +55,13 @@ func (b *DeviceClassSpecApplyConfiguration) WithConfig(values ...*DeviceClassCon
 		}
 		b.Config = append(b.Config, *values[i])
 	}
+	return b
+}
+
+// WithExtendedResourceName sets the ExtendedResourceName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ExtendedResourceName field is set to the value of the last call.
+func (b *DeviceClassSpecApplyConfiguration) WithExtendedResourceName(value string) *DeviceClassSpecApplyConfiguration {
+	b.ExtendedResourceName = &value
 	return b
 }

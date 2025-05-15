@@ -3764,6 +3764,27 @@ type PodResourceClaimStatus struct {
 	ResourceClaimName *string
 }
 
+// PodExtendedResourceClaimStatus is stored in the PodStatus for the extended
+// resource requests backed by DRA. It stores the generated name for
+// the corresponding special ResourceClaim created by kube-scheduler.
+type PodExtendedResourceClaimStatus struct {
+	// RequestMapping identifies the mapping of <container, extended resource backed by DRA> to  device request.
+	RequestMapping []ContainerExtendedResourceRequest
+
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod.
+	ResourceClaimName string
+}
+
+type ContainerExtendedResourceRequest struct {
+	// container name
+	ContainerName string
+	// extended resource name backed by DRA inside the container's requests
+	ExtendedResourceName string
+	// device request name in the special resource claim created for extended resource requests backed by DRA
+	RequestName string
+}
+
 // OSName is the set of OS'es that can be used in OS.
 type OSName string
 
@@ -4353,6 +4374,11 @@ type PodStatus struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus
+
+	// Status of claim of extended resource backed by DRA.
+	// +featureGate=DRAExtendedResource
+	// +optional
+	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatus
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
