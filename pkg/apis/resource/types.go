@@ -341,8 +341,8 @@ type Device struct {
 	// while scheduling the pod.
 	//
 	// The maximum number of binding conditions is 4.
-	//
-	// The conditions must be a valid condition type string.
+	// All entries are condition types, which means
+	// they must be labels.
 	//
 	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
