@@ -46,6 +46,7 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
+		EnableDRAExtendedResource:                    feature.DefaultFeatureGate.Enabled(features.DRAExtendedResource),
 		EnableDRAPrioritizedList:                     feature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
 		EnableDRAAdminAccess:                         feature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		EnableDRADeviceTaints:                        feature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),

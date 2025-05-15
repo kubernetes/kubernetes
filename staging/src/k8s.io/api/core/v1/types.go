@@ -4264,6 +4264,36 @@ type PodResourceClaimStatus struct {
 	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
 }
 
+// PodExtendedResourceClaimStatus is stored in the PodStatus for each extended
+// resource requests backed by DRA. It stores the generated name for
+// the corresponding special ResourceClaim created by scheduler.
+type PodExtendedResourceClaimStatus struct {
+	// RequestMapping identifies the mapping of <container, extended resource backed by DRA> to  device request.
+	// +patchMergeKey=requestName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=requestName
+	// +featureGate=DynamicResourceAllocation
+	RequestMapping []ContainerExtendedResourceRequest `json:"requestMapping" patchStrategy:"merge,retainKeys" patchMergeKey:"requestName" protobuf:"bytes,1,rep,name=requestMapping"`
+
+	// ResourceClaimName is the name of the ResourceClaim that was
+	// generated for the Pod in the namespace of the Pod.
+	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,2,name=resourceClaimName"`
+}
+
+// ContainerExtendedResourceRequest has the mapping of container name,
+// extended resource name to the device request name.
+type ContainerExtendedResourceRequest struct {
+	// ContainerName is the unique container name within the pod.
+	ContainerName string `json:"containerName" protobuf:"bytes,1,name=containerName"`
+	// ExtendedResourceName is the extended resource name backed by DRA inside
+	// the container's requests.
+	ExtendedResourceName string `json:"extendedResourceName" protobuf:"bytes,2,name=extendedResourceName"`
+	// RequestName is the device request name in the special resource claim
+	// created for extended resource requests backed by DRA.
+	RequestName string `json:"requestName" protobuf:"bytes,3,name=requestName"`
+}
+
 // OSName is the set of OS'es that can be used in OS.
 type OSName string
 
@@ -5088,6 +5118,10 @@ type PodStatus struct {
 	// +featureGate=DynamicResourceAllocation
 	// +optional
 	ResourceClaimStatuses []PodResourceClaimStatus `json:"resourceClaimStatuses,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,15,rep,name=resourceClaimStatuses"`
+	// Status of extended resource claim backed by DRA.
+	// +featureGate=DRAExtendedResource
+	// +optional
+	ExtendedResourceClaimStatus *PodExtendedResourceClaimStatus `json:"extendedResourceClaimStatus,omitempty" protobuf:"bytes,18,opt,name=extendedResourceClaimStatus"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -7385,6 +7419,8 @@ const (
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
 	// resource.k8s.io devices requested with a certain DeviceClass, number
 	ResourceClaimsPerClass string = ".deviceclass.resource.k8s.io/devices"
+	// Resource device class prefix
+	ResourceDeviceClassPrefix string = "deviceclass.resource.kubernetes.io/"
 )
 
 // The following identify resource prefix for Kubernetes object types
