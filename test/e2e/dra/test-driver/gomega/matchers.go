@@ -20,10 +20,11 @@ import (
 	"strings"
 
 	"github.com/onsi/gomega/gcustom"
+	testdriver "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 )
 
 // BeRegistered checks that plugin registration has completed.
-var BeRegistered = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+var BeRegistered = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {
 		if call.FullMethod == "/pluginregistration.Registration/NotifyRegistrationStatus" &&
 			call.Err == nil {
@@ -34,7 +35,7 @@ var BeRegistered = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error
 }).WithMessage("contain successful NotifyRegistrationStatus call")
 
 // NodePrepareResoucesSucceeded checks that NodePrepareResources API has been called and succeeded
-var NodePrepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+var NodePrepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {
 		if strings.HasSuffix(call.FullMethod, "/NodePrepareResources") && call.Response != nil && call.Err == nil {
 			return true, nil
@@ -44,7 +45,7 @@ var NodePrepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []GRPCC
 }).WithMessage("contain successful NodePrepareResources call")
 
 // NodePrepareResoucesFailed checks that NodePrepareResources API has been called and returned an error
-var NodePrepareResourcesFailed = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+var NodePrepareResourcesFailed = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {
 		if strings.HasSuffix(call.FullMethod, "/NodePrepareResources") && call.Err != nil {
 			return true, nil
@@ -54,7 +55,7 @@ var NodePrepareResourcesFailed = gcustom.MakeMatcher(func(actualCalls []GRPCCall
 }).WithMessage("contain unsuccessful NodePrepareResources call")
 
 // NodeUnprepareResoucesSucceeded checks that NodeUnprepareResources API has been called and succeeded
-var NodeUnprepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+var NodeUnprepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {
 		if strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") && call.Response != nil && call.Err == nil {
 			return true, nil
@@ -64,7 +65,7 @@ var NodeUnprepareResourcesSucceeded = gcustom.MakeMatcher(func(actualCalls []GRP
 }).WithMessage("contain successful NodeUnprepareResources call")
 
 // NodeUnprepareResoucesFailed checks that NodeUnprepareResources API has been called and returned an error
-var NodeUnprepareResourcesFailed = gcustom.MakeMatcher(func(actualCalls []GRPCCall) (bool, error) {
+var NodeUnprepareResourcesFailed = gcustom.MakeMatcher(func(actualCalls []testdriver.GRPCCall) (bool, error) {
 	for _, call := range actualCalls {
 		if strings.HasSuffix(call.FullMethod, "/NodeUnprepareResources") && call.Err != nil {
 			return true, nil
