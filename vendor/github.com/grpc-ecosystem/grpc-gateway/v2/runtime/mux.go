@@ -71,6 +71,7 @@ type ServeMux struct {
 	routingErrorHandler       RoutingErrorHandlerFunc
 	disablePathLengthFallback bool
 	unescapingMode            UnescapingMode
+	writeContentLength        bool
 }
 
 // ServeMuxOption is an option that can be given to a ServeMux on construction.
@@ -255,6 +256,13 @@ func WithRoutingErrorHandler(fn RoutingErrorHandlerFunc) ServeMuxOption {
 func WithDisablePathLengthFallback() ServeMuxOption {
 	return func(serveMux *ServeMux) {
 		serveMux.disablePathLengthFallback = true
+	}
+}
+
+// WithWriteContentLength returns a ServeMuxOption to enable writing content length on non-streaming responses
+func WithWriteContentLength() ServeMuxOption {
+	return func(serveMux *ServeMux) {
+		serveMux.writeContentLength = true
 	}
 }
 

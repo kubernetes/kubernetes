@@ -92,14 +92,11 @@ func (f *trInFlow) newLimit(n uint32) uint32 {
 
 func (f *trInFlow) onData(n uint32) uint32 {
 	f.unacked += n
-	if f.unacked >= f.limit/4 {
-		w := f.unacked
-		f.unacked = 0
+	if f.unacked < f.limit/4 {
 		f.updateEffectiveWindowSize()
-		return w
+		return 0
 	}
-	f.updateEffectiveWindowSize()
-	return 0
+	return f.reset()
 }
 
 func (f *trInFlow) reset() uint32 {

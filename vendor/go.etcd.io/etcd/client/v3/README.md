@@ -1,7 +1,7 @@
-# etcd/clientv3
+# etcd/client/v3
 
 [![Docs](https://img.shields.io/badge/docs-latest-green.svg)](https://etcd.io/docs)
-[![Godoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/go.etcd.io/etcd/clientv3)
+[![Godoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/go.etcd.io/etcd/client/v3)
 
 `etcd/clientv3` is the official Go etcd client for v3.
 
@@ -16,14 +16,18 @@ go get go.etcd.io/etcd/client/v3
 Create client using `clientv3.New`:
 
 ```go
-cli, err := clientv3.New(clientv3.Config{
-	Endpoints:   []string{"localhost:2379", "localhost:22379", "localhost:32379"},
-	DialTimeout: 5 * time.Second,
-})
-if err != nil {
-	// handle error!
+import clientv3 "go.etcd.io/etcd/client/v3"
+
+func main() {
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   []string{"localhost:2379", "localhost:22379", "localhost:32379"},
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		// handle error!
+	}
+	defer cli.Close()
 }
-defer cli.Close()
 ```
 
 etcd v3 uses [`gRPC`](https://www.grpc.io) for remote procedure calls. And `clientv3` uses

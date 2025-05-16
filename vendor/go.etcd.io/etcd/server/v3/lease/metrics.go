@@ -48,7 +48,8 @@ var (
 			Help:      "Bucketed histogram of lease TTLs.",
 			// 1 second -> 3 months
 			Buckets: prometheus.ExponentialBuckets(1, 2, 24),
-		})
+		},
+	)
 )
 
 func init() {
