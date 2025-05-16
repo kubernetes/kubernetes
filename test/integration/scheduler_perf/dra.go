@@ -238,6 +238,8 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 					Capacity: map[resourceapi.QualifiedName]resourceapi.DeviceCapacity{
 						"memory": {Value: resource.MustParse("1Gi")},
 					},
+					// These fields are only used when the "BindingConditions" feature gate is enabled.
+					// When the feature gate is off, these fields are stripped to ensure backward compatibility.
 					UsageRestrictedToNode:    ptr.To(true),
 					BindingConditions:        []string{"DeviceAttached"},
 					BindingFailureConditions: []string{"AttachmentFailed"},
@@ -373,14 +375,28 @@ claims:
 	}
 }
 
+// updateDeviceConditionsOp defines an op where device conditions are updated.
+// This is used to test the device binding conditions.
+// The conditions are set on the device status of the resource claim.
 type updateDeviceConditionsOp struct {
-	Opcode               operationCode
-	Namespace            string
-	ConditionTypeParam   string
+	// Must be updateDeviceConditionsOpcode.
+	Opcode operationCode
+	// Namespace where the claims are located.
+	Namespace string
+	// Conditions to set on the devices.
+	ConditionTypeParam string
+	// ConditionStatusParam is the parameter for the condition status.
+	// The condition status must be one of "True", "False", or "Unknown".
 	ConditionStatusParam string
-	Conditions           []metav1.Condition
-	Duration             metav1.Duration
-	DurationParam        string
+	// Conditions to set on the devices. This is parameterized through
+	// ConditionTypeParam and ConditionStatusParam.
+	Conditions []metav1.Condition
+	// Duration for the test.
+	Duration metav1.Duration
+	// DurationParam is the parameter for the duration.
+	// If set, the duration is parameterized through this parameter.
+	// The duration is used to wait for the conditions to be set.
+	DurationParam string
 }
 
 func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
@@ -390,12 +406,13 @@ func (op *updateDeviceConditionsOp) isValid(allowParameterization bool) error {
 	if op.Conditions == nil && (op.ConditionTypeParam == "" || op.ConditionStatusParam == "") {
 		return fmt.Errorf("conditions must be set")
 	}
-	if op.Namespace == "" || op.ConditionTypeParam == "" {
-		return fmt.Errorf("namespace and conditions must be set")
+	if op.ConditionStatusParam != "" && op.ConditionTypeParam == "" {
+		return fmt.Errorf("ConditionStatusParam must be set together with ConditionTypeParam")
 	}
-	if op.Namespace == "" || op.ConditionTypeParam == "" {
-		return fmt.Errorf("namespace and conditions must be set")
+	if op.ConditionTypeParam != "" && op.ConditionStatusParam == "" {
+		return fmt.Errorf("ConditionTypeParam must be set together with ConditionStatusParam")
 	}
+
 	return nil
 }
 
@@ -533,12 +550,26 @@ func makeBindingConditions(driver, pool, device, condition string, status metav1
 	}
 }
 
+// checkPodScheduledOp defines an op that checks if all pods in a namespace are scheduled
+// or unscheduled. This is used to test the device binding conditions.
+// The check is done by listing all pods in the namespace and checking their status.
 type checkPodScheduledOp struct {
-	Opcode            operationCode
-	Namespace         string
-	Duration          metav1.Duration
-	DurationParam     string
-	ScheduledParam    string
+	// Must be checkPodScheduledOpcode.
+	Opcode operationCode
+	// Namespace where the pods are located.
+	Namespace string
+	// Duration for the test.
+	Duration metav1.Duration
+	// DurationParam is the parameter for the duration.
+	// If set, the duration is parameterized through this parameter.
+	DurationParam string
+	// ScheduledParam is the parameter for the expected scheduled state.
+	// If set, the expected scheduled state is parameterized through this parameter.
+	ScheduledParam string
+	// ExpectedScheduled is the expected scheduled state.
+	// If true, the op checks if all pods are scheduled.
+	// If false, the op checks if all pods are unscheduled.
+	// This is used to test the device binding conditions.
 	ExpectedScheduled bool
 }
 
