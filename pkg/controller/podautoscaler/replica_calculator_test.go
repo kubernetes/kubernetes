@@ -561,6 +561,42 @@ func TestReplicaCalcScaleUpUnreadyNoScale(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestReplicaCalcScaleUpWithNoReadyPods(t *testing.T) {
+	tc := replicaCalcTestCase{
+		currentReplicas:  3,
+		expectedReplicas: 5,
+		podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse}, // All pods are not ready
+		resource: &resourceInfo{
+			name:     v1.ResourceCPU,
+			requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			levels:   makePodMetricLevels(300, 500, 700),
+
+			targetUtilization:   30,
+			expectedUtilization: 50,
+			expectedValue:       numContainersPerPod * 500,
+		},
+	}
+	tc.runTest(t)
+}
+
+func TestReplicaCalcScaleDownWithNoReadyPods(t *testing.T) {
+    tc := replicaCalcTestCase{
+        currentReplicas:  5,
+        expectedReplicas: 3,
+        podReadiness:     []v1.ConditionStatus{v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse, v1.ConditionFalse}, // All 5 pods are not ready
+        resource: &resourceInfo{
+            name:     v1.ResourceCPU,
+            requests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+            levels:   makePodMetricLevels(100, 300, 500, 250, 250),
+
+            targetUtilization:   50,
+            expectedUtilization: 28,
+            expectedValue:       numContainersPerPod * 280,
+        },
+    }
+    tc.runTest(t)
+}
+
 func TestExternalPerPodMetricReplicaOverflow(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  1,
@@ -2333,3 +2369,4 @@ func TestCalculatePodRequests(t *testing.T) {
 		})
 	}
 }
+

@@ -89,7 +89,13 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 
 	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
-	removeMetricsForPods(metrics, unreadyPods)
+
+	// Don't remove metrics for unready pods if all pods are unready
+	allPodsUnReady := readyPodCount == 0 && len(unreadyPods) > 0
+	if !allPodsUnReady {
+		removeMetricsForPods(metrics, unreadyPods)
+	}
+
 	if len(metrics) == 0 {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("did not receive metrics for targeted pods (pods might be unready)")
 	}
@@ -102,6 +108,13 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	usageRatio, utilization, rawUtilization, err := metricsclient.GetResourceUtilizationRatio(metrics, requests, targetUtilization)
 	if err != nil {
 		return 0, 0, 0, time.Time{}, err
+	}
+
+	if allPodsUnReady {
+		if tolerances.isWithin(usageRatio) {
+			return currentReplicas, utilization, rawUtilization, timestamp, nil
+		}
+		return int32(math.Ceil(usageRatio * float64(currentReplicas))), utilization, rawUtilization, timestamp, nil
 	}
 
 	scaleUpWithUnready := len(unreadyPods) > 0 && usageRatio > 1.0
@@ -200,7 +213,12 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(podList, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
-	removeMetricsForPods(metrics, unreadyPods)
+
+	// Don't remove metrics for unready pods if all pods are unready
+	allPodsUnReady := readyPodCount == 0 && len(unreadyPods) > 0
+	if !allPodsUnReady {
+		removeMetricsForPods(metrics, unreadyPods)
+	}	
 
 	if len(metrics) == 0 {
 		return 0, 0, fmt.Errorf("did not receive metrics for targeted pods (pods might be unready)")
@@ -276,6 +294,8 @@ func (c *ReplicaCalculator) GetObjectMetricReplicas(currentReplicas int32, targe
 
 // getUsageRatioReplicaCount calculates the desired replica count based on usageRatio and ready pods count.
 // For currentReplicas=0 doesn't take into account ready pods count and tolerance to support scaling to zero pods.
+// When no pods are ready (readyPodCount=0) and currentReplicas>0, it uses currentReplicas as the base for calculation
+// to prevent getting stuck in a state where scaling up is impossible.
 func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usageRatio float64, tolerances Tolerances, namespace string, selector labels.Selector) (replicaCount int32, timestamp time.Time, err error) {
 	if currentReplicas != 0 {
 		if tolerances.isWithin(usageRatio) {
@@ -287,7 +307,14 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 		if err != nil {
 			return 0, time.Time{}, fmt.Errorf("unable to calculate ready pods: %s", err)
 		}
-		replicaCount = int32(math.Ceil(usageRatio * float64(readyPodCount)))
+
+		if readyPodCount == 0 {
+			// Fallback to using currentReplicas when no pods are ready
+			replicaCount = int32(math.Ceil(usageRatio) * float64(currentReplicas))
+		} else {
+			replicaCount = int32(math.Ceil(usageRatio * float64(readyPodCount)))
+		}
+
 	} else {
 		// Scale to zero or n pods depending on usageRatio
 		replicaCount = int32(math.Ceil(usageRatio))
