@@ -24,17 +24,20 @@ import (
 	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
+	"k8s.io/kubernetes/pkg/quota/v1/evaluator/resource"
 )
 
 // NewQuotaConfigurationForAdmission returns a quota configuration for admission control.
 func NewQuotaConfigurationForAdmission() quota.Configuration {
 	evaluators := core.NewEvaluators(nil)
+	evaluators = append(evaluators, resource.NewEvaluators(nil)...)
 	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
 }
 
 // NewQuotaConfigurationForControllers returns a quota configuration for controllers.
 func NewQuotaConfigurationForControllers(f quota.ListerForResourceFunc) quota.Configuration {
 	evaluators := core.NewEvaluators(f)
+	evaluators = append(evaluators, resource.NewEvaluators(f)...)
 	return generic.NewConfiguration(evaluators, DefaultIgnoredResources())
 }
 
