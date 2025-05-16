@@ -1191,6 +1191,70 @@ func TestSemverCost(t *testing.T) {
 	}
 }
 
+func TestImageCost(t *testing.T) {
+	cases := []struct {
+		name                string
+		expr                string
+		expectEstimatedCost checker.CostEstimate
+		expectRuntimeCost   uint64
+	}{
+		{
+			name:                "parse",
+			expr:                `image("reg.io/repo/img:tag")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "isImage",
+			expr:                `isImage("reg.io/repo/img:tag")`,
+			expectEstimatedCost: checker.CostEstimate{Min: 2, Max: 2},
+			expectRuntimeCost:   2,
+		},
+		{
+			name:                "containsDigest",
+			expr:                `image("reg.io/repo/img@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").containsDigest()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 10, Max: 10},
+			expectRuntimeCost:   10,
+		},
+		{
+			name:                "registry",
+			expr:                `image("reg.io/repo/img:tag").registry()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "repository",
+			expr:                `image("reg.io/repo/img:tag").repository()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "identifier",
+			expr:                `image("reg.io/repo/img:tag").identifier()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "tag",
+			expr:                `image("reg.io/repo/img:tag").tag()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 3, Max: 3},
+			expectRuntimeCost:   3,
+		},
+		{
+			name:                "digest",
+			expr:                `image("reg.io/repo/img@sha256:6aefddb645ee6963afd681b1845c661d0ea4c3b20ab9db86d9e753b203d385f2").digest()`,
+			expectEstimatedCost: checker.CostEstimate{Min: 10, Max: 10},
+			expectRuntimeCost:   10,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			testCost(t, tc.expr, tc.expectEstimatedCost, tc.expectRuntimeCost)
+		})
+	}
+}
+
 func TestTwoVariableComprehensionCost(t *testing.T) {
 	cases := []struct {
 		name                string
@@ -1305,6 +1369,7 @@ func testCost(t *testing.T, expr string, expectEsimatedCost checker.CostEstimate
 		cel.CostEstimatorOptions(checker.PresenceTestHasCost(false)),
 		ext.TwoVarComprehensions(),
 		SemverLib(SemverVersion(1)),
+		Image(),
 	)
 	if err != nil {
 		t.Fatalf("%v", err)
@@ -1443,6 +1508,7 @@ func TestTypeEquality(t *testing.T) {
 		"net.CIDR":                               apiservercel.CIDR{},
 		"kubernetes.NamedFormat":                 apiservercel.Format{},
 		"kubernetes.Semver":                      apiservercel.Semver{},
+		"kubernetes.Image":                       apiservercel.Image{},
 	}
 
 	originalPanicOnUnknown := panicOnUnknown
