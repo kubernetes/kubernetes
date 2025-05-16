@@ -218,7 +218,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	allPodsUnReady := readyPodCount == 0 && len(unreadyPods) > 0
 	if !allPodsUnReady {
 		removeMetricsForPods(metrics, unreadyPods)
-	}	
+	}
 
 	if len(metrics) == 0 {
 		return 0, 0, fmt.Errorf("did not receive metrics for targeted pods (pods might be unready)")
