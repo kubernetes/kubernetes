@@ -40,6 +40,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
 	applyv1 "k8s.io/client-go/applyconfigurations/core/v1"
@@ -47,9 +48,12 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/events"
+	testdriverapp "k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -266,6 +270,85 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 			testContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, true, container0Env...)
 			testContainerEnv(ctx, f, pod, pod.Spec.Containers[1].Name, true, container1Env...)
+		})
+
+		ginkgo.It("blocks new pod after force-delete", func(ctx context.Context) {
+			// The problem with a force-deleted pod is that kubelet
+			// is not necessarily done yet with tearing down the
+			// pod at the time when the pod and its claim are
+			// already removed. The user can replace the claim and
+			// pod with new instances under the same name.  The
+			// kubelet then needs to detect that the new claim is
+			// not the same as the one that kubelet currently works
+			// on and that the new pod cannot start until the old
+			// one is torn down.
+			//
+			// This test delays termination of the first pod to ensure
+			// that the race goes bad (old pod pending shutdown when
+			// new one arrives) and always schedules to the same node.
+			claim := b.externalClaim()
+			pod := b.podExternal()
+			node := nodes.NodeNames[0]
+			pod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": node}
+			oldClaim := b.create(ctx, claim, pod)[0].(*resourceapi.ResourceClaim)
+			b.testPod(ctx, f, pod)
+
+			ginkgo.By("Force-delete claim and pod")
+			forceDelete := metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}
+			framework.ExpectNoError(b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Delete(ctx, pod.Name, forceDelete))
+
+			// Fail NodeUnprepareResources to simulate long grace period
+			unprepareResources := MethodInstance{node, NodeUnprepareResourcesMethod}
+			driver.Fail(unprepareResources, true)
+
+			// The pod should get deleted immediately.
+			_, err := b.f.ClientSet.CoreV1().Pods(b.f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			if !apierrors.IsNotFound(err) {
+				framework.Failf("Expected 'not found' error, got: %v", err)
+			}
+
+			// The claim may take a bit longer because of the allocation and finalizer.
+			framework.ExpectNoError(b.f.ClientSet.ResourceV1beta1().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, forceDelete))
+			gomega.Eventually(ctx, func(ctx context.Context) (*resourceapi.ResourceClaim, error) {
+				claim, err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Get(ctx, claim.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					return nil, nil
+				}
+				return claim, err
+			}).Should(gomega.BeNil())
+			gomega.Expect(b.driver.Nodes[node].GetPreparedResources()).Should(gomega.Equal([]testdriverapp.ClaimID{{Name: oldClaim.Name, UID: oldClaim.UID}}), "Old claim should still be prepared.")
+
+			ginkgo.By("Re-creating the same claim and pod")
+			newClaim := b.create(ctx, claim, pod)[0].(*resourceapi.ResourceClaim)
+
+			// Keep blocking NodeUnprepareResources for the old pod
+			// until the new pod calls NodePrepareResources and fails.
+			// This ensures that the race is triggered.
+			expectedEvent := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pod.Name,
+				"involvedObject.namespace": pod.Namespace,
+				"reason":                   events.FailedPrepareDynamicResources,
+			}.AsSelector().String()
+
+			// 10 min timeout (PodStartTimeout * 2) should be enough
+			// for Kubelet to emit multiple events, so the test should
+			// be able to catch at least one of them.
+			framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
+				ctx,
+				f.ClientSet,
+				pod.Namespace,
+				expectedEvent,
+				fmt.Sprintf("old claim with same name %s and different UID %s still exists", klog.KObj(oldClaim), oldClaim.UID),
+				framework.PodStartTimeout*2))
+
+			driver.Fail(unprepareResources, false)
+
+			b.testPod(ctx, f, pod)
+
+			// The pod must not have started before NodeUnprepareResources was called for the old one,
+			// i.e. what is prepared now must be the new claim.
+			gomega.Expect(b.driver.Nodes[node].GetPreparedResources()).Should(gomega.Equal([]testdriverapp.ClaimID{{Name: newClaim.Name, UID: newClaim.UID}}), "Only new claim should be prepared now because new pod is running.")
 		})
 	})
 
