@@ -18,11 +18,11 @@ import (
 	goruntime "runtime"
 	"time"
 
-	"go.etcd.io/etcd/api/v3/version"
-	"go.etcd.io/etcd/pkg/v3/runtime"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+
+	"go.etcd.io/etcd/api/v3/version"
+	"go.etcd.io/etcd/pkg/v3/runtime"
 )
 
 var (
@@ -44,18 +44,13 @@ var (
 		Name:      "leader_changes_seen_total",
 		Help:      "The number of leader changes seen.",
 	})
-	isLearner = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "is_learner",
-		Help:      "Whether or not this member is a learner. 1 if is, 0 otherwise.",
-	})
-	learnerPromoteFailed = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "learner_promote_failures",
-		Help:      "The total number of failed learner promotions (likely learner not ready) while this member is leader.",
-	},
+	learnerPromoteFailed = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "etcd",
+			Subsystem: "server",
+			Name:      "learner_promote_failures",
+			Help:      "The total number of failed learner promotions (likely learner not ready) while this member is leader.",
+		},
 		[]string{"Reason"},
 	)
 	learnerPromoteSucceed = prometheus.NewCounter(prometheus.CounterOpts{
@@ -69,12 +64,6 @@ var (
 		Subsystem: "server",
 		Name:      "heartbeat_send_failures_total",
 		Help:      "The total number of leader heartbeat send failures (likely overloaded from slow disk).",
-	})
-	slowApplies = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "slow_apply_total",
-		Help:      "The total number of slow apply requests (likely overloaded from slow disk).",
 	})
 	applySnapshotInProgress = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "etcd",
@@ -124,34 +113,40 @@ var (
 		Name:      "lease_expired_total",
 		Help:      "The total number of expired leases.",
 	})
-	quotaBackendBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "quota_backend_bytes",
-		Help:      "Current backend storage quota size in bytes.",
-	})
-	currentVersion = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "version",
-		Help:      "Which version is running. 1 for 'server_version' label with current version.",
-	},
-		[]string{"server_version"})
-	currentGoVersion = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "go_version",
-		Help:      "Which Go version server is running with. 1 for 'server_go_version' label with current version.",
-	},
-		[]string{"server_go_version"})
-	serverID = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "id",
-		Help:      "Server or member ID in hexadecimal format. 1 for 'server_id' label with current ID.",
-	},
-		[]string{"server_id"})
-
+	currentVersion = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "etcd",
+			Subsystem: "server",
+			Name:      "version",
+			Help:      "Which version is running. 1 for 'server_version' label with current version.",
+		},
+		[]string{"server_version"},
+	)
+	currentGoVersion = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "etcd",
+			Subsystem: "server",
+			Name:      "go_version",
+			Help:      "Which Go version server is running with. 1 for 'server_go_version' label with current version.",
+		},
+		[]string{"server_go_version"},
+	)
+	serverID = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "etcd",
+			Subsystem: "server",
+			Name:      "id",
+			Help:      "Server or member ID in hexadecimal format. 1 for 'server_id' label with current ID.",
+		},
+		[]string{"server_id"},
+	)
+	serverFeatureEnabled = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "etcd_server_feature_enabled",
+			Help: "Whether or not a feature is enabled. 1 is enabled, 0 is not.",
+		},
+		[]string{"name", "stage"},
+	)
 	fdUsed = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: "os",
 		Subsystem: "fd",
@@ -164,17 +159,6 @@ var (
 		Name:      "limit",
 		Help:      "The file descriptor limit.",
 	})
-	applySec = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: "etcd",
-		Subsystem: "server",
-		Name:      "apply_duration_seconds",
-		Help:      "The latency distributions of v2 apply called by backend.",
-
-		// lowest bucket start of upper bound 0.0001 sec (0.1 ms) with factor 2
-		// highest bucket start of 0.0001 sec * 2^19 == 52.4288 sec
-		Buckets: prometheus.ExponentialBuckets(0.0001, 2, 20),
-	},
-		[]string{"version", "op", "success"})
 )
 
 func init() {
@@ -182,7 +166,6 @@ func init() {
 	prometheus.MustRegister(isLeader)
 	prometheus.MustRegister(leaderChanges)
 	prometheus.MustRegister(heartbeatSendFailures)
-	prometheus.MustRegister(slowApplies)
 	prometheus.MustRegister(applySnapshotInProgress)
 	prometheus.MustRegister(proposalsCommitted)
 	prometheus.MustRegister(proposalsApplied)
@@ -191,16 +174,14 @@ func init() {
 	prometheus.MustRegister(slowReadIndex)
 	prometheus.MustRegister(readIndexFailed)
 	prometheus.MustRegister(leaseExpired)
-	prometheus.MustRegister(quotaBackendBytes)
 	prometheus.MustRegister(currentVersion)
 	prometheus.MustRegister(currentGoVersion)
 	prometheus.MustRegister(serverID)
-	prometheus.MustRegister(isLearner)
+	prometheus.MustRegister(serverFeatureEnabled)
 	prometheus.MustRegister(learnerPromoteSucceed)
 	prometheus.MustRegister(learnerPromoteFailed)
 	prometheus.MustRegister(fdUsed)
 	prometheus.MustRegister(fdLimit)
-	prometheus.MustRegister(applySec)
 
 	currentVersion.With(prometheus.Labels{
 		"server_version": version.Version,

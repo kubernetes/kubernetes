@@ -207,17 +207,13 @@ github.com/gogo/protobuf/protoc-gen-gogo/plugin
 github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
-# github.com/golang-jwt/jwt/v4 v4.5.2
-## explicit; go 1.16
-github.com/golang-jwt/jwt/v4
+# github.com/golang-jwt/jwt/v5 v5.2.2
+## explicit; go 1.18
+github.com/golang-jwt/jwt/v5
 # github.com/golang/protobuf v1.5.4
 ## explicit; go 1.17
-github.com/golang/protobuf/descriptor
-github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
-github.com/golang/protobuf/ptypes/any
-github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.1.3
@@ -320,20 +316,19 @@ github.com/gorilla/websocket
 # github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 ## explicit
 github.com/gregjones/httpcache
-# github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
-## explicit; go 1.14
-github.com/grpc-ecosystem/go-grpc-middleware
+# github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1
+## explicit; go 1.19
+github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus
+# github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.0
+## explicit; go 1.23
+github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
 # github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 ## explicit
 github.com/grpc-ecosystem/go-grpc-prometheus
-# github.com/grpc-ecosystem/grpc-gateway v1.16.0
-## explicit; go 1.14
-github.com/grpc-ecosystem/grpc-gateway/internal
-github.com/grpc-ecosystem/grpc-gateway/runtime
-github.com/grpc-ecosystem/grpc-gateway/utilities
-# github.com/grpc-ecosystem/grpc-gateway/v2 v2.24.0
-## explicit; go 1.22.7
+# github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
+## explicit; go 1.23.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
+github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/inconshreveable/mousetrap v1.1.0
@@ -342,8 +337,8 @@ github.com/inconshreveable/mousetrap
 # github.com/ishidawataru/sctp v0.0.0-20230406120618-7ff4192f6ff2
 ## explicit; go 1.12
 github.com/ishidawataru/sctp
-# github.com/jonboulle/clockwork v0.4.0
-## explicit; go 1.15
+# github.com/jonboulle/clockwork v0.5.0
+## explicit; go 1.21
 github.com/jonboulle/clockwork
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
@@ -544,7 +539,7 @@ github.com/soheilhy/cmux
 ## explicit; go 1.15
 github.com/spf13/cobra
 github.com/spf13/cobra/doc
-# github.com/spf13/pflag v1.0.5
+# github.com/spf13/pflag v1.0.6
 ## explicit; go 1.12
 github.com/spf13/pflag
 # github.com/stoewer/go-strcase v1.3.0
@@ -578,10 +573,13 @@ github.com/xiang90/probing
 # github.com/xlab/treeprint v1.2.0
 ## explicit; go 1.13
 github.com/xlab/treeprint
-# go.etcd.io/bbolt v1.3.11
-## explicit; go 1.22
+# go.etcd.io/bbolt v1.4.0
+## explicit; go 1.23
 go.etcd.io/bbolt
-# go.etcd.io/etcd/api/v3 v3.5.21
+go.etcd.io/bbolt/errors
+go.etcd.io/bbolt/internal/common
+go.etcd.io/bbolt/internal/freelist
+# go.etcd.io/etcd/api/v3 v3.6.0
 ## explicit; go 1.23.0
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
@@ -590,7 +588,8 @@ go.etcd.io/etcd/api/v3/membershippb
 go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
-# go.etcd.io/etcd/client/pkg/v3 v3.5.21
+go.etcd.io/etcd/api/v3/versionpb
+# go.etcd.io/etcd/client/pkg/v3 v3.6.0
 ## explicit; go 1.23.0
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
@@ -600,10 +599,8 @@ go.etcd.io/etcd/client/pkg/v3/systemd
 go.etcd.io/etcd/client/pkg/v3/tlsutil
 go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
-# go.etcd.io/etcd/client/v2 v2.305.21
-## explicit; go 1.23.0
-go.etcd.io/etcd/client/v2
-# go.etcd.io/etcd/client/v3 v3.5.21
+go.etcd.io/etcd/client/pkg/v3/verify
+# go.etcd.io/etcd/client/v3 v3.6.0
 ## explicit; go 1.23.0
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
@@ -611,54 +608,46 @@ go.etcd.io/etcd/client/v3/credentials
 go.etcd.io/etcd/client/v3/internal/endpoint
 go.etcd.io/etcd/client/v3/internal/resolver
 go.etcd.io/etcd/client/v3/kubernetes
-# go.etcd.io/etcd/pkg/v3 v3.5.21
+# go.etcd.io/etcd/pkg/v3 v3.6.0
 ## explicit; go 1.23.0
 go.etcd.io/etcd/pkg/v3/adt
 go.etcd.io/etcd/pkg/v3/contention
 go.etcd.io/etcd/pkg/v3/cpuutil
 go.etcd.io/etcd/pkg/v3/crc
 go.etcd.io/etcd/pkg/v3/debugutil
+go.etcd.io/etcd/pkg/v3/featuregate
 go.etcd.io/etcd/pkg/v3/flags
 go.etcd.io/etcd/pkg/v3/httputil
 go.etcd.io/etcd/pkg/v3/idutil
 go.etcd.io/etcd/pkg/v3/ioutil
 go.etcd.io/etcd/pkg/v3/netutil
+go.etcd.io/etcd/pkg/v3/notify
 go.etcd.io/etcd/pkg/v3/pbutil
 go.etcd.io/etcd/pkg/v3/runtime
 go.etcd.io/etcd/pkg/v3/schedule
 go.etcd.io/etcd/pkg/v3/traceutil
 go.etcd.io/etcd/pkg/v3/wait
-# go.etcd.io/etcd/raft/v3 v3.5.21
-## explicit; go 1.23.0
-go.etcd.io/etcd/raft/v3
-go.etcd.io/etcd/raft/v3/confchange
-go.etcd.io/etcd/raft/v3/quorum
-go.etcd.io/etcd/raft/v3/raftpb
-go.etcd.io/etcd/raft/v3/tracker
-# go.etcd.io/etcd/server/v3 v3.5.21
+# go.etcd.io/etcd/server/v3 v3.6.0
 ## explicit; go 1.23.0
 go.etcd.io/etcd/server/v3/auth
 go.etcd.io/etcd/server/v3/config
-go.etcd.io/etcd/server/v3/datadir
 go.etcd.io/etcd/server/v3/embed
 go.etcd.io/etcd/server/v3/etcdserver
 go.etcd.io/etcd/server/v3/etcdserver/api
 go.etcd.io/etcd/server/v3/etcdserver/api/etcdhttp
+go.etcd.io/etcd/server/v3/etcdserver/api/etcdhttp/types
 go.etcd.io/etcd/server/v3/etcdserver/api/membership
 go.etcd.io/etcd/server/v3/etcdserver/api/rafthttp
 go.etcd.io/etcd/server/v3/etcdserver/api/snap
 go.etcd.io/etcd/server/v3/etcdserver/api/snap/snappb
-go.etcd.io/etcd/server/v3/etcdserver/api/v2auth
 go.etcd.io/etcd/server/v3/etcdserver/api/v2discovery
 go.etcd.io/etcd/server/v3/etcdserver/api/v2error
-go.etcd.io/etcd/server/v3/etcdserver/api/v2http
-go.etcd.io/etcd/server/v3/etcdserver/api/v2http/httptypes
 go.etcd.io/etcd/server/v3/etcdserver/api/v2stats
 go.etcd.io/etcd/server/v3/etcdserver/api/v2store
-go.etcd.io/etcd/server/v3/etcdserver/api/v2v3
 go.etcd.io/etcd/server/v3/etcdserver/api/v3alarm
 go.etcd.io/etcd/server/v3/etcdserver/api/v3client
 go.etcd.io/etcd/server/v3/etcdserver/api/v3compactor
+go.etcd.io/etcd/server/v3/etcdserver/api/v3discovery
 go.etcd.io/etcd/server/v3/etcdserver/api/v3election
 go.etcd.io/etcd/server/v3/etcdserver/api/v3election/v3electionpb
 go.etcd.io/etcd/server/v3/etcdserver/api/v3election/v3electionpb/gw
@@ -666,17 +655,32 @@ go.etcd.io/etcd/server/v3/etcdserver/api/v3lock
 go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb
 go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb/gw
 go.etcd.io/etcd/server/v3/etcdserver/api/v3rpc
+go.etcd.io/etcd/server/v3/etcdserver/apply
 go.etcd.io/etcd/server/v3/etcdserver/cindex
+go.etcd.io/etcd/server/v3/etcdserver/errors
+go.etcd.io/etcd/server/v3/etcdserver/txn
+go.etcd.io/etcd/server/v3/etcdserver/version
+go.etcd.io/etcd/server/v3/features
+go.etcd.io/etcd/server/v3/internal/clientv2
 go.etcd.io/etcd/server/v3/lease
 go.etcd.io/etcd/server/v3/lease/leasehttp
 go.etcd.io/etcd/server/v3/lease/leasepb
-go.etcd.io/etcd/server/v3/mvcc
-go.etcd.io/etcd/server/v3/mvcc/backend
-go.etcd.io/etcd/server/v3/mvcc/buckets
 go.etcd.io/etcd/server/v3/proxy/grpcproxy/adapter
+go.etcd.io/etcd/server/v3/storage
+go.etcd.io/etcd/server/v3/storage/backend
+go.etcd.io/etcd/server/v3/storage/datadir
+go.etcd.io/etcd/server/v3/storage/mvcc
+go.etcd.io/etcd/server/v3/storage/schema
+go.etcd.io/etcd/server/v3/storage/wal
+go.etcd.io/etcd/server/v3/storage/wal/walpb
 go.etcd.io/etcd/server/v3/verify
-go.etcd.io/etcd/server/v3/wal
-go.etcd.io/etcd/server/v3/wal/walpb
+# go.etcd.io/raft/v3 v3.6.0
+## explicit; go 1.23
+go.etcd.io/raft/v3
+go.etcd.io/raft/v3/confchange
+go.etcd.io/raft/v3/quorum
+go.etcd.io/raft/v3/raftpb
+go.etcd.io/raft/v3/tracker
 # go.opentelemetry.io/auto/sdk v1.1.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk
@@ -685,8 +689,8 @@ go.opentelemetry.io/auto/sdk/internal/telemetry
 ## explicit; go 1.19
 go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful
 go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconvutil
-# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
-## explicit; go 1.22.7
+# go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.59.0
+## explicit; go 1.22.0
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/internal
 # go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
@@ -695,7 +699,7 @@ go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil
-# go.opentelemetry.io/otel v1.33.0
+# go.opentelemetry.io/otel v1.34.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/otel
 go.opentelemetry.io/otel/attribute
@@ -711,24 +715,23 @@ go.opentelemetry.io/otel/semconv/v1.12.0
 go.opentelemetry.io/otel/semconv/v1.17.0
 go.opentelemetry.io/otel/semconv/v1.20.0
 go.opentelemetry.io/otel/semconv/v1.26.0
-go.opentelemetry.io/otel/semconv/v1.4.0
-# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.33.0
-## explicit; go 1.22.7
+# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.34.0
+## explicit; go 1.22.0
 go.opentelemetry.io/otel/exporters/otlp/otlptrace
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform
-# go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.33.0
-## explicit; go 1.22.7
+# go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.34.0
+## explicit; go 1.22.0
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/envconfig
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry
-# go.opentelemetry.io/otel/metric v1.33.0
+# go.opentelemetry.io/otel/metric v1.34.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/embedded
 go.opentelemetry.io/otel/metric/noop
-# go.opentelemetry.io/otel/sdk v1.33.0
+# go.opentelemetry.io/otel/sdk v1.34.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/otel/sdk
 go.opentelemetry.io/otel/sdk/instrumentation
@@ -737,13 +740,13 @@ go.opentelemetry.io/otel/sdk/internal/x
 go.opentelemetry.io/otel/sdk/resource
 go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/tracetest
-# go.opentelemetry.io/otel/trace v1.33.0
+# go.opentelemetry.io/otel/trace v1.34.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/noop
-# go.opentelemetry.io/proto/otlp v1.4.0
-## explicit; go 1.22.7
+# go.opentelemetry.io/proto/otlp v1.5.0
+## explicit; go 1.22.0
 go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
 go.opentelemetry.io/proto/otlp/resource/v1
@@ -892,26 +895,24 @@ golang.org/x/tools/internal/stdlib
 golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
-# google.golang.org/genproto v0.0.0-20240123012728-ef4313101c80
-## explicit; go 1.19
-google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/genproto/googleapis/api v0.0.0-20241209162323-e6fa225c2576
-## explicit; go 1.21
+# google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb
+## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20241209162323-e6fa225c2576
-## explicit; go 1.21
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb
+## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.68.1
-## explicit; go 1.22
+# google.golang.org/grpc v1.71.1
+## explicit; go 1.22.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
 google.golang.org/grpc/balancer
 google.golang.org/grpc/balancer/base
+google.golang.org/grpc/balancer/endpointsharding
 google.golang.org/grpc/balancer/grpclb/state
 google.golang.org/grpc/balancer/pickfirst
 google.golang.org/grpc/balancer/pickfirst/internal
@@ -946,7 +947,9 @@ google.golang.org/grpc/internal/grpcutil
 google.golang.org/grpc/internal/idle
 google.golang.org/grpc/internal/metadata
 google.golang.org/grpc/internal/pretty
+google.golang.org/grpc/internal/proxyattributes
 google.golang.org/grpc/internal/resolver
+google.golang.org/grpc/internal/resolver/delegatingresolver
 google.golang.org/grpc/internal/resolver/dns
 google.golang.org/grpc/internal/resolver/dns/internal
 google.golang.org/grpc/internal/resolver/passthrough
@@ -961,6 +964,10 @@ google.golang.org/grpc/keepalive
 google.golang.org/grpc/mem
 google.golang.org/grpc/metadata
 google.golang.org/grpc/peer
+google.golang.org/grpc/reflection
+google.golang.org/grpc/reflection/grpc_reflection_v1
+google.golang.org/grpc/reflection/grpc_reflection_v1alpha
+google.golang.org/grpc/reflection/internal
 google.golang.org/grpc/resolver
 google.golang.org/grpc/resolver/dns
 google.golang.org/grpc/resolver/manual

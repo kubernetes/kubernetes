@@ -32,6 +32,8 @@ import (
 	"google.golang.org/grpc/internal/envconfig"
 )
 
+const alpnFailureHelpMessage = "If you upgraded from a grpc-go version earlier than 1.67, your TLS connections may have stopped working due to ALPN enforcement. For more details, see: https://github.com/grpc/grpc-go/issues/434"
+
 var logger = grpclog.Component("credentials")
 
 // TLSInfo contains the auth information for a TLS authenticated connection.
@@ -128,7 +130,7 @@ func (c *tlsCreds) ClientHandshake(ctx context.Context, authority string, rawCon
 	if np == "" {
 		if envconfig.EnforceALPNEnabled {
 			conn.Close()
-			return nil, nil, fmt.Errorf("credentials: cannot check peer: missing selected ALPN property")
+			return nil, nil, fmt.Errorf("credentials: cannot check peer: missing selected ALPN property. %s", alpnFailureHelpMessage)
 		}
 		logger.Warningf("Allowing TLS connection to server %q with ALPN disabled. TLS connections to servers with ALPN disabled will be disallowed in future grpc-go releases", cfg.ServerName)
 	}
@@ -158,7 +160,7 @@ func (c *tlsCreds) ServerHandshake(rawConn net.Conn) (net.Conn, AuthInfo, error)
 	if cs.NegotiatedProtocol == "" {
 		if envconfig.EnforceALPNEnabled {
 			conn.Close()
-			return nil, nil, fmt.Errorf("credentials: cannot check peer: missing selected ALPN property")
+			return nil, nil, fmt.Errorf("credentials: cannot check peer: missing selected ALPN property. %s", alpnFailureHelpMessage)
 		} else if logger.V(2) {
 			logger.Info("Allowing TLS connection from client with ALPN disabled. TLS connections with ALPN disabled will be disallowed in future grpc-go releases")
 		}

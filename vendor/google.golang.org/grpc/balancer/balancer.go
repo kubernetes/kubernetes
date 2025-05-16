@@ -73,17 +73,6 @@ func unregisterForTesting(name string) {
 	delete(m, name)
 }
 
-// connectedAddress returns the connected address for a SubConnState. The
-// address is only valid if the state is READY.
-func connectedAddress(scs SubConnState) resolver.Address {
-	return scs.connectedAddress
-}
-
-// setConnectedAddress sets the connected address for a SubConnState.
-func setConnectedAddress(scs *SubConnState, addr resolver.Address) {
-	scs.connectedAddress = addr
-}
-
 func init() {
 	internal.BalancerUnregister = unregisterForTesting
 	internal.ConnectedAddress = connectedAddress
@@ -104,57 +93,6 @@ func Get(name string) Builder {
 		return b
 	}
 	return nil
-}
-
-// A SubConn represents a single connection to a gRPC backend service.
-//
-// Each SubConn contains a list of addresses.
-//
-// All SubConns start in IDLE, and will not try to connect. To trigger the
-// connecting, Balancers must call Connect.  If a connection re-enters IDLE,
-// Balancers must call Connect again to trigger a new connection attempt.
-//
-// gRPC will try to connect to the addresses in sequence, and stop trying the
-// remainder once the first connection is successful. If an attempt to connect
-// to all addresses encounters an error, the SubConn will enter
-// TRANSIENT_FAILURE for a backoff period, and then transition to IDLE.
-//
-// Once established, if a connection is lost, the SubConn will transition
-// directly to IDLE.
-//
-// This interface is to be implemented by gRPC. Users should not need their own
-// implementation of this interface. For situations like testing, any
-// implementations should embed this interface. This allows gRPC to add new
-// methods to this interface.
-type SubConn interface {
-	// UpdateAddresses updates the addresses used in this SubConn.
-	// gRPC checks if currently-connected address is still in the new list.
-	// If it's in the list, the connection will be kept.
-	// If it's not in the list, the connection will gracefully close, and
-	// a new connection will be created.
-	//
-	// This will trigger a state transition for the SubConn.
-	//
-	// Deprecated: this method will be removed.  Create new SubConns for new
-	// addresses instead.
-	UpdateAddresses([]resolver.Address)
-	// Connect starts the connecting for this SubConn.
-	Connect()
-	// GetOrBuildProducer returns a reference to the existing Producer for this
-	// ProducerBuilder in this SubConn, or, if one does not currently exist,
-	// creates a new one and returns it.  Returns a close function which may be
-	// called when the Producer is no longer needed.  Otherwise the producer
-	// will automatically be closed upon connection loss or subchannel close.
-	// Should only be called on a SubConn in state Ready.  Otherwise the
-	// producer will be unable to create streams.
-	GetOrBuildProducer(ProducerBuilder) (p Producer, close func())
-	// Shutdown shuts down the SubConn gracefully.  Any started RPCs will be
-	// allowed to complete.  No future calls should be made on the SubConn.
-	// One final state update will be delivered to the StateListener (or
-	// UpdateSubConnState; deprecated) with ConnectivityState of Shutdown to
-	// indicate the shutdown operation.  This may be delivered before
-	// in-progress RPCs are complete and the actual connection is closed.
-	Shutdown()
 }
 
 // NewSubConnOptions contains options to create new SubConn.
@@ -191,6 +129,13 @@ type State struct {
 // brand new implementation of this interface. For the situations like
 // testing, the new implementation should embed this interface. This allows
 // gRPC to add new methods to this interface.
+//
+// NOTICE: This interface is intended to be implemented by gRPC, or intercepted
+// by custom load balancing polices.  Users should not need their own complete
+// implementation of this interface -- they should always delegate to a
+// ClientConn passed to Builder.Build() by embedding it in their
+// implementations. An embedded ClientConn must never be nil, or runtime panics
+// will occur.
 type ClientConn interface {
 	// NewSubConn is called by balancer to create a new SubConn.
 	// It doesn't block and wait for the connections to be established.
@@ -229,6 +174,17 @@ type ClientConn interface {
 	//
 	// Deprecated: Use the Target field in the BuildOptions instead.
 	Target() string
+
+	// MetricsRecorder provides the metrics recorder that balancers can use to
+	// record metrics. Balancer implementations which do not register metrics on
+	// metrics registry and record on them can ignore this method. The returned
+	// MetricsRecorder is guaranteed to never be nil.
+	MetricsRecorder() estats.MetricsRecorder
+
+	// EnforceClientConnEmbedding is included to force implementers to embed
+	// another implementation of this interface, allowing gRPC to add methods
+	// without breaking users.
+	internal.EnforceClientConnEmbedding
 }
 
 // BuildOptions contains additional information for Build.
@@ -260,10 +216,6 @@ type BuildOptions struct {
 	// same resolver.Target as passed to the resolver. See the documentation for
 	// the resolver.Target type for details about what it contains.
 	Target resolver.Target
-	// MetricsRecorder is the metrics recorder that balancers can use to record
-	// metrics. Balancer implementations which do not register metrics on
-	// metrics registry and record on them can ignore this field.
-	MetricsRecorder estats.MetricsRecorder
 }
 
 // Builder creates a balancer.
@@ -424,18 +376,6 @@ type ExitIdler interface {
 	ExitIdle()
 }
 
-// SubConnState describes the state of a SubConn.
-type SubConnState struct {
-	// ConnectivityState is the connectivity state of the SubConn.
-	ConnectivityState connectivity.State
-	// ConnectionError is set if the ConnectivityState is TransientFailure,
-	// describing the reason the SubConn failed.  Otherwise, it is nil.
-	ConnectionError error
-	// connectedAddr contains the connected address when ConnectivityState is
-	// Ready. Otherwise, it is indeterminate.
-	connectedAddress resolver.Address
-}
-
 // ClientConnState describes the state of a ClientConn relevant to the
 // balancer.
 type ClientConnState struct {
@@ -448,22 +388,3 @@ type ClientConnState struct {
 // ErrBadResolverState may be returned by UpdateClientConnState to indicate a
 // problem with the provided name resolver data.
 var ErrBadResolverState = errors.New("bad resolver state")
-
-// A ProducerBuilder is a simple constructor for a Producer.  It is used by the
-// SubConn to create producers when needed.
-type ProducerBuilder interface {
-	// Build creates a Producer.  The first parameter is always a
-	// grpc.ClientConnInterface (a type to allow creating RPCs/streams on the
-	// associated SubConn), but is declared as `any` to avoid a dependency
-	// cycle.  Build also returns a close function that will be called when all
-	// references to the Producer have been given up for a SubConn, or when a
-	// connectivity state change occurs on the SubConn.  The close function
-	// should always block until all asynchronous cleanup work is completed.
-	Build(grpcClientConnInterface any) (p Producer, close func())
-}
-
-// A Producer is a type shared among potentially many consumers.  It is
-// associated with a SubConn, and an implementation will typically contain
-// other methods to provide additional functionality, e.g. configuration or
-// subscription registration.
-type Producer any

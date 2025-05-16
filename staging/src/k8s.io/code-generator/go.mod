@@ -10,7 +10,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/google/gnostic-models v0.6.9
 	github.com/google/go-cmp v0.7.0
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	golang.org/x/text v0.23.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20250207200755-1244d31929d7

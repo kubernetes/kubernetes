@@ -16,7 +16,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/moby/spdystream v0.5.0
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
-	github.com/spf13/pflag v1.0.5
+	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/net v0.38.0
 	golang.org/x/time v0.9.0
