@@ -44,12 +44,12 @@ func TestController(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KMSv1, true)
 
 	const expectedSuccessMetricValue = `
-# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [BETA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
 apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="success"} 1
 `
 	const expectedFailureMetricValue = `
-# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
+# HELP apiserver_encryption_config_controller_automatic_reloads_total [BETA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
 # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
 apiserver_encryption_config_controller_automatic_reloads_total{apiserver_id_hash="sha256:cd8a60cec6134082e9f37e7a4146b4bc14a0bf8a863237c36ec8fdb658c3e027",status="failure"} 1
 `
