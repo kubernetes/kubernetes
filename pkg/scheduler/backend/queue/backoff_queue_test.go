@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -92,7 +93,7 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -100,7 +101,7 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod1").Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(time.Second)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -108,14 +109,14 @@ func TestBackoffQueue_popAllBackoffCompleted(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Obj(),
 			},
-			Timestamp: fakeClock.Now().Add(-2 * time.Second),
+			Timestamp: metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			Attempts:  1,
 		},
 		"pod3": {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Obj(),
 			},
-			Timestamp: fakeClock.Now().Add(time.Second),
+			Timestamp: metav1.NewTime(fakeClock.Now().Add(time.Second)),
 			Attempts:  1,
 		},
 	}
@@ -188,7 +189,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod0").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now(),
+			Timestamp:            metav1.NewTime(fakeClock.Now()),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -196,7 +197,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod1").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-time.Second)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -204,7 +205,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod2").Priority(2).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2*time.Second + time.Millisecond),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2*time.Second + time.Millisecond)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -212,7 +213,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod3").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -220,7 +221,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod4").Priority(2).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-2 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-2 * time.Second)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},
@@ -228,7 +229,7 @@ func TestBackoffQueueOrdering(t *testing.T) {
 			PodInfo: &framework.PodInfo{
 				Pod: st.MakePod().Name("pod5").Priority(1).Obj(),
 			},
-			Timestamp:            fakeClock.Now().Add(-3 * time.Second),
+			Timestamp:            metav1.NewTime(fakeClock.Now().Add(-3 * time.Second)),
 			Attempts:             1,
 			UnschedulablePlugins: sets.New("plugin"),
 		},

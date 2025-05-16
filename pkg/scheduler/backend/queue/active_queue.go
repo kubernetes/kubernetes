@@ -20,9 +20,9 @@ import (
 	"container/list"
 	"fmt"
 	"sync"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
@@ -282,7 +282,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
 	}
 	pInfo.Attempts++
-	pInfo.BackoffExpiration = time.Time{}
+	pInfo.BackoffExpiration = metav1.Time{}
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
 		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.

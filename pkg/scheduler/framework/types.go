@@ -19,11 +19,9 @@ package framework
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,6 +274,7 @@ func (s QueueingHint) String() string {
 // ClusterEvent abstracts how a system resource's state gets changed.
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
+// +k8s:deepcopy-gen=true
 type ClusterEvent struct {
 	Resource   EventResource
 	ActionType ActionType
@@ -369,10 +368,11 @@ func UnrollWildCardResource() []ClusterEventWithHint {
 // QueuedPodInfo is a Pod wrapper with additional information related to
 // the pod's status in the scheduling queue, such as the timestamp when
 // it's added to the queue.
+// +k8s:deepcopy-gen=true
 type QueuedPodInfo struct {
 	*PodInfo
 	// The time pod added to the scheduling queue.
-	Timestamp time.Time
+	Timestamp metav1.Time
 	// Number of schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric and calculate the backoff time this Pod is obliged to get before retrying.
 	Attempts int
@@ -380,12 +380,12 @@ type QueuedPodInfo struct {
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
 	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
 	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
-	BackoffExpiration time.Time
+	BackoffExpiration metav1.Time
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
 	// latency for a pod.
-	InitialAttemptTimestamp *time.Time
+	InitialAttemptTimestamp *metav1.Time
 	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
 	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
 	// If Pods are rejected at other extension points,
@@ -407,22 +407,7 @@ func (pqi *QueuedPodInfo) Gated() bool {
 	return pqi.GatingPlugin != ""
 }
 
-// DeepCopy returns a deep copy of the QueuedPodInfo object.
-func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
-	return &QueuedPodInfo{
-		PodInfo:                 pqi.PodInfo.DeepCopy(),
-		Timestamp:               pqi.Timestamp,
-		Attempts:                pqi.Attempts,
-		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
-		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
-		BackoffExpiration:       pqi.BackoffExpiration,
-		GatingPlugin:            pqi.GatingPlugin,
-		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
-		PendingPlugins:          pqi.PendingPlugins.Clone(),
-	}
-}
-
-// podResource contains the result of calculateResource and is used only internally.
+// odResource contains the result of calculateResource and is used only internally.
 type podResource struct {
 	resource Resource
 	non0CPU  int64
@@ -432,6 +417,7 @@ type podResource struct {
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
 // accelerate processing. This information is typically immutable (e.g., pre-processed
 // inter-pod affinity selectors).
+// +k8s:deepcopy-gen=true
 type PodInfo struct {
 	Pod                        *v1.Pod
 	RequiredAffinityTerms      []AffinityTerm
@@ -447,18 +433,6 @@ type PodInfo struct {
 	// Note: cachedResource field shouldn't be accessed directly.
 	// Use calculateResource method to obtain it instead.
 	cachedResource *podResource
-}
-
-// DeepCopy returns a deep copy of the PodInfo object.
-func (pi *PodInfo) DeepCopy() *PodInfo {
-	return &PodInfo{
-		Pod:                        pi.Pod.DeepCopy(),
-		RequiredAffinityTerms:      pi.RequiredAffinityTerms,
-		RequiredAntiAffinityTerms:  pi.RequiredAntiAffinityTerms,
-		PreferredAffinityTerms:     pi.PreferredAffinityTerms,
-		PreferredAntiAffinityTerms: pi.PreferredAntiAffinityTerms,
-		cachedResource:             pi.cachedResource,
-	}
 }
 
 // Update creates a full new PodInfo by default. And only updates the pod when the PodInfo
@@ -511,6 +485,7 @@ func (pi *PodInfo) Update(pod *v1.Pod) error {
 }
 
 // AffinityTerm is a processed version of v1.PodAffinityTerm.
+// +k8s:deepcopy-gen=true
 type AffinityTerm struct {
 	Namespaces        sets.Set[string]
 	Selector          labels.Selector
@@ -527,6 +502,7 @@ func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set) bool {
 }
 
 // WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
+// +k8s:deepcopy-gen=true
 type WeightedAffinityTerm struct {
 	AffinityTerm
 	Weight int32
@@ -820,6 +796,7 @@ func nextGeneration() int64 {
 }
 
 // Resource is a collection of compute resource.
+// +k8s:deepcopy-gen=true
 type Resource struct {
 	MilliCPU         int64
 	Memory           int64

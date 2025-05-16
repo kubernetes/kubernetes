@@ -769,7 +769,7 @@ func TestQueueSortPlugin(t *testing.T) {
 			podNames:      []string{"pod-1", "pod-2", "pod-3"},
 			expectedOrder: []string{"pod-1", "pod-2", "pod-3"},
 			customLessFunc: func(info1, info2 *framework.QueuedPodInfo) bool {
-				return info1.Timestamp.Before(info2.Timestamp)
+				return info1.Timestamp.Before(&info2.Timestamp)
 			},
 		},
 		{
@@ -779,7 +779,7 @@ func TestQueueSortPlugin(t *testing.T) {
 			customLessFunc: func(info1, info2 *framework.QueuedPodInfo) bool {
 				p1 := corev1helpers.PodPriority(info1.Pod)
 				p2 := corev1helpers.PodPriority(info2.Pod)
-				return (p1 > p2) || (p1 == p2 && info1.Timestamp.Before(info2.Timestamp))
+				return (p1 > p2) || (p1 == p2 && info1.Timestamp.Before(&info2.Timestamp))
 			},
 		},
 	}

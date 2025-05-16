@@ -626,7 +626,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 		}
 		if pInfo.InitialAttemptTimestamp == nil {
 			now := p.clock.Now()
-			pInfo.InitialAttemptTimestamp = &now
+			pInfo.InitialAttemptTimestamp = &metav1.Time{Time: now}
 		}
 
 		unlockedActiveQ.add(pInfo, event)
@@ -788,7 +788,7 @@ func (p *PriorityQueue) determineSchedulingHintForInFlightPod(logger klog.Logger
 func (p *PriorityQueue) addUnschedulableWithoutQueueingHint(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error {
 	pod := pInfo.Pod
 	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
+	pInfo.Timestamp = metav1.NewTime(p.clock.Now())
 
 	// When the queueing hint is enabled, they are used differently.
 	// But, we use all of them as UnschedulablePlugins when the queueing hint isn't enabled so that we don't break the old behaviour.
@@ -848,7 +848,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	}
 
 	// Refresh the timestamp since the pod is re-added.
-	pInfo.Timestamp = p.clock.Now()
+	pInfo.Timestamp = metav1.NewTime(p.clock.Now())
 
 	// If a move request has been received, move it to the BackoffQ, otherwise move
 	// it to unschedulablePods.
@@ -896,7 +896,7 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	var podsToMove []*framework.QueuedPodInfo
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
-		lastScheduleTime := pInfo.Timestamp
+		lastScheduleTime := pInfo.Timestamp.Time
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
 			podsToMove = append(podsToMove, pInfo)
 		}
@@ -1344,7 +1344,7 @@ func (p *PriorityQueue) newQueuedPodInfo(pod *v1.Pod, plugins ...string) *framew
 	podInfo, _ := framework.NewPodInfo(pod)
 	return &framework.QueuedPodInfo{
 		PodInfo:                 podInfo,
-		Timestamp:               now,
+		Timestamp:               metav1.NewTime(now),
 		InitialAttemptTimestamp: nil,
 		UnschedulablePlugins:    sets.New(plugins...),
 	}
