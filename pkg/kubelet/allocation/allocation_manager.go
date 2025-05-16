@@ -243,7 +243,7 @@ func (m *manager) AddPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, st
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(pod); err != nil {
-			//TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
+			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
 			klog.ErrorS(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 		}
 	}

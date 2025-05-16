@@ -170,7 +170,23 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
+}
+
+func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
+	imageList := []kubecontainer.Image{
+		{
+			ID:       "abc",
+			RepoTags: []string{"registry.k8s.io:v1", "registry.k8s.io:v2"},
+			Size:     123,
+		},
+		{
+			ID:       "efg",
+			RepoTags: []string{"registry.k8s.io:v3", "registry.k8s.io:v4"},
+			Size:     456,
+		},
+	}
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/)
 }
 
 func newTestKubeletWithImageList(
@@ -179,6 +195,7 @@ func newTestKubeletWithImageList(
 	controllerAttachDetachEnabled bool,
 	initFakeVolumePlugin bool,
 	localStorageCapacityIsolation bool,
+	excludeAdmitHandlers bool,
 ) *TestKubelet {
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -377,7 +394,10 @@ func newTestKubeletWithImageList(
 
 	// Add this as cleanup predicate pod admitter
 	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
-	kubelet.allocationManager.AddPodAdmitHandlers(handlers)
+
+	if !excludeAdmitHandlers {
+		kubelet.allocationManager.AddPodAdmitHandlers(handlers)
+	}
 
 	allPlugins := []volume.VolumePlugin{}
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
@@ -1040,7 +1060,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
