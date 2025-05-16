@@ -2780,7 +2780,7 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 
 			if !tt.expectedResizeNotAllowed {
 				var err error
-				updatedPod, err = kubelet.allocationManager.HandlePodResourcesResize(kubelet.getAllocatedPods(), newPod, kubelet.getNodeAnyWay, podStatus)
+				updatedPod, err = kubelet.allocationManager.HandlePodResourcesResize(kubelet.getAllocatedPods(), newPod, podStatus)
 				require.NoError(t, err)
 			}
 
@@ -3188,7 +3188,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					setContainerStatus(podStatus, &c, i+len(originalPod.Spec.InitContainers))
 				}
 
-				updatedPod, err := kubelet.allocationManager.HandlePodResourcesResize(kubelet.getAllocatedPods(), newPod, kubelet.getNodeAnyWay, podStatus)
+				updatedPod, err := kubelet.allocationManager.HandlePodResourcesResize(kubelet.getAllocatedPods(), newPod, podStatus)
 				require.NoError(t, err)
 
 				var updatedPodCtr v1.Container

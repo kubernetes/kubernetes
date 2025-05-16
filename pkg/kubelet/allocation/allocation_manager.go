@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,16 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 )
 
 // podStatusManagerStateFile is the file name where status manager stores its state
@@ -93,7 +86,7 @@ type Manager interface {
 	// HandlePodResourcesResize returns the "allocated pod", which should be used for all resource
 	// calculations after this function is called. It also updates the cached ResizeStatus according to
 	// the allocation decision and pod status.
-	HandlePodResourcesResize(allocatedPods []*v1.Pod, pod *v1.Pod, getNodeFunc func() (*v1.Node, error), podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
+	HandlePodResourcesResize(allocatedPods []*v1.Pod, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
 
 	// IsPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
 	// for any running containers. Specifically, the following differences are ignored:
@@ -291,7 +284,6 @@ func (m *manager) GetActuatedResources(podUID types.UID, containerName string) (
 func (m *manager) HandlePodResourcesResize(
 	allocatedPods []*v1.Pod,
 	pod *v1.Pod,
-	getNodeFunc func() (*v1.Node, error),
 	podStatus *kubecontainer.PodStatus) (allocatedPod *v1.Pod, err error) {
 	// Always check whether a resize is in progress so we can set the PodResizeInProgressCondition
 	// accordingly.
@@ -323,7 +315,7 @@ func (m *manager) HandlePodResourcesResize(
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 	// Desired resources != allocated resources. Can we update the allocation to the desired resources?
-	fit, reason, message := m.canResizePod(allocatedPods, pod, getNodeFunc)
+	fit, reason, message := m.canResizePod(allocatedPods, pod)
 	if fit {
 		// Update pod resource allocation checkpoint
 		if err := m.SetAllocatedResources(pod); err != nil {
@@ -364,8 +356,6 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			klog.InfoS("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message)
-
-			recordAdmissionRejection(result.Reason)
 			return false, result.Reason, result.Message
 		}
 	}
@@ -377,7 +367,9 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 // pod should hold the desired (pre-allocated) spec.
 // Returns true if the resize can proceed; returns a reason and message
 // otherwise.
-func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod, getNodeFunc func() (*v1.Node, error)) (bool, string, string) {
+func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+	// TODO: Move this logic into a PodAdmitHandler by introducing an operation field to
+	// lifecycle.PodAdmitAttributes, and combine canResizePod with canAdmitPod.
 	if v1qos.GetPodQOS(pod) == v1.PodQOSGuaranteed && !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingExclusiveCPUs) {
 		if m.containerManager.GetNodeConfig().CPUManagerPolicy == "static" {
 			msg := "Resize is infeasible for Guaranteed Pods alongside CPU Manager static policy"
@@ -394,13 +386,9 @@ func (m *manager) canResizePod(allocatedPods []*v1.Pod, pod *v1.Pod, getNodeFunc
 		}
 	}
 
-	node, err := getNodeFunc()
-	if err != nil {
-		klog.ErrorS(err, "getNode function failed")
-		return false, "", ""
-	}
-	cpuAvailable := node.Status.Allocatable.Cpu().MilliValue()
-	memAvailable := node.Status.Allocatable.Memory().Value()
+	allocatable := m.containerManager.GetNodeAllocatableAbsolute()
+	cpuAvailable := allocatable.Cpu().MilliValue()
+	memAvailable := allocatable.Memory().Value()
 	cpuRequests := resource.GetResourceRequest(pod, v1.ResourceCPU)
 	memRequests := resource.GetResourceRequest(pod, v1.ResourceMemory)
 	if cpuRequests > cpuAvailable || memRequests > memAvailable {
@@ -446,45 +434,6 @@ func (m *manager) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecon
 				allocatedResources.Requests[v1.ResourceMemory].Equal(actuatedResources.Requests[v1.ResourceMemory]) &&
 				allocatedResources.Limits[v1.ResourceMemory].Equal(actuatedResources.Limits[v1.ResourceMemory])
 		})
-}
-
-var (
-	admissionRejectionReasons = sets.New[string](
-		lifecycle.AppArmorNotAdmittedReason,
-		lifecycle.PodOSSelectorNodeLabelDoesNotMatch,
-		lifecycle.PodOSNotSupported,
-		lifecycle.InvalidNodeInfo,
-		lifecycle.InitContainerRestartPolicyForbidden,
-		lifecycle.SupplementalGroupsPolicyNotSupported,
-		lifecycle.UnexpectedAdmissionError,
-		lifecycle.UnknownReason,
-		lifecycle.UnexpectedPredicateFailureType,
-		lifecycle.OutOfCPU,
-		lifecycle.OutOfMemory,
-		lifecycle.OutOfEphemeralStorage,
-		lifecycle.OutOfPods,
-		tainttoleration.ErrReasonNotMatch,
-		eviction.Reason,
-		sysctl.ForbiddenReason,
-		topologymanager.ErrorTopologyAffinity,
-		nodeshutdown.NodeShutdownNotAdmittedReason,
-	)
-)
-
-func recordAdmissionRejection(reason string) {
-	// It is possible that the "reason" label can have high cardinality.
-	// To avoid this metric from exploding, we create an allowlist of known
-	// reasons, and only record reasons from this list. Use "Other" reason
-	// for the rest.
-	if admissionRejectionReasons.Has(reason) {
-		metrics.AdmissionRejectionsTotal.WithLabelValues(reason).Inc()
-	} else if strings.HasPrefix(reason, lifecycle.InsufficientResourcePrefix) {
-		// non-extended resources (like cpu, memory, ephemeral-storage, pods)
-		// are already included in admissionRejectionReasons.
-		metrics.AdmissionRejectionsTotal.WithLabelValues("OutOfExtendedResources").Inc()
-	} else {
-		metrics.AdmissionRejectionsTotal.WithLabelValues("Other").Inc()
-	}
 }
 
 func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

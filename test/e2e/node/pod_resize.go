@@ -591,7 +591,7 @@ func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaN
 // Calculate available CPU. nodeAvailableCPU = nodeAllocatableCPU - sum(podAllocatedCPU)
 func getNodeAllocatableAndAvailableMilliCPUValues(ctx context.Context, f *framework.Framework, n *v1.Node) (int64, int64) {
 	nodeAllocatableMilliCPU := n.Status.Allocatable.Cpu().MilliValue()
-	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeNil(), "allocatable")
+	gomega.Expect(n.Status.Allocatable).ShouldNot(gomega.BeEmpty(), "allocatable")
 	podAllocatedMilliCPU := int64(0)
 
 	// Exclude pods that are in the Succeeded or Failed states
