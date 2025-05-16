@@ -22,6 +22,7 @@ import (
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 )
@@ -43,7 +44,7 @@ func NewEvaluators(f quota.ListerForResourceFunc) []quota.Evaluator {
 		NewPersistentVolumeClaimEvaluator(f),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		result = append(result, NewResourceClaimEvaluator(f))
+		result = append(result, NewResourceClaimEvaluator(klog.LoggerWithName(klog.TODO(), "resource-claim-evaluator"), f))
 	}
 
 	// these evaluators require an alias for backwards compatibility

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/resource"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -72,7 +73,6 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		},
 	})
 
-	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := map[string]struct {
 		claim  *api.ResourceClaim
 		usage  corev1.ResourceList
@@ -201,6 +201,8 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			evaluator := NewResourceClaimEvaluator(tCtx.Logger(), nil)
 			actual, err := evaluator.Usage(testCase.claim)
 			if err != nil {
 				if testCase.errMsg == "" {
@@ -222,7 +224,6 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := map[string]struct {
 		items []corev1.ResourceName
 		want  []corev1.ResourceName
@@ -251,6 +252,8 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			evaluator := NewResourceClaimEvaluator(tCtx.Logger(), nil)
 			actual := evaluator.MatchingResources(testCase.items)
 
 			if diff := cmp.Diff(testCase.want, actual); diff != "" {
@@ -261,7 +264,6 @@ func TestResourceClaimEvaluatorMatchingResources(t *testing.T) {
 }
 
 func TestResourceClaimEvaluatorHandles(t *testing.T) {
-	evaluator := NewResourceClaimEvaluator(nil)
 	testCases := []struct {
 		name  string
 		attrs admission.Attributes
@@ -300,6 +302,8 @@ func TestResourceClaimEvaluatorHandles(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			evaluator := NewResourceClaimEvaluator(tCtx.Logger(), nil)
 			actual := evaluator.Handles(tc.attrs)
 
 			if tc.want != actual {

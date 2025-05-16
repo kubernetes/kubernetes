@@ -28,6 +28,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/klog/v2"
 	resourceinternal "k8s.io/kubernetes/pkg/apis/resource"
 	resourceversioned "k8s.io/kubernetes/pkg/apis/resource/v1beta1"
 )
@@ -43,14 +44,19 @@ func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 }
 
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
-func NewResourceClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
+func NewResourceClaimEvaluator(logger klog.Logger, f quota.ListerForResourceFunc) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
-	claimEvaluator := &claimEvaluator{listFuncByNamespace: listFuncByNamespace}
+	claimEvaluator := &claimEvaluator{
+		logger:              logger,
+		listFuncByNamespace: listFuncByNamespace,
+	}
 	return claimEvaluator
 }
 
 // claimEvaluator knows how to evaluate quota usage for resource claims
 type claimEvaluator struct {
+	logger klog.Logger
+
 	// listFuncByNamespace knows how to list resource claims
 	listFuncByNamespace generic.ListFuncByNamespace
 }
@@ -104,9 +110,13 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 }
 
 // Usage knows how to measure usage associated with item.
-func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error) {
-	result := corev1.ResourceList{}
+func (p *claimEvaluator) Usage(item runtime.Object) (result corev1.ResourceList, err error) {
+	// TODO: reduce verbosity or move to caller.
+	result = corev1.ResourceList{}
 	claim, err := toExternalResourceClaimOrError(item)
+	defer func() {
+		p.logger.Info("Resource usage calculated", "claim", klog.KObj(claim), "usage", result, "err", err)
+	}()
 	if err != nil {
 		return result, err
 	}
@@ -168,7 +178,10 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 }
 
 // UsageStats calculates aggregate usage for the object.
-func (p *claimEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.UsageStats, error) {
+func (p *claimEvaluator) UsageStats(options quota.UsageStatsOptions) (stats quota.UsageStats, err error) {
+	defer func() {
+		p.logger.Info("Resource usage statistics calculated", "options", options, "statistics", stats, "err", err)
+	}()
 	return generic.CalculateUsageStats(options, p.listFuncByNamespace, generic.MatchesNoScopeFunc, p.Usage)
 }
 
