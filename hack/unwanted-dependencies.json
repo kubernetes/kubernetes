@@ -228,8 +228,7 @@
       "golang.org/x/exp": [
         "github.com/antlr4-go/antlr/v4",
         "github.com/google/cel-go",
-        "github.com/grpc-ecosystem/go-grpc-middleware/v2",
-        "k8s.io/mount-utils"
+        "github.com/grpc-ecosystem/go-grpc-middleware/v2"
       ],
       "gopkg.in/yaml.v2": [
         "github.com/prometheus/client_golang",
