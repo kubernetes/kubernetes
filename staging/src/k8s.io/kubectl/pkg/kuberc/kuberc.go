@@ -24,16 +24,13 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/kubectl/pkg/config"
-	kuberc "k8s.io/kubectl/pkg/config/install"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+	"k8s.io/kubectl/pkg/config"
 )
 
 const RecommendedKubeRCFileName = "kuberc"
@@ -44,15 +41,7 @@ var (
 
 	aliasNameRegex = regexp.MustCompile("^[a-zA-Z]+$")
 	shortHandRegex = regexp.MustCompile("^-[a-zA-Z]+$")
-
-	scheme        = runtime.NewScheme()
-	strictCodecs  = serializer.NewCodecFactory(scheme, serializer.EnableStrict)
-	lenientCodecs = serializer.NewCodecFactory(scheme, serializer.DisableStrict)
 )
-
-func init() {
-	kuberc.Install(scheme)
-}
 
 // PreferencesHandler is responsible for setting default flags
 // arguments based on user's kuberc configuration.

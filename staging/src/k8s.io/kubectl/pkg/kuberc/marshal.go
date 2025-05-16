@@ -24,12 +24,11 @@ import (
 	"io"
 	"os"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-
+	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/config"
+	"k8s.io/kubectl/pkg/config/scheme"
 )
 
 // decodePreference iterates over the yamls in kuberc file to find the supported kuberc version.
@@ -58,10 +57,10 @@ func decodePreference(kubercFile string) (*config.Preference, error) {
 		}
 		// remember we attempted
 		attemptedItems++
-		pref, gvk, strictDecodeErr := strictCodecs.UniversalDecoder().Decode(doc, nil, nil)
+		pref, gvk, strictDecodeErr := scheme.StrictCodecs.UniversalDecoder().Decode(doc, nil, nil)
 		if strictDecodeErr != nil {
 			var lenientDecodeErr error
-			pref, gvk, lenientDecodeErr = lenientCodecs.UniversalDecoder().Decode(doc, nil, nil)
+			pref, gvk, lenientDecodeErr = scheme.LenientCodecs.UniversalDecoder().Decode(doc, nil, nil)
 			if lenientDecodeErr != nil {
 				// both strict and lenient failed
 				// verbose log the error with the most information about this item and continue
