@@ -26,6 +26,7 @@ import (
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -97,15 +98,25 @@ func Test_StorageVersionUpdatedWithAllEncodingVersionsEqualOnLeaseDeletion(t *te
 	_, ctx := ktesting.NewTestContext(t)
 	setupController(ctx, clientset)
 
+	watch, err := clientset.InternalV1alpha1().StorageVersions().Watch(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("error watching StorageVersion: %v", err)
+	}
+	defer watch.Stop()
+
 	// Delete the lease object and verify that storage version status is updated
 	if err := clientset.CoordinationV1().Leases(metav1.NamespaceSystem).Delete(context.Background(), "kube-apiserver-1", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("error deleting lease object: %v", err)
 	}
 
 	// add a delay to ensure controller had a chance to reconcile
-	time.Sleep(2 * time.Second)
+	select {
+	case <-watch.ResultChan():
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Fatalf("Timed out waiting for reconcile")
+	}
 
-	storageVersion, err := clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
+	storageVersion, err = clientset.InternalV1alpha1().StorageVersions().Get(context.Background(), "k8s.test.resources", metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("error getting StorageVersion: %v", err)
 	}
