@@ -222,7 +222,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
-	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.36.1-1"}
+	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
 	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.7.4"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.5.21-0"}
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-4"}
