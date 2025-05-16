@@ -43,6 +43,7 @@ type RegistryList struct {
 	PrivateRegistry          string `yaml:"privateRegistry"`
 	DockerLibraryRegistry    string `yaml:"dockerLibraryRegistry"`
 	CloudProviderGcpRegistry string `yaml:"cloudProviderGcpRegistry"`
+	SnapshotMetadataRegistry string `yaml:"snapshotMetadataRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -139,6 +140,7 @@ var (
 		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
 		DockerLibraryRegistry:    "docker.io/library",
 		CloudProviderGcpRegistry: "registry.k8s.io/cloud-provider-gcp",
+		SnapshotMetadataRegistry: "gcr.io/k8s-staging-sig-storage",
 	}
 
 	registry, imageConfigs, originalImageConfigs = readRepoList(os.Getenv("KUBE_TEST_REPO_LIST"))
@@ -407,6 +409,8 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 		registryAndUser = reg.DockerLibraryRegistry
 	case initRegistry.CloudProviderGcpRegistry:
 		registryAndUser = reg.CloudProviderGcpRegistry
+	case initRegistry.SnapshotMetadataRegistry:
+		registryAndUser = reg.SnapshotMetadataRegistry
 	default:
 		if countParts == 1 {
 			// We assume we found an image from docker hub library
