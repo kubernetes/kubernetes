@@ -319,6 +319,8 @@ func TestReplicationControllerConversion(t *testing.T) {
 			t.Errorf("can't convert RC to RS: %v", err)
 			continue
 		}
+		// fill in new fields that should not exist in a ReplicationController, but do exist in a ReplicaSet
+		apiObjectFuzzer.FillNoCustom(&rs.Status.TerminatingReplicas)
 		// Round-trip RS before converting back to RC.
 		rs = roundTripRS(t, rs)
 		out := &v1.ReplicationController{}
