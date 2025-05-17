@@ -3553,7 +3553,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	kubeDep := &Dependencies{
 		Auth:                 nil,
 		CAdvisorInterface:    cadvisor,
-		Cloud:                nil,
 		ContainerManager:     cm.NewStubContainerManager(),
 		KubeClient:           nil, // standalone mode
 		HeartbeatClient:      nil,
@@ -3577,7 +3576,6 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		kubeDep,
 		crOptions,
 		"hostname",
-		false,
 		"hostname",
 		[]net.IP{},
 		"",
