@@ -323,10 +323,10 @@ const (
 	KubeletHealthzPort = 10248
 
 	// MinExternalEtcdVersion indicates minimum external etcd version which kubeadm supports
-	MinExternalEtcdVersion = "3.5.11-0"
+	MinExternalEtcdVersion = "3.5.21-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.5.21-0"
+	DefaultEtcdVersion = "3.6.0-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -498,7 +498,7 @@ var (
 		31: "3.5.21-0",
 		32: "3.5.21-0",
 		33: "3.5.21-0",
-		34: "3.5.21-0",
+		34: "3.6.0-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
