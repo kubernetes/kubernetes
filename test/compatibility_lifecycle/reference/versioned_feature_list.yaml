@@ -1449,6 +1449,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.32"
+- name: StaticPodStrictValidation
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: StorageCapacityScoring
   versionedSpecs:
   - default: false
