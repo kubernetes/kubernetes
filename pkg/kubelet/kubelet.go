@@ -1007,6 +1007,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.StaticPodStrictValidation) {
+		staticPodAdmitHandler := &lifecycle.StaticPodAdmitHandler{}
+		klet.admitHandlers.AddPodAdmitHandler(staticPodAdmitHandler)
+	}
+
 	leaseDuration := time.Duration(kubeCfg.NodeLeaseDurationSeconds) * time.Second
 	renewInterval := time.Duration(float64(leaseDuration) * nodeLeaseRenewIntervalFraction)
 	klet.nodeLeaseController = lease.NewController(

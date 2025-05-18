@@ -445,6 +445,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StatefulSet = framework.WithFeature(framework.ValidFeatures.Add("StatefulSet"))
 
+	// Owner: sig-node
+	// Denies pod admission if static pods reference other API objects.
+	StaticPodStrictValidation = framework.WithFeature(framework.ValidFeatures.Add("StaticPodStrictValidation"))
+	
 	// Added to test Swap Feature
 	// This label should be used when testing KEP-2400 (Node Swap Support)
 	Swap = framework.WithFeature(framework.ValidFeatures.Add("NodeSwap"))

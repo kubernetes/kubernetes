@@ -231,6 +231,84 @@ func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	}
 }
 
+type StaticPodAdmitHandler struct{}
+
+func (s *StaticPodAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	pod := attrs.Pod
+
+	if !kubetypes.IsStaticPod(pod) {
+		return PodAdmitResult{Admit: true}
+	}
+
+	if rejectStaticPodAdmissionBasedOnEnv(pod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "StaticPodInvalid",
+			Message: "Static pod cannot reference other API objects in its environment",
+		}
+	}
+
+	if rejectStaticPodAdmissionBasedOnServiceAccount(pod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "StaticPodInvalid",
+			Message: "Static pod cannot reference ServiceAccount",
+		}
+	}
+
+	if rejectStaticPodAdmissionBasedOnVolume(pod) {
+		return PodAdmitResult{
+			Admit:   false,
+			Reason:  "StaticPodInvalid",
+			Message: "Static pod can only have hostPath or emptyDir volume moun",
+		}
+	}
+
+	return PodAdmitResult{Admit: true}
+}
+
+func rejectStaticPodAdmissionBasedOnServiceAccount(pod *v1.Pod) bool {
+	return pod.Spec.ServiceAccountName != ""
+}
+
+func rejectStaticPodAdmissionBasedOnVolume(pod *v1.Pod) bool {
+	for _, volume := range pod.Spec.Volumes {
+		if volume.HostPath == nil && volume.EmptyDir == nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+func rejectStaticPodAdmissionBasedOnEnv(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		return rejectStaticPodContainer(container)
+	}
+
+	for _, container := range pod.Spec.InitContainers {
+		return rejectStaticPodContainer(container)
+	}
+
+	return false
+}
+
+func rejectStaticPodContainer(container v1.Container) bool {
+	for _, envFrom := range container.EnvFrom {
+		if envFrom.ConfigMapRef != nil || envFrom.SecretRef != nil {
+			return true
+		}
+	}
+
+	for _, env := range container.Env {
+		if env.ValueFrom != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
 func isHTTPResponseError(err error) bool {
 	if err == nil {
 		return false
