@@ -259,6 +259,13 @@ var (
 	// SetBufferPoolingThresholdForTesting updates the buffer pooling threshold, for
 	// testing purposes.
 	SetBufferPoolingThresholdForTesting any // func(int)
+
+	// TimeAfterFunc is used to create timers. During tests the function is
+	// replaced to track allocated timers and fail the test if a timer isn't
+	// cancelled.
+	TimeAfterFunc = func(d time.Duration, f func()) Timer {
+		return time.AfterFunc(d, f)
+	}
 )
 
 // HealthChecker defines the signature of the client-side LB channel health
@@ -299,4 +306,10 @@ type EnforceSubConnEmbedding interface {
 // embedding.
 type EnforceClientConnEmbedding interface {
 	enforceClientConnEmbedding()
+}
+
+// Timer is an interface to allow injecting different time.Timer implementations
+// during tests.
+type Timer interface {
+	Stop() bool
 }
