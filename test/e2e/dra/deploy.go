@@ -61,6 +61,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
+	testdrivergomega "k8s.io/kubernetes/test/e2e/dra/test-driver/gomega"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
@@ -491,7 +492,7 @@ func (d *Driver) SetUp(nodes *Nodes, driverResources map[string]resourceslice.Dr
 		notRegistered := make(map[string][]app.GRPCCall)
 		for nodename, plugin := range d.Nodes {
 			calls := plugin.GetGRPCCalls()
-			if contains, err := app.BeRegistered.Match(calls); err != nil || !contains {
+			if contains, err := testdrivergomega.BeRegistered.Match(calls); err != nil || !contains {
 				notRegistered[nodename] = calls
 			}
 		}

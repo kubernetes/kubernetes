@@ -663,6 +663,13 @@ func (d *Helper) RegistrationStatus() *registerapi.RegistrationStatus {
 	return d.registrar.status
 }
 
+// SetGetInfoError configures the registration server to make
+// GetInfo calls return the specified error.
+// To restore normal behavior, call SetGetInfoError(nil).
+func (d *Helper) SetGetInfoError(err error) {
+	d.registrar.setGetInfoError(err)
+}
+
 // serializeGRPCIfEnabled locks a mutex if serialization is enabled.
 // Either way it returns a method that the caller must invoke
 // via defer.
