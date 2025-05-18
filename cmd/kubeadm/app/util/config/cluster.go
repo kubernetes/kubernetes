@@ -60,7 +60,7 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 	}
 	_, _ = printer.Printf("[%s] Reading configuration from the %q ConfigMap in namespace %q...\n",
 		logPrefix, constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
-	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config --config your-config-file' to re-upload it.\n", logPrefix)
+	_, _ = printer.Printf("[%s] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n", logPrefix)
 
 	// Fetch the actual config from cluster
 	cfg, err := getInitConfigurationFromCluster(constants.KubernetesDir, client, newControlPlane, skipComponentConfigs)
