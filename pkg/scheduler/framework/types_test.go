@@ -1877,7 +1877,7 @@ func TestPodInfoCalculateResources(t *testing.T) {
 	}
 }
 
-func TestCalculatePodResourcesWithResize(t *testing.T) {
+func TestCalculatepodResourcesWithResize(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	testpod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

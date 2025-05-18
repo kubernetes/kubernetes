@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -225,9 +226,9 @@ func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Ti
 	}
 	if podInfo.BackoffExpiration.IsZero() {
 		duration := bq.calculateBackoffDuration(podInfo)
-		podInfo.BackoffExpiration = bq.alignToWindow(podInfo.Timestamp.Add(duration))
+		podInfo.BackoffExpiration = metav1.NewTime(bq.alignToWindow(podInfo.Timestamp.Add(duration)))
 	}
-	return podInfo.BackoffExpiration
+	return podInfo.BackoffExpiration.Time
 }
 
 // calculateBackoffDuration is a helper function for calculating the backoffDuration

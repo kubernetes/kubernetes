@@ -3062,11 +3062,11 @@ func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
 	var timestamp = time.Now()
 	pInfo1 := &framework.QueuedPodInfo{
 		PodInfo:   mustNewTestPodInfo(t, pod1),
-		Timestamp: timestamp.Add(-time.Second),
+		Timestamp: metav1.NewTime(timestamp.Add(-time.Second)),
 	}
 	pInfo2 := &framework.QueuedPodInfo{
 		PodInfo:   mustNewTestPodInfo(t, pod2),
-		Timestamp: timestamp.Add(-2 * time.Second),
+		Timestamp: metav1.NewTime(timestamp.Add(-2 * time.Second)),
 	}
 
 	tests := []struct {
@@ -3237,11 +3237,11 @@ func TestPodTimestamp(t *testing.T) {
 	var timestamp = time.Now()
 	pInfo1 := &framework.QueuedPodInfo{
 		PodInfo:   mustNewTestPodInfo(t, pod1),
-		Timestamp: timestamp,
+		Timestamp: metav1.NewTime(timestamp),
 	}
 	pInfo2 := &framework.QueuedPodInfo{
 		PodInfo:   mustNewTestPodInfo(t, pod2),
-		Timestamp: timestamp.Add(time.Second),
+		Timestamp: metav1.NewTime(timestamp.Add(time.Second)),
 	}
 
 	tests := []struct {
@@ -3720,7 +3720,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 			if podInfo.Attempts != test.wantAttempts {
 				t.Errorf("Pod schedule attempt unexpected, got %v, want %v", podInfo.Attempts, test.wantAttempts)
 			}
-			if *podInfo.InitialAttemptTimestamp != test.wantInitialAttemptTs {
+			if podInfo.InitialAttemptTimestamp.Time != test.wantInitialAttemptTs {
 				t.Errorf("Pod initial schedule attempt timestamp unexpected, got %v, want %v", *podInfo.InitialAttemptTimestamp, test.wantInitialAttemptTs)
 			}
 		})
@@ -3736,7 +3736,7 @@ func TestIncomingPodsMetrics(t *testing.T) {
 		p := &framework.QueuedPodInfo{
 			PodInfo: mustNewTestPodInfo(t,
 				st.MakePod().Name(fmt.Sprintf("test-pod-%d", i)).Namespace(fmt.Sprintf("ns%d", i)).UID(fmt.Sprintf("tp-%d", i)).Obj()),
-			Timestamp:            timestamp,
+			Timestamp:            metav1.NewTime(timestamp),
 			UnschedulablePlugins: sets.New(unschedulablePlg),
 		}
 		pInfos = append(pInfos, p)
@@ -3997,7 +3997,7 @@ func makeQueuedPodInfos(num int, namePrefix, label string, timestamp time.Time) 
 		p := &framework.QueuedPodInfo{
 			PodInfo: mustNewPodInfo(
 				st.MakePod().Name(fmt.Sprintf("%v-%d", namePrefix, i)).Namespace(fmt.Sprintf("ns%d", i)).Label(label, "").UID(fmt.Sprintf("tp-%d", i)).Obj()),
-			Timestamp:            timestamp,
+			Timestamp:            metav1.NewTime(timestamp),
 			UnschedulablePlugins: sets.New[string](),
 		}
 		pInfos = append(pInfos, p)

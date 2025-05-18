@@ -314,7 +314,7 @@ func TestNodesForStatusCode(t *testing.T) {
 				"node4": NewStatus(UnschedulableAndUnresolvable),
 			}, NewStatus(UnschedulableAndUnresolvable)),
 			code:     UnschedulableAndUnresolvable,
-			expected: sets.New[string]("node1", "node2", "node3", "node4"),
+			expected: sets.New("node1", "node2", "node3", "node4"),
 		},
 		{
 			name:          "No node should be attempted, as all are implicitly not matching the code",
@@ -326,7 +326,7 @@ func TestNodesForStatusCode(t *testing.T) {
 			name:          "All nodes should be attempted, as all are implicitly matching the code",
 			nodesStatuses: NewDefaultNodeToStatus(),
 			code:          UnschedulableAndUnresolvable,
-			expected:      sets.New[string]("node1", "node2", "node3", "node4"),
+			expected:      sets.New("node1", "node2", "node3", "node4"),
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
