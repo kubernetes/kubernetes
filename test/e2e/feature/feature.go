@@ -442,7 +442,7 @@ var (
 	// Owner: sig-node
 	// Denies pod admission if static pods reference other API objects.
 	StaticPodStrictValidation = framework.WithFeature(framework.ValidFeatures.Add("StaticPodStrictValidation"))
-	
+
 	// Added to test Swap Feature
 	// This label should be used when testing KEP-2400 (Node Swap Support)
 	Swap = framework.WithFeature(framework.ValidFeatures.Add("NodeSwap"))
