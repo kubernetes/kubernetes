@@ -149,19 +149,20 @@ func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, old
 }
 
 func requestInfo(ctx context.Context, subresourceMapper GroupVersionKindProvider) (schema.GroupVersion, []string, error) {
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-		if subresourceMapper != nil {
-			groupVersion = subresourceMapper.GroupVersionKind(groupVersion).GroupVersion()
-		}
-		subresources, err := parseSubresourcePath(requestInfo.Subresource)
-		if err != nil {
-			return schema.GroupVersion{}, nil, fmt.Errorf("unexpected error parsing subresource path: %w", err)
-		}
-		return groupVersion, subresources, nil
-	} else {
+	requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	if !found {
 		return schema.GroupVersion{}, nil, fmt.Errorf("could not find requestInfo in context")
 	}
+	groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	if subresourceMapper != nil {
+		groupVersion = subresourceMapper.GroupVersionKind(groupVersion).GroupVersion()
+	}
+	subresources, err := parseSubresourcePath(requestInfo.Subresource)
+	if err != nil {
+		return schema.GroupVersion{}, nil, fmt.Errorf("unexpected error parsing subresource path: %w", err)
+	}
+	return groupVersion, subresources, nil
+
 }
 
 func parseSubresourcePath(subresourcePath string) ([]string, error) {

@@ -25,7 +25,9 @@ import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
 
-// Root resource is supported by default
+// This tests that without any +k8s:supportsSubresource or +k8s:isSubresource tags,
+// that the validation of both the root resource is allowed and validation of all
+// subresources fails with an error.
 
 // T1 is a test type
 type T1 struct {

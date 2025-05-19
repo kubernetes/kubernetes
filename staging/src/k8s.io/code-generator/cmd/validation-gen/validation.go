@@ -835,10 +835,11 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		// TODO: Remove special-casing for `/` and `/scale` resources once ratcheting is introduced.
 		// This uses a typed nil pointer, rather than a real instance because
 		// we need the type information, but not an instance of the type.
+		sw.Do("$.rootType|private$SupportedResources := []string{$.supportsResources$}\n", targs)
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
-		sw.Do("  if op.Request.SubresourceIn([]string{$.supportsResources$}) {\n", targs)
+		sw.Do("  if op.Request.SubresourceIn($.rootType|private$SupportedResources) {\n", targs)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
 		sw.Do("               op, ", targs)
@@ -849,7 +850,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		sw.Do("  return $.field.ErrorList|raw${", targs)
 		sw.Do("      $.field.InternalError|raw$(", targs)
 		sw.Do("          nil, ", targs)
-		sw.Do("          $.fmt.Errorf|raw$(\"no validation found for %T, subresources: %v\", obj, op.Request.Subresources))", targs)
+		sw.Do("          $.fmt.Errorf|raw$(\"no validation found for %T, subresource: %v\", obj, op.Request.SubresourcePath()))", targs)
 		sw.Do("  }\n", targs)
 		sw.Do("})\n", targs)
 	}

@@ -88,8 +88,7 @@ func (r Request) MatchesSubresource(subresourcePath string) bool {
 	if len(r.Subresources) == 0 && subresourcePath == "/" {
 		return true
 	}
-	subresource := "/" + strings.Join(r.Subresources, "/")
-	return subresource == subresourcePath
+	return r.SubresourcePath() == subresourcePath
 }
 
 // SubresourceIn returns true if the request is for a subresource in the given list.
@@ -99,6 +98,12 @@ func (r Request) MatchesSubresource(subresourcePath string) bool {
 // subresourcePaths contains `/` and Subresources is an empty list.
 func (r Request) SubresourceIn(subresourcePaths []string) bool {
 	return slices.ContainsFunc(subresourcePaths, r.MatchesSubresource)
+}
+
+// SubresourcePath returns the path is a slash-separated list of subresource
+// names. For example, `/status`, `/resize`, or `/x/y/z`.
+func (r Request) SubresourcePath() string {
+	return "/" + strings.Join(r.Subresources, "/")
 }
 
 // Code is the request operation to be validated.

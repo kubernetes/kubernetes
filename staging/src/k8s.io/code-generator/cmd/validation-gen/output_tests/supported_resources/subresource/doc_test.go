@@ -34,10 +34,17 @@ func TestRegisterValidations(t *testing.T) {
 	st.Value(t1).Subresources([]string{"scale"}).ExpectValid()
 	st.Value(t1).Subresources([]string{"x", "y"}).ExpectValid()
 
+	st.Value(t1).Subresources([]string{"status", "unknown"}).ExpectInvalid(
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/status/unknown")),
+	)
+
 	st.Value(t1).Subresources([]string{"unknown"}).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{"unknown"})),
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/unknown")),
 	)
 	st.Value(t1).Subresources([]string{"x", "unknown"}).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{"x", "unknown"})),
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/x/unknown")),
+	)
+	st.Value(t1).Subresources([]string{"x", "y", "unknown"}).ExpectInvalid(
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", t1, "/x/y/unknown")),
 	)
 }

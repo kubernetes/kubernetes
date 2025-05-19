@@ -18,10 +18,8 @@ package testing
 
 import (
 	"bytes"
-	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 	"testing"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -106,17 +104,4 @@ func fmtErrs(errs field.ErrorList) string {
 	}
 
 	return buf.String()
-}
-
-func parseSubresourcePath(subresourcePath string) ([]string, error) {
-	if len(subresourcePath) == 0 {
-		return nil, nil
-	}
-	parts := strings.Split(subresourcePath, "/")
-	for _, part := range parts {
-		if len(part) == 0 {
-			return nil, fmt.Errorf("invalid subresource path: %s", subresourcePath)
-		}
-	}
-	return parts, nil
 }

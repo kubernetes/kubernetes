@@ -124,7 +124,9 @@ func schemeRegistryTag(pkg *types.Package) types.Name {
 }
 
 func isSubresourceTag(t *types.Type) (string, bool) {
-	comments := append(t.SecondClosestCommentLines, t.CommentLines...)
+	var comments []string
+	comments = append(comments, t.SecondClosestCommentLines...)
+	comments = append(comments, t.CommentLines...)
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{isSubresourceTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract isSubresource tags: %v", err)
@@ -140,7 +142,9 @@ func isSubresourceTag(t *types.Type) (string, bool) {
 }
 
 func supportedSubresourceTags(t *types.Type) sets.Set[string] {
-	comments := append(t.SecondClosestCommentLines, t.CommentLines...)
+	var comments []string
+	comments = append(comments, t.SecondClosestCommentLines...)
+	comments = append(comments, t.CommentLines...)
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{supportsSubresourceTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract supportedSubresource tags: %v", err)
