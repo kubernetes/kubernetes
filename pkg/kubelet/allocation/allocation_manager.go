@@ -37,6 +37,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
@@ -67,6 +68,7 @@ type Manager interface {
 	GetActuatedResources(podUID types.UID, containerName string) (v1.ResourceRequirements, bool)
 
 	// AddPodAdmitHandlers adds the admit handlers to the allocation manager.
+	// TODO: See if we can remove this and just add them in the allocation manager constructor.
 	AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers)
 
 	// AddPod checks if a pod can be admitted. If so, it admits the pod and updates the allocation.
@@ -86,7 +88,7 @@ type Manager interface {
 	// HandlePodResourcesResize returns the "allocated pod", which should be used for all resource
 	// calculations after this function is called. It also updates the cached ResizeStatus according to
 	// the allocation decision and pod status.
-	HandlePodResourcesResize(allocatedPods []*v1.Pod, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
+	HandlePodResourcesResize(runtime kubecontainer.Runtime, allocatedPods []*v1.Pod, pod *v1.Pod, podStatus *kubecontainer.PodStatus) (*v1.Pod, error)
 
 	// IsPodResizingInProgress checks whether the actuated resizable resources differ from the allocated resources
 	// for any running containers. Specifically, the following differences are ignored:
@@ -282,6 +284,7 @@ func (m *manager) GetActuatedResources(podUID types.UID, containerName string) (
 }
 
 func (m *manager) HandlePodResourcesResize(
+	runtime kubecontainer.Runtime,
 	allocatedPods []*v1.Pod,
 	pod *v1.Pod,
 	podStatus *kubecontainer.PodStatus) (allocatedPod *v1.Pod, err error) {
@@ -308,6 +311,10 @@ func (m *manager) HandlePodResourcesResize(
 
 	} else if resizable, msg := IsInPlacePodVerticalScalingAllowed(pod); !resizable {
 		// If there is a pending resize but the resize is not allowed, always use the allocated resources.
+		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
+		return podFromAllocation, nil
+	} else if resizeNotAllowed, msg := disallowResizeForSwappableContainers(runtime, pod, podFromAllocation); resizeNotAllowed {
+		// If this resize involve swap recalculation, set as infeasible, as IPPR with swap is not supported for beta.
 		m.statusManager.SetPodResizePendingCondition(pod.UID, v1.PodReasonInfeasible, msg)
 		return podFromAllocation, nil
 	}
@@ -337,6 +344,40 @@ func (m *manager) HandlePodResourcesResize(
 	return podFromAllocation, nil
 }
 
+func disallowResizeForSwappableContainers(runtime kubecontainer.Runtime, desiredPod, allocatedPod *v1.Pod) (bool, string) {
+	if desiredPod == nil || allocatedPod == nil {
+		return false, ""
+	}
+	restartableMemoryResizePolicy := func(resizePolicies []v1.ContainerResizePolicy) bool {
+		for _, policy := range resizePolicies {
+			if policy.ResourceName == v1.ResourceMemory {
+				return policy.RestartPolicy == v1.RestartContainer
+			}
+		}
+		return false
+	}
+	allocatedContainers := make(map[string]v1.Container)
+	for _, container := range append(allocatedPod.Spec.Containers, allocatedPod.Spec.InitContainers...) {
+		allocatedContainers[container.Name] = container
+	}
+	for _, desiredContainer := range append(desiredPod.Spec.Containers, desiredPod.Spec.InitContainers...) {
+		allocatedContainer, ok := allocatedContainers[desiredContainer.Name]
+		if !ok {
+			continue
+		}
+		origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
+		newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
+		if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
+			aSwapBehavior := runtime.GetContainerSwapBehavior(desiredPod, &desiredContainer)
+			bSwapBehavior := runtime.GetContainerSwapBehavior(allocatedPod, &allocatedContainer)
+			if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
+				return true, "In-place resize of containers with swap is not supported."
+			}
+		}
+	}
+	return false, ""
+}
+
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it
 // cannot. "pod" is new pod, while "pods" are all admitted pods
 // The function returns a boolean value indicating whether the pod
@@ -348,10 +389,7 @@ func (m *manager) canAdmitPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, strin
 	// Filter out the pod being evaluated.
 	allocatedPods = slices.DeleteFunc(allocatedPods, func(p *v1.Pod) bool { return p.UID == pod.UID })
 
-	// the kubelet will invoke each pod admit handler in sequence
-	// if any handler rejects, the pod is rejected.
-	// TODO: move out of disk check into a pod admitter
-	// TODO: out of resource eviction should have a pod admitter call-out
+	// If any handler rejects, the pod is rejected.
 	attrs := &lifecycle.PodAdmitAttributes{Pod: pod, OtherPods: allocatedPods}
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {

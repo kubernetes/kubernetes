@@ -1899,18 +1899,9 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
 		allocatedPods := kl.getAllocatedPods()
 
-		if allocatedPod, resizeNotAllowed := kl.disallowResizeForSwappableContainers(pod); resizeNotAllowed {
-			pod = allocatedPod
-			if kl.allocationManager.IsPodResizeInProgress(allocatedPod, podStatus) {
-				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
-			} else {
-				kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
-			}
-		} else {
-			pod, err = kl.allocationManager.HandlePodResourcesResize(allocatedPods, pod, podStatus)
-			if err != nil {
-				return false, err
-			}
+		pod, err = kl.allocationManager.HandlePodResourcesResize(kl.containerRuntime, allocatedPods, pod, podStatus)
+		if err != nil {
+			return false, err
 		}
 	}
 
@@ -2608,6 +2599,7 @@ func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandle
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
+	var updates []UpdatePodOptions
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
@@ -2621,7 +2613,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				klog.V(2).InfoS("Unable to find pod for mirror pod, skipping", "mirrorPod", klog.KObj(mirrorPod), "mirrorPodUID", mirrorPod.UID)
 				continue
 			}
-			kl.podWorkers.UpdatePod(UpdatePodOptions{
+			updates = append(updates, UpdatePodOptions{
 				Pod:        pod,
 				MirrorPod:  mirrorPod,
 				UpdateType: kubetypes.SyncPodUpdate,
@@ -2653,12 +2645,15 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				continue
 			}
 		}
-		kl.podWorkers.UpdatePod(UpdatePodOptions{
+		updates = append(updates, UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
 			UpdateType: kubetypes.SyncPodCreate,
 			StartTime:  start,
 		})
+	}
+	for _, update := range updates {
+		kl.podWorkers.UpdatePod(update)
 	}
 }
 
@@ -2790,47 +2785,6 @@ func (kl *Kubelet) HandlePodSyncs(pods []*v1.Pod) {
 			StartTime:  start,
 		})
 	}
-}
-
-func (kl *Kubelet) disallowResizeForSwappableContainers(desiredPod *v1.Pod) (*v1.Pod, bool) {
-	allocatedPod, updated := kl.allocationManager.UpdatePodFromAllocation(desiredPod)
-	if !updated {
-		return allocatedPod, false
-	}
-
-	if desiredPod == nil || allocatedPod == nil {
-		return allocatedPod, false
-	}
-	restartableMemoryResizePolicy := func(resizePolicies []v1.ContainerResizePolicy) bool {
-		for _, policy := range resizePolicies {
-			if policy.ResourceName == v1.ResourceMemory {
-				return policy.RestartPolicy == v1.RestartContainer
-			}
-		}
-		return false
-	}
-	allocatedContainers := make(map[string]v1.Container)
-	for _, container := range append(allocatedPod.Spec.Containers, allocatedPod.Spec.InitContainers...) {
-		allocatedContainers[container.Name] = container
-	}
-	for _, desiredContainer := range append(desiredPod.Spec.Containers, desiredPod.Spec.InitContainers...) {
-		allocatedContainer, ok := allocatedContainers[desiredContainer.Name]
-		if !ok {
-			continue
-		}
-		origMemRequest := desiredContainer.Resources.Requests[v1.ResourceMemory]
-		newMemRequest := allocatedContainer.Resources.Requests[v1.ResourceMemory]
-		if !origMemRequest.Equal(newMemRequest) && !restartableMemoryResizePolicy(allocatedContainer.ResizePolicy) {
-			aSwapBehavior := kl.containerRuntime.GetContainerSwapBehavior(desiredPod, &desiredContainer)
-			bSwapBehavior := kl.containerRuntime.GetContainerSwapBehavior(allocatedPod, &allocatedContainer)
-			if aSwapBehavior != kubetypes.NoSwap || bSwapBehavior != kubetypes.NoSwap {
-				msg := "In-place resize of containers with swap is not supported."
-				kl.statusManager.SetPodResizePendingCondition(desiredPod.UID, v1.PodReasonInfeasible, msg)
-				return allocatedPod, true
-			}
-		}
-	}
-	return allocatedPod, false
 }
 
 // LatestLoopEntryTime returns the last time in the sync loop monitor.
