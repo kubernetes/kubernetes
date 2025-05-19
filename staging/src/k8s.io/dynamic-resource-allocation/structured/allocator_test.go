@@ -3180,6 +3180,100 @@ func TestAllocator(t *testing.T) {
 				multipleDeviceAllocationResults(req0, driverA, pool1, resourceapi.AllocationResultsMaxSize, 0)...,
 			)},
 		},
+		"partitionable-devices-with-attribute-selector": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 2),
+					request(req1, classA, 1, resourceapi.DeviceSelector{
+						CEL: &resourceapi.CELDeviceSelector{
+							Expression: fmt.Sprintf(`device.attributes["%s"].special`, driverA),
+						},
+					}),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil,
+						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(true),
+							},
+						},
+					).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpu1": resource.MustParse("1"),
+							},
+						),
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"mem": resource.MustParse("10Gi"),
+							},
+						),
+					),
+					device(device2, nil,
+						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(false),
+							},
+						},
+					).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpu2": resource.MustParse("1"),
+							},
+						),
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"mem": resource.MustParse("10Gi"),
+							},
+						),
+					),
+					device(device3, nil,
+						map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+							"special": {
+								BoolValue: ptr.To(false),
+							},
+						},
+					).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"cpu3": resource.MustParse("1"),
+							},
+						),
+						deviceCounterConsumption(counterSet2,
+							map[string]resource.Quantity{
+								"mem": resource.MustParse("10Gi"),
+							},
+						),
+					),
+				).withCounterSet(
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"cpu1": resource.MustParse("1"),
+							"cpu2": resource.MustParse("1"),
+							"cpu3": resource.MustParse("1"),
+						},
+					),
+					counterSet(counterSet2,
+						map[string]resource.Quantity{
+							"mem": resource.MustParse("30Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+				deviceAllocationResult(req1, driverA, pool1, device1, false),
+			)},
+		},
 	}
 
 	for name, tc := range testcases {
