@@ -109,7 +109,7 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField()
 			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
 
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
 		})
 	}
 }

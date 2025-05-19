@@ -18,8 +18,10 @@ package testing
 
 import (
 	"bytes"
+	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +32,7 @@ import (
 )
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
-func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Object) {
+func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Object, subresources ...string) {
 	t.Helper()
 
 	// Accumulate errors from all versioned validation, per version.
@@ -39,9 +41,9 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Obje
 		all[gv] = errs
 	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, accumulate)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, accumulate, subresources...)
 	} else {
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, old, accumulate)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, old, accumulate, subresources...)
 	}
 
 	// Make a copy so we can modify it.
@@ -104,4 +106,17 @@ func fmtErrs(errs field.ErrorList) string {
 	}
 
 	return buf.String()
+}
+
+func parseSubresourcePath(subresourcePath string) ([]string, error) {
+	if len(subresourcePath) == 0 {
+		return nil, nil
+	}
+	parts := strings.Split(subresourcePath, "/")
+	for _, part := range parts {
+		if len(part) == 0 {
+			return nil, fmt.Errorf("invalid subresource path: %s", subresourcePath)
+		}
+	}
+	return parts, nil
 }

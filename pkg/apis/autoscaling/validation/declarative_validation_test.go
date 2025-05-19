@@ -34,8 +34,9 @@ import (
 
 func TestValidateScaleForDeclarative(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "autoscaling",
-		APIVersion: "v1",
+		APIGroup:    "autoscaling",
+		APIVersion:  "v1",
+		Subresource: "scale",
 	})
 	testCases := map[string]struct {
 		input        autoscaling.Scale
@@ -87,7 +88,7 @@ func TestValidateScaleForDeclarative(t *testing.T) {
 			equivalenceMatcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			equivalenceMatcher.Test(t, imperativeErrs, declarativeTakeoverErrs)
 
-			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil)
+			apitesting.VerifyVersionedValidationEquivalence(t, &tc.input, nil, "scale")
 		})
 	}
 }
