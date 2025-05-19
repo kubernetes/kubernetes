@@ -1669,7 +1669,7 @@ func (e *Store) startObservingCount(period time.Duration, objectCountTracker flo
 			count = -1
 		}
 
-		metrics.UpdateObjectCount(resourceName, count)
+		metrics.UpdateObjectCount(e.DefaultQualifiedResource, count)
 		if objectCountTracker != nil {
 			objectCountTracker.Set(resourceName, count)
 		}

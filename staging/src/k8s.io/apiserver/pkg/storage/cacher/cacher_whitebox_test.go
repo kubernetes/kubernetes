@@ -492,7 +492,7 @@ func TestConsistentReadFallback(t *testing.T) {
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="false", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
 `,
 		},
 		{
@@ -506,7 +506,7 @@ apiserver_watch_cache_consistent_read_total{fallback="false", resource="pods", s
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
 `,
 		},
 		{
@@ -521,7 +521,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", success="false"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="false"} 1
 `,
 		},
 		{

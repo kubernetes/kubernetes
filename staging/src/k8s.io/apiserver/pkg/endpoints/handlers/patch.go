@@ -107,7 +107,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 			return
 		}
 
-		patchBytes, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource().String(), requestmetrics.Patch)
+		patchBytes, err := limitedReadBodyWithRecordMetric(ctx, req, scope.MaxRequestBodyBytes, scope.Resource.GroupResource(), requestmetrics.Patch)
 		if err != nil {
 			span.AddEvent("limitedReadBody failed", attribute.Int("len", len(patchBytes)), attribute.String("err", err.Error()))
 			scope.err(err, w, req)
