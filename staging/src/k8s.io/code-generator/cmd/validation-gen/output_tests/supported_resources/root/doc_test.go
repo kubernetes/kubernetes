@@ -14,4 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package subresource
+package root
+
+import (
+	"fmt"
+	"testing"
+
+	"k8s.io/apimachinery/pkg/util/validation/field"
+)
+
+func TestRegisterValidations(t *testing.T) {
+	st := localSchemeBuilder.Test(t)
+
+	t1 := &T1{}
+
+	st.Value(t1).ExpectValid()
+
+	st.Value(t1).Subresources([]string{"scale"}).ExpectInvalid(
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{"scale"})),
+	)
+
+	st.Value(t1).Subresources([]string{"x", "y"}).ExpectInvalid(
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{"x", "y"})),
+	)
+}

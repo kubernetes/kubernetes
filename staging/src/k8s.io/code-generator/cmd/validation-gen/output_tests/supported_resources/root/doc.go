@@ -17,19 +17,18 @@ limitations under the License.
 // Note: this selects all types in the package.
 // +k8s:validation-gen=*
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
-// +k8s:validation-gen-test-fixture=validateFalse
 
 // This is a test package.
-package trivial
+package root
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
 
-type T1 struct{}
+// Root resource is supported by default
 
-type T2 struct{}
-
-type E1 string
-
-type E2 string
+// T1 is a test type
+type T1 struct {
+	// +k8s:validateTrue="field T1.S"
+	S string `json:"s"`
+}

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package subresource
+package is_subresource
 
 import (
 	"fmt"
@@ -27,17 +27,14 @@ func TestRegisterValidations(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	t1 := &T1{}
+	
+	st.Value(t1).ExpectInvalid(
+		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{})),
+	)
 
-	st.Value(t1).ExpectValid()
-
-	st.Value(t1).Subresources([]string{"status"}).ExpectValid()
 	st.Value(t1).Subresources([]string{"scale"}).ExpectValid()
-	st.Value(t1).Subresources([]string{"x", "y"}).ExpectValid()
 
 	st.Value(t1).Subresources([]string{"unknown"}).ExpectInvalid(
 		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{"unknown"})),
-	)
-	st.Value(t1).Subresources([]string{"x", "unknown"}).ExpectInvalid(
-		field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", t1, []string{"x", "unknown"})),
 	)
 }
