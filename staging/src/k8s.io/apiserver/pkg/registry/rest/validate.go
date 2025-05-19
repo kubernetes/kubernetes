@@ -19,8 +19,9 @@ package rest
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/operation"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/api/operation"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -150,7 +151,7 @@ func requestInfo(ctx context.Context, subresourceMapper GroupVersionKindProvider
 	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
 		groupVersion := schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 		if subresourceMapper != nil {
-			return subresourceMapper.GroupVersionKind(groupVersion).GroupVersion(), nil, nil
+			groupVersion = subresourceMapper.GroupVersionKind(groupVersion).GroupVersion()
 		}
 		subresources, err := parseSubresourcePath(requestInfo.Subresource)
 		if err != nil {

@@ -52,7 +52,7 @@ var (
 	safePkg             = "k8s.io/apimachinery/pkg/api/safe"
 	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast")
 	operationPkg        = "k8s.io/apimachinery/pkg/api/operation"
-	operationPkgSymbols = mkPkgNames(operationPkg, "Operation")
+	operationPkgSymbols = mkPkgNames(operationPkg, "Operation", "MatchesSubresource")
 	contextPkg          = "context"
 	contextPkgSymbols   = mkPkgNames(contextPkg, "Context")
 )
@@ -816,14 +816,17 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 			panic(fmt.Sprintf("found nil node for root-type %v", rootType))
 		}
 
+		supportedResources := g.toResourceList(rootType)
+
 		targs := generator.Args{
-			"rootType":  rootType,
-			"typePfx":   "",
-			"field":     mkSymbolArgs(c, fieldPkgSymbols),
-			"fmt":       mkSymbolArgs(c, fmtPkgSymbols),
-			"operation": mkSymbolArgs(c, operationPkgSymbols),
-			"safe":      mkSymbolArgs(c, safePkgSymbols),
-			"context":   mkSymbolArgs(c, contextPkgSymbols),
+			"rootType":          rootType,
+			"typePfx":           "",
+			"field":             mkSymbolArgs(c, fieldPkgSymbols),
+			"fmt":               mkSymbolArgs(c, fmtPkgSymbols),
+			"operation":         mkSymbolArgs(c, operationPkgSymbols),
+			"safe":              mkSymbolArgs(c, safePkgSymbols),
+			"context":           mkSymbolArgs(c, contextPkgSymbols),
+			"supportsResources": strings.Join(supportedResources, ", "),
 		}
 		if !isNilableType(rootType) {
 			targs["typePfx"] = "*"
@@ -835,7 +838,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
-		sw.Do("  if len(op.Request.Subresources) == 0 || (len(op.Request.Subresources) == 1 && op.Request.Subresources[0] == \"scale\") {\n", targs)
+		sw.Do("  if op.Request.SubresourceIn([]string{$.supportsResources$}) {\n", targs)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
 		sw.Do("               op, ", targs)
@@ -852,6 +855,23 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 	}
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
+}
+
+// toResourceList returns a list of resources that are supported by a kind.
+func (g *genValidations) toResourceList(rootType *types.Type) []string {
+	supportedSubresources := supportedSubresourceTags(rootType)
+
+	if subresource, isSubresource := isSubresourceTag(rootType); isSubresource {
+		supportedSubresources.Insert(subresource)
+	} else {
+		supportedSubresources.Insert("/")
+	}
+	supported := supportedSubresources.UnsortedList()
+	slices.Sort(supported)
+	for i, subresource := range supported {
+		supported[i] = strconv.Quote(subresource)
+	}
+	return supported
 }
 
 // emitValidationFunction emits a validation function for the specified type.

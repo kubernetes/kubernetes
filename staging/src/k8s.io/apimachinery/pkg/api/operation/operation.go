@@ -16,7 +16,12 @@ limitations under the License.
 
 package operation
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import (
+	"slices"
+	"strings"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+)
 
 // Operation provides contextual information about a validation request and the API
 // operation being validated.
@@ -71,6 +76,29 @@ type Request struct {
 	// Field wiping logic is expected to be handled in resource strategies by
 	// modifying the incoming object before it is validated.
 	Subresources []string
+}
+
+// MatchesSubresource returns true if the request is for the given subresource path.
+// The subresource path is a slash-separated list of subresource names. For
+// example, `/status`, `/resize`, or `/x/y/z`.
+//
+// `/` identifies the root resource. That is, MatchesSubresource returns true
+// subresourcePath is `/` and Subresources is an empty list.
+func (r Request) MatchesSubresource(subresourcePath string) bool {
+	if len(r.Subresources) == 0 && subresourcePath == "/" {
+		return true
+	}
+	subresource := "/" + strings.Join(r.Subresources, "/")
+	return subresource == subresourcePath
+}
+
+// SubresourceIn returns true if the request is for a subresource in the given list.
+// The subresource path is a slash-separated list of subresource names. For example,
+// `/status`, `/resize`, or `/x/y/z`.
+// `/` identifies the root resource. That is, SubresourceIn returns true
+// subresourcePaths contains `/` and Subresources is an empty list.
+func (r Request) SubresourceIn(subresourcePaths []string) bool {
+	return slices.ContainsFunc(subresourcePaths, r.MatchesSubresource)
 }
 
 // Code is the request operation to be validated.
