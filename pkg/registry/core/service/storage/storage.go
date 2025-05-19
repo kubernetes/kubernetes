@@ -235,6 +235,15 @@ func (r *REST) defaultOnRead(obj runtime.Object) {
 		r.defaultOnReadService(s)
 	case *api.ServiceList:
 		r.defaultOnReadServiceList(s)
+	case runtime.MutateCacheableObject:
+		obj := s.GetObject()
+		service, ok := obj.(*api.Service)
+		if !ok {
+			klog.Warningf("unexpected object type: %T", obj)
+			return
+		}
+		r.defaultOnReadService(service)
+		s.MutateObject(service)
 	default:
 		// This was not an object we can default.  This is not an error, as the
 		// caching layer can pass through here, too.

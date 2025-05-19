@@ -360,6 +360,14 @@ type CacheableObject interface {
 	GetObject() Object
 }
 
+// MutateCacheableObject is a superset of CacheableObject. It allows an object to
+// mutate its cached serialization.
+type MutateCacheableObject interface {
+	CacheableObject
+	// MutateObject	mutates the object to be encoded.
+	MutateObject(obj Object)
+}
+
 // Unstructured objects store values as map[string]interface{}, with only values that can be serialized
 // to JSON allowed.
 type Unstructured interface {
