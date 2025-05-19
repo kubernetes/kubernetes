@@ -1606,6 +1606,8 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
 		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a terminating pod")
 		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
