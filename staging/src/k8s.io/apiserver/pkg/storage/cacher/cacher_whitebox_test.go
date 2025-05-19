@@ -112,10 +112,11 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 
 type dummyStorage struct {
 	sync.RWMutex
-	err       error
-	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
-	getRVFn   func(_ context.Context) (uint64, error)
-	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+	getlistErr error
+	watchErr   error
+	getListFn  func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	getRVFn    func(_ context.Context) (uint64, error)
+	watchFn    func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 
 	// use getRequestWatchProgressCounter when reading
 	// the value of the counter
@@ -167,13 +168,12 @@ func (d *dummyStorage) Watch(ctx context.Context, key string, opts storage.ListO
 	d.RLock()
 	defer d.RUnlock()
 
-	return newDummyWatch(), d.err
+	return newDummyWatch(), d.watchErr
 }
 func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
 	d.RLock()
 	defer d.RUnlock()
-
-	return d.err
+	return d.getlistErr
 }
 func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
 	if d.getListFn != nil {
@@ -183,7 +183,7 @@ func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts stora
 	defer d.RUnlock()
 	podList := listObj.(*example.PodList)
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
-	return d.err
+	return d.getlistErr
 }
 func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
@@ -194,11 +194,11 @@ func (d *dummyStorage) Count(_ string) (int64, error) {
 func (d *dummyStorage) ReadinessCheck() error {
 	return nil
 }
-func (d *dummyStorage) injectError(err error) {
+func (d *dummyStorage) injectGetListError(err error) {
 	d.Lock()
 	defer d.Unlock()
 
-	d.err = err
+	d.getlistErr = err
 }
 
 func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
@@ -741,7 +741,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
+	backingStorage.injectGetListError(errDummy)
 	err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred,
@@ -778,7 +778,7 @@ func TestGetCacheBypass(t *testing.T) {
 	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
+	backingStorage.injectGetListError(errDummy)
 	err = delegator.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
 		ResourceVersion: "0",
@@ -835,7 +835,7 @@ func TestTooManyRequestsNotReturned(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResilientWatchCacheInitialization, false)
 
 	dummyErr := fmt.Errorf("dummy")
-	backingStorage := &dummyStorage{err: dummyErr}
+	backingStorage := &dummyStorage{getlistErr: dummyErr}
 	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -963,7 +963,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Configure cacher so that it can't initialize, because of
 	// constantly failing lists to the underlying storage.
 	dummyErr := fmt.Errorf("dummy")
-	backingStorage := &dummyStorage{err: dummyErr}
+	backingStorage := &dummyStorage{watchErr: dummyErr}
 	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, testingclock.NewFakeClock(time.Now()))
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
