@@ -123,11 +123,12 @@ func ValidateUpdateDeclaratively(ctx context.Context, scheme *runtime.Scheme, ob
 }
 
 func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
-	groupVersion, subresources, err := requestInfo(ctx, o.subresourceGVKMapper)
+	// Find versionedGroupVersion, which identifies the API version to use for declarative validation.
+	versionedGroupVersion, subresources, err := requestInfo(ctx, o.subresourceGVKMapper)
 	if err != nil {
 		return field.ErrorList{field.InternalError(nil, err)}
 	}
-	versionedObj, err := scheme.ConvertToVersion(obj, groupVersion)
+	versionedObj, err := scheme.ConvertToVersion(obj, versionedGroupVersion)
 	if err != nil {
 		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
 	}
@@ -137,7 +138,7 @@ func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, old
 	case operation.Create:
 		return scheme.Validate(ctx, o.options, versionedObj, subresources...)
 	case operation.Update:
-		versionedOldObj, err = scheme.ConvertToVersion(oldObj, groupVersion)
+		versionedOldObj, err = scheme.ConvertToVersion(oldObj, versionedGroupVersion)
 		if err != nil {
 			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
 		}
