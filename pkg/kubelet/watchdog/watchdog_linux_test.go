@@ -23,13 +23,14 @@ import (
 	"bytes"
 	"errors"
 	"flag"
+	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Mock syncLoopHealthChecker
@@ -139,8 +140,19 @@ func TestHealthCheckerStart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			defer func() {
+				tCtx.Cancel("test has completed")
+			}()
 			// Capture logs
-			logBuffer := setupLogging(t)
+			var logBuffer bytes.Buffer
+			flags := &flag.FlagSet{}
+			klog.InitFlags(flags)
+			if err := flags.Set("v", "5"); err != nil {
+				t.Fatal(err)
+			}
+			klog.LogToStderr(false)
+			klog.SetOutput(&logBuffer)
 
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{
@@ -156,13 +168,15 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Start the health checker
-			hc.Start()
+			hc.Start(tCtx)
 
 			// Wait for a short period to allow the health check to run
 			time.Sleep(2 * interval)
 
 			// Check logs to verify the health check ran
 			klog.Flush()
+			// prevent further writes into buf
+			klog.SetOutput(io.Discard)
 			logs := logBuffer.String()
 			for _, expectedLog := range tt.expectedLogs {
 				if !strings.Contains(logs, expectedLog) {
@@ -171,39 +185,4 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 		})
 	}
-}
-
-// threadSafeBuffer is a thread-safe wrapper around bytes.Buffer.
-type threadSafeBuffer struct {
-	buffer bytes.Buffer
-	mu     sync.Mutex
-}
-
-func (b *threadSafeBuffer) Write(p []byte) (n int, err error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buffer.Write(p)
-}
-
-func (b *threadSafeBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.buffer.String()
-}
-
-// setupLogging sets up logging to capture output using a thread-safe buffer.
-func setupLogging(t *testing.T) *threadSafeBuffer {
-	flags := &flag.FlagSet{}
-	klog.InitFlags(flags)
-	if err := flags.Set("v", "5"); err != nil {
-		t.Fatal(err)
-	}
-	klog.LogToStderr(false)
-
-	logBuffer := &threadSafeBuffer{}
-
-	// Set the output to the thread-safe buffer
-	klog.SetOutput(logBuffer)
-
-	return logBuffer
 }

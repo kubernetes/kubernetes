@@ -1823,7 +1823,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SystemdWatchdog) {
-		kl.healthChecker.Start()
+		kl.healthChecker.Start(ctx)
 	}
 
 	kl.syncLoop(ctx, updates, kl)
