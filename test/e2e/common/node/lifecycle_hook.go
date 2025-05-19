@@ -18,6 +18,7 @@ package node
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -561,6 +562,7 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 			podClient = e2epod.NewPodClient(f)
 		})
 
+		var finalizer = "test/finalizer"
 		/*
 			Release : v1.32
 			Testname: Pod Lifecycle, prestop sleep hook
@@ -569,22 +571,34 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 		ginkgo.It("valid prestop hook using sleep action", func(ctx context.Context) {
 			lifecycle := &v1.Lifecycle{
 				PreStop: &v1.LifecycleHandler{
-					Sleep: &v1.SleepAction{Seconds: 15},
+					Sleep: &v1.SleepAction{Seconds: 5},
 				},
 			}
-			podWithHook := getPodWithHook("pod-with-prestop-sleep-hook", imageutils.GetPauseImageName(), lifecycle)
-			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](180)
+			name := "pod-with-prestop-sleep-hook"
+			podWithHook := getPodWithHook(name, imageutils.GetPauseImageName(), lifecycle)
+			podWithHook.Finalizers = append(podWithHook.Finalizers, finalizer)
+			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](30)
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
-			podClient.CreateSync(ctx, podWithHook)
+			p := podClient.CreateSync(ctx, podWithHook)
+			defer podClient.RemoveFinalizer(ctx, name, finalizer)
 			ginkgo.By("delete the pod with lifecycle hook using sleep action")
-			start := time.Now()
-			podClient.DeleteSync(ctx, podWithHook.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-			cost := time.Since(start)
+			podClient.Delete(ctx, podWithHook.Name, metav1.DeleteOptions{})
+			if err := e2epod.WaitForContainerTerminated(ctx, f.ClientSet, p.Namespace, p.Name, name, time.Second*40); err != nil {
+				framework.Failf("failed waiting for container terminated")
+			}
+			p, err := podClient.Get(ctx, p.Name, metav1.GetOptions{})
+			if err != nil {
+				framework.Failf("failed getting pod after deletion")
+			}
+			debugStr, _ := json.Marshal(p)
+			finishAt := p.Status.ContainerStatuses[0].State.Terminated.FinishedAt
+			deletionAt := p.DeletionTimestamp.Time
+
 			// cost should be
-			// longer than 15 seconds (pod should sleep for 15 seconds)
-			// shorter than gracePeriodSeconds (180 seconds here)
-			if !validDuration(cost, 15, 120) {
-				framework.Failf("unexpected delay duration before killing the pod, cost = %v", cost)
+			// longer than 15 seconds (pod should sleep for 5 seconds)
+			// shorter than gracePeriodSeconds (30 seconds here)
+			if !validDuration(finishAt.Time.Sub(deletionAt), 5, 30) {
+				framework.Failf("unexpected delay duration before killing the pod, finishAt = %v, deletionAt= %v , pod=%v", finishAt, deletionAt, string(debugStr))
 			}
 		})
 
