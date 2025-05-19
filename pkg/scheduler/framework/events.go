@@ -68,26 +68,26 @@ func PodSchedulingPropertiesChange(newPod *v1.Pod, oldPod *v1.Pod) (events []Clu
 		r = unschedulablePod
 	}
 
-	podChangeExtracters := []podChangeExtractor{
+	podChangeExtractors := []podChangeExtractor{
 		extractPodLabelsChange,
 		extractPodScaleDown,
 		extractPodSchedulingGateEliminatedChange,
 		extractPodTolerationChange,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-		podChangeExtracters = append(podChangeExtracters, extractPodGeneratedResourceClaimChange)
+		podChangeExtractors = append(podChangeExtractors, extractPodGeneratedResourceClaimChange)
 	}
 
-	for _, fn := range podChangeExtracters {
-		if event := fn(newPod, oldPod); event != none {
+	for _, fn := range podChangeExtractors {
+		if event := fn(newPod, oldPod); event != None {
 			events = append(events, ClusterEvent{Resource: r, ActionType: event})
 		}
 	}
 
 	if len(events) == 0 {
-		// When no specific event is found, we use AssignedPodOtherUpdate,
+		// When no specific event is found, we use the general Update action,
 		// which should only trigger plugins registering a general Pod/Update event.
-		events = append(events, ClusterEvent{Resource: r, ActionType: updatePodOther})
+		events = append(events, ClusterEvent{Resource: r, ActionType: Update})
 	}
 
 	return
@@ -116,14 +116,14 @@ func extractPodScaleDown(newPod, oldPod *v1.Pod) ActionType {
 		}
 	}
 
-	return none
+	return None
 }
 
 func extractPodLabelsChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
 	if isLabelChanged(newPod.GetLabels(), oldPod.GetLabels()) {
 		return UpdatePodLabel
 	}
-	return none
+	return None
 }
 
 func extractPodTolerationChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
@@ -135,7 +135,7 @@ func extractPodTolerationChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
 		return UpdatePodToleration
 	}
 
-	return none
+	return None
 }
 
 func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
@@ -144,7 +144,7 @@ func extractPodSchedulingGateEliminatedChange(newPod *v1.Pod, oldPod *v1.Pod) Ac
 		return UpdatePodSchedulingGatesEliminated
 	}
 
-	return none
+	return None
 }
 
 func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) ActionType {
@@ -152,7 +152,7 @@ func extractPodGeneratedResourceClaimChange(newPod *v1.Pod, oldPod *v1.Pod) Acti
 		return UpdatePodGeneratedResourceClaim
 	}
 
-	return none
+	return None
 }
 
 // NodeSchedulingPropertiesChange interprets the update of a node and returns corresponding UpdateNodeXYZ event(s).
@@ -167,7 +167,7 @@ func NodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) (events 
 	}
 
 	for _, fn := range nodeChangeExtracters {
-		if event := fn(newNode, oldNode); event != none {
+		if event := fn(newNode, oldNode); event != None {
 			events = append(events, ClusterEvent{Resource: Node, ActionType: event})
 		}
 	}
@@ -180,14 +180,14 @@ func extractNodeAllocatableChange(newNode *v1.Node, oldNode *v1.Node) ActionType
 	if !equality.Semantic.DeepEqual(oldNode.Status.Allocatable, newNode.Status.Allocatable) {
 		return UpdateNodeAllocatable
 	}
-	return none
+	return None
 }
 
 func extractNodeLabelsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
 	if isLabelChanged(newNode.GetLabels(), oldNode.GetLabels()) {
 		return UpdateNodeLabel
 	}
-	return none
+	return None
 }
 
 func isLabelChanged(newLabels map[string]string, oldLabels map[string]string) bool {
@@ -198,7 +198,7 @@ func extractNodeTaintsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
 	if !equality.Semantic.DeepEqual(newNode.Spec.Taints, oldNode.Spec.Taints) {
 		return UpdateNodeTaint
 	}
-	return none
+	return None
 }
 
 func extractNodeConditionsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
@@ -212,7 +212,7 @@ func extractNodeConditionsChange(newNode *v1.Node, oldNode *v1.Node) ActionType 
 	if !equality.Semantic.DeepEqual(strip(oldNode.Status.Conditions), strip(newNode.Status.Conditions)) {
 		return UpdateNodeCondition
 	}
-	return none
+	return None
 }
 
 func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
@@ -220,12 +220,12 @@ func extractNodeSpecUnschedulableChange(newNode *v1.Node, oldNode *v1.Node) Acti
 		// TODO: create UpdateNodeSpecUnschedulable ActionType
 		return UpdateNodeTaint
 	}
-	return none
+	return None
 }
 
 func extractNodeAnnotationsChange(newNode *v1.Node, oldNode *v1.Node) ActionType {
 	if !equality.Semantic.DeepEqual(oldNode.GetAnnotations(), newNode.GetAnnotations()) {
 		return UpdateNodeAnnotation
 	}
-	return none
+	return None
 }

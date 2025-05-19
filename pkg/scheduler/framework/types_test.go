@@ -2135,6 +2135,18 @@ func TestCloudEvent_Match(t *testing.T) {
 			comingEvent: ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
 			wantResult:  false,
 		},
+		{
+			name:        "event with resource = '*' matching with coming events carrying a too broad actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: UpdateNodeLabel},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: Update},
+			wantResult:  false,
+		},
+		{
+			name:        "event with resource = '*' matching with coming events carrying a more specific actionType",
+			event:       ClusterEvent{Resource: WildCard, ActionType: Update},
+			comingEvent: ClusterEvent{Resource: Pod, ActionType: UpdateNodeLabel},
+			wantResult:  true,
+		},
 	}
 
 	for _, tc := range testCases {

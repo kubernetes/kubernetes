@@ -81,16 +81,13 @@ const (
 	// Depends on the DynamicResourceAllocation feature gate.
 	UpdatePodGeneratedResourceClaim
 
-	// updatePodOther is a update for pod's other fields.
-	// It's used only for the internal event handling, and thus unexported.
-	updatePodOther
-
 	All ActionType = 1<<iota - 1
 
 	// Use the general Update type if you don't either know or care the specific sub-Update type to use.
-	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim | updatePodOther
-	// none is a special ActionType that is only used internally.
-	none ActionType = 0
+	Update = UpdateNodeAllocatable | UpdateNodeLabel | UpdateNodeTaint | UpdateNodeCondition | UpdateNodeAnnotation | UpdatePodLabel | UpdatePodScaleDown | UpdatePodToleration | UpdatePodSchedulingGatesEliminated | UpdatePodGeneratedResourceClaim
+
+	// None is a special ActionType that is only used internally.
+	None ActionType = 0
 )
 
 var (
@@ -128,8 +125,6 @@ func (a ActionType) String() string {
 		return "UpdatePodSchedulingGatesEliminated"
 	case UpdatePodGeneratedResourceClaim:
 		return "UpdatePodGeneratedResourceClaim"
-	case updatePodOther:
-		return "Update"
 	case All:
 		return "All"
 	case Update:
@@ -320,14 +315,24 @@ func (ce ClusterEvent) IsWildCard() bool {
 }
 
 // Match returns true if ClusterEvent is matched with the coming event.
+// "match" means the coming event is the same or more specific than the ce.
+// i.e., when ce.ActionType is Update, it return true if a coming event is UpdateNodeLabel
+// because UpdateNodeLabel is more specific than Update.
+// On the other hand, when ce.ActionType is UpdateNodeLabel, it doesn't return true if a coming event is Update.
+// This is based on the fact that the scheduler interprets the coming cluster event as specific event if possible;
+// meaning, if a coming event is Node/Update, it means that Node's update is not something
+// that can be interpreted as any of Node's specific Update events.
+//
 // If the ce.Resource is "*", there's no requirement for the coming event' Resource.
 // Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
+// (which should never happen in the current implementation of the scheduling queue.)
 //
 // Note: we have a special case here when the coming event is a wildcard event,
 // it will force all Pods to move to activeQ/backoffQ,
 // but we take it as an unmatched event unless the ce is also a wildcard one.
 func (ce ClusterEvent) Match(incomingEvent ClusterEvent) bool {
-	return ce.IsWildCard() || ce.Resource.match(incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0
+	return ce.IsWildCard() ||
+		ce.Resource.match(incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0 && incomingEvent.ActionType <= ce.ActionType
 }
 
 // match returns true if the resource is matched with the coming resource.
