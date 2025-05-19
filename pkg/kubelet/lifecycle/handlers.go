@@ -260,7 +260,7 @@ func (s *StaticPodAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		return PodAdmitResult{
 			Admit:   false,
 			Reason:  "StaticPodInvalid",
-			Message: "Static pod can only have hostPath or emptyDir volume moun",
+			Message: "Static pod can only have hostPath or emptyDir volume mounts",
 		}
 	}
 
