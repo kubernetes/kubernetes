@@ -38,7 +38,6 @@ import (
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
-	"github.com/prometheus/common/model"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -47,6 +46,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -424,8 +424,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Expect(kubeletPlugin1.GetGRPCCalls()).Should(testdrivergomega.NodePrepareResourcesSucceeded, "Plugin 1 should have prepared resources.")
 			gomega.Expect(kubeletPlugin2.GetGRPCCalls()).Should(testdrivergomega.NodePrepareResourcesSucceeded, "Plugin 2 should have prepared resources.")
 			driverName := func(element any) string {
-				el := element.(*model.Sample)
-				return string(el.Metric[model.LabelName("driver_name")])
+				el := element.(*testutil.Sample)
+				return string(el.Metric[testutil.LabelName("driver_name")])
 			}
 
 			gomega.Expect(getKubeletMetrics(ctx)).Should(gstruct.MatchKeys(gstruct.IgnoreExtras, gstruct.Keys{
