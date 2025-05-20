@@ -685,7 +685,16 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.podManager = kubepod.NewBasicPodManager()
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
-	klet.allocationManager = allocation.NewManager(klet.getRootDir(), klet.containerManager, klet.statusManager)
+	klet.allocationManager = allocation.NewManager(
+		klet.getRootDir(),
+		klet.containerManager,
+		klet.statusManager,
+		func(pod *v1.Pod) { klet.HandlePodSyncs([]*v1.Pod{pod}) },
+		klet.GetActivePods,
+		klet.podManager.GetPodByUID,
+		klet.podCache,
+		klet.sourcesReady,
+	)
 
 	klet.resourceAnalyzer = serverstats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, kubeDeps.Recorder)
 
@@ -718,6 +727,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.resyncInterval,
 		backOffPeriod,
 		klet.podCache,
+		klet.allocationManager,
 	)
 
 	var singleProcessOOMKill *bool
@@ -792,6 +802,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
+	klet.allocationManager.SetContainerRuntime(runtime)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
 	if err != nil {
@@ -1738,6 +1749,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 		klog.V(2).InfoS("Warning: cgroup check", "error", err)
 	}
 
+	// Start the allocation manager
+	if kl.allocationManager != nil {
+		kl.allocationManager.Run(ctx)
+	}
+
 	// Start volume manager
 	go kl.volumeManager.Run(ctx, kl.sourcesReady)
 
@@ -1889,22 +1905,6 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
-	// handlePodResourcesResize updates the pod to use the allocated resources. This should come
-	// before the main business logic of SyncPod, so that a consistent view of the pod is used
-	// across the sync loop.
-	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
-		// Handle pod resize here instead of doing it in HandlePodUpdates because
-		// this conveniently retries any Deferred resize requests
-		// TODO(vinaykul,InPlacePodVerticalScaling): Investigate doing this in HandlePodUpdates + periodic SyncLoop scan
-		//     See: https://github.com/kubernetes/kubernetes/pull/102884#discussion_r663160060
-		allocatedPods := kl.getAllocatedPods()
-
-		pod, err = kl.allocationManager.HandlePodResourcesResize(kl.containerRuntime, allocatedPods, pod, podStatus)
-		if err != nil {
-			return false, err
-		}
-	}
-
 	// Generate final API pod status with pod and status manager status
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus, false)
 	// The pod IP may be changed in generateAPIPodStatus if the pod is using host network. (See #24576)
@@ -2039,13 +2039,17 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff)
 	kl.reasonCache.Update(pod.UID, result)
 
-	for _, r := range result.SyncResults {
-		if r.Action == kubecontainer.ResizePodInPlace {
-			if r.Error == nil {
-				// The pod was resized successfully, clear any pod resize errors in the PodResizeInProgress condition.
-				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", true)
-			} else {
-				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, false)
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		for _, r := range result.SyncResults {
+			if r.Action == kubecontainer.ResizePodInPlace {
+				if r.Error == nil {
+					// The pod was resized successfully, mark the pod resize as completed.
+					kl.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+					// TODO: We only need to make this call if any of the resources were decreased.
+					kl.allocationManager.RetryPendingResizes()
+				} else {
+					kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, false)
+				}
 			}
 		}
 	}
@@ -2600,6 +2604,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
 	var updates []UpdatePodOptions
+	var pendingResizes []types.UID
 	for _, pod := range pods {
 		// Always add the pod to the pod manager. Kubelet relies on the pod
 		// manager as the source of truth for the desired state. If a pod does
@@ -2642,6 +2647,17 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 				recordAdmissionRejection(reason)
 				continue
 			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+				// Backfill the queue of pending resizes, but only after all the pods have
+				// been added. This ensures that no resizes get resolved until all the
+				// existing pods are added.
+				allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+				if updatedFromAllocation {
+					pod = allocatedPod
+					pendingResizes = append(pendingResizes, pod.UID)
+				}
+			}
 		}
 		updates = append(updates, UpdatePodOptions{
 			Pod:        pod,
@@ -2654,6 +2670,12 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	// could potentially resolve a pending resize before the existing pods have been admitted.
 	for _, update := range updates {
 		kl.podWorkers.UpdatePod(update)
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		for _, uid := range pendingResizes {
+			kl.allocationManager.PushPendingResize(uid)
+		}
+		kl.allocationManager.RetryPendingResizes()
 	}
 }
 
@@ -2672,12 +2694,32 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			}
 		}
 
+		var resizeRequest bool
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			allocatedPod, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
+			if updatedFromAllocation {
+				resizeRequest = true
+				pod = allocatedPod
+				kl.allocationManager.PushPendingResize(pod.UID)
+			} else {
+				// We can hit this case if a pending resize has been reverted,
+				// so we need to clear the pending resize condition.
+				kl.allocationManager.ClearPodResizePendingCondition(pod.UID)
+			}
+		}
+
 		kl.podWorkers.UpdatePod(UpdatePodOptions{
 			Pod:        pod,
 			MirrorPod:  mirrorPod,
 			UpdateType: kubetypes.SyncPodUpdate,
 			StartTime:  start,
 		})
+
+		if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+			if resizeRequest {
+				kl.allocationManager.RetryPendingResizes()
+			}
+		}
 	}
 }
 
@@ -2709,6 +2751,10 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		if err := kl.deletePod(pod); err != nil {
 			klog.V(2).InfoS("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		kl.allocationManager.RetryPendingResizes()
 	}
 }
 
