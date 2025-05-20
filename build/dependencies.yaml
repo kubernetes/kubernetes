@@ -256,7 +256,7 @@ dependencies:
     - path: test/e2e_node/resource_collector.go
       match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
     - path: test/e2e_node/image_list.go
-      mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
 
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"
