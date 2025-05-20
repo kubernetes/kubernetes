@@ -206,6 +206,7 @@ func NewKubeGenericRuntimeManager(
 	podLogsDirectory string,
 	machineInfo *cadvisorapi.MachineInfo,
 	podStateProvider podStateProvider,
+	maxPods int32,
 	osInterface kubecontainer.OSInterface,
 	runtimeHelper kubecontainer.RuntimeHelper,
 	insecureContainerLifecycleHTTPClient types.HTTPDoer,
@@ -315,7 +316,15 @@ func NewKubeGenericRuntimeManager(
 			return nil, nil, fmt.Errorf("failed to setup the FSPullRecordsAccessor: %w", err)
 		}
 
-		imagePullManager, err = imagepullmanager.NewImagePullManager(ctx, fsRecordAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, ptr.Deref(maxParallelImagePulls, 0))
+		var ( // variables used to determine cache/lock set sizes
+			maxParallelPulls     = ptr.Deref(maxParallelImagePulls, 0)
+			intentCacheSize      = max(2*maxPods, 2*maxParallelPulls)
+			pullRecordsCacheSize = 5 * maxPods
+		)
+
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(fsRecordAccessor, intentCacheSize, pullRecordsCacheSize, maxParallelPulls)
+
+		imagePullManager, err = imagepullmanager.NewImagePullManager(ctx, memCacheRecordsAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, maxParallelPulls)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create image pull manager: %w", err)
 		}

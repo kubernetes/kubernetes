@@ -3116,6 +3116,7 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.podLogsDirectory,
 		kubelet.machineInfo,
 		kubelet.podWorkers,
+		kubeCfg.MaxPods,
 		kubelet.os,
 		kubelet,
 		nil,
