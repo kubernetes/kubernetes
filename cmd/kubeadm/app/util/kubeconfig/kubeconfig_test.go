@@ -39,7 +39,6 @@ contexts:
   name: user1@k8s
 current-context: user1@k8s
 kind: Config
-preferences: {}
 users:
 - name: user1
   user:
@@ -57,7 +56,6 @@ contexts:
   name: user2@kubernetes
 current-context: user2@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: user2
   user:

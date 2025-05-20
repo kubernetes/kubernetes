@@ -46,7 +46,6 @@ contexts:
   name: default
 current-context: default
 kind: Config
-preferences: {}
 users:
 - name: kubernetes-admin
   user:
