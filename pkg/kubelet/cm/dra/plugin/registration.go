@@ -227,6 +227,21 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		registrationHandler: h,
 	}
 
+	go func() {
+		// Create a new gRPC connection to the plugin as soon as it's registered
+		// to provide an effective connection monitoring.
+		// If this is not done, the connection will be created lazily when
+		// the first gRPC call is made, which can lead to inconsistent behavior
+		// if the connection drops between registration and the first gRPC call.
+		conn, err := pluginInstance.getOrCreateGRPCConn()
+		if err != nil {
+			logger.Error(err, "failed to create gRPC connection")
+		} else {
+			logger.V(3).Info("gRPC connection established")
+			pluginInstance.conn = conn
+		}
+	}()
+
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
 	if err := draPlugins.add(pluginInstance); err != nil {

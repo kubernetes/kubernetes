@@ -68,6 +68,11 @@ type Plugin struct {
 	cancelCleanup       *context.CancelCauseFunc
 }
 
+// getOrCreateGRPCConn establishes and returns a gRPC client connection to the plugin's endpoint.
+// If a connection already exists, it returns the existing connection. Otherwise, it creates a new
+// connection using the specified endpoint and protocol, sets up necessary interceptors and handlers,
+// and waits for the connection to become ready within a one-second timeout. The connection is stored
+// for future use. Returns an error if the connection cannot be established or is not ready in time.
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
