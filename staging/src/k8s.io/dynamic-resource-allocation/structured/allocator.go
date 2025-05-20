@@ -745,7 +745,18 @@ func (m *matchExpressionConstraint) remove(requestName, subRequestName string, d
 	}
 
 	// Reset everything - we'll need to collect and evaluate all devices again
-	m.devices = nil
+	//m.devices = nil
+	// Find and remove only the specific device from the slice
+	for i := 0; i < len(m.devices); i++ {
+		if m.devices[i] == device { // Compare the actual device pointers
+			// Remove this specific device by shifting remaining elements
+			copy(m.devices[i:], m.devices[i+1:])
+			// Shrink slice by one
+			m.devices = m.devices[:len(m.devices)-1]
+			break
+		}
+	}
+
 	m.logger.V(7).Info("Reset constraint state for re-evaluation")
 }
 
