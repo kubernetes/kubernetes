@@ -1560,12 +1560,6 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
-		framework.ExpectNoError(err)
-		// It already was like this before, so typically waitForResourceQuota returns immediately.
-		// Keep checking for a while to detect unexpected changes. There has been a test flake
-		// where updating the pod failed with:
-		//   pods "test-pod" is forbidden: exceeded quota: quota-terminating, requested: pods=1, used: pods=1, limited: pods=1
 		err = ensureResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
@@ -1613,7 +1607,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceRequestsMemory] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsCPU] = resource.MustParse("0")
 		usedResources[v1.ResourceLimitsMemory] = resource.MustParse("0")
-		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaNotTerminating.Name, usedResources)
+		err = waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuotaTerminating.Name, usedResources)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a terminating pod")
