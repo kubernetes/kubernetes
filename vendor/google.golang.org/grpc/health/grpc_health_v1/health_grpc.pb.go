@@ -37,6 +37,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Health_Check_FullMethodName = "/grpc.health.v1.Health/Check"
+	Health_List_FullMethodName  = "/grpc.health.v1.Health/List"
 	Health_Watch_FullMethodName = "/grpc.health.v1.Health/Watch"
 )
 
@@ -55,9 +56,19 @@ type HealthClient interface {
 	//
 	// Clients should set a deadline when calling Check, and can declare the
 	// server unhealthy if they do not receive a timely response.
-	//
-	// Check implementations should be idempotent and side effect free.
 	Check(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
+	// List provides a non-atomic snapshot of the health of all the available
+	// services.
+	//
+	// The server may respond with a RESOURCE_EXHAUSTED error if too many services
+	// exist.
+	//
+	// Clients should set a deadline when calling List, and can declare the server
+	// unhealthy if they do not receive a timely response.
+	//
+	// Clients should keep in mind that the list of health services exposed by an
+	// application can change over the lifetime of the process.
+	List(ctx context.Context, in *HealthListRequest, opts ...grpc.CallOption) (*HealthListResponse, error)
 	// Performs a watch for the serving status of the requested service.
 	// The server will immediately send back a message indicating the current
 	// serving status.  It will then subsequently send a new message whenever
@@ -88,6 +99,16 @@ func (c *healthClient) Check(ctx context.Context, in *HealthCheckRequest, opts .
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HealthCheckResponse)
 	err := c.cc.Invoke(ctx, Health_Check_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *healthClient) List(ctx context.Context, in *HealthListRequest, opts ...grpc.CallOption) (*HealthListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthListResponse)
+	err := c.cc.Invoke(ctx, Health_List_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -128,9 +149,19 @@ type HealthServer interface {
 	//
 	// Clients should set a deadline when calling Check, and can declare the
 	// server unhealthy if they do not receive a timely response.
-	//
-	// Check implementations should be idempotent and side effect free.
 	Check(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
+	// List provides a non-atomic snapshot of the health of all the available
+	// services.
+	//
+	// The server may respond with a RESOURCE_EXHAUSTED error if too many services
+	// exist.
+	//
+	// Clients should set a deadline when calling List, and can declare the server
+	// unhealthy if they do not receive a timely response.
+	//
+	// Clients should keep in mind that the list of health services exposed by an
+	// application can change over the lifetime of the process.
+	List(context.Context, *HealthListRequest) (*HealthListResponse, error)
 	// Performs a watch for the serving status of the requested service.
 	// The server will immediately send back a message indicating the current
 	// serving status.  It will then subsequently send a new message whenever
@@ -158,6 +189,9 @@ type UnimplementedHealthServer struct{}
 
 func (UnimplementedHealthServer) Check(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
+}
+func (UnimplementedHealthServer) List(context.Context, *HealthListRequest) (*HealthListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedHealthServer) Watch(*HealthCheckRequest, grpc.ServerStreamingServer[HealthCheckResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method Watch not implemented")
@@ -200,6 +234,24 @@ func _Health_Check_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Health_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HealthServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Health_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HealthServer).List(ctx, req.(*HealthListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Health_Watch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(HealthCheckRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -221,6 +273,10 @@ var Health_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Check",
 			Handler:    _Health_Check_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _Health_List_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

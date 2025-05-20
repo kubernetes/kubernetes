@@ -73,7 +73,7 @@ func NewBalancer(cc balancer.ClientConn, opts balancer.BuildOptions, childBuilde
 		esOpts:       esOpts,
 		childBuilder: childBuilder,
 	}
-	es.children.Store(resolver.NewEndpointMap())
+	es.children.Store(resolver.NewEndpointMap[*balancerWrapper]())
 	return es
 }
 
@@ -90,7 +90,7 @@ type endpointSharding struct {
 	// calls into a child. To avoid deadlocks, do not acquire childMu while
 	// holding mu.
 	childMu  sync.Mutex
-	children atomic.Pointer[resolver.EndpointMap] // endpoint -> *balancerWrapper
+	children atomic.Pointer[resolver.EndpointMap[*balancerWrapper]]
 
 	// inhibitChildUpdates is set during UpdateClientConnState/ResolverError
 	// calls (calls to children will each produce an update, only want one
@@ -122,7 +122,7 @@ func (es *endpointSharding) UpdateClientConnState(state balancer.ClientConnState
 	var ret error
 
 	children := es.children.Load()
-	newChildren := resolver.NewEndpointMap()
+	newChildren := resolver.NewEndpointMap[*balancerWrapper]()
 
 	// Update/Create new children.
 	for _, endpoint := range state.ResolverState.Endpoints {
@@ -131,9 +131,8 @@ func (es *endpointSharding) UpdateClientConnState(state balancer.ClientConnState
 			// update.
 			continue
 		}
-		var childBalancer *balancerWrapper
-		if val, ok := children.Get(endpoint); ok {
-			childBalancer = val.(*balancerWrapper)
+		childBalancer, ok := children.Get(endpoint)
+		if ok {
 			// Endpoint attributes may have changed, update the stored endpoint.
 			es.mu.Lock()
 			childBalancer.childState.Endpoint = endpoint
@@ -166,7 +165,7 @@ func (es *endpointSharding) UpdateClientConnState(state balancer.ClientConnState
 	for _, e := range children.Keys() {
 		child, _ := children.Get(e)
 		if _, ok := newChildren.Get(e); !ok {
-			child.(*balancerWrapper).closeLocked()
+			child.closeLocked()
 		}
 	}
 	es.children.Store(newChildren)
@@ -189,7 +188,7 @@ func (es *endpointSharding) ResolverError(err error) {
 	}()
 	children := es.children.Load()
 	for _, child := range children.Values() {
-		child.(*balancerWrapper).resolverErrorLocked(err)
+		child.resolverErrorLocked(err)
 	}
 }
 
@@ -202,7 +201,7 @@ func (es *endpointSharding) Close() {
 	defer es.childMu.Unlock()
 	children := es.children.Load()
 	for _, child := range children.Values() {
-		child.(*balancerWrapper).closeLocked()
+		child.closeLocked()
 	}
 }
 
@@ -222,8 +221,7 @@ func (es *endpointSharding) updateState() {
 	childStates := make([]ChildState, 0, children.Len())
 
 	for _, child := range children.Values() {
-		bw := child.(*balancerWrapper)
-		childState := bw.childState
+		childState := child.childState
 		childStates = append(childStates, childState)
 		childPicker := childState.State.Picker
 		switch childState.State.ConnectivityState {

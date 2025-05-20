@@ -51,10 +51,24 @@ var (
 	// xDS server in the list of server configs will be used.
 	XDSFallbackSupport = boolFromEnv("GRPC_EXPERIMENTAL_XDS_FALLBACK", true)
 	// NewPickFirstEnabled is set if the new pickfirst leaf policy is to be used
-	// instead of the exiting pickfirst implementation. This can be enabled by
+	// instead of the exiting pickfirst implementation. This can be disabled by
 	// setting the environment variable "GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST"
-	// to "true".
-	NewPickFirstEnabled = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST", false)
+	// to "false".
+	NewPickFirstEnabled = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_NEW_PICK_FIRST", true)
+
+	// XDSEndpointHashKeyBackwardCompat controls the parsing of the endpoint hash
+	// key from EDS LbEndpoint metadata. Endpoint hash keys can be disabled by
+	// setting "GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT" to "true". When the
+	// implementation of A76 is stable, we will flip the default value to false
+	// in a subsequent release. A final release will remove this environment
+	// variable, enabling the new behavior unconditionally.
+	XDSEndpointHashKeyBackwardCompat = boolFromEnv("GRPC_XDS_ENDPOINT_HASH_KEY_BACKWARD_COMPAT", true)
+
+	// RingHashSetRequestHashKey is set if the ring hash balancer can get the
+	// request hash header by setting the "requestHashHeader" field, according
+	// to gRFC A76. It can be enabled by setting the environment variable
+	// "GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY" to "true".
+	RingHashSetRequestHashKey = boolFromEnv("GRPC_EXPERIMENTAL_RING_HASH_SET_REQUEST_HASH_KEY", false)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

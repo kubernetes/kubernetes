@@ -35,8 +35,10 @@ type ServerStream struct {
 	*Stream // Embed for common stream functionality.
 
 	st      internalServerTransport
-	ctxDone <-chan struct{}    // closed at the end of stream.  Cache of ctx.Done() (for performance)
-	cancel  context.CancelFunc // invoked at the end of stream to cancel ctx.
+	ctxDone <-chan struct{} // closed at the end of stream.  Cache of ctx.Done() (for performance)
+	// cancel is invoked at the end of stream to cancel ctx. It also stops the
+	// timer for monitoring the rpc deadline if configured.
+	cancel func()
 
 	// Holds compressor names passed in grpc-accept-encoding metadata from the
 	// client.
