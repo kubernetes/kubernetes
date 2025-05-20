@@ -1807,6 +1807,55 @@ func TestAllocator(t *testing.T) {
 			node:          node(node1, region1),
 			expectResults: nil, // Should fail as devices are not contiguous
 		},
+		"with-constraint-expression-non-contiguousd-disconnected-components": {
+			claimsToAllocate: objects(
+				claimWithRequests(claim0,
+					[]resourceapi.DeviceConstraint{
+						{
+							Requests: []string{req0},
+							MatchExpression: fmt.Sprintf(`size(devices) == 4 && devices.all(first, devices.exists(second, first != second && ( first.attributes["%s"].deviceId == second.attributes["%s"].deviceId + 1 || first.attributes["%s"].deviceId == second.attributes["%s"].deviceId - 1))) && devices.map(d, d.attributes["%s"].deviceId).max() - devices.map(d, d.attributes["%s"].deviceId).min() == size(devices) - 1`,
+								driverA, driverA, driverA, driverA, driverA, driverA),
+						},
+					},
+					resourceapi.DeviceRequest{
+						Name:            req0,
+						Count:           4,
+						AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+						DeviceClassName: classA,
+					},
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			//they all have neighbors - (6,7) and (9,10) but together the set is not contiguous
+			slices: objects(slice(slice1, node1, pool1, driverA,
+				device(device1,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(6))}, 
+					},
+				),
+				device(device2,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(7))},
+					},
+				),
+				device(device3,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(9))},
+					},
+				),
+				device(device4,
+					nil,
+					map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"deviceId": {IntValue: ptr.To(int64(10))},
+					},
+				),
+			)),
+			node:          node(node1, region1),
+			expectResults: nil, // Should fail as devices are not contiguous
+		},
 		"with-2x4-grid-topology": {
 			claimsToAllocate: objects(
 				claimWithRequests(claim0,
