@@ -160,6 +160,9 @@ const (
 	ImageVolumeRequestedTotalKey      = "image_volume_requested_total"
 	ImageVolumeMountedSucceedTotalKey = "image_volume_mounted_succeed_total"
 	ImageVolumeMountedErrorsTotalKey  = "image_volume_mounted_errors_total"
+
+	// Special label for [DRAResourceClaimsInUseDesc] which counts ResourceClaims regardless of the driver.
+	DRAResourceClaimsInUseAnyDriver = "<any>"
 )
 
 type imageSizeBucket struct {
@@ -1029,7 +1032,7 @@ var (
 	)
 
 	DRAResourceClaimsInUseDesc = metrics.NewDesc(DRASubsystem+"_resource_claims_in_use",
-		"The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).",
+		"The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.",
 		[]string{"driver_name"},
 		nil,
 		metrics.ALPHA,

@@ -588,9 +588,9 @@ func TestClaimInfoCacheAdd(t *testing.T) {
 					Namespace: namespace,
 				},
 			},
-			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
 # TYPE dra_resource_claims_in_use gauge
-dra_resource_claims_in_use{driver_name=""} 0
+dra_resource_claims_in_use{driver_name="<any>"} 0
 `,
 		},
 		{
@@ -606,9 +606,9 @@ dra_resource_claims_in_use{driver_name=""} 0
 				},
 				prepared: true,
 			},
-			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
 # TYPE dra_resource_claims_in_use gauge
-dra_resource_claims_in_use{driver_name=""} 1
+dra_resource_claims_in_use{driver_name="<any>"} 1
 dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 dra_resource_claims_in_use{driver_name="test-driver"} 1
 `,
@@ -642,9 +642,9 @@ dra_resource_claims_in_use{driver_name="test-driver"} 1
 				},
 				prepared: true,
 			},
-			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
 # TYPE dra_resource_claims_in_use gauge
-dra_resource_claims_in_use{driver_name=""} 2
+dra_resource_claims_in_use{driver_name="<any>"} 2
 dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 dra_resource_claims_in_use{driver_name="test-driver"} 2
 `,
@@ -796,9 +796,9 @@ func TestClaimInfoCacheDelete(t *testing.T) {
 					},
 				},
 			},
-			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
 # TYPE dra_resource_claims_in_use gauge
-dra_resource_claims_in_use{driver_name=""} 1
+dra_resource_claims_in_use{driver_name="<any>"} 1
 dra_resource_claims_in_use{driver_name="test-driver"} 1
 dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 `,
@@ -812,9 +812,9 @@ dra_resource_claims_in_use{driver_name="other-test-driver"} 1
 		{
 			description:    "item not in cache",
 			claimInfoCache: &claimInfoCache{},
-			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (non-empty driver_name label value) and across all drivers (empty driver_name).
+			expectMetrics: `# HELP dra_resource_claims_in_use [ALPHA] The number of ResourceClaims that are currently in use on the node, by driver name (driver_name label value) and across all drivers (special value <any> for driver_name). Note that the sum of all by-driver counts is not the total number of in-use ResourceClaims because the same ResourceClaim might use devices from different drivers. Instead, use the count for the <any> driver_name.
 # TYPE dra_resource_claims_in_use gauge
-dra_resource_claims_in_use{driver_name=""} 0
+dra_resource_claims_in_use{driver_name="<any>"} 0
 `,
 		},
 	} {

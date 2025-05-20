@@ -254,7 +254,8 @@ func (cache *claimInfoCache) syncToCheckpoint() error {
 
 // claimsInUse computes the the current counter vector for DRAResourceClaimsInUse.
 // It returns a map of driver name to number of claims which have been prepared using
-// the driver. The empty key stands for all prepared claims.
+// the driver. The [kubeletmetrics.DRAResourceClaimsInUseAnyDriver] key stands for
+// all prepared claims.
 //
 // Must be called while the rlock is held.
 func (cache *claimInfoCache) claimsInUse() map[string]int {
@@ -270,7 +271,7 @@ func (cache *claimInfoCache) claimsInUse() map[string]int {
 			counts[driverName]++
 		}
 	}
-	counts[""] = total
+	counts[kubeletmetrics.DRAResourceClaimsInUseAnyDriver] = total
 	return counts
 }
 
@@ -302,11 +303,7 @@ func (d ClaimsInUseDelta) String() string {
 		if i > 0 {
 			buffer.WriteByte('\n')
 		}
-		driverName := inUse.DriverName
-		if driverName == "" {
-			driverName = "<any>"
-		}
-		buffer.WriteString(fmt.Sprintf("%s: %d (%+d)", driverName, inUse.Count, inUse.Delta))
+		buffer.WriteString(fmt.Sprintf("%s: %d (%+d)", inUse.DriverName, inUse.Count, inUse.Delta))
 	}
 	return buffer.String()
 }
