@@ -249,7 +249,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 				alloc.logger.V(6).Info("Evaluating match expr constraint")
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
 					logger = klog.LoggerWithName(logger, "matchExpressionConstraint")
-					logger = klog.LoggerWithValues(logger, "matchExpression", constraint.MatchExpression)
+					//logger = klog.LoggerWithValues(logger, "matchExpression", constraint.MatchExpression)
 				}
 				m := &matchExpressionConstraint{
 					logger:       logger,
@@ -684,7 +684,7 @@ func (m *matchExpressionConstraint) add(requestName, subRequestName string, devi
 	}
 
 	// Add device to array
-	m.logger.V(7).Info("Appending device", device)
+	m.logger.V(7).Info("Appending device", "device", deviceID)
 	m.devices = append(m.devices, device)
 
 	// Only evaluate when we have all devices
@@ -729,6 +729,8 @@ func (m *matchExpressionConstraint) add(requestName, subRequestName string, devi
 	if !matches {
 		m.logger.V(7).Info("Devices don't satisfy expression",
 			"actualCost", ptr.Deref(details.ActualCost(), 0))
+		//remove the last device we added. For others, there will be a remove call
+		m.devices = m.devices[:len(m.devices)-1]
 		return false
 	}
 
@@ -744,7 +746,6 @@ func (m *matchExpressionConstraint) remove(requestName, subRequestName string, d
 
 	// Reset everything - we'll need to collect and evaluate all devices again
 	m.devices = nil
-	m.numDevices = 0
 	m.logger.V(7).Info("Reset constraint state for re-evaluation")
 }
 

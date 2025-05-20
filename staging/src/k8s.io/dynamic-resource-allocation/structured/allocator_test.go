@@ -1769,7 +1769,6 @@ func TestAllocator(t *testing.T) {
 			node: node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
-				deviceAllocationResult(req0, driverA, pool1, device1, false),
 				deviceAllocationResult(req0, driverA, pool1, device2, false),
 				deviceAllocationResult(req0, driverA, pool1, device3, false),
 			)},
