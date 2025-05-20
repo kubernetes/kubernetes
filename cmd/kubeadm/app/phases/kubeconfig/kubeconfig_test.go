@@ -66,7 +66,7 @@ func TestGetKubeConfigSpecsFailsIfCADoesntExists(t *testing.T) {
 
 	// Executes getKubeConfigSpecs
 	if _, err := getKubeConfigSpecs(cfg); err == nil {
-		t.Error("getKubeConfigSpecs didnt failed when expected")
+		t.Error("getKubeConfigSpecs didn't failed when expected")
 	}
 }
 
@@ -416,7 +416,7 @@ func TestWriteKubeConfigFailsIfCADoesntExists(t *testing.T) {
 
 			// executes writeKubeConfigFunction
 			if err := test.writeKubeConfigFunction(buf); err == nil {
-				t.Error("writeKubeConfigFunction didnt failed when expected")
+				t.Error("writeKubeConfigFunction didn't failed when expected")
 			}
 		})
 	}

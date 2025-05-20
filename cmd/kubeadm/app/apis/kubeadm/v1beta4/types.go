@@ -246,7 +246,7 @@ type NodeRegistrationOptions struct {
 	// +optional
 	Name string `json:"name,omitempty"`
 
-	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later reuse
 	// +optional
 	CRISocket string `json:"criSocket,omitempty"`
 

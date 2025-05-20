@@ -128,7 +128,7 @@ const fakeCurrentCoreDNSVersion = "1.0.6"
 func TestGetAvailableUpgrades(t *testing.T) {
 
 	// constants for test cases
-	// variables are in the form v{MAJOR}{MINOR}{PATCH}, where MINOR is a variable so test are automatically uptodate to the latest MinimumControlPlaneVersion/
+	// variables are in the form v{MAJOR}{MINOR}{PATCH}, where MINOR is a variable so test are automatically up-to-date to the latest MinimumControlPlaneVersion/
 
 	// v1.X series, e.g. v1.14
 	v1X0 := versionutil.MustParseSemantic("v1.14.0")

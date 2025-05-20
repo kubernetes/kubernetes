@@ -234,7 +234,7 @@ type NodeRegistrationOptions struct {
 	// Defaults to the hostname of the node if not provided.
 	Name string
 
-	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later reuse
 	CRISocket string
 
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil,

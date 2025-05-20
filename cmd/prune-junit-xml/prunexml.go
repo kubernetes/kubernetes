@@ -166,7 +166,7 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 // exactly the same string again doesn't add any information. Typically
 // this occurs when joining the failure message because that is the fixed
 // string "Failed" for all tests, regardless of what the test logged.
-// The test log output is typically different because it cointains "=== RUN
+// The test log output is typically different because it contains "=== RUN
 // <test name>" and thus doesn't get dropped.
 func joinTexts(a, b string) string {
 	if a == "" {

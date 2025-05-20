@@ -105,7 +105,7 @@ func runPreflight(c workflow.RunData) error {
 	}
 
 	// Continue with more specific checks based on the init configuration
-	klog.V(1).Infoln("[preflight] Running configuration dependant checks")
+	klog.V(1).Infoln("[preflight] Running configuration dependent checks")
 	if j.Cfg().ControlPlane != nil {
 		// Checks if the cluster configuration supports
 		// joining a new control plane instance and if all the necessary certificates are provided

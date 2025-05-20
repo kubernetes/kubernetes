@@ -273,7 +273,7 @@ func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
 
 func startCloudNodeLifecycleController(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
 	logger := klog.FromContext(ctx)
-	logger.Info("Warning: node-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure node lifecyle controller.")
+	logger.Info("Warning: node-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure node lifecycle controller.")
 	return nil, false, nil
 }
 

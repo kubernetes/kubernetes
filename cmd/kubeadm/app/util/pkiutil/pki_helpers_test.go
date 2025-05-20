@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	// TestMain generates the bellow certs and keys so that
+	// TestMain generates the below certs and keys so that
 	// they are reused in tests whenever possible
 
 	rootCACert, servCert *x509.Certificate

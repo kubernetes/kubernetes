@@ -39,7 +39,7 @@ limitations under the License.
 //	  PASS
 //	  ok  	k8s.io/klog/v2/ktesting/example	(cached)
 //
-// Arbitrary indention with space or tab is supported. All lines of
+// Arbitrary indentation with space or tab is supported. All lines of
 // a klog log entry must be indented the same way.
 package logparse
 
@@ -174,14 +174,14 @@ const (
 )
 
 var (
-	klogPrefix = regexp.MustCompile(`^(?<indention>[[:blank:]]*)` +
+	klogPrefix = regexp.MustCompile(`^(?<indentation>[[:blank:]]*)` +
 		`(?:` + source + `: )?` + // `go test` source code
 		severity +
 		datetime +
 		`(?: +` + pid + ` ` + source + `)?` + // klog pid + source code
 		`\] `)
 
-	indentionIndex = lookupSubmatch("indention")
+	indentationIndex = lookupSubmatch("indention")
 	severityIndex  = lookupSubmatch("severity")
 )
 
@@ -215,13 +215,13 @@ func parseLine(reader *bufio.Reader, line string, yield func(Entry) bool) (strin
 	if !strings.HasSuffix(line, "=<\n") {
 		return "", yield(e), nil
 	}
-	indention := line[match[2*indentionIndex]:match[2*indentionIndex+1]]
+	indentation := line[match[2*indentionIndex]:match[2*indentionIndex+1]]
 	for {
 		var err error
 		line, err = reader.ReadString('\n')
-		if !strings.HasPrefix(line, indention) ||
-			!strings.HasPrefix(line[len(indention):], "\t") && !strings.HasPrefix(line[len(indention):], " >") {
-			// Some other line (wrong indention or wrong continuation).
+		if !strings.HasPrefix(line, indentation) ||
+			!strings.HasPrefix(line[len(indentation):], "\t") && !strings.HasPrefix(line[len(indention):], " >") {
+			// Some other line (wrong indentation or wrong continuation).
 			// Yield what we have so far and the go back to processing that new line.
 			cont := yield(e)
 			return line, cont, err

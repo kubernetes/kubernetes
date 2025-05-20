@@ -117,7 +117,7 @@ func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interf
 		return flagValue
 	}
 
-	// covert the nil to false if this is a bool, this will help to get rid of nil dereference error.
+	// convert the nil to false if this is a bool, this will help to get rid of nil dereference error.
 	cfg, ok := cfgValue.(*bool)
 	if ok && cfg == nil {
 		return ptr.To(false)

@@ -94,7 +94,7 @@ func TestClusterServiceIPRange(t *testing.T) {
 			options:      makeOptionsWithCIDRs("10.0.0.0/8", ""),
 		},
 		{
-			name:                 "service cidr IPv4 is too big but gate enbled",
+			name:                 "service cidr IPv4 is too big but gate enabled",
 			expectErrors:         true,
 			options:              makeOptionsWithCIDRs("10.0.0.0/8", ""),
 			ipAllocatorGate:      true,
