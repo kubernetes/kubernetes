@@ -144,6 +144,12 @@ linters:
 
     {{- end}}
 
+      # Kube-API-Linter should only be run on the API definitions
+      - linters:
+        - kubeapilinter
+        path-except: staging/src/k8s.io/api/.*
+        
+      {{include "hack/kube-api-linter/exceptions.yaml" | indent 6 | trim}}
 
   default: {{if .Base -}} none {{- else -}} standard {{- end}}
   enable: # please keep this alphabetized
@@ -156,6 +162,7 @@ linters:
     - errorlint
     {{- end}}
     - ineffassign
+    - kubeapilinter
     - logcheck
     - revive
     - staticcheck
@@ -175,6 +182,12 @@ linters:
         settings:
           config: |
             {{include "hack/logcheck.conf" | indent 12 | trim}}
+      kubeapilinter:
+        path: _output/local/bin/kube-api-linter.so
+        description: kube-api-linter and lints Kube like APIs based on API conventions and best practices.
+        original-url: sigs.k8s.io/kube-api-linter
+        settings:
+          {{include "hack/kube-api-linter/kube-api-linter.yaml" | indent 10 | trim}}
     depguard:
       rules:
         main:
