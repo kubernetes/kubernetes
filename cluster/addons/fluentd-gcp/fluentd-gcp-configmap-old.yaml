@@ -44,7 +44,7 @@ data:
     # namespace name, 'synth-lgr' is the container name and '997599971ee6..' is
     # the container ID.
     # The record reformer is used is discard the var.log.containers prefix and
-    # the Docker container ID suffix and "kubernetes." is pre-pended giving the tag:
+    # the Docker container ID suffix and "kubernetes." is prepended giving the tag:
     #   kubernetes.synthetic-logger-0.25lps-pod_default_synth-lgr
     # Tag is then parsed by google_cloud plugin and translated to the metadata,
     # visible in the log viewer

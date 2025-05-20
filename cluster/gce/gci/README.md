@@ -30,7 +30,7 @@ There are three ways to specify an image used by each testing suite: `image`,
 
   * `image` is preferred, but manual updates are needed to use a newly released
     COS image, so the test suites don't use deprecated images. This will result
-    to frequent yaml configuration file update everytime COS releases new
+    to frequent yaml configuration file update every time COS releases new
     image.One future option is to use an autobumper robot to update COS image
     automatically. e.g:
 ```

@@ -569,7 +569,7 @@ export ETCD_LISTEN_CLIENT_IP=0.0.0.0
 
 export GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA=true
 
-# Optoinal: Enable Windows CSI-Proxy
+# Optional: Enable Windows CSI-Proxy
 export ENABLE_CSI_PROXY="${ENABLE_CSI_PROXY:-true}"
 
 # KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP decides whether

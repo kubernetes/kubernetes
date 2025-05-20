@@ -492,7 +492,7 @@ EOF
        | ${CFSSLJSON_BIN} -bare "${prefix}"
       ;;
     *)
-      echo "Unknow, unsupported etcd certs type: ${type_cert}" >&2
+      echo "Unknown, unsupported etcd certs type: ${type_cert}" >&2
       echo "Supported type: client, server, peer" >&2
       exit 2
   esac

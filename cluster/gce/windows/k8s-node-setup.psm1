@@ -1061,7 +1061,7 @@ function Start-WorkerServices {
   # pod manifests.
 
   # We configure the service to restart on failure, after 10s wait. We reset
-  # the restart count to 0 each time, so we re-use our restart/10000 action on
+  # the restart count to 0 each time, so we reuse our restart/10000 action on
   # each failure. Note it currently restarts even when explicitly stopped, you
   # have to delete the service entry to *really* kill it (e.g. `sc.exe delete
   # kubelet`). See issue #72900.

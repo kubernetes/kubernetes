@@ -197,7 +197,7 @@ while($true) {
     # FOR PRODUCTION USE!) has Create-NewProfile which achieves this.
     #
     # Run "Get-Command -Module Microsoft.PowerShell.LocalAccounts" to see the
-    # build-in commands for users and groups. For some reason the New-LocalUser
+    # built-in commands for users and groups. For some reason the New-LocalUser
     # command does not create the user profile directory, so we use the
     # auxiliary user-profile.psm1 instead.
 

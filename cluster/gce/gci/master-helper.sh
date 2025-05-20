@@ -19,7 +19,7 @@ source "${KUBE_ROOT}/cluster/gce/gci/helper.sh"
 
 # create-master-instance creates the master instance. If called with
 # an argument, the argument is used as the name to a reserved IP
-# address for the master. (In the case of upgrade/repair, we re-use
+# address for the master. (In the case of upgrade/repair, we reuse
 # the same IP.)
 #
 # It requires a whole slew of assumed variables, partially due to to
