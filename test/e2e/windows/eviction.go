@@ -50,7 +50,7 @@ const (
 	evictionPodNamespaceBaseName = "eviction-test-windows"
 )
 
-var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framework.WithSlow(), framework.WithDisruptive(), (func() {
+var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framework.WithSlow(), framework.WithDisruptive(), func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	})
@@ -74,6 +74,15 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		var node *v1.Node
 		var nodeMem nodeMemory
 		for _, n := range nodeList.Items {
+			// Due to a known issue (https://github.com/projectcalico/calico/issues/6974),
+			// pods on Windows nodes may become undeletable after a reboot. As a result,
+			// the eviction manager may rank such pods for eviction, but fail to remove them.
+			// TODO: Remove this workaround once the upstream issue is resolved.
+			if n.Labels["test/reboot-used"] == "true" {
+				framework.Logf("Skipping node %s because it was used for reboot test", n.Name)
+				continue
+			}
+
 			nm := getNodeMemory(ctx, f, n)
 			if nm.hardEviction.Value() != 0 {
 				framework.Logf("Using node %s", n.Name)
@@ -97,7 +106,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		// Delete img-puller pods if they exist because eviction manager keeps selecting them for eviction first
 		// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
 		// image pre-pulling was enabled.
-		cleanupPods(ctx, f, "img-puller")
+		// cleanupPods(ctx, f, "img-puller")
 
 		ginkgo.DeferCleanup(f.DeleteNamespace, f.Namespace.Name)
 
@@ -175,7 +184,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		pod2, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, pod2, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Waiting for pod2 to start running")
+		ginkgo.By(fmt.Sprintf("Waiting for pod2 running on node %q, in namespace %q", node.Name, f.Namespace.Name))
 		err = e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod2)
 		framework.ExpectNoError(err)
 
@@ -233,7 +242,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		err = e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 10*time.Minute)
 		framework.ExpectNoError(err)
 	})
-}))
+})
 
 func cleanupPods(ctx context.Context, f *framework.Framework, namespace string) {
 	nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})

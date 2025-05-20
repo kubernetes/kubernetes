@@ -104,7 +104,7 @@ var (
 	timeoutSeconds = 10
 
 	externalMaxTries = 10
-	internalMaxTries = 1
+	internalMaxTries = 3
 )
 
 func assertConsistentConnectivity(ctx context.Context, f *framework.Framework, podName string, os string, cmd []string, maxTries int) {

@@ -234,6 +234,29 @@ func findWindowsNode(ctx context.Context, f *framework.Framework) (v1.Node, erro
 	return targetNode, nil
 }
 
+// findWindowsNodes finds all Windows nodes that are Ready and Schedulable
+func findWindowsNodes(ctx context.Context, f *framework.Framework) ([]v1.Node, error) {
+	selector := labels.Set{"kubernetes.io/os": "windows"}.AsSelector()
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: selector.String()})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var targetNodes []v1.Node
+	for _, n := range nodeList.Items {
+		if e2enode.IsNodeReady(&n) && e2enode.IsNodeSchedulable(&n) {
+			targetNodes = append(targetNodes, n)
+		}
+	}
+
+	if len(targetNodes) == 0 {
+		e2eskipper.Skipf("Could not find and ready and schedulable Windows nodes")
+	}
+
+	return targetNodes, nil
+}
+
 // newKubeletStatsTestPods creates a list of pods (specification) for test.
 func newKubeletStatsTestPods(numPods int, image imageutils.Config, nodeName string) []*v1.Pod {
 	var pods []*v1.Pod

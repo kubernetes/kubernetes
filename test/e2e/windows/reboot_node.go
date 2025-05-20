@@ -33,6 +33,7 @@ import (
 	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/test/e2e/feature"
@@ -54,11 +55,23 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 	ginkgo.It("should run as a reboot process on the host/node", func(ctx context.Context) {
 
 		ginkgo.By("selecting a Windows node")
-		targetNode, err := findWindowsNode(ctx, f)
-		framework.ExpectNoError(err, "Error finding Windows node")
+		nodes, err := findWindowsNodes(ctx, f)
+		framework.ExpectNoError(err, "Error finding Windows nodes")
+
+		targetNode := nodes[0]
+		// reuse the node if find label contains "test/reboot-used" first
+		for _, node := range nodes {
+			if _, ok := node.Labels["test/reboot-used"]; ok {
+				framework.Logf("Reusing node %s", node.Name)
+				targetNode = node
+				break
+			}
+		}
+
 		framework.Logf("Using node: %v", targetNode.Name)
 
 		ginkgo.DeferCleanup(cleanupContainers, f, targetNode.Name, []string{f.Namespace.Name})
+		ginkgo.DeferCleanup(patchWindowsNodeIfNeeded, f, targetNode.Name)
 
 		bootID, err := strconv.Atoi(targetNode.Status.NodeInfo.BootID)
 		framework.ExpectNoError(err, "Error converting bootID to int")
@@ -405,4 +418,48 @@ func encodePowerShellCommand(cmd string) string {
 
 	// Base64 encode
 	return base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func patchWindowsNodeIfNeeded(ctx context.Context, f *framework.Framework, nodeName string) {
+	patch := []byte(`{"metadata":{"labels":{"test/reboot-used":"true"}}}`)
+
+	p, error := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if error != nil {
+		framework.Logf("Error getting node %s: %v", nodeName, error)
+		return
+	}
+
+	if _, ok := p.Labels["test/reboot-used"]; ok {
+		framework.Logf("Node %s already patched", nodeName)
+		return
+	}
+
+	// Patch the node with a label to indicate it has been used for testing
+	framework.Logf("Patching node %s with label test/reboot-used=true", nodeName)
+	_, err := f.ClientSet.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		framework.Logf("Error patching node %s: %v", nodeName, err)
+		return
+	}
+
+	// Wait for the node to be patched
+	timeout := time.After(time.Minute * 5)
+	for {
+		select {
+		case <-timeout:
+			framework.Logf("Timeout waiting for node %s to be patched", nodeName)
+			return
+		default:
+			node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+			if err != nil {
+				framework.Logf("Error getting node %s: %v", nodeName, err)
+				return
+			}
+			if _, ok := node.Labels["test/reboot-used"]; ok {
+				framework.Logf("Node %s patched successfully", nodeName)
+				return
+			}
+			time.Sleep(time.Second * 5)
+		}
+	}
 }
