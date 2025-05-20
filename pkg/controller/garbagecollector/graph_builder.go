@@ -195,8 +195,24 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: check if there are differences in the ownerRefs,
-			// finalizers, and DeletionTimestamp; if not, ignore the update.
+			oldMeta, err := meta.Accessor(oldObj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %w", err))
+				return
+			}
+			newMeta, err := meta.Accessor(newObj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("cannot access newObj: %w", err))
+				return
+			}
+
+			if oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+				if len(oldMeta.GetResourceVersion()) == 0 {
+					logger.V(4).Info("Graph builder throwing out update with empty RV.")
+				}
+				return
+			}
+
 			event := &event{
 				eventType: updateEvent,
 				obj:       newObj,
@@ -260,12 +276,12 @@ func (gb *GraphBuilder) syncMonitors(logger klog.Logger, resources map[schema.Gr
 		}
 		kind, err := gb.restMapper.KindFor(resource)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
+			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %w", resource, err))
 			continue
 		}
 		c, s, err := gb.controllerFor(logger, resource, kind)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
+			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %w", resource, err))
 			continue
 		}
 		current[resource] = &monitor{store: s, controller: c}
