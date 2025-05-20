@@ -1007,7 +1007,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.admitHandlers.AddPodAdmitHandler(lifecycle.NewAppArmorAdmitHandler(klet.appArmorValidator))
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.StaticPodStrictValidation) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreventStaticPodAPIReferences) {
 		staticPodAdmitHandler := &lifecycle.StaticPodAdmitHandler{}
 		klet.admitHandlers.AddPodAdmitHandler(staticPodAdmitHandler)
 	}

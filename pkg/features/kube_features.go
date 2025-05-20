@@ -941,7 +941,7 @@ const (
 	// owner: @sreeram-venkitesh
 	//
 	// Denies pod admission if static pods reference other API objects.
-	StaticPodStrictValidation featuregate.Feature = "StaticPodStrictValidation"
+	PreventStaticPodAPIReferences featuregate.Feature = "PreventStaticPodAPIReferences"
 
 	// owner: @zhifei92
 	//
@@ -1788,8 +1788,8 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.33
 	},
 
-	StaticPodStrictValidation: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+	PreventStaticPodAPIReferences: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StorageCapacityScoring: {
