@@ -32,6 +32,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -70,9 +71,11 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 }
 
 type watcher struct {
-	client                   *clientv3.Client
-	codec                    runtime.Codec
-	newFunc                  func() runtime.Object
+	client  *clientv3.Client
+	codec   runtime.Codec
+	newFunc func() runtime.Object
+	// reverseKeyFunc decodes storage key to get object name and namespace
+	reverseKeyFunc           storage.ReverseKeyFunc
 	objectType               string
 	groupResource            schema.GroupResource
 	versioner                storage.Versioner
@@ -88,6 +91,7 @@ type watchChan struct {
 	initialRev               int64
 	recursive                bool
 	progressNotify           bool
+	prevKV                   bool
 	internalPred             storage.SelectionPredicate
 	ctx                      context.Context
 	cancel                   context.CancelFunc
@@ -110,11 +114,17 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if opts.ProgressNotify && w.newFunc == nil {
 		return nil, apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided"))
 	}
+	if opts.WatchWithoutPrevKV && w.reverseKeyFunc == nil {
+		return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV is unsupported because no reverseKeyFunc was provided"))
+	}
+	if opts.WatchWithoutPrevKV && !opts.Predicate.Empty() {
+		return nil, apierrors.NewInternalError(errors.New("watchWithoutPrevKV only work in acceptAll mode"))
+	}
 	startWatchRV, err := w.getStartWatchResourceVersion(ctx, rev, opts)
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, !opts.WatchWithoutPrevKV, opts.Predicate)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -127,13 +137,14 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify, prevKV bool, pred storage.SelectionPredicate) *watchChan {
 	wc := &watchChan{
 		watcher:                  w,
 		key:                      key,
 		initialRev:               rev,
 		recursive:                recursive,
 		progressNotify:           progressNotify,
+		prevKV:                   prevKV,
 		internalPred:             pred,
 		incomingEventChan:        make(chan *event, incomingBufSize),
 		resultChan:               make(chan watch.Event, outgoingBufSize),
@@ -378,7 +389,10 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 			return e
 		}())
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
+	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1)}
+	if wc.prevKV {
+		opts = append(opts, clientv3.WithPrevKV())
+	}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
@@ -416,7 +430,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 				}
 			}
 			metrics.RecordEtcdEvent(wc.watcher.groupResource)
-			parsedEvent, err := parseEvent(e)
+			parsedEvent, err := parseEvent(e, wc.prevKV)
 			if err != nil {
 				logWatchChannelErr(err)
 				// sendError doesn't guarantee that no more items will be put into resultChan.
@@ -719,16 +733,33 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// know that the filter for previous object will return true and
 	// we need the object only to compute whether it was filtered out
 	// before).
-	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
-		if err != nil {
-			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
-		}
-		// Note that this sends the *old* object with the etcd revision for the time at
-		// which it gets deleted.
-		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
-		if err != nil {
-			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
+	if e.isDeleted || !wc.acceptAll() {
+		if len(e.prevValue) > 0 {
+			data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+			if err != nil {
+				return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
+			}
+			// Note that this sends the *old* object with the etcd revision for the time at
+			// which it gets deleted.
+			oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
+			if err != nil {
+				return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
+			}
+		} else if !wc.prevKV {
+			// WatchWithoutPrevKV is enabled, we need to parse etcd key to get object name and namespace.
+			name, namespace, err := wc.watcher.reverseKeyFunc(e.key)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failure to reverse event key: %w", err)
+			}
+
+			oldObj = wc.watcher.newFunc()
+			accessor, err := meta.Accessor(oldObj)
+			if err != nil {
+				return nil, nil, err
+			}
+			accessor.SetName(name)
+			accessor.SetNamespace(namespace)
+			accessor.SetResourceVersion(strconv.FormatInt(e.rev, 10))
 		}
 	}
 	return curObj, oldObj, nil

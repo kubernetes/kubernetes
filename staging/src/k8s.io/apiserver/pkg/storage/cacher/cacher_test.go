@@ -399,33 +399,177 @@ func TestKeySchema(t *testing.T) {
 }
 
 func TestWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatch(ctx, t, cacher)
-}
+	for _, watchWithoutPrevKV := range []bool{true, false} {
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("Watch", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatch(ctx, t, cacher)
+			})
+		})
 
-func TestWatchFromZero(t *testing.T) {
-	ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatch(cacher, server.V3Client.Client))
-}
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchFromZero", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatchFromZero(ctx, t, cacher, compactWatch(cacher, server.V3Client.Client))
+			})
+		})
 
-func TestDeleteTriggerWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
-}
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestDeleteTriggerWatch", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestDeleteTriggerWatch(ctx, t, cacher)
+			})
+		})
 
-func TestWatchFromNonZero(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
-}
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchFromNonZero", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatchFromNonZero(ctx, t, cacher)
+			})
+		})
 
-func TestDelayedWatchDelivery(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestDelayedWatchDelivery", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestDelayedWatchDelivery", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestDelayedWatchDelivery(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatcherTimeout", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchInitializationSignal", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestClusterScopedWatch", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
+				t.Cleanup(terminate)
+				storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestNamespaceScopedWatch", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
+				t.Cleanup(terminate)
+				storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchDispatchBookmarkEvents", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchDispatchBookmarkEvents", func(t *testing.T) {
+				t.Parallel()
+				ctx, cacher, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestSendInitialEventsBackwardCompatibility", func(t *testing.T) {
+				t.Parallel()
+				ctx, store, terminate := testSetup(t)
+				t.Cleanup(terminate)
+				storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchSemantics", func(t *testing.T) {
+				t.Parallel()
+				store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+				t.Cleanup(terminate)
+				storagetesting.RunWatchSemantics(context.TODO(), t, store)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchSemanticInitialEventsExtended", func(t *testing.T) {
+				t.Parallel()
+				store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+				t.Cleanup(terminate)
+				storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
+			})
+		})
+
+		t.Run(fmt.Sprintf("WatchWithoutPrevKV=%v", watchWithoutPrevKV), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, watchWithoutPrevKV)
+			t.Run("TestWatchListMatchSingle", func(t *testing.T) {
+				t.Parallel()
+				store, terminate := testSetupWithEtcdAndCreateWrapper(t)
+				t.Cleanup(terminate)
+				storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)
+			})
+		})
+	}
 }
 
 func TestWatchError(t *testing.T) {
@@ -434,72 +578,6 @@ func TestWatchError(t *testing.T) {
 
 func TestWatchContextCancel(t *testing.T) {
 	// TODO(#109831): Enable use of this test and run it.
-}
-
-func TestWatcherTimeout(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatcherTimeout(ctx, t, cacher)
-}
-
-func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, cacher)
-}
-
-func TestWatchInitializationSignal(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatchInitializationSignal(ctx, t, cacher)
-}
-
-func TestClusterScopedWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withClusterScopedKeyFunc, withNodeNameAndNamespaceIndex)
-	t.Cleanup(terminate)
-	storagetesting.RunTestClusterScopedWatch(ctx, t, cacher)
-}
-
-func TestNamespaceScopedWatch(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
-	t.Cleanup(terminate)
-	storagetesting.RunTestNamespaceScopedWatch(ctx, t, cacher)
-}
-
-func TestWatchDispatchBookmarkEvents(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestWatchDispatchBookmarkEvents(ctx, t, cacher, true)
-}
-
-func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
-	ctx, cacher, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunTestOptionalWatchBookmarksWithCorrectResourceVersion(ctx, t, cacher)
-}
-
-func TestSendInitialEventsBackwardCompatibility(t *testing.T) {
-	ctx, store, terminate := testSetup(t)
-	t.Cleanup(terminate)
-	storagetesting.RunSendInitialEventsBackwardCompatibility(ctx, t, store)
-}
-
-func TestWatchSemantics(t *testing.T) {
-	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
-	t.Cleanup(terminate)
-	storagetesting.RunWatchSemantics(context.TODO(), t, store)
-}
-
-func TestWatchSemanticInitialEventsExtended(t *testing.T) {
-	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
-	t.Cleanup(terminate)
-	storagetesting.RunWatchSemanticInitialEventsExtended(context.TODO(), t, store)
-}
-
-func TestWatchListMatchSingle(t *testing.T) {
-	store, terminate := testSetupWithEtcdAndCreateWrapper(t)
-	t.Cleanup(terminate)
-	storagetesting.RunWatchListMatchSingle(context.TODO(), t, store)
 }
 
 // ===================================================

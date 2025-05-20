@@ -40,11 +40,12 @@ func StorageWithCacher() generic.StorageDecorator {
 		keyFunc func(obj runtime.Object) (string, error),
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
+		reverseKeyFunc storage.ReverseKeyFunc,
 		getAttrsFunc storage.AttrFunc,
 		triggerFuncs storage.IndexerFuncs,
 		indexers *cache.Indexers) (storage.Interface, factory.DestroyFunc, error) {
 
-		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, resourcePrefix)
+		s, d, err := generic.NewRawStorage(storageConfig, newFunc, newListFunc, reverseKeyFunc, resourcePrefix)
 		if err != nil {
 			return s, d, err
 		}
