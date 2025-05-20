@@ -109,11 +109,12 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = options.AllowWatchBookmarks
 	opts := storage.ListOptions{
-		ResourceVersion:   options.ResourceVersion,
-		Predicate:         pred,
-		Recursive:         true,
-		ProgressNotify:    true,
-		SendInitialEvents: options.SendInitialEvents,
+		ResourceVersion:    options.ResourceVersion,
+		Predicate:          pred,
+		Recursive:          true,
+		ProgressNotify:     true,
+		SendInitialEvents:  options.SendInitialEvents,
+		WatchWithoutPrevKV: utilfeature.DefaultFeatureGate.Enabled(features.WatchFromStorageWithoutPrevKV),
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {

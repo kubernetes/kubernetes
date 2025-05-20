@@ -325,6 +325,28 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 			if err == nil && gotCacheKey != tc.expectCacheKey {
 				t.Fatalf("cacheKeyFunc returned %q, expect %q", gotCacheKey, tc.expectCacheKey)
 			}
+
+			if tc.expectKey != "" {
+				if keyFuncs.storageReverseKeyFunc == nil {
+					t.Fatal("storageReverseKeyFunc is nil")
+				}
+				reverseKeyFunc := keyFuncs.storageReverseKeyFunc("/registry/pods")
+				name, namespace, err := reverseKeyFunc("/registry" + tc.expectKey)
+				if err != nil {
+					t.Fatalf("storageReverseKeyFunc error = %v", err)
+				}
+				accessor, err := meta.Accessor(tc.obj)
+				if err != nil {
+					t.Fatalf("failed to access test object: %v", err)
+				}
+				expectedNamespace := ""
+				if tc.namespaced {
+					expectedNamespace = accessor.GetNamespace()
+				}
+				if name != accessor.GetName() || namespace != expectedNamespace {
+					t.Fatalf("storageReverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, accessor.GetName(), expectedNamespace)
+				}
+			}
 		})
 	}
 }
@@ -2587,7 +2609,15 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
+	keyFunc := func(ctx context.Context, id string) (string, error) {
+		if namespace, ok := genericapirequest.NamespaceFrom(ctx); !ok {
+			return "", fmt.Errorf("namespace is required")
+		} else {
+			return path.Join(podPrefix, namespace, id), nil
+		}
+	}
+	reverseKeyFunc := NamespaceReverseKeyFunc(podPrefix)
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, reverseKeyFunc, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -2639,12 +2669,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		KeyRootFunc: func(ctx context.Context) string {
 			return podPrefix
 		},
-		KeyFunc: func(ctx context.Context, id string) (string, error) {
-			if _, ok := genericapirequest.NamespaceFrom(ctx); !ok {
-				return "", fmt.Errorf("namespace is required")
-			}
-			return path.Join(podPrefix, id), nil
-		},
+		KeyFunc:        keyFunc,
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
 		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 			return storage.SelectionPredicate{
@@ -3133,6 +3158,44 @@ func TestValidateIndexers(t *testing.T) {
 		}
 		if !tc.expectedError && err != nil {
 			t.Errorf("%v: expected no error, but got %v", tc.name, err)
+		}
+	}
+}
+
+func TestReverseKeyFunc(t *testing.T) {
+	keyPrefix := "/example"
+	testcases := []struct {
+		name           string
+		pod            *example.Pod
+		keyFunc        func(ctx context.Context, prefix string, name string) (string, error)
+		reverseKeyFunc storage.ReverseKeyFunc
+	}{
+		{
+			name:           "NamespaceReverseKeyFunc should work",
+			pod:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"}},
+			keyFunc:        NamespaceKeyFunc,
+			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+		},
+		{
+			name:           "NoNamespaceReverseKeyFunc should work",
+			pod:            &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			keyFunc:        NoNamespaceKeyFunc,
+			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+		},
+	}
+
+	for _, tc := range testcases {
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), tc.pod.Namespace)
+		key, err := tc.keyFunc(ctx, keyPrefix, tc.pod.Name)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		name, namespace, err := tc.reverseKeyFunc(key)
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if name != tc.pod.Name || namespace != tc.pod.Namespace {
+			t.Errorf("Expected name=%#v, namespace=%#v, got name=%#v namespace=%#v", tc.pod.Name, tc.pod.Namespace, name, namespace)
 		}
 	}
 }

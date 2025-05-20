@@ -19,6 +19,7 @@ package cacher
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -92,6 +93,7 @@ func newEtcdTestStorageWithOptions(t testing.TB, prefix string, codec runtime.Co
 		codec,
 		newPod,
 		newPodList,
+		reverseKeyFunc(prefix+"/pods/"),
 		prefix,
 		"/pods/",
 		schema.GroupResource{Resource: "pods"},
@@ -110,6 +112,50 @@ func computePodKey(obj *example.Pod) string {
 	return fmt.Sprintf("/pods/%s/%s", obj.Namespace, obj.Name)
 }
 
+func reverseKeyFunc(prefix string) storage.ReverseKeyFunc {
+	return func(key string) (name string, namespace string, err error) {
+		if !strings.HasPrefix(key, prefix) {
+			err = fmt.Errorf("invalid key %s, expecting prefix %s", key, prefix)
+			return
+		}
+
+		tokens := strings.Split(key[len(prefix):], "/")
+		if len(tokens) != 2 {
+			err = fmt.Errorf("invalid key %q, requiring namspace/", key)
+			return
+		}
+		return tokens[1], tokens[0], nil
+	}
+}
+
+func TestReverseKeyFunc(t *testing.T) {
+	prefix := "/pods/"
+	rkf := reverseKeyFunc(prefix)
+
+	// Verify that reverseKeyFunc correctly reverses keys produced by computePodKey.
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "testpod", Namespace: "testns"}}
+	key := computePodKey(pod)
+	name, namespace, err := rkf(key)
+	if err != nil {
+		t.Errorf("unexpected error for key %q: %v", key, err)
+	}
+	if name != pod.Name || namespace != pod.Namespace {
+		t.Errorf("expected name=%q namespace=%q, got name=%q namespace=%q", pod.Name, pod.Namespace, name, namespace)
+	}
+
+	// Verify that reverseKeyFunc returns an error for a key with wrong prefix.
+	_, _, err = rkf("/wrongprefix/testns/testpod")
+	if err == nil {
+		t.Error("expected error for key with wrong prefix")
+	}
+
+	// Verify that reverseKeyFunc returns an error for a malformed key.
+	_, _, err = rkf("/pods/onlyonenamespace")
+	if err == nil {
+		t.Error("expected error for malformed key")
+	}
+}
+
 func newCorev1EtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, storage.Interface) {
 	cfg := testserver.NewTestConfig(t)
 	cfg.QuotaBackendBytes = 4 << 30 // 4 GiB (default 2 GiB is too small for 150k pods)
@@ -123,6 +169,7 @@ func newCorev1EtcdTestStorage(t testing.TB) (*etcd3testing.EtcdTestServer, stora
 		corev1ProtoCodec,
 		func() runtime.Object { return &corev1.Pod{} },
 		func() runtime.Object { return &corev1.PodList{} },
+		reverseKeyFunc(etcd3testing.PathPrefix()+"/pods/"),
 		etcd3testing.PathPrefix(),
 		"/pods/",
 		schema.GroupResource{Resource: "pods"},

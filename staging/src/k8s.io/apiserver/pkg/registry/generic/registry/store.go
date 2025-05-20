@@ -19,6 +19,7 @@ package registry
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -318,6 +319,9 @@ type storeKeyFuncs struct {
 	// It is passed to cache layers that receive objects instead of request
 	// contexts, so it derives the namespace and name from object metadata.
 	cacheKeyFunc func(obj runtime.Object) (string, error)
+	// storageReverseKeyFunc returns a function that can recover object identity
+	// from prepared storage keys rooted at a storage-specific prefix.
+	storageReverseKeyFunc func(prefix string) storage.ReverseKeyFunc
 }
 
 func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
@@ -330,6 +334,7 @@ func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
 			func(ctx context.Context, name string) (string, error) {
 				return NamespaceKeyFunc(ctx, prefix, name)
 			},
+			NamespaceReverseKeyFunc,
 		)
 	}
 
@@ -341,6 +346,7 @@ func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
 		func(ctx context.Context, name string) (string, error) {
 			return NoNamespaceKeyFunc(ctx, prefix, name)
 		},
+		NoNamespaceReverseKeyFunc,
 	)
 }
 
@@ -348,10 +354,12 @@ func newStoreKeyFuncs(
 	isNamespaced bool,
 	storageRootKeyFunc func(ctx context.Context) string,
 	storageKeyFunc func(ctx context.Context, name string) (string, error),
+	storageReverseKeyFunc func(prefix string) storage.ReverseKeyFunc,
 ) storeKeyFuncs {
 	return storeKeyFuncs{
-		storageRootKeyFunc: storageRootKeyFunc,
-		storageKeyFunc:     storageKeyFunc,
+		storageRootKeyFunc:    storageRootKeyFunc,
+		storageKeyFunc:        storageKeyFunc,
+		storageReverseKeyFunc: storageReverseKeyFunc,
 		cacheKeyFunc: func(obj runtime.Object) (string, error) {
 			accessor, err := meta.Accessor(obj)
 			if err != nil {
@@ -364,6 +372,44 @@ func newStoreKeyFuncs(
 			}
 			return storageKeyFunc(ctx, accessor.GetName())
 		},
+	}
+}
+
+// NoNamespaceReverseKeyFunc is the default function for constructing storage paths to
+// a resource relative to the given prefix enforcing namespace rules. If the
+// context does not contain a namespace, it errors.
+func NoNamespaceReverseKeyFunc(prefix string) storage.ReverseKeyFunc {
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	return func(key string) (name string, namespace string, err error) {
+		if !strings.HasPrefix(key, prefix) {
+			err = fmt.Errorf("invalid key %s, expecting prefix %s", key, prefix)
+			return
+		}
+		return key[len(prefix):], "", nil
+	}
+}
+
+// NamespaceReverseKeyFunc is the default function for constructing storage paths to
+// a resource relative to the given prefix enforcing namespace rules. If the
+// context does not contain a namespace, it errors.
+func NamespaceReverseKeyFunc(prefix string) storage.ReverseKeyFunc {
+	if !strings.HasSuffix(prefix, "/") {
+		prefix += "/"
+	}
+	return func(key string) (name string, namespace string, err error) {
+		if !strings.HasPrefix(key, prefix) {
+			err = fmt.Errorf("invalid key %s, expecting prefix %s", key, prefix)
+			return
+		}
+
+		tokens := strings.Split(key[len(prefix):], "/")
+		if len(tokens) != 2 {
+			err = fmt.Errorf("invalid key %q, requiring namspace/", key)
+			return
+		}
+		return tokens[1], tokens[0], nil
 	}
 }
 
@@ -1654,7 +1700,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
 		keyFuncs = defaultStoreKeyFuncs(prefix, isNamespaced)
 	} else {
-		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc)
+		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc, nil)
 	}
 	e.KeyRootFunc = keyFuncs.storageRootKeyFunc
 	e.KeyFunc = keyFuncs.storageKeyFunc
@@ -1677,6 +1723,11 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 
 	if e.Storage.Storage == nil {
 		e.Storage.Codec = opts.StorageConfig.Codec
+		storageKeyPrefix := filepath.Join("/", opts.StorageConfig.Prefix, prefix)
+		var reverseKeyFunc storage.ReverseKeyFunc
+		if keyFuncs.storageReverseKeyFunc != nil {
+			reverseKeyFunc = keyFuncs.storageReverseKeyFunc(storageKeyPrefix)
+		}
 		var err error
 		e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(
 			opts.StorageConfig,
@@ -1684,6 +1735,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 			keyFuncs.cacheKeyFunc,
 			e.NewFunc,
 			e.NewListFunc,
+			reverseKeyFunc,
 			attrFunc,
 			options.TriggerFunc,
 			options.Indexers,

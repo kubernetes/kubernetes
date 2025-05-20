@@ -80,7 +80,7 @@ func TestTLSConnection(t *testing.T) {
 		},
 		Codec: codec,
 	}
-	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, "/pods")
+	storage, destroyFunc, err := newETCD3Storage(*cfg.ForResource(schema.GroupResource{Resource: "pods"}), nil, nil, nil, "/pods")
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)

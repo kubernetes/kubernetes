@@ -515,6 +515,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
+
+	if opts.WatchWithoutPrevKV {
+		return nil, fmt.Errorf("watchWithoutPrevKV is not supported by the cacher")
+	}
+
 	key, err := c.prepareKey(key, opts.Recursive)
 	if err != nil {
 		return nil, err
