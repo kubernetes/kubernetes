@@ -31,6 +31,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -69,9 +70,11 @@ func TestOnlySetFatalOnDecodeError(b bool) {
 }
 
 type watcher struct {
-	client              *clientv3.Client
-	codec               runtime.Codec
-	newFunc             func() runtime.Object
+	client  *clientv3.Client
+	codec   runtime.Codec
+	newFunc func() runtime.Object
+	// reverseKeyFunc decodes storage key to get object name and namespace
+	reverseKeyFunc      func(key string) (string, string, error)
 	objectType          string
 	groupResource       schema.GroupResource
 	versioner           storage.Versioner
@@ -374,7 +377,10 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 			return e
 		}())
 	}
-	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1), clientv3.WithPrevKV()}
+	opts := []clientv3.OpOption{clientv3.WithRev(wc.initialRev + 1)}
+	if wc.watcher.reverseKeyFunc == nil {
+		opts = append(opts, clientv3.WithPrevKV())
+	}
 	if wc.recursive {
 		opts = append(opts, clientv3.WithPrefix())
 	}
@@ -403,7 +409,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 
 		for _, e := range wres.Events {
 			metrics.RecordEtcdEvent(wc.watcher.groupResource)
-			parsedEvent, err := parseEvent(e)
+			parsedEvent, err := parseEvent(e, wc.watcher.reverseKeyFunc == nil)
 			if err != nil {
 				logWatchChannelErr(err)
 				// sendError doesn't guarantee that no more items will be put into resultChan.
@@ -706,16 +712,32 @@ func (wc *watchChan) prepareObjs(e *event) (curObj runtime.Object, oldObj runtim
 	// know that the filter for previous object will return true and
 	// we need the object only to compute whether it was filtered out
 	// before).
-	if len(e.prevValue) > 0 && (e.isDeleted || !wc.acceptAll()) {
-		data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
-		if err != nil {
-			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
-		}
-		// Note that this sends the *old* object with the etcd revision for the time at
-		// which it gets deleted.
-		oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
-		if err != nil {
-			return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
+	if e.isDeleted || !wc.acceptAll() {
+		if len(e.prevValue) > 0 {
+			data, _, err := wc.watcher.transformer.TransformFromStorage(wc.ctx, e.prevValue, authenticatedDataString(e.key))
+			if err != nil {
+				return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
+			}
+			// Note that this sends the *old* object with the etcd revision for the time at
+			// which it gets deleted.
+			oldObj, err = decodeObj(wc.watcher.codec, wc.watcher.versioner, data, e.rev)
+			if err != nil {
+				return nil, nil, wc.watcher.transformIfCorruptObjectError(e, err)
+			}
+		} else if wc.watcher.reverseKeyFunc != nil {
+			name, namespace, err := wc.watcher.reverseKeyFunc(e.key)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failure to reverse event key: %v", err)
+			}
+
+			oldObj = wc.watcher.newFunc()
+			accessor, err := meta.Accessor(oldObj)
+			if err != nil {
+				return nil, nil, err
+			}
+			accessor.SetName(name)
+			accessor.SetNamespace(namespace)
+			accessor.SetResourceVersion(strconv.FormatInt(e.rev, 10))
 		}
 	}
 	return curObj, oldObj, nil

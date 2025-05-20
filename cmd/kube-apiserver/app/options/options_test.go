@@ -183,6 +183,7 @@ func TestAddFlags(t *testing.T) {
 						ReuseDurationSeconds: 100,
 						MaxObjectCount:       1000,
 					},
+					WatchPrevKv: true,
 				},
 				DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 				DeleteCollectionWorkers: 1,
