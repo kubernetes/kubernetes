@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -102,11 +101,6 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 
 		err = waitForMemoryPressureTaintRemoval(ctx, f, node.Name, 10*time.Minute)
 		framework.ExpectNoError(err, "Timed out waiting for memory-pressure taint to be removed from node %q", node.Name)
-
-		// Delete img-puller pods if they exist because eviction manager keeps selecting them for eviction first
-		// Note we cannot just delete the namespace because a deferred cleanup task tries to delete the ns if
-		// image pre-pulling was enabled.
-		// cleanupPods(ctx, f, "img-puller")
 
 		ginkgo.DeferCleanup(f.DeleteNamespace, f.Namespace.Name)
 
@@ -243,24 +237,6 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 		framework.ExpectNoError(err)
 	})
 })
-
-func cleanupPods(ctx context.Context, f *framework.Framework, namespace string) {
-	nsList, err := f.ClientSet.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
-	framework.ExpectNoError(err)
-	for _, ns := range nsList.Items {
-		if strings.Contains(ns.Name, namespace) {
-			framework.Logf("Deleting pods in namespace %s", ns.Name)
-			podList, err := f.ClientSet.CoreV1().Pods(ns.Name).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
-			for _, pod := range podList.Items {
-				framework.Logf("  Deleting pod %s", pod.Name)
-				err = f.ClientSet.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}
-			break
-		}
-	}
-}
 
 func waitForMemoryPressureTaintRemoval(ctx context.Context, f *framework.Framework, nodeName string, timeout time.Duration) error {
 	framework.Logf("Waiting for memory-pressure taint to be removed from node %q", nodeName)
