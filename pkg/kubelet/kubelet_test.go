@@ -3316,7 +3316,7 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 func TestPullErrorReportsMissingSecrets(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 
-	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets: [missing]"
+	expectedEvent := "Warning FailedToRetrieveImagePullSecret Unable to retrieve some image pull secrets [missing]; attempting to pull the image might not succeed."
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
