@@ -18,6 +18,7 @@ package testing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -28,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -199,6 +200,53 @@ func testWatch(ctx context.Context, t *testing.T, store storage.Interface, recur
 	}
 }
 
+// RunTestWatchWithoutPrevKV tests that watch without prevKv
+//   - can't work with Predicate
+//   - first occurrence of objects should notify Add event
+//   - update should trigger Modified event
+//   - delete should trigger Deleted event with only meta info.
+func RunTestWatchWithoutPrevKV(ctx context.Context, t *testing.T, store storage.Interface) {
+	key, storedObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
+
+	// Make sure when we watch from 0 we receive an ADDED event
+	_, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(labels.Set{"select": "true"}),
+	}, WatchWithoutPrevKV: true})
+
+	expectNoDiff(t, "expected error: ", apierrors.NewInternalError(errors.New("watchWithoutPrevKV only work in acceptAll mode")), err)
+
+	w, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything, WatchWithoutPrevKV: true})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+	testCheckResult(t, w, watch.Event{Type: watch.Added, Object: storedObj})
+
+	// Update
+	out := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, out, true, nil, storage.SimpleUpdate(
+		func(runtime.Object) (runtime.Object, error) {
+			return &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", Annotations: map[string]string{"a": "1"}}}, nil
+		}), nil)
+	if err != nil {
+		t.Fatalf("GuaranteedUpdate failed: %v", err)
+	}
+
+	// Check that we receive a modified watch event. This check also
+	// indirectly ensures that the cache is synced. This is important
+	// when testing with the Cacher since we may have to allow for slow
+	// processing by allowing updates to propagate to the watch cache.
+	// This allows for that.
+	testCheckResult(t, w, watch.Event{Type: watch.Modified, Object: out})
+
+	err = store.Delete(ctx, key, out, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{})
+	if err != nil {
+		t.Fatalf("Delete failed: %v", err)
+	}
+	expectObj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns", ResourceVersion: out.ResourceVersion}}
+	testCheckResult(t, w, watch.Event{Type: watch.Deleted, Object: expectObj})
+	w.Stop()
+}
+
 // RunTestWatchFromZero tests that
 //   - watch from 0 should sync up and grab the object added before
 //   - For testing with etcd, watch from 0 is able to return events for objects
@@ -272,7 +320,7 @@ func RunTestWatchFromZero(ctx context.Context, t *testing.T, store storage.Inter
 		t.Fatalf("Watch failed: %v", err)
 	}
 	defer tooOldWatcher.Stop()
-	expiredError := errors.NewResourceExpired("").ErrStatus
+	expiredError := apierrors.NewResourceExpired("").ErrStatus
 	// TODO(wojtek-t): It seems that etcd is currently returning a different error,
 	// being an Internal error of "etcd event received with PrevKv=nil".
 	// We temporary allow both but we should unify here.
