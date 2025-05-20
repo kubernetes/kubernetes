@@ -17,8 +17,9 @@ limitations under the License.
 package dra
 
 import (
-	"_/usr/local/google/home/jpsassine/kubernetes/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"context"
+
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
