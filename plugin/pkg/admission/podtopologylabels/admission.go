@@ -216,7 +216,7 @@ func (p *Plugin) isTopologyLabel(key string) bool {
 
 type admitFunc func(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error)
 
-// shouldAdmit inspects the provided adminssion attributes to determine whether the request
+// shouldAdmit inspects the provided admission attributes to determine whether the request
 // requires admittance through this plugin.
 func (p *Plugin) shouldAdmit(a admission.Attributes) (bool, admitFunc, error) {
 	if a.GetResource().GroupResource() != api.Resource("pods") {
