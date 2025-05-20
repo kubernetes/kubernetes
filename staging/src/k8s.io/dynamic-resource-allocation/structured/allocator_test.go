@@ -1629,11 +1629,8 @@ func TestAllocator(t *testing.T) {
 					[]resourceapi.DeviceConstraint{
 						{
 							Requests: []string{req0},
-							MatchExpression: fmt.Sprintf(`size(devices) <= 1 || devices.all(d, devices.exists(other,
-								d != other &&
-								(d.attributes["%s"].deviceId == other.attributes["%s"].deviceId + 1 ||
-								d.attributes["%s"].deviceId == other.attributes["%s"].deviceId - 1)))`,
-								driverA, driverA, driverA, driverA),
+							MatchExpression: fmt.Sprintf(`size(devices) == 3 && devices.all(first, devices.exists(second, first != second && ( first.attributes["%s"].deviceId == second.attributes["%s"].deviceId + 1 || first.attributes["%s"].deviceId == second.attributes["%s"].deviceId - 1))) && devices.map(d, d.attributes["%s"].deviceId).max() - devices.map(d, d.attributes["%s"].deviceId).min() == size(devices) - 1`,
+								driverA, driverA, driverA, driverA, driverA, driverA),
 						},
 					},
 					resourceapi.DeviceRequest{
@@ -1680,11 +1677,8 @@ func TestAllocator(t *testing.T) {
 					[]resourceapi.DeviceConstraint{
 						{
 							Requests: []string{req0},
-							MatchExpression: fmt.Sprintf(`size(devices) <= 1 || devices.all(d, devices.exists(other,
-                        d != other &&
-                        (d.attributes["%s"].deviceId == other.attributes["%s"].deviceId + 1 ||
-                        d.attributes["%s"].deviceId == other.attributes["%s"].deviceId - 1)))`,
-								driverA, driverA, driverA, driverA),
+							MatchExpression: fmt.Sprintf(`size(devices) == 3 && devices.all(first, devices.exists(second, first != second && ( first.attributes["%s"].deviceId == second.attributes["%s"].deviceId + 1 || first.attributes["%s"].deviceId == second.attributes["%s"].deviceId - 1))) && devices.map(d, d.attributes["%s"].deviceId).max() - devices.map(d, d.attributes["%s"].deviceId).min() == size(devices) - 1`,
+								driverA, driverA, driverA, driverA, driverA, driverA),
 						},
 					},
 					resourceapi.DeviceRequest{
@@ -1730,11 +1724,8 @@ func TestAllocator(t *testing.T) {
 					[]resourceapi.DeviceConstraint{
 						{
 							Requests: []string{req0},
-							MatchExpression: fmt.Sprintf(`size(devices) <= 1 || devices.all(d, devices.exists(other,
-                        d != other &&
-                        (d.attributes["%s"].deviceId == other.attributes["%s"].deviceId + 1 ||
-                        d.attributes["%s"].deviceId == other.attributes["%s"].deviceId - 1)))`,
-								driverA, driverA, driverA, driverA),
+							MatchExpression: fmt.Sprintf(`size(devices) == 2 && devices.all(first, devices.exists(second, first != second && ( first.attributes["%s"].deviceId == second.attributes["%s"].deviceId + 1 || first.attributes["%s"].deviceId == second.attributes["%s"].deviceId - 1))) && devices.map(d, d.attributes["%s"].deviceId).max() - devices.map(d, d.attributes["%s"].deviceId).min() == size(devices) - 1`,
+								driverA, driverA, driverA, driverA, driverA, driverA),
 						},
 					},
 					resourceapi.DeviceRequest{
@@ -1780,11 +1771,8 @@ func TestAllocator(t *testing.T) {
 					[]resourceapi.DeviceConstraint{
 						{
 							Requests: []string{req0},
-							MatchExpression: fmt.Sprintf(`size(devices) <= 1 || devices.all(d, devices.exists(other,
-                        d != other &&
-                        (d.attributes["%s"].deviceId == other.attributes["%s"].deviceId + 1 ||
-                        d.attributes["%s"].deviceId == other.attributes["%s"].deviceId - 1)))`,
-								driverA, driverA, driverA, driverA),
+							MatchExpression: fmt.Sprintf(`size(devices) == 3 && devices.all(first, devices.exists(second, first != second && ( first.attributes["%s"].deviceId == second.attributes["%s"].deviceId + 1 || first.attributes["%s"].deviceId == second.attributes["%s"].deviceId - 1))) && devices.map(d, d.attributes["%s"].deviceId).max() - devices.map(d, d.attributes["%s"].deviceId).min() == size(devices) - 1`,
+								driverA, driverA, driverA, driverA, driverA, driverA),
 						},
 					},
 					resourceapi.DeviceRequest{
