@@ -1013,6 +1013,16 @@ func BenchmarkImagePullManager_CompareEnsureSecretPulledImages(b *testing.B) {
 			},
 		)
 	})
+
+	b.Run("ImageRecordsAccess=CachedFS", func(b *testing.B) {
+		benchmarkImagePullManagers(b,
+			&pullManagerBenchmark{
+				createImagePullManager: prepareMemCachedImagePullManager,
+				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+				dimensions:             testDimensions,
+			},
+		)
+	})
 }
 
 func BenchmarkImagePullManageWithEnsureSecretPulledImages(b *testing.B) {
@@ -1020,6 +1030,20 @@ func BenchmarkImagePullManageWithEnsureSecretPulledImages(b *testing.B) {
 		benchmarkImagePullManagers(b,
 			&pullManagerBenchmark{
 				createImagePullManager: prepareFSImagePullManager,
+				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
+
+				dimensions: pullManagerBenchmarkDimensions{
+					imagesPresentAndCached: []int{10, 50, 100, 500},
+					cacheHitPercent:        []int{10, 20, 50, 75, 100},
+				},
+			},
+		)
+	})
+
+	b.Run("ImageRecordsAccess=CachedFS", func(b *testing.B) {
+		benchmarkImagePullManagers(b,
+			&pullManagerBenchmark{
+				createImagePullManager: prepareMemCachedImagePullManager,
 				enableFeatures:         []featuregate.Feature{features.KubeletEnsureSecretPulledImages},
 
 				dimensions: pullManagerBenchmarkDimensions{
@@ -1094,6 +1118,23 @@ func prepareFSImagePullManager(ctx context.Context, b *testing.B, imageService k
 	}
 
 	pullManager, err := pullmanager.NewImagePullManager(ctx, fsAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, 10)
+	if err != nil {
+		b.Fatalf("failed to set up image pull manager: %v", err)
+	}
+	return pullManager
+}
+
+func prepareMemCachedImagePullManager(ctx context.Context, b *testing.B, imageService kubecontainer.ImageService) pullmanager.ImagePullManager {
+	tmpDir := b.TempDir()
+
+	fsAccessor, err := pullmanager.NewFSPullRecordsAccessor(tmpDir)
+	if err != nil {
+		b.Fatalf("failed to set up FS-cache accessor: %v", err)
+	}
+
+	cachedAccessor := pullmanager.NewCachedPullRecordsAccessor(fsAccessor)
+
+	pullManager, err := pullmanager.NewImagePullManager(ctx, cachedAccessor, pullmanager.AlwaysVerifyImagePullPolicy(), imageService, 10) // FIXME: variable for striped locks size
 	if err != nil {
 		b.Fatalf("failed to set up image pull manager: %v", err)
 	}
