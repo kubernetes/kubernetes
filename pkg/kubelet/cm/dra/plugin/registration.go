@@ -235,16 +235,42 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
+	// Create a new gRPC connection to the plugin as soon as it's registered
+	// to provide an effective connection monitoring.
+	// If this is not done, the connection will be created lazily when
+	// the first gRPC call is made, which can lead to inconsistent behavior
+	// if the connection drops between registration and the first gRPC call.
+	// It doesn't wait for the connection to be established, so it doesn't
+	// block the registration process.
+	if _, err = pluginInstance.getOrCreateGRPCConn(); err != nil {
+		cancel(err)
+		return err
+	}
+
 	// Now cancel any pending ResourceSlice wiping for this plugin.
 	// Only needs to be done once.
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-	if cancel := h.pendingWipes[pluginName]; cancel != nil {
-		(*cancel)(errors.New("new plugin instance registered"))
-		delete(h.pendingWipes, pluginName)
+	h.cancelPendingWipes(pluginName, "new plugin instance registered")
+
+	if !pluginInstance.isConnected() {
+		// If the plugin is not connected, it means that the gRPC connection
+		// is not established yet, so we need to set up the cleanup for
+		// ResourceSlices. This will ensure that if the plugin never comes
+		// online, the ResourceSlices will be cleaned up after a delay.
+		logger.V(3).Info("Plugin is not connected, scheduling cleanup of ResourceSlices")
+		pluginInstance.setCancelCleanup(h.cleanupResourceSlices(pluginName))
 	}
 
 	return nil
+}
+
+func (h *RegistrationHandler) cancelPendingWipes(pluginName, errMsg string) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
+
+	if cancel, ok := h.pendingWipes[pluginName]; ok {
+		(*cancel)(errors.New(errMsg))
+		delete(h.pendingWipes, pluginName)
+	}
 }
 
 // validateSupportedServices identifies the highest supported gRPC service for

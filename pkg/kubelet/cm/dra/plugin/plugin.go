@@ -18,14 +18,12 @@ package plugin
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net"
+	"net/url"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
@@ -45,12 +43,12 @@ func NewDRAPluginClient(pluginName string) (*Plugin, error) {
 		return nil, fmt.Errorf("plugin name is empty")
 	}
 
-	existingPlugin := draPlugins.get(pluginName)
-	if existingPlugin == nil {
-		return nil, fmt.Errorf("plugin name %s not found in the list of registered DRA plugins", pluginName)
+	connectedPlugin := draPlugins.get(pluginName)
+	if connectedPlugin == nil {
+		return nil, fmt.Errorf("plugin %s not found in the list of registered DRA plugins or not connected", pluginName)
 	}
 
-	return existingPlugin, nil
+	return connectedPlugin, nil
 }
 
 type Plugin struct {
@@ -68,6 +66,17 @@ type Plugin struct {
 	cancelCleanup       *context.CancelCauseFunc
 }
 
+// getOrCreateGRPCConn creates and triggers a gRPC client connection to the
+// plugin's endpoint. If a connection already exists, it returns the
+// existing connection. Otherwise, it creates a new connection using the
+// specified endpoint and configuration, including transport credentials,
+// context dialer for Unix sockets, unary interceptor for metrics, and a stats
+// handler. The method is thread-safe and ensures only one connection is
+// created per plugin instance.
+// Returns the gRPC client connection or an error if the connection could
+// not be created.
+// NOTE: This method doesn't wait for the connection to be established.
+// It only creates the connection and returns it immediately.
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -80,34 +89,63 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	logger := klog.FromContext(ctx)
 
 	network := "unix"
+	target := (&url.URL{Scheme: network, Path: p.endpoint}).String()
 	logger.V(4).Info("Creating new gRPC connection", "protocol", network, "endpoint", p.endpoint)
-	// grpc.Dial is deprecated. grpc.NewClient should be used instead.
-	// For now this gets ignored because this function is meant to establish
-	// the connection, with the one second timeout below. Perhaps that
-	// approach should be reconsidered?
-	//nolint:staticcheck
-	conn, err := grpc.Dial(
-		p.endpoint,
+
+	conn, err := grpc.NewClient(target,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, target)
-		}),
-		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
 		grpc.WithStatsHandler(p),
+		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
 	)
+
 	if err != nil {
-		return nil, err
+		logger.V(4).Info("failed to create gRPC connection", "plugin", p.name, "endpoint", p.endpoint)
+		return nil, fmt.Errorf("failed to create gRPC connection to plugin %s at endpoint %s: %w", p.name, p.endpoint, err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	conn.Connect() // Trigger the connection immediately
 
-	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, errors.New("timed out waiting for gRPC connection to be ready")
-	}
+	logger.V(4).Info("gRPC connection created", "plugin", p.name, "endpoint", p.endpoint, "state", conn.GetState())
 
 	p.conn = conn
 	return p.conn, nil
+}
+
+// isConnected returns true if the plugin is currently connected.
+func (p *Plugin) isConnected() bool {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return p.connected
+}
+
+// setConnected updates the connection status of the plugin.
+// Depending on the new connection state, it either cancels any pending
+// resource wipes (if connected) or initiates cleanup of resource slices
+// (if disconnected).
+func (p *Plugin) setConnected(connected bool) {
+	p.mutex.Lock()
+	p.connected = connected
+	p.mutex.Unlock()
+	if p.registrationHandler != nil {
+		if connected {
+			p.registrationHandler.cancelPendingWipes(p.name, "connection established")
+		} else {
+			p.setCancelCleanup(p.registrationHandler.cleanupResourceSlices(p.name))
+		}
+	}
+}
+
+// setCancelCleanup sets the cancelCleanup function for the Plugin instance.
+// The cancelCleanup parameter is a pointer to a context.CancelCauseFunc,
+// which can be used to cancel and clean up resources associated with the Plugin.
+func (p *Plugin) setCancelCleanup(cancelClenup *context.CancelCauseFunc) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	if p.cancelCleanup != nil {
+		// If cancelCleanup is already set, we don't need to do anything.
+		return
+	}
+	p.cancelCleanup = cancelClenup
 }
 
 func (p *Plugin) NodePrepareResources(
@@ -192,8 +230,6 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 // initiates gRPC re-connection.
 func (p *Plugin) HandleConn(ctx context.Context, connStats stats.ConnStats) {
 	logger := klog.FromContext(ctx)
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
 
 	if !draPlugins.pluginRegistered(p.name, p.endpoint) {
 		logger.V(2).Info("Plugin not registered, skipping connection stats handling", "plugin", p.name, "endpoint", p.endpoint)
@@ -203,14 +239,10 @@ func (p *Plugin) HandleConn(ctx context.Context, connStats stats.ConnStats) {
 	switch connStats.(type) {
 	case *stats.ConnBegin:
 		logger.V(2).Info("Connection begin", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
-		p.connected = true
-		p.registrationHandler.cancelCleanup(p.name, p.cancelCleanup)
+		p.setConnected(true)
 	case *stats.ConnEnd:
 		logger.V(2).Info("Connection end", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
-		p.connected = false
-		if !draPlugins.pluginConnected(p.name) {
-			p.cancelCleanup = p.registrationHandler.cleanupResourceSlices(p.name)
-		}
+		p.setConnected(false)
 		if p.conn != nil {
 			logger.V(2).Info("Trigger reconnecting to plugin", "plugin", p.name, "endpoint", p.endpoint)
 			p.conn.Connect()

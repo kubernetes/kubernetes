@@ -34,8 +34,9 @@ type pluginsStore struct {
 // and their corresponding sockets.
 var draPlugins = &pluginsStore{}
 
-// Get lets you retrieve a DRA Plugin by name.
-// This method is protected by a mutex.
+// get returns the most recent connected plugin instance
+// for the given plugin name or nil if no connected plugin
+// instance is found.
 func (s *pluginsStore) get(pluginName string) *Plugin {
 	s.RLock()
 	defer s.RUnlock()
@@ -48,6 +49,8 @@ func (s *pluginsStore) get(pluginName string) *Plugin {
 	// the newest, except when plugin disconnects or kubelet got restarted
 	// and registered all running plugins in random order.
 	for i := len(instances) - 1; i >= 0; i-- {
+		instances[i].mutex.Lock()
+		defer instances[i].mutex.Unlock()
 		if instances[i].connected {
 			return instances[i]
 		}
