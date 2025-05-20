@@ -1591,10 +1591,24 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, p
 }
 
 func (m *kubeGenericRuntimeManager) GeneratePodStatus(event *runtimeapi.ContainerEventResponse) (*kubecontainer.PodStatus, error) {
+	if event == nil {
+		return nil, errors.New("container event response is nil")
+	}
+	if event.PodSandboxStatus == nil {
+		return nil, errors.New("pod sandbox status is nil")
+	}
+	if event.PodSandboxStatus.Metadata == nil {
+		return nil, errors.New("pod sandbox metadata is nil")
+	}
+
 	podIPs := m.determinePodSandboxIPs(event.PodSandboxStatus.Metadata.Namespace, event.PodSandboxStatus.Metadata.Name, event.PodSandboxStatus)
 
 	kubeContainerStatuses := []*kubecontainer.Status{}
 	for _, status := range event.ContainersStatuses {
+		if status == nil {
+			klog.V(4).InfoS("Container status in event is nil")
+			continue
+		}
 		kubeContainerStatuses = append(kubeContainerStatuses, m.convertToKubeContainerStatus(status))
 	}
 
