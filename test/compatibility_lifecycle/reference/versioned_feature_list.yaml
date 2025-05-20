@@ -2150,6 +2150,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.37"
+- name: WatchFromStorageWithoutPrevKV
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.38"
 - name: WatchList
   versionedSpecs:
   - default: false
