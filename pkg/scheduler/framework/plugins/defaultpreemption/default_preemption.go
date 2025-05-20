@@ -46,6 +46,23 @@ import (
 // Name of the plugin used in the plugin registry and configurations.
 const Name = names.DefaultPreemption
 
+// IsEligiblePodFunc is a function which may be assigned to the DefaultPreemption plugin.
+// This may implement rules/filtering around preemption eligibility, which is in addition to
+// the internal requirement that the victim pod have lower priority than the preemptor pod.
+// Any customizations should always allow system services to preempt normal pods, to avoid
+// problems if system pods are unable to find space.
+type IsEligiblePodFunc func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool
+
+// MoreImportantPodFunc is a function which may be assigned to the DefaultPreemption plugin.
+// Implementations should return true if the first pod is more important than the second pod
+// and the second one should be considered for preemption before the first one.
+// For performance reasons, the search for nodes eligible for preemption is done by omitting all
+// eligible victims from a node then checking whether the preemptor fits on the node without them,
+// before adding back victims (starting from the most important) that still fit with the preemptor.
+// The default behavior is to not consider pod affinity between the preemptor and the victims,
+// as affinity between pods that are eligible to preempt each other isn't recommended.
+type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
+
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
 	fh        framework.Handle
@@ -54,6 +71,18 @@ type DefaultPreemption struct {
 	podLister corelisters.PodLister
 	pdbLister policylisters.PodDisruptionBudgetLister
 	Evaluator *preemption.Evaluator
+
+	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
+	// This filtering is in addition to the internal requirement that the victim pod have lower
+	// priority than the preemptor pod. Any customizations should always allow system services
+	// to preempt normal pods, to avoid problems if system pods are unable to find space.
+	IsEligiblePod IsEligiblePodFunc
+
+	// MoreImportantPod is used to sort eligible victims in-place in descending order of highest to
+	// lowest importance. Pods with higher importance are less likely to be preempted.
+	// The default behavior is to order pods by descending priority, then descending runtime duration
+	// for pods with equal priority.
+	MoreImportantPod MoreImportantPodFunc
 }
 
 var _ framework.PostFilterPlugin = &DefaultPreemption{}
@@ -64,8 +93,8 @@ func (pl *DefaultPreemption) Name() string {
 	return Name
 }
 
-// New initializes a new plugin and returns it.
-func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (framework.Plugin, error) {
+// New initializes a new plugin and returns it. The plugin type is retained to allow modification.
+func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feature.Features) (*DefaultPreemption, error) {
 	args, ok := dpArgs.(*config.DefaultPreemptionArgs)
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
@@ -85,6 +114,15 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 		pdbLister: pdbLister,
 	}
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, fts.EnableAsyncPreemption)
+
+	// Default behavior: No additional filtering, beyond the internal requirement that the victim pod
+	// have lower priority than the preemptor pod.
+	pl.IsEligiblePod = func(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+		return true
+	}
+
+	// Default behavior: Sort by descending priority, then by descending runtime duration as secondary ordering.
+	pl.MoreImportantPod = util.MoreImportantPod
 
 	return &pl, nil
 }
@@ -202,11 +240,10 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 		return nil
 	}
-	// As the first step, remove all the lower priority pods from the node and
-	// check if the given pod can be scheduled.
-	podPriority := corev1helpers.PodPriority(pod)
+	// As the first step, remove all pods eligible for preemption from the node and
+	// check if the given pod can be scheduled without them present.
 	for _, pi := range nodeInfo.Pods {
-		if corev1helpers.PodPriority(pi.Pod) < podPriority {
+		if pl.isPreemptionAllowed(nodeInfo, pi, pod) {
 			potentialVictims = append(potentialVictims, pi)
 			if err := removePod(pi); err != nil {
 				return nil, 0, framework.AsStatus(err)
@@ -219,23 +256,23 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		return nil, 0, framework.NewStatus(framework.UnschedulableAndUnresolvable, "No preemption victims found for incoming pod")
 	}
 
-	// If the new pod does not fit after removing all the lower priority pods,
+	// If the new pod does not fit after removing all the eligible pods,
 	// we are almost done and this node is not suitable for preemption. The only
 	// condition that we could check is if the "pod" is failing to schedule due to
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
-	// priority pods is not a recommended configuration anyway.
+	// importance (priority) pods is not a recommended configuration anyway.
 	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
-	var victims []*v1.Pod
+	var victims []*framework.PodInfo
 	numViolatingVictim := 0
-	// Sort potentialVictims by pod priority from high to low, which ensures to
-	// reprieve higher priority pods first.
-	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
+	// Sort potentialVictims by descending importance, which ensures reprieve of
+	// higher importance pods first.
+	sort.Slice(potentialVictims, func(i, j int) bool { return pl.MoreImportantPod(potentialVictims[i].Pod, potentialVictims[j].Pod) })
 	// Try to reprieve as many pods as possible. We first try to reprieve the PDB
 	// violating victims and then other non-violating ones. In both cases, we start
-	// from the highest priority victims.
+	// from the highest importance victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims, pdbs)
 	reprievePod := func(pi *framework.PodInfo) (bool, error) {
 		if err := addPod(pi); err != nil {
@@ -247,9 +284,8 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 			if err := removePod(pi); err != nil {
 				return false, err
 			}
-			rpi := pi.Pod
-			victims = append(victims, rpi)
-			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(rpi), "node", klog.KObj(nodeInfo.Node()))
+			victims = append(victims, pi)
+			logger.V(5).Info("Pod is a potential preemption victim on node", "pod", klog.KObj(pi.Pod), "node", klog.KObj(nodeInfo.Node()))
 		}
 		return fits, nil
 	}
@@ -267,11 +303,15 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		}
 	}
 
-	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of priority from high to low.
+	// Sort victims after reprieving pods to keep the pods in the victims sorted in order of importance from high to low.
 	if len(violatingVictims) != 0 && len(nonViolatingVictims) != 0 {
-		sort.Slice(victims, func(i, j int) bool { return util.MoreImportantPod(victims[i], victims[j]) })
+		sort.Slice(victims, func(i, j int) bool { return pl.MoreImportantPod(victims[i].Pod, victims[j].Pod) })
 	}
-	return victims, numViolatingVictim, framework.NewStatus(framework.Success)
+	var victimPods []*v1.Pod
+	for _, pi := range victims {
+		victimPods = append(victimPods, pi.Pod)
+	}
+	return victimPods, numViolatingVictim, framework.NewStatus(framework.Success)
 }
 
 // PodEligibleToPreemptOthers returns one bool and one string. The bool
@@ -297,9 +337,8 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 		}
 
 		if nodeInfo, _ := nodeInfos.Get(nomNodeName); nodeInfo != nil {
-			podPriority := corev1helpers.PodPriority(pod)
 			for _, p := range nodeInfo.Pods {
-				if corev1helpers.PodPriority(p.Pod) < podPriority && podTerminatingByPreemption(p.Pod) {
+				if pl.isPreemptionAllowed(nodeInfo, p, pod) && podTerminatingByPreemption(p.Pod) {
 					// There is a terminating pod on the nominated node.
 					return false, "not eligible due to a terminating pod on the nominated node."
 				}
@@ -312,6 +351,12 @@ func (pl *DefaultPreemption) PodEligibleToPreemptOthers(_ context.Context, pod *
 // OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 func (pl *DefaultPreemption) OrderedScoreFuncs(ctx context.Context, nodesToVictims map[string]*extenderv1.Victims) []func(node string) int64 {
 	return nil
+}
+
+// isPreemptionAllowed returns whether the victim residing on nodeInfo can be preempted by the preemptor
+func (pl *DefaultPreemption) isPreemptionAllowed(nodeInfo *framework.NodeInfo, victim *framework.PodInfo, preemptor *v1.Pod) bool {
+	// The victim must have lower priority than the preemptor, in addition to any filtering implemented by IsEligiblePod
+	return corev1helpers.PodPriority(victim.Pod) < corev1helpers.PodPriority(preemptor) && pl.IsEligiblePod(nodeInfo, victim, preemptor)
 }
 
 // podTerminatingByPreemption returns true if the pod is in the termination state caused by scheduler preemption.
