@@ -32,9 +32,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/cacher"
 	"k8s.io/apiserver/pkg/storage/testing/correctness"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -293,6 +296,14 @@ func TestCorrectness(t *testing.T) {
 			name: "cacher with prefix transformer",
 			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
 				store, prefix := setupStore(tCtx, prefixTransformer{})
+				return setupCacher(tCtx, store), prefix
+			},
+		},
+		{
+			name: "cacher without WatchFromStorageWithoutPrevKV",
+			setupStorage: func(tCtx ktesting.TContext) (storage.Interface, string) {
+				featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, false)
+				store, prefix := setupStore(tCtx, nil)
 				return setupCacher(tCtx, store), prefix
 			},
 		},
