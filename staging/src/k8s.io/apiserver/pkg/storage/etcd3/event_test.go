@@ -30,6 +30,7 @@ func TestParseEvent(t *testing.T) {
 		name          string
 		etcdEvent     *clientv3.Event
 		expectedEvent *event
+		checkPrevKV   bool
 		expectedErr   string
 	}{
 		{
@@ -53,6 +54,7 @@ func TestParseEvent(t *testing.T) {
 				isDeleted: false,
 				isCreated: true,
 			},
+			checkPrevKV: true,
 			expectedErr: "",
 		},
 		{
@@ -67,7 +69,31 @@ func TestParseEvent(t *testing.T) {
 					Value:          nil,
 				},
 			},
+			checkPrevKV: true,
 			expectedErr: "etcd event received with PrevKv=nil",
+		},
+		{
+			name: "don't check prevkv",
+			etcdEvent: &clientv3.Event{
+				Type:   mvccpb.DELETE,
+				PrevKv: nil,
+				Kv: &mvccpb.KeyValue{
+					Key:            []byte("key"),
+					CreateRevision: 1,
+					ModRevision:    2,
+					Value:          nil,
+				},
+			},
+			checkPrevKV: false,
+			expectedEvent: &event{
+				key:       "key",
+				value:     nil,
+				prevValue: nil,
+				rev:       2,
+				isDeleted: true,
+				isCreated: false,
+			},
+			expectedErr: "",
 		},
 		{
 			name: "successful delete",
@@ -94,11 +120,12 @@ func TestParseEvent(t *testing.T) {
 				isDeleted: true,
 				isCreated: false,
 			},
+			checkPrevKV: true,
 			expectedErr: "",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			actualEvent, err := parseEvent(tc.etcdEvent)
+			actualEvent, err := parseEvent(tc.etcdEvent, tc.checkPrevKV)
 			if tc.expectedErr != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, tc.expectedErr)

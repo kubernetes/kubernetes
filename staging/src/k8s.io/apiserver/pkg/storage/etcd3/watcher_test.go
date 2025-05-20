@@ -313,6 +313,7 @@ func TestWatchChanSync(t *testing.T) {
 				0,
 				true,
 				false,
+				true,
 				storage.Everything)
 
 			err = w.sync()

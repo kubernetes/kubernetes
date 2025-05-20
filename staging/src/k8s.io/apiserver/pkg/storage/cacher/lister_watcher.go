@@ -35,19 +35,21 @@ import (
 
 // listerWatcher opaques storage.Interface to expose cache.ListerWatcher.
 type listerWatcher struct {
-	storage         storage.Interface
-	resourcePrefix  string
-	newListFunc     func() runtime.Object
-	contextMetadata metadata.MD
+	storage            storage.Interface
+	resourcePrefix     string
+	newListFunc        func() runtime.Object
+	contextMetadata    metadata.MD
+	watchWithoutPrevKV bool
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
-func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD) cache.ListerWatcher {
+func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListFunc func() runtime.Object, contextMetadata metadata.MD, watchWithoutPrevKV bool) cache.ListerWatcher {
 	return &listerWatcher{
-		storage:         storage,
-		resourcePrefix:  resourcePrefix,
-		newListFunc:     newListFunc,
-		contextMetadata: contextMetadata,
+		storage:            storage,
+		resourcePrefix:     resourcePrefix,
+		newListFunc:        newListFunc,
+		contextMetadata:    contextMetadata,
+		watchWithoutPrevKV: watchWithoutPrevKV,
 	}
 }
 
@@ -81,11 +83,12 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = options.AllowWatchBookmarks
 	opts := storage.ListOptions{
-		ResourceVersion:   options.ResourceVersion,
-		Predicate:         pred,
-		Recursive:         true,
-		ProgressNotify:    true,
-		SendInitialEvents: options.SendInitialEvents,
+		ResourceVersion:    options.ResourceVersion,
+		Predicate:          pred,
+		Recursive:          true,
+		ProgressNotify:     true,
+		SendInitialEvents:  options.SendInitialEvents,
+		WatchWithoutPrevKV: lw.watchWithoutPrevKV,
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {
