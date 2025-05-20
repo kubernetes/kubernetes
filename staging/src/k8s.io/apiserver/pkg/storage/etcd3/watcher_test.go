@@ -56,8 +56,27 @@ import (
 
 func TestWatch(t *testing.T) {
 	t.Run("Watch", func(t *testing.T) {
-		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestWatch(ctx, t, store)
+		ctx, store, _ := testSetup(t, withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
+		storagetesting.RunTestWatch(ctx, t, store, false)
+	})
+	t.Run("WatchWithoutPrevKVRootPrefix", func(t *testing.T) {
+		ctx, store, client := testSetup(t, withPrefix("/"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", true)))
+		recorder := storagetesting.NewWatchRecorder(client.Watcher)
+		client.Watcher = recorder
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "ns", true, recorder)
+	})
+	t.Run("WatchWithoutPrevKVClusterScoped", func(t *testing.T) {
+		ctx, store, client := testSetup(t, withPrefix("/custom/prefix"), withResourcePrefix("/pods"), withReverseKeyFunc(storagetesting.PodReverseKeyFunc("/pods", false)))
+		recorder := storagetesting.NewWatchRecorder(client.Watcher)
+		client.Watcher = recorder
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "", true, recorder)
+	})
+	t.Run("WatchWithoutPrevKVReverseError", func(t *testing.T) {
+		wantErr := errors.New("invalid resource key")
+		ctx, store, _ := testSetup(t, withPrefix("/registry"), withReverseKeyFunc(func(string) (string, string, error) {
+			return "", "", wantErr
+		}))
+		storagetesting.RunTestWatchWithoutPrevKVReverseError(ctx, t, store, wantErr)
 	})
 	t.Run("ClusterScopedWatch", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
@@ -97,7 +116,7 @@ func TestWatch(t *testing.T) {
 	})
 	t.Run("WatchDeleteEventObjectHaveLatestRV", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
-		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store)
+		storagetesting.RunTestWatchDeleteEventObjectHaveLatestRV(ctx, t, store, "test-ns", false, nil)
 	})
 	t.Run("WatchInitializationSignal", func(t *testing.T) {
 		ctx, store, _ := testSetup(t)
@@ -180,6 +199,30 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 			requestOpts: storage.ListOptions{ProgressNotify: true},
 			expectedErr: apierrors.NewInternalError(errors.New("progressNotify for watch is unsupported by the etcd storage because no newFunc was provided")),
 		},
+		{
+			name: "watch without previous values requires an object constructor",
+			setupFn: func(opts *setupOptions) {
+				opts.newFunc = nil
+				opts.reverseKeyFunc = storagetesting.PodReverseKeyFunc("/pods", true)
+			},
+			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
+			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc")),
+		},
+		{
+			name:        "watch without previous values requires a reverse key function",
+			setupFn:     func(opts *setupOptions) { opts.reverseKeyFunc = nil },
+			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
+			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a reverseKeyFunc")),
+		},
+		{
+			name: "watch without previous values requires both functions",
+			setupFn: func(opts *setupOptions) {
+				opts.newFunc = nil
+				opts.reverseKeyFunc = nil
+			},
+			requestOpts: storage.ListOptions{WatchWithoutPrevKV: true, Predicate: storage.Everything},
+			expectedErr: apierrors.NewInternalError(errors.New("watchWithoutPrevKV requires a newFunc")),
+		},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -199,6 +242,9 @@ func TestWatchErrorIncorrectConfiguration(t *testing.T) {
 			}
 			if err.Error() != scenario.expectedErr.Error() {
 				t.Fatalf("unexpected err = %v, expected = %v", err, scenario.expectedErr)
+			}
+			if !apierrors.IsInternalError(err) {
+				t.Fatalf("expected an internal error, got %v", err)
 			}
 		})
 	}
@@ -321,6 +367,7 @@ func TestWatchChanSync(t *testing.T) {
 					true,
 					false,
 					false,
+					false,
 					storage.Everything)
 
 				sync := w.syncPaginated
@@ -407,7 +454,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	kvWrapper.streamKV = unimplementedRangeStreamKV()
 	store.client.KV = kvWrapper
 
-	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, false, storage.Everything)
+	w := store.watcher.createWatchChan(origCtx, "/pods/", 0, true, false, false, false, storage.Everything)
 
 	if err := w.sync(); err != nil {
 		t.Fatalf("sync failed: %v", err)
@@ -436,7 +483,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 
 func drainSync(t *testing.T, store *store, ctx context.Context, sync func(*watchChan) error) map[string]*event {
 	t.Helper()
-	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, false, storage.Everything)
 	if err := sync(wc); err != nil {
 		t.Fatalf("sync failed: %v", err)
 	}
@@ -472,7 +519,7 @@ func TestWatchChanSyncStreamCompactionError(t *testing.T) {
 	legacyregistry.Reset()
 	t.Cleanup(legacyregistry.Reset)
 
-	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
+	wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, false, storage.Everything)
 	if err := wc.syncStreamRecursive(); !apierrors.IsResourceExpired(err) {
 		t.Fatalf("expected ResourceExpired from a compacted revision, got %T %v", err, err)
 	}
@@ -499,7 +546,7 @@ func TestWatchChanSyncStreamMetrics(t *testing.T) {
 		legacyregistry.Reset()
 		t.Cleanup(legacyregistry.Reset)
 
-		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, false, storage.Everything)
 		if err := wc.syncStreamRecursive(); err != nil {
 			t.Fatal(err)
 		}
@@ -522,7 +569,7 @@ etcd_requests_total{group="",operation="listStream",resource="pods"} 1
 		legacyregistry.Reset()
 		t.Cleanup(legacyregistry.Reset)
 
-		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, storage.Everything)
+		wc := store.watcher.createWatchChan(ctx, "/pods/", 0, true, false, false, false, storage.Everything)
 		err := wc.syncStreamRecursive()
 		if grpcstatus.Code(err) != grpccodes.Unimplemented {
 			t.Fatalf("expected Unimplemented error, got %v", err)
