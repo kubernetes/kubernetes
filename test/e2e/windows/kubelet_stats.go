@@ -250,10 +250,6 @@ func findWindowsNodes(ctx context.Context, f *framework.Framework) ([]v1.Node, e
 		}
 	}
 
-	if len(targetNodes) == 0 {
-		e2eskipper.Skipf("Could not find and ready and schedulable Windows nodes")
-	}
-
 	return targetNodes, nil
 }
 

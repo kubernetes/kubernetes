@@ -58,6 +58,10 @@ var _ = sigDescribe(feature.Windows, "[Excluded:WindowsDocker] [MinimumKubeletVe
 		nodes, err := findWindowsNodes(ctx, f)
 		framework.ExpectNoError(err, "Error finding Windows nodes")
 
+		if len(nodes) == 0 {
+			e2eskipper.Skipf("Could not find and ready and schedulable Windows nodes")
+		}
+
 		targetNode := nodes[0]
 		// reuse the node if find label contains "test/reboot-used" first
 		for _, node := range nodes {
