@@ -32,8 +32,15 @@ type Struct struct {
 
 	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListTypedefField[*]"
 	ListTypedefField []OtherTypedefStruct `json:"listTypedefField"`
+
+	// +k8s:eachVal=+k8s:validateFalse="field Struct.ListNonComparableField[*]"
+	ListNonComparableField []NonComparableStruct `json:"listNonComparableField"`
 }
 
 type OtherStruct struct{}
 
 type OtherTypedefStruct OtherStruct
+
+type NonComparableStruct struct {
+	SliceField []string `json:"sliceField"`
+}
