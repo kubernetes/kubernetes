@@ -576,14 +576,14 @@ func toCounters(counters map[string]resource.Quantity) map[string]resourceapi.Co
 }
 
 // generate a ResourceSlice object with the given parameters and one device with restricted usage
-func sliceWithOneDeviceAndRestrictedUsage(name string, nodeSelection any, pool, driver string) *resourceapi.ResourceSlice {
+func sliceWithOneDeviceAndRestrictedUsage(name string, nodeSelection any, pool, driver string) wrapResourceSlice {
 	d := device(device1, nil, nil)
 	d.Basic.UsageRestrictedToNode = ptr.To(true)
 	return slice(name, nodeSelection, pool, driver, d)
 }
 
 // generate a ResourceSlice object with the given parameters and one device with binding conditions
-func sliceWithOneDeviceAndBindingConditions(name, node, pool, driver string, bindingConditions, bindingFailureConditions []string) *resourceapi.ResourceSlice {
+func sliceWithOneDeviceAndBindingConditions(name, node, pool, driver string, bindingConditions, bindingFailureConditions []string) wrapResourceSlice {
 	slice := sliceWithOneDevice(name, node, pool, driver)
 	slice.Spec.Devices[0].Basic.BindingConditions = bindingConditions
 	slice.Spec.Devices[0].Basic.BindingFailureConditions = bindingFailureConditions
@@ -3363,7 +3363,7 @@ func TestAllocator(t *testing.T) {
 			claimsToAllocate: objects(
 				claimWithRequests(claim0, nil, request(req0, classA, 1))),
 			classes: objects(class(classA, driverA)),
-			slices:  objects(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
+			slices:  unwrap(sliceWithOneDeviceAndBindingConditions(slice1, node1, pool1, driverA, []string{"IsPrepare"}, []string{"BindingFailed"})),
 			node:    node(node1, region1),
 
 			expectResults: []any{
@@ -3383,7 +3383,7 @@ func TestAllocator(t *testing.T) {
 			},
 			claimsToAllocate: objects(claim(claim0, req0, classA)),
 			classes:          objects(class(classA, driverA)),
-			slices:           objects(sliceWithOneDeviceAndRestrictedUsage(slice1, nodeLabelSelector(planetKey, planetValueEarth), pool1, driverA)),
+			slices:           unwrap(sliceWithOneDeviceAndRestrictedUsage(slice1, nodeLabelSelector(planetKey, planetValueEarth), pool1, driverA)),
 			node:             node(node1, region1),
 			expectResults: []any{allocationResult(
 				localNodeSelector(node1),
