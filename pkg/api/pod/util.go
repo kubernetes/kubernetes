@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"errors"
 	"iter"
 	"strings"
 
@@ -1487,4 +1488,53 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
+}
+
+var (
+    ErrStaticPodServiceAccount      = errors.New("can not create static pods that reference serviceaccounts")
+    ErrStaticPodSecrets             = errors.New("can not create static pods that reference secrets")
+    ErrStaticPodConfigmaps          = errors.New("can not create static pods that reference configmaps")
+    ErrStaticPodClusterTrustBundles = errors.New("can not create static pods that reference clustertrustbundles")
+    ErrStaticPodInvalidVolumes      = errors.New("can not create static pods that reference volume mounts other than hostPath and emptyDir")
+    ErrStaticPodResourceClaims      = errors.New("can not create static pods that reference resourceclaims")
+)
+
+func HasAPIObjectReferences(pod *api.Pod) (bool, error) {
+	if pod.Spec.ServiceAccountName != "" {
+		return true, ErrStaticPodServiceAccount
+	}
+
+	hasSecrets := false
+	VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, AllContainers)
+	if hasSecrets {
+		return true, ErrStaticPodSecrets
+	}
+
+	hasConfigMaps := false
+	VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, AllContainers)
+	if hasConfigMaps {
+		return true, ErrStaticPodConfigmaps
+	}
+
+	for _, vol := range pod.Spec.Volumes {
+		if vol.VolumeSource.Projected != nil {
+			for _, src := range vol.VolumeSource.Projected.Sources {
+				if src.ClusterTrustBundle != nil {
+					return true, ErrStaticPodClusterTrustBundles
+				}
+			}
+		}
+	}
+
+	for _, v := range pod.Spec.Volumes {
+		if v.HostPath == nil && v.EmptyDir == nil {
+			return true, ErrStaticPodInvalidVolumes
+		}
+	}
+
+	if len(pod.Spec.ResourceClaims) > 0 {
+		return true, ErrStaticPodResourceClaims
+	}
+
+	return false, nil
 }

@@ -175,8 +175,8 @@ func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	_, _, err = tryDecodeSinglePod(json, noDefault)
-	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundle) {
-		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundle)
+	if !errors.Is(err, ErrStaticPodTriedToUseClusterTrustBundles) {
+		t.Errorf("Got error %q, want %q", err, ErrStaticPodTriedToUseClusterTrustBundles)
 	}
 }
 

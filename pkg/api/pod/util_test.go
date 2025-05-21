@@ -4701,3 +4701,363 @@ func TestValidateAllowPodLifecycleSleepActionZeroValue(t *testing.T) {
 		})
 	}
 }
+
+func TestHasAPIReferences(t *testing.T) {
+	tests := []struct {
+		name            string
+		pod             *api.Pod
+		expectRejection bool
+		expectedError   error
+	}{
+		{
+			name:            "Empty ServiceAccount in Static Pod",
+			pod:             &api.Pod{Spec: api.PodSpec{}},
+			expectRejection: false,
+		},
+		{
+			name:            "Non empty ServiceAccount",
+			pod:             &api.Pod{Spec: api.PodSpec{ServiceAccountName: "default"}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodServiceAccount,
+		},
+		{
+			name:            "Empty Volume list",
+			pod:             &api.Pod{Spec: api.PodSpec{Volumes: nil}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with HostPath volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-hostpath", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with EmptyDir volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-emptydir", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+			}}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty volume list with Secret volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with ConfigMap volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with GCEPersistentDisk volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-gce", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with AWSElasticBlockStore volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-aws", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with GitRepo volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with NFS volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-nfs", VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with ISCSI volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-iscsi", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Glusterfs volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with PersistentVolumeClaim",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-pvc", VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with RBD volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with FlexVolume volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Cinder volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-cinder", VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with CephFS volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-cephfs", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Flocker volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-flocker", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with DownwardAPI volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-downwardapi", VolumeSource: api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with FC volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with AzureFile volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-azurefile", VolumeSource: api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with VsphereVolume volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-vsphere", VolumeSource: api.VolumeSource{VsphereVolume: &api.VsphereVirtualDiskVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Quobyte volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-quobyte", VolumeSource: api.VolumeSource{Quobyte: &api.QuobyteVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with AzureDisk volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-azuredisk", VolumeSource: api.VolumeSource{AzureDisk: &api.AzureDiskVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with PhotonPersistentDisk volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-photon", VolumeSource: api.VolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Projected volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Portworx volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-portworx", VolumeSource: api.VolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with ScaleIO volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-scaleio", VolumeSource: api.VolumeSource{ScaleIO: &api.ScaleIOVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with StorageOS volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-storageos", VolumeSource: api.VolumeSource{StorageOS: &api.StorageOSVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with CSI volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-csi", VolumeSource: api.VolumeSource{CSI: &api.CSIVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Ephemeral volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-ephemeral", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name: "Non empty volume list with Image volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-image", VolumeSource: api.VolumeSource{Image: &api.ImageVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodInvalidVolumes,
+		},
+		{
+			name:            "No envs",
+			pod:             &api.Pod{Spec: api.PodSpec{}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty Env with value",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:  "test-env",
+								Value: "TEST_ENV_VAL",
+							},
+						},
+					},
+				},
+			}},
+			expectRejection: false,
+		},
+		{
+			name: "Non empty EnvFrom with ConfigMap",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						EnvFrom: []api.EnvFromSource{
+							{ConfigMapRef: &api.ConfigMapEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodConfigmaps,
+		},
+		{
+			name: "Non empty EnvFrom with Secret",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						EnvFrom: []api.EnvFromSource{
+							{SecretRef: &api.SecretEnvSource{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodSecrets,
+		},
+		{
+			name: "Non empty Env with ConfigMap",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:      "test-env",
+								ValueFrom: &api.EnvVarSource{ConfigMapKeyRef: &api.ConfigMapKeySelector{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+							},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodConfigmaps,
+		},
+		{
+			name: "Non empty Env with Secret",
+			pod: &api.Pod{Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test-container",
+						Env: []api.EnvVar{
+							{
+								Name:      "test-env",
+								ValueFrom: &api.EnvVarSource{SecretKeyRef: &api.SecretKeySelector{LocalObjectReference: api.LocalObjectReference{Name: "test"}}},
+							},
+						},
+					},
+				},
+			}},
+			expectRejection: true,
+			expectedError:   ErrStaticPodSecrets,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actualResult, err := HasAPIObjectReferences(test.pod)
+			if test.expectRejection != actualResult || err != test.expectedError {
+				t.Errorf("unexpected result, expected %v but got %v, expected error: %v, but got %v", test.expectRejection, actualResult, test.expectedError, err)
+			}
+		})
+	}
+}

@@ -1032,7 +1032,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			name:       "forbid create of pod referencing service account",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(sapod, nil, podKind, sapod.Namespace, sapod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        "reference a service account",
+			err:        "can not create static pods that reference serviceaccounts",
 		},
 		{
 			name:       "forbid create of pod referencing secret",
@@ -1053,10 +1053,10 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			err:        "reference clustertrustbundles",
 		},
 		{
-			name:       "forbid create of pod referencing persistentvolumeclaim",
+			name:       "forbid create of pod referencing volume mounts other than hostPath and emptyDir",
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(pvcpod, nil, podKind, pvcpod.Namespace, pvcpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        "reference persistentvolumeclaims",
+			err:        "can not create static pods that reference volume mounts other than hostPath and emptyDir",
 		},
 		{
 			name:       "forbid create of pod referencing resourceclaim",
