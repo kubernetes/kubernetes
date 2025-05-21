@@ -318,7 +318,7 @@ func TestGetConfig(t *testing.T) {
 		expectedConfig *pkiutil.CertConfig
 	}{
 		{
-			name: "encryption algorithm is set",
+			name: "encryption algorithm is set to ECDSA P256",
 			cert: &KubeadmCert{
 				creationTime: now,
 			},
@@ -332,6 +332,23 @@ func TestGetConfig(t *testing.T) {
 					NotBefore: now.Add(-backdate),
 				},
 				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
+			},
+		},
+		{
+			name: "encryption algorithm is set to ECDSA P384",
+			cert: &KubeadmCert{
+				creationTime: now,
+			},
+			cfg: &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
+				},
+			},
+			expectedConfig: &pkiutil.CertConfig{
+				Config: certutil.Config{
+					NotBefore: now.Add(-backdate),
+				},
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
 			},
 		},
 		{

@@ -347,6 +347,7 @@ func ValidateEtcd(e *kubeadm.Etcd, fldPath *field.Path) field.ErrorList {
 func ValidateEncryptionAlgorithm(algo kubeadm.EncryptionAlgorithmType, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	knownAlgorithms := sets.New(
+		kubeadm.EncryptionAlgorithmECDSAP384,
 		kubeadm.EncryptionAlgorithmECDSAP256,
 		kubeadm.EncryptionAlgorithmRSA2048,
 		kubeadm.EncryptionAlgorithmRSA3072,

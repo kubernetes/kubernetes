@@ -43,7 +43,8 @@ var (
 	rootCACert, servCert *x509.Certificate
 	rootCAKey, servKey   crypto.Signer
 
-	ecdsaKey *ecdsa.PrivateKey
+	ecdsaP256Key *ecdsa.PrivateKey
+	ecdsaP384Key *ecdsa.PrivateKey
 )
 
 func TestMain(m *testing.M) {
@@ -72,9 +73,14 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("Failed generating serving cert/key: %v", err))
 	}
 
-	ecdsaKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	ecdsaP256Key, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		panic("Could not generate ECDSA key")
+		panic("Could not generate ECDSA P256 key")
+	}
+
+	ecdsaP384Key, err = ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		panic("Could not generate ECDSA P384 key")
 	}
 
 	os.Exit(m.Run())
@@ -86,8 +92,12 @@ func TestNewCertAndKey(t *testing.T) {
 		key  crypto.Signer
 	}{
 		{
-			name: "ECDSA should succeed",
-			key:  ecdsaKey,
+			name: "ECDSA P256 should succeed",
+			key:  ecdsaP256Key,
+		},
+		{
+			name: "ECDSA P384 should succeed",
+			key:  ecdsaP384Key,
 		},
 	}
 
@@ -136,13 +146,24 @@ func TestHasServerAuth(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "has ServerAuth ECDSA",
+			name: "has ServerAuth ECDSA P256",
 			config: CertConfig{
 				Config: certutil.Config{
 					CommonName: "test",
 					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 				},
 				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP256,
+			},
+			expected: true,
+		},
+		{
+			name: "has ServerAuth ECDSA P384",
+			config: CertConfig{
+				Config: certutil.Config{
+					CommonName: "test",
+					Usages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+				},
+				EncryptionAlgorithm: kubeadmapi.EncryptionAlgorithmECDSAP384,
 			},
 			expected: true,
 		},
@@ -504,10 +525,17 @@ func TestTryLoadKeyFromDisk(t *testing.T) {
 			expected:   true,
 		},
 		{
-			desc:       "ECDSA valid path and name",
+			desc:       "ECDSA P256 valid path and name",
 			pathSuffix: "",
 			name:       "foo",
-			caKey:      ecdsaKey,
+			caKey:      ecdsaP256Key,
+			expected:   true,
+		},
+		{
+			desc:       "ECDSA P384 valid path and name",
+			pathSuffix: "",
+			name:       "foo",
+			caKey:      ecdsaP384Key,
 			expected:   true,
 		},
 	}
