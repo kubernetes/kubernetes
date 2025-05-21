@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package netlink
@@ -180,6 +181,10 @@ func (h *Handle) LinkSetGSOIPv4MaxSize(link Link, maxSize int) error {
 }
 
 func (h *Handle) LinkSetGROIPv4MaxSize(link Link, maxSize int) error {
+	return ErrNotImplemented
+}
+
+func (h *Handle) LinkSetIP6AddrGenMode(link Link, mode int) error {
 	return ErrNotImplemented
 }
 
