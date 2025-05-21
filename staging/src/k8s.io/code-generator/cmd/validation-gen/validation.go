@@ -1133,7 +1133,7 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 		"operation": mkSymbolArgs(c, operationPkgSymbols),
 	}
 	// If the type is a builtin, we can use a simpler equality check when they are not nil.
-	if isDirectComparable(validators.NonPointer(validators.NativeType(t))) {
+	if validators.IsDirectComparable(validators.NonPointer(validators.NativeType(t))) {
 		_, exprPfx, _ := getLeafTypeAndPrefixes(t)
 		targs["exprPfx"] = exprPfx
 		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && $.exprPfx$obj == $.exprPfx$oldObj)) {\n", targs)
@@ -1532,27 +1532,4 @@ func (g *fixtureTestGen) Init(c *generator.Context, w io.Writer) error {
 		sw.Do("}\n", nil)
 	}
 	return nil
-}
-
-// isDirectComparable returns true if the type is safe to compare using "==".
-// It is similar to gengo.IsComparable, but is doesn't consider Pointers
-// as comparable.
-// This would be used for validation ratcheting to check whether this type can directly be compared.
-func isDirectComparable(t *types.Type) bool {
-	switch t.Kind {
-	case types.Builtin:
-		return true
-	case types.Struct:
-		for _, f := range t.Members {
-			if !isDirectComparable(f.Type) {
-				return false
-			}
-		}
-		return true
-	case types.Array:
-		return isDirectComparable(t.Elem)
-	case types.Alias:
-		return isDirectComparable(t.Underlying)
-	}
-	return false
 }

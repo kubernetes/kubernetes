@@ -64,18 +64,6 @@ func mapOf(t *types.Type) *types.Type {
 	}
 }
 
-func arrayOf(t *types.Type) *types.Type {
-	return &types.Type{
-		Name: types.Name{
-			Package: "",
-			Name:    "[2]" + t.Name.String(),
-		},
-		Kind: types.Array,
-		Len:  2,
-		Elem: t,
-	}
-}
-
 func aliasOf(name string, t *types.Type) *types.Type {
 	return &types.Type{
 		Name: types.Name{
@@ -382,78 +370,6 @@ func TestGetLeafTypeAndPrefixes(t *testing.T) {
 		}
 		if got, want := exprPfx, tc.expectedExprPfx; got != want {
 			t.Errorf("%q: wrong expr prefix: expected %q, got %q", tc.in, want, got)
-		}
-	}
-}
-
-func TestIsDirectComparable(t *testing.T) {
-	cases := []struct {
-		in     *types.Type
-		expect bool
-	}{
-		{
-			in:     stringType,
-			expect: true,
-		}, {
-			in:     ptrTo(stringType),
-			expect: false,
-		}, {
-			in:     sliceOf(stringType),
-			expect: false,
-		}, {
-			in:     mapOf(stringType),
-			expect: false,
-		}, {
-			in:     aliasOf("s", stringType),
-			expect: true,
-		}, {
-			in: &types.Type{
-				Name: types.Name{
-					Package: "",
-					Name:    "struct_comparable_member",
-				},
-				Kind: types.Struct,
-				Members: []types.Member{
-					{
-						Name: "s",
-						Type: stringType,
-					},
-				},
-			},
-			expect: true,
-		}, {
-			in: &types.Type{
-				Name: types.Name{
-					Package: "",
-					Name:    "struct_uncomparable_member",
-				},
-				Kind: types.Struct,
-				Members: []types.Member{
-					{
-						Name: "s",
-						Type: ptrTo(stringType),
-					},
-				},
-			},
-			expect: false,
-		}, {
-			in:     arrayOf(stringType),
-			expect: true,
-		}, {
-			in:     arrayOf(aliasOf("s", stringType)),
-			expect: true,
-		}, {
-			in:     arrayOf(ptrTo(stringType)),
-			expect: false,
-		}, {
-			in:     arrayOf(mapOf(stringType)),
-			expect: false,
-		},
-	}
-
-	for _, tc := range cases {
-		if got, want := isDirectComparable(tc.in), tc.expect; got != want {
-			t.Errorf("%q: expected %v, got %v", tc.in, want, got)
 		}
 	}
 }
