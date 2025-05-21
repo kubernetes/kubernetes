@@ -142,8 +142,7 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	oldReplicaSet := old.(*apps.ReplicaSet)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
-	allErrs := appsvalidation.ValidateReplicaSet(obj.(*apps.ReplicaSet), opts)
-	allErrs = append(allErrs, appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)...)
+	allErrs := appsvalidation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)
 
 	return allErrs
 }
