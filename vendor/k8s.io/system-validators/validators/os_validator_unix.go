@@ -21,8 +21,9 @@ package system
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"golang.org/x/sys/unix"
 )
 
 var _ Validator = &OSValidator{}
@@ -39,11 +40,13 @@ func (o *OSValidator) Name() string {
 
 // Validate is part of the system.Validator interface.
 func (o *OSValidator) Validate(spec SysSpec) ([]error, []error) {
-	os, err := exec.Command("uname").CombinedOutput()
+	var utsname unix.Utsname
+	err := unix.Uname(&utsname)
 	if err != nil {
 		return nil, []error{fmt.Errorf("failed to get OS name: %w", err)}
 	}
-	if err = o.validateOS(strings.TrimSpace(string(os)), spec.OS); err != nil {
+	os := strings.TrimSpace(unix.ByteSliceToString(utsname.Sysname[:]))
+	if err = o.validateOS(os, spec.OS); err != nil {
 		return nil, []error{err}
 	}
 	return nil, nil
