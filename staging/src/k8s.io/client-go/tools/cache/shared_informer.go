@@ -266,7 +266,6 @@ type HandlerOptions struct {
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
 type SharedIndexInformer interface {
 	SharedInformer
-	// AddIndexers add indexers to the informer before it starts.
 	AddIndexers(indexers Indexers) error
 	GetIndexer() Indexer
 }
