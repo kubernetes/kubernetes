@@ -114,6 +114,62 @@ func createTestNamespace(tCtx ktesting.TContext, labels map[string]string) strin
 	return ns.Name
 }
 
+// createTestClass creates a DeviceClass with a driver name derived from the test namespace
+func createTestClass(tCtx ktesting.TContext, namespace string) (*resourceapi.DeviceClass, string) {
+	driverName := namespace + ".driver"
+	class := class.DeepCopy()
+	class.Name = namespace + ".class"
+	class.Spec.Selectors = []resourceapi.DeviceSelector{{
+		CEL: &resourceapi.CELDeviceSelector{
+			Expression: fmt.Sprintf("device.driver == %q", driverName),
+		},
+	}}
+	_, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create class")
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.Log("Cleaning up DeviceClass...")
+		err := tCtx.Client().ResourceV1beta1().DeviceClasses().Delete(tCtx, class.Name, metav1.DeleteOptions{})
+		tCtx.ExpectNoError(err, "delete class")
+	})
+
+	return class, driverName
+}
+
+// createClaim creates a claim and in the namespace.
+// The class must already exist and is used for all requests.
+func createClaim(tCtx ktesting.TContext, namespace string, suffix string, class *resourceapi.DeviceClass, claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	claim.Namespace = namespace
+	claim.Name += suffix
+	claimName := claim.Name
+	for i := range claim.Spec.Devices.Requests {
+		request := &claim.Spec.Devices.Requests[i]
+		if request.DeviceClassName != "" {
+			request.DeviceClassName = class.Name
+			continue
+		}
+		for e := range request.FirstAvailable {
+			subRequest := &request.FirstAvailable[e]
+			subRequest.DeviceClassName = class.Name
+		}
+	}
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create claim "+claimName)
+	return claim
+}
+
+// createPod create a pod in the namespace, referencing the given claim.
+func createPod(tCtx ktesting.TContext, namespace string, suffix string, claim *resourceapi.ResourceClaim, pod *v1.Pod) *v1.Pod {
+	pod = pod.DeepCopy()
+	pod.Name += suffix
+	podName := pod.Name
+	pod.Namespace = namespace
+	pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create pod "+podName)
+	return pod
+}
+
 func TestDRA(t *testing.T) {
 	// Each sub-test brings up the API server in a certain
 	// configuration. These sub-tests must run sequentially because they
@@ -453,24 +509,14 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Parallel()
 	namespace := createTestNamespace(tCtx, nil)
-	class := class.DeepCopy()
-	class.Name = namespace
-	class.Spec.Selectors = []resourceapi.DeviceSelector{{
-		CEL: &resourceapi.CELDeviceSelector{
-			Expression: fmt.Sprintf("device.driver == %q", namespace),
-		},
-	}}
-	_, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create class")
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		tCtx.Log("Cleaning up DeviceClass...")
-		err := tCtx.Client().ResourceV1beta1().DeviceClasses().Delete(tCtx, class.Name, metav1.DeleteOptions{})
-		tCtx.ExpectNoError(err, "delete class")
-	})
-	claim := claimPrioritizedList.DeepCopy()
-	claim.Namespace = namespace
-	claim.Spec.Devices.Requests[0].FirstAvailable[0].DeviceClassName = class.Name
-	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	class, _ := createTestClass(tCtx, namespace)
+	// This is allowed to fail if the feature is disabled.
+	// createClaim normally doesn't return errors because this is unusual, but we can get it indirectly.
+	claim, err := func() (claim *resourceapi.ResourceClaim, finalError error) {
+		tCtx, finalize := ktesting.WithError(tCtx, &finalError)
+		defer finalize()
+		return createClaim(tCtx, namespace, "", class, claimPrioritizedList), nil
+	}()
 
 	if !enabled {
 		require.Error(tCtx, err, "claim should have become invalid after dropping FirstAvailable")
@@ -478,30 +524,25 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	}
 
 	require.NotEmpty(tCtx, claim.Spec.Devices.Requests[0].FirstAvailable, "should store FirstAvailable")
-	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
-		startScheduler(tCtx)
+	startScheduler(tCtx)
 
-		// We could create ResourceSlices for some node with the right driver.
-		// But failing during Filter is sufficient to determine that it did
-		// not fail during PreFilter because of FirstAvailable.
-		pod := podWithClaimName.DeepCopy()
-		pod.Namespace = namespace
-		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create pod")
-		schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
-			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Type":    gomega.Equal(v1.PodScheduled),
-				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Reason":  gomega.Equal("Unschedulable"),
-				"Message": gomega.Equal("0/2 nodes are available: 2 cannot allocate all claims. still not schedulable, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."),
-			}),
-		))
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-			pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-			tCtx.ExpectNoError(err, "get pod")
-			return pod
-		}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
-	})
+	// We could create ResourceSlices for some node with the right driver.
+	// But failing during Filter is sufficient to determine that it did
+	// not fail during PreFilter because of FirstAvailable.
+	pod := createPod(tCtx, namespace, "", claim, podWithClaimName)
+	schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
+		gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"Type":    gomega.Equal(v1.PodScheduled),
+			"Status":  gomega.Equal(v1.ConditionFalse),
+			"Reason":  gomega.Equal("Unschedulable"),
+			"Message": gomega.Equal("0/2 nodes are available: 2 cannot allocate all claims. still not schedulable, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."),
+		}),
+	))
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get pod")
+		return pod
+	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
 func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featuregate.Feature) {
