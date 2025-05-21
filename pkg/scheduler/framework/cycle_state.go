@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	// ErrNotFound is the no found error message.
+	// ErrNotFound is the not found error message.
 	ErrNotFound = errors.New("not found")
 )
 
