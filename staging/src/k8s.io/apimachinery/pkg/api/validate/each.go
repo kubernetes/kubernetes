@@ -29,16 +29,30 @@ import (
 type CompareFunc[T any] func(T, T) bool
 
 // EachSliceVal validates each element of newSlice with the specified
-// validation function.  The comparison function is used to find the
-// corresponding value in oldSlice.  The value-type of the slices is assumed to
-// not be nilable.
+// validation function.
+// It uses the match function to find corresponding values in oldSlice, which can perform
+// either full or partial comparison (e.g., matching on specific struct fields).
+// For update operations, it implements validation ratcheting by skipping validation
+// when the old value exists and either:
+//   - The match function provides full comparison (equiv is nil)
+//   - The equiv function confirms the values are equivalent (either directly or semantically)
+//
+// The equiv function provides equality comparison when match uses partial comparison.
+// The value-type of the slices must be non-nilable.
 func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
-	cmp CompareFunc[T], validator ValidateFunc[*T]) field.ErrorList {
+	match, equiv CompareFunc[T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
 	for i, val := range newSlice {
 		var old *T
-		if cmp != nil && len(oldSlice) > 0 {
-			old = lookup(oldSlice, val, cmp)
+		if match != nil && len(oldSlice) > 0 {
+			old = lookup(oldSlice, val, match)
+		}
+		// If the operation is an update, for validation ratcheting, skip re-validating if the old
+		// value is present and one of the following is true:
+		// 1. The equiv function is nil, indicating that the match is full comparison.
+		// 2. The old value is equal to the new value.
+		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, *old)) {
+			continue
 		}
 		errs = append(errs, validator(ctx, op, fldPath.Index(i), &val, old)...)
 	}

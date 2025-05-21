@@ -297,39 +297,54 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	}
 
 	for _, vfn := range validations.Functions {
-		var cmpArg any = Literal("nil")
-		if listMetadata != nil {
-			if listMetadata.declaredAsMap {
-				cmpFn := FunctionLiteral{
-					Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
-					Results:    []ParamResult{{"", types.Bool}},
-				}
-				buf := strings.Builder{}
-				buf.WriteString("return ")
-				// Note: this does not handle pointer fields, which are not
-				// supposed to be used as listMap keys.
-				for i, fld := range listMetadata.keyFields {
-					if i > 0 {
-						buf.WriteString(" && ")
-					}
-					buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
-				}
-				cmpFn.Body = buf.String()
-				cmpArg = cmpFn
-			} else if listMetadata.declaredAsSet {
-				// Emit the cmpArg as a simple comparison when possible.
-				// Slices and maps are not comparable, and structs might hold
-				// pointer fields, which are directly comparable but not what we need.
-				//
-				// Note: This compares the pointee, not the pointer itself.
-				if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
-					cmpArg = Identifier(validateDirectEqual)
-				} else {
-					cmpArg = Identifier(validateSemanticDeepEqual)
-				}
+		// matchArg is the function that is used to lookup the correlated element in the old list.
+		var matchArg any = Literal("nil")
+		// equivArg is the function that is used to compare the correlated elements in the old and new lists.
+		// It would be "nil" if the matchArg is a full comparison function.
+		var equivArg any = Literal("nil")
+		// directComparable is used to determine whether we can use the direct
+		// comparison operator "==" or need to use the semantic DeepEqual when
+		// looking up and comparing correlated list elements for validation ratcheting.
+		directComparable := IsDirectComparable(NonPointer(NativeType(t.Elem)))
+		switch {
+		case listMetadata != nil && listMetadata.declaredAsMap:
+			// Emit the comparison by keys when listType=map
+			matchFn := FunctionLiteral{
+				Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
+				Results:    []ParamResult{{"", types.Bool}},
 			}
+			buf := strings.Builder{}
+			buf.WriteString("return ")
+			// Note: this does not handle pointer fields, which are not
+			// supposed to be used as listMap keys.
+			for i, fld := range listMetadata.keyFields {
+				if i > 0 {
+					buf.WriteString(" && ")
+				}
+				buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
+			}
+			matchFn.Body = buf.String()
+			matchArg = matchFn
+			if directComparable {
+				equivArg = Identifier(validateDirectEqual)
+			} else {
+				equivArg = Identifier(validateSemanticDeepEqual)
+			}
+		case directComparable:
+			// Emit the matchArg as a simple comparison when possible.
+			// Slices and maps are not comparable, and structs might hold
+			// pointer fields, which are directly comparable but not what we need.
+			//
+			// Note: This compares the pointee, not the pointer itself.
+			matchArg = Identifier(validateDirectEqual)
+
+		default:
+			// Emit semantic comparison by default when the element cannot be
+			// directly compared.
+			matchArg = Identifier(validateSemanticDeepEqual)
+
 		}
-		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, cmpArg, WrapperFunction{vfn, t.Elem})
+		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
 	}
 
