@@ -1491,12 +1491,12 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 }
 
 var (
-    ErrStaticPodServiceAccount      = errors.New("can not create static pods that reference serviceaccounts")
-    ErrStaticPodSecrets             = errors.New("can not create static pods that reference secrets")
-    ErrStaticPodConfigmaps          = errors.New("can not create static pods that reference configmaps")
-    ErrStaticPodClusterTrustBundles = errors.New("can not create static pods that reference clustertrustbundles")
-    ErrStaticPodInvalidVolumes      = errors.New("can not create static pods that reference volume mounts other than hostPath and emptyDir")
-    ErrStaticPodResourceClaims      = errors.New("can not create static pods that reference resourceclaims")
+	ErrStaticPodServiceAccount      = errors.New("can not create static pods that reference serviceaccounts")
+	ErrStaticPodSecrets             = errors.New("can not create static pods that reference secrets")
+	ErrStaticPodConfigmaps          = errors.New("can not create static pods that reference configmaps")
+	ErrStaticPodClusterTrustBundles = errors.New("can not create static pods that reference clustertrustbundles")
+	ErrStaticPodInvalidVolumes      = errors.New("can not create static pods that reference volume mounts other than hostPath and emptyDir")
+	ErrStaticPodResourceClaims      = errors.New("can not create static pods that reference resourceclaims")
 )
 
 func HasAPIObjectReferences(pod *api.Pod) (bool, error) {

@@ -17,6 +17,7 @@ limitations under the License.
 package pod
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -5055,7 +5056,7 @@ func TestHasAPIReferences(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actualResult, err := HasAPIObjectReferences(test.pod)
-			if test.expectRejection != actualResult || err != test.expectedError {
+			if test.expectRejection != actualResult || !errors.Is(err, test.expectedError) {
 				t.Errorf("unexpected result, expected %v but got %v, expected error: %v, but got %v", test.expectRejection, actualResult, test.expectedError, err)
 			}
 		})
