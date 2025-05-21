@@ -80,7 +80,7 @@ func NewPreferences() PreferencesHandler {
 type aliasing struct {
 	appendArgs  []string
 	prependArgs []string
-	flags       []config.CommandOverrideFlag
+	flags       []config.CommandOptionDefault
 	command     *cobra.Command
 }
 
@@ -133,7 +133,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 		return nil
 	}
 
-	for _, c := range kuberc.Overrides {
+	for _, c := range kuberc.Defaults {
 		parsedCmds := strings.Fields(c.Command)
 		overrideCmd, _, err := rootCmd.Find(parsedCmds)
 		if err != nil {
@@ -158,7 +158,7 @@ func (p *Preferences) applyOverrides(rootCmd *cobra.Command, kuberc *config.Pref
 			}
 		})
 
-		for _, fl := range c.Flags {
+		for _, fl := range c.Options {
 			existingFlag := cmd.Flag(fl.Name)
 			if existingFlag == nil {
 				return fmt.Errorf("invalid flag %s for command %s", fl.Name, c.Command)
@@ -227,7 +227,7 @@ func (p *Preferences) applyAliases(rootCmd *cobra.Command, kuberc *config.Prefer
 		aliasArgs = &aliasing{
 			prependArgs: alias.PrependArgs,
 			appendArgs:  alias.AppendArgs,
-			flags:       alias.Flags,
+			flags:       alias.Options,
 			command:     aliasCmd,
 		}
 		break
@@ -424,7 +424,7 @@ func searchInArgs(flagName string, shorthand string, allShorthands map[string]st
 }
 
 func validate(plugin *config.Preference) error {
-	validateFlag := func(flags []config.CommandOverrideFlag) error {
+	validateFlag := func(flags []config.CommandOptionDefault) error {
 		for _, flag := range flags {
 			if strings.HasPrefix(flag.Name, "-") {
 				return fmt.Errorf("flag name %s should be in long form without dashes", flag.Name)
@@ -438,7 +438,7 @@ func validate(plugin *config.Preference) error {
 			return fmt.Errorf("invalid alias name, can only include alphabetical characters")
 		}
 
-		if err := validateFlag(alias.Flags); err != nil {
+		if err := validateFlag(alias.Options); err != nil {
 			return err
 		}
 
@@ -448,8 +448,8 @@ func validate(plugin *config.Preference) error {
 		aliases[alias.Name] = struct{}{}
 	}
 
-	for _, override := range plugin.Overrides {
-		if err := validateFlag(override.Flags); err != nil {
+	for _, override := range plugin.Defaults {
+		if err := validateFlag(override.Options); err != nil {
 			return err
 		}
 	}
