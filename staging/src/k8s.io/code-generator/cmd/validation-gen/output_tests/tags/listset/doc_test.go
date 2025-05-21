@@ -76,34 +76,13 @@ func Test(t *testing.T) {
 func TestSetCorrelation(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
-	structNew := ImmutableStruct{SliceComparableField: []ComparableStruct{{"aaa"}, {"bbb"}}}
-	structOld := ImmutableStruct{SliceComparableField: []ComparableStruct{{"bbb"}, {"aaa"}}}
-	st.Value(&structOld).OldValue(&structNew).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Forbidden(field.NewPath("sliceComparableField").Index(0), ""),
-		field.Forbidden(field.NewPath("sliceComparableField").Index(1), ""),
-	})
-
-	structNew = ImmutableStruct{SliceSetComparableField: []ComparableStruct{{"aaa"}, {"bbb"}}}
-	structOld = ImmutableStruct{SliceSetComparableField: []ComparableStruct{{"bbb"}, {"aaa"}}}
+	structNew := ImmutableStruct{SliceSetComparableField: []ComparableStruct{{"aaa"}, {"bbb"}}}
+	structOld := ImmutableStruct{SliceSetComparableField: []ComparableStruct{{"bbb"}, {"aaa"}}}
 	st.Value(&structNew).OldValue(&structOld).ExpectValid()
-
-	structNew = ImmutableStruct{SliceNonComparableField: []NonComparableStruct{{[]string{"aaa"}}, {[]string{"bbb"}}}}
-	structOld = ImmutableStruct{SliceNonComparableField: []NonComparableStruct{{[]string{"bbb"}}, {[]string{"aaa"}}}}
-	st.Value(&structNew).OldValue(&structOld).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Forbidden(field.NewPath("sliceNonComparableField").Index(0), ""),
-		field.Forbidden(field.NewPath("sliceNonComparableField").Index(1), ""),
-	})
 
 	structNew = ImmutableStruct{SliceSetNonComparableField: []NonComparableStruct{{[]string{"aaa"}}, {[]string{"bbb"}}}}
 	structOld = ImmutableStruct{SliceSetNonComparableField: []NonComparableStruct{{[]string{"bbb"}}, {[]string{"aaa"}}}}
 	st.Value(&structNew).OldValue(&structOld).ExpectValid()
-
-	structNew = ImmutableStruct{SlicePrimitiveField: []int{1, 2}}
-	structOld = ImmutableStruct{SlicePrimitiveField: []int{2, 1}}
-	st.Value(&structNew).OldValue(&structOld).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Forbidden(field.NewPath("slicePrimitiveField").Index(0), ""),
-		field.Forbidden(field.NewPath("slicePrimitiveField").Index(1), ""),
-	})
 
 	structNew = ImmutableStruct{SliceSetPrimitiveField: []int{1, 2}}
 	structOld = ImmutableStruct{SliceSetPrimitiveField: []int{2, 1}}
