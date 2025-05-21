@@ -326,7 +326,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 				return nil // no changes
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field sliceField")...)
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_S)...)
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, Validate_S)...)
 			return
 		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *StructSlice) []S { return oldObj.SliceField }))...)
 
