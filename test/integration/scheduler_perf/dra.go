@@ -239,7 +239,8 @@ func resourceSlice(driverName, nodeName string, capacity int) *resourceapi.Resou
 						"memory": {Value: resource.MustParse("1Gi")},
 					},
 					// These fields are only used when the "BindingConditions" feature gate is enabled.
-					// When the feature gate is off, these fields are stripped to ensure backward compatibility.
+					// When the feature gate is off, these fields are stripped, which ensures that other tests continue to work as before without them.
+					// Should DRABindingConditions become enabled unconditionally, a way of generating slices differently for different tests will be needed.
 					UsageRestrictedToNode:    ptr.To(true),
 					BindingConditions:        []string{"DeviceAttached"},
 					BindingFailureConditions: []string{"AttachmentFailed"},
