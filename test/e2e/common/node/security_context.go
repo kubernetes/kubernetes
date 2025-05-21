@@ -969,7 +969,7 @@ var _ = SIGDescribe("User Namespaces for Pod Security Standards [LinuxOnly]", fu
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 
 	ginkgo.Context("with UserNamespacesSupport and UserNamespacesPodSecurityStandards enabled", func() {
-		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, func(ctx context.Context) {
+		f.It("should allow pod", feature.UserNamespacesPodSecurityStandards, framework.WithFeatureGate(features.UserNamespacesSupport), framework.WithFeatureGate(features.UserNamespacesPodSecurityStandards), func(ctx context.Context) {
 			name := "pod-user-namespaces-pss-" + string(uuid.NewUUID())
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
