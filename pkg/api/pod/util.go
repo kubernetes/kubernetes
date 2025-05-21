@@ -1517,8 +1517,8 @@ func HasAPIObjectReferences(pod *api.Pod) (bool, error) {
 	}
 
 	for _, vol := range pod.Spec.Volumes {
-		if vol.VolumeSource.Projected != nil {
-			for _, src := range vol.VolumeSource.Projected.Sources {
+		if vol.Projected != nil {
+			for _, src := range vol.Projected.Sources {
 				if src.ClusterTrustBundle != nil {
 					return true, ErrStaticPodClusterTrustBundles
 				}
