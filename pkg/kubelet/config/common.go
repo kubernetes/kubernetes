@@ -110,8 +110,8 @@ type defaultFunc func(pod *api.Pod) error
 // A static pod tried to use a resource claim.
 
 var (
-    ErrStaticPodTriedToUseClusterTrustBundles = podutil.ErrStaticPodClusterTrustBundles
-    ErrStaticPodTriedToUseResourceClaims      = podutil.ErrStaticPodResourceClaims
+	ErrStaticPodTriedToUseClusterTrustBundles = podutil.ErrStaticPodClusterTrustBundles
+	ErrStaticPodTriedToUseResourceClaims      = podutil.ErrStaticPodResourceClaims
 )
 
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
