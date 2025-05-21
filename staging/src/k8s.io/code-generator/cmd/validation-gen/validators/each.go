@@ -103,7 +103,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 		// comparable but not what we need.
 		//
 		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-		if NonPointer(NativeType(t.Elem)).Kind == types.Builtin {
+		if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
 			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByCompare)}}, nil
 		}
 		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByReflect)}}, nil
@@ -322,7 +322,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 				// pointer fields, which are directly comparable but not what we need.
 				//
 				// Note: This compares the pointee, not the pointer itself.
-				if NonPointer(NativeType(t.Elem)).Kind == types.Builtin {
+				if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
 					cmpArg = Identifier(validateDirectEqual)
 				} else {
 					cmpArg = Identifier(validateSemanticDeepEqual)
