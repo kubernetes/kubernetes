@@ -321,7 +321,7 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 	case *Sfq:
 		opt := nl.TcSfqQoptV1{}
 		opt.TcSfqQopt.Quantum = qdisc.Quantum
-		opt.TcSfqQopt.Perturb = int32(qdisc.Perturb)
+		opt.TcSfqQopt.Perturb = qdisc.Perturb
 		opt.TcSfqQopt.Limit = qdisc.Limit
 		opt.TcSfqQopt.Divisor = qdisc.Divisor
 
@@ -683,7 +683,7 @@ func parseSfqData(qdisc Qdisc, value []byte) error {
 	sfq := qdisc.(*Sfq)
 	opt := nl.DeserializeTcSfqQoptV1(value)
 	sfq.Quantum = opt.TcSfqQopt.Quantum
-	sfq.Perturb = uint8(opt.TcSfqQopt.Perturb)
+	sfq.Perturb = opt.TcSfqQopt.Perturb
 	sfq.Limit = opt.TcSfqQopt.Limit
 	sfq.Divisor = opt.TcSfqQopt.Divisor
 
