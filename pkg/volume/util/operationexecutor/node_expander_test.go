@@ -128,45 +128,10 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:       resource.MustParse("2G"),
 		},
 		{
-<<<<<<< HEAD
 			name:                          "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
 			pvc:                           addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
 			pv:                            getTestPV("test-vol0", "2G"),
 			recoverVolumeExpansionFailure: true,
-
-			expectedResizeStatus:     "",
-			expectResizeCall:         true,
-			assumeResizeOpAsFinished: true,
-			expectFinalErrors:        false,
-			expectedStatusSize:       resource.MustParse("2G"),
-		},
-		{
-			name:                          "RWX pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, reize_op=unsupported",
-			pvc:                           addAccessMode(getTestPVC(volumetesting.FailWithUnSupportedVolumeName, "2G", "2G", "2G", nil), v1.ReadWriteMany),
-			pv:                            getTestPV(volumetesting.FailWithUnSupportedVolumeName, "2G"),
-			recoverVolumeExpansionFailure: true,
-			expectError:                   false,
-			expectedResizeStatus:          "",
-			expectResizeCall:              false,
-			assumeResizeOpAsFinished:      true,
-			expectFinalErrors:             false,
-			expectedStatusSize:            resource.MustParse("2G"),
-		},
-		{
-			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, featuregate=disabled",
-			pvc:                           getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: false,
-||||||| 59526cd4867
-			name: "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
-			pvc:  addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
-			pv:   getTestPV("test-vol0", "2G"),
-=======
-			name:                          "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize",
-			pvc:                           addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany),
-			pv:                            getTestPV("test-vol0", "2G"),
-			recoverVolumeExpansionFailure: true,
->>>>>>> v1.32.5
 
 			expectedResizeStatus:     "",
 			expectResizeCall:         true,
