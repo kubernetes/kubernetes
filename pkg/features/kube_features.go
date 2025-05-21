@@ -233,7 +233,7 @@ const (
 
 	// owner: @KobayashiD27
 	// kep: http://kep.k8s.io/5007
-	// alpha: v1.33
+	// alpha: v1.34
 	//
 	// Enables support for delaying the binding of pods
 	// which depend on devices with binding conditions.
@@ -1164,7 +1164,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	DRADeviceBindingConditions: {
-		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRADeviceTaints: {
