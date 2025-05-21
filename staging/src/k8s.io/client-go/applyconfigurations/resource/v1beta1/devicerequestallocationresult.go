@@ -21,12 +21,15 @@ package v1beta1
 // DeviceRequestAllocationResultApplyConfiguration represents a declarative configuration of the DeviceRequestAllocationResult type for use
 // with apply.
 type DeviceRequestAllocationResultApplyConfiguration struct {
-	Request     *string                              `json:"request,omitempty"`
-	Driver      *string                              `json:"driver,omitempty"`
-	Pool        *string                              `json:"pool,omitempty"`
-	Device      *string                              `json:"device,omitempty"`
-	AdminAccess *bool                                `json:"adminAccess,omitempty"`
-	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
+	Request                  *string                              `json:"request,omitempty"`
+	Driver                   *string                              `json:"driver,omitempty"`
+	Pool                     *string                              `json:"pool,omitempty"`
+	Device                   *string                              `json:"device,omitempty"`
+	AdminAccess              *bool                                `json:"adminAccess,omitempty"`
+	Tolerations              []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
+	BindingConditions        []string                             `json:"bindingConditions,omitempty"`
+	BindingFailureConditions []string                             `json:"bindingFailureConditions,omitempty"`
+	BindingTimeoutSeconds    *int64                               `json:"bindingTimeoutSeconds,omitempty"`
 }
 
 // DeviceRequestAllocationResultApplyConfiguration constructs a declarative configuration of the DeviceRequestAllocationResult type for use with
@@ -85,5 +88,33 @@ func (b *DeviceRequestAllocationResultApplyConfiguration) WithTolerations(values
 		}
 		b.Tolerations = append(b.Tolerations, *values[i])
 	}
+	return b
+}
+
+// WithBindingConditions adds the given value to the BindingConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingConditions field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithBindingConditions(values ...string) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		b.BindingConditions = append(b.BindingConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingFailureConditions adds the given value to the BindingFailureConditions field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BindingFailureConditions field.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithBindingFailureConditions(values ...string) *DeviceRequestAllocationResultApplyConfiguration {
+	for i := range values {
+		b.BindingFailureConditions = append(b.BindingFailureConditions, values[i])
+	}
+	return b
+}
+
+// WithBindingTimeoutSeconds sets the BindingTimeoutSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BindingTimeoutSeconds field is set to the value of the last call.
+func (b *DeviceRequestAllocationResultApplyConfiguration) WithBindingTimeoutSeconds(value int64) *DeviceRequestAllocationResultApplyConfiguration {
+	b.BindingTimeoutSeconds = &value
 	return b
 }
