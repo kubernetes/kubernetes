@@ -23,6 +23,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"sync"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -54,6 +55,15 @@ type Allocator struct {
 	classLister      deviceClassLister
 	slices           []*resourceapi.ResourceSlice
 	celCache         *cel.Cache
+
+	// allocationAttemptsByClaim collects the number of different permutations
+	// of devices that was attempted before succeeding or failing to allocate
+	// devices for a claim.
+	// The key in the map is the index of the claim in claimsToAllocate and
+	// the value is the number of permutations.
+	// Access to the map must be syncronized.
+	allocationAttemptsByClaim map[int]int64
+	mutex                     sync.RWMutex
 }
 
 type Features struct {
@@ -76,12 +86,13 @@ func NewAllocator(ctx context.Context,
 	celCache *cel.Cache,
 ) (*Allocator, error) {
 	return &Allocator{
-		features:         features,
-		claimsToAllocate: claimsToAllocate,
-		allocatedDevices: allocatedDevices,
-		classLister:      classLister,
-		slices:           slices,
-		celCache:         celCache,
+		features:                  features,
+		claimsToAllocate:          claimsToAllocate,
+		allocatedDevices:          allocatedDevices,
+		classLister:               classLister,
+		slices:                    slices,
+		celCache:                  celCache,
+		allocationAttemptsByClaim: make(map[int]int64),
 	}, nil
 }
 
@@ -371,6 +382,28 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 	}
 
 	return result, nil
+}
+
+// Stats shows statistics from the allocation process.
+type Stats struct {
+	// AllocationAttemptsByClaim counts the number of allocation attempts per claim.
+	// We count every combination of devices that were attempted in order to satisfy
+	// the claim as an allocation attempt.
+	AllocationAttemptsByClaim map[string]int64
+}
+
+func (a *Allocator) GetStats() Stats {
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
+
+	allocationAttemptsByClaim := make(map[string]int64)
+	for claimIndex, attemptsForClaim := range a.allocationAttemptsByClaim {
+		claimName := a.claimsToAllocate[claimIndex].Name
+		allocationAttemptsByClaim[claimName] = attemptsForClaim
+	}
+	return Stats{
+		AllocationAttemptsByClaim: allocationAttemptsByClaim,
+	}
 }
 
 func (a *allocator) validateDeviceRequest(request requestAccessor, parentRequest requestAccessor, requestKey requestIndices, pools []*Pool) (requestData, error) {
@@ -726,7 +759,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		// Keep track of whether all attempts to do allocation with the
 		// subrequests results in the allocation result limit exceeded.
 		// If so, there is no need to make attempts with other devices
-		// the in the previous request (if any).
+		// in the previous request (if any), except when
+		// it is a firstAvailable request where some sub-requests
+		// need less devices than others.
 		allAllocationExceeded := true
 		for subRequestIndex := 0; ; subRequestIndex++ {
 			nextSubRequestKey := requestKey
@@ -783,6 +818,8 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 
 	// We already know how many devices per request are needed.
 	if r.deviceIndex >= requestData.numDevices {
+		// We have successfully allocated devices for this request.
+		alloc.incAllocationAttempt(r.claimIndex, r.requestIndex)
 		// Done with request, continue with next one. We have completed the work for
 		// the request or subrequest, so we can no longer be allocating devices for
 		// a subrequest.
@@ -801,6 +838,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 	// don't want to double count any devices already allocated for the current request.
 	numDevicesAfterAlloc := len(alloc.result[r.claimIndex].devices) + requestData.numDevices - r.deviceIndex
 	if numDevicesAfterAlloc > resourceapi.AllocationResultsMaxSize {
+		// Since we reached the allocation max result size, this allocation attempt failed, so
+		// we need to count it as an attempt.
+		alloc.incAllocationAttempt(r.claimIndex, r.requestIndex)
 		// Return a special error so we can identify this situation in the
 		// callers and do more aggressive backtracking.
 		return false, errAllocationResultMaxSizeExceeded
@@ -816,6 +856,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 			return false, err
 		}
 		if !success {
+			alloc.incAllocationAttempt(r.claimIndex, r.requestIndex)
 			// The order in which we allocate "all" devices doesn't matter,
 			// so we only try with the one which was up next. If we couldn't
 			// get all of them, then there is no solution and we have to stop.
@@ -839,6 +880,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		return done, nil
 	}
 
+	// Identify situations where there are no available devices that can
+	// be allocated.
+	var allocatableDeviceFound bool
 	// We need to find suitable devices.
 	for _, pool := range alloc.pools {
 		// If the pool is not valid, then fail now. It's okay when pools of one driver
@@ -872,6 +916,8 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 					continue
 				}
 
+				// We have found at least one device that are eligible.
+				allocatableDeviceFound = true
 				// Finally treat as allocated and move on to the next device.
 				device := deviceWithID{
 					id:    deviceID,
@@ -883,6 +929,9 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 					return false, err
 				}
 				if !allocated {
+					// Since the device couldn't be allocated, we need to try another
+					// set of devices.
+					alloc.incAllocationAttempt(r.claimIndex, r.requestIndex)
 					// In use or constraint violated...
 					alloc.logger.V(7).Info("Device not usable", "device", deviceID)
 					continue
@@ -916,8 +965,25 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 		}
 	}
 
+	// If no none was found, we have allocated all eligible devices without
+	// finding a working solution. We will backtrack and try them in different
+	// order, since allocating devices differently across requests and claims
+	// might produce a working solution. We capture this as an allocation attempt
+	// for the stats.
+	if !allocatableDeviceFound {
+		alloc.incAllocationAttempt(r.claimIndex, r.requestIndex)
+	}
 	// If we get here without finding a solution, then there is none.
 	return false, nil
+}
+
+func (alloc *allocator) incAllocationAttempt(claimIndex, requestIndex int) {
+	alloc.mutex.Lock()
+	defer alloc.mutex.Unlock()
+	if _, ok := alloc.allocationAttemptsByClaim[claimIndex]; !ok {
+		alloc.allocationAttemptsByClaim[claimIndex] = 0
+	}
+	alloc.allocationAttemptsByClaim[claimIndex]++
 }
 
 // isSelectable checks whether a device satisfies the request and class selectors.
