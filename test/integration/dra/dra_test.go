@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -221,10 +223,14 @@ func TestDRA(t *testing.T) {
 			}
 			apiServerFlags = append(apiServerFlags, "--runtime-config="+strings.Join(runtimeConfigs, ","))
 			server := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, apiServerFlags, etcdOptions)
-			tCtx.Cleanup(server.TearDownFn)
+			tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+				tCtx.Log("Stopping the apiserver...")
+				server.TearDownFn()
+			})
 			tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
 
 			createNodes(tCtx)
+			tCtx = prepareScheduler(tCtx)
 
 			tc.f(tCtx)
 		})
@@ -281,20 +287,83 @@ func createNodes(tCtx ktesting.TContext) {
 	})
 }
 
-func startScheduler(tCtx ktesting.TContext) {
-	// Run scheduler with default configuration.
-	tCtx.Log("Scheduler starting...")
-	schedulerCtx := klog.NewContext(tCtx, klog.LoggerWithName(tCtx.Logger(), "scheduler"))
-	schedulerCtx, cancel := context.WithCancelCause(schedulerCtx)
-	_, informerFactory := util.StartScheduler(schedulerCtx, tCtx.Client(), tCtx.RESTConfig(), newDefaultSchedulerComponentConfig(tCtx), nil)
-	// Stop clients of the apiserver before stopping the apiserver itself,
-	// otherwise it delays its shutdown.
-	tCtx.Cleanup(informerFactory.Shutdown)
-	tCtx.Cleanup(func() {
-		tCtx.Log("Stoping scheduler...")
-		cancel(errors.New("test is done"))
-	})
+// prepareScheduler returns a TContext which can be passed to startScheduler
+// to actually start the scheduler when there is a demand for it.
+//
+// Under the hood, schedulerSingleton ensures that at most one scheduler
+// instance is created and tears it down when the last test using it is
+// done. This could lead to starting and stopping it multiple times, but in
+// practice tests start together in parallel and share a single instance.
+func prepareScheduler(tCtx ktesting.TContext) ktesting.TContext {
+	scheduler := &schedulerSingleton{
+		rootCtx: tCtx,
+	}
+
+	return ktesting.WithValue(tCtx, schedulerKey, scheduler)
 }
+
+func startScheduler(tCtx ktesting.TContext) {
+	value := tCtx.Value(schedulerKey)
+	if value == nil {
+		tCtx.Fatal("internal error: startScheduler without a prior prepareScheduler call")
+	}
+	scheduler := value.(*schedulerSingleton)
+	scheduler.start(tCtx)
+}
+
+type schedulerSingleton struct {
+	rootCtx ktesting.TContext
+
+	mutex           sync.Mutex
+	usageCount      int
+	informerFactory informers.SharedInformerFactory
+	cancel          func(err error)
+}
+
+func (scheduler *schedulerSingleton) start(tCtx ktesting.TContext) {
+	scheduler.mutex.Lock()
+	defer scheduler.mutex.Unlock()
+
+	scheduler.usageCount++
+	tCtx.CleanupCtx(scheduler.stop)
+	if scheduler.usageCount > 1 {
+		// Already started earlier.
+		return
+	}
+
+	// Run scheduler with default configuration. This must use the root context because
+	// the per-test tCtx passed to start will get canceled once the test which triggered
+	// starting the scheduler is done.
+	schedulerCtx := scheduler.rootCtx
+	schedulerCtx.Logf("Starting the scheduler for test %s...", tCtx.Name())
+	ctx := klog.NewContext(schedulerCtx, klog.LoggerWithName(schedulerCtx.Logger(), "scheduler"))
+	ctx, scheduler.cancel = context.WithCancelCause(ctx)
+	_, scheduler.informerFactory = util.StartScheduler(ctx, schedulerCtx.Client(), schedulerCtx.RESTConfig(), newDefaultSchedulerComponentConfig(schedulerCtx), nil)
+	schedulerCtx.Logf("Started the scheduler for test %s.", tCtx.Name())
+}
+
+func (scheduler *schedulerSingleton) stop(tCtx ktesting.TContext) {
+	scheduler.mutex.Lock()
+	defer scheduler.mutex.Unlock()
+
+	scheduler.usageCount--
+	if scheduler.usageCount > 0 {
+		// Still in use by some other test.
+		return
+	}
+
+	scheduler.rootCtx.Logf("Stopping the scheduler after test %s...", tCtx.Name())
+	if scheduler.cancel != nil {
+		scheduler.cancel(errors.New("test is done"))
+	}
+	if scheduler.informerFactory != nil {
+		scheduler.informerFactory.Shutdown()
+	}
+}
+
+type schedulerKeyType int
+
+var schedulerKey schedulerKeyType
 
 func newDefaultSchedulerComponentConfig(tCtx ktesting.TContext) *config.KubeSchedulerConfiguration {
 	gvk := kubeschedulerconfigv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
@@ -394,6 +463,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	_, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create class")
 	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.Log("Cleaning up DeviceClass...")
 		err := tCtx.Client().ResourceV1beta1().DeviceClasses().Delete(tCtx, class.Name, metav1.DeleteOptions{})
 		tCtx.ExpectNoError(err, "delete class")
 	})
@@ -438,7 +508,8 @@ func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featu
 	tCtx.Parallel()
 
 	tCtx = ktesting.WithTimeout(tCtx, 30*time.Second, "test timed out")
-	driverName := "dra.example.com"
+	namespace := createTestNamespace(tCtx, nil)
+	driverName := namespace + ".example.com"
 	poolName := "global"
 	resources := &resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{
