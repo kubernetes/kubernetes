@@ -190,7 +190,7 @@ func (f *fakeCRPlugin) Name() string {
 	return "fakeCRPlugin"
 }
 
-func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (f *fakeCRPlugin) Filter(_ context.Context, _ framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, "always fail")
 }
 
@@ -441,7 +441,7 @@ func (*firstFailBindPlugin) Name() string {
 	return "firstFailBindPlugin"
 }
 
-func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodename string) *framework.Status {
+func (p *firstFailBindPlugin) Bind(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodename string) *framework.Status {
 	if p.counter == 0 {
 		// fail in the first Bind call.
 		p.counter++
@@ -572,7 +572,7 @@ func (p *fakePermitPlugin) Name() string {
 	return fakePermitPluginName
 }
 
-func (p *fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
+func (p *fakePermitPlugin) Permit(ctx context.Context, state framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
 	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
 }
 

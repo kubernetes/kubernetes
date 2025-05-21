@@ -19,6 +19,8 @@ package framework
 import (
 	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 type fakeData struct {
@@ -36,8 +38,8 @@ var key StateKey = "fakedata_key"
 
 // createCycleStateWithFakeData creates *CycleState with fakeData.
 // The given data is used in stored fakeData.
-func createCycleStateWithFakeData(data string, recordPluginMetrics bool) *CycleState {
-	c := NewCycleState()
+func createCycleStateWithFakeData(data string, recordPluginMetrics bool) *CycleStateImpl {
+	c := &CycleStateImpl{}
 	c.Write(key, &fakeData{
 		data: data,
 	})
@@ -47,7 +49,7 @@ func createCycleStateWithFakeData(data string, recordPluginMetrics bool) *CycleS
 
 // isCycleStateEqual returns whether two CycleState, which has fakeData in storage, is equal or not.
 // And if they are not equal, returns message which shows why not equal.
-func isCycleStateEqual(a, b *CycleState) (bool, string) {
+func isCycleStateImplEqual(a, b *CycleStateImpl) (bool, string) {
 	if a == nil && b == nil {
 		return true, ""
 	}
@@ -57,6 +59,12 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 
 	if a.recordPluginMetrics != b.recordPluginMetrics {
 		return false, fmt.Sprintf("CycleState A and B have a different recordPluginMetrics. A: %v, B: %v", a.recordPluginMetrics, b.recordPluginMetrics)
+	}
+	if diff := cmp.Diff(a.SkipFilterPlugins, b.SkipFilterPlugins); diff != "" {
+		return false, fmt.Sprintf("CycleState A and B have different SkipFilterPlugin sets. -wanted,+got:\n%s", diff)
+	}
+	if diff := cmp.Diff(a.SkipScorePlugins, b.SkipScorePlugins); diff != "" {
+		return false, fmt.Sprintf("CycleState A and B have different SkipScorePlugins sets. -wanted,+got:\n%s", diff)
 	}
 
 	var msg string
@@ -105,11 +113,11 @@ func isCycleStateEqual(a, b *CycleState) (bool, string) {
 	return true, ""
 }
 
-func TestCycleStateClone(t *testing.T) {
+func TestCycleStateImplClone(t *testing.T) {
 	tests := []struct {
 		name            string
-		state           *CycleState
-		wantClonedState *CycleState
+		state           *CycleStateImpl
+		wantClonedState *CycleStateImpl
 	}{
 		{
 			name:            "clone with recordPluginMetrics true",
@@ -131,9 +139,15 @@ func TestCycleStateClone(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := tt.state
-			stateCopy := state.Clone()
+			copy := state.Clone()
+			var stateCopy *CycleStateImpl
+			if copy != nil {
+				stateCopy = copy.(*CycleStateImpl)
+			} else {
+				stateCopy = nil
+			}
 
-			if isEqual, msg := isCycleStateEqual(stateCopy, tt.wantClonedState); !isEqual {
+			if isEqual, msg := isCycleStateImplEqual(stateCopy, tt.wantClonedState); !isEqual {
 				t.Errorf("unexpected cloned state: %v", msg)
 			}
 
@@ -143,7 +157,7 @@ func TestCycleStateClone(t *testing.T) {
 			}
 
 			stateCopy.Write(key, &fakeData{data: "modified"})
-			if isEqual, _ := isCycleStateEqual(state, stateCopy); isEqual {
+			if isEqual, _ := isCycleStateImplEqual(state, stateCopy); isEqual {
 				t.Errorf("the change for a cloned state should not affect the original state.")
 			}
 		})

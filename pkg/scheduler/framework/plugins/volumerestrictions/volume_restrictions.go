@@ -162,7 +162,7 @@ func needsRestrictionsCheck(v v1.Volume) bool {
 }
 
 // PreFilter computes and stores cycleState containing details for enforcing ReadWriteOncePod.
-func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	needsCheck := false
 	for i := range pod.Spec.Volumes {
 		if needsRestrictionsCheck(pod.Spec.Volumes[i]) {
@@ -192,7 +192,7 @@ func (pl *VolumeRestrictions) PreFilter(ctx context.Context, cycleState *framewo
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -202,7 +202,7 @@ func (pl *VolumeRestrictions) AddPod(ctx context.Context, cycleState *framework.
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	state, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -211,7 +211,7 @@ func (pl *VolumeRestrictions) RemovePod(ctx context.Context, cycleState *framewo
 	return nil
 }
 
-func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+func getPreFilterState(cycleState framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
@@ -306,7 +306,7 @@ func (pl *VolumeRestrictions) PreFilterExtensions() framework.PreFilterExtension
 // - ISCSI forbids if any two pods share at least same IQN and ISCSI volume is read-only
 // If the pod uses PVCs with the ReadWriteOncePod access mode, it evaluates if
 // these PVCs are already in-use and if preemption will help.
-func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) Filter(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if !satisfyVolumeConflicts(pod, nodeInfo) {
 		return framework.NewStatus(framework.Unschedulable, ErrReasonDiskConflict)
 	}

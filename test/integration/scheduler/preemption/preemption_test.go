@@ -103,7 +103,7 @@ func (fp *tokenFilter) Name() string {
 	return tokenFilterName
 }
 
-func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+func (fp *tokenFilter) Filter(ctx context.Context, state framework.CycleState, pod *v1.Pod,
 	nodeInfo *framework.NodeInfo) *framework.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
@@ -116,20 +116,20 @@ func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, 
 	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !fp.EnablePreFilter || fp.Tokens > 0 {
 		return nil, nil
 	}
 	return nil, framework.NewStatus(framework.Unschedulable)
 }
 
-func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
+func (fp *tokenFilter) AddPod(ctx context.Context, state framework.CycleState, podToSchedule *v1.Pod,
 	podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	fp.Tokens--
 	return nil
 }
 
-func (fp *tokenFilter) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
+func (fp *tokenFilter) RemovePod(ctx context.Context, state framework.CycleState, podToSchedule *v1.Pod,
 	podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	fp.Tokens++
 	return nil
@@ -1511,7 +1511,7 @@ func (af *alwaysFail) Name() string {
 	return alwaysFailPlugin
 }
 
-func (af *alwaysFail) PreBind(_ context.Context, _ *framework.CycleState, p *v1.Pod, _ string) *framework.Status {
+func (af *alwaysFail) PreBind(_ context.Context, _ framework.CycleState, p *v1.Pod, _ string) *framework.Status {
 	if strings.Contains(p.Name, doNotFailMe) {
 		return nil
 	}

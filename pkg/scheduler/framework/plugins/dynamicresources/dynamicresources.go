@@ -348,7 +348,7 @@ func (pl *DynamicResources) foreachPodResourceClaim(pod *v1.Pod, cb func(podReso
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate claims bound. UnschedulableAndUnresolvable is returned if
 // the pod cannot be scheduled at the moment on any node.
-func (pl *DynamicResources) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *DynamicResources) PreFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Skip)
 	}
@@ -496,7 +496,7 @@ func (pl *DynamicResources) PreFilterExtensions() framework.PreFilterExtensions 
 	return nil
 }
 
-func getStateData(cs *framework.CycleState) (*stateData, error) {
+func getStateData(cs framework.CycleState) (*stateData, error) {
 	state, err := cs.Read(stateKey)
 	if err != nil {
 		return nil, err
@@ -517,7 +517,7 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 //
 // For claims that are unbound, it checks whether the claim might get allocated
 // for the node.
-func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *DynamicResources) Filter(ctx context.Context, cs framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	if !pl.enabled {
 		return nil
 	}
@@ -604,7 +604,7 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs *framework.CycleState
 // deallocated to help get the Pod schedulable. If yes, it picks one and
 // requests its deallocation.  This only gets called when filtering found no
 // suitable node.
-func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (pl *DynamicResources) PostFilter(ctx context.Context, cs framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	if !pl.enabled {
 		return nil, framework.NewStatus(framework.Unschedulable, "plugin disabled")
 	}
@@ -642,7 +642,7 @@ func (pl *DynamicResources) PostFilter(ctx context.Context, cs *framework.CycleS
 }
 
 // Reserve reserves claims for the pod.
-func (pl *DynamicResources) Reserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
+func (pl *DynamicResources) Reserve(ctx context.Context, cs framework.CycleState, pod *v1.Pod, nodeName string) (status *framework.Status) {
 	if !pl.enabled {
 		return nil
 	}
@@ -721,7 +721,7 @@ func (pl *DynamicResources) Reserve(ctx context.Context, cs *framework.CycleStat
 
 // Unreserve clears the ReservedFor field for all claims.
 // It's idempotent, and does nothing if no state found for the given pod.
-func (pl *DynamicResources) Unreserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (pl *DynamicResources) Unreserve(ctx context.Context, cs framework.CycleState, pod *v1.Pod, nodeName string) {
 	if !pl.enabled {
 		return
 	}
@@ -769,7 +769,7 @@ func (pl *DynamicResources) Unreserve(ctx context.Context, cs *framework.CycleSt
 // If anything fails, we return an error and
 // the pod will have to go into the backoff queue. The scheduler will call
 // Unreserve as part of the error handling.
-func (pl *DynamicResources) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pl *DynamicResources) PreBind(ctx context.Context, cs framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if !pl.enabled {
 		return nil
 	}

@@ -1109,7 +1109,7 @@ type testContext struct {
 	draManager      *DefaultDRAManager
 	p               *DynamicResources
 	nodeInfos       []*framework.NodeInfo
-	state           *framework.CycleState
+	state           framework.CycleState
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {

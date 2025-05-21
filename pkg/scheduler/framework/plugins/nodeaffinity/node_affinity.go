@@ -143,7 +143,7 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 }
 
 // PreFilter builds and writes cycle state used by Filter.
-func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	affinity := pod.Spec.Affinity
 	noNodeAffinity := (affinity == nil ||
 		affinity.NodeAffinity == nil ||
@@ -202,7 +202,7 @@ func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 
 // Filter checks if the Node matches the Pod .spec.affinity.nodeAffinity and
 // the plugin's added affinity.
-func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodeAffinity) Filter(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(node) {
@@ -237,7 +237,7 @@ func (s *preScoreState) Clone() framework.StateData {
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -256,7 +256,7 @@ func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState *framework.Cycl
 // Score returns the sum of the weights of the terms that match the Node.
 // Terms came from the Pod .spec.affinity.nodeAffinity and from the plugin's
 // default affinity.
-func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (pl *NodeAffinity) Score(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 
 	var count int64
@@ -284,7 +284,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	return helper.DefaultNormalizeScore(framework.MaxNodeScore, false, scores)
 }
 
@@ -337,7 +337,7 @@ func getPodPreferredNodeAffinity(pod *v1.Pod) (*nodeaffinity.PreferredScheduling
 	return nil, nil
 }
 
-func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+func getPreScoreState(cycleState framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
 		return nil, fmt.Errorf("reading %q from cycleState: %w", preScoreStateKey, err)
@@ -350,7 +350,7 @@ func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) 
 	return s, nil
 }
 
-func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error) {
+func getPreFilterState(cycleState framework.CycleState) (*preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		return nil, fmt.Errorf("reading %q from cycleState: %v", preFilterStateKey, err)

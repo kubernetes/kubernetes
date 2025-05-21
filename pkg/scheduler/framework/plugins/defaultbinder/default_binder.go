@@ -48,7 +48,7 @@ func (b DefaultBinder) Name() string {
 }
 
 // Bind binds pods to nodes using the k8s client.
-func (b DefaultBinder) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (b DefaultBinder) Bind(ctx context.Context, state framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Attempting to bind pod to node", "pod", klog.KObj(p), "node", klog.KRef("", nodeName))
 	binding := &v1.Binding{

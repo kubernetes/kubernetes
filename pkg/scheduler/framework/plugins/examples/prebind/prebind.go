@@ -18,6 +18,7 @@ package prebind
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -38,7 +39,7 @@ func (sr StatelessPreBindExample) Name() string {
 }
 
 // PreBind is the functions invoked by the framework at "prebind" extension point.
-func (sr StatelessPreBindExample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (sr StatelessPreBindExample) PreBind(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
