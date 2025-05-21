@@ -320,7 +320,15 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 
-	kubelet.allocationManager = allocation.NewInMemoryManager(kubelet.containerManager, kubelet.statusManager)
+	kubelet.allocationManager = allocation.NewInMemoryManager(
+		kubelet.containerManager,
+		kubelet.statusManager,
+		func(pod *v1.Pod) { kubelet.HandlePodSyncs([]*v1.Pod{pod}) },
+		kubelet.GetActivePods,
+		kubelet.podManager.GetPodByUID,
+		kubelet.podCache,
+	)
+	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
@@ -2514,7 +2522,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			expectedPodResourceInfoMap: state.PodResourceInfoMap{
 				"3": state.PodResourceInfo{
 					ContainerResources: map[string]v1.ResourceRequirements{
-						cpu800mMem800MPodSpec.Containers[0].Name: cpu800mMem800MPodSpec.Containers[0].Resources,
+						cpu800mMem800MPodSpec.Containers[0].Name: cpu500mMem500MPodSpec.Containers[0].Resources,
 					},
 				},
 			},
@@ -2549,7 +2557,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			expectedPodResourceInfoMap: state.PodResourceInfoMap{
 				"6": state.PodResourceInfo{
 					ContainerResources: map[string]v1.ResourceRequirements{
-						cpu800mPodSpec.Containers[0].Name: cpu800mPodSpec.Containers[0].Resources,
+						cpu800mPodSpec.Containers[0].Name: cpu500mPodSpec.Containers[0].Resources,
 					},
 				},
 			},
@@ -2584,7 +2592,7 @@ func TestPodResourceAllocationReset(t *testing.T) {
 			expectedPodResourceInfoMap: state.PodResourceInfoMap{
 				"9": state.PodResourceInfo{
 					ContainerResources: map[string]v1.ResourceRequirements{
-						mem800MPodSpec.Containers[0].Name: mem800MPodSpec.Containers[0].Resources,
+						mem800MPodSpec.Containers[0].Name: mem500MPodSpec.Containers[0].Resources,
 					},
 				},
 			},
@@ -3133,6 +3141,7 @@ func TestSyncPodSpans(t *testing.T) {
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
 	)
 	assert.NoError(t, err)
+	kubelet.allocationManager.SetContainerRuntime(kubelet.containerRuntime)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
@@ -3517,10 +3526,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 					Target: pod.UID,
 				}},
 			},
-			expectedResizeConditions: []*v1.PodCondition{{
-				Type:   v1.PodResizeInProgress,
-				Status: v1.ConditionTrue,
-			}},
+			expectedResizeConditions: nil,
 		},
 		{
 			name: "sync results have a non-resize error",
@@ -3551,11 +3557,8 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
-			expectedResizeConditions: []*v1.PodCondition{{
-				Type:   v1.PodResizeInProgress,
-				Status: v1.ConditionTrue,
-			}},
+			expectedErr:              "failed to \"CreatePodSandbox\" for \"12345678\" with CreatePodSandboxError: \"could not create pod sandbox\"",
+			expectedResizeConditions: nil,
 		},
 	}
 

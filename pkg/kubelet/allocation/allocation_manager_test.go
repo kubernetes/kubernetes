@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -381,7 +382,6 @@ func TestIsPodResizeInProgress(t *testing.T) {
 
 	statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 	containerManager := cm.NewFakeContainerManager()
-	am := NewInMemoryManager(containerManager, statusManager)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -391,11 +391,29 @@ func TestIsPodResizeInProgress(t *testing.T) {
 					UID:  "12345",
 				},
 			}
-			t.Cleanup(func() { am.RemovePod(pod.UID) })
 			podStatus := &kubecontainer.PodStatus{
 				ID:   pod.UID,
 				Name: pod.Name,
 			}
+
+			runtime := &containertest.FakeRuntime{PodStatus: *podStatus}
+			am := NewInMemoryManager(
+				containerManager,
+				statusManager,
+				nil,
+				func() []*v1.Pod {
+					return []*v1.Pod{pod}
+				},
+				func(uid types.UID) (*v1.Pod, bool) {
+					v, ok := map[types.UID]*v1.Pod{pod.UID: pod}[uid]
+					return v, ok
+				},
+				containertest.NewFakeCache(runtime),
+			)
+			am.SetContainerRuntime(runtime)
+
+			t.Cleanup(func() { am.RemovePod(pod.UID) })
+
 			for i, c := range test.containers {
 				// Add the container to the pod
 				container := mkContainer(i, c)
@@ -742,31 +760,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 				originalCtr.Resources.Requests = tt.originalRequests
 				originalCtr.Resources.Limits = tt.originalLimits
 
-				statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
-				containerManager := cm.NewFakeContainerManager()
-				allocationManager := NewInMemoryManager(containerManager, statusManager)
-
-				getNode := func() (*v1.Node, error) {
-					return &v1.Node{
-						Status: v1.NodeStatus{
-							Capacity: v1.ResourceList{
-								v1.ResourceCPU:    resource.MustParse("8"),
-								v1.ResourceMemory: resource.MustParse("8Gi"),
-							},
-							Allocatable: v1.ResourceList{
-								v1.ResourceCPU:    resource.MustParse("4"),
-								v1.ResourceMemory: resource.MustParse("4Gi"),
-								v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
-							},
-						},
-					}, nil
-				}
-
-				handler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
-				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
-
 				newPod := originalPod.DeepCopy()
-
 				if isSidecarContainer {
 					newPod.Spec.InitContainers[0].Resources.Requests = tt.newRequests
 					newPod.Spec.InitContainers[0].Resources.Limits = tt.newLimits
@@ -774,14 +768,6 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					newPod.Spec.Containers[0].Resources.Requests = tt.newRequests
 					newPod.Spec.Containers[0].Resources.Limits = tt.newLimits
 				}
-
-				if !tt.newResourcesAllocated {
-					require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
-				} else {
-					require.NoError(t, allocationManager.SetAllocatedResources(newPod))
-				}
-				require.NoError(t, allocationManager.SetActuatedResources(originalPod, nil))
-				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
 
 				podStatus := &kubecontainer.PodStatus{
 					ID:        originalPod.UID,
@@ -809,9 +795,59 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					setContainerStatus(podStatus, &c, i+len(originalPod.Spec.InitContainers))
 				}
 
-				allocatedPods := []*v1.Pod{testPod1, testPod2, testPod3}
-				updatedPod, err := allocationManager.HandlePodResourcesResize(&containertest.FakeRuntime{}, allocatedPods, newPod, podStatus)
+				statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
+				containerManager := cm.NewFakeContainerManager()
+				runtime := &containertest.FakeRuntime{PodStatus: *podStatus}
+				allocationManager := NewInMemoryManager(
+					containerManager,
+					statusManager,
+					nil,
+					func() []*v1.Pod {
+						return []*v1.Pod{testPod1, testPod2, testPod3}
+					},
+					func(uid types.UID) (*v1.Pod, bool) {
+						v, ok := map[types.UID]*v1.Pod{testPod1.UID: testPod1, testPod2.UID: testPod2, testPod3.UID: testPod3}[uid]
+						return v, ok
+					},
+					containertest.NewFakeCache(runtime),
+				)
+				allocationManager.SetContainerRuntime(runtime)
+
+				getNode := func() (*v1.Node, error) {
+					return &v1.Node{
+						Status: v1.NodeStatus{
+							Capacity: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("8"),
+								v1.ResourceMemory: resource.MustParse("8Gi"),
+							},
+							Allocatable: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("4"),
+								v1.ResourceMemory: resource.MustParse("4Gi"),
+								v1.ResourcePods:   *resource.NewQuantity(40, resource.DecimalSI),
+							},
+						},
+					}, nil
+				}
+
+				handler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
+
+				if !tt.newResourcesAllocated {
+					require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
+				} else {
+					require.NoError(t, allocationManager.SetAllocatedResources(newPod))
+				}
+				require.NoError(t, allocationManager.SetActuatedResources(originalPod, nil))
+				t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
+
+				err := allocationManager.(*manager).handlePodResourcesResize(newPod)
 				require.NoError(t, err)
+				var updatedPod *v1.Pod
+				if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) || allocationManager.(*manager).statusManager.IsPodResizeDeferred(newPod.UID) {
+					updatedPod = originalPod
+				} else {
+					updatedPod = newPod
+				}
 
 				var updatedPodCtr v1.Container
 				if isSidecarContainer {
@@ -948,7 +984,47 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 
 			statusManager := status.NewManager(&fake.Clientset{}, kubepod.NewBasicPodManager(), &statustest.FakePodDeletionSafetyProvider{}, kubeletutil.NewPodStartupLatencyTracker())
 			containerManager := cm.NewFakeContainerManager()
-			allocationManager := NewInMemoryManager(containerManager, statusManager)
+			podStatus := &kubecontainer.PodStatus{
+				ID:        originalPod.UID,
+				Name:      originalPod.Name,
+				Namespace: originalPod.Namespace,
+			}
+			setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
+				podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
+					Name:  c.Name,
+					State: kubecontainer.ContainerStateRunning,
+					Resources: &kubecontainer.ContainerResources{
+						CPURequest:  c.Resources.Requests.Cpu(),
+						CPULimit:    c.Resources.Limits.Cpu(),
+						MemoryLimit: c.Resources.Limits.Memory(),
+					},
+				}
+			}
+			podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers))
+			for i, c := range originalPod.Spec.Containers {
+				setContainerStatus(podStatus, &c, i)
+			}
+			runtime := &containertest.FakeRuntime{
+				SwapBehavior: map[string]kubetypes.SwapBehavior{
+					noSwapContainerName: kubetypes.NoSwap,
+					swapContainerName:   kubetypes.LimitedSwap,
+				},
+				PodStatus: *podStatus,
+			}
+			allocationManager := NewInMemoryManager(
+				containerManager,
+				statusManager,
+				nil,
+				func() []*v1.Pod {
+					return []*v1.Pod{testPod}
+				},
+				func(uid types.UID) (*v1.Pod, bool) {
+					v, ok := map[types.UID]*v1.Pod{testPod.UID: testPod}[uid]
+					return v, ok
+				},
+				containertest.NewFakeCache(runtime),
+			)
+			allocationManager.SetContainerRuntime(runtime)
 
 			getNode := func() (*v1.Node, error) {
 				return &v1.Node{
@@ -972,34 +1048,15 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			require.NoError(t, allocationManager.SetAllocatedResources(originalPod))
 			require.NoError(t, allocationManager.SetActuatedResources(originalPod, nil))
 			t.Cleanup(func() { allocationManager.RemovePod(originalPod.UID) })
-			podStatus := &kubecontainer.PodStatus{
-				ID:        originalPod.UID,
-				Name:      originalPod.Name,
-				Namespace: originalPod.Namespace,
-			}
-			setContainerStatus := func(podStatus *kubecontainer.PodStatus, c *v1.Container, idx int) {
-				podStatus.ContainerStatuses[idx] = &kubecontainer.Status{
-					Name:  c.Name,
-					State: kubecontainer.ContainerStateRunning,
-					Resources: &kubecontainer.ContainerResources{
-						CPURequest:  c.Resources.Requests.Cpu(),
-						CPULimit:    c.Resources.Limits.Cpu(),
-						MemoryLimit: c.Resources.Limits.Memory(),
-					},
-				}
-			}
-			podStatus.ContainerStatuses = make([]*kubecontainer.Status, len(originalPod.Spec.Containers))
-			for i, c := range originalPod.Spec.Containers {
-				setContainerStatus(podStatus, &c, i)
-			}
 
-			updatedPod, err := allocationManager.HandlePodResourcesResize(&containertest.FakeRuntime{
-				SwapBehavior: map[string]kubetypes.SwapBehavior{
-					noSwapContainerName: kubetypes.NoSwap,
-					swapContainerName:   kubetypes.LimitedSwap,
-				},
-			}, []*v1.Pod{testPod}, newPod, podStatus)
+			err := allocationManager.(*manager).handlePodResourcesResize(newPod)
 			require.NoError(t, err)
+			var updatedPod *v1.Pod
+			if allocationManager.(*manager).statusManager.IsPodResizeInfeasible(newPod.UID) {
+				updatedPod = originalPod
+			} else {
+				updatedPod = newPod
+			}
 
 			updatedPodCtr := updatedPod.Spec.Containers[0]
 			assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
