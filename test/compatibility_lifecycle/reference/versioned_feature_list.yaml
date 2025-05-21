@@ -1103,6 +1103,8 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+- name: PreventStaticPodAPIReferences
+  versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta

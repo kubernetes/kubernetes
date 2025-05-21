@@ -19,7 +19,6 @@ package config
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -28,8 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
@@ -104,10 +106,13 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 type defaultFunc func(pod *api.Pod) error
 
 // A static pod tried to use a ClusterTrustBundle projected volume source.
-var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
 
 // A static pod tried to use a resource claim.
-var ErrStaticPodTriedToUseResourceClaims = errors.New("static pods may not use ResourceClaims")
+
+var (
+    ErrStaticPodTriedToUseClusterTrustBundles = podutil.ErrStaticPodClusterTrustBundles
+    ErrStaticPodTriedToUseResourceClaims      = podutil.ErrStaticPodResourceClaims
+)
 
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
@@ -144,19 +149,11 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 		return true, nil, err
 	}
 
-	for _, v := range v1Pod.Spec.Volumes {
-		if v.Projected == nil {
-			continue
+	if utilfeature.DefaultFeatureGate.Enabled(features.PreventStaticPodAPIReferences) {
+		// Check if pod has references to API objects
+		if _, err = podutil.HasAPIObjectReferences(newPod); err != nil {
+			return true, nil, err
 		}
-
-		for _, s := range v.Projected.Sources {
-			if s.ClusterTrustBundle != nil {
-				return true, nil, ErrStaticPodTriedToUseClusterTrustBundle
-			}
-		}
-	}
-	if len(v1Pod.Spec.ResourceClaims) > 0 {
-		return true, nil, ErrStaticPodTriedToUseResourceClaims
 	}
 
 	return true, v1Pod, nil
