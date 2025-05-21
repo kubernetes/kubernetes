@@ -256,7 +256,7 @@ device.attributes["dra.example.com"]["version"].isGreaterThan(semver("0.0.1"))
 			attribute := resourceapi.DeviceAttribute{
 				StringValue: ptr.To("abc"),
 			}
-			for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+			for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins; i++ {
 				suffix := fmt.Sprintf("-%d", i)
 				name := prefix + strings.Repeat("x", resourceapi.DeviceMaxIDLength-len(suffix)) + suffix
 				attributes[resourceapi.QualifiedName(name)] = attribute
