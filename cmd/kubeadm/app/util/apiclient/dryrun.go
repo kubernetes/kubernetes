@@ -610,7 +610,7 @@ kind: Config
 users: null
 `)
 	data := map[string]string{
-		bootstrapapi.JWSSignatureKeyPrefix + "abcdef": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiY2RlZiJ9..wUZ0q9o0VK1RWFptmSBOEem2bXHWrHyxrposHg0mb1w",
+		bootstrapapi.JWSSignatureKeyPrefix + "abcdef": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImFiY2RlZiJ9..rh3cVKiU2mdt3CqHzC81sNE-4WQLRHMtXduHWfSbrIM",
 		bootstrapapi.KubeConfigKey:                    kubeconfig,
 	}
 	return getConfigMap(metav1.NamespacePublic, bootstrapapi.ConfigMapClusterInfo, data)
