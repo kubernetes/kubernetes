@@ -40,6 +40,7 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/featuregate"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
@@ -514,7 +515,7 @@ func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.
 	return &foo{}, nil
 }
 
-func (*foo) PreFilter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
@@ -522,6 +523,6 @@ func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func (*foo) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return nil
 }

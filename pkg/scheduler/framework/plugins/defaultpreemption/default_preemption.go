@@ -22,6 +22,8 @@ import (
 	"math/rand"
 	"sort"
 
+	fwk "k8s.io/kube-scheduler/framework"
+
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,7 +92,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh framework.Handle, fts feat
 }
 
 // PostFilter invoked at the postFilter extension point.
-func (pl *DefaultPreemption) PostFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (pl *DefaultPreemption) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	defer func() {
 		metrics.PreemptionAttempts.Inc()
 	}()
@@ -160,7 +162,7 @@ func (pl *DefaultPreemption) CandidatesToVictimsMap(candidates []preemption.Cand
 // for "pod" to be scheduled.
 func (pl *DefaultPreemption) SelectVictimsOnNode(
 	ctx context.Context,
-	state *framework.CycleState,
+	state fwk.CycleState,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status) {

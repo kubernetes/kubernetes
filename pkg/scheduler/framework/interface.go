@@ -37,6 +37,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 )
@@ -266,7 +267,7 @@ const (
 // activated (i.e., moved to activeQ) in two phases:
 // - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
 // - end of a binding cycle if it succeeds
-var PodsToActivateKey StateKey = "kubernetes.io/pods-to-activate"
+var PodsToActivateKey fwk.StateKey = "kubernetes.io/pods-to-activate"
 
 // PodsToActivate stores pods to be activated.
 type PodsToActivate struct {
@@ -276,7 +277,7 @@ type PodsToActivate struct {
 }
 
 // Clone just returns the same state.
-func (s *PodsToActivate) Clone() StateData {
+func (s *PodsToActivate) Clone() fwk.StateData {
 	return s
 }
 
@@ -501,10 +502,10 @@ type EnqueueExtensions interface {
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
-	AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
+	AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
 	// RemovePod is called by the framework while trying to evaluate the impact
 	// of removing podToRemove from the node while scheduling podToSchedule.
-	RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
+	RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
 }
 
 // PreFilterPlugin is an interface that must be implemented by "PreFilter" plugins.
@@ -520,7 +521,7 @@ type PreFilterPlugin interface {
 	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod, nodes []*NodeInfo) (*PreFilterResult, *Status)
+	PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*NodeInfo) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -553,7 +554,7 @@ type FilterPlugin interface {
 	// For example, during preemption, we may pass a copy of the original
 	// nodeInfo object that has some pods removed from it to evaluate the
 	// possibility of preempting them to schedule the target pod.
-	Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
+	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
 }
 
 // PostFilterPlugin is an interface for "PostFilter" plugins. These plugins are called
@@ -577,7 +578,7 @@ type PostFilterPlugin interface {
 	// Optionally, a non-nil PostFilterResult may be returned along with a Success status. For example,
 	// a preemption plugin may choose to return nominatedNodeName, so that framework can reuse that to update the
 	// preemptor pod's .spec.status.nominatedNodeName field.
-	PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
+	PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
 }
 
 // PreScorePlugin is an interface for "PreScore" plugin. PreScore is an
@@ -591,7 +592,7 @@ type PreScorePlugin interface {
 	// the pod will be rejected
 	// When it returns Skip status, other fields in status are just ignored,
 	// and coupled Score plugin will be skipped in this scheduling cycle.
-	PreScore(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*NodeInfo) *Status
+	PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*NodeInfo) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -599,7 +600,7 @@ type ScoreExtensions interface {
 	// NormalizeScore is called for all node scores produced by the same plugin's "Score"
 	// method. A successful run of NormalizeScore will update the scores list and return
 	// a success status.
-	NormalizeScore(ctx context.Context, state *CycleState, p *v1.Pod, scores NodeScoreList) *Status
+	NormalizeScore(ctx context.Context, state fwk.CycleState, p *v1.Pod, scores NodeScoreList) *Status
 }
 
 // ScorePlugin is an interface that must be implemented by "Score" plugins to rank
@@ -609,7 +610,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *Status)
+	Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions
@@ -626,13 +627,13 @@ type ReservePlugin interface {
 	// Reserve is called by the scheduling framework when the scheduler cache is
 	// updated. If this method returns a failed Status, the scheduler will call
 	// the Unreserve method for all enabled ReservePlugins.
-	Reserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
+	Reserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *Status
 	// Unreserve is called by the scheduling framework when a reserved pod was
 	// rejected, an error occurred during reservation of subsequent plugins, or
 	// in a later phase. The Unreserve method implementation must be idempotent
 	// and may be called by the scheduler even if the corresponding Reserve
 	// method for the same plugin was not called.
-	Unreserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string)
+	Unreserve(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string)
 }
 
 // PreBindPlugin is an interface that must be implemented by "PreBind" plugins.
@@ -641,7 +642,7 @@ type PreBindPlugin interface {
 	Plugin
 	// PreBind is called before binding a pod. All prebind plugins must return
 	// success or the pod will be rejected and won't be sent for binding.
-	PreBind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
+	PreBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *Status
 }
 
 // PostBindPlugin is an interface that must be implemented by "PostBind" plugins.
@@ -652,7 +653,7 @@ type PostBindPlugin interface {
 	// informational. A common application of this extension point is for cleaning
 	// up. If a plugin needs to clean-up its state after a pod is scheduled and
 	// bound, PostBind is the extension point that it should register.
-	PostBind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string)
+	PostBind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string)
 }
 
 // PermitPlugin is an interface that must be implemented by "Permit" plugins.
@@ -665,7 +666,7 @@ type PermitPlugin interface {
 	// The pod will also be rejected if the wait timeout or the pod is rejected while
 	// waiting. Note that if the plugin returns "wait", the framework will wait only
 	// after running the remaining plugins given that no other plugin rejects the pod.
-	Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration)
+	Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration)
 }
 
 // BindPlugin is an interface that must be implemented by "Bind" plugins. Bind
@@ -678,7 +679,7 @@ type BindPlugin interface {
 	// remaining bind plugins are skipped. When a bind plugin does not handle a pod,
 	// it must return Skip in its Status code. If a bind plugin returns an Error, the
 	// pod is rejected and will not be bound.
-	Bind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status
+	Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *Status
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
@@ -704,33 +705,33 @@ type Framework interface {
 	// The third returns value contains PreFilter plugin that rejected some or all Nodes with PreFilterResult.
 	// But, note that it doesn't contain any plugin when a plugin rejects this Pod with non-success status,
 	// not with PreFilterResult.
-	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) (*PreFilterResult, *Status, sets.Set[string])
+	RunPreFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod) (*PreFilterResult, *Status, sets.Set[string])
 
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured
 	// to execute first and return Unschedulable status, or ones that try to change the
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
-	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
+	RunPostFilterPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusReader) (*PostFilterResult, *Status)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
 	// anything but Success. If the Status code is "Unschedulable", it is
 	// considered as a scheduling check failure, otherwise, it is considered as an
 	// internal error. In either case the pod is not going to be bound.
-	RunPreBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	RunPreBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *Status
 
 	// RunPostBindPlugins runs the set of configured PostBind plugins.
-	RunPostBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string)
+	RunPostBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 
 	// RunReservePluginsReserve runs the Reserve method of the set of
 	// configured Reserve plugins. If any of these calls returns an error, it
 	// does not continue running the remaining ones and returns the error. In
 	// such case, pod will not be scheduled.
-	RunReservePluginsReserve(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	RunReservePluginsReserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *Status
 
 	// RunReservePluginsUnreserve runs the Unreserve method of the set of
 	// configured Reserve plugins.
-	RunReservePluginsUnreserve(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string)
+	RunReservePluginsUnreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string)
 
 	// RunPermitPlugins runs the set of configured Permit plugins. If any of these
 	// plugins returns a status other than "Success" or "Wait", it does not continue
@@ -738,7 +739,7 @@ type Framework interface {
 	// plugins returns "Wait", then this function will create and add waiting pod
 	// to a map of currently waiting pods and return status with "Wait" code.
 	// Pod will remain waiting pod for the minimum duration returned by the Permit plugins.
-	RunPermitPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *Status
 
 	// WaitOnPermit will block, if the pod is a waiting pod, until the waiting pod is rejected or allowed.
 	WaitOnPermit(ctx context.Context, pod *v1.Pod) *Status
@@ -748,7 +749,7 @@ type Framework interface {
 	// binding, it should return code=5("skip") status. Otherwise, it should return "Error"
 	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
 	// code=5("skip") status.
-	RunBindPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) *Status
+	RunBindPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *Status
 
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool
@@ -828,7 +829,7 @@ type Handle interface {
 	SharedDRAManager() SharedDRAManager
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
-	RunFilterPluginsWithNominatedPods(ctx context.Context, state *CycleState, pod *v1.Pod, info *NodeInfo) *Status
+	RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info *NodeInfo) *Status
 
 	// Extenders returns registered scheduler extenders.
 	Extenders() []Extender
@@ -929,12 +930,12 @@ type PodNominator interface {
 type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
-	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*NodeInfo) *Status
+	RunPreScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []*NodeInfo) *Status
 	// RunScorePlugins runs the set of configured scoring plugins.
 	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*NodeInfo) ([]NodePluginScores, *Status)
+	RunScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []*NodeInfo) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
@@ -942,13 +943,13 @@ type PluginsRunner interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) *Status
+	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, *NodeInfo) *Status
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
+	RunPreFilterExtensionAddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
 	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
+	RunPreFilterExtensionRemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
 }

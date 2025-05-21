@@ -32,6 +32,7 @@ import (
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -233,7 +234,7 @@ func (pl *CSILimits) isSchedulableAfterCSINodeUpdated(logger klog.Logger, pod *v
 // PreFilter invoked at the prefilter extension point
 //
 // If the pod haven't those types of volumes, we'll skip the Filter phase
-func (pl *CSILimits) PreFilter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *CSILimits) PreFilter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]
@@ -251,7 +252,7 @@ func (pl *CSILimits) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *CSILimits) Filter(ctx context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
 		return nil

@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -137,7 +138,7 @@ var clearNominatedNode = &framework.NominatingInfo{NominatingMode: framework.Mod
 // schedulingCycle tries to schedule a single Pod.
 func (sched *Scheduler) schedulingCycle(
 	ctx context.Context,
-	state *framework.CycleState,
+	state fwk.CycleState,
 	fwk framework.Framework,
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
@@ -265,7 +266,7 @@ func (sched *Scheduler) schedulingCycle(
 // bindingCycle tries to bind an assumed Pod.
 func (sched *Scheduler) bindingCycle(
 	ctx context.Context,
-	state *framework.CycleState,
+	state fwk.CycleState,
 	fwk framework.Framework,
 	scheduleResult ScheduleResult,
 	assumedPodInfo *framework.QueuedPodInfo,
@@ -332,7 +333,7 @@ func (sched *Scheduler) bindingCycle(
 
 func (sched *Scheduler) handleBindingCycleError(
 	ctx context.Context,
-	state *framework.CycleState,
+	state fwk.CycleState,
 	fwk framework.Framework,
 	podInfo *framework.QueuedPodInfo,
 	start time.Time,
@@ -396,7 +397,7 @@ func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Frame
 // schedulePod tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError with reasons.
-func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
+func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 	if err := sched.Cache.UpdateSnapshot(klog.FromContext(ctx), sched.nodeInfoSnapshot); err != nil {
@@ -448,7 +449,7 @@ func (sched *Scheduler) schedulePod(ctx context.Context, fwk framework.Framework
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
+func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state fwk.CycleState, pod *v1.Pod) ([]*framework.NodeInfo, framework.Diagnosis, error) {
 	logger := klog.FromContext(ctx)
 	diagnosis := framework.Diagnosis{
 		NodeToStatus: framework.NewDefaultNodeToStatus(),
@@ -532,7 +533,7 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, fwk framework.F
 	return feasibleNodesAfterExtender, diagnosis, nil
 }
 
-func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*framework.NodeInfo, error) {
+func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state fwk.CycleState, diagnosis framework.Diagnosis) ([]*framework.NodeInfo, error) {
 	nnn := pod.Status.NominatedNodeName
 	nodeInfo, err := sched.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
@@ -579,7 +580,7 @@ func (sched *Scheduler) hasExtenderFilters() bool {
 func (sched *Scheduler) findNodesThatPassFilters(
 	ctx context.Context,
 	fwk framework.Framework,
-	state *framework.CycleState,
+	state fwk.CycleState,
 	pod *v1.Pod,
 	diagnosis *framework.Diagnosis,
 	nodes []*framework.NodeInfo) ([]*framework.NodeInfo, error) {
@@ -744,7 +745,7 @@ func prioritizeNodes(
 	ctx context.Context,
 	extenders []framework.Extender,
 	fwk framework.Framework,
-	state *framework.CycleState,
+	state fwk.CycleState,
 	pod *v1.Pod,
 	nodes []*framework.NodeInfo,
 ) ([]framework.NodePluginScores, error) {
@@ -953,7 +954,7 @@ func (sched *Scheduler) assume(logger klog.Logger, assumed *v1.Pod, host string)
 // bind binds a pod to a given node defined in a binding object.
 // The precedence for binding is: (1) extenders and (2) framework plugins.
 // We expect this to run asynchronously, so we handle binding metrics internally.
-func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state *framework.CycleState) (status *framework.Status) {
+func (sched *Scheduler) bind(ctx context.Context, fwk framework.Framework, assumed *v1.Pod, targetNode string, state fwk.CycleState) (status *framework.Status) {
 	logger := klog.FromContext(ctx)
 	defer func() {
 		sched.finishBinding(logger, fwk, assumed, targetNode, status)

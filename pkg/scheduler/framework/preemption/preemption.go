@@ -37,6 +37,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
@@ -116,7 +117,7 @@ type Interface interface {
 	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
 	// for "pod" to be scheduled.
 	// Note that both `state` and `nodeInfo` are deep copied.
-	SelectVictimsOnNode(ctx context.Context, state *framework.CycleState,
+	SelectVictimsOnNode(ctx context.Context, state fwk.CycleState,
 		pod *v1.Pod, nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status)
 	// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 	// The ordered score functions will be processed one by one iff we find more than one node with the highest score.
@@ -228,7 +229,7 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 //
 //   - <non-nil PostFilterResult, Success>. It's the regular happy path
 //     and the non-empty nominatedNodeName will be applied to the preemptor pod.
-func (ev *Evaluator) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (ev *Evaluator) Preempt(ctx context.Context, state fwk.CycleState, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	logger := klog.FromContext(ctx)
 
 	// 0) Fetch the latest version of <pod>.
@@ -303,7 +304,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, state *framework.CycleState, p
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (ev *Evaluator) findCandidates(ctx context.Context, state *framework.CycleState, allNodes []*framework.NodeInfo, pod *v1.Pod, m framework.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
+func (ev *Evaluator) findCandidates(ctx context.Context, state fwk.CycleState, allNodes []*framework.NodeInfo, pod *v1.Pod, m framework.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
 	if len(allNodes) == 0 {
 		return nil, nil, errors.New("no nodes available")
 	}
@@ -678,7 +679,7 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn framework.PodNominator
 // The number of candidates depends on the constraints defined in the plugin's args. In the returned list of
 // candidates, ones that do not violate PDB are preferred over ones that do.
 // NOTE: This method is exported for easier testing in default preemption.
-func (ev *Evaluator) DryRunPreemption(ctx context.Context, state *framework.CycleState, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
+func (ev *Evaluator) DryRunPreemption(ctx context.Context, state fwk.CycleState, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget, offset int32, candidatesNum int32) ([]Candidate, *framework.NodeToStatus, error) {
 
 	fh := ev.Handler

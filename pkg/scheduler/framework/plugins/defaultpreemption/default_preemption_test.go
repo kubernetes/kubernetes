@@ -47,6 +47,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	apipod "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
@@ -122,14 +123,14 @@ func newTestPlugin(_ context.Context, injArgs runtime.Object, f framework.Handle
 	return &TestPlugin{name: "test-plugin"}, nil
 }
 
-func (pl *TestPlugin) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *TestPlugin) AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo.Node().GetLabels()["error"] == "true" {
 		return framework.AsStatus(fmt.Errorf("failed to add pod: %v", podToSchedule.Name))
 	}
 	return nil
 }
 
-func (pl *TestPlugin) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *TestPlugin) RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	if nodeInfo.Node().GetLabels()["error"] == "true" {
 		return framework.AsStatus(fmt.Errorf("failed to remove pod: %v", podToSchedule.Name))
 	}
@@ -144,11 +145,11 @@ func (pl *TestPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 	return pl
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
-func (pl *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *TestPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
