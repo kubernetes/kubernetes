@@ -59,18 +59,6 @@ func mapOf(t *types.Type) *types.Type {
 	}
 }
 
-func arrayOf(t *types.Type) *types.Type {
-	return &types.Type{
-		Name: types.Name{
-			Package: "",
-			Name:    "[2]" + t.Name.String(),
-		},
-		Kind: types.Array,
-		Len:  2,
-		Elem: t,
-	}
-}
-
 func aliasOf(name string, t *types.Type) *types.Type {
 	return &types.Type{
 		Name: types.Name{
