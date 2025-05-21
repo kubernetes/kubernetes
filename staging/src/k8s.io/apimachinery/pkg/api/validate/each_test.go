@@ -32,6 +32,23 @@ type TestStruct struct {
 	D string
 }
 
+type TestStructWithKey struct {
+	Key string
+	I   int
+	D   string
+}
+
+type NonComparableStruct struct {
+	I int
+	S []string
+}
+
+type NonComparableStructWithKey struct {
+	Key string
+	I   int
+	S   []string
+}
+
 func TestEachSliceVal(t *testing.T) {
 	testEachSliceVal(t, "valid", []int{11, 12, 13})
 	testEachSliceVal(t, "valid", []string{"a", "b", "c"})
@@ -70,7 +87,7 @@ func testEachSliceVal[T any](t *testing.T, name string, input []T) {
 			calls++
 			return nil
 		}
-		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, vfn)
+		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, nil, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
 		}
@@ -96,9 +113,93 @@ func testEachSliceValUpdate[T any](t *testing.T, name string, input []T) {
 		copy(old, input)
 		slices.Reverse(old)
 		cmp := func(a, b T) bool { return reflect.DeepEqual(a, b) }
-		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, cmp, vfn)
+		_ = EachSliceVal(context.Background(), operation.Operation{}, field.NewPath("test"), input, old, cmp, cmp, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
+		}
+	})
+}
+
+func TestEachSliceValRatcheting(t *testing.T) {
+	testEachSliceValRatcheting(t, "ComparableStruct same data different order",
+		[]TestStruct{
+			{11, "a"}, {12, "b"}, {13, "c"},
+		},
+		[]TestStruct{
+			{11, "a"}, {13, "c"}, {12, "b"},
+		},
+		SemanticDeepEqual,
+		nil,
+	)
+	testEachSliceValRatcheting(t, "ComparableStruct less data in new, exist in old",
+		[]TestStruct{
+			{11, "a"}, {12, "b"}, {13, "c"},
+		},
+		[]TestStruct{
+			{11, "a"}, {13, "c"},
+		},
+		DirectEqual,
+		nil,
+	)
+	testEachSliceValRatcheting(t, "Comparable struct with key same data different order",
+		[]TestStructWithKey{
+			{Key: "a", I: 11, D: "a"}, {Key: "b", I: 12, D: "b"}, {Key: "c", I: 13, D: "c"},
+		},
+		[]TestStructWithKey{
+			{Key: "a", I: 11, D: "a"}, {Key: "c", I: 13, D: "c"}, {Key: "b", I: 12, D: "b"},
+		},
+		CompareFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
+			return a.Key == b.Key
+		}),
+		DirectEqual,
+	)
+	testEachSliceValRatcheting(t, "Comparable struct with key less data in new, exist in old",
+		[]TestStructWithKey{
+			{Key: "a", I: 11, D: "a"}, {Key: "b", I: 12, D: "b"}, {Key: "c", I: 13, D: "c"},
+		},
+		[]TestStructWithKey{
+			{Key: "a", I: 11, D: "a"}, {Key: "c", I: 13, D: "c"},
+		},
+		CompareFunc[TestStructWithKey](func(a, b TestStructWithKey) bool {
+			return a.Key == b.Key
+		}),
+		DirectEqual,
+	)
+	testEachSliceValRatcheting(t, "NonComparableStruct same data different order",
+		[]NonComparableStruct{
+			{I: 11, S: []string{"a"}}, {I: 12, S: []string{"b"}}, {I: 13, S: []string{"c"}},
+		},
+		[]NonComparableStruct{
+			{I: 11, S: []string{"a"}}, {I: 13, S: []string{"c"}}, {I: 12, S: []string{"b"}},
+		},
+		SemanticDeepEqual,
+		nil,
+	)
+	testEachSliceValRatcheting(t, "NonComparableStructWithKey same data different order",
+		[]NonComparableStructWithKey{
+			{Key: "a", I: 11, S: []string{"a"}}, {Key: "b", I: 12, S: []string{"b"}}, {Key: "c", I: 13, S: []string{"c"}},
+		},
+		[]NonComparableStructWithKey{
+			{Key: "a", I: 11, S: []string{"a"}}, {Key: "b", I: 12, S: []string{"b"}}, {Key: "c", I: 13, S: []string{"c"}},
+		},
+		CompareFunc[NonComparableStructWithKey](func(a, b NonComparableStructWithKey) bool {
+			return a.Key == b.Key
+		}),
+		SemanticDeepEqual,
+	)
+
+}
+
+func testEachSliceValRatcheting[T any](t *testing.T, name string, old, new []T, cmp, equiv CompareFunc[T]) {
+	t.Helper()
+	var zero T
+	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *T) field.ErrorList {
+			return field.ErrorList{field.Invalid(fldPath, *newVal, "expected no calls")}
+		}
+		errs := EachSliceVal(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, cmp, equiv, vfn)
+		if len(errs) > 0 {
+			t.Errorf("expected no errors, got %d: %s", len(errs), fmtErrs(errs))
 		}
 	})
 }
