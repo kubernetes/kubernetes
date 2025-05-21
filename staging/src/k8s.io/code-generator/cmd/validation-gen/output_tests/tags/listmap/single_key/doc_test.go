@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func Test(t *testing.T) {
@@ -81,4 +82,35 @@ func Test(t *testing.T) {
 		field.Forbidden(field.NewPath("listTypedefField").Index(1), "field is immutable"),
 		field.Forbidden(field.NewPath("listTypedefField").Index(2), "field is immutable"),
 	)
+
+	// Test validation ratcheting.
+	structC := Struct{
+		ListComparableField: []OtherStruct{
+			{"key1", "one"},
+			{"key2", "two"},
+		},
+		ListNonComparableField: []NonComparableStruct{
+			{"key1", ptr.To("one")},
+			{"key2", ptr.To("two")},
+		},
+	}
+
+	// Same data, different order.
+	structC2 := Struct{
+		ListComparableField: []OtherStruct{
+			{"key2", "two"},
+			{"key1", "one"},
+		},
+		ListNonComparableField: []NonComparableStruct{
+			{"key2", ptr.To("two")},
+			{"key1", ptr.To("one")},
+		},
+	}
+	st.Value(&structC2).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
+		field.Invalid(field.NewPath("listComparableField").Index(0), "", ""),
+		field.Invalid(field.NewPath("listComparableField").Index(1), "", ""),
+		field.Invalid(field.NewPath("listNonComparableField").Index(0), "", ""),
+		field.Invalid(field.NewPath("listNonComparableField").Index(1), "", ""),
+	})
+	st.Value(&structC).OldValue(&structC2).ExpectValid()
 }
