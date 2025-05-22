@@ -287,7 +287,7 @@ func (wc *watchChan) sync() error {
 	for {
 		startTime := time.Now()
 		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
-		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource.String(), err, startTime)
+		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource, err, startTime)
 		if err != nil {
 			return interpretListError(err, true, preparedKey, wc.key)
 		}
@@ -397,12 +397,12 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 		}
 		if wres.IsProgressNotify() {
 			wc.queueEvent(progressNotifyEvent(wres.Header.GetRevision()))
-			metrics.RecordEtcdBookmark(wc.watcher.groupResource.String())
+			metrics.RecordEtcdBookmark(wc.watcher.groupResource)
 			continue
 		}
 
 		for _, e := range wres.Events {
-			metrics.RecordEtcdEvent(wc.watcher.groupResource.String())
+			metrics.RecordEtcdEvent(wc.watcher.groupResource)
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
 				logWatchChannelErr(err)

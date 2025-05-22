@@ -75,17 +75,16 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client              *kubernetes.Client
-	codec               runtime.Codec
-	versioner           storage.Versioner
-	transformer         value.Transformer
-	pathPrefix          string
-	groupResource       schema.GroupResource
-	groupResourceString string
-	watcher             *watcher
-	leaseManager        *leaseManager
-	decoder             Decoder
-	listErrAggrFactory  func() ListErrorAggregator
+	client             *kubernetes.Client
+	codec              runtime.Codec
+	versioner          storage.Versioner
+	transformer        value.Transformer
+	pathPrefix         string
+	groupResource      schema.GroupResource
+	watcher            *watcher
+	leaseManager       *leaseManager
+	decoder            Decoder
+	listErrAggrFactory func() ListErrorAggregator
 
 	resourcePrefix string
 	newListFunc    func() runtime.Object
@@ -179,17 +178,16 @@ func newStore(c *kubernetes.Client, codec runtime.Codec, newFunc, newListFunc fu
 		w.objectType = reflect.TypeOf(newFunc()).String()
 	}
 	s := &store{
-		client:              c,
-		codec:               codec,
-		versioner:           versioner,
-		transformer:         transformer,
-		pathPrefix:          pathPrefix,
-		groupResource:       groupResource,
-		groupResourceString: groupResource.String(),
-		watcher:             w,
-		leaseManager:        newDefaultLeaseManager(c.Client, leaseManagerConfig),
-		decoder:             decoder,
-		listErrAggrFactory:  listErrAggrFactory,
+		client:             c,
+		codec:              codec,
+		versioner:          versioner,
+		transformer:        transformer,
+		pathPrefix:         pathPrefix,
+		groupResource:      groupResource,
+		watcher:            w,
+		leaseManager:       newDefaultLeaseManager(c.Client, leaseManagerConfig),
+		decoder:            decoder,
+		listErrAggrFactory: listErrAggrFactory,
 
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
@@ -217,7 +215,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 	}
 	startTime := time.Now()
 	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
-	metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
+	metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
 	if err != nil {
 		return err
 	}
@@ -239,7 +237,7 @@ func (s *store) Get(ctx context.Context, key string, opts storage.GetOptions, ou
 
 	err = s.decoder.Decode(data, out, getResp.KV.ModRevision)
 	if err != nil {
-		recordDecodeError(s.groupResourceString, preparedKey)
+		recordDecodeError(s.groupResource, preparedKey)
 		return err
 	}
 	return nil
@@ -255,7 +253,8 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
 		attribute.String("type", getTypeName(obj)),
-		attribute.String("resource", s.groupResourceString),
+		attribute.String("group", s.groupResource.Group),
+		attribute.String("resource", s.groupResource.Resource),
 	)
 	defer span.End(500 * time.Millisecond)
 	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
@@ -289,7 +288,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 
 	startTime := time.Now()
 	txnResp, err := s.client.Kubernetes.OptimisticPut(ctx, preparedKey, newData, 0, kubernetes.PutOptions{LeaseID: lease})
-	metrics.RecordEtcdRequest("create", s.groupResourceString, err, startTime)
+	metrics.RecordEtcdRequest("create", s.groupResource, err, startTime)
 	if err != nil {
 		span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 		return err
@@ -304,7 +303,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 		err = s.decoder.Decode(data, out, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			recordDecodeError(s.groupResourceString, preparedKey)
+			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
 		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
@@ -408,7 +407,7 @@ func (s *store) conditionalDelete(
 		txnResp, err := s.client.Kubernetes.OptimisticDelete(ctx, key, origState.rev, kubernetes.DeleteOptions{
 			GetOnFailure: true,
 		})
-		metrics.RecordEtcdRequest("delete", s.groupResourceString, err, startTime)
+		metrics.RecordEtcdRequest("delete", s.groupResource, err, startTime)
 		if err != nil {
 			return err
 		}
@@ -425,7 +424,7 @@ func (s *store) conditionalDelete(
 		if !skipTransformDecode {
 			err = s.decoder.Decode(origState.data, out, txnResp.Revision)
 			if err != nil {
-				recordDecodeError(s.groupResourceString, key)
+				recordDecodeError(s.groupResource, key)
 				return err
 			}
 		}
@@ -445,7 +444,8 @@ func (s *store) GuaranteedUpdate(
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
 		attribute.String("key", key),
 		attribute.String("type", getTypeName(destination)),
-		attribute.String("resource", s.groupResourceString))
+		attribute.String("group", s.groupResource.Group),
+		attribute.String("resource", s.groupResource.Resource))
 	defer span.End(500 * time.Millisecond)
 
 	v, err := conversion.EnforcePtr(destination)
@@ -542,7 +542,7 @@ func (s *store) GuaranteedUpdate(
 			if !origState.stale {
 				err = s.decoder.Decode(origState.data, destination, origState.rev)
 				if err != nil {
-					recordDecodeError(s.groupResourceString, preparedKey)
+					recordDecodeError(s.groupResource, preparedKey)
 					return err
 				}
 				return nil
@@ -571,7 +571,7 @@ func (s *store) GuaranteedUpdate(
 			GetOnFailure: true,
 			LeaseID:      lease,
 		})
-		metrics.RecordEtcdRequest("update", s.groupResourceString, err, startTime)
+		metrics.RecordEtcdRequest("update", s.groupResource, err, startTime)
 		if err != nil {
 			span.AddEvent("Txn call failed", attribute.String("err", err.Error()))
 			return err
@@ -592,7 +592,7 @@ func (s *store) GuaranteedUpdate(
 		err = s.decoder.Decode(data, destination, txnResp.Revision)
 		if err != nil {
 			span.AddEvent("decode failed", attribute.Int("len", len(data)), attribute.String("err", err.Error()))
-			recordDecodeError(s.groupResourceString, preparedKey)
+			recordDecodeError(s.groupResource, preparedKey)
 			return err
 		}
 		span.AddEvent("decode succeeded", attribute.Int("len", len(data)))
@@ -632,7 +632,7 @@ func (s *store) Count(key string) (int64, error) {
 
 	startTime := time.Now()
 	count, err := s.client.Kubernetes.Count(context.Background(), preparedKey, kubernetes.CountOptions{})
-	metrics.RecordEtcdRequest("listWithCount", preparedKey, err, startTime)
+	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
 	if err != nil {
 		return 0, err
 	}
@@ -726,7 +726,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
+		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
 	}()
 
 	metricsOp := "get"
@@ -742,7 +742,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 			Limit:    limit,
 			Continue: continueKey,
 		})
-		metrics.RecordEtcdRequest(metricsOp, s.groupResourceString, err, startTime)
+		metrics.RecordEtcdRequest(metricsOp, s.groupResource, err, startTime)
 		if err != nil {
 			return interpretListError(err, len(opts.Predicate.Continue) > 0, continueKey, keyPrefix)
 		}
@@ -794,7 +794,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 
 			obj, err := s.decoder.DecodeListItem(ctx, data, uint64(kv.ModRevision), newItemFunc)
 			if err != nil {
-				recordDecodeError(s.groupResourceString, string(kv.Key))
+				recordDecodeError(s.groupResource, string(kv.Key))
 				if done := aggregator.Aggregate(string(kv.Key), err); done {
 					return aggregator.Err()
 				}
@@ -927,7 +927,7 @@ func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value
 	return func() (*objState, error) {
 		startTime := time.Now()
 		getResp, err := s.client.Kubernetes.Get(ctx, key, kubernetes.GetOptions{})
-		metrics.RecordEtcdRequest("get", s.groupResourceString, err, startTime)
+		metrics.RecordEtcdRequest("get", s.groupResource, err, startTime)
 		if err != nil {
 			return nil, err
 		}
@@ -979,7 +979,7 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v
 		state.stale = stale
 
 		if err := s.decoder.Decode(state.data, state.obj, state.rev); err != nil {
-			recordDecodeError(s.groupResourceString, key)
+			recordDecodeError(s.groupResource, key)
 			return nil, err
 		}
 	}
@@ -1073,9 +1073,9 @@ func (s *store) prepareKey(key string) (string, error) {
 }
 
 // recordDecodeError record decode error split by object type.
-func recordDecodeError(resource string, key string) {
-	metrics.RecordDecodeError(resource)
-	klog.V(4).Infof("Decoding %s \"%s\" failed", resource, key)
+func recordDecodeError(groupResource schema.GroupResource, key string) {
+	metrics.RecordDecodeError(groupResource)
+	klog.V(4).Infof("Decoding %s \"%s\" failed", groupResource, key)
 }
 
 // getTypeName returns type name of an object for reporting purposes.
