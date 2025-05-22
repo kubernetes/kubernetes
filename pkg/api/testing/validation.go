@@ -24,7 +24,6 @@ import (
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
@@ -39,9 +38,9 @@ func VerifyVersionedValidationEquivalence(t *testing.T, obj, old k8sruntime.Obje
 		all[gv] = errs
 	}
 	if old == nil {
-		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, accumulate, subresources...)
+		runtimetest.RunValidationForEachVersion(t, legacyscheme.Scheme, []string{}, obj, accumulate)
 	} else {
-		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, sets.Set[string]{}, obj, old, accumulate, subresources...)
+		runtimetest.RunUpdateValidationForEachVersion(t, legacyscheme.Scheme, []string{}, obj, old, accumulate)
 	}
 
 	// Make a copy so we can modify it.
