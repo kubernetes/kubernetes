@@ -895,10 +895,10 @@ func TestVerifyFeatureRemoval(t *testing.T) {
 	}
 }
 
-func TestVerifyFeatureCleanup(t *testing.T) {
+func TestGetFeaturesAndVerifyCleanup(t *testing.T) {
 	tests := []struct {
 		name                    string
-		featureList             []featureInfo
+		featureListFile         string
 		currentVersion          *version.Version
 		expectErr               bool
 		expectErrMsgContains    []string
@@ -906,20 +906,48 @@ func TestVerifyFeatureCleanup(t *testing.T) {
 	}{
 		{
 			name: "multiple features needing cleanup",
-			featureList: []featureInfo{
-				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
-				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
-			},
+			featureListFile: `
+- name: FeatureA
+  versionedSpecs:
+  - version: "1.0"
+    preRelease: Alpha
+  - version: "1.1"
+    preRelease: Beta
+  - version: "1.2"
+    preRelease: GA
+    lockToDefault: true
+- name: FeatureB
+  versionedSpecs:
+  - version: "1.0"
+    preRelease: Alpha
+  - version: "1.1"
+    preRelease: Beta
+  - version: "1.2"
+    preRelease: GA
+    lockToDefault: true
+`,
 			currentVersion:       version.MustParse("1.7"),
 			expectErr:            true,
 			expectErrMsgContains: []string{"FeatureA", "FeatureB"},
 		},
 		{
 			name: "some but not all features needing cleanup",
-			featureList: []featureInfo{
-				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.4", PreRelease: "Beta"}, {Version: "1.5", PreRelease: "GA", LockToDefault: true}}},
-				{Name: "FeatureB", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
-			},
+			featureListFile: `
+- name: FeatureA
+  versionedSpecs:
+  - version: "1.4"
+    preRelease: Beta
+  - version: "1.5"
+    preRelease: GA
+    lockToDefault: true
+- name: FeatureB
+  versionedSpecs:
+  - version: "1.0"
+    preRelease: Alpha
+  - version: "1.2"
+    preRelease: GA
+    lockToDefault: true
+`,
 			currentVersion:          version.MustParse("1.7"),
 			expectErr:               true,
 			expectErrMsgContains:    []string{"FeatureB"},
@@ -927,24 +955,41 @@ func TestVerifyFeatureCleanup(t *testing.T) {
 		},
 		{
 			name: "locked feature not needing cleanup yet",
-			featureList: []featureInfo{
-				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA", LockToDefault: true}}},
-			},
+			featureListFile: `
+- name: FeatureA
+  versionedSpecs:
+  - version: "1.0"
+    preRelease: Alpha
+  - version: "1.1"
+    preRelease: Beta
+  - version: "1.2"
+    preRelease: GA
+    lockToDefault: true
+`,
 			currentVersion: version.MustParse("1.6"),
 			expectErr:      false,
 		},
 		{
 			name: "feature that is not locked",
-			featureList: []featureInfo{
-				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}, {Version: "1.1", PreRelease: "Beta"}, {Version: "1.2", PreRelease: "GA"}}},
-			},
+			featureListFile: `
+- name: FeatureA
+  versionedSpecs:
+  - version: "1.0"
+    preRelease: Alpha
+  - version: "1.1"
+    preRelease: Beta
+  - version: "1.2"
+    preRelease: GA
+`,
 			currentVersion: version.MustParse("1.7"),
 			expectErr:      false,
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := verifyFeatureCleanup(tc.featureList, tc.currentVersion)
+			tmpDir := t.TempDir()
+			featureListFile := writeContentToTmpFile(t, tmpDir, "versioned_feature_list.yaml", tc.featureListFile)
+			err := getFeaturesAndVerifyCleanup(tmpDir, filepath.Base(featureListFile.Name()), tc.currentVersion)
 			if tc.expectErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")

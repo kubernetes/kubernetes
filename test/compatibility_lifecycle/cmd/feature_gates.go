@@ -105,7 +105,7 @@ func NewUpdateFeatureListCommand() *cobra.Command {
 func NewVerifyFeatureCleanupCommand() *cobra.Command {
 	cmd := cobra.Command{
 		Use:   "verify-cleanup",
-		Short: "Verify that there are no feature gates that should be cleaned up",
+		Short: fmt.Sprintf("Verify that no feature gates in %s need to be cleaned up", versionedFeatureListFile),
 		Run:   verifyFeatureCleanupFunc,
 	}
 	return &cmd
@@ -128,7 +128,8 @@ func updateFeatureListFunc(cmd *cobra.Command, args []string) {
 }
 
 func verifyFeatureCleanupFunc(cmd *cobra.Command, args []string) {
-	if err := getFeaturesAndVerifyCleanup(k8sRootPath); err != nil {
+	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
+	if err := getFeaturesAndVerifyCleanup(k8sRootPath, versionedFeatureListFile, currentVersion); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to verify that feature gates have been cleaned up: \n%s", err)
 		os.Exit(1)
 	}
@@ -156,13 +157,7 @@ func verifyOrUpdateFeatureList(rootPath, featureListFile string, currentVersion 
 	}
 
 	filePath := filepath.Join(rootPath, featureListFile)
-	baseFeatureListBytes, err := os.ReadFile(filePath)
-	if err != nil {
-		return err
-	}
-
-	baseFeatureList := []featureInfo{}
-	err = yaml.Unmarshal(baseFeatureListBytes, &baseFeatureList)
+	baseFeatureList, baseFeatureListBytes, err := getFeaturesFromFile(filePath)
 	if err != nil {
 		return err
 	}
@@ -201,6 +196,21 @@ func getFeatures(rootPath string) ([]featureInfo, error) {
 	}
 	featureList = append(featureList, features...)
 	return featureList, nil
+}
+
+func getFeaturesFromFile(path string) ([]featureInfo, []byte, error) {
+	featuresBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	features := []featureInfo{}
+	err = yaml.Unmarshal(featuresBytes, &features)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return features, featuresBytes, nil
 }
 
 func dedupeFeatureList(featureList []featureInfo) ([]featureInfo, error) {
@@ -291,11 +301,10 @@ func verifyFeatureRemoval(featureList []featureInfo, baseFeatureList []featureIn
 	return nil
 }
 
-// getFeaturesAndVerifyCleanup gets the feature list from the code base and verifies that
+// getFeaturesAndVerifyCleanup gets the feature list from the YAML file and verifies that
 // no feature gates need to be cleaned up.
-func getFeaturesAndVerifyCleanup(rootPath string) error {
-	currentVersion := version.MustParse(baseversion.DefaultKubeBinaryVersion)
-	featureList, err := getFeatures(rootPath)
+func getFeaturesAndVerifyCleanup(rootPath, featureListFile string, currentVersion *version.Version) error {
+	featureList, _, err := getFeaturesFromFile(filepath.Join(rootPath, featureListFile))
 	if err != nil {
 		return err
 	}
