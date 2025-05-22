@@ -305,9 +305,12 @@ func (p *Plugin) admitPodCreate(nodeName string, a admission.Attributes) error {
 	}
 
 	// don't allow a node to create a pod that references any other API objects
-	isPodReferencingAPIObjects, err := podutil.HasAPIObjectReferences(pod)
+	isPodReferencingAPIObjects, resource, err := podutil.HasAPIObjectReference(pod)
+	if err != nil {
+		return admission.NewForbidden(a, err)
+	}
 	if isPodReferencingAPIObjects {
-		return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to create pods referencing API objects: %w", nodeName, err))
+		return admission.NewForbidden(a, fmt.Errorf("node %q can not create pods that reference %s API objects", nodeName, resource))
 	}
 
 	return nil

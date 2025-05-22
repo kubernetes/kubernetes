@@ -17,7 +17,7 @@ limitations under the License.
 package pod
 
 import (
-	"errors"
+	"fmt"
 	"iter"
 	"strings"
 
@@ -1490,51 +1490,71 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 	return false
 }
 
-var (
-	ErrStaticPodServiceAccount      = errors.New("can not create static pods that reference serviceaccounts")
-	ErrStaticPodSecrets             = errors.New("can not create static pods that reference secrets")
-	ErrStaticPodConfigmaps          = errors.New("can not create static pods that reference configmaps")
-	ErrStaticPodClusterTrustBundles = errors.New("can not create static pods that reference clustertrustbundles")
-	ErrStaticPodInvalidVolumes      = errors.New("can not create static pods that reference volume mounts other than hostPath and emptyDir")
-	ErrStaticPodResourceClaims      = errors.New("can not create static pods that reference resourceclaims")
-)
-
-func HasAPIObjectReferences(pod *api.Pod) (bool, error) {
+// HasAPIObjectReference returns true if a reference to an API object is found in the pod spec,
+// along with the plural resource of the referenced API type, or an error if an unknown field is encountered.
+func HasAPIObjectReference(pod *api.Pod) (bool, string, error) {
 	if pod.Spec.ServiceAccountName != "" {
-		return true, ErrStaticPodServiceAccount
+		return true, "serviceaccounts", nil
 	}
 
 	hasSecrets := false
 	VisitPodSecretNames(pod, func(name string) (shouldContinue bool) { hasSecrets = true; return false }, AllContainers)
 	if hasSecrets {
-		return true, ErrStaticPodSecrets
+		return true, "secrets", nil
 	}
 
 	hasConfigMaps := false
 	VisitPodConfigmapNames(pod, func(name string) (shouldContinue bool) { hasConfigMaps = true; return false }, AllContainers)
 	if hasConfigMaps {
-		return true, ErrStaticPodConfigmaps
-	}
-
-	for _, vol := range pod.Spec.Volumes {
-		if vol.Projected != nil {
-			for _, src := range vol.Projected.Sources {
-				if src.ClusterTrustBundle != nil {
-					return true, ErrStaticPodClusterTrustBundles
-				}
-			}
-		}
+		return true, "configmaps", nil
 	}
 
 	for _, v := range pod.Spec.Volumes {
-		if v.HostPath == nil && v.EmptyDir == nil {
-			return true, ErrStaticPodInvalidVolumes
+		switch {
+		case v.AWSElasticBlockStore != nil, v.AzureDisk != nil, v.AzureFile != nil, v.CephFS != nil, v.Cinder != nil,
+			v.DownwardAPI != nil, v.EmptyDir != nil, v.FC != nil, v.FlexVolume != nil, v.Flocker != nil, v.GCEPersistentDisk != nil,
+			v.GitRepo != nil, v.Glusterfs != nil, v.HostPath != nil, v.Image != nil, v.ISCSI != nil, v.NFS != nil, v.PhotonPersistentDisk != nil,
+			v.PortworxVolume != nil, v.Quobyte != nil, v.RBD != nil, v.ScaleIO != nil, v.StorageOS != nil, v.VsphereVolume != nil:
+			return false, "", nil
+		case v.ConfigMap != nil:
+			return true, "configmap volumes", nil
+		case v.Secret != nil:
+			return true, "secret volumes", nil
+		case v.CSI != nil:
+			return true, "CSI volumes", nil
+		case v.PersistentVolumeClaim != nil:
+			return true, "persistentvolumeclaims", nil
+		case v.Ephemeral != nil:
+			return true, "ephemeral volumes", nil
+		case v.Projected != nil:
+			for _, s := range v.Projected.Sources {
+				// Reject projected volume sources that require the Kubernetes API
+				switch {
+				case s.ConfigMap != nil:
+					return true, "configmap projected volumes", nil
+				case s.Secret != nil:
+					return true, "secret projected volumes", nil
+				case s.ServiceAccountToken != nil:
+					return true, "serviceaccounttoken projected volumes", nil
+				case s.ClusterTrustBundle != nil:
+					return true, "clustertrustbundles", nil
+				case s.DownwardAPI != nil:
+					// Allow projected volume sources that don't require the Kubernetes API
+					return false, "", nil
+				default:
+					// Reject unknown volume types
+					return true, "", fmt.Errorf("unknown source for projected volume %q", v.Name)
+				}
+			}
+			return true, "projected volumes", nil
+		default:
+			return true, "", fmt.Errorf("unknown volume type for volume  %q", v.Name)
 		}
 	}
 
 	if len(pod.Spec.ResourceClaims) > 0 {
-		return true, ErrStaticPodResourceClaims
+		return true, "resourceclaims", nil
 	}
 
-	return false, nil
+	return false, "", nil
 }
