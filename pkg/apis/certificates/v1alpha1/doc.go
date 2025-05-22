@@ -18,6 +18,8 @@ limitations under the License.
 // +k8s:conversion-gen-external-types=k8s.io/api/certificates/v1alpha1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/certificates/v1alpha1
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/certificates/v1alpha1
 
 // +groupName=certificates.k8s.io
 
