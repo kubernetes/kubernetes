@@ -19,6 +19,7 @@ package config
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -175,7 +176,7 @@ func TestDecodeSinglePodRejectsClusterTrustBundleVolumes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	_, _, err = tryDecodeSinglePod(json, noDefault)
-	if err.Error() != fmt.Errorf("static pods may not reference clustertrustbundles API objects").Error() {
+	if !strings.Contains(err.Error(), "may not reference clustertrustbundles") {
 		t.Errorf("Got error %q, want %q", err, fmt.Errorf("static pods may not reference clustertrustbundles API objects"))
 	}
 }
@@ -231,7 +232,7 @@ func TestDecodeSinglePodRejectsResourceClaims(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	_, _, err = tryDecodeSinglePod(json, noDefault)
-	if err.Error() != fmt.Errorf("static pods may not reference resourceclaims API objects").Error() {
+	if !strings.Contains(err.Error(), "may not reference resourceclaims") {
 		t.Errorf("Got error %q, want %q", err, fmt.Errorf("static pods may not reference resourceclaims API objects"))
 	}
 }
