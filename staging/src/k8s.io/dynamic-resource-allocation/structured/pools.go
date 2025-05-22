@@ -67,7 +67,21 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			}
 			if match {
 				if hasBindingConditions(slice) {
-					needBindingSlices = append(needBindingSlices, slice)
+					needBindingSlice := slice.DeepCopy()
+					needBindingSlice.Spec.Devices = nil
+					nodeSlice := slice.DeepCopy()
+					nodeSlice.Spec.Devices = nil
+					for _, device := range slice.Spec.Devices {
+						if device.Basic != nil && device.Basic.BindingConditions != nil {
+							needBindingSlice.Spec.Devices = append(needBindingSlice.Spec.Devices, device)
+						} else {
+							nodeSlice.Spec.Devices = append(nodeSlice.Spec.Devices, device)
+						}
+					}
+					needBindingSlices = append(needBindingSlices, needBindingSlice)
+					if err := addSlice(pools, nodeSlice); err != nil {
+						return nil, fmt.Errorf("failed to add node slice %s: %w", nodeSlice.Name, err)
+					}
 					continue
 				}
 				if err := addSlice(pools, slice); err != nil {
