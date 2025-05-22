@@ -4745,7 +4745,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{}}},
 			}}},
 			expectRejection: true,
-			resource:        "secret volumes",
+			resource:        "secrets (via secret volumes)",
 		},
 		{
 			name: "Non empty volume list with ConfigMap volume",
@@ -4753,7 +4753,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
 			}}},
 			expectRejection: true,
-			resource:        "configmap volumes",
+			resource:        "configmaps (via configmap volumes)",
 		},
 		{
 			name: "Non empty volume list with GCEPersistentDisk volume",
@@ -4795,7 +4795,8 @@ func TestHasAPIReferences(t *testing.T) {
 			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
 				{Name: "test-volume-glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}},
 			}}},
-			expectRejection: false,
+			expectRejection: true,
+			resource:        "glusterfs volumes",
 		},
 		{
 			name: "Non empty volume list with PersistentVolumeClaim",
@@ -4903,7 +4904,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{Secret: &api.SecretProjection{}}}}}},
 			}}},
 			expectRejection: true,
-			resource:        "secret projected volumes",
+			resource:        "secrets (via projected volumes)",
 		},
 		{
 			name: "Non empty volume list with Projected volume with configmap",
@@ -4911,7 +4912,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ConfigMap: &api.ConfigMapProjection{}}}}}},
 			}}},
 			expectRejection: true,
-			resource:        "configmap projected volumes",
+			resource:        "configmaps (via projected volumes)",
 		},
 		{
 			name: "Non empty volume list with Projected volume with serviceaccounttoken",
@@ -4919,7 +4920,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ServiceAccountToken: &api.ServiceAccountTokenProjection{}}}}}},
 			}}},
 			expectRejection: true,
-			resource:        "serviceaccounttoken projected volumes",
+			resource:        "serviceaccounts (via projected volumes)",
 		},
 		{
 			name: "Non empty volume list with Projected volume with downwardapi",
@@ -4955,7 +4956,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-csi", VolumeSource: api.VolumeSource{CSI: &api.CSIVolumeSource{}}},
 			}}},
 			expectRejection: true,
-			resource:        "CSI volumes",
+			resource:        "csidrivers (via CSI volumes)",
 		},
 		{
 			name: "Non empty volume list with Ephemeral volume",
@@ -4963,7 +4964,7 @@ func TestHasAPIReferences(t *testing.T) {
 				{Name: "test-volume-ephemeral", VolumeSource: api.VolumeSource{Ephemeral: &api.EphemeralVolumeSource{}}},
 			}}},
 			expectRejection: true,
-			resource:        "ephemeral volumes",
+			resource:        "persistentvolumeclaims (via ephemeral volumes)",
 		},
 		{
 			name: "Non empty volume list with Image volume",
@@ -5059,6 +5060,33 @@ func TestHasAPIReferences(t *testing.T) {
 			}},
 			expectRejection: true,
 			resource:        "secrets",
+		},
+		{
+			name: "Multiple volume list where invalid volume comes after valid volume source",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-portworx", VolumeSource: api.VolumeSource{PortworxVolume: &api.PortworxVolumeSource{}}},
+				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via configmap volumes)",
+		},
+		{
+			name: "Multiple volume list where invalid configmap volume comes after valid downwardapi projected volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{DownwardAPI: &api.DownwardAPIProjection{}}}}}},
+				{Name: "test-volume-configmap", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via configmap volumes)",
+		},
+		{
+			name: "Multiple volume list where invalid configmap projected volume comes after valid downwardapi projected volume",
+			pod: &api.Pod{Spec: api.PodSpec{Volumes: []api.Volume{
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{DownwardAPI: &api.DownwardAPIProjection{}}}}}},
+				{Name: "test-volume-projected", VolumeSource: api.VolumeSource{Projected: &api.ProjectedVolumeSource{Sources: []api.VolumeProjection{{ConfigMap: &api.ConfigMapProjection{}}}}}},
+			}}},
+			expectRejection: true,
+			resource:        "configmaps (via projected volumes)",
 		},
 	}
 	for _, test := range tests {

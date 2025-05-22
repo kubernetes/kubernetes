@@ -107,10 +107,6 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 type defaultFunc func(pod *api.Pod) error
 
 // A static pod tried to use a ClusterTrustBundle projected volume source.
-
-// A static pod tried to use a resource claim.
-
-// A static pod tried to use a ClusterTrustBundle projected volume source.
 var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
 
 // A static pod tried to use a resource claim.
@@ -158,10 +154,10 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 			return true, nil, err
 		}
 		if resource != "" {
-			return true, nil, fmt.Errorf("static pods may not reference %s API objects", resource)
+			return true, nil, fmt.Errorf("static pods may not reference %s", resource)
 		}
 	} else {
-		// TOOD: Remove this else block once the PreventStaticPodAPIReferences gate is GA
+		// TODO: Remove this else block once the PreventStaticPodAPIReferences gate is GA
 		for _, v := range v1Pod.Spec.Volumes {
 			if v.Projected == nil {
 				continue
