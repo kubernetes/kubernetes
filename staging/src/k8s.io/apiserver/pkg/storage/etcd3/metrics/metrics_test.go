@@ -268,6 +268,42 @@ apiserver_storage_objects{resource="bar"} -1
 	}
 }
 
+func TestDeleteObjectCount(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	registry.MustRegister(objectCounts)
+	testedMetrics := "apiserver_storage_objects"
+
+	UpdateObjectCount("foo", int64(10))
+	UpdateObjectCount("bar", int64(20))
+
+	expectedMetrics := `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="foo"} 10
+apiserver_storage_objects{resource="bar"} 20
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), testedMetrics); err != nil {
+		t.Fatal(err)
+	}
+
+	DeleteObjectCount("foo")
+
+	expectedMetrics = `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+apiserver_storage_objects{resource="bar"} 20
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), testedMetrics); err != nil {
+		t.Fatal(err)
+	}
+
+	DeleteObjectCount("bar")
+	expectedMetrics = `# HELP apiserver_storage_objects [STABLE] Number of stored objects at the time of last check split by kind. In case of a fetching error, the value will be -1.
+# TYPE apiserver_storage_objects gauge
+`
+	if err := testutil.GatherAndCompare(registry, strings.NewReader(expectedMetrics), testedMetrics); err != nil {
+		t.Fatal(err)
+	}
+}
+
 type fakeEtcdMonitor struct {
 	storageSize int64
 }
