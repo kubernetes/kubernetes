@@ -100,7 +100,7 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
-  // For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
+	// For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
 	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
 	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
 	pluginSettings := framework.NewPluginSettings()
