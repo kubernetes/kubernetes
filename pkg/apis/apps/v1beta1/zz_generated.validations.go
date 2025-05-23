@@ -23,6 +23,7 @@ package v1beta1
 
 import (
 	context "context"
+	fmt "fmt"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -38,7 +39,11 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	scheme.AddValidationFunc((*appsv1beta1.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_Scale(ctx, op, nil /* fldPath */, obj.(*appsv1beta1.Scale), safe.Cast[*appsv1beta1.Scale](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/scale":
+			return Validate_Scale(ctx, op, nil /* fldPath */, obj.(*appsv1beta1.Scale), safe.Cast[*appsv1beta1.Scale](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
 }
