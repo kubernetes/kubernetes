@@ -21,14 +21,7 @@ import (
 	"k8s.io/gengo/v2/types"
 )
 
-var stringType = &types.Type{
-	Name: types.Name{
-		Package: "",
-		Name:    "string",
-	},
-	Kind: types.Builtin,
-}
-
+// gengo has `PointerTo()` but not the rest, so keep this here for consistency.
 func ptrTo(t *types.Type) *types.Type {
 	return &types.Type{
 		Name: types.Name{
@@ -58,7 +51,7 @@ func mapOf(t *types.Type) *types.Type {
 			Name:    "map[string]" + t.Name.String(),
 		},
 		Kind: types.Map,
-		Key:  stringType,
+		Key:  types.String,
 		Elem: t,
 	}
 }
@@ -92,19 +85,19 @@ func TestIsDirectComparable(t *testing.T) {
 		expect bool
 	}{
 		{
-			in:     stringType,
+			in:     types.String,
 			expect: true,
 		}, {
-			in:     ptrTo(stringType),
+			in:     ptrTo(types.String),
 			expect: false,
 		}, {
-			in:     sliceOf(stringType),
+			in:     sliceOf(types.String),
 			expect: false,
 		}, {
-			in:     mapOf(stringType),
+			in:     mapOf(types.String),
 			expect: false,
 		}, {
-			in:     aliasOf("s", stringType),
+			in:     aliasOf("s", types.String),
 			expect: true,
 		}, {
 			in: &types.Type{
@@ -116,7 +109,7 @@ func TestIsDirectComparable(t *testing.T) {
 				Members: []types.Member{
 					{
 						Name: "s",
-						Type: stringType,
+						Type: types.String,
 					},
 				},
 			},
@@ -131,22 +124,22 @@ func TestIsDirectComparable(t *testing.T) {
 				Members: []types.Member{
 					{
 						Name: "s",
-						Type: ptrTo(stringType),
+						Type: ptrTo(types.String),
 					},
 				},
 			},
 			expect: false,
 		}, {
-			in:     arrayOf(stringType),
+			in:     arrayOf(types.String),
 			expect: true,
 		}, {
-			in:     arrayOf(aliasOf("s", stringType)),
+			in:     arrayOf(aliasOf("s", types.String)),
 			expect: true,
 		}, {
-			in:     arrayOf(ptrTo(stringType)),
+			in:     arrayOf(ptrTo(types.String)),
 			expect: false,
 		}, {
-			in:     arrayOf(mapOf(stringType)),
+			in:     arrayOf(mapOf(types.String)),
 			expect: false,
 		},
 	}

@@ -999,8 +999,6 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			bufsw := sw.Dup(buf)
 
 			validations := fld.fieldValidations
-
-			// fldRatchetingChecked is used to avoid emitting the ratcheting check multiple times.
 			fldRatchetingChecked := false
 			if !validations.Empty() {
 				emitComments(validations.Comments, bufsw)
@@ -1136,9 +1134,15 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 	}
 	// If the type is a builtin, we can use a simpler equality check when they are not nil.
 	if validators.IsDirectComparable(validators.NonPointer(validators.NativeType(t))) {
-		_, exprPfx, _ := getLeafTypeAndPrefixes(t)
-		targs["exprPfx"] = exprPfx
-		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && $.exprPfx$obj == $.exprPfx$oldObj)) {\n", targs)
+		// We should never get anything but pointers here, since every other
+		// nilable type is not Comparable.
+		//
+		// This condition looks overly complex, but each case is needed:
+		// - obj == oldObj : handle pointers which are nil in old and new
+		// - obj != nil : handle optional fields which are updated to nil
+		// - oldObj != nil : handle optional fields which are updated from nil
+		// - *obj == *oldObj : compare values
+		sw.Do("if op.Type == $.operation.Update|raw$ && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {\n", targs)
 	} else {
 		targs["equality"] = mkSymbolArgs(c, equalityPkgSymbols)
 		sw.Do("if op.Type == $.operation.Update|raw$ && $.equality.Semantic|raw$.DeepEqual(obj, oldObj) {\n", targs)

@@ -25,22 +25,20 @@ import (
 func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
-	st.Value(&Struct{
-		// All zero-values.
-	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":           []string{"Required value"},
-		"stringPtrField":        []string{"Required value"},
-		"stringTypedefField":    []string{"Required value"},
-		"stringTypedefPtrField": []string{"Required value"},
-		"intField":              []string{"Required value"},
-		"intPtrField":           []string{"Required value"},
-		"intTypedefField":       []string{"Required value"},
-		"intTypedefPtrField":    []string{"Required value"},
-		"otherStructPtrField":   []string{"Required value"},
-		"sliceField":            []string{"Required value"},
-		"sliceTypedefField":     []string{"Required value"},
-		"mapField":              []string{"Required value"},
-		"mapTypedefField":       []string{"Required value"},
+	st.Value(&Struct{ /* All zero-values */ }).ExpectRegexpsByPath(map[string][]string{
+		"stringField":           {"Required value"},
+		"stringPtrField":        {"Required value"},
+		"stringTypedefField":    {"Required value"},
+		"stringTypedefPtrField": {"Required value"},
+		"intField":              {"Required value"},
+		"intPtrField":           {"Required value"},
+		"intTypedefField":       {"Required value"},
+		"intTypedefPtrField":    {"Required value"},
+		"otherStructPtrField":   {"Required value"},
+		"sliceField":            {"Required value"},
+		"sliceTypedefField":     {"Required value"},
+		"mapField":              {"Required value"},
+		"mapTypedefField":       {"Required value"},
 	})
 
 	// Test validation ratcheting
@@ -56,19 +54,19 @@ func Test(t *testing.T) {
 		MapField:              map[string]string{},    // does not satisfy required
 		MapTypedefField:       map[string]string{},    // does not satisfy required
 	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":           []string{"Required value"},
-		"stringPtrField":        []string{"field Struct.StringPtrField"},
-		"stringTypedefField":    []string{"Required value"},
-		"stringTypedefPtrField": []string{"field Struct.StringTypedefPtrField", "type StringType"},
-		"intField":              []string{"Required value"},
-		"intPtrField":           []string{"field Struct.IntPtrField"},
-		"intTypedefField":       []string{"Required value"},
-		"intTypedefPtrField":    []string{"field Struct.IntTypedefPtrField", "type IntType"},
-		"otherStructPtrField":   []string{"Required value"},
-		"sliceField":            []string{"Required value"},
-		"sliceTypedefField":     []string{"Required value"},
-		"mapField":              []string{"Required value"},
-		"mapTypedefField":       []string{"Required value"},
+		"stringField":           {"Required value"},
+		"stringPtrField":        {"field Struct.StringPtrField"},
+		"stringTypedefField":    {"Required value"},
+		"stringTypedefPtrField": {"field Struct.StringTypedefPtrField", "type StringType"},
+		"intField":              {"Required value"},
+		"intPtrField":           {"field Struct.IntPtrField"},
+		"intTypedefField":       {"Required value"},
+		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
+		"otherStructPtrField":   {"Required value"},
+		"sliceField":            {"Required value"},
+		"sliceTypedefField":     {"Required value"},
+		"mapField":              {"Required value"},
+		"mapTypedefField":       {"Required value"},
 	})
 	// Test validation ratcheting
 	st.Value(&Struct{
@@ -88,63 +86,39 @@ func Test(t *testing.T) {
 		// nil and empty slices are considered equivalent.
 	}).ExpectValid()
 
-	st.Value(&Struct{
-		StringField:           "abc",
-		StringPtrField:        ptr.To("xyz"),
-		StringTypedefField:    StringType("abc"),
-		StringTypedefPtrField: ptr.To(StringType("xyz")),
-		IntField:              123,
-		IntPtrField:           ptr.To(456),
-		IntTypedefField:       IntType(123),
-		IntTypedefPtrField:    ptr.To(IntType(456)),
-		OtherStructPtrField:   &OtherStruct{},
-		SliceField:            []string{"a", "b"},
-		SliceTypedefField:     SliceType([]string{"a", "b"}),
-		MapField:              map[string]string{"a": "b", "c": "d"},
-		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
-	}).ExpectRegexpsByPath(map[string][]string{
-		"stringField":           []string{"field Struct.StringField"},
-		"stringPtrField":        []string{"field Struct.StringPtrField"},
-		"stringTypedefField":    []string{"field Struct.StringTypedefField", "type StringType"},
-		"stringTypedefPtrField": []string{"field Struct.StringTypedefPtrField", "type StringType"},
-		"intField":              []string{"field Struct.IntField"},
-		"intPtrField":           []string{"field Struct.IntPtrField"},
-		"intTypedefField":       []string{"field Struct.IntTypedefField", "type IntType"},
-		"intTypedefPtrField":    []string{"field Struct.IntTypedefPtrField", "type IntType"},
-		"otherStructPtrField":   []string{"field Struct.OtherStructPtrField", "type OtherStruct"},
-		"sliceField":            []string{"field Struct.SliceField"},
-		"sliceTypedefField":     []string{"field Struct.SliceTypedefField", "type SliceType"},
-		"mapField":              []string{"field Struct.MapField"},
-		"mapTypedefField":       []string{"field Struct.MapTypedefField", "type MapType"},
+	mkInvalid := func() *Struct {
+		return &Struct{
+			StringField:           "abc",
+			StringPtrField:        ptr.To("xyz"),
+			StringTypedefField:    StringType("abc"),
+			StringTypedefPtrField: ptr.To(StringType("xyz")),
+			IntField:              123,
+			IntPtrField:           ptr.To(456),
+			IntTypedefField:       IntType(123),
+			IntTypedefPtrField:    ptr.To(IntType(456)),
+			OtherStructPtrField:   &OtherStruct{},
+			SliceField:            []string{"a", "b"},
+			SliceTypedefField:     SliceType([]string{"a", "b"}),
+			MapField:              map[string]string{"a": "b", "c": "d"},
+			MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
+		}
+	}
+
+	st.Value(mkInvalid()).ExpectRegexpsByPath(map[string][]string{
+		"stringField":           {"field Struct.StringField"},
+		"stringPtrField":        {"field Struct.StringPtrField"},
+		"stringTypedefField":    {"field Struct.StringTypedefField", "type StringType"},
+		"stringTypedefPtrField": {"field Struct.StringTypedefPtrField", "type StringType"},
+		"intField":              {"field Struct.IntField"},
+		"intPtrField":           {"field Struct.IntPtrField"},
+		"intTypedefField":       {"field Struct.IntTypedefField", "type IntType"},
+		"intTypedefPtrField":    {"field Struct.IntTypedefPtrField", "type IntType"},
+		"otherStructPtrField":   {"field Struct.OtherStructPtrField", "type OtherStruct"},
+		"sliceField":            {"field Struct.SliceField"},
+		"sliceTypedefField":     {"field Struct.SliceTypedefField", "type SliceType"},
+		"mapField":              {"field Struct.MapField"},
+		"mapTypedefField":       {"field Struct.MapTypedefField", "type MapType"},
 	})
 	// Test validation ratcheting
-	st.Value(&Struct{
-		StringField:           "abc",
-		StringPtrField:        ptr.To("xyz"),
-		StringTypedefField:    StringType("abc"),
-		StringTypedefPtrField: ptr.To(StringType("xyz")),
-		IntField:              123,
-		IntPtrField:           ptr.To(456),
-		IntTypedefField:       IntType(123),
-		IntTypedefPtrField:    ptr.To(IntType(456)),
-		OtherStructPtrField:   &OtherStruct{},
-		SliceField:            []string{"a", "b"},
-		SliceTypedefField:     SliceType([]string{"a", "b"}),
-		MapField:              map[string]string{"a": "b", "c": "d"},
-		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
-	}).OldValue(&Struct{
-		StringField:           "abc",
-		StringPtrField:        ptr.To("xyz"),
-		StringTypedefField:    StringType("abc"),
-		StringTypedefPtrField: ptr.To(StringType("xyz")),
-		IntField:              123,
-		IntPtrField:           ptr.To(456),
-		IntTypedefField:       IntType(123),
-		IntTypedefPtrField:    ptr.To(IntType(456)),
-		OtherStructPtrField:   &OtherStruct{},
-		SliceField:            []string{"a", "b"},
-		SliceTypedefField:     SliceType([]string{"a", "b"}),
-		MapField:              map[string]string{"a": "b", "c": "d"},
-		MapTypedefField:       MapType(map[string]string{"a": "b", "c": "d"}),
-	}).ExpectValid()
+	st.Value(mkInvalid()).OldValue(mkInvalid()).ExpectValid()
 }
