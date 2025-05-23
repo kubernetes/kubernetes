@@ -27,6 +27,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
@@ -57,13 +58,21 @@ type Plugin struct {
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
-	mutex             sync.Mutex
-	conn              *grpc.ClientConn
-	endpoint          string
-	chosenService     string // e.g. drapbv1beta1.DRAPluginService
-	clientCallTimeout time.Duration
+	mutex               sync.Mutex
+	conn                *grpc.ClientConn
+	connected           bool
+	endpoint            string
+	chosenService       string // e.g. drapbv1beta1.DRAPluginService
+	registrationHandler *RegistrationHandler
+	clientCallTimeout   time.Duration
+	cancelCleanup       *context.CancelCauseFunc
 }
 
+// getOrCreateGRPCConn establishes and returns a gRPC client connection to the plugin's endpoint.
+// If a connection already exists, it returns the existing connection. Otherwise, it creates a new
+// connection using the specified endpoint and protocol, sets up necessary interceptors and handlers,
+// and waits for the connection to become ready within a one-second timeout. The connection is stored
+// for future use. Returns an error if the connection cannot be established or is not ready in time.
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
@@ -89,6 +98,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
 		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
+		grpc.WithStatsHandler(p),
 	)
 	if err != nil {
 		return nil, err
@@ -179,3 +189,27 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 		return err
 	}
 }
+
+func (p *Plugin) HandleConn(ctx context.Context, connStats stats.ConnStats) {
+	logger := klog.FromContext(ctx)
+	switch connStats.(type) {
+	case *stats.ConnBegin:
+		logger.V(2).Info("Connection begin", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
+		p.connected = true
+		p.registrationHandler.cancelCleanup(p.name, p.cancelCleanup)
+	case *stats.ConnEnd:
+		logger.V(2).Info("Connection end", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
+		p.connected = false
+		if !draPlugins.pluginConnected(p.name) {
+			p.cancelCleanup = p.registrationHandler.cleanupResourceSlices(p.name)
+		}
+		if p.conn != nil {
+			logger.V(2).Info("Trigger reconnecting to plugin", "plugin", p.name, "endpoint", p.endpoint)
+			p.conn.Connect()
+		}
+	}
+}
+
+func (p *Plugin) HandleRPC(ctx context.Context, stats stats.RPCStats)                  {}
+func (p *Plugin) TagConn(ctx context.Context, info *stats.ConnTagInfo) context.Context { return ctx }
+func (p *Plugin) TagRPC(ctx context.Context, info *stats.RPCTagInfo) context.Context   { return ctx }
