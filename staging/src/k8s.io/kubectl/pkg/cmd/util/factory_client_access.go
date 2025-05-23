@@ -175,7 +175,7 @@ func (f *factoryImpl) Validator(validationDirective string) (validation.Schema, 
 	primary := resource.NewQueryParamVerifierV3(dynamicClient, oapiV3Client, queryParam)
 	secondary := resource.NewQueryParamVerifier(dynamicClient, f.openAPIGetter(), queryParam)
 	fallback := resource.NewFallbackQueryParamVerifier(primary, secondary)
-	return validation.NewParamVerifyingSchema(schema, fallback, string(validationDirective)), nil
+	return validation.NewParamVerifyingSchema(schema, newCachingVerifier(fallback), string(validationDirective)), nil
 }
 
 // OpenAPISchema returns metadata and structural information about
