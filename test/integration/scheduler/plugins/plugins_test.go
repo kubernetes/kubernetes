@@ -590,12 +590,12 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state framework.Cycl
 		return nil, framework.NewStatus(framework.Error, err.Error())
 	}
 
-	pluginInfo := framework.NewPluginInfo()
-	pluginInfo.State = state
+	pluginSettings := framework.NewPluginSettings()
+	pluginSettings.State = state
 	for _, nodeInfo := range nodeInfos {
-		pp.fh.RunFilterPlugins(ctx, pluginInfo, pod, nodeInfo)
+		pp.fh.RunFilterPlugins(ctx, pluginSettings, pod, nodeInfo)
 	}
-	pp.fh.RunScorePlugins(ctx, pluginInfo, pod, nodeInfos)
+	pp.fh.RunScorePlugins(ctx, pluginSettings, pod, nodeInfos)
 
 	if pp.failPostFilter {
 		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))

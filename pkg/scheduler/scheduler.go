@@ -84,7 +84,7 @@ type Scheduler struct {
 	// SchedulePod tries to schedule the given pod to one of the nodes in the node list.
 	// Return a struct of ScheduleResult with the name of suggested host on success,
 	// otherwise will return a FitError with reasons.
-	SchedulePod func(ctx context.Context, fwk framework.Framework, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod) (ScheduleResult, error)
+	SchedulePod func(ctx context.Context, fwk framework.Framework, pluginSettings *framework.PluginSettings, pod *v1.Pod) (ScheduleResult, error)
 
 	// Close this to shut down the scheduler.
 	StopEverything <-chan struct{}

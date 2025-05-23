@@ -103,8 +103,8 @@ func (c *CycleStateImpl) Delete(key StateKey) {
 	c.storage.Delete(key)
 }
 
-// PluginRunningInfo contains information for the scheduler on how to run plugins in the given scheduling cycle.
-type PluginRunningInfo struct {
+// PluginSettings contains information for the scheduler on how to run plugins in the given scheduling cycle.
+type PluginSettings struct {
 	// if recordPluginMetrics is true, metrics.PluginExecutionDuration will be recorded for this cycle.
 	recordPluginMetrics bool
 	// SkipFilterPlugins are plugins that will be skipped in the Filter extension point.
@@ -116,7 +116,7 @@ type PluginRunningInfo struct {
 }
 
 // ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics should be recorded.
-func (p *PluginRunningInfo) ShouldRecordPluginMetrics() bool {
+func (p *PluginSettings) ShouldRecordPluginMetrics() bool {
 	if p == nil {
 		return false
 	}
@@ -124,19 +124,19 @@ func (p *PluginRunningInfo) ShouldRecordPluginMetrics() bool {
 }
 
 // SetRecordPluginMetrics sets recordPluginMetrics to the given value.
-func (p *PluginRunningInfo) SetRecordPluginMetrics(flag bool) {
+func (p *PluginSettings) SetRecordPluginMetrics(flag bool) {
 	if p == nil {
 		return
 	}
 	p.recordPluginMetrics = flag
 }
 
-func (p *PluginRunningInfo) Clone() *PluginRunningInfo {
+func (p *PluginSettings) Clone() *PluginSettings {
 	if p == nil {
 		return nil
 	}
 
-	copy := &PluginRunningInfo{}
+	copy := &PluginSettings{}
 	copy.recordPluginMetrics = p.recordPluginMetrics
 	copy.SkipFilterPlugins = p.SkipFilterPlugins
 	copy.SkipScorePlugins = p.SkipScorePlugins
@@ -147,8 +147,8 @@ func (p *PluginRunningInfo) Clone() *PluginRunningInfo {
 	return copy
 }
 
-func NewPluginInfo() *PluginRunningInfo {
-	p := &PluginRunningInfo{}
+func NewPluginSettings() *PluginSettings {
+	p := &PluginSettings{}
 	p.State = NewCycleState()
 	return p
 }

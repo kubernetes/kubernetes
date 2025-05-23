@@ -444,13 +444,13 @@ func TestPostFilter(t *testing.T) {
 			}
 			p.Evaluator = preemption.NewEvaluator(names.DefaultPreemption, f, &p, false)
 
-			pluginInfo := framework.NewPluginInfo()
-			// Ensure <pluginInfo.State> is populated.
-			if _, status, _ := f.RunPreFilterPlugins(ctx, pluginInfo, tt.pod); !status.IsSuccess() {
+			pluginSettings := framework.NewPluginSettings()
+			// Ensure <pluginSettings.State> is populated.
+			if _, status, _ := f.RunPreFilterPlugins(ctx, pluginSettings, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
-			gotResult, gotStatus := p.PostFilter(ctx, pluginInfo.State, tt.pod, tt.filteredNodesStatuses)
+			gotResult, gotStatus := p.PostFilter(ctx, pluginSettings.State, tt.pod, tt.filteredNodesStatuses)
 			// As we cannot compare two errors directly due to miss the equal method for how to compare two errors, so just need to compare the reasons.
 			if gotStatus.Code() == framework.Error {
 				if diff := cmp.Diff(tt.wantStatus.Reasons(), gotStatus.Reasons()); diff != "" {
@@ -1202,9 +1202,9 @@ func TestDryRunPreemption(t *testing.T) {
 			getOffsetRand = rand.New(rand.NewSource(4)).Int31n
 			var prevNumFilterCalled int32
 			for cycle, pod := range tt.testPods {
-				pluginInfo := framework.NewPluginInfo()
+				pluginSettings := framework.NewPluginSettings()
 				// Some tests rely on PreFilter plugin to compute its CycleState (within PluginRunningInfo).
-				if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginInfo, pod); !status.IsSuccess() {
+				if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginSettings, pod); !status.IsSuccess() {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
 				pe := preemption.Evaluator{
@@ -1215,7 +1215,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Interface:  pl,
 				}
 				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got, _, _ := pe.DryRunPreemption(ctx, pluginInfo, pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				got, _, _ := pe.DryRunPreemption(ctx, pluginSettings, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1435,9 +1435,9 @@ func TestSelectBestCandidate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			pluginInfo := framework.NewPluginInfo()
-			// Some tests rely on PreFilter plugin to compute its CycleState (within the PluginInfo).
-			if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginInfo, tt.pod); !status.IsSuccess() {
+			pluginSettings := framework.NewPluginSettings()
+			// Some tests rely on PreFilter plugin to compute its CycleState (within the PluginSettings).
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginSettings, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 
@@ -1455,7 +1455,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				Interface:  pl,
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pe.DryRunPreemption(ctx, framework.NewPluginInfo(), tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pe.DryRunPreemption(ctx, framework.NewPluginSettings(), tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pe.SelectCandidate(ctx, candidates)
 			if s == nil || len(s.Name()) == 0 {
 				return
@@ -1839,9 +1839,9 @@ func TestPreempt(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				pluginInfo := framework.NewPluginInfo()
+				pluginSettings := framework.NewPluginSettings()
 				// Some tests rely on PreFilter plugin to compute its CycleState.
-				if _, s, _ := fwk.RunPreFilterPlugins(ctx, pluginInfo, testPod); !s.IsSuccess() {
+				if _, s, _ := fwk.RunPreFilterPlugins(ctx, pluginSettings, testPod); !s.IsSuccess() {
 					t.Errorf("Unexpected preFilterStatus: %v", s)
 				}
 				// Call preempt and check the expected results.
@@ -1862,7 +1862,7 @@ func TestPreempt(t *testing.T) {
 					nodeToStatusMap.Set(n.Name, framework.NewStatus(framework.Unschedulable))
 				}
 
-				res, status := pe.Preempt(ctx, pluginInfo, testPod, nodeToStatusMap)
+				res, status := pe.Preempt(ctx, pluginSettings, testPod, nodeToStatusMap)
 				if !status.IsSuccess() && !status.IsRejected() {
 					t.Errorf("unexpected error in preemption: %v", status.AsError())
 				}
@@ -1935,7 +1935,7 @@ func TestPreempt(t *testing.T) {
 				mu.RUnlock()
 
 				// Call preempt again and make sure it doesn't preempt any more pods.
-				res, status = pe.Preempt(ctx, pluginInfo, testPod, framework.NewDefaultNodeToStatus())
+				res, status = pe.Preempt(ctx, pluginSettings, testPod, framework.NewDefaultNodeToStatus())
 				if !status.IsSuccess() && !status.IsRejected() {
 					t.Errorf("unexpected error in preemption: %v", status.AsError())
 				}

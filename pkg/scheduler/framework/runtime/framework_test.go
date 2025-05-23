@@ -419,7 +419,7 @@ var defaultWeights = map[string]int32{
 	scorePlugin1:              1,
 }
 
-var pluginInfo = framework.NewPluginInfo()
+var pluginSettings = framework.NewPluginSettings()
 
 // Pod is only used for logging errors.
 var pod = &v1.Pod{}
@@ -1113,12 +1113,12 @@ func TestRunPreScorePlugins(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
-			pluginInfo := framework.NewPluginInfo()
-			status := f.RunPreScorePlugins(ctx, pluginInfo, nil, nil)
+			pluginSettings := framework.NewPluginSettings()
+			status := f.RunPreScorePlugins(ctx, pluginSettings, nil, nil)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
 			}
-			skipped := pluginInfo.SkipScorePlugins
+			skipped := pluginSettings.SkipScorePlugins
 			if diff := cmp.Diff(tt.wantSkippedPlugins, skipped); diff != "" {
 				t.Errorf("wrong skip score plugins (-want, +got):\n%s", diff)
 			}
@@ -1511,9 +1511,9 @@ func TestRunScorePlugins(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			pluginInfo := framework.NewPluginInfo()
-			pluginInfo.SkipScorePlugins = tt.skippedPlugins
-			res, status := f.RunScorePlugins(ctx, pluginInfo, pod, BuildNodeInfos(nodes))
+			pluginSettings := framework.NewPluginSettings()
+			pluginSettings.SkipScorePlugins = tt.skippedPlugins
+			res, status := f.RunScorePlugins(ctx, pluginSettings, pod, BuildNodeInfos(nodes))
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -1558,10 +1558,10 @@ func TestPreFilterPlugins(t *testing.T) {
 		defer func() {
 			_ = f.Close()
 		}()
-		pluginInfo := framework.NewPluginInfo()
-		f.RunPreFilterPlugins(ctx, pluginInfo, nil)
-		f.RunPreFilterExtensionAddPod(ctx, pluginInfo, nil, nil, nil)
-		f.RunPreFilterExtensionRemovePod(ctx, pluginInfo, nil, nil, nil)
+		pluginSettings := framework.NewPluginSettings()
+		f.RunPreFilterPlugins(ctx, pluginSettings, nil)
+		f.RunPreFilterExtensionAddPod(ctx, pluginSettings, nil, nil, nil)
+		f.RunPreFilterExtensionRemovePod(ctx, pluginSettings, nil, nil, nil)
 
 		if preFilter1.PreFilterCalled != 1 {
 			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
@@ -1752,15 +1752,15 @@ func TestRunPreFilterPlugins(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			pluginInfo := framework.NewPluginInfo()
-			result, status, _ := f.RunPreFilterPlugins(ctx, pluginInfo, nil)
+			pluginSettings := framework.NewPluginSettings()
+			result, status, _ := f.RunPreFilterPlugins(ctx, pluginSettings, nil)
 			if diff := cmp.Diff(tt.wantPreFilterResult, result); diff != "" {
 				t.Errorf("wrong status (-want,+got):\n%s", diff)
 			}
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
 			}
-			skipped := pluginInfo.SkipFilterPlugins
+			skipped := pluginSettings.SkipFilterPlugins
 			if diff := cmp.Diff(tt.wantSkippedPlugins, skipped); diff != "" {
 				t.Errorf("wrong skip filter plugins (-want,+got):\n%s", diff)
 			}
@@ -1846,9 +1846,9 @@ func TestRunPreFilterExtensionRemovePod(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			pluginInfo := framework.NewPluginInfo()
-			pluginInfo.SkipFilterPlugins = tt.skippedPluginNames
-			status := f.RunPreFilterExtensionRemovePod(ctx, pluginInfo, nil, nil, nil)
+			pluginSettings := framework.NewPluginSettings()
+			pluginSettings.SkipFilterPlugins = tt.skippedPluginNames
+			status := f.RunPreFilterExtensionRemovePod(ctx, pluginSettings, nil, nil, nil)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
 			}
@@ -1934,9 +1934,9 @@ func TestRunPreFilterExtensionAddPod(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			pluginInfo := framework.NewPluginInfo()
-			pluginInfo.SkipFilterPlugins = tt.skippedPluginNames
-			status := f.RunPreFilterExtensionAddPod(ctx, pluginInfo, nil, nil, nil)
+			pluginSettings := framework.NewPluginSettings()
+			pluginSettings.SkipFilterPlugins = tt.skippedPluginNames
+			status := f.RunPreFilterExtensionAddPod(ctx, pluginSettings, nil, nil, nil)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("wrong status code. got: %v, want: %v", status, tt.wantStatusCode)
 			}
@@ -2140,9 +2140,9 @@ func TestFilterPlugins(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
-			pluginInfo = framework.NewPluginInfo()
-			pluginInfo.SkipFilterPlugins = tt.skippedPlugins
-			gotStatus := f.RunFilterPlugins(ctx, pluginInfo, pod, nil)
+			pluginSettings = framework.NewPluginSettings()
+			pluginSettings.SkipFilterPlugins = tt.skippedPlugins
+			gotStatus := f.RunFilterPlugins(ctx, pluginSettings, pod, nil)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-want,+got):\n%s", diff)
 			}
@@ -2268,7 +2268,7 @@ func TestPostFilterPlugins(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
-			_, gotStatus := f.RunPostFilterPlugins(ctx, pluginInfo, pod, nil)
+			_, gotStatus := f.RunPostFilterPlugins(ctx, pluginSettings, pod, nil)
 
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status (-want,+got):\n%s", diff)
@@ -2437,7 +2437,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				_ = f.Close()
 			}()
 			tt.nodeInfo.SetNode(tt.node)
-			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, pluginInfo, tt.pod, tt.nodeInfo)
+			gotStatus := f.RunFilterPluginsWithNominatedPods(ctx, pluginSettings, tt.pod, tt.nodeInfo)
 			if diff := cmp.Diff(tt.wantStatus, gotStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("Unexpected status: (-want,+got):\n%s", diff)
 			}
@@ -2598,7 +2598,7 @@ func TestPreBindPlugins(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			status := f.RunPreBindPlugins(ctx, pluginInfo, pod, "")
+			status := f.RunPreBindPlugins(ctx, pluginSettings, pod, "")
 
 			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
@@ -2760,7 +2760,7 @@ func TestReservePlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunReservePluginsReserve(ctx, pluginInfo, pod, "")
+			status := f.RunReservePluginsReserve(ctx, pluginSettings, pod, "")
 
 			if diff := cmp.Diff(tt.wantStatus, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
@@ -2892,7 +2892,7 @@ func TestPermitPlugins(t *testing.T) {
 				t.Fatalf("fail to create framework: %s", err)
 			}
 
-			status := f.RunPermitPlugins(ctx, pluginInfo, pod, "")
+			status := f.RunPermitPlugins(ctx, pluginSettings, pod, "")
 			if diff := cmp.Diff(tt.want, status, statusCmpOpts...); diff != "" {
 				t.Errorf("Wrong status code (-want,+got):\n%s", diff)
 			}
@@ -2908,7 +2908,7 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 }
 
 func TestRecordingMetrics(t *testing.T) {
-	pluginInfo.SetRecordPluginMetrics(true)
+	pluginSettings.SetRecordPluginMetrics(true)
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -2918,73 +2918,75 @@ func TestRecordingMetrics(t *testing.T) {
 	}{
 		{
 			name:               "PreFilter - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, pluginInfo, pod) },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, pluginSettings, pod) },
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         framework.Success,
 		},
 		{
 			name:               "PreScore - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, pluginInfo, pod, nil) },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, pluginSettings, pod, nil) },
 			wantExtensionPoint: "PreScore",
 			wantStatus:         framework.Success,
 		},
 		{
 			name: "Score - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunScorePlugins(ctx, pluginInfo, pod, BuildNodeInfos(nodes))
+				f.RunScorePlugins(ctx, pluginSettings, pod, BuildNodeInfos(nodes))
 			},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Success,
 		},
 		{
-			name:               "Reserve - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, pluginInfo, pod, "") },
+			name: "Reserve - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunReservePluginsReserve(ctx, pluginSettings, pod, "")
+			},
 			wantExtensionPoint: "Reserve",
 			wantStatus:         framework.Success,
 		},
 		{
 			name: "Unreserve - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunReservePluginsUnreserve(ctx, pluginInfo, pod, "")
+				f.RunReservePluginsUnreserve(ctx, pluginSettings, pod, "")
 			},
 			wantExtensionPoint: "Unreserve",
 			wantStatus:         framework.Success,
 		},
 		{
 			name:               "PreBind - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, pluginSettings, pod, "") },
 			wantExtensionPoint: "PreBind",
 			wantStatus:         framework.Success,
 		},
 		{
 			name:               "Bind - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, pluginSettings, pod, "") },
 			wantExtensionPoint: "Bind",
 			wantStatus:         framework.Success,
 		},
 		{
 			name:               "PostBind - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPostBindPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPostBindPlugins(ctx, pluginSettings, pod, "") },
 			wantExtensionPoint: "PostBind",
 			wantStatus:         framework.Success,
 		},
 		{
 			name:               "Permit - Success",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, pluginSettings, pod, "") },
 			wantExtensionPoint: "Permit",
 			wantStatus:         framework.Success,
 		},
 
 		{
 			name:               "PreFilter - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, pluginInfo, pod) },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreFilterPlugins(ctx, pluginSettings, pod) },
 			inject:             injectedResult{PreFilterStatus: int(framework.Error)},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         framework.Error,
 		},
 		{
 			name:               "PreScore - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, pluginInfo, pod, nil) },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreScorePlugins(ctx, pluginSettings, pod, nil) },
 			inject:             injectedResult{PreScoreStatus: int(framework.Error)},
 			wantExtensionPoint: "PreScore",
 			wantStatus:         framework.Error,
@@ -2992,43 +2994,45 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "Score - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunScorePlugins(ctx, pluginInfo, pod, BuildNodeInfos(nodes))
+				f.RunScorePlugins(ctx, pluginSettings, pod, BuildNodeInfos(nodes))
 			},
 			inject:             injectedResult{ScoreStatus: int(framework.Error)},
 			wantExtensionPoint: "Score",
 			wantStatus:         framework.Error,
 		},
 		{
-			name:               "Reserve - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunReservePluginsReserve(ctx, pluginInfo, pod, "") },
+			name: "Reserve - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunReservePluginsReserve(ctx, pluginSettings, pod, "")
+			},
 			inject:             injectedResult{ReserveStatus: int(framework.Error)},
 			wantExtensionPoint: "Reserve",
 			wantStatus:         framework.Error,
 		},
 		{
 			name:               "PreBind - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPreBindPlugins(ctx, pluginSettings, pod, "") },
 			inject:             injectedResult{PreBindStatus: int(framework.Error)},
 			wantExtensionPoint: "PreBind",
 			wantStatus:         framework.Error,
 		},
 		{
 			name:               "Bind - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunBindPlugins(ctx, pluginSettings, pod, "") },
 			inject:             injectedResult{BindStatus: int(framework.Error)},
 			wantExtensionPoint: "Bind",
 			wantStatus:         framework.Error,
 		},
 		{
 			name:               "Permit - Error",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, pluginSettings, pod, "") },
 			inject:             injectedResult{PermitStatus: int(framework.Error)},
 			wantExtensionPoint: "Permit",
 			wantStatus:         framework.Error,
 		},
 		{
 			name:               "Permit - Wait",
-			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, pluginInfo, pod, "") },
+			action:             func(ctx context.Context, f framework.Framework) { f.RunPermitPlugins(ctx, pluginSettings, pod, "") },
 			inject:             injectedResult{PermitStatus: int(framework.Wait)},
 			wantExtensionPoint: "Permit",
 			wantStatus:         framework.Wait,
@@ -3195,7 +3199,7 @@ func TestRunBindPlugins(t *testing.T) {
 				_ = fwk.Close()
 			}()
 
-			st := fwk.RunBindPlugins(ctx, pluginInfo, pod, "")
+			st := fwk.RunBindPlugins(ctx, pluginSettings, pod, "")
 			if st.Code() != tt.wantStatus {
 				t.Errorf("got status code %s, want %s", st.Code(), tt.wantStatus)
 			}
@@ -3256,7 +3260,7 @@ func TestPermitWaitDurationMetric(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			f.RunPermitPlugins(ctx, pluginInfo, pod, "")
+			f.RunPermitPlugins(ctx, pluginSettings, pod, "")
 			f.WaitOnPermit(ctx, pod)
 
 			collectAndComparePermitWaitDuration(t, tt.wantRes)
@@ -3318,7 +3322,7 @@ func TestWaitOnPermit(t *testing.T) {
 				_ = f.Close()
 			}()
 
-			runPermitPluginsStatus := f.RunPermitPlugins(ctx, pluginInfo, pod, "")
+			runPermitPluginsStatus := f.RunPermitPlugins(ctx, pluginSettings, pod, "")
 			if runPermitPluginsStatus.Code() != framework.Wait {
 				t.Fatalf("Expected RunPermitPlugins to return status %v, but got %v",
 					framework.Wait, runPermitPluginsStatus.Code())

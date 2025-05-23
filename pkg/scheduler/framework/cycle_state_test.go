@@ -39,8 +39,8 @@ var key StateKey = "fakedata_key"
 
 // createPluginRunningInfoWithFakeData creates running info with CycleState with fakeData.
 // The given data is used in stored fakeData.
-func createPluginRunningInfoWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *PluginRunningInfo {
-	p := NewPluginInfo()
+func createPluginRunningInfoWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *PluginSettings {
+	p := NewPluginSettings()
 	p.SetRecordPluginMetrics(recordPluginMetrics)
 	if len(skipPlugins) > 0 {
 		p.SkipFilterPlugins = make(sets.Set[string])
@@ -59,7 +59,7 @@ func createPluginRunningInfoWithFakeData(data string, recordPluginMetrics bool, 
 
 // isCycleStateEqual returns whether two CycleState, which has fakeData in storage, is equal or not.
 // And if they are not equal, returns message which shows why not equal.
-func isPluginRunningInfoEqual(a, b *PluginRunningInfo) (bool, string) {
+func isPluginRunningInfoEqual(a, b *PluginSettings) (bool, string) {
 	if a == nil && b == nil {
 		return true, ""
 	}
@@ -130,48 +130,48 @@ func isPluginRunningInfoEqual(a, b *PluginRunningInfo) (bool, string) {
 
 func TestPluginRunningInfoClone(t *testing.T) {
 	tests := []struct {
-		name                 string
-		pluginInfo           *PluginRunningInfo
-		wantClonedPluginInfo *PluginRunningInfo
+		name                     string
+		pluginSettings           *PluginSettings
+		wantClonedPluginSettings *PluginSettings
 	}{
 		{
-			name:                 "clone with recordPluginMetrics true",
-			pluginInfo:           createPluginRunningInfoWithFakeData("data", true),
-			wantClonedPluginInfo: createPluginRunningInfoWithFakeData("data", true),
+			name:                     "clone with recordPluginMetrics true",
+			pluginSettings:           createPluginRunningInfoWithFakeData("data", true),
+			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", true),
 		},
 		{
-			name:                 "clone with recordPluginMetrics false",
-			pluginInfo:           createPluginRunningInfoWithFakeData("data", false),
-			wantClonedPluginInfo: createPluginRunningInfoWithFakeData("data", false),
+			name:                     "clone with recordPluginMetrics false",
+			pluginSettings:           createPluginRunningInfoWithFakeData("data", false),
+			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", false),
 		},
 		{
-			name:                 "clone with skipScoringPlugins",
-			pluginInfo:           createPluginRunningInfoWithFakeData("data", true, []string{"pl1", "pl2"}),
-			wantClonedPluginInfo: createPluginRunningInfoWithFakeData("data", true, []string{"pl1", "pl2"}),
+			name:                     "clone with skipScoringPlugins",
+			pluginSettings:           createPluginRunningInfoWithFakeData("data", true, []string{"pl1", "pl2"}),
+			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", true, []string{"pl1", "pl2"}),
 		},
 		{
-			name:                 "clone with skipScoringAndFilterPlugins",
-			pluginInfo:           createPluginRunningInfoWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
-			wantClonedPluginInfo: createPluginRunningInfoWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
+			name:                     "clone with skipScoringAndFilterPlugins",
+			pluginSettings:               createPluginRunningInfoWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
+			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
 		},
 		{
-			name:                 "clone with skipFilterPlugins",
-			pluginInfo:           createPluginRunningInfoWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
-			wantClonedPluginInfo: createPluginRunningInfoWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
+			name:                     "clone with skipFilterPlugins",
+			pluginSettings:               createPluginRunningInfoWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
+			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
 		},
 		{
-			name:                 "clone with nil PluginInfo",
-			pluginInfo:           nil,
-			wantClonedPluginInfo: nil,
+			name:                     "clone with nil PluginSettings",
+			pluginSettings:               nil,
+			wantClonedPluginSettings: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pi := tt.pluginInfo
+			pi := tt.pluginSettings
 			copy := pi.Clone()
 
-			if isEqual, msg := isPluginRunningInfoEqual(copy, tt.wantClonedPluginInfo); !isEqual {
+			if isEqual, msg := isPluginRunningInfoEqual(copy, tt.wantClonedPluginSettings); !isEqual {
 				t.Errorf("unexpected cloned state: %v", msg)
 			}
 

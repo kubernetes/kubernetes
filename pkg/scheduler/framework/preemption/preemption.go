@@ -115,8 +115,8 @@ type Interface interface {
 	PodEligibleToPreemptOthers(ctx context.Context, pod *v1.Pod, nominatedNodeStatus *framework.Status) (bool, string)
 	// SelectVictimsOnNode finds minimum set of pods on the given node that should be preempted in order to make enough room
 	// for "pod" to be scheduled.
-	// Note that both `pluginInfo` and `nodeInfo` are deep copied.
-	SelectVictimsOnNode(ctx context.Context, pluginInfo *framework.PluginRunningInfo,
+	// Note that both `pluginSettings` and `nodeInfo` are deep copied.
+	SelectVictimsOnNode(ctx context.Context, pluginSettings *framework.PluginSettings,
 		pod *v1.Pod, nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status)
 	// OrderedScoreFuncs returns a list of ordered score functions to select preferable node where victims will be preempted.
 	// The ordered score functions will be processed one by one iff we find more than one node with the highest score.
@@ -228,7 +228,7 @@ func (ev *Evaluator) IsPodRunningPreemption(podUID types.UID) bool {
 //
 //   - <non-nil PostFilterResult, Success>. It's the regular happy path
 //     and the non-empty nominatedNodeName will be applied to the preemptor pod.
-func (ev *Evaluator) Preempt(ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+func (ev *Evaluator) Preempt(ctx context.Context, pluginSettings *framework.PluginSettings, pod *v1.Pod, m framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
 	logger := klog.FromContext(ctx)
 
 	// 0) Fetch the latest version of <pod>.
@@ -254,7 +254,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pluginInfo *framework.PluginRu
 	if err != nil {
 		return nil, framework.AsStatus(err)
 	}
-	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, pluginInfo, allNodes, pod, m)
+	candidates, nodeToStatusMap, err := ev.findCandidates(ctx, pluginSettings, allNodes, pod, m)
 	if err != nil && len(candidates) == 0 {
 		return nil, framework.AsStatus(err)
 	}
@@ -303,7 +303,7 @@ func (ev *Evaluator) Preempt(ctx context.Context, pluginInfo *framework.PluginRu
 
 // FindCandidates calculates a slice of preemption candidates.
 // Each candidate is executable to make the given <pod> schedulable.
-func (ev *Evaluator) findCandidates(ctx context.Context, pluginInfo *framework.PluginRunningInfo, allNodes []*framework.NodeInfo, pod *v1.Pod, m framework.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
+func (ev *Evaluator) findCandidates(ctx context.Context, pluginSettings *framework.PluginSettings, allNodes []*framework.NodeInfo, pod *v1.Pod, m framework.NodeToStatusReader) ([]Candidate, *framework.NodeToStatus, error) {
 	if len(allNodes) == 0 {
 		return nil, nil, errors.New("no nodes available")
 	}
@@ -324,7 +324,7 @@ func (ev *Evaluator) findCandidates(ctx context.Context, pluginInfo *framework.P
 	}
 
 	offset, candidatesNum := ev.GetOffsetAndNumCandidates(int32(len(potentialNodes)))
-	return ev.DryRunPreemption(ctx, pluginInfo, pod, potentialNodes, pdbs, offset, candidatesNum)
+	return ev.DryRunPreemption(ctx, pluginSettings, pod, potentialNodes, pdbs, offset, candidatesNum)
 }
 
 // callExtenders calls given <extenders> to select the list of feasible candidates.
@@ -678,7 +678,7 @@ func getLowerPriorityNominatedPods(logger klog.Logger, pn framework.PodNominator
 // The number of candidates depends on the constraints defined in the plugin's args. In the returned list of
 // candidates, ones that do not violate PDB are preferred over ones that do.
 // NOTE: This method is exported for easier testing in default preemption.
-func (ev *Evaluator) DryRunPreemption(ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
+func (ev *Evaluator) DryRunPreemption(ctx context.Context, pluginSettings *framework.PluginSettings, pod *v1.Pod, potentialNodes []*framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget, offset int32, candidatesNum int32) ([]Candidate, *framework.NodeToStatus, error) {
 
 	fh := ev.Handler
@@ -697,8 +697,8 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pluginInfo *framework
 		nodeInfoCopy := potentialNodes[(int(offset)+i)%len(potentialNodes)].Snapshot()
 		logger.V(5).Info("Check the potential node for preemption", "node", nodeInfoCopy.Node().Name)
 
-		pluginInfoCopy := pluginInfo.Clone()
-		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, pluginInfoCopy, pod, nodeInfoCopy, pdbs)
+		pluginSettingsCopy := pluginSettings.Clone()
+		pods, numPDBViolations, status := ev.SelectVictimsOnNode(ctx, pluginSettingsCopy, pod, nodeInfoCopy, pdbs)
 		if status.IsSuccess() && len(pods) != 0 {
 			victims := extenderv1.Victims{
 				Pods:             pods,

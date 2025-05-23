@@ -34,9 +34,9 @@ import (
 )
 
 type frameworkContract interface {
-	RunPreFilterPlugins(ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status, sets.Set[string])
-	RunFilterPlugins(context.Context, *framework.PluginRunningInfo, *v1.Pod, *framework.NodeInfo) *framework.Status
-	RunReservePluginsReserve(ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod, nodeName string) *framework.Status
+	RunPreFilterPlugins(ctx context.Context, pluginSettings *framework.PluginSettings, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status, sets.Set[string])
+	RunFilterPlugins(context.Context, *framework.PluginSettings, *v1.Pod, *framework.NodeInfo) *framework.Status
+	RunReservePluginsReserve(ctx context.Context, pluginSettings *framework.PluginSettings, pod *v1.Pod, nodeName string) *framework.Status
 }
 
 func TestFrameworkContract(t *testing.T) {
