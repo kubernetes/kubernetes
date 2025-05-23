@@ -62,7 +62,7 @@ func (s *balancedAllocationPreScoreState) Clone() framework.StateData {
 }
 
 // PreScore calculates incoming pod's resource requests and writes them to the cycle state used.
-func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	podRequests := ba.calculatePodResourceRequestList(pod, ba.resources)
 	if ba.isBestEffortPod(podRequests) {
 		// Skip BalancedAllocation scoring for best-effort pods to
@@ -77,7 +77,7 @@ func (ba *BalancedAllocation) PreScore(ctx context.Context, cycleState *framewor
 	return nil
 }
 
-func getBalancedAllocationPreScoreState(cycleState *framework.CycleState) (*balancedAllocationPreScoreState, error) {
+func getBalancedAllocationPreScoreState(cycleState framework.CycleState) (*balancedAllocationPreScoreState, error) {
 	c, err := cycleState.Read(balancedAllocationPreScoreStateKey)
 	if err != nil {
 		return nil, fmt.Errorf("reading %q from cycleState: %w", balancedAllocationPreScoreStateKey, err)
@@ -96,7 +96,7 @@ func (ba *BalancedAllocation) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (ba *BalancedAllocation) Score(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	s, err := getBalancedAllocationPreScoreState(state)
 	if err != nil {
 		s = &balancedAllocationPreScoreState{podRequests: ba.calculatePodResourceRequestList(pod, ba.resources)}

@@ -34,9 +34,9 @@ import (
 )
 
 type frameworkContract interface {
-	RunPreFilterPlugins(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status, sets.Set[string])
-	RunFilterPlugins(context.Context, *framework.CycleState, *v1.Pod, *framework.NodeInfo) *framework.Status
-	RunReservePluginsReserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status
+	RunPreFilterPlugins(ctx context.Context, pluginSettings *framework.PluginSettings, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status, sets.Set[string])
+	RunFilterPlugins(context.Context, *framework.PluginSettings, *v1.Pod, *framework.NodeInfo) *framework.Status
+	RunReservePluginsReserve(ctx context.Context, pluginSettings *framework.PluginSettings, pod *v1.Pod, nodeName string) *framework.Status
 }
 
 func TestFrameworkContract(t *testing.T) {
@@ -56,6 +56,6 @@ func TestNewFramework(t *testing.T) {
 
 func TestNewCycleState(t *testing.T) {
 	var state interface{} = framework.NewCycleState()
-	_, ok := state.(*framework.CycleState)
+	_, ok := state.(framework.CycleState)
 	assert.True(t, ok)
 }

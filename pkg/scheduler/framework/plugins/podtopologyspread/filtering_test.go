@@ -2368,7 +2368,7 @@ func BenchmarkFilter(b *testing.B) {
 		},
 	}
 	for _, tt := range tests {
-		var state *framework.CycleState
+		var state framework.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			_, ctx := ktesting.NewTestContext(b)

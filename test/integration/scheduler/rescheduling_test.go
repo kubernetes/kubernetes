@@ -46,7 +46,7 @@ func (rp *ReservePlugin) Name() string {
 	return rp.name
 }
 
-func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (rp *ReservePlugin) Reserve(ctx context.Context, state framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	rp.numReserveCalled += 1
 
 	if rp.statusCode == framework.Error {
@@ -62,7 +62,7 @@ func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleStat
 	return nil
 }
 
-func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) {
+func (rp *ReservePlugin) Unreserve(ctx context.Context, state framework.CycleState, p *v1.Pod, nodeName string) {
 	rp.numUnreserveCalled += 1
 }
 
@@ -87,7 +87,7 @@ func (pp *PermitPlugin) Name() string {
 	return pp.name
 }
 
-func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (pp *PermitPlugin) Permit(ctx context.Context, state framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	pp.numPermitCalled += 1
 
 	if pp.statusCode == framework.Error {

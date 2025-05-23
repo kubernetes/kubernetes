@@ -116,7 +116,7 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
 func (pl *PodTopologySpread) PreScore(
 	ctx context.Context,
-	cycleState *framework.CycleState,
+	cycleState framework.CycleState,
 	pod *v1.Pod,
 	filteredNodes []*framework.NodeInfo,
 ) *framework.Status {
@@ -192,7 +192,7 @@ func (pl *PodTopologySpread) PreScore(
 // Score invoked at the Score extension point.
 // The "score" returned in this function is the matching number of pods on the `nodeName`,
 // it is normalized later.
-func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (pl *PodTopologySpread) Score(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	node := nodeInfo.Node()
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
@@ -222,7 +222,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -268,7 +268,7 @@ func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
 	return pl
 }
 
-func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
+func getPreScoreState(cycleState framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %q from cycleState: %w", preScoreStateKey, err)

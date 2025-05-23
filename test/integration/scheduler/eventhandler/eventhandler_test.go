@@ -53,7 +53,7 @@ func (pl *fooPlugin) Name() string {
 	return "foo"
 }
 
-func (pl *fooPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *fooPlugin) Filter(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	taints := nodeInfo.Node().Spec.Taints
 	if len(taints) == 0 {
 		return nil

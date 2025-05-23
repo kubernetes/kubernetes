@@ -190,7 +190,7 @@ func (f *fakeCRPlugin) Name() string {
 	return "fakeCRPlugin"
 }
 
-func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (f *fakeCRPlugin) Filter(_ context.Context, _ framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, "always fail")
 }
 
@@ -328,7 +328,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewPluginSettings(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
@@ -441,7 +441,7 @@ func (*firstFailBindPlugin) Name() string {
 	return "firstFailBindPlugin"
 }
 
-func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodename string) *framework.Status {
+func (p *firstFailBindPlugin) Bind(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodename string) *framework.Status {
 	if p.counter == 0 {
 		// fail in the first Bind call.
 		p.counter++
@@ -572,7 +572,7 @@ func (p *fakePermitPlugin) Name() string {
 	return fakePermitPluginName
 }
 
-func (p *fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
+func (p *fakePermitPlugin) Permit(ctx context.Context, state framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
 	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
 }
 

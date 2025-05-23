@@ -1242,7 +1242,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
-			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
+			getState := func(pods []*v1.Pod) (*InterPodAffinity, framework.CycleState, *preFilterState, *cache.Snapshot) {
 				snapshot := cache.NewSnapshot(pods, test.nodes)
 				_, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)

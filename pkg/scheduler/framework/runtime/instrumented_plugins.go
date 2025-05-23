@@ -32,7 +32,7 @@ type instrumentedFilterPlugin struct {
 
 var _ framework.FilterPlugin = &instrumentedFilterPlugin{}
 
-func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	p.metric.Inc()
 	return p.FilterPlugin.Filter(ctx, state, pod, nodeInfo)
 }
@@ -45,7 +45,7 @@ type instrumentedPreFilterPlugin struct {
 
 var _ framework.PreFilterPlugin = &instrumentedPreFilterPlugin{}
 
-func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	result, status := p.PreFilterPlugin.PreFilter(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()
@@ -61,7 +61,7 @@ type instrumentedPreScorePlugin struct {
 
 var _ framework.PreScorePlugin = &instrumentedPreScorePlugin{}
 
-func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	status := p.PreScorePlugin.PreScore(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()
@@ -77,7 +77,7 @@ type instrumentedScorePlugin struct {
 
 var _ framework.ScorePlugin = &instrumentedScorePlugin{}
 
-func (p *instrumentedScorePlugin) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (p *instrumentedScorePlugin) Score(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	p.metric.Inc()
 	return p.ScorePlugin.Score(ctx, state, pod, nodeInfo)
 }
