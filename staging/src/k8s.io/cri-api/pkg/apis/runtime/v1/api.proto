@@ -97,6 +97,8 @@ service RuntimeService {
     rpc Attach(AttachRequest) returns (AttachResponse) {}
     // PortForward prepares a streaming endpoint to forward ports from a PodSandbox.
     rpc PortForward(PortForwardRequest) returns (PortForwardResponse) {}
+    // ImagePullProgress prepares a streaming endpoint to image pull from a PodSandbox.
+    rpc ImagePullProgress(ImagePullProgressRequest) returns (ImagePullProgressResponse) {}
 
     // ContainerStats returns stats of the container. If the container does not
     // exist, the call returns an error.
@@ -1568,6 +1570,16 @@ message PortForwardRequest {
 
 message PortForwardResponse {
     // Fully qualified URL of the port-forward streaming server.
+    string url = 1;
+}
+
+message ImagePullProgressRequest {
+    // ID of the pod to which to progresss of the image pull.
+    string pod_sandbox_id = 1;
+}
+
+message ImagePullProgressResponse {
+    // Fully qualified URL of the image pull progresss streaming server.
     string url = 1;
 }
 

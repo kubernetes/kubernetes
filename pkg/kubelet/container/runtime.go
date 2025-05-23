@@ -151,6 +151,7 @@ type StreamingRuntime interface {
 	GetExec(ctx context.Context, id ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetAttach(ctx context.Context, id ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error)
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, ports []int32) (*url.URL, error)
+	GetImagePullProgress(ctx context.Context, podName, podNamespace string, podUID types.UID) (*url.URL, error)
 }
 
 // ImageService interfaces allows to work with image service.

@@ -380,3 +380,22 @@ func (m *kubeGenericRuntimeManager) GetPortForward(ctx context.Context, podName,
 	}
 	return url.Parse(resp.Url)
 }
+
+// GetImagePullProgress gets the endpoint the runtime will serve the image-pull-progress request from.
+func (m *kubeGenericRuntimeManager) GetImagePullProgress(ctx context.Context, podName, podNamespace string, podUID kubetypes.UID) (*url.URL, error) {
+	sandboxIDs, err := m.getSandboxIDByPodUID(ctx, podUID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find sandboxID for pod %s: %v", format.PodDesc(podName, podNamespace, podUID), err)
+	}
+	if len(sandboxIDs) == 0 {
+		return nil, fmt.Errorf("failed to find sandboxID for pod %s", format.PodDesc(podName, podNamespace, podUID))
+	}
+	req := &runtimeapi.ImagePullProgressRequest{
+		PodSandboxId: sandboxIDs[0],
+	}
+	resp, err := m.runtimeService.ImagePullProgress(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return url.Parse(resp.Url)
+}

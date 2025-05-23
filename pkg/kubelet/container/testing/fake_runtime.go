@@ -511,6 +511,14 @@ func (f *FakeStreamingRuntime) GetPortForward(_ context.Context, podName, podNam
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
+func (f *FakeStreamingRuntime) GetImagePullProgress(ctx context.Context, podName, podNamespace string, podUID types.UID) (*url.URL, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.CalledFunctions = append(f.CalledFunctions, "GetImagePullProgress")
+	return &url.URL{Host: FakeHost}, f.Err
+}
+
 type FakeContainerCommandRunner struct {
 	// what to return
 	Stdout string

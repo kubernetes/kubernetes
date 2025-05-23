@@ -57,10 +57,12 @@ import (
 	// Do some initialization to decode the query parameters correctly.
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	imagepullprogress "k8s.io/client-go/tools/imagepullprogress"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/kubelet/pkg/cri/streaming"
+	imagepullprogressserver "k8s.io/kubelet/pkg/cri/streaming/imagepullprogress"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -78,15 +80,16 @@ const (
 )
 
 type fakeKubelet struct {
-	podByNameFunc       func(namespace, name string) (*v1.Pod, bool)
-	machineInfoFunc     func() (*cadvisorapi.MachineInfo, error)
-	podsFunc            func() []*v1.Pod
-	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
-	logFunc             func(w http.ResponseWriter, req *http.Request)
-	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
-	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
-	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
+	podByNameFunc             func(namespace, name string) (*v1.Pod, bool)
+	machineInfoFunc           func() (*cadvisorapi.MachineInfo, error)
+	podsFunc                  func() []*v1.Pod
+	runningPodsFunc           func(ctx context.Context) ([]*v1.Pod, error)
+	logFunc                   func(w http.ResponseWriter, req *http.Request)
+	runFunc                   func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
+	getExecCheck              func(string, types.UID, string, []string, remotecommandserver.Options)
+	getAttachCheck            func(string, types.UID, string, remotecommandserver.Options)
+	getPortForwardCheck       func(string, string, types.UID, portforward.V4Options)
+	getImagePullProgressCheck func(podName, podNamespace string, podUID types.UID, imagePullProgressOpts imagepullprogressserver.Options)
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	hostnameFunc      func() string
@@ -169,9 +172,10 @@ func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 }
 
 type fakeRuntime struct {
-	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
-	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
-	portForwardFunc func(string, int32, io.ReadWriteCloser) error
+	execFunc              func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
+	attachFunc            func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommand.TerminalSize) error
+	portForwardFunc       func(string, int32, io.ReadWriteCloser) error
+	imagePullProgressFunc func(string, chan<- imagepullprogress.Progress) error
 }
 
 func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
@@ -184,6 +188,10 @@ func (f *fakeRuntime) Attach(_ context.Context, containerID string, stdin io.Rea
 
 func (f *fakeRuntime) PortForward(_ context.Context, podSandboxID string, port int32, stream io.ReadWriteCloser) error {
 	return f.portForwardFunc(podSandboxID, port, stream)
+}
+
+func (f *fakeRuntime) ImagePullProgress(_ context.Context, podSandboxID string, progresses chan<- imagepullprogress.Progress) error {
+	return f.imagePullProgressFunc(podSandboxID, progresses)
 }
 
 type testStreamingServer struct {
@@ -266,6 +274,20 @@ func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace
 	resp, err := fk.streamingRuntime.GetPortForward(&runtimeapi.PortForwardRequest{
 		PodSandboxId: testPodSandboxID,
 		Port:         portForwardOpts.Ports,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return url.Parse(resp.GetUrl())
+}
+
+func (fk *fakeKubelet) GetImagePullProgress(ctx context.Context, podName, podNamespace string, podUID types.UID, imagePullProgressOpts imagepullprogressserver.Options) (*url.URL, error) {
+	if fk.getImagePullProgressCheck != nil {
+		fk.getImagePullProgressCheck(podName, podNamespace, podUID, imagePullProgressOpts)
+	}
+	// Always use testPodSandboxID
+	resp, err := fk.streamingRuntime.GetImagePullProgress(&runtimeapi.ImagePullProgressRequest{
+		PodSandboxId: testPodSandboxID,
 	})
 	if err != nil {
 		return nil, err

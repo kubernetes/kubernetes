@@ -44,6 +44,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubelet/pkg/cri/streaming/imagepullprogress"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2448,6 +2449,24 @@ func (kl *Kubelet) GetPortForward(ctx context.Context, podName, podNamespace str
 	}
 
 	return kl.streamingRuntime.GetPortForward(ctx, podName, podNamespace, podUID, portForwardOpts.Ports)
+}
+
+// GetImagePullProgress gets the URL the image-pull-progress will be served from, or nil if the Kubelet will serve it.
+func (kl *Kubelet) GetImagePullProgress(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts imagepullprogress.Options) (*url.URL, error) {
+	pods, err := kl.containerRuntime.GetPods(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	// Resolve and type convert back again.
+	// We need the static pod UID but the kubecontainer API works with types.UID.
+	podUID = types.UID(kl.podManager.TranslatePodUID(podUID))
+	podFullName := kubecontainer.BuildPodFullName(podName, podNamespace)
+	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+	if pod.IsEmpty() {
+		return nil, fmt.Errorf("pod not found (%q)", podFullName)
+	}
+
+	return kl.streamingRuntime.GetImagePullProgress(ctx, podName, podNamespace, podUID)
 }
 
 // cleanupOrphanedPodCgroups removes cgroups that should no longer exist.
