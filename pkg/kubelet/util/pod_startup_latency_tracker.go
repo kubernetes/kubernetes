@@ -48,8 +48,11 @@ type basicPodStartupLatencyTracker struct {
 }
 
 type perPodState struct {
-	firstStartedPulling time.Time
-	lastFinishedPulling time.Time
+	firstStartedPulling    time.Time
+	lastFinishedPulling    time.Time
+	initContainerStartTime time.Time
+	// when all main containers are running
+	containersRunningTime time.Time
 	// first time, when pod status changed into Running
 	observedRunningTime time.Time
 	// log, if pod latency was already Observed
@@ -99,7 +102,8 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 	if hasPodStartedSLO(pod) {
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
 		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
-		podStartSLOduration := (podStartingDuration - imagePullingDuration).Seconds()
+		initContainerDuration := state.containersRunningTime.Sub(state.initContainerStartTime)
+		podStartSLOduration := (podStartingDuration - imagePullingDuration - initContainerDuration).Seconds()
 
 		klog.InfoS("Observed pod startup duration",
 			"pod", klog.KObj(pod),
@@ -161,6 +165,36 @@ func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 	if state.metricRecorded {
 		// skip, pod latency already recorded
 		return
+	}
+
+	// Find earliest init container start time as long as it isnt the waiting state
+	for _, cs := range pod.Status.InitContainerStatuses {
+		if cs.State.Running != nil && !cs.State.Running.StartedAt.IsZero() {
+			if state.initContainerStartTime.IsZero() || cs.State.Running.StartedAt.Time.Before(state.initContainerStartTime) {
+				state.initContainerStartTime = cs.State.Running.StartedAt.Time
+			}
+		}
+		if cs.State.Terminated != nil && !cs.State.Terminated.StartedAt.IsZero() {
+			if state.initContainerStartTime.IsZero() || cs.State.Terminated.StartedAt.Time.Before(state.initContainerStartTime) {
+				state.initContainerStartTime = cs.State.Terminated.StartedAt.Time
+			}
+		}
+	}
+
+	// Find when all main containers are running
+	allContainersRunning := true
+	latestStartedAtTime := time.Time{}
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.State.Running == nil || cs.State.Running.StartedAt.IsZero() {
+			allContainersRunning = false
+			break
+		}
+		if cs.State.Running.StartedAt.Time.After(latestStartedAtTime) {
+			latestStartedAtTime = cs.State.Running.StartedAt.Time
+		}
+	}
+	if allContainersRunning && state.containersRunningTime.IsZero() {
+		state.containersRunningTime = latestStartedAtTime
 	}
 
 	if !state.observedRunningTime.IsZero() {
