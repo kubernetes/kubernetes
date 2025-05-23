@@ -221,14 +221,6 @@ func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
 	return nil
 }
 
-// unalias returns the unaliased type.
-func unalias(t *types.Type) *types.Type {
-	for t.Kind == types.Alias {
-		t = t.Underlying
-	}
-	return t
-}
-
 // discoverType walks the given type recursively and returns a typeNode
 // representing it. This does not distinguish between discovering a type
 // definition and discovering a field of a struct.  The first time it
@@ -257,7 +249,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 			return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
 		}
 	case types.Pointer:
-		pointee := unalias(t.Elem)
+		pointee := validators.NativeType(t.Elem)
 		switch pointee.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): pointers to pointers are not supported", fldPath.String(), t)
@@ -269,23 +261,23 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	case types.Array:
 		return nil, fmt.Errorf("field %s (%s): fixed-size arrays are not supported", fldPath.String(), t)
 	case types.Slice:
-		elem := unalias(t.Elem)
+		elem := validators.NativeType(t.Elem)
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): lists of pointers are not supported", fldPath.String(), t)
 		case types.Slice:
-			if unalias(elem.Elem) != types.Byte {
+			if validators.NativeType(elem.Elem) != types.Byte {
 				return nil, fmt.Errorf("field %s (%s): lists of lists are not supported", fldPath.String(), t)
 			}
 		case types.Map:
 			return nil, fmt.Errorf("field %s (%s): lists of maps are not supported", fldPath.String(), t)
 		}
 	case types.Map:
-		key := unalias(t.Key)
+		key := validators.NativeType(t.Key)
 		if key != types.String {
 			return nil, fmt.Errorf("field %s (%s): maps with non-string keys are not supported", fldPath.String(), t)
 		}
-		elem := unalias(t.Elem)
+		elem := validators.NativeType(t.Elem)
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
@@ -593,7 +585,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		}
 
 		// Handle non-included types.
-		switch nonPtrType(childType).Kind {
+		switch validators.NonPointer(childType).Kind {
 		case types.Struct, types.Alias:
 			if child.node == nil { // a non-included type
 				if !child.fieldValidations.OpaqueType {
@@ -716,14 +708,6 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 
 	thisNode.fields = fields
 	return nil
-}
-
-// nonPtrType removes any pointerness from the type.
-func nonPtrType(t *types.Type) *types.Type {
-	for t.Kind == types.Pointer {
-		t = t.Elem
-	}
-	return t
 }
 
 // getValidationFunctionName looks up the name of the specified type's
@@ -1464,7 +1448,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 
 // isNilableType returns true if the argument type can be compared to nil.
 func isNilableType(t *types.Type) bool {
-	t = unalias(t)
+	t = validators.NativeType(t)
 	switch t.Kind {
 	case types.Pointer, types.Map, types.Slice, types.Interface: // Note: Arrays are not nilable
 		return true
