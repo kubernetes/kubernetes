@@ -27,11 +27,18 @@ Optionally add one or more of the following kinds if applicable:
 
 #### What this PR does / why we need it:
 
-#### Which issue(s) this PR fixes:
+#### Which issue(s) this PR fixes (or partially fixes):
 <!--
-*Automatically closes linked issue when PR is merged.
-Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
-_If PR is about `failing-tests or flakes`, please post the related issues/tests in a comment and do not use `Fixes`_*
+Please link relevant issues to help with tracking.
+
+To automatically close the linked issue(s) when this PR is merged, use one of the following formats:
+Fixes #<issue number> (if issue is in the same repository as the PR)
+Fixes <issue link> (if issue is in a different repository)
+
+If this PR is of kind `failing-test` or `flake`, or should not automatically close the issue(s), then paste
+the #<issue number> or <issue link> without the word `Fixes`.
+
+If there is no associated issue, then write "N/A"
 -->
 Fixes #
 
