@@ -37,9 +37,9 @@ func (f *fakeData) Clone() StateData {
 
 var key StateKey = "fakedata_key"
 
-// createPluginRunningInfoWithFakeData creates running info with CycleState with fakeData.
+// createPluginSettingsWithFakeData creates settings with CycleState with fakeData.
 // The given data is used in stored fakeData.
-func createPluginRunningInfoWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *PluginSettings {
+func createPluginSettingsWithFakeData(data string, recordPluginMetrics bool, skipPlugins ...[]string) *PluginSettings {
 	p := NewPluginSettings()
 	p.SetRecordPluginMetrics(recordPluginMetrics)
 	if len(skipPlugins) > 0 {
@@ -59,28 +59,28 @@ func createPluginRunningInfoWithFakeData(data string, recordPluginMetrics bool, 
 
 // isCycleStateEqual returns whether two CycleState, which has fakeData in storage, is equal or not.
 // And if they are not equal, returns message which shows why not equal.
-func isPluginRunningInfoEqual(a, b *PluginSettings) (bool, string) {
+func isPluginSettingsEqual(a, b *PluginSettings) (bool, string) {
 	if a == nil && b == nil {
 		return true, ""
 	}
 	if a == nil || b == nil {
-		return false, fmt.Sprintf("one PluginRunningInfo is nil, but another one is not nil. A: %v, B: %v", a, b)
+		return false, fmt.Sprintf("one PluginSettings is nil, but another one is not nil. A: %v, B: %v", a, b)
 	}
 
 	if a.recordPluginMetrics != b.recordPluginMetrics {
-		return false, fmt.Sprintf("PluginRunningInfo A and B have a different recordPluginMetrics. A: %v, B: %v", a.recordPluginMetrics, b.recordPluginMetrics)
+		return false, fmt.Sprintf("PluginSettings A and B have a different recordPluginMetrics. A: %v, B: %v", a.recordPluginMetrics, b.recordPluginMetrics)
 	}
 	if diff := cmp.Diff(a.SkipFilterPlugins, b.SkipFilterPlugins); diff != "" {
-		return false, fmt.Sprintf("PluginRunningInfo A and B have different SkipFilterPlugin sets. -wanted,+got:\n%s", diff)
+		return false, fmt.Sprintf("PluginSettings A and B have different SkipFilterPlugin sets. -wanted,+got:\n%s", diff)
 	}
 	if diff := cmp.Diff(a.SkipScorePlugins, b.SkipScorePlugins); diff != "" {
-		return false, fmt.Sprintf("PluginRunningInfo A and B have different SkipScorePlugins sets. -wanted,+got:\n%s", diff)
+		return false, fmt.Sprintf("PluginSettings A and B have different SkipScorePlugins sets. -wanted,+got:\n%s", diff)
 	}
 
 	stateA, ok1 := a.State.(*CycleStateImpl)
 	stateB, ok2 := b.State.(*CycleStateImpl)
 	if !ok1 || !ok2 {
-		return false, "PluginRunningInfo has cyclestate which is not type *CycleStateImpl."
+		return false, "PluginSettings has cyclestate which is not type *CycleStateImpl."
 	}
 	var msg string
 	isEqual := true
@@ -128,7 +128,7 @@ func isPluginRunningInfoEqual(a, b *PluginSettings) (bool, string) {
 	return true, ""
 }
 
-func TestPluginRunningInfoClone(t *testing.T) {
+func TestPluginSettingsClone(t *testing.T) {
 	tests := []struct {
 		name                     string
 		pluginSettings           *PluginSettings
@@ -136,32 +136,32 @@ func TestPluginRunningInfoClone(t *testing.T) {
 	}{
 		{
 			name:                     "clone with recordPluginMetrics true",
-			pluginSettings:           createPluginRunningInfoWithFakeData("data", true),
-			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", true),
+			pluginSettings:           createPluginSettingsWithFakeData("data", true),
+			wantClonedPluginSettings: createPluginSettingsWithFakeData("data", true),
 		},
 		{
 			name:                     "clone with recordPluginMetrics false",
-			pluginSettings:           createPluginRunningInfoWithFakeData("data", false),
-			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", false),
+			pluginSettings:           createPluginSettingsWithFakeData("data", false),
+			wantClonedPluginSettings: createPluginSettingsWithFakeData("data", false),
 		},
 		{
 			name:                     "clone with skipScoringPlugins",
-			pluginSettings:           createPluginRunningInfoWithFakeData("data", true, []string{"pl1", "pl2"}),
-			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", true, []string{"pl1", "pl2"}),
+			pluginSettings:           createPluginSettingsWithFakeData("data", true, []string{"pl1", "pl2"}),
+			wantClonedPluginSettings: createPluginSettingsWithFakeData("data", true, []string{"pl1", "pl2"}),
 		},
 		{
 			name:                     "clone with skipScoringAndFilterPlugins",
-			pluginSettings:               createPluginRunningInfoWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
-			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
+			pluginSettings:           createPluginSettingsWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
+			wantClonedPluginSettings: createPluginSettingsWithFakeData("data", false, []string{"pl1", "pl2"}, []string{"pl3"}),
 		},
 		{
 			name:                     "clone with skipFilterPlugins",
-			pluginSettings:               createPluginRunningInfoWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
-			wantClonedPluginSettings: createPluginRunningInfoWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
+			pluginSettings:           createPluginSettingsWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
+			wantClonedPluginSettings: createPluginSettingsWithFakeData("data", true, []string{}, []string{"pl3", "pl4"}),
 		},
 		{
 			name:                     "clone with nil PluginSettings",
-			pluginSettings:               nil,
+			pluginSettings:           nil,
 			wantClonedPluginSettings: nil,
 		},
 	}
@@ -171,7 +171,7 @@ func TestPluginRunningInfoClone(t *testing.T) {
 			pi := tt.pluginSettings
 			copy := pi.Clone()
 
-			if isEqual, msg := isPluginRunningInfoEqual(copy, tt.wantClonedPluginSettings); !isEqual {
+			if isEqual, msg := isPluginSettingsEqual(copy, tt.wantClonedPluginSettings); !isEqual {
 				t.Errorf("unexpected cloned state: %v", msg)
 			}
 
@@ -181,7 +181,7 @@ func TestPluginRunningInfoClone(t *testing.T) {
 			}
 
 			copy.State.Write(key, &fakeData{data: "modified"})
-			if isEqual, _ := isPluginRunningInfoEqual(pi, copy); isEqual {
+			if isEqual, _ := isPluginSettingsEqual(pi, copy); isEqual {
 				t.Errorf("the change for a cloned state should not affect the original state.")
 			}
 		})
