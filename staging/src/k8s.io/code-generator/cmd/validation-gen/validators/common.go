@@ -38,11 +38,10 @@ func getMemberByJSON(t *types.Type, jsonName string) *types.Member {
 	return nil
 }
 
-// isNilableType returns true if the argument type can be compared to nil.
-func isNilableType(t *types.Type) bool {
-	for t.Kind == types.Alias {
-		t = t.Underlying
-	}
+// IsNilableType returns true if the argument type can be compared to nil.
+func IsNilableType(t *types.Type) bool {
+	t = NativeType(t)
+
 	switch t.Kind {
 	case types.Pointer, types.Map, types.Slice, types.Interface: // Note: Arrays are not nilable
 		return true

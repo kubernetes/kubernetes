@@ -83,12 +83,12 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 
 		for _, vfn := range validations.Functions {
 			nilableStructType := context.Type
-			if !isNilableType(nilableStructType) {
+			if !IsNilableType(nilableStructType) {
 				nilableStructType = types.PointerTo(nilableStructType)
 			}
 			nilableFieldType := submemb.Type
 			fieldExprPrefix := ""
-			if !isNilableType(nilableFieldType) {
+			if !IsNilableType(nilableFieldType) {
 				nilableFieldType = types.PointerTo(nilableFieldType)
 				fieldExprPrefix = "&"
 			}
