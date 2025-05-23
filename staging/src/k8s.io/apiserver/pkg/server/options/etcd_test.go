@@ -445,3 +445,25 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
 	}
 }
+
+func TestDisablePrevKV(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchFromStorageWithoutPrevKV, true)
+	serverConfig := server.NewConfig(codecs)
+	etcdOptions := &EtcdOptions{
+		StorageConfig: storagebackend.Config{
+			WatchPrevKv: true,
+		},
+		EnableWatchCache:      true,
+		DefaultWatchCacheSize: 1000,
+	}
+	if err := etcdOptions.ApplyTo(serverConfig); err != nil {
+		t.Fatalf("Failed to apply etcd options error: %v", err)
+	}
+	restOptions, err := serverConfig.RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "", Resource: ""}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restOptions.StorageConfig.WatchPrevKv {
+		t.Errorf("WatchPrevKv should be disabled if WatchFromStorageWithoutPrevKV is true and WatchCache is enabled")
+	}
+}
