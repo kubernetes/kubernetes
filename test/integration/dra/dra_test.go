@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -42,6 +43,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -54,6 +56,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/integration/util"
+	"k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
@@ -85,6 +88,8 @@ var (
 				Namespace(namespace).
 				RequestWithPrioritizedList(className).
 				Obj()
+
+	numNodes = 2
 )
 
 // createTestNamespace creates a namespace with a name that is derived from the
@@ -109,12 +114,73 @@ func createTestNamespace(tCtx ktesting.TContext, labels map[string]string) strin
 	return ns.Name
 }
 
+// createTestClass creates a DeviceClass with a driver name derived from the test namespace
+func createTestClass(tCtx ktesting.TContext, namespace string) (*resourceapi.DeviceClass, string) {
+	driverName := namespace + ".driver"
+	class := class.DeepCopy()
+	class.Name = namespace + ".class"
+	class.Spec.Selectors = []resourceapi.DeviceSelector{{
+		CEL: &resourceapi.CELDeviceSelector{
+			Expression: fmt.Sprintf("device.driver == %q", driverName),
+		},
+	}}
+	_, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create class")
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.Log("Cleaning up DeviceClass...")
+		err := tCtx.Client().ResourceV1beta1().DeviceClasses().Delete(tCtx, class.Name, metav1.DeleteOptions{})
+		tCtx.ExpectNoError(err, "delete class")
+	})
+
+	return class, driverName
+}
+
+// createClaim creates a claim and in the namespace.
+// The class must already exist and is used for all requests.
+func createClaim(tCtx ktesting.TContext, namespace string, suffix string, class *resourceapi.DeviceClass, claim *resourceapi.ResourceClaim) *resourceapi.ResourceClaim {
+	claim = claim.DeepCopy()
+	claim.Namespace = namespace
+	claim.Name += suffix
+	claimName := claim.Name
+	for i := range claim.Spec.Devices.Requests {
+		request := &claim.Spec.Devices.Requests[i]
+		if request.DeviceClassName != "" {
+			request.DeviceClassName = class.Name
+			continue
+		}
+		for e := range request.FirstAvailable {
+			subRequest := &request.FirstAvailable[e]
+			subRequest.DeviceClassName = class.Name
+		}
+	}
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create claim "+claimName)
+	return claim
+}
+
+// createPod create a pod in the namespace, referencing the given claim.
+func createPod(tCtx ktesting.TContext, namespace string, suffix string, claim *resourceapi.ResourceClaim, pod *v1.Pod) *v1.Pod {
+	pod = pod.DeepCopy()
+	pod.Name += suffix
+	podName := pod.Name
+	pod.Namespace = namespace
+	pod.Spec.ResourceClaims[0].ResourceClaimName = &claim.Name
+	pod, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create pod "+podName)
+	return pod
+}
+
 func TestDRA(t *testing.T) {
 	// Each sub-test brings up the API server in a certain
 	// configuration. These sub-tests must run sequentially because they
 	// change the global DefaultFeatureGate. For each configuration,
 	// multiple tests can run in parallel as long as they are careful
 	// about what they create.
+	//
+	// Each configuration starts with two Nodes (ready, sufficient RAM and CPU for multiple pods)
+	// and no ResourceSlices. To test scheduling, a sub-test must create ResourceSlices.
+	// createTestNamespace can be used to create a unique per-test namespace. The name of that
+	// namespace then can be used to create cluster-scoped objects without conflicts between tests.
 	for name, tc := range map[string]struct {
 		apis     map[schema.GroupVersion]bool
 		features map[featuregate.Feature]bool
@@ -213,28 +279,147 @@ func TestDRA(t *testing.T) {
 			}
 			apiServerFlags = append(apiServerFlags, "--runtime-config="+strings.Join(runtimeConfigs, ","))
 			server := kubeapiservertesting.StartTestServerOrDie(t, apiServerOptions, apiServerFlags, etcdOptions)
-			tCtx.Cleanup(server.TearDownFn)
+			tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+				tCtx.Log("Stopping the apiserver...")
+				server.TearDownFn()
+			})
 			tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
+
+			createNodes(tCtx)
+			tCtx = prepareScheduler(tCtx)
 
 			tc.f(tCtx)
 		})
 	}
 }
 
-func startScheduler(tCtx ktesting.TContext) {
-	// Run scheduler with default configuration.
-	tCtx.Log("Scheduler starting...")
-	schedulerCtx := klog.NewContext(tCtx, klog.LoggerWithName(tCtx.Logger(), "scheduler"))
-	schedulerCtx, cancel := context.WithCancelCause(schedulerCtx)
-	_, informerFactory := util.StartScheduler(schedulerCtx, tCtx.Client(), tCtx.RESTConfig(), newDefaultSchedulerComponentConfig(tCtx), nil)
-	// Stop clients of the apiserver before stopping the apiserver itself,
-	// otherwise it delays its shutdown.
-	tCtx.Cleanup(informerFactory.Shutdown)
-	tCtx.Cleanup(func() {
-		tCtx.Log("Stoping scheduler...")
-		cancel(errors.New("test is done"))
+func createNodes(tCtx ktesting.TContext) {
+	for i := 0; i < numNodes; i++ {
+		// Create node.
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("worker-%d", i),
+			},
+		}
+		node, err := tCtx.Client().CoreV1().Nodes().Create(tCtx, node, metav1.CreateOptions{})
+		tCtx.ExpectNoError(err, fmt.Sprintf("creating node #%d", i))
+
+		// Make the node ready.
+		node.Status = v1.NodeStatus{
+			Capacity: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("100"),
+				v1.ResourceMemory: resource.MustParse("1000"),
+				v1.ResourcePods:   resource.MustParse("100"),
+			},
+			Phase: v1.NodeRunning,
+			Conditions: []v1.NodeCondition{
+				{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				},
+			},
+		}
+		node, err = tCtx.Client().CoreV1().Nodes().UpdateStatus(tCtx, node, metav1.UpdateOptions{})
+		tCtx.ExpectNoError(err, fmt.Sprintf("setting status of node #%d", i))
+
+		// Remove taint added by TaintNodesByCondition admission check.
+		node.Spec.Taints = nil
+		_, err = tCtx.Client().CoreV1().Nodes().Update(tCtx, node, metav1.UpdateOptions{})
+		tCtx.ExpectNoError(err, fmt.Sprintf("removing node taint from #%d", i))
+	}
+
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		if !tCtx.Failed() {
+			return
+		}
+
+		// Dump information about the cluster.
+		nodes, err := tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
+		if err != nil {
+			tCtx.Logf("Retrieving nodes failed: %v", err)
+		} else {
+			tCtx.Logf("Nodes:\n%s", format.Object(nodes.Items, 1))
+		}
 	})
 }
+
+// prepareScheduler returns a TContext which can be passed to startScheduler
+// to actually start the scheduler when there is a demand for it.
+//
+// Under the hood, schedulerSingleton ensures that at most one scheduler
+// instance is created and tears it down when the last test using it is
+// done. This could lead to starting and stopping it multiple times, but in
+// practice tests start together in parallel and share a single instance.
+func prepareScheduler(tCtx ktesting.TContext) ktesting.TContext {
+	scheduler := &schedulerSingleton{
+		rootCtx: tCtx,
+	}
+
+	return ktesting.WithValue(tCtx, schedulerKey, scheduler)
+}
+
+func startScheduler(tCtx ktesting.TContext) {
+	value := tCtx.Value(schedulerKey)
+	if value == nil {
+		tCtx.Fatal("internal error: startScheduler without a prior prepareScheduler call")
+	}
+	scheduler := value.(*schedulerSingleton)
+	scheduler.start(tCtx)
+}
+
+type schedulerSingleton struct {
+	rootCtx ktesting.TContext
+
+	mutex           sync.Mutex
+	usageCount      int
+	informerFactory informers.SharedInformerFactory
+	cancel          func(err error)
+}
+
+func (scheduler *schedulerSingleton) start(tCtx ktesting.TContext) {
+	scheduler.mutex.Lock()
+	defer scheduler.mutex.Unlock()
+
+	scheduler.usageCount++
+	tCtx.CleanupCtx(scheduler.stop)
+	if scheduler.usageCount > 1 {
+		// Already started earlier.
+		return
+	}
+
+	// Run scheduler with default configuration. This must use the root context because
+	// the per-test tCtx passed to start will get canceled once the test which triggered
+	// starting the scheduler is done.
+	schedulerCtx := scheduler.rootCtx
+	schedulerCtx.Logf("Starting the scheduler for test %s...", tCtx.Name())
+	ctx := klog.NewContext(schedulerCtx, klog.LoggerWithName(schedulerCtx.Logger(), "scheduler"))
+	ctx, scheduler.cancel = context.WithCancelCause(ctx)
+	_, scheduler.informerFactory = util.StartScheduler(ctx, schedulerCtx.Client(), schedulerCtx.RESTConfig(), newDefaultSchedulerComponentConfig(schedulerCtx), nil)
+	schedulerCtx.Logf("Started the scheduler for test %s.", tCtx.Name())
+}
+
+func (scheduler *schedulerSingleton) stop(tCtx ktesting.TContext) {
+	scheduler.mutex.Lock()
+	defer scheduler.mutex.Unlock()
+
+	scheduler.usageCount--
+	if scheduler.usageCount > 0 {
+		// Still in use by some other test.
+		return
+	}
+
+	scheduler.rootCtx.Logf("Stopping the scheduler after test %s...", tCtx.Name())
+	if scheduler.cancel != nil {
+		scheduler.cancel(errors.New("test is done"))
+	}
+	if scheduler.informerFactory != nil {
+		scheduler.informerFactory.Shutdown()
+	}
+}
+
+type schedulerKeyType int
+
+var schedulerKey schedulerKeyType
 
 func newDefaultSchedulerComponentConfig(tCtx ktesting.TContext) *config.KubeSchedulerConfiguration {
 	gvk := kubeschedulerconfigv1.SchemeGroupVersion.WithKind("KubeSchedulerConfiguration")
@@ -323,12 +508,15 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 
 func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	tCtx.Parallel()
-	_, err := tCtx.Client().ResourceV1beta1().DeviceClasses().Create(tCtx, class, metav1.CreateOptions{})
-	tCtx.ExpectNoError(err, "create class")
 	namespace := createTestNamespace(tCtx, nil)
-	claim := claimPrioritizedList.DeepCopy()
-	claim.Namespace = namespace
-	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	class, _ := createTestClass(tCtx, namespace)
+	// This is allowed to fail if the feature is disabled.
+	// createClaim normally doesn't return errors because this is unusual, but we can get it indirectly.
+	claim, err := func() (claim *resourceapi.ResourceClaim, finalError error) {
+		tCtx, finalize := ktesting.WithError(tCtx, &finalError)
+		defer finalize()
+		return createClaim(tCtx, namespace, "", class, claimPrioritizedList), nil
+	}()
 
 	if !enabled {
 		require.Error(tCtx, err, "claim should have become invalid after dropping FirstAvailable")
@@ -336,38 +524,33 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 	}
 
 	require.NotEmpty(tCtx, claim.Spec.Devices.Requests[0].FirstAvailable, "should store FirstAvailable")
-	tCtx.Run("scheduler", func(tCtx ktesting.TContext) {
-		startScheduler(tCtx)
+	startScheduler(tCtx)
 
-		// The fake cluster configuration is not complete enough to actually schedule pods.
-		// That is covered over in test/integration/scheduler_perf.
-		// Here we only test that we get to the point where it notices that, without failing
-		// during PreFilter because of FirstAvailable.
-		pod := podWithClaimName.DeepCopy()
-		pod.Namespace = namespace
-		_, err := tCtx.Client().CoreV1().Pods(namespace).Create(tCtx, pod, metav1.CreateOptions{})
-		tCtx.ExpectNoError(err, "create pod")
-		schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
-			gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-				"Type":    gomega.Equal(v1.PodScheduled),
-				"Status":  gomega.Equal(v1.ConditionFalse),
-				"Reason":  gomega.Equal("Unschedulable"),
-				"Message": gomega.Equal("no nodes available to schedule pods"),
-			}),
-		))
-		ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
-			pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
-			tCtx.ExpectNoError(err, "get pod")
-			return pod
-		}).WithTimeout(time.Minute).WithPolling(time.Second).Should(schedulingAttempted)
-	})
+	// We could create ResourceSlices for some node with the right driver.
+	// But failing during Filter is sufficient to determine that it did
+	// not fail during PreFilter because of FirstAvailable.
+	pod := createPod(tCtx, namespace, "", claim, podWithClaimName)
+	schedulingAttempted := gomega.HaveField("Status.Conditions", gomega.ContainElement(
+		gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+			"Type":    gomega.Equal(v1.PodScheduled),
+			"Status":  gomega.Equal(v1.ConditionFalse),
+			"Reason":  gomega.Equal("Unschedulable"),
+			"Message": gomega.Equal("0/2 nodes are available: 2 cannot allocate all claims. still not schedulable, preemption: 0/2 nodes are available: 2 Preemption is not helpful for scheduling."),
+		}),
+	))
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+		pod, err := tCtx.Client().CoreV1().Pods(namespace).Get(tCtx, pod.Name, metav1.GetOptions{})
+		tCtx.ExpectNoError(err, "get pod")
+		return pod
+	}).WithTimeout(10 * time.Second).WithPolling(time.Second).Should(schedulingAttempted)
 }
 
 func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featuregate.Feature) {
 	tCtx.Parallel()
 
 	tCtx = ktesting.WithTimeout(tCtx, 30*time.Second, "test timed out")
-	driverName := "dra.example.com"
+	namespace := createTestNamespace(tCtx, nil)
+	driverName := namespace + ".example.com"
 	poolName := "global"
 	resources := &resourceslice.DriverResources{
 		Pools: map[string]resourceslice.Pool{
@@ -481,7 +664,7 @@ func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featu
 	ktesting.Eventually(tCtx, getStats).WithTimeout(10*time.Second).Should(gomega.HaveField("NumDeletes", gomega.BeNumerically(">=", int64(1))), "Slice should have been removed.")
 	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) bool {
 		return gotValidationError.Load()
-	}).WithTimeout(10 * time.Second).Should(gomega.BeTrueBecause("Should have gotten another error because the slice is invalid."))
+	}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("Should have gotten another error because the slice is invalid."))
 
 }
 
