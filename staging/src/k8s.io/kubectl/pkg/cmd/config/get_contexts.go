@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -70,7 +71,7 @@ func NewCmdConfigGetContexts(streams genericiooptions.IOStreams, configAccess cl
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "get-contexts [(-o|--output=)name)]",
+		Use:                   "get-contexts [-o|--output=(name|json)] [CONTEXT_NAME ...]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Describe one or many contexts"),
 		Long:                  getContextsLong,
@@ -83,13 +84,13 @@ func NewCmdConfigGetContexts(streams genericiooptions.IOStreams, configAccess cl
 	}
 
 	cmd.Flags().BoolVar(&options.noHeaders, "no-headers", options.noHeaders, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringVarP(&options.outputFormat, "output", "o", options.outputFormat, `Output format. One of: (name).`)
+	cmd.Flags().StringVarP(&options.outputFormat, "output", "o", options.outputFormat, `Output format. One of: (name|json).`)
 	return cmd
 }
 
 // Complete assigns GetContextsOptions from the args.
 func (o *GetContextsOptions) Complete(cmd *cobra.Command, args []string) error {
-	supportedOutputTypes := sets.New[string]("", "name")
+	supportedOutputTypes := sets.New[string]("", "name", "json")
 	if !supportedOutputTypes.Has(o.outputFormat) {
 		return fmt.Errorf("--output %v is not available in kubectl config get-contexts; resetting to default output format", o.outputFormat)
 	}
@@ -142,18 +143,28 @@ func (o GetContextsOptions) RunGetContexts() error {
 			}
 		}
 	}
-	if o.showHeaders {
-		err = printContextHeaders(out, o.nameOnly)
-		if err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
 
 	sort.Strings(toPrint)
-	for _, name := range toPrint {
-		err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
-		if err != nil {
+
+	switch o.outputFormat {
+	case "json":
+		if err := printContextsJSON(config, toPrint, allErrs, out); err != nil {
 			allErrs = append(allErrs, err)
+		}
+
+	default:
+		if o.showHeaders {
+			err = printContextHeaders(out, o.nameOnly)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
+
+		for _, name := range toPrint {
+			err = printContext(name, config.Contexts[name], out, o.nameOnly, config.CurrentContext == name)
+			if err != nil {
+				allErrs = append(allErrs, err)
+			}
 		}
 	}
 
@@ -180,4 +191,33 @@ func printContext(name string, context *clientcmdapi.Context, w io.Writer, nameO
 	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", prefix, name, context.Cluster, context.AuthInfo, context.Namespace)
 	return err
+}
+
+type contextJSON struct {
+	Current   bool   `json:"current,omitempty"`
+	Name      string `json:"name"`
+	Cluster   string `json:"cluster"`
+	AuthInfo  string `json:"authInfo"`
+	Namespace string `json:"namespace,omitempty"`
+}
+
+func printContextsJSON(config *clientcmdapi.Config, toPrint []string, errs []error, out io.Writer) error {
+	// Gather contexts.
+	contexts := make([]*contextJSON, 0, len(toPrint))
+	for _, name := range toPrint {
+		c := config.Contexts[name]
+		contexts = append(contexts, &contextJSON{
+			Current:   config.CurrentContext == name,
+			Name:      name,
+			Cluster:   c.Cluster,
+			AuthInfo:  c.AuthInfo,
+			Namespace: c.Namespace,
+		})
+	}
+
+	// Encode.
+	if err := json.NewEncoder(out).Encode(contexts); err != nil {
+		return fmt.Errorf("failed to marshal contexts: %w", err)
+	}
+	return nil
 }
