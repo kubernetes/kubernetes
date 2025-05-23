@@ -17,22 +17,25 @@ limitations under the License.
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
-	utiltesting "k8s.io/client-go/util/testing"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utiltesting "k8s.io/client-go/util/testing"
 )
 
 type getContextsTest struct {
-	startingConfig clientcmdapi.Config
-	names          []string
-	noHeader       bool
-	nameOnly       bool
-	expectedOut    string
+	startingConfig  clientcmdapi.Config
+	names           []string
+	noHeader        bool
+	nameOnly        bool
+	expectedOut     string
+	expectedOutJSON any
 }
 
 func TestGetContextsAll(t *testing.T) {
@@ -102,6 +105,27 @@ func TestGetContextsAllName(t *testing.T) {
 	test.run(t)
 }
 
+func TestGetContextsAllJSON(t *testing.T) {
+	tconf := clientcmdapi.Config{
+		CurrentContext: "shaker-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			"abc":            {AuthInfo: "blue-user", Cluster: "abc-cluster", Namespace: "kube-system"},
+			"xyz":            {AuthInfo: "blue-user", Cluster: "xyz-cluster", Namespace: "default"}}}
+	test := getContextsTest{
+		startingConfig: tconf,
+		names:          []string{},
+		noHeader:       false,
+		nameOnly:       false,
+		expectedOutJSON: []any{
+			map[string]any{"name": "abc", "authInfo": "blue-user", "cluster": "abc-cluster", "namespace": "kube-system"},
+			map[string]any{"name": "shaker-context", "authInfo": "blue-user", "cluster": "big-cluster", "namespace": "saw-ns", "current": true},
+			map[string]any{"name": "xyz", "authInfo": "blue-user", "cluster": "xyz-cluster", "namespace": "default"},
+		},
+	}
+	test.run(t)
+}
+
 func TestGetContextsAllNameNoHeader(t *testing.T) {
 	tconf := clientcmdapi.Config{
 		CurrentContext: "shaker-context",
@@ -144,6 +168,24 @@ func TestGetContextsSelectOneOfTwo(t *testing.T) {
 	test.run(t)
 }
 
+func TestGetContextsSelectOneOfTwoJSON(t *testing.T) {
+	tconf := clientcmdapi.Config{
+		CurrentContext: "shaker-context",
+		Contexts: map[string]*clientcmdapi.Context{
+			"shaker-context": {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"},
+			"not-this":       {AuthInfo: "blue-user", Cluster: "big-cluster", Namespace: "saw-ns"}}}
+	test := getContextsTest{
+		startingConfig: tconf,
+		names:          []string{"shaker-context"},
+		noHeader:       false,
+		nameOnly:       false,
+		expectedOutJSON: []any{
+			map[string]any{"name": "shaker-context", "authInfo": "blue-user", "cluster": "big-cluster", "namespace": "saw-ns", "current": true},
+		},
+	}
+	test.run(t)
+}
+
 func (test getContextsTest) run(t *testing.T) {
 	fakeKubeFile, err := os.CreateTemp(os.TempDir(), "")
 	if err != nil {
@@ -166,6 +208,9 @@ func (test getContextsTest) run(t *testing.T) {
 	if test.nameOnly {
 		cmd.Flags().Set("output", "name")
 	}
+	if test.expectedOutJSON != nil {
+		cmd.Flags().Set("output", "json")
+	}
 	if test.noHeader {
 		cmd.Flags().Set("no-headers", "true")
 	}
@@ -175,5 +220,15 @@ func (test getContextsTest) run(t *testing.T) {
 			t.Errorf("Expected\n%s\ngot\n%s", test.expectedOut, buf.String())
 		}
 		return
+	}
+	if test.expectedOutJSON != nil {
+		var v any
+		if err := json.Unmarshal(buf.Bytes(), &v); err != nil {
+			t.Errorf("Error decoding JSON output: %v", err)
+		} else {
+			if !cmp.Equal(v, test.expectedOutJSON) {
+				t.Error("Unexpected JSON output encountered:\n", cmp.Diff(test.expectedOutJSON, v))
+			}
+		}
 	}
 }
