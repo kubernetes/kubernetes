@@ -179,6 +179,12 @@ func autoConvert_api_BasicDevice_To_v1beta1_BasicDevice(in *BasicDevice, out *v1
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]v1beta1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	if err := metav1.Convert_bool_To_Pointer_bool(&in.UsageRestrictedToNode, &out.UsageRestrictedToNode, s); err != nil {
+		return err
+	}
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 
@@ -205,6 +211,12 @@ func autoConvert_v1beta1_BasicDevice_To_api_BasicDevice(in *v1beta1.BasicDevice,
 	out.NodeSelector = (*v1.NodeSelector)(unsafe.Pointer(in.NodeSelector))
 	out.AllNodes = (*bool)(unsafe.Pointer(in.AllNodes))
 	out.Taints = *(*[]v1beta1.DeviceTaint)(unsafe.Pointer(&in.Taints))
+	if err := metav1.Convert_Pointer_bool_To_bool(&in.UsageRestrictedToNode, &out.UsageRestrictedToNode, s); err != nil {
+		return err
+	}
+	out.BindingConditions = *(*[]string)(unsafe.Pointer(&in.BindingConditions))
+	out.BindingFailureConditions = *(*[]string)(unsafe.Pointer(&in.BindingFailureConditions))
+	out.BindingTimeoutSeconds = (*int64)(unsafe.Pointer(in.BindingTimeoutSeconds))
 	return nil
 }
 

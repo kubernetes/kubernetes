@@ -439,6 +439,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+- name: DRADeviceBindingConditions
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: DRADeviceTaints
   versionedSpecs:
   - default: false

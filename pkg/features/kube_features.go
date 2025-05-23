@@ -231,6 +231,17 @@ const (
 	// cause pods using them to stop. Users can decide to tolerate taints.
 	DRADeviceTaints featuregate.Feature = "DRADeviceTaints"
 
+	// owner: @KobayashiD27
+	// kep: http://kep.k8s.io/5007
+	// alpha: v1.34
+	//
+	// Enables support for delaying the binding of pods
+	// which depend on devices with binding conditions.
+	//
+	// DRAResourceClaimDeviceStatus also needs to be
+	// enabled.
+	DRADeviceBindingConditions featuregate.Feature = "DRADeviceBindingConditions"
+
 	// owner: @mortent, @cici37
 	// kep: http://kep.k8s.io/4815
 	//
@@ -1150,6 +1161,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DRAAdminAccess: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	DRADeviceBindingConditions: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRADeviceTaints: {
