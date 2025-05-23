@@ -77,6 +77,16 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	})
 	defer tearDownFn()
 
+	// Validate that OIDC discovery doc and keys are available.
+	for _, p := range []string{
+		"/.well-known/openid-configuration",
+		"/openid/v1/jwks",
+	} {
+		if _, err := client.CoreV1().RESTClient().Get().AbsPath(p).DoRaw(ctx); err != nil {
+			t.Errorf("Validating OIDC discovery failed, error getting api path %q: %v", p, err)
+		}
+	}
+
 	// Create Namesapce (ns-1) to work with.
 	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
