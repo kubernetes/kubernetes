@@ -878,7 +878,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 				}
 				queue.Add(logger, item.sendPod)
 
-				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod) (ScheduleResult, error) {
 					return item.mockScheduleResult, item.injectSchedulingError
 				}
 				sched.FailureHandler = func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, ni *framework.NominatingInfo, start time.Time) {
@@ -1169,7 +1169,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 					gotPodIsInFlightAtWaitOnPermit = podListContainsPod(fwk.queue.InFlightPods(), pod)
 					return item.mockWaitOnPermitResult
 				}
-				fwk.runPreBindPluginsFn = func(_ context.Context, _ framework.CycleState, pod *v1.Pod, _ string) *framework.Status {
+				fwk.runPreBindPluginsFn = func(_ context.Context, _ *framework.PluginRunningInfo, pod *v1.Pod, _ string) *framework.Status {
 					gotPodIsInFlightAtRunPreBindPlugins = podListContainsPod(fwk.queue.InFlightPods(), pod)
 					return item.mockRunPreBindPluginsResult
 				}
@@ -1183,7 +1183,7 @@ func TestScheduleOneMarksPodAsProcessedBeforePreBind(t *testing.T) {
 				}
 				queue.Add(logger, item.sendPod)
 
-				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state framework.CycleState, pod *v1.Pod) (ScheduleResult, error) {
+				sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod) (ScheduleResult, error) {
 					return item.mockScheduleResult, item.injectSchedulingError
 				}
 				sched.FailureHandler = func(_ context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *framework.Status, _ *framework.NominatingInfo, _ time.Time) {
@@ -1264,7 +1264,7 @@ type FakeFramework struct {
 	framework.Framework
 	queue               internalqueue.SchedulingQueue
 	waitOnPermitFn      func(context.Context, *v1.Pod) *framework.Status
-	runPreBindPluginsFn func(context.Context, framework.CycleState, *v1.Pod, string) *framework.Status
+	runPreBindPluginsFn func(context.Context, *framework.PluginRunningInfo, *v1.Pod, string) *framework.Status
 }
 
 func NewFakeFramework(ctx context.Context, schedQueue internalqueue.SchedulingQueue, fns []tf.RegisterPluginFunc,
@@ -1280,8 +1280,8 @@ func (ff *FakeFramework) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewo
 	return ff.waitOnPermitFn(ctx, pod)
 }
 
-func (ff *FakeFramework) RunPreBindPlugins(ctx context.Context, state framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
-	return ff.runPreBindPluginsFn(ctx, state, pod, nodeName)
+func (ff *FakeFramework) RunPreBindPlugins(ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod, nodeName string) *framework.Status {
+	return ff.runPreBindPluginsFn(ctx, pluginInfo, pod, nodeName)
 }
 
 func podListContainsPod(list []*v1.Pod, pod *v1.Pod) bool {
@@ -1711,7 +1711,7 @@ func TestSchedulerBinding(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pod := st.MakePod().Name(test.podName).Obj()
 			defaultBound := false
-			state := framework.NewCycleState()
+			pluginInfo := framework.NewPluginInfo()
 			client := clientsetfake.NewClientset(pod)
 			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
 				if action.GetSubresource() == "binding" {
@@ -1736,7 +1736,7 @@ func TestSchedulerBinding(t *testing.T) {
 				nodeInfoSnapshot:         nil,
 				percentageOfNodesToScore: 0,
 			}
-			status := sched.bind(ctx, fwk, pod, "node", state)
+			status := sched.bind(ctx, fwk, pod, "node", pluginInfo)
 			if !status.IsSuccess() {
 				t.Error(status.AsError())
 			}
@@ -3085,7 +3085,7 @@ func TestSchedulerSchedulePod(t *testing.T) {
 			informerFactory.Start(ctx.Done())
 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := sched.SchedulePod(ctx, fwk, framework.NewCycleState(), test.pod)
+			result, err := sched.SchedulePod(ctx, fwk, framework.NewPluginInfo(), test.pod)
 			if err != test.wErr {
 				gotFitErr, gotOK := err.(*framework.FitError)
 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
@@ -3138,7 +3138,7 @@ func TestFindFitAllError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), &v1.Pod{})
+	_, diagnosis, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewPluginInfo(), &v1.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3184,7 +3184,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	pod := st.MakePod().Name("1").UID("1").Obj()
-	_, diagnosis, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), pod)
+	_, diagnosis, err := scheduler.findNodesThatFitPod(ctx, fwk, framework.NewPluginInfo(), pod)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3279,7 +3279,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			fwk.AddNominatedPod(logger, podinfo, &framework.NominatingInfo{NominatingMode: framework.ModeOverride, NominatedNodeName: "1"})
 
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, framework.NewPluginInfo(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3417,8 +3417,8 @@ func TestZeroRequest(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			state := framework.NewCycleState()
-			_, _, err = sched.findNodesThatFitPod(ctx, fwk, state, test.pod)
+			pluginInfo := framework.NewPluginInfo()
+			_, _, err = sched.findNodesThatFitPod(ctx, fwk, pluginInfo, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
@@ -3426,8 +3426,8 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			fwk.RunPreScorePlugins(ctx, state, test.pod, nodeInfos)
-			list, err := prioritizeNodes(ctx, nil, fwk, state, test.pod, nodeInfos)
+			fwk.RunPreScorePlugins(ctx, pluginInfo, test.pod, nodeInfos)
+			list, err := prioritizeNodes(ctx, nil, fwk, pluginInfo, test.pod, nodeInfos)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3819,7 +3819,6 @@ func Test_prioritizeNodes(t *testing.T) {
 				t.Fatalf("error creating framework: %+v", err)
 			}
 
-			state := framework.NewCycleState()
 			var extenders []framework.Extender
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
@@ -3828,7 +3827,7 @@ func Test_prioritizeNodes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to list node from snapshot: %v", err)
 			}
-			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, state, test.pod, nodeInfos)
+			nodesscores, err := prioritizeNodes(ctx, extenders, fwk, framework.NewPluginInfo(), test.pod, nodeInfos)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -3949,7 +3948,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := sched.findNodesThatFitPod(ctx, fwk, framework.NewPluginInfo(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -4034,7 +4033,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			}
 			sched.applyDefaultHandlers()
 
-			_, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewCycleState(), test.pod)
+			_, _, err = sched.findNodesThatFitPod(ctx, fwk, framework.NewPluginInfo(), test.pod)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

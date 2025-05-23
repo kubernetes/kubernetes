@@ -46,12 +46,6 @@ type StateKey string
 // Note: CycleState uses a sync.Map to back the storage, because it is thread safe. It's aimed to optimize for the "write once and read many times" scenarios.
 // It is the recommended pattern used in all in-tree plugins - plugin-specific state is written once in PreFilter/PreScore and afterward read many times in Filter/Score.
 type CycleState interface {
-	ShouldRecordPluginMetrics() bool
-	SetRecordPluginMetrics(flag bool)
-	GetSkipFilterPlugins() sets.Set[string]
-	SetSkipFilterPlugins(plugins sets.Set[string])
-	GetSkipScorePlugins() sets.Set[string]
-	SetSkipScorePlugins(plugins sets.Set[string])
 	Read(key StateKey) (StateData, error)
 	Write(key StateKey, val StateData)
 	Delete(key StateKey)
@@ -61,49 +55,11 @@ type CycleState interface {
 type CycleStateImpl struct {
 	// storage is keyed with StateKey, and valued with StateData.
 	storage sync.Map
-	// if recordPluginMetrics is true, metrics.PluginExecutionDuration will be recorded for this cycle.
-	recordPluginMetrics bool
-	// SkipFilterPlugins are plugins that will be skipped in the Filter extension point.
-	SkipFilterPlugins sets.Set[string]
-	// SkipScorePlugins are plugins that will be skipped in the Score extension point.
-	SkipScorePlugins sets.Set[string]
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
 func NewCycleState() CycleState {
 	return &CycleStateImpl{}
-}
-
-// ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics should be recorded.
-func (c *CycleStateImpl) ShouldRecordPluginMetrics() bool {
-	if c == nil {
-		return false
-	}
-	return c.recordPluginMetrics
-}
-
-// SetRecordPluginMetrics sets recordPluginMetrics to the given value.
-func (c *CycleStateImpl) SetRecordPluginMetrics(flag bool) {
-	if c == nil {
-		return
-	}
-	c.recordPluginMetrics = flag
-}
-
-func (c *CycleStateImpl) SetSkipFilterPlugins(plugins sets.Set[string]) {
-	c.SkipFilterPlugins = plugins
-}
-
-func (c *CycleStateImpl) GetSkipFilterPlugins() sets.Set[string] {
-	return c.SkipFilterPlugins
-}
-
-func (c *CycleStateImpl) SetSkipScorePlugins(plugins sets.Set[string]) {
-	c.SkipScorePlugins = plugins
-}
-
-func (c *CycleStateImpl) GetSkipScorePlugins() sets.Set[string] {
-	return c.SkipScorePlugins
 }
 
 // Clone creates a copy of CycleState and returns its pointer. Clone returns
@@ -118,10 +74,6 @@ func (c *CycleStateImpl) Clone() CycleState {
 		copy.storage.Store(k, v.(StateData).Clone())
 		return true
 	})
-	// The below are not mutated, so we don't have to safe copy.
-	copy.recordPluginMetrics = c.recordPluginMetrics
-	copy.SkipFilterPlugins = c.SkipFilterPlugins
-	copy.SkipScorePlugins = c.SkipScorePlugins
 
 	return copy
 }
@@ -149,4 +101,54 @@ func (c *CycleStateImpl) Write(key StateKey, val StateData) {
 // See CycleState for notes on concurrency.
 func (c *CycleStateImpl) Delete(key StateKey) {
 	c.storage.Delete(key)
+}
+
+// PluginRunningInfo contains information for the scheduler on how to run plugins in the given scheduling cycle.
+type PluginRunningInfo struct {
+	// if recordPluginMetrics is true, metrics.PluginExecutionDuration will be recorded for this cycle.
+	recordPluginMetrics bool
+	// SkipFilterPlugins are plugins that will be skipped in the Filter extension point.
+	SkipFilterPlugins sets.Set[string]
+	// SkipScorePlugins are plugins that will be skipped in the Score extension point.
+	SkipScorePlugins sets.Set[string]
+	// State contains data to be passed between plugins.
+	State CycleState
+}
+
+// ShouldRecordPluginMetrics returns whether metrics.PluginExecutionDuration metrics should be recorded.
+func (p *PluginRunningInfo) ShouldRecordPluginMetrics() bool {
+	if p == nil {
+		return false
+	}
+	return p.recordPluginMetrics
+}
+
+// SetRecordPluginMetrics sets recordPluginMetrics to the given value.
+func (p *PluginRunningInfo) SetRecordPluginMetrics(flag bool) {
+	if p == nil {
+		return
+	}
+	p.recordPluginMetrics = flag
+}
+
+func (p *PluginRunningInfo) Clone() *PluginRunningInfo {
+	if p == nil {
+		return nil
+	}
+
+	copy := &PluginRunningInfo{}
+	copy.recordPluginMetrics = p.recordPluginMetrics
+	copy.SkipFilterPlugins = p.SkipFilterPlugins
+	copy.SkipScorePlugins = p.SkipScorePlugins
+	if p.State != nil {
+		copy.State = p.State.Clone()
+	}
+
+	return copy
+}
+
+func NewPluginInfo() *PluginRunningInfo {
+	p := &PluginRunningInfo{}
+	p.State = NewCycleState()
+	return p
 }

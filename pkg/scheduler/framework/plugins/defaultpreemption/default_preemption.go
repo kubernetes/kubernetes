@@ -95,7 +95,10 @@ func (pl *DefaultPreemption) PostFilter(ctx context.Context, state framework.Cyc
 		metrics.PreemptionAttempts.Inc()
 	}()
 
-	result, status := pl.Evaluator.Preempt(ctx, state, pod, m)
+	// Preempt is called without the info about plugin execution.
+	pluginInfo := framework.NewPluginInfo()
+	pluginInfo.State = state
+	result, status := pl.Evaluator.Preempt(ctx, pluginInfo, pod, m)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return result, framework.NewStatus(status.Code(), "preemption: "+msg)
@@ -160,7 +163,7 @@ func (pl *DefaultPreemption) CandidatesToVictimsMap(candidates []preemption.Cand
 // for "pod" to be scheduled.
 func (pl *DefaultPreemption) SelectVictimsOnNode(
 	ctx context.Context,
-	state framework.CycleState,
+	pluginInfo *framework.PluginRunningInfo,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
 	pdbs []*policy.PodDisruptionBudget) ([]*v1.Pod, int, *framework.Status) {
@@ -170,7 +173,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		if err := nodeInfo.RemovePod(logger, rpi.Pod); err != nil {
 			return err
 		}
-		status := pl.fh.RunPreFilterExtensionRemovePod(ctx, state, pod, rpi, nodeInfo)
+		status := pl.fh.RunPreFilterExtensionRemovePod(ctx, pluginInfo, pod, rpi, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -178,7 +181,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	}
 	addPod := func(api *framework.PodInfo) error {
 		nodeInfo.AddPodInfo(api)
-		status := pl.fh.RunPreFilterExtensionAddPod(ctx, state, pod, api, nodeInfo)
+		status := pl.fh.RunPreFilterExtensionAddPod(ctx, pluginInfo, pod, api, nodeInfo)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -207,7 +210,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo); !status.IsSuccess() {
+	if status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, pluginInfo, pod, nodeInfo); !status.IsSuccess() {
 		return nil, 0, status
 	}
 	var victims []*v1.Pod
@@ -223,7 +226,7 @@ func (pl *DefaultPreemption) SelectVictimsOnNode(
 		if err := addPod(pi); err != nil {
 			return false, err
 		}
-		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+		status := pl.fh.RunFilterPluginsWithNominatedPods(ctx, pluginInfo, pod, nodeInfo)
 		fits := status.IsSuccess()
 		if !fits {
 			if err := removePod(pi); err != nil {

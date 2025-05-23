@@ -72,7 +72,7 @@ type FakePostFilterPlugin struct {
 }
 
 func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state framework.CycleState, pod *v1.Pod,
+	ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod,
 	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *framework.Status) {
 	return append(victims, nodeInfo.Pods[0].Pod), pl.numViolatingVictim, nil
 }
@@ -109,7 +109,7 @@ func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod)
 type FakePreemptionScorePostFilterPlugin struct{}
 
 func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state framework.CycleState, pod *v1.Pod,
+	ctx context.Context, pluginInfo *framework.PluginRunningInfo, pod *v1.Pod,
 	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *framework.Status) {
 	return append(victims, nodeInfo.Pods[0].Pod), 1, nil
 }
@@ -262,13 +262,13 @@ func TestDryRunPreemption(t *testing.T) {
 			fakePostPlugin := &FakePostFilterPlugin{numViolatingVictim: tt.numViolatingVictim}
 
 			for cycle, pod := range tt.testPods {
-				state := framework.NewCycleState()
+				pluginInfo := framework.NewPluginInfo()
 				pe := Evaluator{
 					PluginName: "FakePostFilter",
 					Handler:    fwk,
 					Interface:  fakePostPlugin,
 				}
-				got, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				got, _, _ := pe.DryRunPreemption(ctx, pluginInfo, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -349,9 +349,9 @@ func TestSelectCandidate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			state := framework.NewCycleState()
+			pluginInfo := framework.NewPluginInfo()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginInfo, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 			nodeInfos, err := snapshot.NodeInfos().List()
@@ -362,13 +362,13 @@ func TestSelectCandidate(t *testing.T) {
 			fakePreemptionScorePostFilterPlugin := &FakePreemptionScorePostFilterPlugin{}
 
 			for _, pod := range tt.testPods {
-				state := framework.NewCycleState()
+				pluginInfo := framework.NewPluginInfo()
 				pe := Evaluator{
 					PluginName: "FakePreemptionScorePostFilter",
 					Handler:    fwk,
 					Interface:  fakePreemptionScorePostFilterPlugin,
 				}
-				candidates, _, _ := pe.DryRunPreemption(ctx, state, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
+				candidates, _, _ := pe.DryRunPreemption(ctx, pluginInfo, pod, nodeInfos, nil, 0, int32(len(nodeInfos)))
 				s := pe.SelectCandidate(ctx, candidates)
 				if s == nil || len(s.Name()) == 0 {
 					t.Errorf("expect any node in %v, but no candidate selected", tt.expected)
