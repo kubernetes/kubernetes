@@ -60,6 +60,7 @@ func makeOptionsWithCIDRs(serviceCIDR string, secondaryServiceCIDR string) *Serv
 }
 
 func TestClusterServiceIPRange(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	testCases := []struct {
 		name                 string
 		options              *ServerRunOptions

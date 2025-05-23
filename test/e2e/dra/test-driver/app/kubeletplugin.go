@@ -30,12 +30,14 @@ import (
 
 	"google.golang.org/grpc"
 
-	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapi "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
+	cgoresource "k8s.io/client-go/kubernetes/typed/resource/v1beta2"
+	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/kubeletplugin"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -43,16 +45,15 @@ import (
 )
 
 type ExamplePlugin struct {
-	stopCh     <-chan struct{}
-	logger     klog.Logger
-	kubeClient kubernetes.Interface
-	d          *kubeletplugin.Helper
-	fileOps    FileOperations
+	stopCh         <-chan struct{}
+	logger         klog.Logger
+	resourceClient cgoresource.ResourceV1beta2Interface
+	d              *kubeletplugin.Helper
+	fileOps        FileOperations
 
-	cdiDir      string
-	driverName  string
-	nodeName    string
-	deviceNames sets.Set[string]
+	cdiDir     string
+	driverName string
+	nodeName   string
 
 	// The mutex is needed because there are other goroutines checking the state.
 	// Serializing in the gRPC server alone is not enough because writing would
@@ -118,13 +119,11 @@ type FileOperations struct {
 	// file does not exist.
 	Remove func(name string) error
 
-	// NumDevices determines whether the plugin reports devices
-	// and how many. It reports nothing if negative.
-	NumDevices int
-
-	// Pre-defined devices, with each device name mapped to
-	// the device attributes. Not used if NumDevices >= 0.
-	Devices map[string]map[resourceapi.QualifiedName]resourceapi.DeviceAttribute
+	// ErrorHandler is an optional callback for ResourceSlice publishing problems.
+	ErrorHandler func(ctx context.Context, err error, msg string)
+	// DriverResources provides the information that the driver will use to
+	// construct the ResourceSlices that it will publish.
+	DriverResources *resourceslice.DriverResources
 }
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
@@ -145,23 +144,16 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		}
 	}
 	ex := &ExamplePlugin{
-		stopCh:      ctx.Done(),
-		logger:      logger,
-		kubeClient:  kubeClient,
-		fileOps:     fileOps,
-		cdiDir:      cdiDir,
-		driverName:  driverName,
-		nodeName:    nodeName,
-		prepared:    make(map[ClaimID][]kubeletplugin.Device),
-		deviceNames: sets.New[string](),
+		stopCh:         ctx.Done(),
+		logger:         logger,
+		resourceClient: draclient.New(kubeClient),
+		fileOps:        fileOps,
+		cdiDir:         cdiDir,
+		driverName:     driverName,
+		nodeName:       nodeName,
+		prepared:       make(map[ClaimID][]kubeletplugin.Device),
 	}
 
-	for i := 0; i < ex.fileOps.NumDevices; i++ {
-		ex.deviceNames.Insert(fmt.Sprintf("device-%02d", i))
-	}
-	for deviceName := range ex.fileOps.Devices {
-		ex.deviceNames.Insert(deviceName)
-	}
 	opts = append(opts,
 		kubeletplugin.DriverName(driverName),
 		kubeletplugin.NodeName(nodeName),
@@ -175,44 +167,8 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 	}
 	ex.d = d
 
-	if fileOps.NumDevices >= 0 {
-		devices := make([]resourceapi.Device, ex.fileOps.NumDevices)
-		for i := 0; i < ex.fileOps.NumDevices; i++ {
-			devices[i] = resourceapi.Device{
-				Name:  fmt.Sprintf("device-%02d", i),
-				Basic: &resourceapi.BasicDevice{},
-			}
-		}
-		driverResources := resourceslice.DriverResources{
-			Pools: map[string]resourceslice.Pool{
-				nodeName: {
-					Slices: []resourceslice.Slice{{
-						Devices: devices,
-					}},
-				},
-			},
-		}
-		if err := ex.d.PublishResources(ctx, driverResources); err != nil {
-			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
-		}
-	} else if len(ex.fileOps.Devices) > 0 {
-		devices := make([]resourceapi.Device, len(ex.fileOps.Devices))
-		for i, deviceName := range sets.List(ex.deviceNames) {
-			devices[i] = resourceapi.Device{
-				Name:  deviceName,
-				Basic: &resourceapi.BasicDevice{Attributes: ex.fileOps.Devices[deviceName]},
-			}
-		}
-		driverResources := resourceslice.DriverResources{
-			Pools: map[string]resourceslice.Pool{
-				nodeName: {
-					Slices: []resourceslice.Slice{{
-						Devices: devices,
-					}},
-				},
-			},
-		}
-		if err := ex.d.PublishResources(ctx, driverResources); err != nil {
+	if fileOps.DriverResources != nil {
+		if err := ex.d.PublishResources(ctx, *fileOps.DriverResources); err != nil {
 			return nil, fmt.Errorf("start kubelet plugin: publish resources: %w", err)
 		}
 	}
@@ -231,6 +187,14 @@ func (ex *ExamplePlugin) IsRegistered() bool {
 		return false
 	}
 	return status.PluginRegistered
+}
+
+func (ex *ExamplePlugin) ErrorHandler(ctx context.Context, err error, msg string) {
+	if ex.fileOps.ErrorHandler != nil {
+		ex.fileOps.ErrorHandler(ctx, err, msg)
+		return
+	}
+	utilruntime.HandleErrorWithContext(ctx, err, msg)
 }
 
 // BlockNodePrepareResources locks blockPrepareResourcesMutex and returns unlocking function for it
@@ -540,6 +504,15 @@ func (ex *ExamplePlugin) GetGRPCCalls() []GRPCCall {
 	return calls
 }
 
+// ResetGRPCCalls clears the internal tracking of GRPC calls made to the plugin.
+// This is useful in tests to start with a clean slate when verifying plugin
+// registration behavior, particularly when testing registration retry scenarios.
+func (ex *ExamplePlugin) ResetGRPCCalls() {
+	ex.mutex.Lock()
+	defer ex.mutex.Unlock()
+	ex.gRPCCalls = nil
+}
+
 // CountCalls counts GRPC calls with the given method suffix.
 func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 	count := 0
@@ -552,5 +525,15 @@ func (ex *ExamplePlugin) CountCalls(methodSuffix string) int {
 }
 
 func (ex *ExamplePlugin) UpdateStatus(ctx context.Context, resourceClaim *resourceapi.ResourceClaim) (*resourceapi.ResourceClaim, error) {
-	return ex.kubeClient.ResourceV1beta1().ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+	return ex.resourceClient.ResourceClaims(resourceClaim.Namespace).UpdateStatus(ctx, resourceClaim, metav1.UpdateOptions{})
+}
+
+// SetGetInfoError sets an error to be returned by the plugin's GetInfo call.
+// This can be used in tests to simulate a registration failure scenario,
+// allowing verification that the kubelet plugin manager retries registration
+// when GetInfo fails.
+//
+// To restore normal GetInfo behavior, call SetGetInfoError(nil).
+func (ex *ExamplePlugin) SetGetInfoError(err error) {
+	ex.d.SetGetInfoError(err)
 }

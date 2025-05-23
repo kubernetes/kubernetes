@@ -68,13 +68,18 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 	// Walk the list of foldable expression and continue to fold until there are no more folds left.
 	// All of the fold candidates returned by the constantExprMatcher should succeed unless there's
 	// a logic bug with the selection of expressions.
-	foldableExprs := ast.MatchDescendants(root, constantExprMatcher)
+	constantExprMatcherCapture := func(e ast.NavigableExpr) bool { return constantExprMatcher(ctx, a, e) }
+	foldableExprs := ast.MatchDescendants(root, constantExprMatcherCapture)
 	foldCount := 0
 	for len(foldableExprs) != 0 && foldCount < opt.maxFoldIterations {
 		for _, fold := range foldableExprs {
 			// If the expression could be folded because it's a non-strict call, and the
 			// branches are pruned, continue to the next fold.
 			if fold.Kind() == ast.CallKind && maybePruneBranches(ctx, fold) {
+				continue
+			}
+			// Late-bound function calls cannot be folded.
+			if fold.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, a, fold) {
 				continue
 			}
 			// Otherwise, assume all context is needed to evaluate the expression.
@@ -85,7 +90,7 @@ func (opt *constantFoldingOptimizer) Optimize(ctx *OptimizerContext, a *ast.AST)
 			}
 		}
 		foldCount++
-		foldableExprs = ast.MatchDescendants(root, constantExprMatcher)
+		foldableExprs = ast.MatchDescendants(root, constantExprMatcherCapture)
 	}
 	// Once all of the constants have been folded, try to run through the remaining comprehensions
 	// one last time. In this case, there's no guarantee they'll run, so we only update the
@@ -137,6 +142,15 @@ func tryFold(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) error {
 	// Update the fold expression to be a literal.
 	ctx.UpdateExpr(expr, ctx.NewLiteral(out))
 	return nil
+}
+
+func isLateBoundFunctionCall(ctx *OptimizerContext, a *ast.AST, expr ast.Expr) bool {
+	call := expr.AsCall()
+	function := ctx.Functions()[call.FunctionName()]
+	if function == nil {
+		return false
+	}
+	return function.HasLateBinding()
 }
 
 // maybePruneBranches inspects the non-strict call expression to determine whether
@@ -455,7 +469,7 @@ func adaptLiteral(ctx *OptimizerContext, val ref.Val) (ast.Expr, error) {
 // Only comprehensions which are not nested are included as possible constant folds, and only
 // if all variables referenced in the comprehension stack exist are only iteration or
 // accumulation variables.
-func constantExprMatcher(e ast.NavigableExpr) bool {
+func constantExprMatcher(ctx *OptimizerContext, a *ast.AST, e ast.NavigableExpr) bool {
 	switch e.Kind() {
 	case ast.CallKind:
 		return constantCallMatcher(e)
@@ -475,6 +489,10 @@ func constantExprMatcher(e ast.NavigableExpr) bool {
 				vars[nested.IterVar()] = true
 			}
 			if e.Kind() == ast.IdentKind && !vars[e.AsIdent()] {
+				constantExprs = false
+			}
+			// Late-bound function calls cannot be folded.
+			if e.Kind() == ast.CallKind && isLateBoundFunctionCall(ctx, a, e) {
 				constantExprs = false
 			}
 		})

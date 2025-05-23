@@ -15,7 +15,7 @@ testing.
 
 Valid parameters are key/value string pairs stored in a ConfigMap.
 Those get copied into the ResourceClaimStatus with "user_" and "admin_" as
-prefix, depending on whether they came from the ResourceClaim or ResourceClass.
+prefix, depending on whether they came from the ResourceClaim or DeviceClass.
 They get stored in the `ResourceHandle` field as JSON map by the controller.
 The kubelet plugin then sets these attributes as environment variables in each
 container that uses the resource.
@@ -71,7 +71,7 @@ KUBECONFIG=/var/run/kubernetes/admin.kubeconfig go run ./test/e2e/dra/test-drive
 And finally:
 ```console
 $ export KUBECONFIG=/var/run/kubernetes/admin.kubeconfig
-$ kubectl create -f test/e2e/dra/test-driver/deploy/example/resourceclass.yaml
+$ kubectl create -f test/e2e/dra/test-driver/deploy/example/deviceclass.yaml
 resourceclass/example created
 $ kubectl create -f test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
 configmap/pause-claim-parameters created

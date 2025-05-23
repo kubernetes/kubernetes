@@ -36,7 +36,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -455,7 +455,7 @@ func ensureChain(chain string, tx *knftables.Transaction, createdChains sets.Set
 
 func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	noLocalhost := "ip daddr != 127.0.0.0/8"
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
@@ -723,11 +723,12 @@ func CleanupLeftovers(ctx context.Context) bool {
 
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
 		nft, err := knftables.New(family, kubeProxyTable)
-		if err == nil {
-			tx := nft.NewTransaction()
-			tx.Delete(&knftables.Table{})
-			err = nft.Run(ctx, tx)
+		if err != nil {
+			continue
 		}
+		tx := nft.NewTransaction()
+		tx.Delete(&knftables.Table{})
+		err = nft.Run(ctx, tx)
 		if err != nil && !knftables.IsNotFound(err) {
 			logger.Error(err, "Error cleaning up nftables rules")
 			encounteredError = true
@@ -788,7 +789,6 @@ func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 // object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
-
 }
 
 // OnServiceSynced is called once all the initial event handlers were
@@ -1252,7 +1252,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
 	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
 		ipvX_addr = "ipv6_addr"
@@ -1586,7 +1586,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						protocol, "dport", svcInfo.Port(),
 						"jump", markMasqChain,
 					),
 				})
@@ -1600,7 +1599,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						protocol, "dport", svcInfo.Port(),
 						proxier.localDetector.IfNotLocalNFT(),
 						"jump", markMasqChain,
 					),

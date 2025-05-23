@@ -106,6 +106,9 @@ type defaultFunc func(pod *api.Pod) error
 // A static pod tried to use a ClusterTrustBundle projected volume source.
 var ErrStaticPodTriedToUseClusterTrustBundle = errors.New("static pods may not use ClusterTrustBundle projected volume sources")
 
+// A static pod tried to use a resource claim.
+var ErrStaticPodTriedToUseResourceClaims = errors.New("static pods may not use ResourceClaims")
+
 // tryDecodeSinglePod takes data and tries to extract valid Pod config information from it.
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v1.Pod, err error) {
 	// JSON is valid YAML, so this should work for everything.
@@ -151,6 +154,9 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *v
 				return true, nil, ErrStaticPodTriedToUseClusterTrustBundle
 			}
 		}
+	}
+	if len(v1Pod.Spec.ResourceClaims) > 0 {
+		return true, nil, ErrStaticPodTriedToUseResourceClaims
 	}
 
 	return true, v1Pod, nil

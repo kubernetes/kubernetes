@@ -781,6 +781,7 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 
 func TestDescribeService(t *testing.T) {
 	singleStack := corev1.IPFamilyPolicySingleStack
+	preferClose := corev1.ServiceTrafficDistributionPreferClose
 	testCases := []struct {
 		name           string
 		service        *corev1.Service
@@ -1136,6 +1137,54 @@ func TestDescribeService(t *testing.T) {
 				Session Affinity:         None
 				External Traffic Policy:  Local
 				HealthCheck NodePort:     32222
+				Events:                   <none>
+			`)[1:],
+		},
+		{
+			name: "test-TrafficDistribution",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: corev1.ServiceSpec{
+					Type: corev1.ServiceTypeLoadBalancer,
+					Ports: []corev1.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					IPFamilies:            []corev1.IPFamily{corev1.IPv4Protocol},
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       corev1.ServiceAffinityNone,
+					ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyLocal,
+					TrafficDistribution:   &preferClose,
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expected: dedent.Dedent(`
+				Name:                     bar
+				Namespace:                foo
+				Labels:                   <none>
+				Annotations:              <none>
+				Selector:                 blah=heh
+				Type:                     LoadBalancer
+				IP Families:              IPv4
+				IP:                       1.2.3.4
+				IPs:                      <none>
+				Desired LoadBalancer IP:  5.6.7.8
+				Port:                     port-tcp  8080/TCP
+				TargetPort:               targetPort/TCP
+				NodePort:                 port-tcp  31111/TCP
+				Endpoints:                <none>
+				Session Affinity:         None
+				External Traffic Policy:  Local
+				HealthCheck NodePort:     32222
+				Traffic Distribution:     PreferClose
 				Events:                   <none>
 			`)[1:],
 		},

@@ -288,9 +288,9 @@ func (g *applyConfigurationGenerator) generateMemberWith(sw *generator.SnippetWr
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(value $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
 	if g.refGraph.isApplyConfig(memberParams.Member.Type) || isNillable(memberParams.Member.Type) {
-		sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = value\n", memberParams)
+		sw.Do("b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = value\n", memberParams)
 	} else {
-		sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = &value\n", memberParams)
+		sw.Do("b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = &value\n", memberParams)
 	}
 	sw.Do("  return b\n", memberParams)
 	sw.Do("}\n", memberParams)
@@ -304,7 +304,7 @@ func (g *applyConfigurationGenerator) generateMemberGetter(sw *generator.Snippet
 		sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) Get$.Member.Name$() *$.MemberType|raw$ {\n", memberParams)
 	}
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
-	sw.Do("  return b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$\n", memberParams)
+	sw.Do("  return b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$\n", memberParams)
 	sw.Do("}\n", memberParams)
 }
 
@@ -331,15 +331,15 @@ func (g *applyConfigurationGenerator) generateMemberWithForSlice(sw *generator.S
 		sw.Do("}\n", memberParams)
 
 		if memberIsPointerToSlice {
-			sw.Do("*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, *values[i])\n", memberParams)
+			sw.Do("*b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = append(*b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$, *values[i])\n", memberParams)
 		} else {
-			sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, *values[i])\n", memberParams)
+			sw.Do("b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = append(b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$, *values[i])\n", memberParams)
 		}
 	} else {
 		if memberIsPointerToSlice {
-			sw.Do("*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(*b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, values[i])\n", memberParams)
+			sw.Do("*b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = append(*b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$, values[i])\n", memberParams)
 		} else {
-			sw.Do("b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = append(b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$, values[i])\n", memberParams)
+			sw.Do("b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = append(b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$, values[i])\n", memberParams)
 		}
 	}
 	sw.Do("  }\n", memberParams)
@@ -354,11 +354,11 @@ func (g *applyConfigurationGenerator) generateMemberWithForMap(sw *generator.Sni
 	sw.Do("// overwriting an existing map entries in $.Member.Name$ field with the same key.\n", memberParams)
 	sw.Do("func (b *$.ApplyConfig.ApplyConfiguration|public$) With$.Member.Name$(entries $.MemberType|raw$) *$.ApplyConfig.ApplyConfiguration|public$ {\n", memberParams)
 	g.ensureEmbedExistsIfApplicable(sw, memberParams)
-	sw.Do("  if b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
-	sw.Do("    b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
+	sw.Do("  if b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ == nil && len(entries) > 0 {\n", memberParams)
+	sw.Do("    b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$ = make($.MemberType|raw$, len(entries))\n", memberParams)
 	sw.Do("  }\n", memberParams)
 	sw.Do("  for k, v := range entries {\n", memberParams)
-	sw.Do("    b$if ne .EmbeddedIn nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$.$.Member.Name$[k] = v\n", memberParams)
+	sw.Do("    b$if ne .EmbeddedIn nil$$if ne .EmbeddedIn.MemberType.Name.Name \"\"$.$.EmbeddedIn.MemberType.Name.Name$$else if ne .EmbeddedIn.MemberType.Elem nil$.$.EmbeddedIn.MemberType.Elem.Name.Name$$end$$end$.$.Member.Name$[k] = v\n", memberParams)
 	sw.Do("  }\n", memberParams)
 	sw.Do("  return b\n", memberParams)
 	sw.Do("}\n", memberParams)

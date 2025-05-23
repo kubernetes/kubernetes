@@ -18,12 +18,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	defaultLog "log"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
+
+	gw "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/soheilhy/cmux"
+	"github.com/tmc/grpc-websocket-proxy/wsproxy"
+	"go.uber.org/zap"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/trace"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	etcdservergw "go.etcd.io/etcd/api/v3/etcdserverpb/gw"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
@@ -39,14 +48,6 @@ import (
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb"
 	v3lockgw "go.etcd.io/etcd/server/v3/etcdserver/api/v3lock/v3lockpb/gw"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/v3rpc"
-
-	gw "github.com/grpc-ecosystem/grpc-gateway/runtime"
-	"github.com/soheilhy/cmux"
-	"github.com/tmc/grpc-websocket-proxy/wsproxy"
-	"go.uber.org/zap"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/trace"
-	"google.golang.org/grpc"
 )
 
 type serveCtx struct {
@@ -79,6 +80,18 @@ type serveCtx struct {
 	wg sync.WaitGroup
 }
 
+func (sctx *serveCtx) startHandler(errHandler func(error), handler func() error) {
+	// start each handler in a separate goroutine
+	sctx.wg.Add(1)
+	go func() {
+		defer sctx.wg.Done()
+		err := handler()
+		if errHandler != nil {
+			errHandler(err)
+		}
+	}()
+}
+
 type servers struct {
 	secure bool
 	grpc   *grpc.Server
@@ -108,9 +121,10 @@ func (sctx *serveCtx) serve(
 	handler http.Handler,
 	errHandler func(error),
 	grpcDialForRestGatewayBackends func(ctx context.Context) (*grpc.ClientConn, error),
-	splitHttp bool,
-	gopts ...grpc.ServerOption) (err error) {
-	logger := defaultLog.New(ioutil.Discard, "etcdhttp", 0)
+	splitHTTP bool,
+	gopts ...grpc.ServerOption,
+) (err error) {
+	logger := defaultLog.New(io.Discard, "etcdhttp", 0)
 
 	// Make sure serversC is closed even if we prematurely exit the function.
 	defer sctx.close()
@@ -125,9 +139,9 @@ func (sctx *serveCtx) serve(
 
 	m := cmux.New(sctx.l)
 	var server func() error
-	onlyGRPC := splitHttp && !sctx.httpOnly
-	onlyHttp := splitHttp && sctx.httpOnly
-	grpcEnabled := !onlyHttp
+	onlyGRPC := splitHTTP && !sctx.httpOnly
+	onlyHTTP := splitHTTP && sctx.httpOnly
+	grpcEnabled := !onlyHTTP
 	httpEnabled := !onlyGRPC
 
 	v3c := v3client.New(s)
@@ -147,7 +161,7 @@ func (sctx *serveCtx) serve(
 	switch {
 	case onlyGRPC:
 		traffic = "grpc"
-	case onlyHttp:
+	case onlyHTTP:
 		traffic = "http"
 	default:
 		traffic = "grpc+http"
@@ -162,7 +176,7 @@ func (sctx *serveCtx) serve(
 				Handler:  createAccessController(sctx.lg, s, httpmux),
 				ErrorLog: logger, // do not log user error
 			}
-			if err := configureHttpServer(srv, s.Cfg); err != nil {
+			if err = configureHTTPServer(srv, s.Cfg); err != nil {
 				sctx.lg.Error("Configure http server failed", zap.Error(err))
 				return err
 			}
@@ -190,19 +204,15 @@ func (sctx *serveCtx) serve(
 			server = m.Serve
 
 			httpl := m.Match(cmux.HTTP1())
-			sctx.wg.Add(1)
-			go func(srvhttp *http.Server, tlsLis net.Listener) {
-				defer sctx.wg.Done()
-				errHandler(srvhttp.Serve(tlsLis))
-			}(srv, httpl)
+			sctx.startHandler(errHandler, func() error {
+				return srv.Serve(httpl)
+			})
 
 			if grpcEnabled {
 				grpcl := m.Match(cmux.HTTP2())
-				sctx.wg.Add(1)
-				go func(gs *grpc.Server, l net.Listener) {
-					defer sctx.wg.Done()
-					errHandler(gs.Serve(l))
-				}(gs, grpcl)
+				sctx.startHandler(errHandler, func() error {
+					return gs.Serve(grpcl)
+				})
 			}
 		}
 
@@ -249,7 +259,7 @@ func (sctx *serveCtx) serve(
 				TLSConfig: tlscfg,
 				ErrorLog:  logger, // do not log user error
 			}
-			if err := configureHttpServer(srv, s.Cfg); err != nil {
+			if err = configureHTTPServer(srv, s.Cfg); err != nil {
 				sctx.lg.Error("Configure https server failed", zap.Error(err))
 				return err
 			}
@@ -264,11 +274,9 @@ func (sctx *serveCtx) serve(
 			if tlsErr != nil {
 				return tlsErr
 			}
-			sctx.wg.Add(1)
-			go func(srvhttp *http.Server, tlsl net.Listener) {
-				defer sctx.wg.Done()
-				errHandler(srvhttp.Serve(tlsl))
-			}(srv, tlsl)
+			sctx.startHandler(errHandler, func() error {
+				return srv.Serve(tlsl)
+			})
 		}
 
 		sctx.serversC <- &servers{secure: true, grpc: gs, http: srv}
@@ -281,12 +289,11 @@ func (sctx *serveCtx) serve(
 
 	err = server()
 	sctx.close()
-	// ensure all goroutines, which are created by this method, to complete before this method returns.
 	sctx.wg.Wait()
 	return err
 }
 
-func configureHttpServer(srv *http.Server, cfg config.ServerConfig) error {
+func configureHTTPServer(srv *http.Server, cfg config.ServerConfig) error {
 	// todo (ahrtr): should we support configuring other parameters in the future as well?
 	return http2.ConfigureServer(srv, &http2.Server{
 		MaxConcurrentStreams: cfg.MaxConcurrentStreams,
@@ -319,7 +326,23 @@ func (sctx *serveCtx) registerGateway(dial func(ctx context.Context) (*grpc.Clie
 	if err != nil {
 		return nil, err
 	}
-	gwmux := gw.NewServeMux()
+
+	// Refer to https://grpc-ecosystem.github.io/grpc-gateway/docs/mapping/customizing_your_gateway/
+	gwmux := gw.NewServeMux(
+		gw.WithMarshalerOption(gw.MIMEWildcard,
+			&gw.HTTPBodyMarshaler{
+				Marshaler: &gw.JSONPb{
+					MarshalOptions: protojson.MarshalOptions{
+						UseProtoNames:   true,
+						EmitUnpopulated: false,
+					},
+					UnmarshalOptions: protojson.UnmarshalOptions{
+						DiscardUnknown: true,
+					},
+				},
+			},
+		),
+	)
 
 	handlers := []registerHandlerFunc{
 		etcdservergw.RegisterKVHandler,
@@ -336,9 +359,7 @@ func (sctx *serveCtx) registerGateway(dial func(ctx context.Context) (*grpc.Clie
 			return nil, err
 		}
 	}
-	sctx.wg.Add(1)
-	go func() {
-		defer sctx.wg.Done()
+	sctx.startHandler(nil, func() error {
 		<-ctx.Done()
 		if cerr := conn.Close(); cerr != nil {
 			sctx.lg.Warn(
@@ -347,7 +368,8 @@ func (sctx *serveCtx) registerGateway(dial func(ctx context.Context) (*grpc.Clie
 				zap.Error(cerr),
 			)
 		}
-	}()
+		return nil
+	})
 
 	return gwmux, nil
 }
@@ -356,11 +378,11 @@ type wsProxyZapLogger struct {
 	*zap.Logger
 }
 
-func (w wsProxyZapLogger) Warnln(i ...interface{}) {
+func (w wsProxyZapLogger) Warnln(i ...any) {
 	w.Warn(fmt.Sprint(i...))
 }
 
-func (w wsProxyZapLogger) Debugln(i ...interface{}) {
+func (w wsProxyZapLogger) Debugln(i ...any) {
 	w.Debug(fmt.Sprint(i...))
 }
 
@@ -450,7 +472,7 @@ func (ac *accessController) ServeHTTP(rw http.ResponseWriter, req *http.Request)
 		addCORSHeader(rw, origin)
 	}
 
-	if req.Method == "OPTIONS" {
+	if req.Method == http.MethodOptions {
 		rw.WriteHeader(http.StatusOK)
 		return
 	}
@@ -500,7 +522,7 @@ func (ch *corsHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		addCORSHeader(rw, origin)
 	}
 
-	if req.Method == "OPTIONS" {
+	if req.Method == http.MethodOptions {
 		rw.WriteHeader(http.StatusOK)
 		return
 	}

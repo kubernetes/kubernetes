@@ -24,11 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// Immutable verifies that the specified value has not changed in the course of
-// an update operation.  It does nothing if the old value is not provided. If
-// the caller needs to compare types that are not trivially comparable, they
-// should use ImmutableNonComparable instead.
-func Immutable[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
+// ImmutableByCompare verifies that the specified value has not changed in the
+// course of an update operation.  It does nothing if the old value is not
+// provided. If the caller needs to compare types that are not trivially
+// comparable, they should use ImmutableByReflect instead.
+//
+// Caution: structs with pointer fields satisfy comparable, but this function
+// will only compare pointer values.  It does not compare the pointed-to
+// values.
+func ImmutableByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue *T) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}
@@ -43,11 +47,11 @@ func Immutable[T comparable](_ context.Context, op operation.Operation, fldPath 
 	return nil
 }
 
-// ImmutableNonComparable verifies that the specified value has not changed in
+// ImmutableByReflect verifies that the specified value has not changed in
 // the course of an update operation.  It does nothing if the old value is not
-// provided. Unlike Immutable, this function can be used with types that are
+// provided. Unlike ImmutableByCompare, this function can be used with types that are
 // not directly comparable, at the cost of performance.
-func ImmutableNonComparable[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue T) field.ErrorList {
+func ImmutableByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, value, oldValue T) field.ErrorList {
 	if op.Type != operation.Update {
 		return nil
 	}

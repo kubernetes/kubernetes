@@ -228,14 +228,12 @@ func TestPrintOrCreateKubeProxyObjects(t *testing.T) {
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  creationTimestamp: null
   name: kube-proxy
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  creationTimestamp: null
   name: kubeadm:node-proxier
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -249,7 +247,6 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  creationTimestamp: null
   name: kube-proxy
   namespace: kube-system
 rules:
@@ -265,7 +262,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  creationTimestamp: null
   name: kube-proxy
   namespace: kube-system
 roleRef:

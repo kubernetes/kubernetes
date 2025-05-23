@@ -26,9 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	clientset "k8s.io/client-go/kubernetes"
 	helpers "k8s.io/component-helpers/resource"
 	resourceapi "k8s.io/kubernetes/pkg/api/v1/resource"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/test/e2e/common/node/framework/cgroups"
 	"k8s.io/kubernetes/test/e2e/common/node/framework/podresize"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -39,7 +41,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-func doPodResizeAdmissionPluginsTests() {
+func doPodResizeAdmissionPluginsTests(f *framework.Framework) {
 	testcases := []struct {
 		name                  string
 		enableAdmissionPlugin func(ctx context.Context, f *framework.Framework)
@@ -65,6 +67,12 @@ func doPodResizeAdmissionPluginsTests() {
 				ginkgo.By("Creating a ResourceQuota")
 				_, rqErr := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, &resourceQuota, metav1.CreateOptions{})
 				framework.ExpectNoError(rqErr, "failed to create resource quota")
+				// pod creation using this quota will fail until the quota status is populated, so we need to wait to
+				// prevent races with the resourcequota controller
+				ginkgo.By("Waiting for ResourceQuota status to populate")
+				quotaStatusErr := waitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, resourceQuota.Name)
+				framework.ExpectNoError(quotaStatusErr, "resource quota status failed to populate")
+
 			},
 			wantMemoryError: "exceeded quota: resize-resource-quota, requested: memory=350Mi, used: memory=700Mi, limited: memory=800Mi",
 			wantCPUError:    "exceeded quota: resize-resource-quota, requested: cpu=200m, used: cpu=700m, limited: cpu=800m",
@@ -112,13 +120,11 @@ func doPodResizeAdmissionPluginsTests() {
 	}
 
 	for _, tc := range testcases {
-		f := framework.NewDefaultFramework(tc.name)
-
 		ginkgo.It(tc.name, func(ctx context.Context) {
 			containers := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "300m", CPULim: "300m", MemReq: "300Mi", MemLim: "300Mi"},
 				},
 			}
 			patchString := `{"spec":{"containers":[
@@ -127,7 +133,7 @@ func doPodResizeAdmissionPluginsTests() {
 			expected := []podresize.ResizableContainerInfo{
 				{
 					Name:      "c1",
-					Resources: &podresize.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
+					Resources: &cgroups.ContainerResources{CPUReq: "400m", CPULim: "400m", MemReq: "400Mi", MemLim: "400Mi"},
 				},
 			}
 			patchStringExceedCPU := `{"spec":{"containers":[
@@ -259,13 +265,13 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		c1 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c1",
-				Resources: &podresize.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Resources: &cgroups.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 			},
 		}
 		c2 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c2",
-				Resources: &podresize.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
+				Resources: &cgroups.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
 			},
 		}
 		patchTestpod2ToFitNode := fmt.Sprintf(`{
@@ -323,7 +329,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		c3 := []podresize.ResizableContainerInfo{
 			{
 				Name:      "c3",
-				Resources: &podresize.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
+				Resources: &cgroups.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
 			},
 		}
 		patchTestpod1ToMakeSpaceForPod3 := fmt.Sprintf(`{
@@ -408,7 +414,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 		expected := []podresize.ResizableContainerInfo{
 			{
 				Name:         "c1",
-				Resources:    &podresize.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
+				Resources:    &cgroups.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
 				RestartCount: testPod1.Status.ContainerStatuses[0].RestartCount,
 			},
 		}
@@ -452,5 +458,15 @@ var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(fe
 			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
 		}
 	})
-	doPodResizeAdmissionPluginsTests()
+	doPodResizeAdmissionPluginsTests(f)
 })
+
+func waitForResourceQuota(ctx context.Context, c clientset.Interface, ns, quotaName string) error {
+	return framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (v1.ResourceList, error) {
+		quota, err := c.CoreV1().ResourceQuotas(ns).Get(ctx, quotaName, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		return quota.Status.Used, nil
+	})).WithTimeout(framework.PollShortTimeout).ShouldNot(gomega.BeEmpty())
+}

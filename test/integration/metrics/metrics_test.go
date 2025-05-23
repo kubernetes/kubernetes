@@ -701,6 +701,8 @@ func parseConsistencyCheckMetric(r io.Reader) (map[consistencyCheckStatus]float6
 			switch label.GetName() {
 			case "resource":
 				status.resource = label.GetValue()
+			case "group":
+				status.group = label.GetValue()
 			case "status":
 				status.status = label.GetValue()
 			default:
@@ -713,6 +715,7 @@ func parseConsistencyCheckMetric(r io.Reader) (map[consistencyCheckStatus]float6
 }
 
 type consistencyCheckStatus struct {
+	group    string
 	resource string
 	status   string
 }

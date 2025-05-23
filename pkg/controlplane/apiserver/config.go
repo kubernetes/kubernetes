@@ -378,7 +378,7 @@ func CreateConfig(
 
 	if len(opts.Authentication.ServiceAccounts.KeyFiles) > 0 {
 		// Load and set the public keys.
-		var pubKeys []interface{}
+		var pubKeys []any
 		for _, f := range opts.Authentication.ServiceAccounts.KeyFiles {
 			keys, err := keyutil.PublicKeysFromFile(f)
 			if err != nil {
@@ -391,7 +391,10 @@ func CreateConfig(
 			return nil, nil, fmt.Errorf("failed to set up public service account keys: %w", err)
 		}
 		config.ServiceAccountPublicKeysGetter = keysGetter
+	} else if opts.Authentication.ServiceAccounts.ExternalPublicKeysGetter != nil {
+		config.ServiceAccountPublicKeysGetter = opts.Authentication.ServiceAccounts.ExternalPublicKeysGetter
 	}
+
 	config.ServiceAccountIssuerURL = opts.Authentication.ServiceAccounts.Issuers[0]
 	config.ServiceAccountJWKSURI = opts.Authentication.ServiceAccounts.JWKSURI
 

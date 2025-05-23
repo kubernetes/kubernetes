@@ -50,7 +50,6 @@ import (
 	v1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -73,6 +72,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	admissionregistrationv1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1"
 	admissionregistrationv1alpha1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1alpha1"
 	admissionregistrationv1beta1 "k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1"
@@ -106,7 +106,6 @@ import (
 	internal "k8s.io/client-go/applyconfigurations/internal"
 	applyconfigurationsmetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	applyconfigurationsnetworkingv1 "k8s.io/client-go/applyconfigurations/networking/v1"
-	applyconfigurationsnetworkingv1alpha1 "k8s.io/client-go/applyconfigurations/networking/v1alpha1"
 	applyconfigurationsnetworkingv1beta1 "k8s.io/client-go/applyconfigurations/networking/v1beta1"
 	applyconfigurationsnodev1 "k8s.io/client-go/applyconfigurations/node/v1"
 	applyconfigurationsnodev1alpha1 "k8s.io/client-go/applyconfigurations/node/v1alpha1"
@@ -126,7 +125,6 @@ import (
 	applyconfigurationsstoragev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
 	applyconfigurationsstoragev1beta1 "k8s.io/client-go/applyconfigurations/storage/v1beta1"
 	applyconfigurationsstoragemigrationv1alpha1 "k8s.io/client-go/applyconfigurations/storagemigration/v1alpha1"
-	testing "k8s.io/client-go/testing"
 )
 
 // ForKind returns an apply configuration type for the given GroupVersionKind, or nil if no
@@ -1451,20 +1449,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	case networkingv1.SchemeGroupVersion.WithKind("ServiceCIDRStatus"):
 		return &applyconfigurationsnetworkingv1.ServiceCIDRStatusApplyConfiguration{}
 
-		// Group=networking.k8s.io, Version=v1alpha1
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddress"):
-		return &applyconfigurationsnetworkingv1alpha1.IPAddressApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("IPAddressSpec"):
-		return &applyconfigurationsnetworkingv1alpha1.IPAddressSpecApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ParentReference"):
-		return &applyconfigurationsnetworkingv1alpha1.ParentReferenceApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ServiceCIDR"):
-		return &applyconfigurationsnetworkingv1alpha1.ServiceCIDRApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ServiceCIDRSpec"):
-		return &applyconfigurationsnetworkingv1alpha1.ServiceCIDRSpecApplyConfiguration{}
-	case networkingv1alpha1.SchemeGroupVersion.WithKind("ServiceCIDRStatus"):
-		return &applyconfigurationsnetworkingv1alpha1.ServiceCIDRStatusApplyConfiguration{}
-
 		// Group=networking.k8s.io, Version=v1beta1
 	case networkingv1beta1.SchemeGroupVersion.WithKind("HTTPIngressPath"):
 		return &applyconfigurationsnetworkingv1beta1.HTTPIngressPathApplyConfiguration{}
@@ -1941,6 +1925,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 	return nil
 }
 
-func NewTypeConverter(scheme *runtime.Scheme) *testing.TypeConverter {
-	return &testing.TypeConverter{Scheme: scheme, TypeResolver: internal.Parser()}
+func NewTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter {
+	return managedfields.NewSchemeTypeConverter(scheme, internal.Parser())
 }

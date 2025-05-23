@@ -19,6 +19,7 @@ package framework
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -341,6 +342,15 @@ func (r EventResource) match(resource EventResource) bool {
 		r == Pod && (resource == assignedPod || resource == unschedulablePod)
 }
 
+func (ce ClusterEvent) MatchAny(events []ClusterEvent) bool {
+	for _, e := range events {
+		if e.Match(ce) {
+			return true
+		}
+	}
+	return false
+}
+
 func UnrollWildCardResource() []ClusterEventWithHint {
 	return []ClusterEventWithHint{
 		{Event: ClusterEvent{Resource: Pod, ActionType: All}},
@@ -363,14 +373,30 @@ type QueuedPodInfo struct {
 	*PodInfo
 	// The time pod added to the scheduling queue.
 	Timestamp time.Time
-	// Number of schedule attempts before successfully scheduled.
-	// It's used to record the # attempts metric and calculate the backoff time this Pod is obliged to get before retrying.
+	// Number of all schedule attempts before successfully scheduled.
+	// It's used to record the # attempts metric.
 	Attempts int
 	// BackoffExpiration is the time when the Pod will complete its backoff.
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
 	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
 	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
 	BackoffExpiration time.Time
+	// The total number of the scheduling attempts that this Pod gets unschedulable.
+	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
+	// this count won't be incremented.
+	// It's used to calculate the backoff time this Pod is obliged to get before retrying.
+	UnschedulableCount int
+	// The number of the error status that this Pod gets sequentially.
+	// This count is reset when the Pod gets another status than Error.
+	//
+	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the Pod and hence need a backoff retry mechanism
+	// because that might push more burden to the kube-apiserver.
+	// But, we don't want to calculate the backoff time in the same way as the normal unschedulable reason
+	// since the purpose is different; the backoff for a unschedulable status etc is for the punishment of wasting the scheduling cycles,
+	// whereas the backoff for the error status is for the protection of the kube-apiserver.
+	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
+	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
+	ConsecutiveErrorsCount int
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -385,8 +411,16 @@ type QueuedPodInfo struct {
 	UnschedulablePlugins sets.Set[string]
 	// PendingPlugins records the plugin names that the Pod failed with Pending status.
 	PendingPlugins sets.Set[string]
-	// Whether the Pod is scheduling gated (by PreEnqueuePlugins) or not.
-	Gated bool
+	// GatingPlugin records the plugin name that gated the Pod at PreEnqueue.
+	GatingPlugin string
+	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
+	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
+	GatingPluginEvents []ClusterEvent
+}
+
+// Gated returns true if the pod is gated by any plugin.
+func (pqi *QueuedPodInfo) Gated() bool {
+	return pqi.GatingPlugin != ""
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
@@ -395,10 +429,14 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		PodInfo:                 pqi.PodInfo.DeepCopy(),
 		Timestamp:               pqi.Timestamp,
 		Attempts:                pqi.Attempts,
+		UnschedulableCount:      pqi.UnschedulableCount,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
 		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
+		BackoffExpiration:       pqi.BackoffExpiration,
+		GatingPlugin:            pqi.GatingPlugin,
+		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
-		Gated:                   pqi.Gated,
+		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
 	}
 }
 

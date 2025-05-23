@@ -100,6 +100,9 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
+  // For the sake of performance, scheduler does not measure and export the scheduler_plugin_execution_duration metric
+	// for every plugin execution in each scheduling cycle. Instead it samples a portion of scheduling cycles - percentage
+	// determined by pluginMetricsSamplePercent. The line below helps to randomly pick appropriate scheduling cycles.
 	pluginSettings := framework.NewPluginSettings()
 	pluginSettings.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 
@@ -1087,7 +1090,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, fwk framewo
 	fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(&pod.Status, pod.Generation, v1.PodScheduled),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
 		Status:             v1.ConditionFalse,
 		Reason:             reason,
 		Message:            errMsg,

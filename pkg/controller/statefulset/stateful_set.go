@@ -61,6 +61,8 @@ type StatefulSetController struct {
 	control StatefulSetControlInterface
 	// podControl is used for patching pods.
 	podControl controller.PodControlInterface
+	// podIndexer allows looking up pods by ControllerRef UID
+	podIndexer cache.Indexer
 	// podLister is able to list/get pods from a shared informer's store
 	podLister corelisters.PodLister
 	// podListerSynced returns true if the pod shared informer has synced at least once
@@ -129,7 +131,8 @@ func NewStatefulSetController(
 	})
 	ssc.podLister = podInformer.Lister()
 	ssc.podListerSynced = podInformer.Informer().HasSynced
-
+	controller.AddPodControllerUIDIndexer(podInformer.Informer())
+	ssc.podIndexer = podInformer.Informer().GetIndexer()
 	setInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: ssc.enqueueStatefulSet,
@@ -309,11 +312,24 @@ func (ssc *StatefulSetController) deletePod(logger klog.Logger, obj interface{})
 // NOTE: Returned Pods are pointers to objects from the cache.
 // If you need to modify one, you need to copy it first.
 func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set *apps.StatefulSet, selector labels.Selector) ([]*v1.Pod, error) {
-	// List all pods to include the pods that don't match the selector anymore but
-	// has a ControllerRef pointing to this StatefulSet.
-	pods, err := ssc.podLister.Pods(set.Namespace).List(labels.Everything())
-	if err != nil {
-		return nil, err
+	// Iterate over two keys:
+	//  The UID of the StatefulSet, which identifies Pods that are controlled by the StatefulSet.
+	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
+	//   but may be adopted later on if they have matching labels with the StatefulSet.
+	podsForSts := []*v1.Pod{}
+	for _, key := range []string{string(set.UID), controller.OrphanPodIndexKey} {
+		podObjs, err := ssc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range podObjs {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			podsForSts = append(podsForSts, pod)
+		}
 	}
 
 	filter := func(pod *v1.Pod) bool {
@@ -322,7 +338,7 @@ func (ssc *StatefulSetController) getPodsForStatefulSet(ctx context.Context, set
 	}
 
 	cm := controller.NewPodControllerRefManager(ssc.podControl, set, selector, controllerKind, ssc.canAdoptFunc(ctx, set))
-	return cm.ClaimPods(ctx, pods, filter)
+	return cm.ClaimPods(ctx, podsForSts, filter)
 }
 
 // If any adoptions are attempted, we should first recheck for deletion with

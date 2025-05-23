@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -105,11 +106,9 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 	// is not needed.
 	if len(members) == 1 {
 		etcdClientAddress := etcdutil.GetClientURL(&cfg.LocalAPIEndpoint)
-		for _, endpoint := range etcdClient.Endpoints {
-			if endpoint == etcdClientAddress {
-				klog.V(1).Info("[etcd] This is the only remaining etcd member in the etcd cluster, skip removing it")
-				return nil
-			}
+		if slices.Contains(etcdClient.Endpoints, etcdClientAddress) {
+			klog.V(1).Info("[etcd] This is the only remaining etcd member in the etcd cluster, skip removing it")
+			return nil
 		}
 	}
 

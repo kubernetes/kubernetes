@@ -7990,7 +7990,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "TimeAdded represents the time at which the taint was added. It is only written for NoExecute taints."
+            "description": "TimeAdded represents the time at which the taint was added."
           },
           "value": {
             "description": "The taint value corresponding to the taint key.",
@@ -9105,11 +9105,6 @@
           {
             "group": "networking.k8s.io",
             "kind": "DeleteOptions",
-            "version": "v1alpha1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "DeleteOptions",
             "version": "v1beta1"
           },
           {
@@ -9857,11 +9852,6 @@
             "group": "networking.k8s.io",
             "kind": "WatchEvent",
             "version": "v1"
-          },
-          {
-            "group": "networking.k8s.io",
-            "kind": "WatchEvent",
-            "version": "v1alpha1"
           },
           {
             "group": "networking.k8s.io",

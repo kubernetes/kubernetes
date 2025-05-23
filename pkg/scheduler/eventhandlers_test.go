@@ -372,6 +372,26 @@ func TestPreCheckForNode(t *testing.T) {
 			},
 			want: []bool{false, true, false, false},
 		},
+		{
+			name: "tainted node with NoExecute effect, pods with tolerations",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule},
+					{Key: "baz", Effect: v1.TaintEffectNoExecute},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Obj(),
+				st.MakePod().Name("p3").Toleration("foo").Obj(),
+				st.MakePod().Name("p4").Toleration("baz").Obj(),
+				st.MakePod().Name("p5").Obj(),
+				st.MakePod().Name("p6").Toleration("bar").Toleration("baz").Obj(),
+			},
+			want: []bool{false, false, false, true, false, true},
+		},
 	}
 
 	for _, tt := range tests {

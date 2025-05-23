@@ -92,15 +92,13 @@ func (g *genValidations) Namers(_ *generator.Context) namer.NameSystems {
 
 func (g *genValidations) Filter(_ *generator.Context, t *types.Type) bool {
 	// We want to emit code for all root types.
-	for _, rt := range g.rootTypes {
-		if rt == t {
-			return true
-		}
+	if slices.Contains(g.rootTypes, t) {
+		return true
 	}
 	// We want to emit for any other type that is transitively part of a root
 	// type and has validations.
 	n := g.discovered.typeNodes[t]
-	return n != nil && hasValidations(n)
+	return n != nil && g.hasValidations(n)
 }
 
 func (g *genValidations) Imports(_ *generator.Context) (imports []string) {
@@ -145,65 +143,6 @@ func (g *genValidations) GenerateType(c *generator.Context, t *types.Type, w io.
 	return nil
 }
 
-// This is a global cache of whether a type has validations.
-var hasValidationsCache = map[*typeNode]bool{}
-
-// hasValidations checks and caches whether the given typeNode has any
-// validations, transitively.  Callers must be SURE that the typeNode has
-// already been full discovered, or this may return wrong answers.  It should
-// be totally safe in the generation phase, but discovery needs to be careful!
-func hasValidations(n *typeNode) bool {
-	seen := map[*typeNode]bool{}
-	return hasValidationsImpl(n, seen)
-}
-
-// hasValidationsImpl implements hasValidations without risk of infinite
-// recursion.
-func hasValidationsImpl(n *typeNode, seen map[*typeNode]bool) bool {
-	if n == nil {
-		return false
-	}
-
-	if seen[n] {
-		return false // prevent infinite recursion
-	}
-	seen[n] = true
-
-	if r, found := hasValidationsCache[n]; found {
-		return r
-	}
-
-	r := hasValidationsMiss(n, seen)
-	hasValidationsCache[n] = r
-	return r
-}
-
-// hasValidationsMiss is called in case of a cache miss.
-func hasValidationsMiss(n *typeNode, seen map[*typeNode]bool) bool {
-	if !n.typeValidations.Empty() {
-		return true
-	}
-	allChildren := n.fields
-	if n.key != nil {
-		allChildren = append(allChildren, n.key)
-	}
-	if n.elem != nil {
-		allChildren = append(allChildren, n.elem)
-	}
-	if n.underlying != nil {
-		allChildren = append(allChildren, n.underlying)
-	}
-	for _, c := range allChildren {
-		if !c.fieldValidations.Empty() {
-			return true
-		}
-		if hasValidationsImpl(c.node, seen) {
-			return true
-		}
-	}
-	return false
-}
-
 // typeDiscoverer contains fields necessary to build graphs of types.
 type typeDiscoverer struct {
 	validator  validators.Validator
@@ -232,6 +171,13 @@ type childNode struct {
 	node      *typeNode   // the node of the child's value type, or nil if it is in a foreign package
 
 	fieldValidations validators.Validations // validations on the field
+
+	// These are not the same as fieldValidations, and are not considered in
+	// hasValidations. These let us emit the iteration code for list and
+	// map types, but we might not have enough information to know if we can
+	// skip them at discovery time.
+	fieldValIterations validators.Validations // validations on each val
+	fieldKeyIterations validators.Validations // validations on each key
 }
 
 // typeNode represents a node in the type-graph, annotated with information
@@ -248,16 +194,13 @@ type typeNode struct {
 	underlying *childNode   // populated when this type is an alias
 
 	typeValidations validators.Validations // validations on the type
-}
 
-// lookupField returns the childNode with the specified JSON name.
-func (n typeNode) lookupField(jsonName string) *childNode {
-	for _, fld := range n.fields {
-		if fld.jsonName == jsonName {
-			return fld
-		}
-	}
-	return nil
+	// These are not the same as typeValidations, and are not considered in
+	// hasValidations. These let us emit the iteration code for list and
+	// map types, but we might not have enough information to know if we can
+	// skip them at discovery time.
+	typeValIterations validators.Validations // validations on each val
+	typeKeyIterations validators.Validations // validations on each key
 }
 
 // DiscoverType walks the given type recursively, building a type-graph in this
@@ -268,7 +211,7 @@ func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
 		return fmt.Errorf("type %v: pointer root-types are not supported", t)
 	}
 	fldPath := field.NewPath(t.Name.String())
-	if node, err := td.discover(t, fldPath); err != nil {
+	if node, err := td.discoverType(t, fldPath); err != nil {
 		return err
 	} else if node == nil {
 		panic(fmt.Sprintf("discovered a nil node for type %v", t))
@@ -284,12 +227,12 @@ func unalias(t *types.Type) *types.Type {
 	return t
 }
 
-// discover walks the given type recursively and returns a typeNode
+// discoverType walks the given type recursively and returns a typeNode
 // representing it. This does not distinguish between discovering a type
 // definition and discovering a field of a struct.  The first time it
-// encounters a type it has not seen before, it will discover that type. If it
+// encounters a type it has not seen before, it will explore that type. If it
 // finds a type it has already processed, it will return the existing node.
-func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNode, error) {
+func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typeNode, error) {
 	// With the exception of builtins (which gengo puts in package ""), we
 	// can't traverse into packages which are not being processed by this tool.
 	if t.Name.Package != "" {
@@ -357,7 +300,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 
 	// Discovery applies to values, not pointers.
 	if t.Kind == types.Pointer {
-		return td.discover(t.Elem, fldPath)
+		return td.discoverType(t.Elem, fldPath)
 	}
 
 	// If we have done this type already, we can stop here and break any
@@ -365,14 +308,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 	if node, found := td.typeNodes[t]; found {
 		return node, nil
 	}
-
-	// If we are descending into a named type, reboot the field path for better
-	// logging.  Otherwise the field path might come in as something like
-	// <type1>.<field1>.<field2> which is true, but not super useful.
-	switch t.Kind {
-	case types.Alias, types.Struct:
-		fldPath = field.NewPath(t.Name.String())
-	}
+	klog.V(4).InfoS("discoverType", "type", t, "kind", t.Kind, "path", fldPath.String())
 
 	// This is the type-node being assembled in the rest of this function.
 	thisNode := &typeNode{
@@ -380,9 +316,15 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 	}
 	td.typeNodes[t] = thisNode
 
-	// If this is a known, named type, we can call its validation function.
+	// If we are descending into a named type...
 	switch t.Kind {
 	case types.Alias, types.Struct:
+		// Reboot the field path for better logging.  Otherwise the field path
+		// might come in as something like <type1>.<field1>.<field2> which is
+		// true, but not super useful.
+		fldPath = field.NewPath(t.Name.String())
+
+		// Find its validation function for later use.
 		if fn, ok := td.getValidationFunctionName(t); ok {
 			thisNode.funcName = fn
 		}
@@ -407,7 +349,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		//    3) In the case of a type definition whose RHS is a struct which
 		//       has fields with validation tags, the validation for those fields
 		//       WILL be called from the generated for for the new type.
-		if node, err := td.discover(t.Underlying, fldPath); err != nil {
+		if node, err := td.discoverType(t.Underlying, fldPath); err != nil {
 			return nil, err
 		} else {
 			thisNode.underlying = &childNode{
@@ -422,7 +364,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 	case types.Slice:
 		// Discover the element type.
-		if node, err := td.discover(t.Elem, fldPath.Key("vals")); err != nil {
+		if node, err := td.discoverType(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
 		} else {
 			thisNode.elem = &childNode{
@@ -432,7 +374,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 	case types.Map:
 		// Discover the key type.
-		if node, err := td.discover(t.Key, fldPath.Key("keys")); err != nil {
+		if node, err := td.discoverType(t.Key, fldPath.Key("keys")); err != nil {
 			return nil, err
 		} else {
 			thisNode.key = &childNode{
@@ -442,7 +384,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 		}
 
 		// Discover the element type.
-		if node, err := td.discover(t.Elem, fldPath.Key("vals")); err != nil {
+		if node, err := td.discoverType(t.Elem, fldPath.Key("vals")); err != nil {
 			return nil, err
 		} else {
 			thisNode.elem = &childNode{
@@ -457,56 +399,55 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 	// For example, all struct field validators get called before the type
 	// validators.  This does not influence the order in which the validations
 	// are called in emitted code, just how we evaluate what to emit.
-	//
-	// This should only ever hit Struct and Alias types, since that is the only
-	// opportunity to have type-attached comments to process.
-	context := validators.Context{
-		Scope: validators.ScopeType,
-		Type:  t,
-		Path:  fldPath,
-	}
-	if t.Kind == types.Alias {
-		context.Parent = t
-		context.Type = t.Underlying
-	}
-	if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
-		return nil, fmt.Errorf("%v: %w", fldPath, err)
-	} else if !validations.Empty() {
-		klog.V(5).InfoS("found type-attached validations", "n", validations.Len())
-		thisNode.typeValidations.Add(validations)
-	}
+	switch t.Kind {
+	case types.Alias, types.Struct:
+		context := validators.Context{
+			Scope:  validators.ScopeType,
+			Type:   t,
+			Parent: nil,
+			Path:   fldPath,
+		}
+		if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
+			return nil, fmt.Errorf("%v: %w", fldPath, err)
+		} else if validations.Empty() {
+			klog.V(6).InfoS("no type-attached validations", "type", t)
+		} else {
+			klog.V(5).InfoS("found type-attached validations", "n", validations.Len(), "type", t)
+			thisNode.typeValidations.Add(validations)
+		}
 
-	// Handle type definitions whose output depends on the rest of type
-	// discovery being complete. In particular, aliases to lists and maps need
-	// iteration, but we don't want to iterate them if the key or value types
-	// don't actually have validations. We also want to handle non-included
-	// types and make users tell us what they intended. Lastly, we want to
-	// handle recursive types, but we need to finish discovering the type
-	// before we know if there are other validations, again so we don't emit
-	// empty functions.
-	if t.Kind == types.Alias {
-		underlying := thisNode.underlying
+		// Handle type definitions whose output depends on the rest of type
+		// discovery being complete. In particular, aliases to lists and maps need
+		// iteration, but we don't want to iterate them if the key or value types
+		// don't actually have validations. We also want to handle non-included
+		// types and make users tell us what they intended. Lastly, we want to
+		// handle recursive types, but we need to finish discovering the type
+		// before we know if there are other validations, again so we don't emit
+		// empty functions.
+		if t.Kind == types.Alias {
+			underlying := thisNode.underlying
 
-		switch t.Underlying.Kind {
-		case types.Slice:
-			// Validate each value.
-			if elemNode := underlying.node.elem.node; elemNode == nil {
-				if !thisNode.typeValidations.OpaqueValType {
-					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						fldPath, underlying.node.elem.childType)
-				}
-			} else if thisNode.typeValidations.OpaqueValType {
-				// If the type is marked as opaque, we can treat it as it is
-				// were in a non-included package.
-			} else {
-				// If the value type is a named type, call the validation
-				// function for each element.
-				if funcName := elemNode.funcName; funcName.Name != "" {
-					// We only need the iteration function if the underlying
-					// type has validations, otherwise it is noise.
-					if hasValidations(underlying.node) {
+			switch t.Underlying.Kind {
+			case types.Slice:
+				// Validate each value.
+				if elemNode := underlying.node.elem.node; elemNode == nil {
+					if !thisNode.typeValidations.OpaqueValType {
+						return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
+							fldPath, underlying.node.elem.childType)
+					}
+				} else if thisNode.typeValidations.OpaqueValType {
+					// If the type is marked as opaque, we can treat it as it is
+					// were in a non-included package.
+				} else {
+					// If the value type is a named type, call the validation
+					// function for each element.
+					if funcName := elemNode.funcName; funcName.Name != "" {
+						// Save the iteration validation while we have all the
+						// information we need. Later we can check if we
+						// actually need it.
+						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachVal(fldPath, underlying.childType,
@@ -514,30 +455,30 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 						if err != nil {
 							return nil, fmt.Errorf("generating list iteration: %w", err)
 						} else {
-							thisNode.typeValidations.Add(v)
+							thisNode.typeValIterations.Add(v)
 						}
 					}
 				}
-			}
-		case types.Map:
-			// Validate each key.
-			if keyNode := underlying.node.key.node; keyNode == nil {
-				if !thisNode.typeValidations.OpaqueKeyType {
-					return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
-						fldPath, underlying.node.elem.childType)
-				}
-			} else if thisNode.typeValidations.OpaqueKeyType {
-				// If the type is marked as opaque, we can treat it as it is
-				// were in a non-included package.
-			} else {
-				// If the key type is a named type, call the validation
-				// function for each key.
-				if funcName := keyNode.funcName; funcName.Name != "" {
-					// We only need the iteration function if the underlying
-					// type has validations, otherwise it is noise.
-					if hasValidations(underlying.node) {
+			case types.Map:
+				// Validate each key.
+				if keyNode := underlying.node.key.node; keyNode == nil {
+					if !thisNode.typeValidations.OpaqueKeyType {
+						return nil, fmt.Errorf("%v: key type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachKey=+k8s:opaqueType to the field to skip validation",
+							fldPath, underlying.node.elem.childType)
+					}
+				} else if thisNode.typeValidations.OpaqueKeyType {
+					// If the type is marked as opaque, we can treat it as it is
+					// were in a non-included package.
+				} else {
+					// If the key type is a named type, call the validation
+					// function for each key.
+					if funcName := keyNode.funcName; funcName.Name != "" {
+						// Save the iteration validation while we have all the
+						// information we need. Later we can check if we
+						// actually need it.
+						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachKey(fldPath, underlying.childType,
@@ -545,29 +486,29 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 						if err != nil {
 							return nil, fmt.Errorf("generating map key iteration: %w", err)
 						} else {
-							thisNode.typeValidations.Add(v)
+							thisNode.typeKeyIterations.Add(v)
 						}
 					}
 				}
-			}
-			// Validate each value.
-			if elemNode := underlying.node.elem.node; elemNode == nil {
-				if !thisNode.typeValidations.OpaqueValType {
-					return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
-						"either add this package to validation-gen's --readonly-pkg flag, "+
-						"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
-						fldPath, underlying.node.elem.childType)
-				}
-			} else if thisNode.typeValidations.OpaqueValType {
-				// If the type is marked as opaque, we can treat it as it is
-				// were in a non-included package.
-			} else {
-				// If the value type is a named type, call the validation
-				// function for each element.
-				if funcName := elemNode.funcName; funcName.Name != "" {
-					// We only need the iteration function if the underlying
-					// type has validations, otherwise it is noise.
-					if hasValidations(underlying.node) {
+				// Validate each value.
+				if elemNode := underlying.node.elem.node; elemNode == nil {
+					if !thisNode.typeValidations.OpaqueValType {
+						return nil, fmt.Errorf("%v: value type %v is in a non-included package; "+
+							"either add this package to validation-gen's --readonly-pkg flag, "+
+							"or add +k8s:eachVal=+k8s:opaqueType to the field to skip validation",
+							fldPath, underlying.node.elem.childType)
+					}
+				} else if thisNode.typeValidations.OpaqueValType {
+					// If the type is marked as opaque, we can treat it as it is
+					// were in a non-included package.
+				} else {
+					// If the value type is a named type, call the validation
+					// function for each element.
+					if funcName := elemNode.funcName; funcName.Name != "" {
+						// Save the iteration validation while we have all the
+						// information we need. Later we can check if we
+						// actually need it.
+						//
 						// Note: the first argument to Function() is really
 						// only for debugging.
 						v, err := validators.ForEachVal(fldPath, underlying.childType,
@@ -575,7 +516,7 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 						if err != nil {
 							return nil, fmt.Errorf("generating map value iteration: %w", err)
 						} else {
-							thisNode.typeValidations.Add(v)
+							thisNode.typeValIterations.Add(v)
 						}
 					}
 				}
@@ -589,6 +530,8 @@ func (td *typeDiscoverer) discover(t *types.Type, fldPath *field.Path) (*typeNod
 // discoverStruct walks a struct type recursively.
 func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path) error {
 	var fields []*childNode
+
+	klog.V(5).InfoS("discoverStruct", "type", thisNode.valueType)
 
 	// Discover into each field of this struct.
 	for _, memb := range thisNode.valueType.Members {
@@ -612,13 +555,12 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			jsonName = commentTags.Name
 		}
 
-		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type)
-
 		// Discover the field type.
 		childPath := fldPath.Child(name)
+		klog.V(5).InfoS("field", "name", name, "jsonName", jsonName, "type", memb.Type, "path", childPath)
 		childType := memb.Type
 		var child *childNode
-		if node, err := td.discover(childType, childPath); err != nil {
+		if node, err := td.discoverType(childType, childPath); err != nil {
 			return err
 		} else {
 			child = &childNode{
@@ -639,8 +581,10 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		}
 		if validations, err := td.validator.ExtractValidations(context, memb.CommentLines); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
-		} else if !validations.Empty() {
-			klog.V(5).InfoS("found field-attached validations", "n", validations.Len())
+		} else if validations.Empty() {
+			klog.V(6).InfoS("no field-attached validations", "field", childPath)
+		} else {
+			klog.V(5).InfoS("found field-attached validations", "n", validations.Len(), "field", childPath)
 			child.fieldValidations.Add(validations)
 			if len(validations.Variables) > 0 {
 				return fmt.Errorf("%v: variable generation is not supported for field validations", childPath)
@@ -669,8 +613,8 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		// because some of this is conditional on whether other validations
 		// were emitted (to avoid emitting empty functions).
 		//
-		// We do this here, rather than in discover() because we need to know
-		// information about the field, not just the type.
+		// We do this here, rather than in discoverType() because we need to
+		// know information about the field, not just the type.
 		switch childType.Kind {
 		case types.Slice:
 			// Validate each value of a list field.
@@ -688,18 +632,18 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the list's value type is a named type, call the validation
 				// function for each element.
 				if funcName := elemNode.funcName; funcName.Name != "" {
-					// We only emit the iteration function if the field
-					// has other validations, otherwise it is noise.
-					if hasValidations(child.node) {
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachVal(childPath, childType,
-							validators.Function("iterateListValues", validators.DefaultFlags, funcName))
-						if err != nil {
-							return fmt.Errorf("generating list iteration: %w", err)
-						} else {
-							child.fieldValidations.Add(v)
-						}
+					// Save the iteration validation while we have all the
+					// information we need. Later we can check if we
+					// actually need it.
+					//
+					// Note: the first argument to Function() is really
+					// only for debugging.
+					v, err := validators.ForEachVal(childPath, childType,
+						validators.Function("iterateListValues", validators.DefaultFlags, funcName))
+					if err != nil {
+						return fmt.Errorf("generating list iteration: %w", err)
+					} else {
+						child.fieldValIterations.Add(v)
 					}
 				}
 			}
@@ -719,18 +663,18 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the map's key type is a named type, call the validation
 				// function for each key.
 				if funcName := keyNode.funcName; funcName.Name != "" {
-					// We only emit the iteration function if the field
-					// has other validations, otherwise it is noise.
-					if hasValidations(child.node) {
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachKey(childPath, childType,
-							validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
-						if err != nil {
-							return fmt.Errorf("generating map key iteration: %w", err)
-						} else {
-							child.fieldValidations.Add(v)
-						}
+					// Save the iteration validation while we have all the
+					// information we need. Later we can check if we
+					// actually need it.
+					//
+					// Note: the first argument to Function() is really
+					// only for debugging.
+					v, err := validators.ForEachKey(childPath, childType,
+						validators.Function("iterateMapKeys", validators.DefaultFlags, funcName))
+					if err != nil {
+						return fmt.Errorf("generating map key iteration: %w", err)
+					} else {
+						child.fieldKeyIterations.Add(v)
 					}
 				}
 			}
@@ -749,18 +693,18 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 				// If the map's value type is a named type, call the validation
 				// function for each element.
 				if funcName := elemNode.funcName; funcName.Name != "" {
-					// We only emit the iteration function if the field
-					// has other validations, otherwise it is noise.
-					if hasValidations(child.node) {
-						// Note: the first argument to Function() is really
-						// only for debugging.
-						v, err := validators.ForEachVal(childPath, childType,
-							validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
-						if err != nil {
-							return fmt.Errorf("generating map value iteration: %w", err)
-						} else {
-							child.fieldValidations.Add(v)
-						}
+					// Save the iteration validation while we have all the
+					// information we need. Later we can check if we
+					// actually need it.
+					//
+					// Note: the first argument to Function() is really
+					// only for debugging.
+					v, err := validators.ForEachVal(childPath, childType,
+						validators.Function("iterateMapValues", validators.DefaultFlags, funcName))
+					if err != nil {
+						return fmt.Errorf("generating map value iteration: %w", err)
+					} else {
+						child.fieldValIterations.Add(v)
 					}
 				}
 			}
@@ -805,6 +749,49 @@ func mkSymbolArgs(c *generator.Context, names []types.Name) generator.Args {
 	return args
 }
 
+// hasValidations checks whether the given typeNode has any
+// validations, transitively.
+func (g *genValidations) hasValidations(n *typeNode) bool {
+	seen := map[*typeNode]bool{}
+	return g.hasValidationsImpl(n, seen)
+}
+
+// hasValidationsImpl implements hasValidations without risk of infinite
+// recursion.
+func (g *genValidations) hasValidationsImpl(n *typeNode, seen map[*typeNode]bool) bool {
+	if n == nil {
+		return false
+	}
+
+	if seen[n] {
+		return false
+	}
+	seen[n] = true
+
+	if !n.typeValidations.Empty() {
+		return true
+	}
+	allChildren := n.fields
+	if n.key != nil {
+		allChildren = append(allChildren, n.key)
+	}
+	if n.elem != nil {
+		allChildren = append(allChildren, n.elem)
+	}
+	if n.underlying != nil {
+		allChildren = append(allChildren, n.underlying)
+	}
+	for _, c := range allChildren {
+		if !c.fieldValidations.Empty() {
+			return true
+		}
+		if g.hasValidationsImpl(c.node, seen) {
+			return true
+		}
+	}
+	return false
+}
+
 // emitRegisterFunction emits the type-registration logic for validation
 // functions.
 func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegistry types.Name, sw *generator.SnippetWriter) {
@@ -820,7 +807,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
 	sw.Do("func RegisterValidations(scheme $.|raw$) error {\n", schemePtr)
 	for _, rootType := range g.rootTypes {
-		if !hasValidations(g.discovered.typeNodes[rootType]) {
+		if !g.hasValidations(g.discovered.typeNodes[rootType]) {
 			continue
 		}
 
@@ -829,36 +816,26 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 			panic(fmt.Sprintf("found nil node for root-type %v", rootType))
 		}
 
-		// TODO: It would be nice if these were not hard-coded.
-		var statusType *types.Type
-		var statusField string
-		if status := node.lookupField("status"); status != nil {
-			statusType = status.node.valueType
-			statusField = status.name
-		}
-
 		targs := generator.Args{
-			"rootType":    rootType,
-			"typePfx":     "",
-			"statusType":  statusType,
-			"statusField": statusField,
-			"field":       mkSymbolArgs(c, fieldPkgSymbols),
-			"fmt":         mkSymbolArgs(c, fmtPkgSymbols),
-			"operation":   mkSymbolArgs(c, operationPkgSymbols),
-			"safe":        mkSymbolArgs(c, safePkgSymbols),
-			"context":     mkSymbolArgs(c, contextPkgSymbols),
+			"rootType":  rootType,
+			"typePfx":   "",
+			"field":     mkSymbolArgs(c, fieldPkgSymbols),
+			"fmt":       mkSymbolArgs(c, fmtPkgSymbols),
+			"operation": mkSymbolArgs(c, operationPkgSymbols),
+			"safe":      mkSymbolArgs(c, safePkgSymbols),
+			"context":   mkSymbolArgs(c, contextPkgSymbols),
 		}
 		if !isNilableType(rootType) {
 			targs["typePfx"] = "*"
 		}
 
+		// TODO: Remove special-casing for `/` and `/scale` resources once ratcheting is introduced.
 		// This uses a typed nil pointer, rather than a real instance because
 		// we need the type information, but not an instance of the type.
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
-		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}, ", targs)
-		sw.Do("    subresources ...string) $.field.ErrorList|raw$ {\n", targs)
-		sw.Do("  if len(subresources) == 0 {\n", targs)
+		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
+		sw.Do("  if len(op.Request.Subresources) == 0 {\n", targs)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
 		sw.Do("               op, ", targs)
@@ -866,36 +843,10 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		sw.Do("               obj.($.typePfx$$.rootType|raw$), ", targs)
 		sw.Do("               $.safe.Cast|raw$[$.typePfx$$.rootType|raw$](oldObj))\n", targs)
 		sw.Do("  }\n", targs)
-
-		if statusType != nil {
-			targs["statusTypePfx"] = ""
-			targs["statusTypePtrPfx"] = ""
-			if !isNilableType(statusType) {
-				targs["statusTypePfx"] = "*"
-				targs["statusTypePtrPfx"] = "&"
-			}
-			sw.Do("  if len(subresources) == 1 && subresources[0] == \"status\" {\n", targs)
-			if hasValidations(g.discovered.typeNodes[statusType]) {
-				sw.Do("    root := obj.($.typePfx$$.rootType|raw$)\n", targs)
-				sw.Do("    return $.statusType|objectvalidationfn$(", targs)
-				sw.Do("               ctx, ", targs)
-				sw.Do("               op, ", targs)
-				sw.Do("               nil /* fldPath */, ", targs)
-				sw.Do("               &root.$.statusField$, ", targs)
-				sw.Do("               $.safe.Field|raw$(", targs)
-				sw.Do("                   $.safe.Cast|raw$[$.typePfx$$.rootType|raw$](oldObj), ", targs)
-				sw.Do("                   func(oldObj $.typePfx$$.rootType|raw$) $.statusTypePfx$$.statusType|raw$ { ", targs)
-				sw.Do("                       return $.statusTypePtrPfx$oldObj.$.statusField$ ", targs)
-				sw.Do("                   }))\n", targs)
-			} else {
-				sw.Do("    return nil // $.statusType|raw$ has no validation\n", targs)
-			}
-			sw.Do("  }\n", targs)
-		}
 		sw.Do("  return $.field.ErrorList|raw${", targs)
 		sw.Do("      $.field.InternalError|raw$(", targs)
 		sw.Do("          nil, ", targs)
-		sw.Do("          $.fmt.Errorf|raw$(\"no validation found for %T, subresources: %v\", obj, subresources))", targs)
+		sw.Do("          $.fmt.Errorf|raw$(\"no validation found for %T, subresources: %v\", obj, op.Request.Subresources))", targs)
 		sw.Do("  }\n", targs)
 		sw.Do("})\n", targs)
 	}
@@ -905,7 +856,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 
 // emitValidationFunction emits a validation function for the specified type.
 func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.Type, sw *generator.SnippetWriter) {
-	if !hasValidations(g.discovered.typeNodes[t]) {
+	if !g.hasValidations(g.discovered.typeNodes[t]) {
 		return
 	}
 
@@ -970,6 +921,31 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 		sw.Do("// type $.inType|raw$\n", targs)
 		emitComments(validations.Comments, sw)
 		emitCallsToValidators(c, validations.Functions, sw)
+		if thisNode.valueType.Kind == types.Alias {
+			underlyingNode := thisNode.underlying.node
+			switch underlyingNode.valueType.Kind {
+			case types.Slice:
+				// If this field is a list and the value-type has validations,
+				// call its validation function.
+				if validations := thisNode.typeValIterations; g.hasValidations(underlyingNode.elem.node) && !validations.Empty() {
+					emitComments(validations.Comments, sw)
+					emitCallsToValidators(c, validations.Functions, sw)
+				}
+			case types.Map:
+				// If this field is a map and the key-type has validations,
+				// call its validation function.
+				if validations := thisNode.typeKeyIterations; g.hasValidations(underlyingNode.key.node) && !validations.Empty() {
+					emitComments(validations.Comments, sw)
+					emitCallsToValidators(c, validations.Functions, sw)
+				}
+				// If this field is a map and the value-type has validations,
+				// call its validation function.
+				if validations := thisNode.typeValIterations; g.hasValidations(underlyingNode.elem.node) && !validations.Empty() {
+					emitComments(validations.Comments, sw)
+					emitCallsToValidators(c, validations.Functions, sw)
+				}
+			}
+		}
 		sw.Do("\n", nil)
 		didSome = true
 	}
@@ -1009,6 +985,30 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				case types.Alias, types.Struct:
 					// If this field is another type, call its validation function.
 					g.emitCallToOtherTypeFunc(c, fld.node, bufsw)
+				case types.Slice:
+					// If this field is a list and the value-type has
+					// validations, call its validation function.
+					if validations := fld.fieldValIterations; g.hasValidations(fld.node.elem.node) && !validations.Empty() {
+						emitComments(validations.Comments, bufsw)
+						emitCallsToValidators(c, validations.Functions, bufsw)
+					}
+					// Descend into this field.
+					g.emitValidationForChild(c, fld, bufsw)
+				case types.Map:
+					// If this field is a map and the key-type has
+					// validations, call its validation function.
+					if validations := fld.fieldKeyIterations; g.hasValidations(fld.node.key.node) && !validations.Empty() {
+						emitComments(validations.Comments, bufsw)
+						emitCallsToValidators(c, validations.Functions, bufsw)
+					}
+					// If this field is a map and the value-type has
+					// validations, call its validation function.
+					if validations := fld.fieldValIterations; g.hasValidations(fld.node.elem.node) && !validations.Empty() {
+						emitComments(validations.Comments, bufsw)
+						emitCallsToValidators(c, validations.Functions, bufsw)
+					}
+					// Descend into this field.
+					g.emitValidationForChild(c, fld, bufsw)
 				default:
 					// Descend into this field.
 					g.emitValidationForChild(c, fld, bufsw)
@@ -1069,7 +1069,7 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 func (g *genValidations) emitCallToOtherTypeFunc(c *generator.Context, node *typeNode, sw *generator.SnippetWriter) {
 	// If this type has no validations (transitively) then we don't need to do
 	// anything.
-	if !hasValidations(node) {
+	if !g.hasValidations(node) {
 		return
 	}
 
@@ -1375,7 +1375,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 			}
 			rv.Type().Elem()
 			sw.Do("[$.arraySize$]$.itemType${", map[string]string{"arraySize": arraySize, "itemType": itemType})
-			for i := 0; i < rv.Len(); i++ {
+			for i := range rv.Len() {
 				val := rv.Index(i)
 				toGolangSourceDataLiteral(sw, c, val.Interface())
 				if i < rv.Len()-1 {

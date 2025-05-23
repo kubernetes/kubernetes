@@ -87,7 +87,8 @@ type ReplicaSetController struct {
 
 	kubeClient clientset.Interface
 	podControl controller.PodControlInterface
-
+	// podIndexer allows looking up pods by ControllerRef UID
+	podIndexer       cache.Indexer
 	eventBroadcaster record.EventBroadcaster
 
 	// A ReplicaSet is temporarily suspended after creating/deleting these many replicas.
@@ -197,7 +198,8 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 	})
 	rsc.podLister = podInformer.Lister()
 	rsc.podListerSynced = podInformer.Informer().HasSynced
-
+	controller.AddPodControllerUIDIndexer(podInformer.Informer()) //nolint:errcheck
+	rsc.podIndexer = podInformer.Informer().GetIndexer()
 	rsc.syncHandler = rsc.syncReplicaSet
 
 	return rsc
@@ -671,6 +673,30 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 	return nil
 }
 
+// getRSPods returns the Pods that a given RS should manage.
+func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet) ([]*v1.Pod, error) {
+	// Iterate over two keys:
+	//  The UID of the RS, which identifies Pods that are controlled by the RS.
+	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
+	//   but may be adopted later on if they have matching labels with the ReplicaSet.
+	podsForRS := []*v1.Pod{}
+	for _, key := range []string{string(rs.UID), controller.OrphanPodIndexKey} {
+		podObjs, err := rsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range podObjs {
+			pod, ok := obj.(*v1.Pod)
+			if !ok {
+				utilruntime.HandleError(fmt.Errorf("unexpected object type in pod indexer: %v", obj))
+				continue
+			}
+			podsForRS = append(podsForRS, pod)
+		}
+	}
+	return podsForRS, nil
+}
+
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
@@ -702,17 +728,15 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		return nil
 	}
 
-	// list all pods to include the pods that don't match the rs`s selector
-	// anymore but has the stale controller ref.
-	// TODO: Do the List and Filter in a single pass, or use an index.
-	allPods, err := rsc.podLister.Pods(rs.Namespace).List(labels.Everything())
+	// List all pods indexed to RS UID and Orphan pods
+	allRSPods, err := rsc.getRSPods(rs)
 	if err != nil {
 		return err
 	}
 
 	// NOTE: activePods and terminatingPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
-	allActivePods := controller.FilterActivePods(logger, allPods)
+	allActivePods := controller.FilterActivePods(logger, allRSPods)
 	activePods, err := rsc.claimPods(ctx, rs, selector, allActivePods)
 	if err != nil {
 		return err
@@ -720,7 +744,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 
 	var terminatingPods []*v1.Pod
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
-		allTerminatingPods := controller.FilterTerminatingPods(allPods)
+		allTerminatingPods := controller.FilterTerminatingPods(allRSPods)
 		terminatingPods = controller.FilterClaimedPods(rs, selector, allTerminatingPods)
 	}
 

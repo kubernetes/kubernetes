@@ -1268,22 +1268,22 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			want: `
 		# HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
     # TYPE apiserver_watch_cache_read_wait_seconds histogram
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.005"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.025"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.05"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.1"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.2"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.4"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.6"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="0.8"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1.25"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="1.5"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="2"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="3"} 1
-      apiserver_watch_cache_read_wait_seconds_bucket{resource="pods",le="+Inf"} 1
-      apiserver_watch_cache_read_wait_seconds_sum{resource="pods"} 0
-      apiserver_watch_cache_read_wait_seconds_count{resource="pods"} 1
+	    apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.05"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.4"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.6"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.8"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.25"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="1.5"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="2"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="3"} 1
+        apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="+Inf"} 1
+        apiserver_watch_cache_read_wait_seconds_sum{group="",resource="pods"} 0
+        apiserver_watch_cache_read_wait_seconds_count{group="",resource="pods"} 1
 `,
 		},
 		{

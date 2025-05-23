@@ -36,21 +36,32 @@ var CmdPause = &cobra.Command{
 
 func pause(cmd *cobra.Command, args []string) {
 	fmt.Println("Paused")
+
 	sigCh := make(chan os.Signal, 1)
-	done := make(chan int, 1)
-	signal.Notify(sigCh, syscall.SIGINT)
-	signal.Notify(sigCh, syscall.SIGTERM)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println("Signals registered")
-	go func() {
-		sig := <-sigCh
-		switch sig {
-		case syscall.SIGINT:
-			done <- 1
-		case syscall.SIGTERM:
-			done <- 2
-		}
-	}()
-	result := <-done
-	fmt.Printf("exiting %d\n", result)
+	sig := <-sigCh
+
+	// Pods using the agnhost image may choose to override the default
+	// termination message path. They then have to the TERMINATION_MESSAGE_PATH
+	// env variable.
+	//
+	// `terminationMessagePolicy: FallbackToLogsOnError` also works because
+	// the same message is also the last line of output.
+	terminationMessagePath := os.Getenv("TERMINATION_MESSAGE_PATH")
+	if terminationMessagePath == "" {
+		terminationMessagePath = "/dev/termination-log"
+	}
+	exitMsg := []byte(fmt.Sprintf("exiting because of signal %q\n", sig))
+	_ = os.WriteFile(terminationMessagePath, exitMsg, 0644)
+	_, _ = os.Stdout.Write(exitMsg)
+
+	var result int
+	switch sig {
+	case syscall.SIGINT:
+		result = 1
+	case syscall.SIGTERM:
+		result = 2
+	}
 	os.Exit(result)
 }

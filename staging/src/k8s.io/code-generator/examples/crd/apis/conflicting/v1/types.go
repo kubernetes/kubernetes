@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	gwv1alpha2 "k8s.io/code-generator/examples/crd/apis/gateway-api/v1alpha2"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -45,7 +48,12 @@ type TestTypeList struct {
 }
 
 type TestTypeStatus struct {
-	Blah string `json:"blah"`
+	Blah                    string `json:"blah"`
+	gwv1alpha2.PolicyStatus `json:",inline"`
+}
+
+type TestTypeEmbeddedStatus struct {
+	Statuses []TestTypeEmbeddedStatus `json:"statuses"`
 }
 
 // TestEmbeddedType is a type intended to create conflicts with other embedded structs:

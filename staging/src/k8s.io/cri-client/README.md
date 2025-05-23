@@ -34,7 +34,7 @@ You can reach the maintainers of this repository at:
 - Slack: #sig-node (on https://kubernetes.slack.com -- get an
   invite at [slack.kubernetes.io](https://slack.kubernetes.io))
 - Mailing List:
-  https://groups.google.com/forum/#!forum/kubernetes-sig-node
+  https://groups.google.com/a/kubernetes.io/g/sig-node
 
 ### Code of Conduct
 

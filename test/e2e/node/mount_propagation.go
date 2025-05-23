@@ -197,11 +197,11 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Higher pids are more likely to be created after the first one
 		kubeletPids := strings.Split(strings.TrimSuffix(kubeletPid, "\n"), " ")
 		enterKubeletMountNS := fmt.Sprintf("nsenter -t %s -m", kubeletPids[len(kubeletPids)-1])
-		framework.Logf(enterKubeletMountNS)
 
 		// Check that the master and host mounts are propagated to the container runtime's mount namespace
 		for _, mountName := range []string{"host", master.Name} {
 			cmd := fmt.Sprintf("%s cat \"%s/%s/file\"", enterKubeletMountNS, hostDir, mountName)
+			framework.Logf("running command '%s' on node '%s'", cmd, node.Name)
 			output, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 			framework.ExpectNoError(err, "host container namespace should see mount from %s: %s", mountName, output)
 			output = strings.TrimSuffix(output, "\n")
@@ -211,6 +211,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// Check that the slave, private, and default mounts are not propagated to the container runtime's mount namespace
 		for _, podName := range []string{slave.Name, private.Name, defaultPropagation.Name} {
 			cmd := fmt.Sprintf("%s test ! -e \"%s/%s/file\"", enterKubeletMountNS, hostDir, podName)
+			framework.Logf("running command '%s' on node '%s'", cmd, node.Name)
 			output, err := hostExec.IssueCommandWithResult(ctx, cmd, node)
 			framework.ExpectNoError(err, "host container namespace shouldn't see mount from %s: %s", podName, output)
 		}

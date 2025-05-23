@@ -74,8 +74,7 @@ func TestWriteCertificateAuthorityFilesIfNotExist(t *testing.T) {
 
 	for _, test := range tests {
 		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		tmpdir := t.TempDir()
 
 		// executes setup func (if necessary)
 		if test.setupFunc != nil {
@@ -179,8 +178,7 @@ func TestWriteCertificateFilesIfNotExist(t *testing.T) {
 
 	for _, test := range tests {
 		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		tmpdir := t.TempDir()
 
 		// executes setup func (if necessary)
 		if test.setupFunc != nil {
@@ -252,8 +250,7 @@ func TestCreateServiceAccountKeyAndPublicKeyFiles(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			dir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			if tt.setupFunc != nil {
 				if err := tt.setupFunc(dir); err != nil {
@@ -383,9 +380,8 @@ func TestSharedCertificateExists(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run("", func(t *testing.T) {
-			tmpdir := testutil.SetupTempDir(t)
+			tmpdir := t.TempDir()
 			os.MkdirAll(tmpdir+"/etcd", os.ModePerm)
-			defer os.RemoveAll(tmpdir)
 
 			cfg := &kubeadmapi.ClusterConfiguration{
 				CertificatesDir: tmpdir,
@@ -415,8 +411,7 @@ func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			pkiutiltesting.Reset()
 
-			tmpdir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(tmpdir)
+			tmpdir := t.TempDir()
 
 			cfg := testutil.GetDefaultInternalConfig(t)
 			cfg.ClusterConfiguration.CertificatesDir = tmpdir
@@ -518,8 +513,7 @@ func TestUsingExternalCA(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pkiutiltesting.Reset()
 
-			dir := testutil.SetupTempDir(t)
-			defer os.RemoveAll(dir)
+			dir := t.TempDir()
 
 			cfg := &kubeadmapi.InitConfiguration{
 				LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
@@ -622,8 +616,7 @@ func TestValidateMethods(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		dir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(dir)
+		dir := t.TempDir()
 		test.loc.pkiDir = dir
 
 		certstestutil.WritePKIFiles(t, dir, test.files)
@@ -678,8 +671,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 		pkiutiltesting.Reset()
 
 		// Create temp folder for the test case
-		tmpdir := testutil.SetupTempDir(t)
-		defer os.RemoveAll(tmpdir)
+		tmpdir := t.TempDir()
 
 		cfg := &kubeadmapi.InitConfiguration{
 			LocalAPIEndpoint: kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4"},

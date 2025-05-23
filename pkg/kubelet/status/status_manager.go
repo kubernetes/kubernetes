@@ -324,7 +324,7 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	status = *status.DeepCopy()
 
 	// Set the observedGeneration for this pod status.
-	status.ObservedGeneration = podutil.GetPodObservedGenerationIfEnabled(pod)
+	status.ObservedGeneration = podutil.CalculatePodStatusObservedGeneration(pod)
 
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still

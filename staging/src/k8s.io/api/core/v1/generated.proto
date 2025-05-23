@@ -6300,7 +6300,6 @@ message Taint {
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
-  // It is only written for NoExecute taints.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
 }

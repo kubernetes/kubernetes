@@ -151,6 +151,19 @@
   labels:
   - name
   - stage
+- name: probe_total
+  subsystem: prober
+  help: Cumulative number of a liveness, readiness or startup probe for a container
+    by result.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - container
+  - namespace
+  - pod
+  - pod_uid
+  - probe_type
+  - result
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.

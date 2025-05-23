@@ -18,7 +18,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 1.6.2
+    version: 1.7.1
     refPaths:
     - path: cluster/gce/config-common.sh
       match: WINDOWS_CNI_VERSION=
@@ -31,7 +31,7 @@ dependencies:
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.12.0
+    version: 1.12.1
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: registry.k8s.io/coredns
@@ -41,14 +41,14 @@ dependencies:
       match: registry.k8s.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.12.0
+    version: 1.12.1
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
 
   # CRI Tools
   - name: "crictl"
-    version: 1.32.0
+    version: 1.33.0
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
@@ -80,7 +80,7 @@ dependencies:
       match: configs\[Etcd\] = Config{list\.GcEtcdRegistry, "etcd", "\d+\.\d+.\d+(-(alpha|beta|rc).\d+)?(-\d+)?"}
 
   - name: "etcd-image"
-    version: 3.5.21
+    version: 3.6.0
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
@@ -109,7 +109,7 @@ dependencies:
 
   # From https://github.com/etcd-io/etcd/blob/main/Makefile
   - name: "golang: etcd release version"
-    version: 1.23.7 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.5.md
+    version: 1.23.9 # https://github.com/etcd-io/etcd/blob/main/CHANGELOG/CHANGELOG-3.6.md
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION := \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
@@ -256,7 +256,7 @@ dependencies:
     - path: test/e2e_node/resource_collector.go
       match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
     - path: test/e2e_node/image_list.go
-      mathc: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
+      match: gcr.io\/cadvisor\/cadvisor:v\d+\.\d+\.\d+
 
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"

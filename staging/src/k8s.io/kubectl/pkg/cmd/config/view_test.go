@@ -85,7 +85,6 @@ contexts:
   name: my-cluster
 current-context: minikube
 kind: Config
-preferences: {}
 users:
 - name: minikube
   user:
@@ -165,7 +164,6 @@ contexts:
   name: my-cluster
 current-context: minikube
 kind: Config
-preferences: {}
 users:
 - name: minikube
   user:
@@ -247,7 +245,6 @@ contexts:
   name: minikube
 current-context: minikube
 kind: Config
-preferences: {}
 users:
 - name: minikube
   user:
@@ -272,7 +269,6 @@ contexts:
   name: my-cluster
 current-context: my-cluster
 kind: Config
-preferences: {}
 users:
 - name: mu-cluster
   user:

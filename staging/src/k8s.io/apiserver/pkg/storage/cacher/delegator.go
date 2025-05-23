@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
@@ -64,7 +65,7 @@ func NewCacheDelegator(cacher *Cacher, storage storage.Interface) *CacheDelegato
 		stopCh:  make(chan struct{}),
 	}
 	if ConsistencyCheckerEnabled {
-		d.checker = newConsistencyChecker(cacher.resourcePrefix, cacher.newListFunc, cacher, storage)
+		d.checker = newConsistencyChecker(cacher.resourcePrefix, cacher.groupResource, cacher.newListFunc, cacher, storage)
 		d.wg.Add(1)
 		go func() {
 			defer d.wg.Done()
@@ -231,12 +232,12 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 			if err != nil {
 				success = "false"
 			}
-			metrics.ConsistentReadTotal.WithLabelValues(c.cacher.resourcePrefix, success, fallback).Add(1)
+			metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
 		}
 		return err
 	}
 	if result.ConsistentRead {
-		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.resourcePrefix, success, fallback).Add(1)
+		metrics.ConsistentReadTotal.WithLabelValues(c.cacher.groupResource.Group, c.cacher.groupResource.Resource, success, fallback).Add(1)
 	}
 	return nil
 }
@@ -286,8 +287,9 @@ func (c *CacheDelegator) Stop() {
 	c.wg.Wait()
 }
 
-func newConsistencyChecker(resourcePrefix string, newListFunc func() runtime.Object, cacher getListerReady, etcd getLister) *consistencyChecker {
+func newConsistencyChecker(resourcePrefix string, groupResource schema.GroupResource, newListFunc func() runtime.Object, cacher getListerReady, etcd getLister) *consistencyChecker {
 	return &consistencyChecker{
+		groupResource:  groupResource,
 		resourcePrefix: resourcePrefix,
 		newListFunc:    newListFunc,
 		cacher:         cacher,
@@ -297,6 +299,7 @@ func newConsistencyChecker(resourcePrefix string, newListFunc func() runtime.Obj
 
 type consistencyChecker struct {
 	resourcePrefix string
+	groupResource  schema.GroupResource
 	newListFunc    func() runtime.Object
 
 	cacher getListerReady
@@ -318,25 +321,25 @@ func (c consistencyChecker) startChecking(stopCh <-chan struct{}) {
 		return false, nil
 	})
 	if err != nil {
-		klog.InfoS("Cache consistency check exiting", "resource", c.resourcePrefix, "err", err)
+		klog.InfoS("Cache consistency check exiting", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "err", err)
 	}
 }
 
 func (c *consistencyChecker) check(ctx context.Context) {
 	digests, err := c.calculateDigests(ctx)
 	if err != nil {
-		klog.ErrorS(err, "Cache consistency check error", "resource", c.resourcePrefix)
-		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "error").Inc()
+		klog.ErrorS(err, "Cache consistency check error", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
+		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, "error").Inc()
 		return
 	}
 	if digests.CacheDigest == digests.EtcdDigest {
-		klog.V(3).InfoS("Cache consistency check passed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
-		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "success").Inc()
+		klog.V(3).InfoS("Cache consistency check passed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "digest", digests.CacheDigest)
+		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, "success").Inc()
 	} else {
-		klog.ErrorS(nil, "Cache consistency check failed", "resource", c.resourcePrefix, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
-		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.resourcePrefix, "failure").Inc()
+		klog.ErrorS(nil, "Cache consistency check failed", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "resourceVersion", digests.ResourceVersion, "etcdDigest", digests.EtcdDigest, "cacheDigest", digests.CacheDigest)
+		metrics.StorageConsistencyCheckTotal.WithLabelValues(c.groupResource.Group, c.groupResource.Resource, "failure").Inc()
 		// Panic on internal consistency checking enabled only by environment variable. R
-		panic(fmt.Sprintf("Cache consistency check failed, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q", c.resourcePrefix, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest))
+		panic(fmt.Sprintf("Cache consistency check failed, group: %q, resource: %q, resourceVersion: %q, etcdDigest: %q, cacheDigest: %q", c.groupResource.Group, c.groupResource.Resource, digests.ResourceVersion, digests.EtcdDigest, digests.CacheDigest))
 	}
 }
 

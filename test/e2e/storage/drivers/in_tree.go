@@ -190,10 +190,10 @@ func (n *nfsDriver) PrepareTest(ctx context.Context, f *framework.Framework) *st
 
 	// TODO(mkimuram): cluster-admin gives too much right but system:persistent-volume-provisioner
 	// is not enough. We should create new clusterrole for testing.
-	err := e2eauth.BindClusterRole(ctx, cs.RbacV1(), "cluster-admin", ns.Name,
+	cleanupFunc, err := e2eauth.BindClusterRole(ctx, cs.RbacV1(), "cluster-admin", ns.Name,
 		rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Namespace: ns.Name, Name: "default"})
 	framework.ExpectNoError(err)
-	ginkgo.DeferCleanup(cs.RbacV1().ClusterRoleBindings().Delete, ns.Name+"--"+"cluster-admin", *metav1.NewDeleteOptions(0))
+	ginkgo.DeferCleanup(cleanupFunc)
 
 	err = e2eauth.WaitForAuthorizationUpdate(ctx, cs.AuthorizationV1(),
 		serviceaccount.MakeUsername(ns.Name, "default"),

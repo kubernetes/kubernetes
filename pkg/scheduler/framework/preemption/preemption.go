@@ -172,7 +172,7 @@ func NewEvaluator(pluginName string, fh framework.Handle, i Interface, enableAsy
 		} else {
 			condition := &v1.PodCondition{
 				Type:               v1.DisruptionTarget,
-				ObservedGeneration: apipod.GetPodObservedGenerationIfEnabledOnCondition(&victim.Status, victim.Generation, v1.DisruptionTarget),
+				ObservedGeneration: apipod.CalculatePodConditionObservedGeneration(&victim.Status, victim.Generation, v1.DisruptionTarget),
 				Status:             v1.ConditionTrue,
 				Reason:             v1.PodReasonPreemptionByScheduler,
 				Message:            fmt.Sprintf("%s: preempting to accommodate a higher priority pod", preemptor.Spec.SchedulerName),

@@ -59,7 +59,6 @@ import (
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
 	imagepolicyv1alpha1 "k8s.io/api/imagepolicy/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1alpha1 "k8s.io/api/networking/v1alpha1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -128,7 +127,6 @@ var groups = []runtime.SchemeBuilder{
 	imagepolicyv1alpha1.SchemeBuilder,
 	networkingv1.SchemeBuilder,
 	networkingv1beta1.SchemeBuilder,
-	networkingv1alpha1.SchemeBuilder,
 	nodev1.SchemeBuilder,
 	nodev1alpha1.SchemeBuilder,
 	nodev1beta1.SchemeBuilder,

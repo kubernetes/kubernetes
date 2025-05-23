@@ -21,11 +21,9 @@ package tools
 import (
 	// linting tools
 	_ "github.com/aojea/sloppy-netparser"
-	_ "github.com/client9/misspell/cmd/misspell"
-	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
+	_ "github.com/golangci/misspell"
 	_ "github.com/jcchavezs/porto/cmd/porto"
 	_ "honnef.co/go/tools/cmd/staticcheck"
-	_ "sigs.k8s.io/logtools/logcheck"
 
 	// benchmarking tools
 	_ "github.com/cespare/prettybench"
@@ -40,4 +38,7 @@ import (
 	// for publishing bot
 	_ "golang.org/x/mod/modfile"
 	_ "k8s.io/publishing-bot/cmd/publishing-bot/config"
+
+	// used by go-to-protobuf
+	_ "golang.org/x/tools/cmd/goimports"
 )

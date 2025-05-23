@@ -48,7 +48,7 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutosca
 	}
 	if behavior.ScaleUp != nil && behavior.ScaleUp.Tolerance != nil {
 		if !copiedAnnotations {
-			copiedAnnotations = true
+			copiedAnnotations = true //nolint:ineffassign // Intentionally setting the variable even though it's not read because this might change when adding another if clause below in the future.
 			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
 		}
 		out.Annotations[autoscaling.ToleranceScaleUpAnnotation] = behavior.ScaleUp.Tolerance.String()

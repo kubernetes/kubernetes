@@ -656,7 +656,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		mockRuntimeCache,
 		fakeRuntimeService,
 		nil,
-		NewFakeHostStatsProvider(),
+		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
 	)
 
@@ -791,7 +791,7 @@ func TestCRIImagesFsStats(t *testing.T) {
 		mockRuntimeCache,
 		fakeRuntimeService,
 		fakeImageService,
-		NewFakeHostStatsProvider(),
+		NewFakeHostStatsProvider(&kubecontainertest.FakeOS{}),
 		false,
 	)
 

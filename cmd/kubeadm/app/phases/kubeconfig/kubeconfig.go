@@ -25,6 +25,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -280,15 +281,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	currentCaCert := currentCACerts[0]
 
 	// Find a common trust anchor
-	trustAnchorFound := false
-	for _, expectedCaCert := range expectedCACerts {
-		// Compare the current CA cert to the expected CA cert.
-		// If the certificates match then a common trust anchor was found.
-		if currentCaCert.Equal(expectedCaCert) {
-			trustAnchorFound = true
-			break
-		}
-	}
+	trustAnchorFound := slices.ContainsFunc(expectedCACerts, currentCaCert.Equal)
 	if !trustAnchorFound {
 		return errors.Errorf("a kubeconfig file %q exists but does not contain a trusted CA in its current context's "+
 			"cluster. Total CA certificates found: %d", kubeConfigFilePath, len(currentCACerts))

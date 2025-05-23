@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -295,12 +296,7 @@ func isValidAuthzMode(authzMode string) bool {
 		kubeadmconstants.ModeAlwaysDeny,
 	}
 
-	for _, mode := range allModes {
-		if authzMode == mode {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allModes, authzMode)
 }
 
 // getControllerManagerCommand builds the right controller manager command from the given config object and version

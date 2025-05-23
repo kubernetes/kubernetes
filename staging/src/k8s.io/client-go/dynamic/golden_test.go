@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -338,7 +339,10 @@ func TestGoldenResponse(t *testing.T) {
 
 				var got []interface{}
 				for e := range w.ResultChan() {
-					u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&e)
+					u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&metav1.WatchEvent{
+						Type:   string(e.Type),
+						Object: runtime.RawExtension{Object: e.Object},
+					})
 					if err != nil {
 						t.Fatalf("failed to convert watch event to unstructured content: %v", err)
 					}

@@ -48,7 +48,7 @@ func GenerateContainersReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, c
 	if containerStatuses == nil {
 		return v1.PodCondition{
 			Type:               v1.ContainersReady,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.ContainersReady),
 			Status:             v1.ConditionFalse,
 			Reason:             UnknownContainerStatuses,
 		}
@@ -102,7 +102,7 @@ func GenerateContainersReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, c
 	if unreadyMessage != "" {
 		return v1.PodCondition{
 			Type:               v1.ContainersReady,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.ContainersReady),
 			Status:             v1.ConditionFalse,
 			Reason:             ContainersNotReady,
 			Message:            unreadyMessage,
@@ -111,7 +111,7 @@ func GenerateContainersReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, c
 
 	return v1.PodCondition{
 		Type:               v1.ContainersReady,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.ContainersReady),
 		Status:             v1.ConditionTrue,
 	}
 }
@@ -125,7 +125,7 @@ func GeneratePodReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, conditio
 	if containersReady.Status != v1.ConditionTrue {
 		return v1.PodCondition{
 			Type:               v1.PodReady,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodReady),
 			Status:             containersReady.Status,
 			Reason:             containersReady.Reason,
 			Message:            containersReady.Message,
@@ -149,7 +149,7 @@ func GeneratePodReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, conditio
 		unreadyMessage := strings.Join(unreadyMessages, ", ")
 		return v1.PodCondition{
 			Type:               v1.PodReady,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodReady),
 			Status:             v1.ConditionFalse,
 			Reason:             ReadinessGatesNotReady,
 			Message:            unreadyMessage,
@@ -158,7 +158,7 @@ func GeneratePodReadyCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, conditio
 
 	return v1.PodCondition{
 		Type:               v1.PodReady,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodReady),
 		Status:             v1.ConditionTrue,
 	}
 }
@@ -183,7 +183,7 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	if containerStatuses == nil && len(pod.Spec.InitContainers) > 0 {
 		return v1.PodCondition{
 			Type:               v1.PodInitialized,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
 			Status:             v1.ConditionFalse,
 			Reason:             UnknownContainerStatuses,
 		}
@@ -206,7 +206,7 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	if podPhase == v1.PodSucceeded && len(unknownContainers) == 0 {
 		return v1.PodCondition{
 			Type:               v1.PodInitialized,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
 			Status:             v1.ConditionTrue,
 			Reason:             PodCompleted,
 		}
@@ -219,7 +219,7 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	if kubecontainer.HasAnyRegularContainerStarted(&pod.Spec, containerStatuses) {
 		return v1.PodCondition{
 			Type:               v1.PodInitialized,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
 			Status:             v1.ConditionTrue,
 		}
 	}
@@ -235,7 +235,7 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	if unreadyMessage != "" {
 		return v1.PodCondition{
 			Type:               v1.PodInitialized,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
 			Status:             v1.ConditionFalse,
 			Reason:             ContainersNotInitialized,
 			Message:            unreadyMessage,
@@ -244,7 +244,7 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 
 	return v1.PodCondition{
 		Type:               v1.PodInitialized,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodInitialized),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodInitialized),
 		Status:             v1.ConditionTrue,
 	}
 }
@@ -258,13 +258,13 @@ func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, oldPodStatus *v1.Po
 	if !newSandboxNeeded {
 		return v1.PodCondition{
 			Type:               v1.PodReadyToStartContainers,
-			ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReadyToStartContainers),
+			ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodReadyToStartContainers),
 			Status:             v1.ConditionTrue,
 		}
 	}
 	return v1.PodCondition{
 		Type:               v1.PodReadyToStartContainers,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReadyToStartContainers),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodReadyToStartContainers),
 		Status:             v1.ConditionFalse,
 	}
 }
@@ -272,7 +272,7 @@ func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, oldPodStatus *v1.Po
 func generateContainersReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
 	condition := v1.PodCondition{
 		Type:               v1.ContainersReady,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.ContainersReady),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.ContainersReady),
 		Status:             v1.ConditionFalse,
 	}
 
@@ -288,7 +288,7 @@ func generateContainersReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus 
 func generatePodReadyConditionForTerminalPhase(pod *v1.Pod, oldPodStatus *v1.PodStatus, podPhase v1.PodPhase) v1.PodCondition {
 	condition := v1.PodCondition{
 		Type:               v1.PodReady,
-		ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(oldPodStatus, pod.Generation, v1.PodReady),
+		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(oldPodStatus, pod.Generation, v1.PodReady),
 		Status:             v1.ConditionFalse,
 	}
 

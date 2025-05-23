@@ -94,7 +94,7 @@ func validateUnknownVersionInteroperabilityProxyFlags(options *Options) []error 
 	return err
 }
 
-var pathOrSocket = regexp.MustCompile(`(^(/[^/ ]*)+/?$)|(^@([a-zA-Z0-9_-]+\.)*[a-zA-Z0-9_-]+$)`)
+var abstractSocketRegex = regexp.MustCompile(`^@([a-zA-Z0-9_-]+\.)*[a-zA-Z0-9_-]+$`)
 
 func validateServiceAccountTokenSigningConfig(options *Options) []error {
 	if len(options.ServiceAccountSigningEndpoint) == 0 {
@@ -109,9 +109,9 @@ func validateServiceAccountTokenSigningConfig(options *Options) []error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExternalServiceAccountTokenSigner) {
 		errors = append(errors, fmt.Errorf("setting `--service-account-signing-endpoint` requires enabling ExternalServiceAccountTokenSigner feature gate"))
 	}
-	// Check if ServiceAccountSigningEndpoint is a linux file path or an abstract socket name.
-	if !pathOrSocket.MatchString(options.ServiceAccountSigningEndpoint) {
-		errors = append(errors, fmt.Errorf("invalid value %q passed for `--service-account-signing-endpoint`, should be a valid location on the filesystem or must be prefixed with @ to name UDS in abstract namespace", options.ServiceAccountSigningEndpoint))
+	// Ensure ServiceAccountSigningEndpoint is a valid abstract socket name if prefixed with '@'.
+	if strings.HasPrefix(options.ServiceAccountSigningEndpoint, "@") && !abstractSocketRegex.MatchString(options.ServiceAccountSigningEndpoint) {
+		errors = append(errors, fmt.Errorf("invalid value %q passed for `--service-account-signing-endpoint`, when prefixed with @ must be a valid abstract socket name", options.ServiceAccountSigningEndpoint))
 	}
 
 	return errors

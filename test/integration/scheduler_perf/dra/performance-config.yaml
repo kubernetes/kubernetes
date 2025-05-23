@@ -415,6 +415,132 @@
       measurePods: 10
       maxClaimsPerNode: 10
 
+# SchedulingWithResourceClaimTemplatePartitionable is a variant of SchedulingWithResourceClaimTemplate.
+# It creates ResourceSlices with partitionable devices and uses a claim template referenced
+# by the test pods. It includes allocated claims that consumes counters and it sets up the devices
+# such that the allocator will have to backtrack once in order to find a working solution.
+- name: SteadyStateClusterResourceClaimTemplatePartitionable
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPartitionableDevices: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: templates/resourceslice-partitionable.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaim-with-selector.yaml
+    namespace: init
+    countParam: $initClaims
+  - opcode: allocResourceClaims
+    namespace: init
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-for-two-devices.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 10
+      initClaims: 10
+      measurePods: 10
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 10
+      initClaims: 10
+      measurePods: 10
+      duration: 2s
+  - name: 2000pods_100nodes
+    params:
+      nodesWithDRA: 100
+      nodesWithoutDRA: 0
+      resourceSlices: 2000
+      initClaims: 2000
+      measurePods: 2000
+      duration: 10s
+
+# SchedulingWithResourceClaimTemplatePartitionableBacktracking is a variant of
+# SchedulingWithResourceClaimTemplate. It creates a single ResourceSlice and a
+# ResourceClaim that forces the allocator to backtrack multiple times in order
+# to find a solution.
+- name: SteadyStateClusterResourceClaimTemplatePartitionableBacktracking
+  featureGates:
+    DynamicResourceAllocation: true
+    DRAPartitionableDevices: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $nodesWithoutDRA
+  - opcode: createNodes
+    nodeTemplatePath: templates/node-with-dra-test-driver.yaml
+    countParam: $nodesWithDRA
+  - opcode: createAny
+    templatePath: templates/resourceslice-partitionable-backtracking.yaml
+    countParam: $resourceSlices
+  - opcode: createAny
+    templatePath: templates/deviceclass.yaml
+  - opcode: createAny
+    templatePath: templates/resourceclaimtemplate-backtracking.yaml
+    namespace: test
+  - opcode: createPods
+    namespace: test
+    countParam: $measurePods
+    steadyState: true
+    durationParam: $duration
+    podTemplatePath: templates/pod-with-claim-template.yaml
+    collectMetrics: true
+  workloads:
+  - name: fast
+    featureGates:
+      SchedulerQueueingHints: false
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      duration: 2s
+  - name: fast_QueueingHintsEnabled
+    featureGates:
+      SchedulerQueueingHints: true
+    labels: [integration-test, short]
+    params:
+      # This testcase runs through all code paths without
+      # taking too long overall.
+      nodesWithDRA: 1
+      nodesWithoutDRA: 1
+      resourceSlices: 1
+      measurePods: 1
+      duration: 2s
+
 # SchedulingWithResourceClaimTemplate uses ResourceClaims
 # with deterministic names that are shared between pods.
 # There is a fixed ratio of 1:5 between claims and pods.

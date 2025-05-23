@@ -22,7 +22,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
-
 	"sort"
 	"strconv"
 	"strings"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	apidiscoveryv2conversion "k8s.io/apiserver/pkg/apis/apidiscovery/v2"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -133,7 +133,7 @@ func fetchPath(handler http.Handler, acceptPrefix string, path string, etag stri
 func fetchPathHelper(handler http.Handler, accept string, path string, etag string) (*http.Response, []byte) {
 	// Expect json-formatted apis group list
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", discoveryPath, nil)
+	req := httptest.NewRequest(request.MethodGet, discoveryPath, nil)
 
 	// Ask for JSON response
 	req.Header.Set("Accept", accept)

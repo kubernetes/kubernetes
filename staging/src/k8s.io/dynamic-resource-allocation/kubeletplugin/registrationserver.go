@@ -19,6 +19,7 @@ package kubeletplugin
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
@@ -29,12 +30,17 @@ type registrationServer struct {
 	endpoint          string
 	supportedVersions []string
 	status            *registerapi.RegistrationStatus
+
+	getInfoError atomic.Pointer[error]
 }
 
 var _ registerapi.RegistrationServer = &registrationServer{}
 
 // GetInfo is the RPC invoked by plugin watcher.
 func (e *registrationServer) GetInfo(ctx context.Context, req *registerapi.InfoRequest) (*registerapi.PluginInfo, error) {
+	if err := e.getGetInfoError(); err != nil {
+		return nil, err
+	}
 	return &registerapi.PluginInfo{
 		Type:              registerapi.DRAPlugin,
 		Name:              e.driverName,
@@ -51,4 +57,23 @@ func (e *registrationServer) NotifyRegistrationStatus(ctx context.Context, statu
 	}
 
 	return &registerapi.RegistrationStatusResponse{}, nil
+}
+
+func (e *registrationServer) getGetInfoError() error {
+	errPtr := e.getInfoError.Load()
+	if errPtr == nil {
+		return nil
+	}
+	return *errPtr
+}
+
+// setGetInfoError sets the error to be returned by the GetInfo handler of the registration server.
+// If a non-nil error is provided, subsequent GetInfo calls will return this error.
+// Passing nil as the err argument will clear any previously set error, effectively disabling erroring.
+func (e *registrationServer) setGetInfoError(err error) {
+	if err == nil {
+		e.getInfoError.Store(nil)
+		return
+	}
+	e.getInfoError.Store(&err)
 }

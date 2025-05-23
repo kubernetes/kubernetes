@@ -90,7 +90,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -108,7 +107,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -127,7 +125,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -146,7 +143,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: invalidContext
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:
@@ -165,7 +161,6 @@ contexts:
   name: system:node:mynode@kubernetes
 current-context: system:node:mynode@kubernetes
 kind: Config
-preferences: {}
 users:
 - name: system:node:mynode
   user:

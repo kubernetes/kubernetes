@@ -411,9 +411,7 @@ func ValidateIngressLoadBalancerStatus(status, oldStatus *networking.IngressLoad
 
 func validateIngressRules(ingressRules []networking.IngressRule, fldPath *field.Path, opts IngressValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(ingressRules) == 0 {
-		return append(allErrs, field.Required(fldPath, ""))
-	}
+
 	for i, ih := range ingressRules {
 		wildcardHost := false
 		if len(ih.Host) > 0 {

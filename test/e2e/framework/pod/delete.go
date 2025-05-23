@@ -44,7 +44,7 @@ func DeletePodOrFail(ctx context.Context, c clientset.Interface, ns, name string
 		return
 	}
 
-	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
+	framework.ExpectNoErrorWithOffset(1, err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // DeletePodWithWait deletes the passed-in pod and waits for the pod to be terminated. Resilient to the pod

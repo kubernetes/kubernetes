@@ -133,25 +133,21 @@ type Context struct {
 	Scope Scope
 
 	// Type provides details about the type being validated.  When Scope is
-	// ScopeType, this is the underlying type.  When Scope is ScopeField, this
-	// is the field's type (including any pointerness).  When Scope indicates a
-	// list-value, map-key, or map-value, this is the type of that key or
-	// value.
+	// ScopeType, this is the newly defined type.  When Scope is ScopeField,
+	// this is the field's type (which may be a pointer, an alias, or both).
+	// When Scope indicates a list-value, map-key, or map-value, this is the
+	// type of that key or value (which, again, may be a pointer, and alias, or
+	// both).
 	Type *types.Type
 
-	// Parent provides details about the logical parent type of the type being
-	// validated, when applicable.  When Scope is ScopeType, this is the
-	// newly-defined type (when it exists - gengo handles struct-type
-	// definitions differently that other "alias" type definitions).  When
-	// Scope is ScopeField, this is the field's parent struct's type.  When
-	// Scope indicates a list-value, map-key, or map-value, this is the type of
-	// the whole list or map.
-	//
-	// Because of how gengo handles struct-type definitions, this field may be
-	// nil in those cases.
+	// Parent provides details about the logical parent type of the object
+	// being validated, when applicable.  When Scope is ScopeField, this is the
+	// containing struct's type.  When Scope indicates a list-value, map-key,
+	// or map-value, this is the type of the whole list or map. When Scope is
+	// ScopeType, this is nil.
 	Parent *types.Type
 
-	// Member provides details about a field within a struct, when Scope is
+	// Member provides details about a field within a struct when Scope is
 	// ScopeField.  For all other values of Scope, this will be nil.
 	Member *types.Member
 

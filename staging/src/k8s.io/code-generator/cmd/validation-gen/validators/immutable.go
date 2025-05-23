@@ -44,25 +44,22 @@ func (immutableTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	immutableValidator              = types.Name{Package: libValidationPkg, Name: "Immutable"}
-	immutableNonComparableValidator = types.Name{Package: libValidationPkg, Name: "ImmutableNonComparable"}
+	immutableCompareValidator = types.Name{Package: libValidationPkg, Name: "ImmutableByCompare"}
+	immutableReflectValidator = types.Name{Package: libValidationPkg, Name: "ImmutableByReflect"}
 )
 
 func (immutableTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
 	var result Validations
 
-	t := context.Type
-	for t.Kind == types.Pointer || t.Kind == types.Alias {
-		if t.Kind == types.Pointer {
-			t = t.Elem
-		} else if t.Kind == types.Alias {
-			t = t.Underlying
-		}
-	}
-	if t.IsComparable() {
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableValidator))
+	if nonPointer(nativeType(context.Type)).Kind == types.Builtin {
+		// This is a minor optimization to just compare primitive values when
+		// possible. Slices and maps are not comparable, and structs might hold
+		// pointer fields, which are directly comparable but not what we need.
+		//
+		// Note: This compares the pointee, not the pointer itself.
+		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableCompareValidator))
 	} else {
-		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableNonComparableValidator))
+		result.AddFunction(Function(immutableTagName, DefaultFlags, immutableReflectValidator))
 	}
 
 	return result, nil

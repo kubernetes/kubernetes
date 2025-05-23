@@ -24,6 +24,9 @@ limitations under the License.
 //
 // A list of changes since v1beta3:
 //
+// v1.34:
+//   - Add "ECDSA-P384" to the allowed encryption algorithm options for `ClusterConfiguration.EncryptionAlgorithm`.
+//
 // v1.33:
 //   - Add an `EtcdUpgrade` field into `UpgradeConfiguration.Plan` that can be used to control whether the etcd upgrade plan
 //     should be displayed.

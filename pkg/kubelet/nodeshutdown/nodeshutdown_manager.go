@@ -161,7 +161,7 @@ func (m *podManager) killPods(activePods []*v1.Pod) error {
 					status.Reason = nodeShutdownReason
 					podutil.UpdatePodCondition(status, &v1.PodCondition{
 						Type:               v1.DisruptionTarget,
-						ObservedGeneration: podutil.GetPodObservedGenerationIfEnabledOnCondition(status, pod.Generation, v1.DisruptionTarget),
+						ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(status, pod.Generation, v1.DisruptionTarget),
 						Status:             v1.ConditionTrue,
 						Reason:             v1.PodReasonTerminationByKubelet,
 						Message:            nodeShutdownMessage,

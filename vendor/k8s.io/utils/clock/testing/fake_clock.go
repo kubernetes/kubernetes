@@ -221,12 +221,24 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 	f.waiters = newWaiters
 }
 
-// HasWaiters returns true if After or AfterFunc has been called on f but not yet satisfied (so you can
-// write race-free tests).
+// HasWaiters returns true if Waiters() returns non-0 (so you can write race-free tests).
 func (f *FakeClock) HasWaiters() bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	return len(f.waiters) > 0
+}
+
+// Waiters returns the number of "waiters" on the clock (so you can write race-free
+// tests). A waiter exists for:
+//   - every call to After that has not yet signaled its channel.
+//   - every call to AfterFunc that has not yet called its callback.
+//   - every timer created with NewTimer which is currently ticking.
+//   - every ticker created with NewTicker which is currently ticking.
+//   - every ticker created with Tick.
+func (f *FakeClock) Waiters() int {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	return len(f.waiters)
 }
 
 // Sleep is akin to time.Sleep
