@@ -668,6 +668,10 @@ func startUDPServer(address string, udpPort int) {
 			log.Printf("Sending clientip back to UDP client %s\n", clientAddress)
 			_, err = serverConn.WriteToUDP([]byte(clientAddress.String()), clientAddress)
 			assertNoError(err, fmt.Sprintf("failed to write clientip to UDP client %s", clientAddress))
+		} else if receivedText == "serveraddress" {
+			log.Printf("Sending server address to UDP client %s\n", serverConn.LocalAddr().String())
+			_, err = serverConn.WriteToUDP([]byte(serverConn.LocalAddr().String()), clientAddress)
+			assertNoError(err, fmt.Sprintf("failed to write server address to UDP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
 			log.Printf("Unknown UDP command received from %s: %v\n", clientAddress, receivedText)
 		}
