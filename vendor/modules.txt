@@ -334,7 +334,7 @@ github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/ishidawataru/sctp v0.0.0-20230406120618-7ff4192f6ff2
+# github.com/ishidawataru/sctp v0.0.0-20250521072954-ae8eb7fa7995
 ## explicit; go 1.12
 github.com/ishidawataru/sctp
 # github.com/jonboulle/clockwork v0.5.0

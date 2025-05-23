@@ -1,10 +1,6 @@
 {
   "spec": {
     "pinnedModules": {
-      "github.com/ishidawataru/sctp": {
-        "Version": "v0.0.0-20230406120618-7ff4192f6ff2",
-        "Reason": "broken module, do not update until https://github.com/ishidawataru/sctp/pull/75 is fixed"
-      },
       "github.com/libopenstorage/openstorage": {
         "Version": "v1.0.0",
         "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
