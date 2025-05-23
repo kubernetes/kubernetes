@@ -51,10 +51,6 @@ import (
 )
 
 const (
-	// resyncPeriod for informer
-	// TODO (https://github.com/kubernetes/kubernetes/issues/123688): disable?
-	resyncPeriod = time.Duration(10 * time.Minute)
-
 	// poolNameIndex is the name for the ResourceSlice store's index function,
 	// which is to index by ResourceSlice.Spec.Pool.Name
 	poolNameIndex = "poolName"
@@ -433,7 +429,11 @@ func (c *Controller) initInformer(ctx context.Context) error {
 			},
 		},
 		&resourceapi.ResourceSlice{},
-		resyncPeriod,
+		// No resync because all it would do is periodically trigger syncing pools
+		// again by reporting all slices as updated with the object as old/new.
+		// Our sync method is deterministic (or should be!), so repeating it
+		// won't change the outcome.
+		0,
 		indexers,
 	)
 	c.sliceStore = cache.NewIntegerResourceVersionMutationCache(logger, informer.GetStore(), informer.GetIndexer(), c.mutationCacheTTL, true /* includeAdds */)
