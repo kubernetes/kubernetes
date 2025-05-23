@@ -816,30 +816,34 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 			panic(fmt.Sprintf("found nil node for root-type %v", rootType))
 		}
 
-		supportedResources := g.toResourceList(rootType)
-
 		targs := generator.Args{
-			"rootType":          rootType,
-			"typePfx":           "",
-			"field":             mkSymbolArgs(c, fieldPkgSymbols),
-			"fmt":               mkSymbolArgs(c, fmtPkgSymbols),
-			"operation":         mkSymbolArgs(c, operationPkgSymbols),
-			"safe":              mkSymbolArgs(c, safePkgSymbols),
-			"context":           mkSymbolArgs(c, contextPkgSymbols),
-			"supportsResources": strings.Join(supportedResources, ", "),
+			"rootType":  rootType,
+			"typePfx":   "",
+			"field":     mkSymbolArgs(c, fieldPkgSymbols),
+			"fmt":       mkSymbolArgs(c, fmtPkgSymbols),
+			"operation": mkSymbolArgs(c, operationPkgSymbols),
+			"safe":      mkSymbolArgs(c, safePkgSymbols),
+			"context":   mkSymbolArgs(c, contextPkgSymbols),
 		}
 		if !isNilableType(rootType) {
 			targs["typePfx"] = "*"
 		}
 
-		// TODO: Remove special-casing for `/` and `/scale` resources once ratcheting is introduced.
 		// This uses a typed nil pointer, rather than a real instance because
 		// we need the type information, but not an instance of the type.
-		sw.Do("$.rootType|private$SupportedResources := []string{$.supportsResources$}\n", targs)
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
-		sw.Do("  if op.Request.SubresourceIn($.rootType|private$SupportedResources) {\n", targs)
+
+		sw.Do("switch op.Request.SubresourcePath() {\n", nil)
+		sw.Do("case ", nil)
+		for i, s := range g.toResourceList(rootType) {
+			if i > 0 {
+				sw.Do(", ", nil)
+			}
+			sw.Do("$.$", s)
+		}
+		sw.Do(":\n", nil)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
 		sw.Do("               op, ", targs)

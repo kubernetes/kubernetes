@@ -17,7 +17,6 @@ limitations under the License.
 package operation
 
 import (
-	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -78,31 +77,12 @@ type Request struct {
 	Subresources []string
 }
 
-// MatchesSubresource returns true if the request is for the given subresource path.
-// The subresource path is a slash-separated list of subresource names. For
-// example, `/status`, `/resize`, or `/x/y/z`.
-//
-// `/` identifies the root resource. That is, MatchesSubresource returns true
-// subresourcePath is `/` and Subresources is an empty list.
-func (r Request) MatchesSubresource(subresourcePath string) bool {
-	if len(r.Subresources) == 0 && subresourcePath == "/" {
-		return true
-	}
-	return r.SubresourcePath() == subresourcePath
-}
-
-// SubresourceIn returns true if the request is for a subresource in the given list.
-// The subresource path is a slash-separated list of subresource names. For example,
-// `/status`, `/resize`, or `/x/y/z`.
-// `/` identifies the root resource. That is, SubresourceIn returns true
-// subresourcePaths contains `/` and Subresources is an empty list.
-func (r Request) SubresourceIn(subresourcePaths []string) bool {
-	return slices.ContainsFunc(subresourcePaths, r.MatchesSubresource)
-}
-
 // SubresourcePath returns the path is a slash-separated list of subresource
 // names. For example, `/status`, `/resize`, or `/x/y/z`.
 func (r Request) SubresourcePath() string {
+	if len(r.Subresources) == 0 {
+		return "/"
+	}
 	return "/" + strings.Join(r.Subresources, "/")
 }
 
