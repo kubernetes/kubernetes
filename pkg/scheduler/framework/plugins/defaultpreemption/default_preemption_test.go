@@ -1436,7 +1436,7 @@ func TestSelectBestCandidate(t *testing.T) {
 				t.Fatal(err)
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, framework.NewPluginSettings(), tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, pluginSettings, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := pl.Evaluator.SelectCandidate(ctx, candidates)
 			if s == nil || len(s.Name()) == 0 {
 				t.Fatalf("expected any node in %v, but candidate is missing", tt.expected)
@@ -1645,9 +1645,9 @@ func TestCustomSelection(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			state := framework.NewCycleState()
+			pluginSettings := framework.NewPluginSettings()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginSettings, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 			nodeInfos, err := snapshot.NodeInfos().List()
@@ -1664,7 +1664,7 @@ func TestCustomSelection(t *testing.T) {
 				pl.IsEligiblePod = tt.eligiblePods
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, pluginSettings, tt.pod, nodeInfos, nil, offset, numCandidates)
 			// check that the candidates match what's expected
 			if len(tt.expected) != len(candidates) {
 				candidateNames := []string{}
@@ -1783,9 +1783,9 @@ func TestCustomOrdering(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			state := framework.NewCycleState()
+			pluginSettings := framework.NewPluginSettings()
 			// Some tests rely on PreFilter plugin to compute its CycleState.
-			if _, status, _ := fwk.RunPreFilterPlugins(ctx, state, tt.pod); !status.IsSuccess() {
+			if _, status, _ := fwk.RunPreFilterPlugins(ctx, pluginSettings, tt.pod); !status.IsSuccess() {
 				t.Errorf("Unexpected PreFilter Status: %v", status)
 			}
 			nodeInfos, err := snapshot.NodeInfos().List()
@@ -1802,7 +1802,7 @@ func TestCustomOrdering(t *testing.T) {
 				pl.MoreImportantPod = tt.orderPods
 			}
 			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _, _ := pl.Evaluator.DryRunPreemption(ctx, pluginSettings, tt.pod, nodeInfos, nil, offset, numCandidates)
 			if len(candidates) != 1 {
 				t.Fatalf("expected exactly one node but got %+v", candidates)
 			}
