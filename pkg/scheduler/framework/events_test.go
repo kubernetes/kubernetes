@@ -60,7 +60,7 @@ func TestNodeAllocatableChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.oldAllocatable}}
 			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.newAllocatable}}
-			changed := extractNodeAllocatableChange(newNode, oldNode) != none
+			changed := extractNodeAllocatableChange(newNode, oldNode) != None
 			if changed != test.changed {
 				t.Errorf("nodeAllocatableChanged should be %t, got %t", test.changed, changed)
 			}
@@ -93,7 +93,7 @@ func TestNodeLabelsChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.oldLabels}}
 			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.newLabels}}
-			changed := extractNodeLabelsChange(newNode, oldNode) != none
+			changed := extractNodeLabelsChange(newNode, oldNode) != None
 			if changed != test.changed {
 				t.Errorf("Test case %q failed: should be %t, got %t", test.name, test.changed, changed)
 			}
@@ -125,7 +125,7 @@ func TestNodeTaintsChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.oldTaints}}
 			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.newTaints}}
-			changed := extractNodeTaintsChange(newNode, oldNode) != none
+			changed := extractNodeTaintsChange(newNode, oldNode) != None
 			if changed != test.changed {
 				t.Errorf("Test case %q failed: should be %t, not %t", test.name, test.changed, changed)
 			}
@@ -180,7 +180,7 @@ func TestNodeConditionsChange(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.oldConditions}}
 			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.newConditions}}
-			changed := extractNodeConditionsChange(newNode, oldNode) != none
+			changed := extractNodeConditionsChange(newNode, oldNode) != None
 			if changed != test.changed {
 				t.Errorf("Test case %q failed: should be %t, got %t", test.name, test.changed, changed)
 			}
@@ -377,7 +377,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "pod's resource request is scaled up",
 			oldPod: podWithSmallRequest,
 			newPod: podWithBigRequest,
-			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: updatePodOther}},
+			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: Update}},
 		},
 		{
 			name:   "both pod's resource request and label are updated",
@@ -392,7 +392,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "untracked properties of pod is updated",
 			newPod: st.MakePod().Annotation("foo", "bar").Obj(),
 			oldPod: st.MakePod().Annotation("foo", "bar2").Obj(),
-			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: updatePodOther}},
+			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: Update}},
 		},
 		{
 			name:   "scheduling gate is eliminated",
@@ -404,7 +404,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			name:   "scheduling gate is removed, but not completely eliminated",
 			newPod: st.MakePod().SchedulingGates([]string{"foo"}).Obj(),
 			oldPod: st.MakePod().SchedulingGates([]string{"foo", "bar"}).Obj(),
-			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: updatePodOther}},
+			want:   []ClusterEvent{{Resource: unschedulablePod, ActionType: Update}},
 		},
 		{
 			name:   "pod's tolerations are updated",
@@ -417,7 +417,7 @@ func Test_podSchedulingPropertiesChange(t *testing.T) {
 			draDisabled: true,
 			newPod:      st.MakePod().ResourceClaimStatuses(claimStatusA).Obj(),
 			oldPod:      st.MakePod().Obj(),
-			want:        []ClusterEvent{{Resource: unschedulablePod, ActionType: updatePodOther}},
+			want:        []ClusterEvent{{Resource: unschedulablePod, ActionType: Update}},
 		},
 		{
 			name:   "pod claim statuses change, feature enabled",
