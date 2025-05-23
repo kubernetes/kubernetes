@@ -113,7 +113,7 @@ func unifiedResToSystemdProps(cm *dbusConnManager, res map[string]string) (props
 					return nil, fmt.Errorf("unified resource %q quota value conversion error: %w", k, err)
 				}
 			}
-			addCpuQuota(cm, &props, quota, period)
+			addCPUQuota(cm, &props, &quota, period)
 
 		case "cpu.weight":
 			if shouldSetCPUIdle(cm, strings.TrimSpace(res["cpu.idle"])) {
@@ -254,7 +254,7 @@ func genV2ResourcesProperties(dirPath string, r *cgroups.Resources, cm *dbusConn
 		}
 	}
 
-	addCpuQuota(cm, &properties, r.CpuQuota, r.CpuPeriod)
+	addCPUQuota(cm, &properties, &r.CpuQuota, r.CpuPeriod)
 
 	if r.PidsLimit > 0 || r.PidsLimit == -1 {
 		properties = append(properties,
@@ -480,6 +480,9 @@ func (m *UnifiedManager) Set(r *cgroups.Resources) error {
 	if r == nil {
 		return nil
 	}
+	// Use a copy since CpuQuota in r may be modified.
+	rCopy := *r
+	r = &rCopy
 	properties, err := genV2ResourcesProperties(m.fsMgr.Path(""), r, m.dbus)
 	if err != nil {
 		return err
