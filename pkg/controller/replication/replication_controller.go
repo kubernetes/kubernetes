@@ -63,6 +63,9 @@ func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInf
 				Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replication-controller"}),
 			}},
 			eventBroadcaster,
+			replicaset.ReplicaSetControllerFeatures{
+				EnableStatusTerminatingReplicas: false,
+			},
 		),
 	}
 }
