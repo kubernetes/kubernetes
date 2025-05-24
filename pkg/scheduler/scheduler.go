@@ -23,7 +23,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -518,8 +517,8 @@ func (sched *Scheduler) Run(ctx context.Context) {
 
 // NewInformerFactory creates a SharedInformerFactory and initializes a scheduler specific
 // in-place podInformer.
-func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration) informers.SharedInformerFactory {
-	informerFactory := informers.NewSharedInformerFactory(cs, resyncPeriod)
+func NewInformerFactory(cs clientset.Interface, resyncPeriod time.Duration, options ...informers.SharedInformerOption) informers.SharedInformerFactory {
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(cs, resyncPeriod, options...)
 	informerFactory.InformerFor(&v1.Pod{}, newPodInformer)
 	return informerFactory
 }
@@ -605,18 +604,5 @@ func newPodInformer(cs clientset.Interface, resyncPeriod time.Duration) cache.Sh
 	tweakListOptions := func(options *metav1.ListOptions) {
 		options.FieldSelector = selector
 	}
-	informer := coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
-
-	// Dropping `.metadata.managedFields` to improve memory usage.
-	// The Extract workflow (i.e. `ExtractPod`) should be unused.
-	trim := func(obj interface{}) (interface{}, error) {
-		if accessor, err := meta.Accessor(obj); err == nil {
-			if accessor.GetManagedFields() != nil {
-				accessor.SetManagedFields(nil)
-			}
-		}
-		return obj, nil
-	}
-	informer.SetTransform(trim)
-	return informer
+	return coreinformers.NewFilteredPodInformer(cs, metav1.NamespaceAll, resyncPeriod, cache.Indexers{}, tweakListOptions)
 }
