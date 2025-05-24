@@ -265,6 +265,8 @@ type manager struct {
 	lastRequestCancel context.CancelFunc
 	lastRequest       *x509.CertificateRequest
 
+	templateChanged chan struct{}
+
 	dynamicTemplate              bool
 	signerName                   string
 	requestedCertificateLifetime *time.Duration
@@ -424,7 +426,7 @@ func (m *manager) run() {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	templateChanged := make(chan struct{})
+	m.templateChanged = make(chan struct{})
 	rotate := func(ctx context.Context) {
 		deadline := m.nextRotationDeadline(logger)
 		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
@@ -436,7 +438,7 @@ func (m *manager) run() {
 			select {
 			case <-timer.C:
 				// unblock when deadline expires
-			case <-templateChanged:
+			case <-m.templateChanged:
 				_, lastRequestTemplate := m.getLastRequest()
 				if reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
 					// if the template now matches what we last requested, restart the rotation deadline loop
@@ -459,7 +461,7 @@ func (m *manager) run() {
 		}
 		if err := wait.ExponentialBackoffWithContext(ctx, backoff, m.rotateCerts); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Reached backoff limit, still unable to rotate certs")
-			wait.PollInfiniteWithContext(ctx, 32*time.Second, m.rotateCerts)
+			utilruntime.HandleErrorWithContext(ctx, wait.PollUntilContextCancel(ctx, 32*time.Second, true, m.rotateCerts), "Failed to rotate certs")
 		}
 	}
 
@@ -471,18 +473,9 @@ func (m *manager) run() {
 
 	if m.dynamicTemplate {
 		template := func(ctx context.Context) {
-			// check if the current template matches what we last requested
-			lastRequestCancel, lastRequestTemplate := m.getLastRequest()
-
-			if !m.certSatisfiesTemplate(logger) && !reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
-				// if the template is different, queue up an interrupt of the rotation deadline loop.
-				// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
-				if lastRequestCancel != nil {
-					// if we're currently waiting on a submitted request that no longer matches what we want, stop waiting
-					lastRequestCancel()
-				}
+			if !m.validateLastRequestOrCancel(logger) {
 				select {
-				case templateChanged <- struct{}{}:
+				case m.templateChanged <- struct{}{}:
 				case <-ctx.Done():
 				}
 			}
@@ -493,6 +486,26 @@ func (m *manager) run() {
 			wait.UntilWithContext(m.ctx, template, time.Second)
 		}()
 	}
+}
+
+// validateOrCancelLastRequest returns a boolean indicating whether the last
+// requested certificate is up-to-date for the latest template. If not, it also
+// cancels the last request. All done under lastRequestLock
+func (m *manager) validateLastRequestOrCancel(logger klog.Logger) bool {
+	m.lastRequestLock.Lock()
+	defer m.lastRequestLock.Unlock()
+
+	// check if the current template matches what we last requested
+	if !m.certSatisfiesTemplate(logger) && !reflect.DeepEqual(m.lastRequest, m.getTemplate()) {
+		// if the template is different, queue up an interrupt of the rotation deadline loop.
+		// if we've requested a CSR that matches the new template by the time the interrupt is handled, the interrupt is disregarded.
+		if m.lastRequestCancel != nil {
+			// if we're currently waiting on a submitted request that no longer matches what we want, stop waiting
+			m.lastRequestCancel()
+		}
+		return false
+	}
+	return true
 }
 
 func getCurrentCertificateOrBootstrap(
@@ -797,6 +810,11 @@ func (m *manager) setLastRequest(cancel context.CancelFunc, r *x509.CertificateR
 	defer m.lastRequestLock.Unlock()
 	m.lastRequestCancel = cancel
 	m.lastRequest = r
+	// flush the channel in case there was a writer blocked signaling on a previous request, assumes a single informer
+	select {
+	case <-m.templateChanged:
+	default:
+	}
 }
 
 func hasKeyUsage(usages []certificates.KeyUsage, usage certificates.KeyUsage) bool {
