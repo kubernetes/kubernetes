@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package v1beta1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -24,26 +24,26 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 type Preference struct {
 	metav1.TypeMeta `json:",inline"`
 
-	// overrides allows changing default flag values of commands.
+	// defaults allow changing default option values of commands.
 	// This is especially useful, when user doesn't want to explicitly
-	// set flags each time.
+	// set options each time.
 	// +listType=atomic
-	Defaults []CommandDefaults `json:"overrides"`
+	Defaults []CommandDefaults `json:"defaults"`
 
-	// aliases allow defining command aliases for existing kubectl commands, with optional default flag values.
+	// aliases allow defining command aliases for existing kubectl commands, with optional default option values.
 	// If the alias name collides with a built-in command, built-in command always takes precedence.
-	// Flag overrides defined in the overrides section do NOT apply to aliases for the same command.
-	// kubectl [ALIAS NAME] [USER_FLAGS] [USER_EXPLICIT_ARGS] expands to
+	// Option overrides defined in the defaults section do NOT apply to aliases for the same command.
+	// kubectl [ALIAS NAME] [USER_OPTIONS] [USER_EXPLICIT_ARGS] expands to
 	// kubectl [COMMAND] # built-in command alias points to
 	//         [KUBERC_PREPEND_ARGS]
-	//         [USER_FLAGS]
-	//         [KUBERC_FLAGS] # rest of the flags that are not passed by user in [USER_FLAGS]
+	//         [USER_OPTIONS]
+	//         [KUBERC_OPTIONS] # rest of the options that are not passed by user in [USER_OPTIONS]
 	//         [USER_EXPLICIT_ARGS]
 	//         [KUBERC_APPEND_ARGS]
 	// e.g.
 	// - name: runx
 	//   command: run
-	//   flags:
+	//   options:
 	//   - name: image
 	//     default: nginx
 	//   appendArgs:
@@ -53,7 +53,7 @@ type Preference struct {
 	// this will be expanded to "kubectl run --image=nginx test-pod -- custom-arg1"
 	// - name: getn
 	//   command: get
-	//   flags:
+	//   options:
 	//   - name: output
 	//     default: wide
 	//   prependArgs:
@@ -80,30 +80,30 @@ type AliasOverride struct {
 	// These arguments are appended to the USER_ARGS.
 	// +listType=atomic
 	AppendArgs []string `json:"appendArgs,omitempty"`
-	// flags is allocated to store the flag definitions of alias.
-	// flags only modifies the default value of the flag and if
+	// options is allocated to store the option definitions of alias.
+	// options only modify the default value of the option and if
 	// user explicitly passes a value, explicit one is used.
 	// +listType=atomic
-	Options []CommandOptionDefault `json:"flags,omitempty"`
+	Options []CommandOptionDefault `json:"options,omitempty"`
 }
 
 // CommandDefaults stores the commands and their associated option's
 // default values.
 type CommandDefaults struct {
-	// command refers to a command whose flag's default value is changed.
+	// command refers to a command whose option's default value is changed.
 	Command string `json:"command"`
-	// flags is a list of flags storing different default values.
+	// options is a list of options storing different default values.
 	// +listType=atomic
-	Options []CommandOptionDefault `json:"flags"`
+	Options []CommandOptionDefault `json:"options"`
 }
 
 // CommandOptionDefault stores the name and the specified default
 // value of an option.
 type CommandOptionDefault struct {
-	// Flag name (long form, without dashes).
+	// Option name (long form, without dashes).
 	Name string `json:"name"`
 
 	// In a string format of a default value. It will be parsed
-	// by kubectl to the compatible value of the flag.
+	// by kubectl to the compatible value of the option.
 	Default string `json:"default"`
 }
