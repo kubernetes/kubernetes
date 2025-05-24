@@ -888,6 +888,11 @@ func NewNodeAllocatableStrategy(nodeAllocatable map[v1.ResourceName]string, csiN
 
 func (s *NodeAllocatableStrategy) PreparePatch(node *v1.Node) []byte {
 	newNode := node.DeepCopy()
+
+	if newNode.Status.Allocatable == nil {
+		newNode.Status.Allocatable = make(v1.ResourceList)
+	}
+
 	for name, value := range s.NodeAllocatable {
 		newNode.Status.Allocatable[name] = resource.MustParse(value)
 	}
