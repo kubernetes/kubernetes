@@ -52,6 +52,10 @@ type Config struct {
 	version  string
 }
 
+func (i Config) String() string {
+	return fmt.Sprintf("registry: %s, name: %s, version: %s", i.registry, i.name, i.version)
+}
+
 // SetRegistry sets an image registry in a Config struct
 func (i *Config) SetRegistry(registry string) {
 	i.registry = registry
