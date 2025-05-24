@@ -209,9 +209,10 @@ func TestValidateStatefulSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -235,7 +236,9 @@ func TestValidateStatefulSet(t *testing.T) {
 						ContainerPort: 12345,
 						Protocol:      api.ProtocolTCP,
 					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
 				}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -253,6 +256,36 @@ func TestValidateStatefulSet(t *testing.T) {
 		},
 	}
 
+	podTemplateWithVolumeMounts := api.PodTemplate{
+		Template: api.PodTemplateSpec{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: validLabels,
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					HostNetwork: true,
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+				Containers: []api.Container{{
+					Name:            "abc",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					Ports: []api.ContainerPort{{
+						ContainerPort: 12345,
+						Protocol:      api.ProtocolTCP,
+					}},
+					VolumeMounts: []api.VolumeMount{{
+						Name:      "test",
+						MountPath: "/test",
+					}},
+					TerminationMessagePolicy: api.TerminationMessageReadFile,
+				}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
+			},
+		},
+	}
+
 	invalidTime := int64(60)
 	invalidPodTemplate2 := api.PodTemplate{
 		Template: api.PodTemplateSpec{
@@ -260,9 +293,10 @@ func TestValidateStatefulSet(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy:         api.RestartPolicyAlways,
-				DNSPolicy:             api.DNSClusterFirst,
-				ActiveDeadlineSeconds: &invalidTime,
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				ActiveDeadlineSeconds:         &invalidTime,
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -317,6 +351,19 @@ func TestValidateStatefulSet(t *testing.T) {
 			tweakReplicas(3),
 			tweakOrdinalsStart(2),
 		),
+	}, {
+		name: "missing volume in pod volumeMounts",
+		set: mkStatefulSet(&podTemplateWithVolumeMounts,
+			tweakPVCTemplate(api.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+				Spec: api.PersistentVolumeClaimSpec{
+					Resources: api.VolumeResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceStorage: resource.MustParse("1Gi"),
+						},
+					},
+				},
+			})),
 	},
 	}
 
@@ -407,6 +454,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		set:  mkStatefulSet(&validPodTemplate, tweakTemplateRestartPolicy("")),
 		errs: field.ErrorList{
 			field.NotSupported[string](field.NewPath("spec", "template", "spec", "restartPolicy"), nil, nil),
+			field.Required(field.NewPath("spec", "template", "spec", "restartPolicy"), ""),
 		},
 	}, {
 		name: "invalid update strategy",
@@ -465,6 +513,7 @@ func TestValidateStatefulSet(t *testing.T) {
 		set:  mkStatefulSet(&invalidPodTemplate2, tweakReplicas(3)),
 		errs: field.ErrorList{
 			field.Forbidden(field.NewPath("spec", "template", "spec", "activeDeadlineSeconds"), ""),
+			field.Required(field.NewPath("spec", "template", "spec", "containers"), ""),
 		},
 	}, {
 		name: "empty PersistentVolumeClaimRetentionPolicy",
@@ -534,6 +583,12 @@ func TestValidateStatefulSet(t *testing.T) {
 		errs: field.ErrorList{
 			field.Invalid(field.NewPath("spec", "serviceName"), "Invalid.Name", ""),
 		},
+	}, {
+		name: "missing volume in pod volumeMounts",
+		set:  mkStatefulSet(&podTemplateWithVolumeMounts),
+		errs: field.ErrorList{
+			field.NotFound(field.NewPath("spec", "template", "spec", "containers[0].volumeMounts[0].name"), "test"),
+		},
 	},
 	}
 
@@ -566,9 +621,10 @@ func generateStatefulSetSpec(minSeconds int32) *apps.StatefulSetSpec {
 				Labels: labels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -758,9 +814,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Labels: validLabels,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -770,9 +827,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 				Labels: validLabels2,
 			},
 			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-				Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:                 api.RestartPolicyAlways,
+				DNSPolicy:                     api.DNSClusterFirst,
+				Containers:                    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile}},
+				TerminationGracePeriodSeconds: ptr.To[int64](30),
 			},
 		},
 	}
@@ -815,7 +873,7 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 
 	addContainersValidTemplate := validPodTemplate.DeepCopy()
 	addContainersValidTemplate.Template.Spec.Containers = append(addContainersValidTemplate.Template.Spec.Containers,
-		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent"})
+		api.Container{Name: "def", Image: "image2", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: api.TerminationMessageReadFile})
 	if len(addContainersValidTemplate.Template.Spec.Containers) != len(validPodTemplate.Template.Spec.Containers)+1 {
 		t.Errorf("failure during test setup: template %v should have more containers than template %v", addContainersValidTemplate, validPodTemplate)
 	}
