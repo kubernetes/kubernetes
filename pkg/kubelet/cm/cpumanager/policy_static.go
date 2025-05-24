@@ -338,6 +338,12 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 		}
 	}()
 
+	if cpuset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
+		p.updateCPUsToReuse(pod, container, cpuset)
+		klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
+		return nil
+	}
+
 	if p.options.FullPhysicalCPUsOnly {
 		if (numCPUs % p.cpuGroupSize) != 0 {
 			// Since CPU Manager has been enabled requesting strict SMT alignment, it means a guaranteed pod can only be admitted
@@ -370,11 +376,6 @@ func (p *staticPolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Contai
 				CausedByPhysicalCPUs:  true,
 			}
 		}
-	}
-	if cset, ok := s.GetCPUSet(string(pod.UID), container.Name); ok {
-		p.updateCPUsToReuse(pod, container, cset)
-		klog.InfoS("Static policy: container already present in state, skipping", "pod", klog.KObj(pod), "containerName", container.Name)
-		return nil
 	}
 
 	// Call Topology Manager to get the aligned socket affinity across all hint providers.
