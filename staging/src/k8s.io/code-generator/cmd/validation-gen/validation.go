@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -249,7 +250,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 			return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
 		}
 	case types.Pointer:
-		pointee := validators.NativeType(t.Elem)
+		pointee := util.NativeType(t.Elem)
 		switch pointee.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): pointers to pointers are not supported", fldPath.String(), t)
@@ -261,23 +262,23 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	case types.Array:
 		return nil, fmt.Errorf("field %s (%s): fixed-size arrays are not supported", fldPath.String(), t)
 	case types.Slice:
-		elem := validators.NativeType(t.Elem)
+		elem := util.NativeType(t.Elem)
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): lists of pointers are not supported", fldPath.String(), t)
 		case types.Slice:
-			if validators.NativeType(elem.Elem) != types.Byte {
+			if util.NativeType(elem.Elem) != types.Byte {
 				return nil, fmt.Errorf("field %s (%s): lists of lists are not supported", fldPath.String(), t)
 			}
 		case types.Map:
 			return nil, fmt.Errorf("field %s (%s): lists of maps are not supported", fldPath.String(), t)
 		}
 	case types.Map:
-		key := validators.NativeType(t.Key)
+		key := util.NativeType(t.Key)
 		if key != types.String {
 			return nil, fmt.Errorf("field %s (%s): maps with non-string keys are not supported", fldPath.String(), t)
 		}
-		elem := validators.NativeType(t.Elem)
+		elem := util.NativeType(t.Elem)
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
@@ -585,7 +586,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 		}
 
 		// Handle non-included types.
-		switch validators.NonPointer(childType).Kind {
+		switch util.NonPointer(childType).Kind {
 		case types.Struct, types.Alias:
 			if child.node == nil { // a non-included type
 				if !child.fieldValidations.OpaqueType {
@@ -810,7 +811,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 			"safe":      mkSymbolArgs(c, safePkgSymbols),
 			"context":   mkSymbolArgs(c, contextPkgSymbols),
 		}
-		if !validators.IsNilableType(rootType) {
+		if !util.IsNilableType(rootType) {
 			targs["typePfx"] = "*"
 		}
 
@@ -877,7 +878,7 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 		"context":    mkSymbolArgs(c, contextPkgSymbols),
 		"objTypePfx": "*",
 	}
-	if validators.IsNilableType(t) {
+	if util.IsNilableType(t) {
 		targs["objTypePfx"] = ""
 	}
 
@@ -1117,7 +1118,7 @@ func emitRatchetingCheck(c *generator.Context, t *types.Type, sw *generator.Snip
 		"operation": mkSymbolArgs(c, operationPkgSymbols),
 	}
 	// If the type is a builtin, we can use a simpler equality check when they are not nil.
-	if validators.IsDirectComparable(validators.NonPointer(validators.NativeType(t))) {
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(t))) {
 		// We should never get anything but pointers here, since every other
 		// nilable type is not Comparable.
 		//
@@ -1349,7 +1350,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 				"objType":    v.ObjType,
 				"objTypePfx": "*",
 			}
-			if validators.IsNilableType(v.ObjType) {
+			if util.IsNilableType(v.ObjType) {
 				targs["objTypePfx"] = ""
 			}
 
@@ -1471,7 +1472,7 @@ func getLeafTypeAndPrefixes(inType *types.Type) (*types.Type, string, string) {
 		nPtrs++
 		leafType = leafType.Elem
 	}
-	if !validators.IsNilableType(leafType) {
+	if !util.IsNilableType(leafType) {
 		typePfx = "*"
 		if nPtrs == 0 {
 			exprPfx = "&"

@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -60,7 +61,7 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := NonPointer(NativeType(context.Type)); t != types.String {
+	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
@@ -116,7 +117,7 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	var result Validations
 
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	if t := NativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
+	if t := util.NativeType(context.Type); t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
 
@@ -171,7 +172,7 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := NonPointer(NativeType(context.Type)); !types.IsInteger(t) {
+	if t := util.NonPointer(util.NativeType(context.Type)); !types.IsInteger(t) {
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
