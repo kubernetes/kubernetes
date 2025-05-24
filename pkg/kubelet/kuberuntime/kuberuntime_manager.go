@@ -304,7 +304,9 @@ func NewKubeGenericRuntimeManager(
 			return nil, nil, fmt.Errorf("failed to setup the FSPullRecordsAccessor: %w", err)
 		}
 
-		imagePullManager, err = imagepullmanager.NewImagePullManager(ctx, fsRecordAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, ptr.Deref(maxParallelImagePulls, 0))
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(fsRecordAccessor)
+
+		imagePullManager, err = imagepullmanager.NewImagePullManager(ctx, memCacheRecordsAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, ptr.Deref(maxParallelImagePulls, 0))
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create image pull manager: %w", err)
 		}
