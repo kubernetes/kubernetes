@@ -132,9 +132,13 @@ container: .container-${OS}-$(ARCH)
 		-t $(IMAGE):$(TAG)-${OS}-$(ARCH) --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) .
 	touch $@
 
+.container-windows-$(ARCH): SHELL:=/bin/bash
 .container-windows-$(ARCH): $(foreach binary, ${BIN}, bin/${binary}-${OS}-${ARCH})
+	declare -A tagToKernelVersionMap=( ['1809']='17763' ['ltsc2022']='20348' ); \
+	kernel_version=$${tagToKernelVersionMap[$$OSVERSION]}; \
+	kernel_version_image_name=$$(./make-pause-windows.sh ${BASE.windows} $$kernel_version); \
 	docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
-		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=${BASE}-windows-${OSVERSION}-${ARCH} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
+    		-t $(IMAGE):$(TAG)-${OS}-$(ARCH)-${OSVERSION} --build-arg BASE=$${kernel_version_image_name} --build-arg ARCH=$(ARCH) -f Dockerfile_windows .
 	touch $@
 
 # Useful for testing, not automatically included in container image
