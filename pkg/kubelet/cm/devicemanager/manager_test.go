@@ -1072,9 +1072,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		if testCase.expectedContainerOptsLen == nil {
 			as.Nil(runContainerOpts)
 		} else {
-			as.Equal(len(runContainerOpts.Devices), testCase.expectedContainerOptsLen[0])
-			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
-			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
+			as.Len(runContainerOpts.Devices, testCase.expectedContainerOptsLen[0])
+			as.Len(runContainerOpts.Mounts, testCase.expectedContainerOptsLen[1])
+			as.Len(runContainerOpts.Envs, testCase.expectedContainerOptsLen[2])
 		}
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
