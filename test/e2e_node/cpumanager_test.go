@@ -175,7 +175,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: cpuset.CPUSet{},
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
 				{
@@ -199,7 +199,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
 				{
@@ -224,7 +224,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			podGu := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -280,7 +280,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -315,7 +315,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -349,7 +349,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -384,7 +384,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -427,7 +427,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -471,7 +471,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
@@ -514,7 +514,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			pod1 := makeCPUManagerPod("gu-pod-1", []ctnAttribute{
 				{
@@ -568,7 +568,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				options: map[string]string{
 					cpumanager.StrictCPUReservationOption: "true",
 				},
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
 				{
@@ -597,7 +597,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				options: map[string]string{
 					cpumanager.StrictCPUReservationOption: "true",
 				},
-			}))
+			}, false, false))
 
 			pod := makeCPUManagerPod("non-gu-pod", []ctnAttribute{
 				{
@@ -623,7 +623,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				options: map[string]string{
 					cpumanager.StrictCPUReservationOption: "true",
 				},
-			}))
+			}, false, false))
 
 			cpuCount := 1
 
@@ -683,7 +683,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				options: map[string]string{
 					cpumanager.FullPCPUsOnlyOption: "true",
 				},
-			}))
+			}, false, false))
 			cpuDetails = cpuDetailsFromNode(localNode)
 		})
 
@@ -779,7 +779,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.FullPCPUsOnlyOption:        "true",
 						cpumanager.StrictCPUReservationOption: "true",
 					},
-				}))
+				}, false, false))
 				cpuDetails := cpuDetailsFromNode(localNode)
 
 				// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
@@ -825,7 +825,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.FullPCPUsOnlyOption:        "true",
 						cpumanager.StrictCPUReservationOption: "true",
 					},
-				}))
+				}, false, false))
 				cpuDetails := cpuDetailsFromNode(localNode)
 
 				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
@@ -889,7 +889,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.FullPCPUsOnlyOption:            "true",
 						cpumanager.DistributeCPUsAcrossNUMAOption: "false",
 					},
-				}))
+				}, false, false))
 				cpuDetails := cpuDetailsFromNode(localNode)
 
 				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
@@ -940,7 +940,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.FullPCPUsOnlyOption:            "true",
 						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
 					},
-				}))
+				}, false, false))
 				cpuDetails := cpuDetailsFromNode(localNode)
 
 				// our tests want to allocate a full core, so we need at least 2*2=4 virtual cpus
@@ -1004,7 +1004,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				policyName:                       string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:               reservedCPUs,
 				disableCPUQuotaWithExclusiveCPUs: true,
-			}))
+			}, false, false))
 		})
 
 		ginkgo.It("should enforce for best-effort pod", func(ctx context.Context) {
@@ -1152,7 +1152,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
-			}))
+			}, false, false))
 
 			var containerRestartPolicyAlways = v1.ContainerRestartPolicyAlways
 
