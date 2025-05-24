@@ -134,6 +134,11 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 			newSS.Spec.Ordinals = nil
 		}
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+		if oldSS == nil || oldSS.Spec.VolumeClaimUpdatePolicy == "" {
+			newSS.Spec.VolumeClaimUpdatePolicy = ""
+		}
+	}
 }
 
 // Validate validates a new StatefulSet.

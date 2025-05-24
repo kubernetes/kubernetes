@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -25,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -34,7 +36,10 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
+
+const fieldManager = "statefulset-controller"
 
 // StatefulPodControlObjectManager abstracts the manipulation of Pods and PVCs. The real controller implements this
 // with a clientset for writes and listers for reads; for tests we provide stubs.
@@ -44,6 +49,7 @@ type StatefulPodControlObjectManager interface {
 	UpdatePod(pod *v1.Pod) error
 	DeletePod(pod *v1.Pod) error
 	CreateClaim(claim *v1.PersistentVolumeClaim) error
+	ApplyClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error)
 	GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error)
 	UpdateClaim(claim *v1.PersistentVolumeClaim) error
 }
@@ -101,6 +107,24 @@ func (om *realStatefulPodControlObjectManager) DeletePod(pod *v1.Pod) error {
 func (om *realStatefulPodControlObjectManager) CreateClaim(claim *v1.PersistentVolumeClaim) error {
 	_, err := om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(context.TODO(), claim, metav1.CreateOptions{})
 	return err
+}
+
+func (om *realStatefulPodControlObjectManager) ApplyClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+	claim.TypeMeta = metav1.TypeMeta{
+		Kind:       "PersistentVolumeClaim",
+		APIVersion: "v1",
+	}
+	patch, err := json.Marshal(claim)
+	if err != nil {
+		return nil, err
+	}
+	return om.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Patch(
+		ctx, claim.Name, types.ApplyPatchType, patch,
+		metav1.PatchOptions{
+			FieldManager: fieldManager,
+			Force:        ptr.To(true),
+		},
+	)
 }
 
 func (om *realStatefulPodControlObjectManager) GetClaim(namespace, claimName string) (*v1.PersistentVolumeClaim, error) {
@@ -285,6 +309,37 @@ func (spc *StatefulPodControl) PodClaimIsStale(set *apps.StatefulSet, pod *v1.Po
 	return false, nil
 }
 
+// readyForUpdate returns true if the updated pod is ready and the rollout should continue.
+func (spc *StatefulPodControl) readyForUpdate(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) (bool, error) {
+	logger := klog.FromContext(ctx)
+	if !isHealthy(pod) {
+		logger.V(4).Info("StatefulSet is waiting for Pod to update",
+			"statefulSet", klog.KObj(set), "pod", klog.KObj(pod))
+		return false, nil
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+		ordinal := getOrdinal(pod)
+		templates := set.Spec.VolumeClaimTemplates
+		for i := range templates {
+			claimName := getPersistentVolumeClaimName(set, &templates[i], ordinal)
+			claim, err := spc.objectMgr.GetClaim(set.Namespace, claimName)
+			switch {
+			case apierrors.IsNotFound(err):
+				return false, nil
+			case err != nil:
+				return false, fmt.Errorf("could not retrieve claim %s for %s when checking PVC compatibility", claimName, pod.Name)
+			default:
+				if !isClaimCampatible(claim, &templates[i]) {
+					logger.V(4).Info("StatefulSet is waiting for PVC to be compatible",
+						"statefulSet", klog.KObj(set), "PVC", klog.KObj(claim))
+					return false, nil
+				}
+			}
+		}
+	}
+	return true, nil
+}
+
 // recordPodEvent records an event for verb applied to a Pod in a StatefulSet. If err is nil the generated event will
 // have a reason of v1.EventTypeNormal. If err is not nil the generated event will have a reason of v1.EventTypeWarning.
 func (spc *StatefulPodControl) recordPodEvent(verb string, set *apps.StatefulSet, pod *v1.Pod, err error) {
@@ -320,8 +375,14 @@ func (spc *StatefulPodControl) recordClaimEvent(verb string, set *apps.StatefulS
 
 // createMissingPersistentVolumeClaims creates all of the required PersistentVolumeClaims for pod, and updates its retention policy
 func (spc *StatefulPodControl) createMissingPersistentVolumeClaims(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod) error {
-	if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
-		return err
+	if utilfeature.DefaultFeatureGate.Enabled(features.UpdateVolumeClaimTemplate) {
+		if err := spc.applyPersistentVolumeClaims(ctx, set, pod, true); err != nil {
+			return err
+		}
+	} else {
+		if err := spc.createPersistentVolumeClaims(set, pod); err != nil {
+			return err
+		}
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
@@ -360,6 +421,40 @@ func (spc *StatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSe
 			}
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
+	}
+	return errorutils.NewAggregate(errs)
+}
+
+// applyPersistentVolumeClaims creates/updates all of the required PersistentVolumeClaims for pod, which must be a member of
+// set. If all of the claims for Pod are successfully applied, the returned error is nil. If failed, this method
+// may be called again until no error is returned, indicating the PersistentVolumeClaims for pod are consistent with
+// set's Spec.
+func (spc *StatefulPodControl) applyPersistentVolumeClaims(ctx context.Context, set *apps.StatefulSet, pod *v1.Pod, create bool) error {
+	var errs []error
+	for _, template := range getPersistentVolumeClaims(set, pod) {
+		claim, err := spc.objectMgr.GetClaim(template.Namespace, template.Name)
+		switch {
+		case apierrors.IsNotFound(err):
+			if !create {
+				continue
+			}
+		case err != nil:
+			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", template.Name, err))
+			spc.recordClaimEvent("create", set, pod, &template, err)
+			continue
+		case claim.DeletionTimestamp != nil:
+			errs = append(errs, fmt.Errorf("pvc %s is being deleted", template.Name))
+			continue
+		default:
+			if create {
+				continue
+			}
+			prepareClaimApplyPatch(claim, &template)
+		}
+		_, err = spc.objectMgr.ApplyClaim(ctx, &template)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("failed to apply PVC %s: %s", claim.Name, err))
+		}
 	}
 	return errorutils.NewAggregate(errs)
 }

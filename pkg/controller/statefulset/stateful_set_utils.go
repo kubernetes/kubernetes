@@ -465,11 +465,6 @@ func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
 	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
-// isCreated returns true if pod has been created and is maintained by the API server
-func isCreated(pod *v1.Pod) bool {
-	return pod.Status.Phase != ""
-}
-
 // isPending returns true if pod has a Phase of PodPending
 func isPending(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodPending
@@ -493,6 +488,28 @@ func isTerminating(pod *v1.Pod) bool {
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *v1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
+}
+
+// isClaimCampatible returns true if the claim is compatible with the template and should not block rollout.
+func isClaimCampatible(claim *v1.PersistentVolumeClaim, template *v1.PersistentVolumeClaim) bool {
+	req := template.Spec.Resources.Requests["storage"]
+	cap := claim.Status.Capacity["storage"]
+	return req.Cmp(cap) <= 0
+}
+
+// prepareClaimApplyPatch modifies template in-place to be a server-side apply patch.
+func prepareClaimApplyPatch(claim *v1.PersistentVolumeClaim, template *v1.PersistentVolumeClaim) {
+	req := template.Spec.Resources.Requests["storage"]
+	minSize := claim.Spec.Resources.Requests["storage"]
+	if utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure) {
+		minSize = claim.Status.Capacity["storage"]
+	}
+	if req.Cmp(minSize) <= 0 {
+		// We do not shrink PVCs
+		template.Spec.Resources.Requests["storage"] = minSize
+	}
+	// We depends on the old size to set the new size, so add ResourceVersion to avoid conflict.
+	template.ResourceVersion = claim.ResourceVersion
 }
 
 // allowsBurst is true if the alpha burst annotation is set.
@@ -526,26 +543,21 @@ func newStatefulSetPod(set *apps.StatefulSet, ordinal int) *v1.Pod {
 	return pod
 }
 
-// newVersionedStatefulSetPod creates a new Pod for a StatefulSet. currentSet is the representation of the set at the
-// current revision. updateSet is the representation of the set at the updateRevision. currentRevision is the name of
-// the current revision. updateRevision is the name of the update revision. ordinal is the ordinal of the Pod. If the
-// returned error is nil, the returned Pod is valid.
-func newVersionedStatefulSetPod(currentSet, updateSet *apps.StatefulSet, currentRevision, updateRevision string, ordinal int) *v1.Pod {
-	if currentSet.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
-		(currentSet.Spec.UpdateStrategy.RollingUpdate == nil && ordinal < (getStartOrdinal(currentSet)+int(currentSet.Status.CurrentReplicas))) ||
-		(currentSet.Spec.UpdateStrategy.RollingUpdate != nil && ordinal < (getStartOrdinal(currentSet)+int(*currentSet.Spec.UpdateStrategy.RollingUpdate.Partition))) {
-		pod := newStatefulSetPod(currentSet, ordinal)
-		setPodRevision(pod, currentRevision)
-		return pod
+// chooseRevision choose the correct revison from c for creating the Pod and PVCs for
+// the i-th valid replica (at oridnal getStartOrdinal(set) + i).
+func chooseRevision(c *updateContext, i int) (*apps.StatefulSet, string) {
+	curr := c.currentSet
+	if curr.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
+		(curr.Spec.UpdateStrategy.RollingUpdate == nil && i < int(curr.Status.CurrentReplicas)) ||
+		(curr.Spec.UpdateStrategy.RollingUpdate != nil && i < int(*curr.Spec.UpdateStrategy.RollingUpdate.Partition)) {
+		return curr, c.currentRevision
 	}
-	pod := newStatefulSetPod(updateSet, ordinal)
-	setPodRevision(pod, updateRevision)
-	return pod
+	return c.updateSet, c.updateRevision
 }
 
 // getPatch returns a strategic merge patch that can be applied to restore a StatefulSet to a
 // previous version. If the returned error is nil the patch is valid. The current state that we save is just the
-// PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
+// spec.template and spec.volumeClaimTemplates. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getPatch(set *apps.StatefulSet) ([]byte, error) {
 	data, err := runtime.Encode(patchCodec, set)
@@ -560,9 +572,17 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
+
 	template := spec["template"].(map[string]interface{})
 	specCopy["template"] = template
 	template["$patch"] = "replace"
+
+	if set.Spec.VolumeClaimUpdatePolicy != "" {
+		// This means the StatefulSet is updated at least once since the UpdateVolumeClaimTemplate is enabled.
+		// This is an atomic typed list
+		specCopy["volumeClaimTemplates"] = spec["volumeClaimTemplates"]
+	}
+
 	objCopy["spec"] = specCopy
 	patch, err := json.Marshal(objCopy)
 	return patch, err
