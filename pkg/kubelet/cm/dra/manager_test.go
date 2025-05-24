@@ -199,7 +199,8 @@ func TestNewManagerImpl(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory, "worker")
+			tCtx := ktesting.Init(t)
+			manager, err := NewManagerImpl(tCtx.Logger(), kubeClient, test.stateFileDirectory, "worker")
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -363,7 +364,8 @@ func TestGetResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
+			tCtx := ktesting.Init(t)
+			manager, err := NewManagerImpl(tCtx.Logger(), kubeClient, t.TempDir(), "worker")
 			require.NoError(t, err)
 
 			if test.claimInfo != nil {
@@ -558,7 +560,7 @@ func TestPrepareResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("failed to newClaimInfoCache, err:%v", err)
 			}
@@ -709,7 +711,7 @@ func TestUnprepareResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
 			}
@@ -772,9 +774,10 @@ func TestUnprepareResources(t *testing.T) {
 }
 
 func TestPodMightNeedToUnprepareResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	fakeKubeClient := fake.NewSimpleClientset()
 
-	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+	cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), draManagerStateFileName)
 	if err != nil {
 		t.Fatalf("failed to newClaimInfoCache, err:%v", err)
 	}
@@ -855,7 +858,8 @@ func TestGetContainerClaimInfos(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+			tCtx := ktesting.Init(t)
+			cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), draManagerStateFileName)
 			if err != nil {
 				t.Fatalf("error occur:%v", err)
 			}
@@ -903,7 +907,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	defer plg.DeRegisterPlugin(driverName, draServerInfo.socketName)
 
 	// Create ClaimInfo cache
-	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+	cache, err := newClaimInfoCache(tCtx.Logger(), t.TempDir(), draManagerStateFileName)
 	if err != nil {
 		t.Errorf("failed to newClaimInfoCache, err: %+v", err)
 		return
