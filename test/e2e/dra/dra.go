@@ -25,10 +25,12 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/onsi/gomega/types"
 
@@ -1783,6 +1785,85 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}).Should(gomega.MatchError(gomega.ContainSubstring("exceeded quota: object-count, requested: count/resourceclaims.resource.k8s.io=1, used: count/resourceclaims.resource.k8s.io=1, limited: count/resourceclaims.resource.k8s.io=1")), "creating second claim not allowed")
 		})
 
+		ginkgo.It("supports count/configmaps ResourceQuota", func(ctx context.Context) {
+			object := &v1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "configmap-",
+					Namespace:    f.Namespace.Name,
+				},
+			}
+			resourceName := "count/configmaps"
+			limit := resource.MustParse("100")
+			quota := &v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "object-count",
+					Namespace: f.Namespace.Name,
+				},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{v1.ResourceName(resourceName): limit},
+				},
+			}
+			quota, err := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "create resource quota")
+
+			// Create one object until we are sure that the kube-apiserver has observed and enforced
+			// the new ResourceQuota.
+			beManagedByKubeAPIServer := GomegaObject(gomega.HaveField("ObjectMeta.ManagedFields", gomega.ContainElement(gomega.HaveField("Manager", gomega.Equal("kube-apiserver")))))
+			gomega.Eventually(ctx, func(ctx context.Context) (*v1.ResourceQuota, error) {
+				_, err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, object, metav1.CreateOptions{})
+				if err != nil {
+					return nil, err
+				}
+				quota, err := f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get(ctx, quota.Name, metav1.GetOptions{})
+				return quota, err
+			}).Should(beManagedByKubeAPIServer, "kube-apiserver should have bumped up the status.used value during admission.")
+
+			// Delete all of them again.
+			err = f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			// Create too many objects in parallel.
+			var forbidden atomic.Int32
+			var wg sync.WaitGroup
+			for i := int64(0); i <= limit.Value(); i++ {
+				wg.Add(1)
+				go func() {
+					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
+
+					_, err := f.ClientSet.CoreV1().ConfigMaps(f.Namespace.Name).Create(ctx, object, metav1.CreateOptions{})
+					switch {
+					case err == nil:
+						// okay
+					case apierrors.IsForbidden(err):
+						forbidden.Add(1)
+					default:
+						framework.ExpectNoError(err, "Creating additional ResourceClaim failed.")
+					}
+				}()
+			}
+			wg.Wait()
+
+			// Maybe more than one if the deletion has not been accounted for in time.
+			gomega.Expect(forbidden.Load()).To(gomega.BeNumerically(">=", int32(1)), "At least one create should have failed because quota was exceeded.")
+
+			// Eventually the quota status should consider the existing claims and then not be changed further.
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
+				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(v1.ResourceQuotaStatus{
+						Hard: v1.ResourceList{v1.ResourceName(resourceName): limit},
+						Used: v1.ResourceList{v1.ResourceName(resourceName): limit},
+					})})))
+			gomega.Consistently(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
+				WithTimeout(10 * time.Second).
+				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(v1.ResourceQuotaStatus{
+						Hard: v1.ResourceList{v1.ResourceName(resourceName): limit},
+						Used: v1.ResourceList{v1.ResourceName(resourceName): limit},
+					})})))
+
+		})
+
 		f.It("DaemonSet with admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			// Ensure namespace has the dra admin label.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
@@ -2772,4 +2853,39 @@ func toDriverResources(counters []resourceapi.CounterSet, devices ...resourceapi
 			},
 		}
 	}
+}
+
+// GomegaObject returns a matcher which appends a full dump of the actual value
+// to the failure of the matcher that it wraps. This is useful e.g. for
+// gomega.HaveField which otherwise only generates a message containing
+// the field that it is checking, but not the object in which that field occurs.
+func GomegaObject(shouldMatch types.GomegaMatcher) types.GomegaMatcher {
+	return &gomegaObjectMatcher{
+		shouldMatch: shouldMatch,
+	}
+}
+
+type gomegaObjectMatcher struct {
+	shouldMatch types.GomegaMatcher
+}
+
+func (m *gomegaObjectMatcher) Match(actual interface{}) (success bool, err error) {
+	return m.shouldMatch.Match(actual)
+}
+
+func (m *gomegaObjectMatcher) FailureMessage(actual interface{}) (message string) {
+	return m.withDump(actual, m.shouldMatch.FailureMessage(actual))
+}
+
+func (m *gomegaObjectMatcher) NegatedFailureMessage(actual interface{}) (message string) {
+	return m.withDump(actual, m.shouldMatch.NegatedFailureMessage(actual))
+}
+
+func (m *gomegaObjectMatcher) withDump(actual any, message string) string {
+	dump := format.Object(actual, 1)
+	if !strings.HasSuffix(message, "\n") {
+		message += "\n"
+	}
+	message += fmt.Sprintf("\nFull object:\n%s", dump)
+	return message
 }
