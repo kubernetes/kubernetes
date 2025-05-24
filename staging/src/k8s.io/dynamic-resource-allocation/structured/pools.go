@@ -58,6 +58,15 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 			continue
 		}
 
+		// Don't include the slice if it has shared counters that uses mixins.
+		if !features.ResourceSliceMixins {
+			for _, counterSet := range slice.Spec.SharedCounters {
+				if len(counterSet.Includes) > 0 {
+					continue
+				}
+			}
+		}
+
 		switch {
 		case slice.Spec.NodeName != "" || slice.Spec.AllNodes || slice.Spec.NodeSelector != nil:
 			match, err := nodeMatches(node, slice.Spec.NodeName, slice.Spec.AllNodes, slice.Spec.NodeSelector)
