@@ -11,6 +11,46 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 <!-- Released section -->
 <!-- Don't change this section unless doing release -->
 
+## [1.35.0/0.57.0/0.11.0] 2025-03-05
+
+This release is the last to support [Go 1.22].
+The next release will require at least [Go 1.23].
+
+### Added
+
+- Add `ValueFromAttribute` and `KeyValueFromAttribute` in `go.opentelemetry.io/otel/log`. (#6180)
+- Add `EventName` and `SetEventName` to `Record` in `go.opentelemetry.io/otel/log`. (#6187)
+- Add `EventName` to `RecordFactory` in `go.opentelemetry.io/otel/log/logtest`. (#6187)
+- `AssertRecordEqual` in `go.opentelemetry.io/otel/log/logtest` checks `Record.EventName`. (#6187)
+- Add `EventName` and `SetEventName` to `Record` in `go.opentelemetry.io/otel/sdk/log`. (#6193)
+- Add `EventName` to `RecordFactory` in `go.opentelemetry.io/otel/sdk/log/logtest`. (#6193)
+- Emit `Record.EventName` field in `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc`. (#6211)
+- Emit `Record.EventName` field in `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp`. (#6211)
+- Emit `Record.EventName` field in `go.opentelemetry.io/otel/exporters/stdout/stdoutlog` (#6210)
+- The `go.opentelemetry.io/otel/semconv/v1.28.0` package.
+  The package contains semantic conventions from the `v1.28.0` version of the OpenTelemetry Semantic Conventions.
+  See the [migration documentation](./semconv/v1.28.0/MIGRATION.md) for information on how to upgrade from `go.opentelemetry.io/otel/semconv/v1.27.0`(#6236)
+- The `go.opentelemetry.io/otel/semconv/v1.30.0` package.
+  The package contains semantic conventions from the `v1.30.0` version of the OpenTelemetry Semantic Conventions.
+  See the [migration documentation](./semconv/v1.30.0/MIGRATION.md) for information on how to upgrade from `go.opentelemetry.io/otel/semconv/v1.28.0`(#6240)
+- Document the pitfalls of using `Resource` as a comparable type.
+  `Resource.Equal` and `Resource.Equivalent` should be used instead. (#6272)
+- Support [Go 1.24]. (#6304)
+- Add `FilterProcessor` and `EnabledParameters` in `go.opentelemetry.io/otel/sdk/log`.
+  It replaces `go.opentelemetry.io/otel/sdk/log/internal/x.FilterProcessor`.
+  Compared to previous version it additionally gives the possibility to filter by resource and instrumentation scope. (#6317)
+
+### Changed
+
+- Update `github.com/prometheus/common` to `v0.62.0`, which changes the `NameValidationScheme` to `NoEscaping`.
+  This allows metrics names to keep original delimiters (e.g. `.`), rather than replacing with underscores.
+  This is controlled by the `Content-Type` header, or can be reverted by setting `NameValidationScheme` to `LegacyValidation` in `github.com/prometheus/common/model`. (#6198)
+
+### Fixes
+
+- Eliminate goroutine leak for the processor returned by `NewSimpleSpanProcessor` in `go.opentelemetry.io/otel/sdk/trace` when `Shutdown` is called and the passed `ctx` is canceled and `SpanExporter.Shutdown` has not returned. (#6368)
+- Eliminate goroutine leak for the processor returned by `NewBatchSpanProcessor` in `go.opentelemetry.io/otel/sdk/trace` when `ForceFlush` is called and the passed `ctx` is canceled and `SpanExporter.Export` has not returned. (#6369)
+
 ## [1.34.0/0.56.0/0.10.0] 2025-01-17
 
 ### Changed
@@ -3197,7 +3237,8 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
-[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.34.0...HEAD
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.35.0...HEAD
+[1.35.0/0.57.0/0.11.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.35.0
 [1.34.0/0.56.0/0.10.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.34.0
 [1.33.0/0.55.0/0.9.0/0.0.12]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.33.0
 [1.32.0/0.54.0/0.8.0/0.0.11]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.32.0
@@ -3288,6 +3329,7 @@ It contains api and sdk for trace and meter.
 
 <!-- Released section ended -->
 
+[Go 1.24]: https://go.dev/doc/go1.24
 [Go 1.23]: https://go.dev/doc/go1.23
 [Go 1.22]: https://go.dev/doc/go1.22
 [Go 1.21]: https://go.dev/doc/go1.21
