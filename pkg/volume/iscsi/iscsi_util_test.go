@@ -28,7 +28,7 @@ import (
 
 	testingexec "k8s.io/utils/exec/testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -414,7 +414,7 @@ func TestGetVolCount(t *testing.T) {
 		},
 		{
 			name:    "volumeDevices (block) volume",
-			baseDir: filepath.Join(baseDir, config.DefaultKubeletVolumeDevicesDirName),
+			baseDir: filepath.Join(baseDir, kubeletconfig.DefaultKubeletVolumeDevicesDirName),
 			portal:  "192.168.0.2:3260",
 			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1-lun-4",
 			count:   1,
@@ -451,8 +451,8 @@ func createFakePluginDirs() (string, error) {
 		"iface-127.0.0.1:3260:pv1/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3",
 		"iface-127.0.0.1:3260:pv2/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2",
 		"iface-127.0.0.1:3260:pv2/192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1",
-		filepath.Join(config.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4"),
-		filepath.Join(config.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5"),
+		filepath.Join(kubeletconfig.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4"),
+		filepath.Join(kubeletconfig.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5"),
 	}
 
 	for _, d := range subdirs {
