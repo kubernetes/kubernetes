@@ -98,7 +98,9 @@ func (collector *volumeStatsCollector) DescribeWithStability(ch chan<- *metrics.
 
 // CollectWithStability implements the metrics.StableCollector interface.
 func (collector *volumeStatsCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	ctx := context.Background()
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	ctx := context.TODO()
 	podStats, err := collector.statsProvider.ListPodStats(ctx)
 	if err != nil {
 		return
