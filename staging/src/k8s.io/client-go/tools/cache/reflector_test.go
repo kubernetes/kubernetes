@@ -2054,10 +2054,117 @@ func TestReflectorReplacesStoreOnUnsafeDelete(t *testing.T) {
 	}
 }
 
+func TestReflectorRespectStoreTransformer(t *testing.T) {
+	mkPod := func(id string, rv string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: id, ResourceVersion: rv},
+			Spec: v1.PodSpec{
+				Hostname: "test",
+			},
+		}
+	}
+
+	preExisting1 := mkPod("foo-1", "1")
+	preExisting2 := mkPod("foo-2", "2")
+	pod3 := mkPod("foo-3", "3")
+
+	lastExpectedRV := "3"
+	events := []watch.Event{
+		{Type: watch.Added, Object: preExisting1},
+		{Type: watch.Added, Object: preExisting2},
+		{Type: watch.Bookmark, Object: &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				ResourceVersion: lastExpectedRV,
+				Annotations: map[string]string{
+					metav1.InitialEventsAnnotationKey: "true",
+				},
+			},
+		}},
+		{Type: watch.Added, Object: pod3},
+	}
+
+	s := NewFIFO(MetaNamespaceKeyFunc)
+	var replaceInvoked atomic.Int32
+	store := &fakeStore{
+		Store: s,
+		beforeReplace: func(list []interface{}, rv string) {
+			replaceInvoked.Add(1)
+			// Only two pods are present at the point when Replace is called.
+			if len(list) != 2 {
+				t.Errorf("unexpected nb of objects: expected 2 received %d", len(list))
+			}
+			for _, obj := range list {
+				cast := obj.(*v1.Pod)
+				if cast.Spec.Hostname != "transformed" {
+					t.Error("Object was not transformed prior to replacement")
+				}
+			}
+		},
+		afterReplace: func(rv string, err error) {},
+		transformer: func(i interface{}) (interface{}, error) {
+			cast := i.(*v1.Pod)
+			cast.Spec.Hostname = "transformed"
+			return cast, nil
+		},
+	}
+
+	var once sync.Once
+	lw := &ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			fw := watch.NewFake()
+			go func() {
+				once.Do(func() {
+					for _, e := range events {
+						fw.Action(e.Type, e.Object)
+					}
+				})
+			}()
+			return fw, nil
+		},
+		// ListFunc should never be used in WatchList mode
+		ListFunc: nil,
+	}
+
+	r := NewReflector(lw, &v1.Pod{}, store, 0)
+	r.UseWatchList = ptr.To(true)
+	doneCh, stopCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(doneCh)
+		//nolint:logcheck // Intentionally uses the old API.
+		r.Run(stopCh)
+	}()
+
+	// wait for the RV to sync to the version returned by the final list
+	err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(ctx context.Context) (done bool, err error) {
+		if rv := r.LastSyncResourceVersion(); rv == lastExpectedRV {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Fatalf("reflector never caught up with expected revision: %q, err: %v", lastExpectedRV, err)
+	}
+
+	if want, got := lastExpectedRV, r.LastSyncResourceVersion(); want != got {
+		t.Errorf("expected LastSyncResourceVersion to be %q, but got: %q", want, got)
+	}
+	if want, got := 1, int(replaceInvoked.Load()); want != got {
+		t.Errorf("expected replace to be invoked %d times, but got: %d", want, got)
+	}
+
+	close(stopCh)
+	select {
+	case <-doneCh:
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for Run to return")
+	}
+}
+
 type fakeStore struct {
 	Store
 	beforeReplace func(list []interface{}, s string)
 	afterReplace  func(rv string, err error)
+	transformer   TransformFunc
 }
 
 func (f *fakeStore) Replace(list []interface{}, rv string) error {
@@ -2065,6 +2172,10 @@ func (f *fakeStore) Replace(list []interface{}, rv string) error {
 	err := f.Store.Replace(list, rv)
 	f.afterReplace(rv, err)
 	return err
+}
+
+func (f *fakeStore) Transformer() TransformFunc {
+	return f.transformer
 }
 
 func BenchmarkExtractList(b *testing.B) {
