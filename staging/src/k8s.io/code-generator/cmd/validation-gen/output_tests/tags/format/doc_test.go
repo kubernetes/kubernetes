@@ -27,57 +27,57 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
-		IPField:              "1.2.3.4",
-		IPPtrField:           ptr.To("1.2.3.4"),
-		IPTypedefField:       "1.2.3.4",
-		DNSLabelField:        "foo-bar",
-		DNSLabelPtrField:     ptr.To("foo-bar"),
-		DNSLabelTypedefField: "foo-bar",
+		IPField:               "1.2.3.4",
+		IPPtrField:            ptr.To("1.2.3.4"),
+		IPTypedefField:        "1.2.3.4",
+		ShortNameField:        "foo-bar",
+		ShortNamePtrField:     ptr.To("foo-bar"),
+		ShortNameTypedefField: "foo-bar",
 	}).ExpectValid()
 
 	st.Value(&Struct{
-		IPField:              "abcd::1234",
-		IPPtrField:           ptr.To("abcd::1234"),
-		IPTypedefField:       "abcd::1234",
-		DNSLabelField:        "1234",
-		DNSLabelPtrField:     ptr.To("1234"),
-		DNSLabelTypedefField: "1234",
+		IPField:               "abcd::1234",
+		IPPtrField:            ptr.To("abcd::1234"),
+		IPTypedefField:        "abcd::1234",
+		ShortNameField:        "1234",
+		ShortNamePtrField:     ptr.To("1234"),
+		ShortNameTypedefField: "1234",
 	}).ExpectValid()
 
 	invalidStruct := &Struct{
-		IPField:              "",
-		IPPtrField:           ptr.To(""),
-		IPTypedefField:       "",
-		DNSLabelField:        "",
-		DNSLabelPtrField:     ptr.To(""),
-		DNSLabelTypedefField: "",
+		IPField:               "",
+		IPPtrField:            ptr.To(""),
+		IPTypedefField:        "",
+		ShortNameField:        "",
+		ShortNamePtrField:     ptr.To(""),
+		ShortNameTypedefField: "",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
-		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
-		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
+		field.Invalid(field.NewPath("shortNamePtrField"), nil, "").WithOrigin("format=k8s-short-name"),
+		field.Invalid(field.NewPath("shortNameTypedefField"), nil, "").WithOrigin("format=k8s-short-name"),
 	})
 	// Test validation ratcheting
 	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()
 
 	invalidStruct = &Struct{
-		IPField:              "Not an IP",
-		IPPtrField:           ptr.To("Not an IP"),
-		IPTypedefField:       "Not an IP",
-		DNSLabelField:        "Not a DNS label",
-		DNSLabelPtrField:     ptr.To("Not a DNS label"),
-		DNSLabelTypedefField: "Not a DNS label",
+		IPField:               "Not an IP",
+		IPPtrField:            ptr.To("Not an IP"),
+		IPTypedefField:        "Not an IP",
+		ShortNameField:        "Not a ShortName",
+		ShortNamePtrField:     ptr.To("Not a ShortName"),
+		ShortNameTypedefField: "Not a ShortName",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
-		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
-		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("shortNameField"), nil, "").WithOrigin("format=k8s-short-name"),
+		field.Invalid(field.NewPath("shortNamePtrField"), nil, "").WithOrigin("format=k8s-short-name"),
+		field.Invalid(field.NewPath("shortNameTypedefField"), nil, "").WithOrigin("format=k8s-short-name"),
 	})
 	// Test validation ratcheting
 	st.Value(invalidStruct).OldValue(invalidStruct).ExpectValid()

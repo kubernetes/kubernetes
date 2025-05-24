@@ -34,25 +34,3 @@ func rootTypeString(src, dst *types.Type) string {
 	}
 	return src.String() + " -> " + dst.String()
 }
-
-// IsDirectComparable returns true if the type is safe to compare using "==".
-// It is similar to gengo.IsComparable, but it doesn't consider Pointers to be
-// comparable (we don't want shallow compare).
-func IsDirectComparable(t *types.Type) bool {
-	switch t.Kind {
-	case types.Builtin:
-		return true
-	case types.Struct:
-		for _, f := range t.Members {
-			if !IsDirectComparable(f.Type) {
-				return false
-			}
-		}
-		return true
-	case types.Array:
-		return IsDirectComparable(t.Elem)
-	case types.Alias:
-		return IsDirectComparable(t.Underlying)
-	}
-	return false
-}

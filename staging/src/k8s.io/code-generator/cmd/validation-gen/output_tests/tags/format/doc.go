@@ -42,7 +42,7 @@ type Struct struct {
 	// +k8s:format=k8s-short-name
 	DNSLabelPtrField *string `json:"dnsLabelPtrField"`
 
-	// +k8s:format=k8s-short-name
+	// Note: no validation here
 	DNSLabelTypedefField DNSLabelStringType `json:"dnsLabelTypedefField"`
 }
 

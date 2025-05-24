@@ -136,8 +136,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil
 			}
-			// call field-attached validations
-			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 			// call the type's validation function
 			errs = append(errs, Validate_DNSLabelStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
