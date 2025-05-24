@@ -502,12 +502,16 @@ func adjustCommit(c string) string {
 
 // adjustVersion strips "alpha", "beta", etc. from version in form
 // major.minor.patch-[alpha|beta|etc].
-func adjustVersion(v string) string {
+func adjustVersion(v string, versionOpts ...string) string {
 	if len(v) == 0 {
 		return "unknown"
 	}
 	seg := strings.SplitN(v, "-", 2)
-	return seg[0]
+	res := seg[0]
+	for _, o := range versionOpts {
+		res += "/" + o
+	}
+	return res
 }
 
 // adjustCommand returns the last component of the
@@ -527,10 +531,10 @@ func buildUserAgent(command, version, os, arch, commit string) string {
 }
 
 // DefaultKubernetesUserAgent returns a User-Agent string built from static global vars.
-func DefaultKubernetesUserAgent() string {
+func DefaultKubernetesUserAgent(versionOpts ...string) string {
 	return buildUserAgent(
 		adjustCommand(os.Args[0]),
-		adjustVersion(version.Get().GitVersion),
+		adjustVersion(version.Get().GitVersion, versionOpts...),
 		gruntime.GOOS,
 		gruntime.GOARCH,
 		adjustCommit(version.Get().GitCommit))
@@ -623,8 +627,8 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 	return nil, nil
 }
 
-func AddUserAgent(config *Config, userAgent string) *Config {
-	fullUserAgent := DefaultKubernetesUserAgent() + "/" + userAgent
+func AddUserAgent(config *Config, userAgent string, versionOpts ...string) *Config {
+	fullUserAgent := DefaultKubernetesUserAgent(versionOpts...) + "/" + userAgent
 	config.UserAgent = fullUserAgent
 	return config
 }

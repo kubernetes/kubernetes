@@ -309,8 +309,10 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 		return nil, err
 	}
 
+	c.ComponentGlobalsRegistry = o.ComponentGlobalsRegistry
+
 	// Prepare kube clients.
-	client, eventClient, err := createClients(c.KubeConfig)
+	client, eventClient, err := createClients(c.KubeConfig, c.ComponentGlobalsRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -337,7 +339,6 @@ func (o *Options) Config(ctx context.Context) (*schedulerappconfig.Config, error
 	dynClient := dynamic.NewForConfigOrDie(c.KubeConfig)
 	c.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, corev1.NamespaceAll, nil)
 	c.LeaderElection = leaderElectionConfig
-	c.ComponentGlobalsRegistry = o.ComponentGlobalsRegistry
 
 	return c, nil
 }
@@ -394,8 +395,10 @@ func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, 
 }
 
 // createClients creates a kube client and an event client from the given kubeConfig
-func createClients(kubeConfig *restclient.Config) (clientset.Interface, clientset.Interface, error) {
-	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler"))
+func createClients(kubeConfig *restclient.Config, componentRegistry basecompatibility.ComponentGlobalsRegistry) (clientset.Interface, clientset.Interface, error) {
+	effectiveVer := componentRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)
+	compatVersionInfo := fmt.Sprintf("%s=%s", "emulationVersion", effectiveVer.EmulationVersion())
+	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeConfig, "scheduler", compatVersionInfo))
 	if err != nil {
 		return nil, nil, err
 	}
