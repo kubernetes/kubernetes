@@ -38,18 +38,13 @@ type VersionValidationRunner func(t *testing.T, gv string, versionValidationErro
 //	      errs = append(errs, versionValidationErrors...) // generated declarative validation
 //		  // Validate that the errors are what was expected for this test case.
 //		})
-func RunValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options sets.Set[string], unversioned runtime.Object, fn VersionValidationRunner) {
-	runValidation(t, scheme, options, unversioned, fn)
+func RunValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options sets.Set[string], unversioned runtime.Object, fn VersionValidationRunner, subresources ...string) {
+	runValidation(t, scheme, options, unversioned, fn, subresources...)
 }
 
 // RunUpdateValidationForEachVersion is like RunValidationForEachVersion but for update validation.
-func RunUpdateValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options sets.Set[string], unversioned, unversionedOld runtime.Object, fn VersionValidationRunner) {
-	runUpdateValidation(t, scheme, options, unversioned, unversionedOld, fn)
-}
-
-// RunStatusValidationForEachVersion is like RunUpdateValidationForEachVersion but for status validation.
-func RunStatusValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options sets.Set[string], unversioned, unversionedOld runtime.Object, fn VersionValidationRunner) {
-	runUpdateValidation(t, scheme, options, unversioned, unversionedOld, fn, "status")
+func RunUpdateValidationForEachVersion(t *testing.T, scheme *runtime.Scheme, options sets.Set[string], unversioned, unversionedOld runtime.Object, fn VersionValidationRunner, subresources ...string) {
+	runUpdateValidation(t, scheme, options, unversioned, unversionedOld, fn, subresources...)
 }
 
 func runValidation(t *testing.T, scheme *runtime.Scheme, options sets.Set[string], unversioned runtime.Object, fn VersionValidationRunner, subresources ...string) {

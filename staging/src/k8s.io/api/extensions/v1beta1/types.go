@@ -27,6 +27,9 @@ import (
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
 	// +optional
+	// +k8s:optional
+	// +default=0
+	// +k8s:minimum=0
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 
@@ -54,6 +57,7 @@ type ScaleStatus struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.1
 // +k8s:prerelease-lifecycle-gen:deprecated=1.2
 // +k8s:prerelease-lifecycle-gen:removed=1.16
+// +k8s:isSubresource=/scale
 
 // represents a scaling request for a resource.
 type Scale struct {

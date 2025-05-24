@@ -38,6 +38,13 @@ const (
 	inputTagName          = "k8s:validation-gen-input"
 	schemeRegistryTagName = "k8s:validation-gen-scheme-registry" // defaults to k8s.io/apimachinery/pkg.runtime.Scheme
 	testFixtureTagName    = "k8s:validation-gen-test-fixture"    // if set, generate go test files for test fixtures.  Supported values: "validateFalse".
+
+	// name of the subresource that this type represents and can validate declaratively.
+	isSubresourceTagName = "k8s:isSubresource"
+
+	// name of a subresource that this type can validate declaratively, tag may be
+	// repeated to support multiple subresources.
+	supportsSubresourceTagName = "k8s:supportsSubresource"
 )
 
 var (
@@ -114,6 +121,43 @@ func schemeRegistryTag(pkg *types.Package) types.Name {
 		panic(fmt.Sprintf("Package %q contains more than one usage of %q", pkg.Path, schemeRegistryTagName))
 	}
 	return types.ParseFullyQualifiedName(values[0].Value)
+}
+
+func isSubresourceTag(t *types.Type) (string, bool) {
+	var comments []string
+	comments = append(comments, t.SecondClosestCommentLines...)
+	comments = append(comments, t.CommentLines...)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{isSubresourceTagName}, comments)
+	if err != nil {
+		klog.Fatalf("Failed to extract isSubresource tags: %v", err)
+	}
+	values, found := tags[isSubresourceTagName]
+	if !found || len(values) == 0 {
+		return "", false
+	}
+	if len(values) > 1 {
+		panic(fmt.Sprintf("Type %q contains more than one usage of %q", t.Name.String(), isSubresourceTagName))
+	}
+	return values[0].Value, true
+}
+
+func supportedSubresourceTags(t *types.Type) sets.Set[string] {
+	var comments []string
+	comments = append(comments, t.SecondClosestCommentLines...)
+	comments = append(comments, t.CommentLines...)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{supportsSubresourceTagName}, comments)
+	if err != nil {
+		klog.Fatalf("Failed to extract supportedSubresource tags: %v", err)
+	}
+	values, found := tags[supportsSubresourceTagName]
+	if !found || len(values) == 0 {
+		return sets.New[string]()
+	}
+	subresources := sets.New[string]()
+	for _, tag := range values {
+		subresources.Insert(tag.Value)
+	}
+	return subresources
 }
 
 var testFixtureTagValues = sets.New("validateFalse")

@@ -16,7 +16,11 @@ limitations under the License.
 
 package operation
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import (
+	"strings"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+)
 
 // Operation provides contextual information about a validation request and the API
 // operation being validated.
@@ -71,6 +75,15 @@ type Request struct {
 	// Field wiping logic is expected to be handled in resource strategies by
 	// modifying the incoming object before it is validated.
 	Subresources []string
+}
+
+// SubresourcePath returns the path is a slash-separated list of subresource
+// names. For example, `/status`, `/resize`, or `/x/y/z`.
+func (r Request) SubresourcePath() string {
+	if len(r.Subresources) == 0 {
+		return "/"
+	}
+	return "/" + strings.Join(r.Subresources, "/")
 }
 
 // Code is the request operation to be validated.
