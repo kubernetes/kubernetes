@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/utils/clock"
@@ -396,6 +397,7 @@ func createPodWorkers() (*podWorkers, *containertest.FakeRuntime, map[types.UID]
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	fakeQueue := &fakeQueue{}
 	clock := clocktesting.NewFakePassiveClock(time.Unix(1, 0))
+	fakeStateChannel := make(pod.PodStateChannel, 500)
 	w := newPodWorkers(
 		&podSyncerFuncs{
 			syncPod: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) (bool, error) {
@@ -451,6 +453,7 @@ func createPodWorkers() (*podWorkers, *containertest.FakeRuntime, map[types.UID]
 		time.Second,
 		time.Millisecond,
 		fakeCache,
+		fakeStateChannel,
 	)
 	workers := w.(*podWorkers)
 	workers.clock = clock
@@ -1937,10 +1940,10 @@ func TestFakePodWorkers(t *testing.T) {
 	kubeletForFakeWorkers := &simpleFakeKubelet{}
 	realPodSyncer := newPodSyncerFuncs(kubeletForRealWorkers)
 	realPodSyncer.syncPod = kubeletForRealWorkers.SyncPodWithWaitGroup
-
+	fakeStateChannel := make(pod.PodStateChannel, 500)
 	realPodWorkers := newPodWorkers(
 		realPodSyncer,
-		fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache)
+		fakeRecorder, queue.NewBasicWorkQueue(&clock.RealClock{}), time.Second, time.Second, fakeCache, fakeStateChannel)
 	fakePodWorkers := &fakePodWorkers{
 		syncPodFn: kubeletForFakeWorkers.SyncPod,
 		cache:     fakeCache,
