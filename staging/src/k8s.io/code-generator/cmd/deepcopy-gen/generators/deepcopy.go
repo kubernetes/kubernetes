@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/deepcopy-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -469,7 +470,12 @@ func extractInterfacesTag(t *types.Type) []string {
 
 func extractNonPointerInterfaces(t *types.Type) (bool, error) {
 	comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
-	values := gengo.ExtractCommentTags("+", comments)[interfacesNonPointerTagName]
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{interfacesNonPointerTagName}, comments)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse comments: %w", err)
+	}
+
+	values := tags[interfacesNonPointerTagName]
 	if len(values) == 0 {
 		return false, nil
 	}
