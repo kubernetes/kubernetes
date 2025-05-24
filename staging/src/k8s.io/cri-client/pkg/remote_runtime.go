@@ -610,6 +610,15 @@ func (r *remoteRuntimeService) portForwardV1(ctx context.Context, req *runtimeap
 	return resp, nil
 }
 
+// ImagePullProgress prepares a streaming endpoint to image pull progress from a PodSandbox, and returns the address.
+func (r *remoteRuntimeService) ImagePullProgress(ctx context.Context, req *runtimeapi.ImagePullProgressRequest) (*runtimeapi.ImagePullProgressResponse, error) {
+	r.log(10, "[RemoteRuntimeService] ImagePullProgress", "podSandboxID", req.PodSandboxId, "timeout", r.timeout)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	return r.runtimeClient.ImagePullProgress(ctx, req)
+}
+
 // UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
 // the pod-level resource configuration.
 func (r *remoteRuntimeService) UpdatePodSandboxResources(ctx context.Context, req *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error) {

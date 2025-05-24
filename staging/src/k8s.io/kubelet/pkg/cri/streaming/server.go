@@ -34,8 +34,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
+	imagepullprogress "k8s.io/client-go/tools/imagepullprogress"
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	imagepullprogressserver "k8s.io/kubelet/pkg/cri/streaming/imagepullprogress"
 	"k8s.io/kubelet/pkg/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubelet/pkg/cri/streaming/remotecommand"
 )
@@ -65,6 +67,7 @@ type Runtime interface {
 	Exec(ctx context.Context, containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	Attach(ctx context.Context, containerID string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error
 	PortForward(ctx context.Context, podSandboxID string, port int32, stream io.ReadWriteCloser) error
+	ImagePullProgress(ctx context.Context, podSandboxID string, layerProgress chan<- imagepullprogress.Layer) error
 }
 
 // Config defines the options used for running the stream server.
@@ -131,6 +134,7 @@ func NewServer(config Config, runtime Runtime) (Server, error) {
 		{"/exec/{token}", s.serveExec},
 		{"/attach/{token}", s.serveAttach},
 		{"/portforward/{token}", s.servePortForward},
+		{"/imagepullprogress/{token}", s.serveImagePullProgress},
 	}
 	// If serving relative to a base path, set that here.
 	pathPrefix := path.Dir(s.config.BaseURL.Path)
@@ -228,6 +232,19 @@ func (s *server) GetPortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi
 	}
 	return &runtimeapi.PortForwardResponse{
 		Url: s.buildURL("portforward", token),
+	}, nil
+}
+
+func (s *server) GetImagePullProgress(req *runtimeapi.ImagePullProgressRequest) (*runtimeapi.ImagePullProgressResponse, error) {
+	if req.PodSandboxId == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "missing required pod_sandbox_id")
+	}
+	token, err := s.cache.Insert(req)
+	if err != nil {
+		return nil, err
+	}
+	return &runtimeapi.ImagePullProgressResponse{
+		Url: s.buildURL("imagepullprogress", token),
 	}, nil
 }
 
@@ -360,6 +377,30 @@ func (s *server) servePortForward(req *restful.Request, resp *restful.Response) 
 		s.config.SupportedPortForwardProtocols)
 }
 
+func (s *server) serveImagePullProgress(req *restful.Request, resp *restful.Response) {
+	token := req.PathParameter("token")
+	cachedRequest, ok := s.cache.Consume(token)
+	if !ok {
+		http.NotFound(resp.ResponseWriter, req.Request)
+		return
+	}
+	pf, ok := cachedRequest.(*runtimeapi.PortForwardRequest)
+	if !ok {
+		http.NotFound(resp.ResponseWriter, req.Request)
+		return
+	}
+
+	imagepullprogressserver.ServeImagePullProgressed(
+		resp.ResponseWriter,
+		req.Request,
+		s.runtime,
+		pf.PodSandboxId,
+		"",
+		s.config.StreamIdleTimeout,
+		s.config.SupportedPortForwardProtocols,
+	)
+}
+
 // criAdapter wraps the Runtime functions to conform to the remotecommand interfaces.
 // The adapter binds the container ID to the container name argument, and the pod sandbox ID to the pod name.
 type criAdapter struct {
@@ -380,4 +421,8 @@ func (a *criAdapter) AttachContainer(ctx context.Context, podName string, podUID
 
 func (a *criAdapter) PortForward(ctx context.Context, podName string, podUID types.UID, port int32, stream io.ReadWriteCloser) error {
 	return a.Runtime.PortForward(ctx, podName, port, stream)
+}
+
+func (a *criAdapter) ImagePullProgress(ctx context.Context, podSandboxID string, podUID types.UID, layerProgress chan<- imagepullprogress.Layer) error {
+	return a.Runtime.ImagePullProgress(ctx, podSandboxID, layerProgress)
 }
