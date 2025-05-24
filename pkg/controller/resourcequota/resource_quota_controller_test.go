@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1317,5 +1318,58 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 		}
 		defer connection.Close()
 		time.Sleep(30 * time.Second)
+	}
+}
+
+func TestResourceQuotaControllerLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, qc *Controller)
+	}{
+		"run": {
+			runner: func(ctx context.Context, qc *Controller) { qc.Run(ctx, 1) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, qc *Controller) { qc.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
+
+			cl := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			informerFactory.Start(tCtx.Done())
+
+			quotaConfiguration := install.NewQuotaConfigurationForControllers(mockListerForResourceFunc(map[schema.GroupVersionResource]cache.GenericLister{}))
+
+			alwaysStarted := make(chan struct{})
+			close(alwaysStarted)
+			resourceQuotaControllerOptions := &ControllerOptions{
+				QuotaClient:               cl.CoreV1(),
+				ResourceQuotaInformer:     informerFactory.Core().V1().ResourceQuotas(),
+				ResyncPeriod:              controller.NoResyncPeriodFunc,
+				ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+				IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
+				DiscoveryFunc:             mockDiscoveryFunc,
+				Registry:                  generic.NewRegistry(quotaConfiguration.Evaluators()),
+				InformersStarted:          alwaysStarted,
+				InformerFactory:           informerFactory,
+			}
+
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			qc, err := NewController(tCtx, resourceQuotaControllerOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, qc)
+		},
+		)
 	}
 }

@@ -17,13 +17,15 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"reflect"
 	"sort"
 	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"go.uber.org/goleak"
+	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,6 +35,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	ktesting "k8s.io/client-go/testing"
 	klogtesting "k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/utils/ptr"
 )
 
@@ -334,7 +337,10 @@ func TestNewEndpointsMultipleHandlersAddedAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	config, err := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	if err != nil {
+		t.Errorf("failed to create endpointslice config: %v", err)
+	}
 	handler := NewEndpointSliceHandlerMock()
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -381,7 +387,10 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 
 	sharedInformers := informers.NewSharedInformerFactory(client, time.Minute)
 
-	config := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	config, err := NewEndpointSliceConfig(ctx, sharedInformers.Discovery().V1().EndpointSlices(), time.Minute)
+	if err != nil {
+		t.Errorf("failed to create endpointslice config: %v", err)
+	}
 	handler := NewEndpointSliceHandlerMock()
 	handler2 := NewEndpointSliceHandlerMock()
 	config.RegisterEventHandler(handler)
@@ -451,6 +460,43 @@ func TestNewEndpointsMultipleHandlersAddRemoveSetAndNotified(t *testing.T) {
 	endpoints = []*discoveryv1.EndpointSlice{endpoints1v2, endpoints3}
 	handler.ValidateEndpointSlices(t, endpoints)
 	handler2.ValidateEndpointSlices(t, endpoints)
+}
+
+func TestEndpointSliceConfigLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, esc *EndpointSliceConfig)
+	}{
+		"run": {
+			runner: func(ctx context.Context, esc *EndpointSliceConfig) { esc.Run(ctx.Done()) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, esc *EndpointSliceConfig) { esc.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, tCtx := klogtesting.NewTestContext(t)
+
+			cl := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			endpointSlices := informerFactory.Discovery().V1().EndpointSlices()
+			informerFactory.Start(tCtx.Done())
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			esc, err := NewEndpointSliceConfig(tCtx, endpointSlices, time.Minute)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, esc)
+		},
+		)
+	}
 }
 
 // TODO: Add a unittest for interrupts getting processed in a timely manner.
