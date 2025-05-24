@@ -1176,15 +1176,14 @@ func TestPodContainerDeviceToAllocate(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
-		if !reflect.DeepEqual(err, testCase.expErr) {
-			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
-				testCase.description, testCase.expErr, err)
-		}
-		if !reflect.DeepEqual(allocDevices, testCase.expectedAllocatedDevices) {
-			t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
-				testCase.description, testCase.expectedAllocatedDevices, allocDevices)
-		}
+		t.Run(testCase.description, func(t *testing.T) {
+			allocDevices, err := testManager.devicesToAllocate(testCase.podUID, testCase.contName, testCase.resource, testCase.required, testCase.reusableDevices)
+			require.EqualError(t, err, testCase.expErr.Error())
+			if !reflect.DeepEqual(allocDevices, testCase.expectedAllocatedDevices) {
+				t.Errorf("devicePluginManager error (%v). expected error: %v but got: %v",
+					testCase.description, testCase.expectedAllocatedDevices, allocDevices)
+			}
+		})
 	}
 
 }
