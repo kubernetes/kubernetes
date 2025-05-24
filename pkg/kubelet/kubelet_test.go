@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -4410,6 +4411,147 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 				c.LastTransitionTime = metav1.Time{}
 			}
 			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
+		})
+	}
+}
+
+func TestGetPodResizeInfo(t *testing.T) {
+	type testResources struct {
+		cpuReq, cpuLim, memReq, memLim int64
+	}
+
+	type testContainer struct {
+		allocated testResources
+		actuated  *testResources
+	}
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345",
+			Name:      "test-pod",
+			Namespace: "default",
+		},
+		Spec: v1.PodSpec{
+			Containers:     []v1.Container{{Name: "c0"}, {Name: "c1"}},
+			InitContainers: []v1.Container{{Name: "c2", RestartPolicy: &containerRestartPolicyAlways}, {Name: "c3"}},
+		},
+	}
+
+	tests := []struct {
+		pod           *v1.Pod
+		name          string
+		expectDetails *PodResourceSummary
+		containers    []testContainer
+	}{{
+		pod:  pod,
+		name: "Pod resize completed msg includes resizeable container, does not include unresizble containers",
+		containers: []testContainer{{
+			actuated: &testResources{100, 100, 100, 100},
+		}, {
+			actuated: &testResources{200, 200, 200, 200},
+		}, {
+			actuated: &testResources{300, 300, 300, 300},
+		}, {
+			actuated: &testResources{400, 400, 400, 400},
+		},
+		},
+
+		expectDetails: &PodResourceSummary{
+			InitContainers: []ContainerAllocation{
+				{
+					Name: "c2",
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(300, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(300, resource.DecimalSI),
+						},
+					},
+				},
+			},
+			Containers: []ContainerAllocation{
+				{
+					Name: "c0",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI),
+						},
+					},
+				},
+				{
+					Name: "c1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+							v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI),
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	mkRequirements := func(r testResources) v1.ResourceRequirements {
+		res := v1.ResourceRequirements{
+			Requests: v1.ResourceList{},
+			Limits:   v1.ResourceList{},
+		}
+		if r.cpuReq != 0 {
+			res.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuReq, resource.DecimalSI)
+		}
+		if r.cpuLim != 0 {
+			res.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(r.cpuLim, resource.DecimalSI)
+		}
+		if r.memReq != 0 {
+			res.Requests[v1.ResourceMemory] = *resource.NewQuantity(r.memReq, resource.DecimalSI)
+		}
+		if r.memLim != 0 {
+			res.Limits[v1.ResourceMemory] = *resource.NewQuantity(r.memLim, resource.DecimalSI)
+		}
+		return res
+	}
+
+	mkContainer := func(index int, c testContainer) v1.Container {
+		container := v1.Container{
+			Name:      fmt.Sprintf("c%d", index),
+			Resources: mkRequirements(c.allocated),
+		}
+		return container
+	}
+
+	testKubelet := newTestKubelet(t, false)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	am := kl.allocationManager
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for i, c := range test.containers {
+				container := mkContainer(i, c)
+				if c.actuated != nil {
+					actuatedContainer := container.DeepCopy()
+					actuatedContainer.Resources = mkRequirements(*c.actuated)
+					require.NoError(t, am.SetActuatedResources(pod, actuatedContainer))
+				}
+			}
+
+			allocatedPod := test.pod.DeepCopy()
+			PodResizecompleteMsg := kl.getPodResizeInfo(allocatedPod)
+			expectDetailsJSON, _ := json.Marshal(test.expectDetails)
+			expectPodResizecompleteMsg := fmt.Sprintf("Pod resize completed, %s", string(expectDetailsJSON))
+			assert.Equal(t, expectPodResizecompleteMsg, PodResizecompleteMsg)
 		})
 	}
 }
