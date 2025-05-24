@@ -123,12 +123,15 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 	// original kubeletconfig before the context start, to be restored
 	var oldCfg *kubeletconfig.KubeletConfiguration
-	var localNode *v1.Node
+	var reservedCPUs cpuset.CPUSet
 	var onlineCPUs cpuset.CPUSet
 	var smtLevel int
 	// tracks all the pods created by a It() block. Best would be a namespace per It block
 	// TODO: move to a namespace per It block?
 	var podMap map[string]*v1.Pod
+
+	// closure just and only to not carry around awkwardly `f` and `onlineCPUs` only for logging purposes
+	var skipIfAllocatableCPUsLessThan func(node *v1.Node, cpuReq int)
 
 	ginkgo.BeforeAll(func(ctx context.Context) {
 		var err error
@@ -163,7 +166,27 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	})
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
+		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
 		podMap = make(map[string]*v1.Pod)
+	})
+
+	ginkgo.JustBeforeEach(func(ctx context.Context) {
+		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
+
+		// use a closure to minimize the arguments, to make the usage more straightforward
+		skipIfAllocatableCPUsLessThan = func(node *v1.Node, val int) {
+			ginkgo.GinkgoHelper()
+			cpuReq := int64(val + reservedCPUs.Size()) // reserved CPUs are not usable, need to account them
+			// the framework is initialized using an injected BeforeEach node, so the
+			// earliest we can do is to initialize the other objects here
+			nodeCPUDetails := cpuDetailsFromNode(node)
+
+			msg := fmt.Sprintf("%v full CPUs (detected=%v requested=%v reserved=%v online=%v smt=%v)", cpuReq, nodeCPUDetails.Allocatable, val, reservedCPUs.Size(), onlineCPUs.Size(), smtLevel)
+			ginkgo.By("Checking if allocatable: " + msg)
+			if nodeCPUDetails.Allocatable < cpuReq {
+				e2eskipper.Skipf("Skipping CPU Manager test: not allocatable %s", msg)
+			}
+		}
 	})
 
 	ginkgo.AfterEach(func(ctx context.Context) {
@@ -172,7 +195,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 	ginkgo.When("running non-guaranteed pods tests", ginkgo.Label("non-guaranteed", "reserved-cpus"), func() {
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: cpuset.CPUSet{},
 			}))
@@ -194,9 +217,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should let the container access all the online CPUs when using a reserved CPUs set", func(ctx context.Context) {
-			reservedCPUs := cpuset.New(0)
+			reservedCPUs = cpuset.New(0)
 
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -219,9 +242,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		ginkgo.It("should let the container access all the online non-exclusively-allocated CPUs when using a reserved CPUs set", ginkgo.Label("guaranteed", "exclusive-cpus"), func(ctx context.Context) {
 			cpuCount := 1
-			reservedCPUs := cpuset.New(0)
+			reservedCPUs = cpuset.New(0)
 
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount+1) // note the extra for the non-gu pod
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -263,21 +288,16 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	})
 
 	ginkgo.When("running guaranteed pod tests", ginkgo.Label("guaranteed", "exclusive-cpus"), func() {
-		var cpuAlloc int64
-		var reservedCPUs cpuset.CPUSet
-
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			reservedCPUs = cpuset.New(0)
-
-			localNode = getLocalNode(ctx, f)
-			cpuAllocQty := localNode.Status.Allocatable[v1.ResourceCPU]
-			cpuAlloc = cpuAllocQty.Value()
 		})
 
 		ginkgo.It("should allocate exclusively a CPU to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 1
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -307,12 +327,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively a even number of CPUs to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 2
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -341,12 +358,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively a odd number of CPUs to a 1-container pod", func(ctx context.Context) {
 			cpuCount := 3
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -376,12 +390,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively CPUs to a multi-container pod (1+2)", func(ctx context.Context) {
 			cpuCount := 3 // total
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -419,12 +430,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively CPUs to a multi-container pod (3+2)", func(ctx context.Context) {
 			cpuCount := 5 // total
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -463,12 +471,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively CPUs to a multi-container pod (4+2)", func(ctx context.Context) {
 			cpuCount := 6 // total
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -506,12 +511,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		ginkgo.It("should allocate exclusively a CPU to multiple 1-container pods", func(ctx context.Context) {
 			cpuCount := 4 // total
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
@@ -554,14 +556,12 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	})
 
 	ginkgo.When("running with strict CPU reservation", ginkgo.Label("strict-cpu-reservation"), func() {
-		var reservedCPUs cpuset.CPUSet
-
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			reservedCPUs = cpuset.New(0)
 		})
 
 		ginkgo.It("should let the container access all the online CPUs without a reserved CPUs set", func(ctx context.Context) {
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:      cpuset.CPUSet{},
 				enableCPUManagerOptions: true,
@@ -590,7 +590,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should let the container access all the online CPUs minus the reserved CPUs set when enabled", func(ctx context.Context) {
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: true,
@@ -616,7 +616,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should let the container access all the online non-exclusively-allocated CPUs minus the reserved CPUs set when enabled", func(ctx context.Context) {
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			cpuCount := 1
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount+1) // note the extra for the non-gu pod)
+
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:      reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 				enableCPUManagerOptions: true,
@@ -625,13 +629,13 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				},
 			}))
 
-			cpuCount := 1
+			cpuReq := fmt.Sprintf("%dm", 1000*cpuCount)
 
 			podGu := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
 					ctnName:    "gu-container",
-					cpuRequest: fmt.Sprintf("%dm", 1000*cpuCount),
-					cpuLimit:   fmt.Sprintf("%dm", 1000*cpuCount),
+					cpuRequest: cpuReq,
+					cpuLimit:   cpuReq,
 				},
 			})
 			ginkgo.By("creating the guaranteed test pod")
@@ -666,17 +670,15 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	})
 
 	ginkgo.When("running with SMT Alignment", ginkgo.Label("smt-alignment"), func() {
-		var cpuDetails nodeCPUDetails
-
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			// strict SMT alignment is trivially verified and granted on non-SMT systems
 			if smtLevel < minSMTLevel {
 				e2eskipper.Skipf("Skipping CPU Manager %q tests since SMT disabled", cpumanager.FullPCPUsOnlyOption)
 			}
 
-			reservedCPUs := cpuset.New(0)
+			reservedCPUs = cpuset.New(0)
 
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:              string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:      reservedCPUs,
 				enableCPUManagerOptions: true,
@@ -684,22 +686,21 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 					cpumanager.FullPCPUsOnlyOption: "true",
 				},
 			}))
-			cpuDetails = cpuDetailsFromNode(localNode)
 		})
 
 		ginkgo.It("should reject workload asking non-SMT-multiple of cpus", func(ctx context.Context) {
-			// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
-			if cpuDetails.Allocatable < int64(smtLevel) {
-				e2eskipper.Skipf("Skipping CPU Manager %q tests since the CPU capacity < %d", cpumanager.FullPCPUsOnlyOption, smtLevel)
-			}
+			cpuCount := 1
+			cpuReq := fmt.Sprintf("%dm", 1000*cpuCount)
+
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			ginkgo.By("creating the testing pod")
 			// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
 			pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 				{
 					ctnName:    "gu-container-neg",
-					cpuRequest: "1000m",
-					cpuLimit:   "1000m",
+					cpuRequest: cpuReq,
+					cpuLimit:   cpuReq,
 				},
 			})
 			ginkgo.By("creating the test pod")
@@ -729,10 +730,7 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			// 2. take a full core
 			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
 			//          this means on more-than-2-way SMT systems this test will prove nothing
-
-			if cpuDetails.Allocatable < int64(smtLevel) {
-				e2eskipper.Skipf("required %d allocatable CPUs found %d", smtLevel, cpuDetails.Allocatable)
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
 
 			cpuRequest := fmt.Sprintf("%d000m", smtLevel)
 			ginkgo.By(fmt.Sprintf("creating the testing pod cpuRequest=%v", cpuRequest))
@@ -760,8 +758,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	ginkgo.When("checking the compatibility between options", func() {
 		// please avoid nesting `BeforeEach` as much as possible. Ideally avoid completely.
 		ginkgo.Context("SMT Alignment and strict CPU reservation", ginkgo.Label("smt-alignment", "strict-cpu-reservation"), func() {
-			var reservedCPUs cpuset.CPUSet
-
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				// strict SMT alignment is trivially verified and granted on non-SMT systems
 				if smtLevel < minSMTLevel {
@@ -771,7 +767,11 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			})
 
 			ginkgo.It("should reject workload asking non-SMT-multiple of cpus", func(ctx context.Context) {
-				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				cpuCount := 1
+
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount+1) // note the extra for the non-gu pod)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
@@ -780,12 +780,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.StrictCPUReservationOption: "true",
 					},
 				}))
-				cpuDetails := cpuDetailsFromNode(localNode)
-
-				// our tests want to allocate a full core, so we need at last 2*2=4 virtual cpus
-				if cpuDetails.Allocatable < int64(smtLevel) {
-					e2eskipper.Skipf("Skipping CPU Manager %q tests since the CPU capacity < %d", cpumanager.FullPCPUsOnlyOption, smtLevel)
-				}
 
 				// negative test: try to run a container whose requests aren't a multiple of SMT level, expect a rejection
 				pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
@@ -817,7 +811,14 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			})
 
 			ginkgo.It("should admit workload asking SMT-multiple of cpus", func(ctx context.Context) {
-				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
+				// 1. are core siblings
+				// 2. take a full core
+				// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
+				//          this means on more-than-2-way SMT systems this test will prove nothing
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
@@ -826,20 +827,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.StrictCPUReservationOption: "true",
 					},
 				}))
-				cpuDetails := cpuDetailsFromNode(localNode)
-
-				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
-				// 1. are core siblings
-				// 2. take a full core
-				// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
-				//          this means on more-than-2-way SMT systems this test will prove nothing
-
-				if cpuDetails.Allocatable < int64(smtLevel) {
-					e2eskipper.Skipf("required %d allocatable CPUs found %d", smtLevel, cpuDetails.Allocatable)
-				}
 
 				cpuCount := smtLevel
-				cpuRequest := fmt.Sprintf("%d000m", cpuCount)
+				cpuRequest := fmt.Sprintf("%d000m", smtLevel)
 				ginkgo.By(fmt.Sprintf("creating the testing pod cpuRequest=%v", cpuRequest))
 				pod := makeCPUManagerPod("gu-pod", []ctnAttribute{
 					{
@@ -870,8 +860,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 		// please avoid nesting `BeforeEach` as much as possible. Ideally avoid completely.
 		ginkgo.Context("SMT Alignment and distribution across NUMA", ginkgo.Label("smt-alignment", "distribute-cpus-across-numa"), func() {
-			var reservedCPUs cpuset.CPUSet
-
 			ginkgo.BeforeEach(func(ctx context.Context) {
 				// strict SMT alignment is trivially verified and granted on non-SMT systems
 				if smtLevel < minSMTLevel {
@@ -881,7 +869,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			})
 
 			ginkgo.It("should assign packed CPUs with distribute-cpus-across-numa disabled and pcpu-only policy options enabled", func(ctx context.Context) {
-				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), smtLevel)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
@@ -890,18 +880,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.DistributeCPUsAcrossNUMAOption: "false",
 					},
 				}))
-				cpuDetails := cpuDetailsFromNode(localNode)
-
-				// positive test: try to run a container whose requests are a multiple of SMT level, check allocated cores
-				// 1. are core siblings
-				// 2. take a full core
-				// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
-				//          this means on more-than-2-way SMT systems this test will prove nothing
-
-				minCPUCount := int64(smtLevel * minCPUCapacity)
-				if cpuDetails.Allocatable < minCPUCount {
-					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < %d", minCPUCount)
-				}
 
 				ctnAttrs := []ctnAttribute{
 					{
@@ -925,14 +903,17 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 			})
 
 			ginkgo.It("should assign CPUs distributed across NUMA with distribute-cpus-across-numa and pcpu-only policy options enabled", func(ctx context.Context) {
-				reservedCPUs := cpuset.New(0)
+				reservedCPUs = cpuset.New(0)
 
 				// this test is intended to be run on a multi-node NUMA system and
 				// a system with at least 4 cores per socket, hostcheck skips test
 				// if above requirements are not satisfied
 				numaNodeNum, _, _, cpusNumPerNUMA := hostCheck()
+				cpuReq := (cpusNumPerNUMA - smtLevel) * numaNodeNum
 
-				localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+				skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuReq)
+
+				updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 					policyName:              string(cpumanager.PolicyStatic),
 					reservedSystemCPUs:      reservedCPUs,
 					enableCPUManagerOptions: true,
@@ -941,13 +922,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 						cpumanager.DistributeCPUsAcrossNUMAOption: "true",
 					},
 				}))
-				cpuDetails := cpuDetailsFromNode(localNode)
-
-				// our tests want to allocate a full core, so we need at least 2*2=4 virtual cpus
-				minCPUCount := int64(smtLevel * minCPUCapacity)
-				if cpuDetails.Allocatable < minCPUCount {
-					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU capacity < %d", minCPUCount)
-				}
 
 				// 'distribute-cpus-across-numa' policy option ensures that CPU allocations are evenly distributed
 				//  across NUMA nodes in cases where more than one NUMA node is required to satisfy the allocation.
@@ -960,7 +934,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 				// In summary: cpusNumPerNUMA < CPURequest < ((cpusNumPerNuma * numaNodeNum) - reservedCPUscount)
 				// Considering all these constraints we select: CPURequest= (cpusNumPerNUMA-smtLevel)*numaNodeNum
 
-				cpuReq := (cpusNumPerNUMA - smtLevel) * numaNodeNum
 				ctnAttrs := []ctnAttribute{
 					{
 						ctnName:    "test-gu-container-distribute-cpus-across-numa",
@@ -999,8 +972,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
 			//          this means on more-than-2-way SMT systems this test will prove nothing
-			reservedCPUs := cpuset.New(0)
-			localNode = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			reservedCPUs = cpuset.New(0)
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:                       string(cpumanager.PolicyStatic),
 				reservedSystemCPUs:               reservedCPUs,
 				disableCPUQuotaWithExclusiveCPUs: true,
@@ -1024,6 +997,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should disable for guaranteed pod with exclusive CPUs assigned", func(ctx context.Context) {
+			cpuCount := 1
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
 			ctnName := "gu-container-cfsquota-disabled"
 			pod := makeCPUManagerPod("gu-pod-cfsquota-off", []ctnAttribute{
 				{
@@ -1041,6 +1017,9 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should enforce for guaranteed pod", func(ctx context.Context) {
+			cpuCount := 1 // overshoot, minimum request is 1
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
+
 			ctnName := "gu-container-cfsquota-enabled"
 			pod := makeCPUManagerPod("gu-pod-cfs-quota-on", []ctnAttribute{
 				{
@@ -1058,6 +1037,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should enforce for burstable pod", func(ctx context.Context) {
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), 0)
+
 			ctnName := "bu-container-cfsquota-enabled"
 			pod := makeCPUManagerPod("bu-pod-cfs-quota-on", []ctnAttribute{
 				{
@@ -1075,10 +1056,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should not enforce with multiple containers without exclusive CPUs", func(ctx context.Context) {
-			cpuDetails := cpuDetailsFromNode(localNode)
-			if cpuDetails.Allocatable < int64(2) {
-				e2eskipper.Skipf("Skipping because needs %d allocatable CPUs, detected %d", 2, cpuDetails.Allocatable)
-			}
+			cpuCount := 2
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			pod := makeCPUManagerPod("gu-pod-multicontainer", []ctnAttribute{
 				{
@@ -1102,10 +1081,8 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 		})
 
 		ginkgo.It("should not enforce with multiple containers only in the container with exclusive CPUs", func(ctx context.Context) {
-			cpuDetails := cpuDetailsFromNode(localNode)
-			if cpuDetails.Allocatable < int64(2) {
-				e2eskipper.Skipf("Skipping because needs %d allocatable CPUs, detected %d", 2, cpuDetails.Allocatable)
-			}
+			cpuCount := 2
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
 			pod := makeCPUManagerPod("gu-pod-multicontainer-mixed", []ctnAttribute{
 				{
@@ -1130,26 +1107,16 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	})
 
 	f.Context("When checking the sidecar containers", feature.SidecarContainers, func() {
-		var cpuAlloc int64
-		var reservedCPUs cpuset.CPUSet
-
 		ginkgo.BeforeEach(func(ctx context.Context) {
 			reservedCPUs = cpuset.New(0)
-
-			localNode = getLocalNode(ctx, f)
-			cpuAllocQty := localNode.Status.Allocatable[v1.ResourceCPU]
-			cpuAlloc = cpuAllocQty.Value()
 		})
 
 		ginkgo.It("should reuse init container exclusive CPUs, but not sidecar container exclusive CPUS", func(ctx context.Context) {
 			cpuCount := 2 // total
 
-			cpuReq := int64(cpuCount + reservedCPUs.Size())
-			if cpuAlloc < cpuReq {
-				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable %d < CPU request %d (online %d)", cpuAlloc, cpuReq, onlineCPUs.Size())
-			}
+			skipIfAllocatableCPUsLessThan(getLocalNode(ctx, f), cpuCount)
 
-			_ = updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
+			updateKubeletConfigIfNeeded(ctx, f, configureCPUManagerInKubelet(oldCfg, &cpuManagerKubeletArguments{
 				policyName:         string(cpumanager.PolicyStatic),
 				reservedSystemCPUs: reservedCPUs, // Not really needed for the tests but helps to make a more precise check
 			}))
