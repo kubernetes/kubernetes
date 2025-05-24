@@ -563,6 +563,14 @@ func addAccessMode(pvc *v1.PersistentVolumeClaim, mode v1.PersistentVolumeAccess
 	return pvc
 }
 
+func addAnnotation(pvc *v1.PersistentVolumeClaim, key, value string) *v1.PersistentVolumeClaim {
+	if pvc.Annotations == nil {
+		pvc.Annotations = make(map[string]string)
+	}
+	pvc.Annotations[key] = value
+	return pvc
+}
+
 func getTestPV(volumeName string, specSize string) *v1.PersistentVolume {
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
