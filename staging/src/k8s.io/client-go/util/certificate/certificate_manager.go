@@ -265,6 +265,8 @@ type manager struct {
 	lastRequestCancel context.CancelFunc
 	lastRequest       *x509.CertificateRequest
 
+	templateChanged chan struct{}
+
 	dynamicTemplate              bool
 	signerName                   string
 	requestedCertificateLifetime *time.Duration
@@ -424,7 +426,7 @@ func (m *manager) run() {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	templateChanged := make(chan struct{})
+	m.templateChanged = make(chan struct{})
 	rotate := func(ctx context.Context) {
 		deadline := m.nextRotationDeadline(logger)
 		if sleepInterval := deadline.Sub(m.now()); sleepInterval > 0 {
@@ -436,7 +438,7 @@ func (m *manager) run() {
 			select {
 			case <-timer.C:
 				// unblock when deadline expires
-			case <-templateChanged:
+			case <-m.templateChanged:
 				_, lastRequestTemplate := m.getLastRequest()
 				if reflect.DeepEqual(lastRequestTemplate, m.getTemplate()) {
 					// if the template now matches what we last requested, restart the rotation deadline loop
@@ -459,7 +461,7 @@ func (m *manager) run() {
 		}
 		if err := wait.ExponentialBackoffWithContext(ctx, backoff, m.rotateCerts); err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "Reached backoff limit, still unable to rotate certs")
-			wait.PollInfiniteWithContext(ctx, 32*time.Second, m.rotateCerts)
+			wait.PollUntilContextCancel(ctx, 32*time.Second, true, m.rotateCerts)
 		}
 	}
 
@@ -482,7 +484,7 @@ func (m *manager) run() {
 					lastRequestCancel()
 				}
 				select {
-				case templateChanged <- struct{}{}:
+				case m.templateChanged <- struct{}{}:
 				case <-ctx.Done():
 				}
 			}
@@ -797,6 +799,12 @@ func (m *manager) setLastRequest(cancel context.CancelFunc, r *x509.CertificateR
 	defer m.lastRequestLock.Unlock()
 	m.lastRequestCancel = cancel
 	m.lastRequest = r
+	// flush the channel in case there was a writer blocked signaling on a previous request, assumes a single informer
+	select {
+	case <-m.templateChanged:
+	default:
+		return
+	}
 }
 
 func hasKeyUsage(usages []certificates.KeyUsage, usage certificates.KeyUsage) bool {
