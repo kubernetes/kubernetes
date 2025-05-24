@@ -213,7 +213,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			}
 			inputImageList, expectedImageList := generateTestingImageLists(numTestImages, int(tc.nodeStatusMaxImages))
 			testKubelet := newTestKubeletWithImageList(
-				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/, true /* localStorageCapacityIsolation */)
+				t, inputImageList, false /* controllerAttachDetachEnabled */, true /*initFakeVolumePlugin*/, true /* localStorageCapacityIsolation */, false /*excludePodAdmitHandlers*/)
 			defer testKubelet.Cleanup()
 			kubelet := testKubelet.kubelet
 			kubelet.nodeStatusMaxImages = tc.nodeStatusMaxImages
@@ -1585,7 +1585,7 @@ func TestUpdateNewNodeStatusTooLargeReservation(t *testing.T) {
 	// generate one more in inputImageList than we configure the Kubelet to report
 	inputImageList, _ := generateTestingImageLists(nodeStatusMaxImages+1, nodeStatusMaxImages)
 	testKubelet := newTestKubeletWithImageList(
-		t, inputImageList, false /* controllerAttachDetachEnabled */, true /* initFakeVolumePlugin */, true)
+		t, inputImageList, false /* controllerAttachDetachEnabled */, true /* initFakeVolumePlugin */, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 	kubelet.nodeStatusMaxImages = nodeStatusMaxImages
