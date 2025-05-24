@@ -310,11 +310,7 @@ func (g *genericDescriber) Describe(namespace, name string, describerSettings De
 }
 
 func printUnstructuredContent(w PrefixWriter, level int, content map[string]interface{}, skipPrefix string, skip ...string) {
-	fields := []string{}
-	for field := range content {
-		fields = append(fields, field)
-	}
-	sort.Strings(fields)
+	fields := slices.Sorted(maps.Keys(content))
 
 	for _, field := range fields {
 		value := content[field]
