@@ -895,6 +895,7 @@
             "type": "string"
           },
           "name": {
+            "default": "",
             "description": "Name is the name of the object being referenced.",
             "type": "string"
           },
@@ -903,6 +904,7 @@
             "type": "string"
           },
           "resource": {
+            "default": "",
             "description": "Resource is the resource of the object being referenced.",
             "type": "string"
           }

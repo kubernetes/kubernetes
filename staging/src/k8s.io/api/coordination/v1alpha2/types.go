@@ -74,7 +74,7 @@ type LeaseCandidateSpec struct {
 	// by the candidate with the latest BinaryVersion will be used. If there is still conflict,
 	// this is a user error and coordinated leader election will not operate the Lease until resolved.
 	// +required
-	Strategy v1.CoordinatedLeaseStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
+	Strategy v1.CoordinatedLeaseStrategy `json:"strategy" protobuf:"bytes,6,opt,name=strategy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
