@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:best-practices"
   ],
   "ignorePaths": [],
   "labels": ["Skip Changelog", "dependencies"],
@@ -13,6 +13,10 @@
       "matchManagers": ["gomod"],
       "matchDepTypes": ["indirect"],
       "enabled": true
+    },
+    {
+      "matchPackageNames": ["go.opentelemetry.io/build-tools/**"],
+      "groupName": "build-tools"
     },
     {
       "matchPackageNames": ["google.golang.org/genproto/googleapis/**"],
