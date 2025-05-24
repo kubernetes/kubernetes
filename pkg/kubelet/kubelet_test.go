@@ -3726,7 +3726,6 @@ func TestSyncPodSpans(t *testing.T) {
 	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodCreate, pod, nil, &kubecontainer.PodStatus{})
 	require.NoError(t, err)
 
-	require.NoError(t, err)
 	assert.NotEmpty(t, exp.GetSpans())
 
 	// find root span for syncPod
