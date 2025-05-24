@@ -181,6 +181,18 @@ patterns in the spec.
 For a deeper discussion, see
 [this](https://github.com/open-telemetry/opentelemetry-specification/issues/165).
 
+## Tests
+
+Each functionality should be covered by tests.
+
+Performance-critical functionality should also be covered by benchmarks.
+
+- Pull requests adding a performance-critical functionality
+should have `go test -bench` output in their description.
+- Pull requests changing a performance-critical functionality
+should have [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
+output in their description.
+
 ## Documentation
 
 Each (non-internal, non-test) package must be documented using

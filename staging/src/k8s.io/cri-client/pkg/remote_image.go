@@ -72,8 +72,7 @@ func NewRemoteImageService(endpoint string, connectionTimeout time.Duration, tp 
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOpts = append(dialOpts,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
 
 	connParams := grpc.ConnectParams{
