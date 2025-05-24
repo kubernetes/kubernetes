@@ -1,0 +1,11 @@
+{
+  "*embedded.T1": {
+    "intField": [
+      "T2.IntField",
+      "T3.IntField"
+    ],
+    "stringField": [
+      "T3.StringField"
+    ]
+  }
+}
