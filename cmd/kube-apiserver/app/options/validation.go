@@ -127,6 +127,19 @@ func validatePublicIPServiceClusterIPRangeIPFamilies(extra Extra, generic generi
 	return nil
 }
 
+func validateKubeletClientConfig(options Extra) []error {
+	var errs []error
+
+	kubeletTLSConfig := options.KubeletConfig.TLSClientConfig
+	if kubeletTLSConfig.ValidateNodeName && len(kubeletTLSConfig.CAFile) == 0 {
+		errs = append(errs, fmt.Errorf("--kubelet-certificate-authority must be set with --kubelet-validate-node-name"))
+	}
+
+	// TODO add feature gate and check it here
+
+	return errs
+}
+
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s CompletedOptions) Validate() []error {
 	var errs []error
@@ -135,6 +148,7 @@ func (s CompletedOptions) Validate() []error {
 	errs = append(errs, validateClusterIPFlags(s.Extra)...)
 	errs = append(errs, validateServiceNodePort(s.Extra)...)
 	errs = append(errs, validatePublicIPServiceClusterIPRangeIPFamilies(s.Extra, *s.GenericServerRunOptions)...)
+	errs = append(errs, validateKubeletClientConfig(s.Extra)...)
 
 	if s.MasterCount <= 0 {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
