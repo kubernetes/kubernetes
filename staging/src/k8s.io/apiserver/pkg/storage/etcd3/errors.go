@@ -70,6 +70,8 @@ func interpretListError(err error, paging bool, continueKey, keyPrefix string) e
 			return handleCompactedErrorForPaging(continueKey, keyPrefix)
 		}
 		return errors.NewResourceExpired(expired)
+	case goerrors.Is(err, etcdrpc.ErrFutureRev):
+		return errors.NewTimeoutError(etcdrpc.ErrFutureRev.Error(), 0)
 	}
 	return err
 }
