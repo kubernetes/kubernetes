@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -1328,5 +1329,138 @@ func numOccurrences(hay, needle string) int {
 		}
 		count++
 		hay = hay[index+len(needle):]
+	}
+}
+
+// mockInformerMetrics is a test implementation of InformerMetricsProvider
+type mockInformerMetrics struct {
+	pendingNotifications map[string]float64
+	ringGrowingSizes     map[string]float64
+	processDurations     map[string][]float64
+	mu                   sync.Mutex
+}
+
+func newMockInformerMetrics() *mockInformerMetrics {
+	return &mockInformerMetrics{
+		pendingNotifications: make(map[string]float64),
+		ringGrowingSizes:     make(map[string]float64),
+		processDurations:     make(map[string][]float64),
+	}
+}
+
+func (p *mockInformerMetrics) NewPendingNotificationsMetric(informerName, resourceType, handlerName string) GaugeMetric {
+	key := fmt.Sprintf("%s/%s/%s", informerName, resourceType, handlerName)
+	return &mockGaugeMetric{
+		key: key,
+		set: func(val float64) {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			p.pendingNotifications[key] = val
+		},
+	}
+}
+
+func (p *mockInformerMetrics) NewRingGrowingMetric(informerName, resourceType, handlerName string) GaugeMetric {
+	key := fmt.Sprintf("%s/%s/%s", informerName, resourceType, handlerName)
+	return &mockGaugeMetric{
+		key: key,
+		set: func(val float64) {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			p.ringGrowingSizes[key] = val
+		},
+	}
+}
+
+func (p *mockInformerMetrics) NewProcessDurationMetric(informerName, resourceType, handlerName string) HistogramMetric {
+	key := fmt.Sprintf("%s/%s/%s", informerName, resourceType, handlerName)
+	return &mockHistogramMetric{
+		key: key,
+		observe: func(val float64) {
+			p.mu.Lock()
+			defer p.mu.Unlock()
+			p.processDurations[key] = append(p.processDurations[key], val)
+		},
+	}
+}
+
+type mockGaugeMetric struct {
+	key string
+	set func(float64)
+}
+
+func (m *mockGaugeMetric) Set(val float64) {
+	m.set(val)
+}
+
+type mockHistogramMetric struct {
+	key     string
+	observe func(float64)
+}
+
+func (m *mockHistogramMetric) Observe(val float64) {
+	m.observe(val)
+}
+
+func TestSharedInformerMetrics(t *testing.T) {
+	source := newFakeControllerSource(t)
+	metrics := newMockInformerMetrics()
+
+	informer := NewSharedIndexInformerWithOptions(
+		source,
+		&v1.Pod{},
+		SharedIndexInformerOptions{
+			Name:            "informer",
+			MetricsProvider: metrics,
+		},
+	)
+
+	fakeEventHandler := ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			time.Sleep(50 * time.Millisecond) // Simulate processing time
+		},
+	}
+	_, err := informer.AddEventHandlerWithOptions(fakeEventHandler, HandlerOptions{Name: "FakeEventHandlerName"})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go informer.RunWithContext(ctx)
+
+	require.Eventually(t, informer.HasSynced, time.Second, 10*time.Millisecond)
+
+	// Add pods to generate metrics
+	numPods := 200
+	for i := 1; i <= numPods; i++ {
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("pod%d", i)}})
+		if i%10 == 0 {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	time.Sleep(6 * time.Second)
+
+	metrics.mu.Lock()
+	defer metrics.mu.Unlock()
+
+	key := fmt.Sprintf("informer/%s/FakeEventHandlerName", reflect.TypeOf(&v1.Pod{}).Elem().String())
+	pendingNotifs := metrics.pendingNotifications[key]
+	if pendingNotifs < 0 {
+		t.Errorf("Expected pending notifications to be >= 0, got %v", pendingNotifs)
+	}
+
+	ringSize := metrics.ringGrowingSizes[key]
+	if ringSize < float64(1024) {
+		t.Errorf("Expected ring buffer size to be >= 1024, got %v", ringSize)
+	}
+
+	durations := metrics.processDurations[key]
+	if len(durations) == 0 {
+		t.Error("Expected process durations to be recorded, got none")
+	}
+	for i, duration := range durations {
+		if duration < 0.05 { // We slept for 50ms
+			t.Errorf("Duration %d: Expected >= 0.05 seconds, got %v", i, duration)
+		}
 	}
 }

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
@@ -36,7 +37,7 @@ func BenchmarkListener(b *testing.B) {
 	swg.Add(b.N)
 	b.SetParallelism(concurrencyLevel)
 	// Preallocate enough space so that benchmark does not run out of it
-	pl := newProcessListener(klog.Background(), &ResourceEventHandlerFuncs{
+	pl := newProcessListener(klog.Background(), &informerMetrics{}, "informer_test", &v1.Pod{}, "handler_test", &ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			swg.Done()
 		},
