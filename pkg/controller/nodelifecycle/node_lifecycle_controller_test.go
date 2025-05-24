@@ -52,12 +52,13 @@ import (
 )
 
 const (
-	testNodeMonitorGracePeriod = 50 * time.Second
-	testNodeStartupGracePeriod = 60 * time.Second
-	testNodeMonitorPeriod      = 5 * time.Second
-	testRateLimiterQPS         = float32(100000)
-	testLargeClusterThreshold  = 20
-	testUnhealthyThreshold     = float32(0.55)
+	testNodeMonitorGracePeriod        = 50 * time.Second
+	testNodeStartupGracePeriod        = 60 * time.Second
+	testNodeMonitorPeriod             = 5 * time.Second
+	testRateLimiterQPS                = float32(100000)
+	testLargeClusterThreshold         = 20
+	testUnhealthyThreshold            = float32(0.55)
+	testPauseEvictionOnFullDisruption = false
 )
 
 func alwaysReady() bool { return true }
@@ -138,6 +139,7 @@ func newNodeLifecycleControllerFromClient(
 	secondaryEvictionLimiterQPS float32,
 	largeClusterThreshold int32,
 	unhealthyZoneThreshold float32,
+	pauseEvictionOnFullDisruption bool,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -164,6 +166,7 @@ func newNodeLifecycleControllerFromClient(
 		secondaryEvictionLimiterQPS,
 		largeClusterThreshold,
 		unhealthyZoneThreshold,
+		pauseEvictionOnFullDisruption,
 	)
 	if err != nil {
 		return nil, err
@@ -808,9 +811,11 @@ func TestMonitorNodeHealth(t *testing.T) {
 				testRateLimiterQPS,
 				testLargeClusterThreshold,
 				testUnhealthyThreshold,
+				testPauseEvictionOnFullDisruption,
 				testNodeMonitorGracePeriod,
 				testNodeStartupGracePeriod,
-				testNodeMonitorPeriod)
+				testNodeMonitorPeriod,
+			)
 			nodeController.recorder = testutil.NewFakeRecorder()
 			nodeController.enterPartialDisruptionFunc = func(nodeNum int) float32 {
 				return testRateLimiterQPS
@@ -950,6 +955,7 @@ func TestPodStatusChange(t *testing.T) {
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
 			testUnhealthyThreshold,
+			testPauseEvictionOnFullDisruption,
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
@@ -1235,6 +1241,7 @@ func TestMonitorNodeHealthUpdateStatus(t *testing.T) {
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
 			testUnhealthyThreshold,
+			testPauseEvictionOnFullDisruption,
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
@@ -1779,6 +1786,7 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 				testRateLimiterQPS,
 				testLargeClusterThreshold,
 				testUnhealthyThreshold,
+				testPauseEvictionOnFullDisruption,
 				testNodeMonitorGracePeriod,
 				testNodeStartupGracePeriod,
 				testNodeMonitorPeriod,
@@ -1944,6 +1952,7 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
 			testUnhealthyThreshold,
+			testPauseEvictionOnFullDisruption,
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod,
@@ -2046,6 +2055,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyWithWorkerSize(t *testing.T) {
 			testRateLimiterQPS,
 			testLargeClusterThreshold,
 			testUnhealthyThreshold,
+			testPauseEvictionOnFullDisruption,
 			testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod,
 			testNodeMonitorPeriod)
@@ -2249,6 +2259,7 @@ func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
 				testRateLimiterQPS,
 				testLargeClusterThreshold,
 				testUnhealthyThreshold,
+				testPauseEvictionOnFullDisruption,
 				testNodeMonitorGracePeriod,
 				testNodeStartupGracePeriod,
 				testNodeMonitorPeriod,
@@ -2428,6 +2439,7 @@ func TestApplyNoExecuteTaints(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -2624,6 +2636,7 @@ func TestApplyNoExecuteTaintsToNodesEnqueueTwice(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -2847,6 +2860,7 @@ func TestSwapUnreachableNotReadyTaints(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -2951,6 +2965,7 @@ func TestTaintsNodeByCondition(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -3158,6 +3173,7 @@ func TestNodeEventGeneration(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -3231,6 +3247,7 @@ func TestReconcileNodeLabels(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -3378,6 +3395,7 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 		testRateLimiterQPS,
 		testLargeClusterThreshold,
 		testUnhealthyThreshold,
+		testPauseEvictionOnFullDisruption,
 		testNodeMonitorGracePeriod,
 		testNodeStartupGracePeriod,
 		testNodeMonitorPeriod,
@@ -3682,6 +3700,7 @@ func TestProcessPodMarkPodNotReady(t *testing.T) {
 				testRateLimiterQPS,
 				testLargeClusterThreshold,
 				testUnhealthyThreshold,
+				testPauseEvictionOnFullDisruption,
 				testNodeMonitorGracePeriod,
 				testNodeStartupGracePeriod,
 				testNodeMonitorPeriod,
