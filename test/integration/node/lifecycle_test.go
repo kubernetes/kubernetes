@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
+	defaulttolerationsecondspluginapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -314,11 +315,20 @@ func TestTaintBasedEvictions(t *testing.T) {
 		},
 	}
 
+	// Create default toleration seconds configuration
+	var defaultNotReadyTolerationSeconds int64 = 300
+	var defaultUnreachableTolerationSeconds int64 = 300
+	defaultTolerationSecondsConfig := &defaulttolerationsecondspluginapi.Configuration{
+		DefaultTolerationSecondsConfig: defaulttolerationsecondspluginapi.DefaultTolerationSecondsConfig{
+			NotReadyTolerationSeconds:    &defaultNotReadyTolerationSeconds,
+			UnreachableTolerationSeconds: &defaultUnreachableTolerationSeconds,
+		},
+	}
 	// Build admission chain handler.
 	podTolerations := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 	admission := admission.NewChainHandler(
 		podTolerations,
-		defaulttolerationseconds.NewDefaultTolerationSeconds(),
+		defaulttolerationseconds.NewDefaultTolerationSeconds(defaultTolerationSecondsConfig),
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

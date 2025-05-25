@@ -19,8 +19,6 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	"k8s.io/component-base/cli/globalflag"
-
 	// ensure libs have a chance to globally register their flags
 	_ "k8s.io/apiserver/pkg/admission"
 )
@@ -31,7 +29,4 @@ import (
 func AddCustomGlobalFlags(fs *pflag.FlagSet) {
 	// Lookup flags in global flag set and re-register the values with our flagset.
 
-	// Adds flags from k8s.io/apiserver/pkg/admission.
-	globalflag.Register(fs, "default-not-ready-toleration-seconds")
-	globalflag.Register(fs, "default-unreachable-toleration-seconds")
 }

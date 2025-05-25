@@ -18,7 +18,6 @@ package defaulttolerationseconds
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"io"
 
@@ -26,39 +25,32 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
+	"k8s.io/utils/pointer"
 )
 
 // PluginName indicates name of admission plugin.
 const PluginName = "DefaultTolerationSeconds"
 
 var (
-	defaultNotReadyTolerationSeconds = flag.Int64("default-not-ready-toleration-seconds", 300,
-		"Indicates the tolerationSeconds of the toleration for notReady:NoExecute"+
-			" that is added by default to every pod that does not already have such a toleration.")
-
-	defaultUnreachableTolerationSeconds = flag.Int64("default-unreachable-toleration-seconds", 300,
-		"Indicates the tolerationSeconds of the toleration for unreachable:NoExecute"+
-			" that is added by default to every pod that does not already have such a toleration.")
-
-	notReadyToleration = api.Toleration{
-		Key:               v1.TaintNodeNotReady,
-		Operator:          api.TolerationOpExists,
-		Effect:            api.TaintEffectNoExecute,
-		TolerationSeconds: defaultNotReadyTolerationSeconds,
-	}
-
-	unreachableToleration = api.Toleration{
-		Key:               v1.TaintNodeUnreachable,
-		Operator:          api.TolerationOpExists,
-		Effect:            api.TaintEffectNoExecute,
-		TolerationSeconds: defaultUnreachableTolerationSeconds,
-	}
+	defaultNotReadyTolerationSeconds    = pointer.Int64(300)
+	defaultUnreachableTolerationSeconds = pointer.Int64(300)
 )
 
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
-		return NewDefaultTolerationSeconds(), nil
+		pluginConfig, err := loadConfiguration(config)
+		if err != nil {
+			return nil, err
+		}
+		if pluginConfig.DefaultTolerationSecondsConfig.NotReadyTolerationSeconds == nil {
+			pluginConfig.DefaultTolerationSecondsConfig.NotReadyTolerationSeconds = defaultNotReadyTolerationSeconds
+		}
+		if pluginConfig.DefaultTolerationSecondsConfig.UnreachableTolerationSeconds == nil {
+			pluginConfig.DefaultTolerationSecondsConfig.UnreachableTolerationSeconds = defaultUnreachableTolerationSeconds
+		}
+		return NewDefaultTolerationSeconds(pluginConfig), nil
 	})
 }
 
@@ -70,14 +62,32 @@ func Register(plugins *admission.Plugins) {
 // or `unreachable:NoExecute`, the plugin won't touch it.
 type Plugin struct {
 	*admission.Handler
+	pluginConfig *pluginapi.Configuration
+
+	// These two are precomputed during initialization for efficiency
+	notReadyToleration    api.Toleration
+	unreachableToleration api.Toleration
 }
 
 var _ admission.MutationInterface = &Plugin{}
 
 // NewDefaultTolerationSeconds creates a new instance of the DefaultTolerationSeconds admission controller
-func NewDefaultTolerationSeconds() *Plugin {
+func NewDefaultTolerationSeconds(pluginConfig *pluginapi.Configuration) *Plugin {
 	return &Plugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update),
+		Handler:      admission.NewHandler(admission.Create, admission.Update),
+		pluginConfig: pluginConfig,
+		notReadyToleration: api.Toleration{
+			Key:               v1.TaintNodeNotReady,
+			Operator:          api.TolerationOpExists,
+			Effect:            api.TaintEffectNoExecute,
+			TolerationSeconds: pluginConfig.DefaultTolerationSecondsConfig.NotReadyTolerationSeconds,
+		},
+		unreachableToleration: api.Toleration{
+			Key:               v1.TaintNodeUnreachable,
+			Operator:          api.TolerationOpExists,
+			Effect:            api.TaintEffectNoExecute,
+			TolerationSeconds: pluginConfig.DefaultTolerationSecondsConfig.UnreachableTolerationSeconds,
+		},
 	}
 }
 
@@ -114,11 +124,11 @@ func (p *Plugin) Admit(ctx context.Context, attributes admission.Attributes, o a
 	}
 
 	if !toleratesNodeNotReady {
-		pod.Spec.Tolerations = append(pod.Spec.Tolerations, notReadyToleration)
+		pod.Spec.Tolerations = append(pod.Spec.Tolerations, p.notReadyToleration)
 	}
 
 	if !toleratesNodeUnreachable {
-		pod.Spec.Tolerations = append(pod.Spec.Tolerations, unreachableToleration)
+		pod.Spec.Tolerations = append(pod.Spec.Tolerations, p.unreachableToleration)
 	}
 
 	return nil
