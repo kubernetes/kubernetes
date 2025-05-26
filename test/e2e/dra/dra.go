@@ -697,12 +697,24 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		_, expected := b.parametersEnv()
 		expectedEnv = append(expectedEnv, expected...)
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports claim and class parameters", func(ctx context.Context) {
 			pod, template := b.podInline()
 			b.create(ctx, pod, template)
 			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports reusing resources", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pods := make([]*v1.Pod, numPods)
@@ -731,6 +743,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			wg.Wait()
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports sharing a claim concurrently", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			objects = append(objects, b.externalClaim())
@@ -758,6 +776,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			wg.Wait()
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("retries pod scheduling after creating device class", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pod, template := b.podInline()
@@ -779,6 +803,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("retries pod scheduling after updating device class", func(ctx context.Context) {
 			var objects []klog.KMetadata
 			pod, template := b.podInline()
@@ -810,6 +840,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			b.testPod(ctx, f, pod, expectedEnv...)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("runs a pod without a generated resource claim", func(ctx context.Context) {
 			pod, _ /* template */ := b.podInline()
 			created := b.create(ctx, pod)
@@ -828,18 +864,36 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod))
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports simple pod referencing inline resource claim", func(ctx context.Context) {
 			pod, template := b.podInline()
 			b.create(ctx, pod, template)
 			b.testPod(ctx, f, pod)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports inline claim referenced by multiple containers", func(ctx context.Context) {
 			pod, template := b.podInlineMultiple()
 			b.create(ctx, pod, template)
 			b.testPod(ctx, f, pod)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports simple pod referencing external resource claim", func(ctx context.Context) {
 			pod := b.podExternal()
 			claim := b.externalClaim()
@@ -847,6 +901,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			b.testPod(ctx, f, pod)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports external claim referenced by multiple pods", func(ctx context.Context) {
 			pod1 := b.podExternal()
 			pod2 := b.podExternal()
@@ -859,6 +919,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			}
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports external claim referenced by multiple containers of multiple pods", func(ctx context.Context) {
 			pod1 := b.podExternalMultiple()
 			pod2 := b.podExternalMultiple()
@@ -871,6 +937,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			}
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("supports init containers", func(ctx context.Context) {
 			pod, template := b.podInline()
 			pod.Spec.InitContainers = []v1.Container{pod.Spec.Containers[0]}
@@ -882,6 +954,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			b.testPod(ctx, f, pod)
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		ginkgo.It("must deallocate after use", func(ctx context.Context) {
 			pod := b.podExternal()
 			claim := b.externalClaim()
@@ -902,6 +980,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.HaveField("Status.Allocation", (*resourceapi.AllocationResult)(nil)))
 		})
 
+		/*
+		  Release: v1.35
+		  Testname: scheduler: keeps pod pending because of CEL runtime errors
+		  Description: If evaluating a CEL expression in a ResourceClaim fails,
+		  pod scheduling must get aborted.
+		*/
 		f.It("must be possible for the driver to update the ResourceClaim.Status.Devices once allocated", f.WithFeatureGate(features.DRAResourceClaimDeviceStatus), func(ctx context.Context) {
 			pod := b.podExternal()
 			claim := b.externalClaim()
@@ -999,6 +1083,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			driver.WithKubelet = withKubelet
 			b := newBuilder(f, driver)
 
+			/*
+			  Release: v1.35
+			  Testname: 1
+			  Description: If evaluating a CEL expression in a ResourceClaim fails,
+			  pod scheduling must get aborted.
+			*/
 			ginkgo.It("keeps pod pending because of CEL runtime errors", func(ctx context.Context) {
 				// When pod scheduling encounters CEL runtime errors for some nodes, but not all,
 				// it should still not schedule the pod because there is something wrong with it.
@@ -1058,6 +1148,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			driver.WithKubelet = withKubelet
 			b := newBuilder(f, driver)
 
+			/*
+			  Release: v1.35
+			  Testname: scheduler: keeps pod pending because of CEL runtime errors
+			  Description: If evaluating a CEL expression in a ResourceClaim fails,
+			  pod scheduling must get aborted.
+			*/
 			ginkgo.It("uses all resources", func(ctx context.Context) {
 				var objs []klog.KMetadata
 				var pods []*v1.Pod
@@ -1106,6 +1202,12 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 			driver.WithKubelet = withKubelet
 			b := newBuilder(f, driver)
 
+			/*
+			  Release: v1.35
+			  Testname: scheduler: keeps pod pending because of CEL runtime errors
+			  Description: If evaluating a CEL expression in a ResourceClaim fails,
+			  pod scheduling must get aborted.
+			*/
 			f.It("supports sharing a claim sequentially", f.WithSlow(), func(ctx context.Context) {
 				var objects []klog.KMetadata
 				objects = append(objects, b.externalClaim())
@@ -1782,10 +1884,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), framework.With
 		})
 	}
 
-	framework.Context("control plane with single node", func() { singleNodeTests(false) })
+	framework.Context("control plane with single node", framework.WithConformance(), func() { singleNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on single node", func() { singleNodeTests(true) })
 
-	framework.Context("control plane with multiple nodes", func() { multiNodeTests(false) })
+	framework.Context("control plane with multiple nodes", framework.WithConformance(), func() { multiNodeTests(false) })
 	framework.Context("kubelet", feature.DynamicResourceAllocation, "on multiple nodes", func() { multiNodeTests(true) })
 
 	framework.Context("kubelet", feature.DynamicResourceAllocation, f.WithFeatureGate(features.DRAPrioritizedList), prioritizedListTests)
