@@ -339,7 +339,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				f.ClientSet,
 				pod.Namespace,
 				expectedEvent,
-				fmt.Sprintf("old claim with same name %s and different UID %s still exists", klog.KObj(oldClaim), oldClaim.UID),
+				fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", oldClaim.Name, oldClaim.UID),
 				framework.PodStartTimeout*2))
 
 			driver.Fail(unprepareResources, false)
