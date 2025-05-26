@@ -505,7 +505,7 @@ func TestPrepareResources(t *testing.T) {
 			claim:                genTestClaim(claimName, driverName, deviceName, podUID),
 			wantTimeout:          true,
 			expectedPrepareCalls: 1,
-			expectedErrMsg:       "NodePrepareResources failed: rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+			expectedErrMsg:       "NodePrepareResources failed: rpc error: code = DeadlineExceeded",
 		},
 		{
 			description:            "should prepare resource, claim not in cache",
@@ -671,7 +671,7 @@ func TestUnprepareResources(t *testing.T) {
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
-			expectedErrMsg:         "context deadline exceeded",
+			expectedErrMsg:         "NodeUnprepareResources failed: rpc error: code = DeadlineExceeded",
 		},
 		{
 			description:            "should fail when driver returns empty response",
