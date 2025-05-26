@@ -149,7 +149,7 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 		Memory:           rootStats.Memory,
 		Swap:             rootStats.Swap,
 		StartTime:        rootStats.StartTime,
-		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, false),
+		SystemContainers: sp.GetSystemContainersCPUAndMemoryStats(nodeConfig, podStats, true),
 	}
 	summary := statsapi.Summary{
 		Node: nodeStats,
