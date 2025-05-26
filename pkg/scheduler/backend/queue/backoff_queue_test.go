@@ -67,6 +67,13 @@ func TestBackoffQueue_getBackoffTime(t *testing.T) {
 			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 5, ConsecutiveErrorsCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
 			want:                   time.Date(2023, 10, 1, 0, 0, 32, 0, time.UTC),
 		},
+		{
+			name:                   "zero maxBackoffDuration means no backoff",
+			initialBackoffDuration: 0,
+			maxBackoffDuration:     0,
+			podInfo:                &framework.QueuedPodInfo{UnschedulableCount: 16, Timestamp: time.Date(2023, 10, 1, 0, 0, 0, 0, time.UTC)},
+			want:                   time.Time{},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
