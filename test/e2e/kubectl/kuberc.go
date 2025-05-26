@@ -39,19 +39,19 @@ import (
 )
 
 var kuberc = `
-apiVersion: kubectl.config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 aliases:
 - name: getn
   command: get
   prependArgs:
    - namespace
-  flags:
+  options:
    - name: output
      default: json
 - name: runx
   command: run
-  flags:
+  options:
   - name: image
     default: %s
   - name: labels
@@ -65,9 +65,9 @@ aliases:
   - --
   - custom-arg1
   - custom-arg2
-overrides:
+defaults:
 - command: apply
-  flags:
+  options:
   - name: server-side
     default: "true"
   - name: dry-run
@@ -75,11 +75,11 @@ overrides:
   - name: validate
     default: "strict"
 - command: delete
-  flags:
+  options:
   - name: interactive
     default: "true"
 - command: get
-  flags:
+  options:
   - name: namespace
     default: "%s"
   - name: output
