@@ -218,6 +218,10 @@ func (bq *backoffQueue) isPodBackingoff(podInfo *framework.QueuedPodInfo) bool {
 // because of the fact that the backoff time is calculated based on podInfo.Attempts,
 // which doesn't get changed until the pod's scheduling is retried.
 func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Time {
+	if bq.podMaxBackoff == 0 {
+		// If podMaxBackoff is set to 0, the backoff should be disabled completely.
+		return time.Time{}
+	}
 	count := podInfo.UnschedulableCount
 	if podInfo.ConsecutiveErrorsCount > 0 {
 		// This Pod has experienced an error status at the last scheduling cycle,
