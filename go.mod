@@ -14,7 +14,7 @@ require (
 	bitbucket.org/bertimus9/systemstat v0.5.0
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/Microsoft/hnslib v0.0.8
+	github.com/Microsoft/hnslib v0.1.1
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/blang/semver/v4 v4.0.0
