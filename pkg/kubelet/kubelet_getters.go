@@ -120,8 +120,9 @@ func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
 // user namespaces.
 func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error) {
 	rtHandlers := kl.runtimeState.runtimeHandlers()
-	if rtHandlers == nil {
-		return false, fmt.Errorf("runtime handlers are not set")
+	if len(rtHandlers) == 0 {
+		// The slice is empty if the runtime is old and doesn't support this message.
+		return false, nil
 	}
 	for _, h := range rtHandlers {
 		if h.Name == rtHandler {
