@@ -17,9 +17,8 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"fmt"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -74,8 +73,8 @@ func kubeletConfigFromCluster(h *handler, clientset clientset.Interface, _ *kube
 	klog.V(1).Infof("attempting to download the KubeletConfiguration from ConfigMap %q", configMapName)
 	cm, err := h.fromConfigMap(clientset, configMapName, constants.KubeletBaseConfigurationConfigMapKey, true)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not download the kubelet configuration from ConfigMap %q",
-			configMapName)
+		return nil, fmt.Errorf("could not download the kubelet configuration from ConfigMap %q: %w",
+			configMapName, err)
 	}
 	return cm, nil
 }

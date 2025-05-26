@@ -19,11 +19,12 @@ package upgrade
 import (
 	"bufio"
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -53,7 +54,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 	opt := configutil.LoadOrDefaultConfigurationOptions{}
 	upgradeCfg, err := configutil.LoadOrDefaultUpgradeConfiguration(flags.cfgPath, externalCfg, opt)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/upgrade config] FATAL")
+		return nil, nil, nil, nil, fmt.Errorf("[upgrade/upgrade config] FATAL: %w", err)
 	}
 
 	// `dryRun` should be always be `false` for `kubeadm plan`.
@@ -72,7 +73,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	client, err := getClient(flags.kubeConfigPath, *isDryRun, printer)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+		return nil, nil, nil, nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %w", flags.kubeConfigPath, err)
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, ignoreErrCfg)
@@ -94,7 +95,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false, false)
 	if err != nil {
-		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/init config] FATAL")
+		return nil, nil, nil, nil, fmt.Errorf("[upgrade/init config] FATAL: %w", err)
 	}
 
 	// Set the ImagePullPolicy and ImagePullSerial from the UpgradeApplyConfiguration to the InitConfiguration.
@@ -132,7 +133,7 @@ func enforceRequirements(flagSet *pflag.FlagSet, flags *applyPlanFlags, args []s
 
 	// Run healthchecks against the cluster
 	if err := upgrade.CheckClusterHealth(client, &initCfg.ClusterConfiguration, ignorePreflightErrorsSet, dryRun, printer); err != nil {
-		return nil, nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
+		return nil, nil, nil, nil, fmt.Errorf("[upgrade/health] FATAL: %w", err)
 	}
 
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
@@ -202,7 +203,7 @@ func getClient(file string, dryRun bool, printer output.Printer) (clientset.Inte
 			}
 			serverVersion, err = dryRun.Client().Discovery().ServerVersion()
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to get server version")
+				return nil, fmt.Errorf("failed to get server version: %w", err)
 			}
 		} else if os.IsNotExist(err) {
 			// If the file (supposedly admin.conf) does not exist, add more reactors.
@@ -223,7 +224,7 @@ func getClient(file string, dryRun bool, printer output.Printer) (clientset.Inte
 				PrependReactor(dryRun.ListDeploymentsReactor())
 		} else {
 			// Throw an error if the file exists but there was a different stat error.
-			return nil, errors.Wrapf(err, "could not create a client from %q", file)
+			return nil, fmt.Errorf("could not create a client from %q: %w", file, err)
 		}
 
 		// Obtain the FakeDiscovery object for this fake client.

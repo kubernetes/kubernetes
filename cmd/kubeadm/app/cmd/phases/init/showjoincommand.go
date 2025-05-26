@@ -17,11 +17,12 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"text/template"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -89,7 +90,7 @@ func showJoinCommand(c workflow.RunData) error {
 	// Prints the join command, multiple times in case the user has multiple tokens
 	for _, token := range data.Tokens() {
 		if err := printJoinCommand(data.OutputWriter(), adminKubeConfigPath, token, data); err != nil {
-			return errors.Wrap(err, "failed to print join command")
+			return fmt.Errorf("failed to print join command: %w", err)
 		}
 	}
 

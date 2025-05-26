@@ -18,9 +18,8 @@ limitations under the License.
 package node
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -60,7 +59,7 @@ func runKubeconfig() func(c workflow.RunData) error {
 		cfg := data.InitCfg()
 
 		if err := upgrade.UpdateKubeletKubeconfigServer(cfg, data.DryRun()); err != nil {
-			return errors.Wrap(err, "failed to update kubelet local mode")
+			return fmt.Errorf("failed to update kubelet local mode: %w", err)
 		}
 
 		fmt.Println("[upgrade/kubeconfig] The kubeconfig files for this node were successfully upgraded!")

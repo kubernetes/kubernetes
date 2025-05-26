@@ -17,11 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -224,7 +224,7 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 
 	client, err := getClient(applyFlags.kubeConfigPath, *dryRun, printer)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", applyFlags.kubeConfigPath)
+		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %w", applyFlags.kubeConfigPath, err)
 	}
 
 	// Fetches the cluster configuration.
@@ -234,9 +234,9 @@ func newApplyData(cmd *cobra.Command, args []string, applyFlags *applyFlags) (*a
 		if apierrors.IsNotFound(err) {
 			_, _ = printer.Printf("[upgrade] In order to upgrade, a ConfigMap called %q in the %q namespace must exist.\n", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 			_, _ = printer.Printf("[upgrade/config] Use 'kubeadm init phase upload-config kubeadm --config your-config-file' to re-upload it.\n")
-			err = errors.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
+			err = fmt.Errorf("the ConfigMap %q in the %q namespace was not found", constants.KubeadmConfigConfigMap, metav1.NamespaceSystem)
 		}
-		return nil, errors.Wrap(err, "[upgrade] FATAL")
+		return nil, fmt.Errorf("[upgrade] FATAL: %w", err)
 	}
 
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:

@@ -18,10 +18,9 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -64,7 +63,7 @@ func NewAddonPhase() workflow.Phase {
 func shouldUpgradeAddons(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, out io.Writer) (bool, error) {
 	unupgradedControlPlanes, err := upgrade.UnupgradedControlPlaneInstances(client, cfg.NodeRegistration.Name)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to determine whether all the control plane instances have been upgraded")
+		return false, fmt.Errorf("failed to determine whether all the control plane instances have been upgraded: %w", err)
 	}
 	if len(unupgradedControlPlanes) > 0 {
 		fmt.Fprintf(out, "[upgrade/addon] Skipping upgrade of addons because control plane instances %v have not been upgraded\n", unupgradedControlPlanes)

@@ -20,11 +20,10 @@ limitations under the License.
 package initsystem
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // OpenRCInitSystem defines openrc
@@ -89,7 +88,7 @@ func (sysd SystemdInitSystem) EnableCommand(service string) string {
 // reloadSystemd reloads the systemd daemon
 func (sysd SystemdInitSystem) reloadSystemd() error {
 	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return errors.Wrap(err, "failed to reload systemd")
+		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
 	return nil
 }
@@ -164,7 +163,7 @@ func GetInitSystem() (InitSystem, error) {
 		for _, binary := range binaries {
 			_, err = exec.LookPath(binary)
 			if err != nil {
-				return nil, errors.Wrapf(err, "openrc detected, but missing required binary: %s", binary)
+				return nil, fmt.Errorf("openrc detected, but missing required binary: %s: %w", binary, err)
 			}
 		}
 		return &OpenRCInitSystem{}, nil

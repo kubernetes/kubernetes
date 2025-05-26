@@ -18,12 +18,12 @@ package kubeadm
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -44,8 +44,8 @@ func runCmdNoWrap(command string, args ...string) (string, string, int, error) {
 func RunCmd(command string, args ...string) (string, string, int, error) {
 	stdout, stderr, retcode, err := runCmdNoWrap(command, args...)
 	if err != nil {
-		return stdout, stderr, retcode, errors.Wrapf(err, "error running %s %v; \nretcode %d, \nstdout %q, \nstderr %q, \ngot error",
-			command, args, retcode, stdout, stderr)
+		return stdout, stderr, retcode, fmt.Errorf("error running %s %v; \nretcode %d, \nstdout %q, \nstderr %q, \ngot error: %w",
+			command, args, retcode, stdout, stderr, err)
 	}
 	return stdout, stderr, retcode, nil
 }

@@ -17,9 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 
@@ -97,7 +96,7 @@ func runEtcdPhaseLocal() func(c workflow.RunData) error {
 			}
 			fmt.Printf("[etcd] Creating static Pod manifest for local etcd in %q\n", data.ManifestDir())
 			if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun()); err != nil {
-				return errors.Wrap(err, "error creating local etcd static pod manifest file")
+				return fmt.Errorf("error creating local etcd static pod manifest file: %w", err)
 			}
 		} else {
 			klog.V(1).Infoln("[etcd] External etcd mode. Skipping the creation of a manifest for local etcd")

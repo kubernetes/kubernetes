@@ -20,9 +20,8 @@ limitations under the License.
 package preflight
 
 import (
+	"fmt"
 	"syscall"
-
-	"github.com/pkg/errors"
 
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	system "k8s.io/system-validators/validators"
@@ -34,13 +33,13 @@ func (mc MemCheck) Check() (warnings, errorList []error) {
 	info := syscall.Sysinfo_t{}
 	err := syscall.Sysinfo(&info)
 	if err != nil {
-		errorList = append(errorList, errors.Wrapf(err, "failed to get system info"))
+		errorList = append(errorList, fmt.Errorf("failed to get system info: %w", err))
 	}
 
 	// Totalram holds the total usable memory. Unit holds the size of a memory unit in bytes. Multiply them and convert to MB
 	actual := uint64(info.Totalram) * uint64(info.Unit) / 1024 / 1024
 	if actual < mc.Mem {
-		errorList = append(errorList, errors.Errorf("the system RAM (%d MB) is less than the minimum %d MB", actual, mc.Mem))
+		errorList = append(errorList, fmt.Errorf("the system RAM (%d MB) is less than the minimum %d MB", actual, mc.Mem))
 	}
 	return warnings, errorList
 }

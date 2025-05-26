@@ -17,9 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -58,7 +57,7 @@ func documentMapToUpgradeConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepre
 	}
 
 	if len(upgradeBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.UpgradeConfigurationKind)
+		return nil, fmt.Errorf("no %s found in the supplied config", constants.UpgradeConfigurationKind)
 	}
 
 	// Set internalcfg to an empty struct value the deserializer will populate
@@ -85,7 +84,7 @@ func LoadUpgradeConfigurationFromFile(cfgPath string, _ LoadOrDefaultConfigurati
 	// Otherwise, we have a config file. Let's load it.
 	configBytes, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
+		return nil, fmt.Errorf("unable to load config from file %q: %w", cfgPath, err)
 	}
 
 	// Convert documentMap to internal UpgradeConfiguration, InitConfiguration and ClusterConfiguration from config file will be ignored.

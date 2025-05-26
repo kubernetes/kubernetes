@@ -19,10 +19,9 @@ package proxy
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -134,7 +133,7 @@ func printOrCreateKubeProxyObjects(cmByte []byte, dsByte []byte, client clientse
 	// Create the objects if printManifest is false
 	if !printManifest {
 		if err := apiclient.CreateOrUpdate(client.CoreV1().ServiceAccounts(sa.GetNamespace()), sa); err != nil {
-			return errors.Wrap(err, "error when creating kube-proxy service account")
+			return fmt.Errorf("error when creating kube-proxy service account: %w", err)
 		}
 
 		if err := apiclient.CreateOrUpdate(client.RbacV1().ClusterRoleBindings(), crb); err != nil {
@@ -203,7 +202,7 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 
 	proxyBytes, err := kubeProxyCfg.Marshal()
 	if err != nil {
-		return []byte(""), errors.Wrap(err, "error when marshaling")
+		return []byte(""), fmt.Errorf("error when marshaling: %w", err)
 	}
 
 	// Indent the proxy CM bytes with 4 spaces to comply with the location in the template.
@@ -226,7 +225,7 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 			ProxyConfigMapKey:    constants.KubeProxyConfigMapKey,
 		})
 	if err != nil {
-		return []byte(""), errors.Wrap(err, "error when parsing kube-proxy configmap template")
+		return []byte(""), fmt.Errorf("error when parsing kube-proxy configmap template: %w", err)
 	}
 
 	if printManifest {
@@ -235,7 +234,7 @@ func createKubeProxyConfigMap(cfg *kubeadmapi.ClusterConfiguration, localEndpoin
 
 	kubeproxyConfigMap := &v1.ConfigMap{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), configMapBytes, kubeproxyConfigMap); err != nil {
-		return []byte(""), errors.Wrap(err, "unable to decode kube-proxy configmap")
+		return []byte(""), fmt.Errorf("unable to decode kube-proxy configmap: %w", err)
 	}
 
 	if !kubeProxyCfg.IsUserSupplied() {
@@ -253,7 +252,7 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 		ProxyConfigMapKey: constants.KubeProxyConfigMapKey,
 	})
 	if err != nil {
-		return []byte(""), errors.Wrap(err, "error when parsing kube-proxy daemonset template")
+		return []byte(""), fmt.Errorf("error when parsing kube-proxy daemonset template: %w", err)
 	}
 
 	if printManifest {
@@ -262,7 +261,7 @@ func createKubeProxyAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset
 
 	kubeproxyDaemonSet := &apps.DaemonSet{}
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
-		return []byte(""), errors.Wrap(err, "unable to decode kube-proxy daemonset")
+		return []byte(""), fmt.Errorf("unable to decode kube-proxy daemonset: %w", err)
 	}
 	// Propagate the http/https proxy host environment variables to the container
 	env := &kubeproxyDaemonSet.Spec.Template.Spec.Containers[0].Env

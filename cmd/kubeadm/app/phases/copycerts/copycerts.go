@@ -19,12 +19,11 @@ package copycerts
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -56,11 +55,11 @@ const (
 func createShortLivedBootstrapToken(client clientset.Interface) (string, error) {
 	tokenStr, err := bootstraputil.GenerateBootstrapToken()
 	if err != nil {
-		return "", errors.Wrap(err, "error generating token to upload certs")
+		return "", fmt.Errorf("error generating token to upload certs: %w", err)
 	}
 	token, err := bootstraptokenv1.NewBootstrapTokenString(tokenStr)
 	if err != nil {
-		return "", errors.Wrap(err, "error creating upload certs token")
+		return "", fmt.Errorf("error creating upload certs token: %w", err)
 	}
 	tokens := []bootstraptokenv1.BootstrapToken{{
 		Token:       token,
@@ -71,7 +70,7 @@ func createShortLivedBootstrapToken(client clientset.Interface) (string, error) 
 	}}
 
 	if err := nodebootstraptokenphase.CreateNewTokens(client, tokens); err != nil {
-		return "", errors.Wrap(err, "error creating token")
+		return "", fmt.Errorf("error creating token: %w", err)
 	}
 	return tokens[0].Token.ID, nil
 }
@@ -90,7 +89,7 @@ func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, 
 	fmt.Printf("[upload-certs] Storing the certificates in Secret %q in the %q Namespace\n", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
-		return errors.Wrap(err, "error decoding certificate key")
+		return fmt.Errorf("error decoding certificate key: %w", err)
 	}
 	tokenID, err := createShortLivedBootstrapToken(client)
 	if err != nil {
@@ -163,7 +162,7 @@ func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.Own
 	secretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
-		return nil, errors.Wrap(err, "error to get token reference")
+		return nil, fmt.Errorf("error to get token reference: %w", err)
 	}
 
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Secret"}
@@ -221,17 +220,17 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 
 	decodedKey, err := hex.DecodeString(key)
 	if err != nil {
-		return errors.Wrap(err, "error decoding certificate key")
+		return fmt.Errorf("error decoding certificate key: %w", err)
 	}
 
 	secret, err := getSecret(client)
 	if err != nil {
-		return errors.Wrap(err, "error downloading the secret")
+		return fmt.Errorf("error downloading the secret: %w", err)
 	}
 
 	secretData, err := getDataFromSecret(secret, decodedKey)
 	if err != nil {
-		return errors.Wrap(err, "error decoding secret data with provided key")
+		return fmt.Errorf("error decoding secret data with provided key: %w", err)
 	}
 
 	fmt.Printf("[download-certs] Saving the certificates to the folder: %q\n", cfg.CertificatesDir)
@@ -239,7 +238,7 @@ func DownloadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration
 	for certOrKeyName, certOrKeyPath := range certsToTransfer(cfg) {
 		certOrKeyData, found := secretData[certOrKeyNameToSecretName(certOrKeyName)]
 		if !found {
-			return errors.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
+			return fmt.Errorf("the Secret does not include the required certificate or key - name: %s, path: %s", certOrKeyName, certOrKeyPath)
 		}
 		if len(certOrKeyData) == 0 {
 			klog.V(1).Infof("[download-certs] Not saving %q to disk, since it is empty in the %q Secret\n", certOrKeyName, kubeadmconstants.KubeadmCertsSecret)
@@ -266,7 +265,7 @@ func getSecret(client clientset.Interface) (*v1.Secret, error) {
 	secret, err := client.CoreV1().Secrets(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeadmCertsSecret, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, errors.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
+			return nil, fmt.Errorf("Secret %q was not found in the %q Namespace. This Secret might have expired. Please, run `kubeadm init phase upload-certs --upload-certs` on a control plane to generate a new one", kubeadmconstants.KubeadmCertsSecret, metav1.NamespaceSystem)
 		}
 		return nil, err
 	}

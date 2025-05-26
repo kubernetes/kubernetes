@@ -29,7 +29,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 
@@ -157,7 +156,7 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 	// Marshal the Pod manifest into YAML.
 	podYAML, err := kubeadmutil.MarshalToYaml(pod, v1.SchemeGroupVersion)
 	if err != nil {
-		return pod, errors.Wrapf(err, "failed to marshal Pod manifest to YAML")
+		return pod, fmt.Errorf("failed to marshal Pod manifest to YAML: %w", err)
 	}
 
 	patchManager, err := patches.GetPatchManagerForPath(patchesDir, patches.KnownTargets(), output)
@@ -176,12 +175,12 @@ func PatchStaticPod(pod *v1.Pod, patchesDir string, output io.Writer) (*v1.Pod, 
 
 	obj, err := kubeadmutil.UniversalUnmarshal(patchTarget.Data)
 	if err != nil {
-		return pod, errors.Wrap(err, "failed to unmarshal patched manifest")
+		return pod, fmt.Errorf("failed to unmarshal patched manifest: %w", err)
 	}
 
 	pod2, ok := obj.(*v1.Pod)
 	if !ok {
-		return pod, errors.Wrap(err, "patched manifest is not a valid Pod object")
+		return pod, fmt.Errorf("patched manifest is not a valid Pod object: %w", err)
 	}
 
 	return pod2, nil
@@ -192,19 +191,19 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(manifestDir, 0700); err != nil {
-		return errors.Wrapf(err, "failed to create directory %q", manifestDir)
+		return fmt.Errorf("failed to create directory %q: %w", manifestDir, err)
 	}
 
 	// writes the pod to disk
 	serialized, err := kubeadmutil.MarshalToYaml(&pod, v1.SchemeGroupVersion)
 	if err != nil {
-		return errors.Wrapf(err, "failed to marshal manifest for %q to YAML", componentName)
+		return fmt.Errorf("failed to marshal manifest for %q to YAML: %w", componentName, err)
 	}
 
 	filename := kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir)
 
 	if err := os.WriteFile(filename, serialized, 0600); err != nil {
-		return errors.Wrapf(err, "failed to write static pod manifest file for %q (%q)", componentName, filename)
+		return fmt.Errorf("failed to write static pod manifest file for %q (%q): %w", componentName, filename, err)
 	}
 
 	return nil
@@ -214,17 +213,17 @@ func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	buf, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return &v1.Pod{}, errors.Wrapf(err, "failed to read manifest for %q", manifestPath)
+		return &v1.Pod{}, fmt.Errorf("failed to read manifest for %q: %w", manifestPath, err)
 	}
 
 	obj, err := kubeadmutil.UniversalUnmarshal(buf)
 	if err != nil {
-		return &v1.Pod{}, errors.Errorf("failed to unmarshal manifest for %q: %v", manifestPath, err)
+		return &v1.Pod{}, fmt.Errorf("failed to unmarshal manifest for %q: %v", manifestPath, err)
 	}
 
 	pod, ok := obj.(*v1.Pod)
 	if !ok {
-		return &v1.Pod{}, errors.Errorf("failed to parse Pod object defined in %q", manifestPath)
+		return &v1.Pod{}, fmt.Errorf("failed to parse Pod object defined in %q", manifestPath)
 	}
 
 	return pod, nil
@@ -384,12 +383,12 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, string, error) {
 
 	manifest1, err := kubeadmutil.MarshalToYaml(pod1, v1.SchemeGroupVersion)
 	if err != nil {
-		return false, "", errors.Wrapf(err, "failed to marshal Pod manifest for %q to YAML", path1)
+		return false, "", fmt.Errorf("failed to marshal Pod manifest for %q to YAML: %w", path1, err)
 	}
 
 	manifest2, err := kubeadmutil.MarshalToYaml(pod2, v1.SchemeGroupVersion)
 	if err != nil {
-		return false, "", errors.Wrapf(err, "failed to marshal Pod manifest for %q to YAML", path2)
+		return false, "", fmt.Errorf("failed to marshal Pod manifest for %q to YAML: %w", path2, err)
 	}
 
 	diff := difflib.UnifiedDiff{
@@ -399,7 +398,7 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, string, error) {
 
 	diffStr, err := difflib.GetUnifiedDiffString(diff)
 	if err != nil {
-		return false, "", errors.Wrapf(err, "failed to generate the differences between manifest %q and manifest %q", path1, path2)
+		return false, "", fmt.Errorf("failed to generate the differences between manifest %q and manifest %q: %w", path1, path2, err)
 	}
 
 	return false, diffStr, nil

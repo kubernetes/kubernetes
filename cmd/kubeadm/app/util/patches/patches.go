@@ -19,6 +19,7 @@ package patches
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -28,7 +29,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pkg/errors"
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -172,7 +172,7 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 	var patchedData []byte
 
 	if !slices.Contains(pm.knownTargets, patchTarget.Name) {
-		return errors.Errorf("unknown patch target name %q, must be one of %v", patchTarget.Name, pm.knownTargets)
+		return fmt.Errorf("unknown patch target name %q, must be one of %v", patchTarget.Name, pm.knownTargets)
 	}
 
 	// Always convert the target data to JSON.
@@ -216,9 +216,10 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 			}
 
 			if err != nil {
-				return errors.Wrapf(err, "could not apply the following patch of type %q to target %q:\n%s\n",
+				return fmt.Errorf("could not apply the following patch of type %q to target %q: %w\n%s\n",
 					patchSet.patchType,
 					patchTarget.Name,
+					err,
 					patch)
 			}
 			fmt.Fprintf(pm.output, "[patches] Applied patch of type %q to target %q\n", patchSet.patchType, patchTarget.Name)
@@ -238,7 +239,7 @@ func (pm *PatchManager) ApplyPatchesToTarget(patchTarget *PatchTarget) error {
 func parseFilename(fileName string, knownTargets []string) (string, types.PatchType, error, error) {
 	// Return a warning if the extension cannot be matched.
 	if !regExtension.MatchString(fileName) {
-		return "", "", errors.Errorf("the file extension must be one of %v", knownExtensions), nil
+		return "", "", fmt.Errorf("the file extension must be one of %v", knownExtensions), nil
 	}
 
 	regFileNameSplit := regexp.MustCompile(
@@ -248,12 +249,12 @@ func parseFilename(fileName string, knownTargets []string) (string, types.PatchT
 	//   [full-match, targetName, suffix, +, patchType]
 	sub := regFileNameSplit.FindStringSubmatch(fileName)
 	if sub == nil {
-		return "", "", errors.Errorf("unknown target, must be one of %v", knownTargets), nil
+		return "", "", fmt.Errorf("unknown target, must be one of %v", knownTargets), nil
 	}
 	targetName := sub[1]
 
 	if len(sub[3]) > 0 && len(sub[4]) == 0 {
-		return "", "", nil, errors.Errorf("unknown or missing patch type after '+', must be one of %v", patchTypeList)
+		return "", "", nil, fmt.Errorf("unknown or missing patch type after '+', must be one of %v", patchTypeList)
 	}
 	patchType := patchTypes[sub[4]]
 
@@ -273,7 +274,7 @@ func CreatePatchSet(targetName string, patchType types.PatchType, data string) (
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, errors.Wrapf(err, "could not split patches for data:\n%s\n", data)
+			return nil, fmt.Errorf("could not split patches for data:\n%s\n: %w", data, err)
 		}
 
 		patch = bytes.TrimSpace(patch)
@@ -283,7 +284,7 @@ func CreatePatchSet(targetName string, patchType types.PatchType, data string) (
 
 		patchJSON, err := yaml.YAMLToJSON(patch)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not convert patch to JSON:\n%s\n", patch)
+			return nil, fmt.Errorf("could not convert patch to JSON:\n%s\n: %w", patch, err)
 		}
 		patches = append(patches, string(patchJSON))
 	}
@@ -342,7 +343,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		// Read the patch file.
 		data, err := os.ReadFile(path)
 		if err != nil {
-			return errors.Wrapf(err, "could not read the file %q", path)
+			return fmt.Errorf("could not read the file %q: %w", path, err)
 		}
 
 		if len(data) == 0 {
@@ -364,7 +365,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 
 return_path_error:
 	if err != nil {
-		return nil, nil, nil, errors.Wrapf(err, "could not list patch files for path %q", targetPath)
+		return nil, nil, nil, fmt.Errorf("could not list patch files for path %q: %w", targetPath, err)
 	}
 
 	return patchSets, patchFiles, ignoredFiles, nil

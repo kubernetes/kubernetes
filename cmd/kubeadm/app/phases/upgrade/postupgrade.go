@@ -23,8 +23,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -54,10 +52,10 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list kube-apiserver Pod from cluster")
+		return nil, fmt.Errorf("failed to list kube-apiserver Pod from cluster: %w", err)
 	}
 	if len(pods.Items) == 0 {
-		return nil, errors.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
+		return nil, fmt.Errorf("cannot find kube-apiserver Pod by label selector: %v", selector.String())
 	}
 
 	nodeImageMap := map[string]string{}
@@ -72,13 +70,13 @@ func UnupgradedControlPlaneInstances(client clientset.Interface, nodeName string
 			}
 		}
 		if !found {
-			return nil, errors.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
+			return nil, fmt.Errorf("cannot find container by name %q for Pod %v", kubeadmconstants.KubeAPIServer, klog.KObj(&pod))
 		}
 	}
 
 	upgradedImage, ok := nodeImageMap[nodeName]
 	if !ok {
-		return nil, errors.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
+		return nil, fmt.Errorf("cannot find kube-apiserver image for current control plane instance %v", nodeName)
 	}
 
 	unupgradedNodes := sets.New[string]()
@@ -124,7 +122,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 		fmt.Printf("[upgrade] Backing up kubelet config file to %s\n", dest)
 		err := kubeadmutil.CopyFile(src, dest)
 		if err != nil {
-			return errors.Wrap(err, "error backing up the kubelet config file")
+			return fmt.Errorf("error backing up the kubelet config file: %w", err)
 		}
 	} else {
 		fmt.Printf("[dryrun] Would back up kubelet config file to %s\n", dest)
@@ -159,7 +157,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
 				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
 			} else {
-				return errors.Wrap(err, "error reading kubeadm flags file")
+				return fmt.Errorf("error reading kubeadm flags file: %w", err)
 			}
 
 			kubeletConfig := &kubeletconfig.KubeletConfiguration{
@@ -167,13 +165,13 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 			}
 
 			if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, kubeletDir); err != nil {
-				return errors.Wrap(err, "error writing kubelet instance configuration")
+				return fmt.Errorf("error writing kubelet instance configuration: %w", err)
 			}
 
 			if dryRun { // Print what contents would be written
 				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 				if err != nil {
-					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
+					return fmt.Errorf("error printing kubelet instance configuration file on dryrun: %w", err)
 				}
 			}
 		}
@@ -181,13 +179,13 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletConfigDir
 
 	// Write the configuration for the kubelet down to disk so the upgraded kubelet can start with fresh config
 	if err := kubeletphase.WriteConfigToDisk(&cfg.ClusterConfiguration, kubeletDir, patchesDir, out); err != nil {
-		return errors.Wrap(err, "error writing kubelet configuration to file")
+		return fmt.Errorf("error writing kubelet configuration to file: %w", err)
 	}
 
 	if dryRun { // Print what contents would be written
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, os.Stdout)
 		if err != nil {
-			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
+			return fmt.Errorf("error printing kubelet configuration file on dryrun: %w", err)
 		}
 	}
 	return nil
@@ -215,7 +213,7 @@ func UpdateKubeletKubeconfigServer(cfg *kubeadmapi.InitConfiguration, dryRun boo
 
 	configContext, ok := config.Contexts[config.CurrentContext]
 	if !ok {
-		return errors.Errorf("cannot find cluster for active context in kubeconfig %q", kubeletKubeConfigFilePath)
+		return fmt.Errorf("cannot find cluster for active context in kubeconfig %q", kubeletKubeConfigFilePath)
 	}
 
 	localAPIEndpoint, err := kubeadmutil.GetLocalAPIEndpoint(&cfg.LocalAPIEndpoint)

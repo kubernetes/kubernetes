@@ -17,13 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"slices"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -355,7 +355,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 	dryRunDir := ""
 	if initOptions.dryRun || cfg.DryRun {
 		if dryRunDir, err = kubeadmconstants.GetDryRunDir(kubeadmconstants.EnvVarInitDryRunDir, "kubeadm-init-dryrun", klog.Warningf); err != nil {
-			return nil, errors.Wrap(err, "couldn't create a temporary directory")
+			return nil, fmt.Errorf("couldn't create a temporary directory: %w", err)
 		}
 	}
 
@@ -365,7 +365,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		// In case the certificates signed by CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the CA Key
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid or incomplete external CA")
+			return nil, fmt.Errorf("invalid or incomplete external CA: %w", err)
 		}
 
 		// Validate that also the required kubeconfig files exists and are invalid, because
@@ -382,7 +382,7 @@ func newInitData(cmd *cobra.Command, args []string, initOptions *initOptions, ou
 		// In case the certificates signed by Front-Proxy CA (that should be provided by the user) are missing or invalid,
 		// returns, because kubeadm can't regenerate them without the Front-Proxy CA Key
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid or incomplete external front-proxy CA")
+			return nil, fmt.Errorf("invalid or incomplete external front-proxy CA: %w", err)
 		}
 	}
 
@@ -550,7 +550,7 @@ func (d *initData) Client() (clientset.Interface, error) {
 				// Call EnsureAdminClusterRoleBinding() to obtain a working client from admin.conf.
 				d.client, err = kubeconfigphase.EnsureAdminClusterRoleBinding(kubeadmconstants.KubernetesDir, nil)
 				if err != nil {
-					return nil, errors.Wrapf(err, "could not bootstrap the admin user in file %s", kubeadmconstants.AdminKubeConfigFileName)
+					return nil, fmt.Errorf("could not bootstrap the admin user in file %s: %w", kubeadmconstants.AdminKubeConfigFileName, err)
 				}
 				d.adminKubeConfigBootstrapped = true
 			} else {

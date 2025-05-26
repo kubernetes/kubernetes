@@ -24,8 +24,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pkg/errors"
-
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/klog/v2"
 
@@ -96,7 +94,7 @@ func (k *KubeadmCert) GetConfig(ic *kubeadmapi.InitConfiguration) (*pkiutil.Cert
 func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x509.Certificate, caKey crypto.Signer) error {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't create %q certificate", k.Name)
+		return fmt.Errorf("couldn't create %q certificate: %w", k.Name, err)
 	}
 	cert, key, err := pkiutil.NewCertAndKey(caCert, caKey, cfg)
 	if err != nil {
@@ -112,7 +110,7 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 	)
 
 	if err != nil {
-		return errors.Wrapf(err, "failed to write or validate certificate %q", k.Name)
+		return fmt.Errorf("failed to write or validate certificate %q: %w", k.Name, err)
 	}
 
 	return nil
@@ -122,11 +120,11 @@ func (k *KubeadmCert) CreateFromCA(ic *kubeadmapi.InitConfiguration, caCert *x50
 func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certificate, crypto.Signer, error) {
 	cfg, err := k.GetConfig(ic)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't get configuration for %q CA certificate", k.Name)
+		return nil, nil, fmt.Errorf("couldn't get configuration for %q CA certificate: %w", k.Name, err)
 	}
 	caCert, caKey, err := pkiutil.NewCertificateAuthority(cfg)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't generate %q CA certificate", k.Name)
+		return nil, nil, fmt.Errorf("couldn't generate %q CA certificate: %w", k.Name, err)
 	}
 
 	err = writeCertificateAuthorityFilesIfNotExist(
@@ -136,7 +134,7 @@ func (k *KubeadmCert) CreateAsCA(ic *kubeadmapi.InitConfiguration) (*x509.Certif
 		caKey,
 	)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "couldn't write out %q CA certificate", k.Name)
+		return nil, nil, fmt.Errorf("couldn't write out %q CA certificate: %w", k.Name, err)
 	}
 
 	return caCert, caKey, nil
@@ -162,7 +160,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 
 			// Cert exists already, make sure it's valid
 			if !caCert.IsCA {
-				return errors.Errorf("certificate %q is not a CA", ca.Name)
+				return fmt.Errorf("certificate %q is not a CA", ca.Name)
 			}
 			// Try and load a CA Key
 			caKey, err = pkiutil.TryLoadKeyFromDisk(ic.CertificatesDir, ca.BaseName)
@@ -175,7 +173,7 @@ func (t CertificateTree) CreateTree(ic *kubeadmapi.InitConfiguration) error {
 						uxName:   leaf.Name,
 					}
 					if err := validateSignedCertWithCA(cl, caCert); err != nil {
-						return errors.Wrapf(err, "could not load expected certificate %q or validate the existence of key %q for it", leaf.Name, ca.Name)
+						return fmt.Errorf("could not load expected certificate %q or validate the existence of key %q for it: %w", leaf.Name, ca.Name, err)
 					}
 				}
 				continue
@@ -224,7 +222,7 @@ func (m CertificateMap) CertTree() (CertificateTree, error) {
 		} else {
 			ca, ok := m[cert.CAName]
 			if !ok {
-				return nil, errors.Errorf("certificate %q references unknown CA %q", cert.Name, cert.CAName)
+				return nil, fmt.Errorf("certificate %q references unknown CA %q", cert.Name, cert.CAName)
 			}
 			caMap[ca] = append(caMap[ca], cert)
 		}
@@ -478,15 +476,15 @@ func leafCertificates(c Certificates) (Certificates, error) {
 
 func createKeyAndCSR(kubeadmConfig *kubeadmapi.InitConfiguration, cert *KubeadmCert) error {
 	if kubeadmConfig == nil {
-		return errors.Errorf("%s: kubeadmConfig was nil", errInvalid)
+		return fmt.Errorf("%s: kubeadmConfig was nil", errInvalid)
 	}
 	if cert == nil {
-		return errors.Errorf("%s: cert was nil", errInvalid)
+		return fmt.Errorf("%s: cert was nil", errInvalid)
 	}
 	certDir := kubeadmConfig.CertificatesDir
 	name := cert.BaseName
 	if pkiutil.CSROrKeyExist(certDir, name) {
-		return errors.Errorf("%s: key or CSR %s/%s", errExist, certDir, name)
+		return fmt.Errorf("%s: key or CSR %s/%s", errExist, certDir, name)
 	}
 	cfg, err := cert.GetConfig(kubeadmConfig)
 	if err != nil {

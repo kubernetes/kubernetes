@@ -19,12 +19,11 @@ package certs
 import (
 	"bytes"
 	"crypto/x509"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	certutil "k8s.io/client-go/util/cert"
@@ -705,7 +704,7 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 func deleteCertOrKey(name string) func(*kubeadmapi.InitConfiguration) error {
 	return func(cfg *kubeadmapi.InitConfiguration) error {
 		if err := os.Remove(filepath.Join(cfg.CertificatesDir, name)); err != nil {
-			return errors.Wrapf(err, "failed removing %s", name)
+			return fmt.Errorf("failed removing %s: %w", name, err)
 		}
 		return nil
 	}

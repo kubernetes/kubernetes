@@ -17,9 +17,9 @@ limitations under the License.
 package patchnode
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -48,7 +48,7 @@ func RemoveCRISocketAnnotation(client clientset.Interface, nodeName string) erro
 	klog.V(1).Infof("[patchnode] Removing the CRI socket annotation from Node %q", nodeName)
 
 	if err := apiclient.PatchNode(client, nodeName, removeNodeCRISocketAnnotation); err != nil {
-		return errors.Wrapf(err, "could not remove the CRI socket annotation from Node %q", nodeName)
+		return fmt.Errorf("could not remove the CRI socket annotation from Node %q: %w", nodeName, err)
 	}
 	return nil
 }

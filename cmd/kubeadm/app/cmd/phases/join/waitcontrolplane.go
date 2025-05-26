@@ -17,10 +17,10 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"time"
-
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -57,7 +57,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 
 	initCfg, err := data.InitCfg()
 	if err != nil {
-		return errors.Wrap(err, "could not obtain InitConfiguration during the wait-control-plane phase")
+		return fmt.Errorf("could not obtain InitConfiguration during the wait-control-plane phase: %w", err)
 	}
 
 	// TODO: remove this check once WaitForAllControlPlaneComponents goes GA
@@ -74,7 +74,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 
 	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, client, data.OutputWriter())
 	if err != nil {
-		return errors.Wrap(err, "error creating waiter")
+		return fmt.Errorf("error creating waiter: %w", err)
 	}
 
 	waiter.SetTimeout(data.Cfg().Timeouts.ControlPlaneComponentHealthCheck.Duration)
@@ -86,7 +86,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	if err = waiter.WaitForControlPlaneComponents(pods,
 		data.Cfg().ControlPlane.LocalAPIEndpoint.AdvertiseAddress); err != nil {
 		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
-		return errors.Wrap(err, "failed while waiting for the control plane to start")
+		return fmt.Errorf("failed while waiting for the control plane to start: %w", err)
 	}
 
 	return nil

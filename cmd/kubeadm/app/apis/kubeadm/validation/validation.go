@@ -26,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	corev1 "k8s.io/api/core/v1"
@@ -526,7 +525,7 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 		// assume it is an integer, if not it will fail later
 		maskSize, err = strconv.Atoi(maskValue)
 		if err != nil {
-			return 0, errors.Wrapf(err, "could not parse the value of the kube-controller-manager flag %s as an integer", maskArg)
+			return 0, fmt.Errorf("could not parse the value of the kube-controller-manager flag %s as an integer: %w", maskArg, err)
 		}
 	} else if isIPv6 {
 		maskSize = defaultNodeMaskCIDRIPv6
@@ -597,7 +596,7 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 	})
 
 	if len(mixedInvalidFlags) != 0 {
-		return errors.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
+		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
 	}
 	return nil
 }
@@ -788,18 +787,18 @@ func ValidateCertValidity(cfg *kubeadm.ClusterConfiguration) []error {
 	var allErrs []error
 	if cfg.CertificateValidityPeriod != nil && cfg.CertificateValidityPeriod.Duration > constants.CertificateValidityPeriod {
 		allErrs = append(allErrs,
-			errors.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
+			fmt.Errorf("certificateValidityPeriod: the value %v is more than the recommended default for certificate expiration: %v",
 				cfg.CertificateValidityPeriod.Duration, constants.CertificateValidityPeriod))
 	}
 	if cfg.CACertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod.Duration > constants.CACertificateValidityPeriod {
 		allErrs = append(allErrs,
-			errors.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
+			fmt.Errorf("caCertificateValidityPeriod: the value %v is more than the recommended default for CA certificate expiration: %v",
 				cfg.CACertificateValidityPeriod.Duration, constants.CACertificateValidityPeriod))
 	}
 	if cfg.CertificateValidityPeriod != nil && cfg.CACertificateValidityPeriod != nil {
 		if cfg.CertificateValidityPeriod.Duration > cfg.CACertificateValidityPeriod.Duration {
 			allErrs = append(allErrs,
-				errors.Errorf("certificateValidityPeriod: the value %v is more than the caCertificateValidityPeriod: %v",
+				fmt.Errorf("certificateValidityPeriod: the value %v is more than the caCertificateValidityPeriod: %v",
 					cfg.CertificateValidityPeriod.Duration, cfg.CACertificateValidityPeriod.Duration))
 		}
 	}

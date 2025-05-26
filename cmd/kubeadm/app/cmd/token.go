@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -26,7 +27,6 @@ import (
 	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,7 +163,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return errors.Wrap(err, "could not construct output printer")
+				return fmt.Errorf("could not construct output printer: %w", err)
 			}
 
 			return RunListTokens(out, errW, client, printer)
@@ -187,7 +187,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		`),
 		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				return errors.Errorf("missing argument; 'token delete' is missing token of form %q or %q", bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
+				return fmt.Errorf("missing argument; 'token delete' is missing token of form %q or %q", bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientForTokenCommands(kubeConfigFile, dryRun)
@@ -259,7 +259,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 			skipCertificateKeyPrint := false
 			joinCommand, err := cmdutil.GetJoinControlPlaneCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), certificateKey, skipTokenPrint, skipCertificateKeyPrint)
 			if err != nil {
-				return errors.Wrap(err, "failed to get join command")
+				return fmt.Errorf("failed to get join command: %w", err)
 			}
 			joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
 			joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
@@ -267,7 +267,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 		} else {
 			joinCommand, err := cmdutil.GetJoinWorkerCommand(kubeConfigFile, internalcfg.BootstrapTokens[0].Token.String(), skipTokenPrint)
 			if err != nil {
-				return errors.Wrap(err, "failed to get join command")
+				return fmt.Errorf("failed to get join command: %w", err)
 			}
 			joinCommand = strings.ReplaceAll(joinCommand, "\\\n", "")
 			joinCommand = strings.ReplaceAll(joinCommand, "\t", "")
@@ -374,7 +374,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 	klog.V(1).Info("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(context.TODO(), listOptions)
 	if err != nil {
-		return errors.Wrap(err, "failed to list bootstrap tokens")
+		return fmt.Errorf("failed to list bootstrap tokens: %w", err)
 	}
 
 	for _, secret := range secrets.Items {
@@ -398,7 +398,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 		}
 
 		if err := printer.PrintObj(&outputToken, out); err != nil {
-			return errors.Wrapf(err, "unable to print token %s", token.Token)
+			return fmt.Errorf("unable to print token %s: %w", token.Token, err)
 		}
 	}
 	return nil
@@ -414,7 +414,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 			bts, err := bootstraptokenv1.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
-				return errors.Errorf("given token didn't match pattern %q or %q",
+				return fmt.Errorf("given token didn't match pattern %q or %q",
 					bootstrapapi.BootstrapTokenPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			tokenID = bts.ID
@@ -423,7 +423,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
 		klog.V(1).Infof("[token] deleting token %q", tokenID)
 		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, metav1.DeleteOptions{}); err != nil {
-			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
+			return fmt.Errorf("failed to delete bootstrap token %q: %w", tokenID, err)
 		}
 		fmt.Fprintf(out, "bootstrap token %q deleted\n", tokenID)
 	}

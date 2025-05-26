@@ -17,11 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 )
@@ -64,7 +63,7 @@ func MoveFile(src, dest string) error {
 		// although it is less efficient than os.Rename().
 		klog.V(4).Infof("cannot rename %v to %v due to %v, attempting an alternative method", src, dest, err)
 		if err := CopyFile(src, dest); err != nil {
-			return errors.Wrapf(err, "failed to copy file %v to %v", src, dest)
+			return fmt.Errorf("failed to copy file %v to %v: %w", src, dest, err)
 		}
 		return os.Remove(src)
 	}

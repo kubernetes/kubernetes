@@ -18,9 +18,9 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"io"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"

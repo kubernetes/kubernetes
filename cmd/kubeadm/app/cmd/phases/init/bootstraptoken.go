@@ -17,9 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -89,19 +88,19 @@ func runBootstrapToken(c workflow.RunData) error {
 	fmt.Println("[bootstrap-token] Configuring bootstrap tokens, cluster-info ConfigMap, RBAC Roles")
 	// Create the default node bootstrap token
 	if err := nodebootstraptokenphase.UpdateOrCreateTokens(client, false, data.Cfg().BootstrapTokens); err != nil {
-		return errors.Wrap(err, "error updating or creating token")
+		return fmt.Errorf("error updating or creating token: %w", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get nodes
 	if err := nodebootstraptokenphase.AllowBootstrapTokensToGetNodes(client); err != nil {
-		return errors.Wrap(err, "error allowing bootstrap tokens to get Nodes")
+		return fmt.Errorf("error allowing bootstrap tokens to get Nodes: %w", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to post CSRs
 	if err := nodebootstraptokenphase.AllowBootstrapTokensToPostCSRs(client); err != nil {
-		return errors.Wrap(err, "error allowing bootstrap tokens to post CSRs")
+		return fmt.Errorf("error allowing bootstrap tokens to post CSRs: %w", err)
 	}
 	// Create RBAC rules that makes the bootstrap tokens able to get their CSRs approved automatically
 	if err := nodebootstraptokenphase.AutoApproveNodeBootstrapTokens(client); err != nil {
-		return errors.Wrap(err, "error auto-approving node bootstrap tokens")
+		return fmt.Errorf("error auto-approving node bootstrap tokens: %w", err)
 	}
 
 	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
@@ -111,10 +110,10 @@ func runBootstrapToken(c workflow.RunData) error {
 
 	// Create the cluster-info ConfigMap with the associated RBAC rules
 	if err := clusterinfophase.CreateBootstrapConfigMapIfNotExists(client, kubeconfig); err != nil {
-		return errors.Wrap(err, "error creating bootstrap ConfigMap")
+		return fmt.Errorf("error creating bootstrap ConfigMap: %w", err)
 	}
 	if err := clusterinfophase.CreateClusterInfoRBACRules(client); err != nil {
-		return errors.Wrap(err, "error creating clusterinfo RBAC rules")
+		return fmt.Errorf("error creating clusterinfo RBAC rules: %w", err)
 	}
 	return nil
 }

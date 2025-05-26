@@ -17,10 +17,9 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -88,7 +87,7 @@ func LoadResetConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurat
 
 	b, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
+		return nil, fmt.Errorf("unable to read config from %q : %w", cfgPath, err)
 	}
 
 	return BytesToResetConfiguration(b, opts)
@@ -136,7 +135,7 @@ func documentMapToResetConfiguration(gvkmap kubeadmapi.DocumentMap, allowDepreca
 	}
 
 	if len(resetBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, fmt.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.ResetConfiguration{}

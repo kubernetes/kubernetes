@@ -17,9 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -69,7 +68,7 @@ func runUploadCerts(c workflow.RunData) error {
 	}
 
 	if err := copycerts.UploadCerts(client, data.Cfg(), data.CertificateKey()); err != nil {
-		return errors.Wrap(err, "error uploading certs")
+		return fmt.Errorf("error uploading certs: %w", err)
 	}
 	if !data.SkipCertificateKeyPrint() {
 		fmt.Printf("[upload-certs] Using certificate key:\n%s\n", data.CertificateKey())

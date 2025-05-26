@@ -17,9 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 
@@ -75,7 +74,7 @@ func runKubeletStart(c workflow.RunData) error {
 	// as we handle that ourselves in the mark-control-plane phase
 	// TODO: Maybe we want to do that some time in the future, in order to remove some logic from the mark-control-plane phase?
 	if err := kubeletphase.WriteKubeletDynamicEnvFile(&data.Cfg().ClusterConfiguration, &data.Cfg().NodeRegistration, false, data.KubeletDir()); err != nil {
-		return errors.Wrap(err, "error writing a dynamic environment file for the kubelet")
+		return fmt.Errorf("error writing a dynamic environment file for the kubelet: %w", err)
 	}
 
 	// Write the instance kubelet configuration file to disk.
@@ -84,13 +83,13 @@ func runKubeletStart(c workflow.RunData) error {
 			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
 		}
 		if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
-			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
+			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 		}
 	}
 
 	// Write the kubelet configuration file to disk.
 	if err := kubeletphase.WriteConfigToDisk(&data.Cfg().ClusterConfiguration, data.KubeletDir(), data.PatchesDir(), data.OutputWriter()); err != nil {
-		return errors.Wrap(err, "error writing kubelet configuration to disk")
+		return fmt.Errorf("error writing kubelet configuration to disk: %w", err)
 	}
 
 	// Try to start the kubelet service in case it's inactive

@@ -19,9 +19,8 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -65,11 +64,11 @@ func CreateOrUpdate[T kubernetesObject](client kubernetesInterface[T], obj T) er
 			ctx := context.Background()
 			if _, err := client.Create(ctx, obj, metav1.CreateOptions{}); err != nil {
 				if !apierrors.IsAlreadyExists(err) {
-					lastError = errors.Wrapf(err, "unable to create %T", obj)
+					lastError = fmt.Errorf("unable to create %T: %w", obj, err)
 					return false, nil
 				}
 				if _, err := client.Update(ctx, obj, metav1.UpdateOptions{}); err != nil {
-					lastError = errors.Wrapf(err, "unable to update %T", obj)
+					lastError = fmt.Errorf("unable to update %T: %w", obj, err)
 					return false, nil
 				}
 			}
@@ -116,10 +115,10 @@ func CreateOrMutate[T kubernetesObject](client kubernetesInterface[T], obj T, mu
 func mutate[T kubernetesObject](ctx context.Context, client kubernetesInterface[T], meta metav1.ObjectMeta, mutator objectMutator[T]) error {
 	obj, err := client.Get(ctx, meta.Name, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrapf(err, "unable to get %T", obj)
+		return fmt.Errorf("unable to get %T: %w", obj, err)
 	}
 	if err = mutator(obj); err != nil {
-		return errors.Wrapf(err, "unable to mutate %T", obj)
+		return fmt.Errorf("unable to mutate %T: %w", obj, err)
 	}
 	_, err = client.Update(ctx, obj, metav1.UpdateOptions{})
 	return err
@@ -137,11 +136,11 @@ func CreateOrRetain[T kubernetesObject](client kubernetesInterface[T], obj T, na
 			ctx := context.Background()
 			if _, err := client.Get(ctx, name, metav1.GetOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
-					lastError = errors.Wrapf(err, "unable to get %T", obj)
+					lastError = fmt.Errorf("unable to get %T: %w", obj, err)
 					return false, nil
 				}
 				if _, err := client.Create(ctx, obj, metav1.CreateOptions{}); err != nil {
-					lastError = errors.Wrapf(err, "unable to create %T", obj)
+					lastError = fmt.Errorf("unable to create %T: %w", obj, err)
 					return false, nil
 				}
 			}
@@ -172,7 +171,7 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 		oldData, err := json.Marshal(n)
 		if err != nil {
-			*lastError = errors.Wrapf(err, "failed to marshal unmodified node %q into JSON", n.Name)
+			*lastError = fmt.Errorf("failed to marshal unmodified node %q into JSON: %w", n.Name, err)
 			return false, *lastError
 		}
 
@@ -181,18 +180,18 @@ func PatchNodeOnce(client clientset.Interface, nodeName string, patchFn func(*v1
 
 		newData, err := json.Marshal(n)
 		if err != nil {
-			*lastError = errors.Wrapf(err, "failed to marshal modified node %q into JSON", n.Name)
+			*lastError = fmt.Errorf("failed to marshal modified node %q into JSON: %w", n.Name, err)
 			return false, *lastError
 		}
 
 		patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Node{})
 		if err != nil {
-			*lastError = errors.Wrap(err, "failed to create two way merge patch")
+			*lastError = fmt.Errorf("failed to create two way merge patch: %w", err)
 			return false, *lastError
 		}
 
 		if _, err := client.CoreV1().Nodes().Patch(ctx, n.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
-			*lastError = errors.Wrapf(err, "error patching Node %q", n.Name)
+			*lastError = fmt.Errorf("error patching Node %q: %w", n.Name, err)
 			if apierrors.IsTimeout(err) || apierrors.IsConflict(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
 				return false, nil
 			}

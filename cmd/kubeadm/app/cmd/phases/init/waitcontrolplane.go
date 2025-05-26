@@ -17,11 +17,10 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -59,19 +58,19 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	// TODO: think of a better place to move this call - e.g. a hidden phase.
 	if data.DryRun() {
 		if err := dryrunutil.PrintFilesIfDryRunning(true /* needPrintManifest */, data.ManifestDir(), data.OutputWriter()); err != nil {
-			return errors.Wrap(err, "error printing files on dryrun")
+			return fmt.Errorf("error printing files on dryrun: %w", err)
 		}
 	}
 
 	// Both Wait* calls below use a /healthz endpoint, thus a client without permissions works fine
 	client, err := data.ClientWithoutBootstrap()
 	if err != nil {
-		return errors.Wrap(err, "cannot obtain client without bootstrap")
+		return fmt.Errorf("cannot obtain client without bootstrap: %w", err)
 	}
 
 	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, client, data.OutputWriter())
 	if err != nil {
-		return errors.Wrap(err, "error creating waiter")
+		return fmt.Errorf("error creating waiter: %w", err)
 	}
 
 	fmt.Printf("[wait-control-plane] Waiting for the kubelet to boot up the control plane as static Pods"+
@@ -86,7 +85,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 	if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
 		apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
-		return errors.Wrap(err, "failed while waiting for the kubelet to start")
+		return fmt.Errorf("failed while waiting for the kubelet to start: %w", err)
 	}
 
 	var podMap map[string]*v1.Pod
@@ -103,7 +102,7 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	}
 	if err != nil {
 		apiclient.PrintControlPlaneErrorHelpScreen(data.OutputWriter(), data.Cfg().NodeRegistration.CRISocket)
-		return errors.Wrap(err, "failed while waiting for the control plane to start")
+		return fmt.Errorf("failed while waiting for the control plane to start: %w", err)
 	}
 
 	return nil

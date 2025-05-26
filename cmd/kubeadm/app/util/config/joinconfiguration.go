@@ -17,9 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -84,7 +83,7 @@ func LoadJoinConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurati
 
 	b, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
+		return nil, fmt.Errorf("unable to read config from %q : %w", cfgPath, err)
 	}
 
 	return BytesToJoinConfiguration(b, opts)
@@ -132,7 +131,7 @@ func documentMapToJoinConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	}
 
 	if len(joinBytes) == 0 {
-		return nil, errors.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
+		return nil, fmt.Errorf("no %s found in the supplied config", constants.JoinConfigurationKind)
 	}
 
 	internalcfg := &kubeadmapi.JoinConfiguration{}

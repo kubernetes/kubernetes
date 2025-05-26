@@ -17,11 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -194,7 +194,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	printer := &output.TextPrinter{}
 	client, err := getClient(nodeOptions.kubeConfigPath, *dryRun, printer)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", nodeOptions.kubeConfigPath)
+		return nil, fmt.Errorf("couldn't create a Kubernetes client from file %q: %w", nodeOptions.kubeConfigPath, err)
 	}
 
 	// Fetches the cluster configuration
@@ -202,7 +202,7 @@ func newNodeData(cmd *cobra.Command, nodeOptions *nodeOptions, out io.Writer) (*
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
 	initCfg, err := configutil.FetchInitConfigurationFromCluster(client, nil, "upgrade", !isControlPlaneNode, false)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
+		return nil, fmt.Errorf("unable to fetch the kubeadm-config ConfigMap: %w", err)
 	}
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(nodeOptions.ignorePreflightErrors, upgradeCfg.Node.IgnorePreflightErrors)

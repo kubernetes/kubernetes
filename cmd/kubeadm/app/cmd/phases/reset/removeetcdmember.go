@@ -17,11 +17,10 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
 

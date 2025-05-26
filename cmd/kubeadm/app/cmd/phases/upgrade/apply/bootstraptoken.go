@@ -18,9 +18,8 @@ limitations under the License.
 package apply
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 

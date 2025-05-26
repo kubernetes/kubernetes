@@ -17,10 +17,9 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -146,7 +145,7 @@ func runKubeConfigFile(kubeConfigFileName string) func(workflow.RunData) error {
 			if data.DryRun() {
 				err := kubeadmutil.CopyFile(filepath.Join(kubeadmconstants.KubernetesDir, kubeConfigFileName), filepath.Join(data.KubeConfigDir(), kubeConfigFileName))
 				if err != nil {
-					return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeConfigFileName, data.KubeConfigDir())
+					return fmt.Errorf("could not copy %s to dry run directory %s: %w", kubeConfigFileName, data.KubeConfigDir(), err)
 				}
 			}
 			return nil

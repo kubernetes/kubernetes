@@ -22,8 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
-
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,7 +126,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 		return true, nil
 	})
 	if err != nil {
-		return errors.Wrap(lastError, "could not check if there is at least one Node that can schedule a test Pod")
+		return fmt.Errorf("could not check if there is at least one Node that can schedule a test Pod: %w", lastError)
 	}
 
 	if len(nodes.Items) == 0 {
@@ -191,7 +189,7 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 		return true, nil
 	})
 	if err != nil {
-		return errors.Wrapf(lastError, "could not create Job %q in the namespace %q", jobName, ns)
+		return fmt.Errorf("could not create Job %q in the namespace %q: %w", jobName, ns, lastError)
 	}
 
 	// Wait for the Job to complete
@@ -207,12 +205,12 @@ func createJob(client clientset.Interface, cfg *kubeadmapi.ClusterConfiguration,
 				return true, nil
 			}
 		}
-		lastError = errors.Errorf("no condition of type %v", batchv1.JobComplete)
+		lastError = fmt.Errorf("no condition of type %v", batchv1.JobComplete)
 		klog.V(2).Infof("Job %q in the namespace %q is not yet complete, retrying", jobName, ns)
 		return false, nil
 	})
 	if err != nil {
-		return errors.Wrapf(lastError, "Job %q in the namespace %q did not complete in %v", jobName, ns, timeout)
+		return fmt.Errorf("Job %q in the namespace %q did not complete in %v: %w", jobName, ns, timeout, lastError)
 	}
 
 	klog.V(2).Infof("Job %q in the namespace %q completed", jobName, ns)
@@ -229,12 +227,12 @@ func controlPlaneNodesReady(client clientset.Interface, _ *kubeadmapi.ClusterCon
 		LabelSelector: selectorControlPlane.String(),
 	})
 	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", constants.LabelNodeRoleControlPlane)
+		return fmt.Errorf("could not list nodes labeled with %q: %w", constants.LabelNodeRoleControlPlane, err)
 	}
 
 	notReadyControlPlanes := getNotReadyNodes(nodes.Items)
 	if len(notReadyControlPlanes) != 0 {
-		return errors.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
+		return fmt.Errorf("there are NotReady control-planes in the cluster: %v", notReadyControlPlanes)
 	}
 	return nil
 }
@@ -255,7 +253,7 @@ func staticPodManifestHealth(_ clientset.Interface, _ *kubeadmapi.ClusterConfigu
 	if len(nonExistentManifests) == 0 {
 		return nil
 	}
-	return errors.Errorf("manifest files not found: %v", nonExistentManifests)
+	return fmt.Errorf("manifest files not found: %v", nonExistentManifests)
 }
 
 // getNotReadyNodes returns a string slice of nodes in the cluster that are NotReady

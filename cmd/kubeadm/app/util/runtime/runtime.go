@@ -20,10 +20,11 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	criapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -80,13 +81,13 @@ func (runtime *CRIRuntime) SetImpl(impl impl) {
 func (runtime *CRIRuntime) Connect() error {
 	runtimeService, err := runtime.impl.NewRemoteRuntimeService(runtime.criSocket, defaultTimeout)
 	if err != nil {
-		return errors.Wrap(err, "failed to create new CRI runtime service")
+		return fmt.Errorf("failed to create new CRI runtime service: %w", err)
 	}
 	runtime.runtimeService = runtimeService
 
 	imageService, err := runtime.impl.NewRemoteImageService(runtime.criSocket, defaultTimeout)
 	if err != nil {
-		return errors.Wrap(err, "failed to create new CRI image service")
+		return fmt.Errorf("failed to create new CRI image service: %w", err)
 	}
 	runtime.imageService = imageService
 
@@ -100,13 +101,13 @@ func (runtime *CRIRuntime) IsRunning() error {
 
 	res, err := runtime.impl.Status(ctx, runtime.runtimeService, false)
 	if err != nil {
-		return errors.Wrap(err, "container runtime is not running")
+		return fmt.Errorf("container runtime is not running: %w", err)
 	}
 
 	for _, condition := range res.GetStatus().GetConditions() {
 		if condition.GetType() == runtimeapi.RuntimeReady && // NetworkReady will not be tested on purpose
 			!condition.GetStatus() {
-			return errors.Errorf(
+			return fmt.Errorf(
 				"container runtime condition %q is not true. reason: %s, message: %s",
 				condition.GetType(), condition.GetReason(), condition.GetMessage(),
 			)
@@ -123,7 +124,7 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 
 	sandboxes, err := runtime.impl.ListPodSandbox(ctx, runtime.runtimeService, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list pod sandboxes")
+		return nil, fmt.Errorf("failed to list pod sandboxes: %w", err)
 	}
 
 	pods := []string{}
@@ -143,7 +144,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 
 			ctx, cancel := defaultContext()
 			if err := runtime.impl.StopPodSandbox(ctx, runtime.runtimeService, container); err != nil {
-				lastErr = errors.Wrapf(err, "failed to stop running pod %s", container)
+				lastErr = fmt.Errorf("failed to stop running pod %s: %w", container, err)
 				cancel()
 				continue
 			}
@@ -151,7 +152,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 
 			ctx, cancel = defaultContext()
 			if err := runtime.impl.RemovePodSandbox(ctx, runtime.runtimeService, container); err != nil {
-				lastErr = errors.Wrapf(err, "failed to remove pod %s", container)
+				lastErr = fmt.Errorf("failed to remove pod %s: %w", container, err)
 				cancel()
 				continue
 			}
@@ -175,7 +176,7 @@ func (runtime *CRIRuntime) PullImage(image string) (err error) {
 			return nil
 		}
 	}
-	return errors.Wrapf(err, "failed to pull image %s", image)
+	return fmt.Errorf("failed to pull image %s: %w", image, err)
 }
 
 // PullImagesInParallel pulls a list of images in parallel
@@ -208,7 +209,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 			}
 			err := pullImageFunc(image)
 			if err != nil {
-				err = errors.WithMessagef(err, "failed to pull image %s", image)
+				err = fmt.Errorf("failed to pull image %s: %w", image, err)
 			} else {
 				klog.V(1).Infof("done pulling: %s", image)
 			}
@@ -259,7 +260,7 @@ func detectCRISocketImpl(isSocket func(string) bool, knownCRISockets []string) (
 		return foundCRISockets[0], nil
 	default:
 		// Multiple CRIs installed?
-		return "", errors.Errorf("found multiple CRI endpoints on the host. Please define which one do you wish "+
+		return "", fmt.Errorf("found multiple CRI endpoints on the host. Please define which one do you wish "+
 			"to use by setting the 'criSocket' field in the kubeadm configuration file: %s",
 			strings.Join(foundCRISockets, ", "))
 	}
@@ -276,12 +277,12 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 	defer cancel()
 	status, err := runtime.impl.Status(ctx, runtime.runtimeService, true)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get runtime status")
+		return "", fmt.Errorf("failed to get runtime status: %w", err)
 	}
 
 	infoConfig, ok := status.GetInfo()["config"]
 	if !ok {
-		return "", errors.Errorf("no 'config' field in CRI info: %+v", status)
+		return "", fmt.Errorf("no 'config' field in CRI info: %+v", status)
 	}
 
 	type config struct {
@@ -290,7 +291,7 @@ func (runtime *CRIRuntime) SandboxImage() (string, error) {
 	c := config{}
 
 	if err := json.Unmarshal([]byte(infoConfig), &c); err != nil {
-		return "", errors.Wrap(err, "failed to unmarshal CRI info config")
+		return "", fmt.Errorf("failed to unmarshal CRI info config: %w", err)
 	}
 
 	if c.SandboxImage == "" {

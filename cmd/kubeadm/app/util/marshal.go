@@ -19,9 +19,8 @@ package util
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,7 +46,7 @@ func MarshalToYamlForCodecs(obj runtime.Object, gv schema.GroupVersion, codecs s
 	const mediaType = runtime.ContentTypeYAML
 	info, ok := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), mediaType)
 	if !ok {
-		return []byte{}, errors.Errorf("unsupported media type %q", mediaType)
+		return []byte{}, fmt.Errorf("unsupported media type %q", mediaType)
 	}
 
 	encoder := codecs.EncoderForVersion(info.Serializer, gv)
@@ -60,7 +59,7 @@ func UniversalUnmarshal(buffer []byte) (runtime.Object, error) {
 	decoder := codecs.UniversalDeserializer()
 	obj, _, err := decoder.Decode(buffer, nil, nil)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to decode %s into runtime.Object", buffer)
+		return nil, fmt.Errorf("failed to decode %s into runtime.Object: %w", buffer, err)
 	}
 	return obj, nil
 }
@@ -90,12 +89,12 @@ func SplitConfigDocuments(documentBytes []byte) (kubeadmapi.DocumentMap, error) 
 			return nil, err
 		}
 		if len(gvk.Group) == 0 || len(gvk.Version) == 0 || len(gvk.Kind) == 0 {
-			return nil, errors.Errorf("invalid configuration for GroupVersionKind %+v: kind and apiVersion is mandatory information that must be specified", gvk)
+			return nil, fmt.Errorf("invalid configuration for GroupVersionKind %+v: kind and apiVersion is mandatory information that must be specified", gvk)
 		}
 
 		// Check whether the kind has been registered before. If it has, throw an error
 		if known := knownKinds[gvk.Kind]; known {
-			errs = append(errs, errors.Errorf("invalid configuration: kind %q is specified twice in YAML file", gvk.Kind))
+			errs = append(errs, fmt.Errorf("invalid configuration: kind %q is specified twice in YAML file", gvk.Kind))
 			continue
 		}
 		knownKinds[gvk.Kind] = true

@@ -22,8 +22,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/pkg/errors"
-
 	clientset "k8s.io/client-go/kubernetes"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
@@ -34,13 +32,13 @@ import (
 func createTestRunDiffFile(contents []byte) (string, error) {
 	file, err := os.CreateTemp("", "kubeadm-upgrade-diff-config-*.yaml")
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create temporary test file")
+		return "", fmt.Errorf("failed to create temporary test file: %w", err)
 	}
 	if _, err := file.Write(contents); err != nil {
-		return "", errors.Wrap(err, "failed to write to temporary test file")
+		return "", fmt.Errorf("failed to write to temporary test file: %w", err)
 	}
 	if err := file.Close(); err != nil {
-		return "", errors.Wrap(err, "failed to close temporary test file")
+		return "", fmt.Errorf("failed to close temporary test file: %w", err)
 	}
 	return file.Name(), nil
 }

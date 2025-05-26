@@ -17,7 +17,7 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,7 +83,7 @@ func (h *handler) fromConfigMap(client clientset.Interface, cmName, cmKey string
 
 	configData, ok := configMap.Data[cmKey]
 	if !ok {
-		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", cmName, cmKey)
+		return nil, fmt.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing", cmName, cmKey)
 	}
 
 	gvkmap, err := kubeadmutil.SplitConfigDocuments([]byte(configData))

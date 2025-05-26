@@ -18,9 +18,8 @@ package renewal
 
 import (
 	"crypto/x509"
+	"fmt"
 	"sort"
-
-	"github.com/pkg/errors"
 
 	certutil "k8s.io/client-go/util/cert"
 
@@ -218,7 +217,7 @@ func (rm *Manager) CAs() []*CAExpirationHandler {
 func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return false, errors.Errorf("%s is not a valid certificate for this cluster", name)
+		return false, fmt.Errorf("%s is not a valid certificate for this cluster", name)
 	}
 
 	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
@@ -271,7 +270,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	// create a new certificate with the same config
 	newCert, newKey, err := NewFileRenewer(caCert, caKey).Renew(cfg)
 	if err != nil {
-		return false, errors.Wrapf(err, "failed to renew certificate %s", name)
+		return false, fmt.Errorf("failed to renew certificate %s: %w", name, err)
 	}
 
 	// writes the new certificate to disk
@@ -290,7 +289,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return errors.Errorf("%s is not a known certificate", name)
+		return fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	// reads the current certificate
@@ -314,14 +313,14 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	// generates the CSR request and save it
 	csr, key, err := pkiutil.NewCSRAndKey(cfg)
 	if err != nil {
-		return errors.Wrapf(err, "failure while generating %s CSR and key", name)
+		return fmt.Errorf("failure while generating %s CSR and key: %w", name, err)
 	}
 	if err := pkiutil.WriteKey(outdir, name, key); err != nil {
-		return errors.Wrapf(err, "failure while saving %s key", name)
+		return fmt.Errorf("failure while saving %s key: %w", name, err)
 	}
 
 	if err := pkiutil.WriteCSR(outdir, name, csr); err != nil {
-		return errors.Wrapf(err, "failure while saving %s CSR", name)
+		return fmt.Errorf("failure while saving %s CSR: %w", name, err)
 	}
 
 	return nil
@@ -331,7 +330,7 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 func (rm *Manager) CertificateExists(name string) (bool, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return false, errors.Errorf("%s is not a known certificate", name)
+		return false, fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	return handler.readwriter.Exists()
@@ -344,7 +343,7 @@ func (rm *Manager) CertificateExists(name string) (bool, error) {
 func (rm *Manager) GetCertificateExpirationInfo(name string) (*ExpirationInfo, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
-		return nil, errors.Errorf("%s is not a known certificate", name)
+		return nil, fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
@@ -367,7 +366,7 @@ func (rm *Manager) GetCertificateExpirationInfo(name string) (*ExpirationInfo, e
 func (rm *Manager) CAExists(name string) (bool, error) {
 	handler, ok := rm.cas[name]
 	if !ok {
-		return false, errors.Errorf("%s is not a known certificate", name)
+		return false, fmt.Errorf("%s is not a known certificate", name)
 	}
 
 	return handler.readwriter.Exists()
@@ -377,7 +376,7 @@ func (rm *Manager) CAExists(name string) (bool, error) {
 func (rm *Manager) GetCAExpirationInfo(name string) (*ExpirationInfo, error) {
 	handler, ok := rm.cas[name]
 	if !ok {
-		return nil, errors.Errorf("%s is not a known CA", name)
+		return nil, fmt.Errorf("%s is not a known CA", name)
 	}
 
 	// checks if the CA is externally managed (CA certificate provided without the certificate key)
@@ -402,23 +401,23 @@ func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
 	case kubeadmconstants.CACertAndKeyBaseName:
 		externallyManaged, err := certsphase.UsingExternalCA(rm.cfg)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
+			return false, fmt.Errorf("Error checking external CA condition for %s certificate authority: %w", caBaseName, err)
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
 		externallyManaged, err := certsphase.UsingExternalFrontProxyCA(rm.cfg)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
+			return false, fmt.Errorf("Error checking external CA condition for %s certificate authority: %w", caBaseName, err)
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.EtcdCACertAndKeyBaseName:
 		externallyManaged, err := certsphase.UsingExternalEtcdCA(rm.cfg)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
+			return false, fmt.Errorf("Error checking external CA condition for %s certificate authority: %w", caBaseName, err)
 		}
 		return externallyManaged, nil
 	default:
-		return false, errors.Errorf("unknown certificate authority %s", caBaseName)
+		return false, fmt.Errorf("unknown certificate authority %s", caBaseName)
 	}
 }
 

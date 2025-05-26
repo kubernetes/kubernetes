@@ -25,8 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	utilsnet "k8s.io/utils/net"
@@ -113,7 +111,7 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		} else {
 			usersAndGroups, err = staticpodutil.GetUsersAndGroups()
 			if err != nil {
-				return errors.Wrap(err, "failed to create users and groups")
+				return fmt.Errorf("failed to create users and groups: %w", err)
 			}
 		}
 	}
@@ -123,7 +121,7 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		// retrieves the StaticPodSpec for given component
 		spec, exists := specs[componentName]
 		if !exists {
-			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
+			return fmt.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
 		}
 
 		// print all volumes that are mounted
@@ -137,7 +135,7 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 			} else {
 				if usersAndGroups != nil {
 					if err := staticpodutil.RunComponentAsNonRoot(componentName, &spec, usersAndGroups, cfg); err != nil {
-						return errors.Wrapf(err, "failed to run component %q as non-root", componentName)
+						return fmt.Errorf("failed to run component %q as non-root: %w", componentName, err)
 					}
 				}
 			}
@@ -147,14 +145,14 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 		if patchesDir != "" {
 			patchedSpec, err := staticpodutil.PatchStaticPod(&spec, patchesDir, os.Stdout)
 			if err != nil {
-				return errors.Wrapf(err, "failed to patch static Pod manifest file for %q", componentName)
+				return fmt.Errorf("failed to patch static Pod manifest file for %q: %w", componentName, err)
 			}
 			spec = *patchedSpec
 		}
 
 		// writes the StaticPodSpec to disk
 		if err := staticpodutil.WriteStaticPodToDisk(componentName, manifestDir, spec); err != nil {
-			return errors.Wrapf(err, "failed to create static pod manifest file for %q", componentName)
+			return fmt.Errorf("failed to create static pod manifest file for %q: %w", componentName, err)
 		}
 
 		klog.V(1).Infof("[control-plane] wrote static Pod manifest for component %q to %q\n", componentName, kubeadmconstants.GetStaticPodFilepath(componentName, manifestDir))

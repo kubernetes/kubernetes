@@ -21,14 +21,14 @@ import (
 	"context"
 	"crypto"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"time"
-
-	"github.com/pkg/errors"
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -127,7 +127,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		// retrieves the KubeConfigSpec for given kubeConfigFileName
 		spec, exists := specs[kubeConfigFileName]
 		if !exists {
-			return errors.Errorf("couldn't retrieve KubeConfigSpec for %s", kubeConfigFileName)
+			return fmt.Errorf("couldn't retrieve KubeConfigSpec for %s", kubeConfigFileName)
 		}
 
 		// builds the KubeConfig object
@@ -149,11 +149,11 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 // NB. this method holds the information about how kubeadm creates kubeconfig files.
 func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConfigSpec, error) {
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
-	if os.IsNotExist(errors.Cause(err)) {
-		return nil, errors.Wrap(err, "the CA files do not exist, please run `kubeadm init phase certs ca` to generate it")
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("the CA files do not exist, please run `kubeadm init phase certs ca` to generate it: %w", err)
 	}
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
+		return nil, fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %w", err)
 	}
 	// Validate period
 	certsphase.CheckCertificatePeriodValidity(kubeadmconstants.CACertAndKeyBaseName, caCert)
@@ -189,12 +189,12 @@ func buildKubeConfigFromSpec(spec *kubeConfigSpec, clustername string) (*clientc
 
 	clientCert, clientKey, err := pkiutil.NewCertAndKey(spec.CACert, spec.ClientCertAuth.CAKey, &clientCertConfig)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failure while creating %s client certificate", spec.ClientName)
+		return nil, fmt.Errorf("failure while creating %s client certificate: %w", spec.ClientName, err)
 	}
 
 	encodedClientKey, err := keyutil.MarshalPrivateKeyToPEM(clientKey)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshal private key to PEM")
+		return nil, fmt.Errorf("failed to marshal private key to PEM: %w", err)
 	}
 	// create a kubeconfig with the client certs
 	return kubeconfigutil.CreateWithCerts(
@@ -230,21 +230,21 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	// The kubeconfig already exists, let's check if it has got the same CA and server URL
 	currentConfig, err := clientcmd.LoadFromFile(kubeConfigFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to load kubeconfig file %s that already exists on disk", kubeConfigFilePath)
+		return fmt.Errorf("failed to load kubeconfig file %s that already exists on disk: %w", kubeConfigFilePath, err)
 	}
 
 	expectedCtx, exists := config.Contexts[config.CurrentContext]
 	if !exists {
-		return errors.Errorf("failed to find expected context %s", config.CurrentContext)
+		return fmt.Errorf("failed to find expected context %s", config.CurrentContext)
 	}
 	expectedCluster := expectedCtx.Cluster
 	currentCtx, exists := currentConfig.Contexts[currentConfig.CurrentContext]
 	if !exists {
-		return errors.Errorf("failed to find CurrentContext in Contexts of the kubeconfig file %s", kubeConfigFilePath)
+		return fmt.Errorf("failed to find CurrentContext in Contexts of the kubeconfig file %s", kubeConfigFilePath)
 	}
 	currentCluster := currentCtx.Cluster
 	if currentConfig.Clusters[currentCluster] == nil {
-		return errors.Errorf("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig file %s", kubeConfigFilePath)
+		return fmt.Errorf("failed to find the given CurrentContext Cluster in Clusters of the kubeconfig file %s", kubeConfigFilePath)
 	}
 
 	// Make sure the compared CAs are whitespace-trimmed. The function clientcmd.LoadFromFile() just decodes
@@ -268,13 +268,13 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	// Parse the current certificate authority data
 	currentCACerts, err := certutil.ParseCertsPEM(caCurrent)
 	if err != nil {
-		return errors.Errorf("the kubeconfig file %q contains an invalid CA cert", kubeConfigFilePath)
+		return fmt.Errorf("the kubeconfig file %q contains an invalid CA cert", kubeConfigFilePath)
 	}
 
 	// Parse the expected certificate authority data
 	expectedCACerts, err := certutil.ParseCertsPEM(caExpected)
 	if err != nil {
-		return errors.Errorf("the expected base64 encoded CA cert could not be parsed as a PEM:\n%s\n", caExpected)
+		return fmt.Errorf("the expected base64 encoded CA cert could not be parsed as a PEM:\n%s\n", caExpected)
 	}
 
 	// Only use the first certificate in the current CA cert list
@@ -283,7 +283,7 @@ func validateKubeConfig(outDir, filename string, config *clientcmdapi.Config) er
 	// Find a common trust anchor
 	trustAnchorFound := slices.ContainsFunc(expectedCACerts, currentCaCert.Equal)
 	if !trustAnchorFound {
-		return errors.Errorf("a kubeconfig file %q exists but does not contain a trusted CA in its current context's "+
+		return fmt.Errorf("a kubeconfig file %q exists but does not contain a trusted CA in its current context's "+
 			"cluster. Total CA certificates found: %d", kubeConfigFilePath, len(currentCACerts))
 	}
 
@@ -311,7 +311,7 @@ func createKubeConfigFileIfNotExists(outDir, filename string, config *clientcmda
 		}
 		fmt.Printf("[kubeconfig] Writing %q kubeconfig file\n", filename)
 		err = kubeconfigutil.WriteToDisk(kubeConfigFilePath, config)
-		return errors.Wrapf(err, "failed to save kubeconfig file %q on disk", kubeConfigFilePath)
+		return fmt.Errorf("failed to save kubeconfig file %q on disk: %w", kubeConfigFilePath, err)
 	}
 	// kubeadm doesn't validate the existing kubeconfig file more than this (kubeadm trusts the client certs to be valid)
 	// Basically, if we find a kubeconfig file with the same path; the same CA cert and the same server URL;
@@ -327,7 +327,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, caKey, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
+		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %w", err)
 	}
 	// Validate period
 	certsphase.CheckCertificatePeriodValidity(kubeadmconstants.CACertAndKeyBaseName, caCert)
@@ -358,7 +358,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 	// creates the KubeConfigSpecs, actualized for the current InitConfiguration
 	caCert, _, err := pkiutil.TryLoadCertAndKeyFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrap(err, "couldn't create a kubeconfig; the CA files couldn't be loaded")
+		return fmt.Errorf("couldn't create a kubeconfig; the CA files couldn't be loaded: %w", err)
 	}
 	// Validate period
 	certsphase.CheckCertificatePeriodValidity(kubeadmconstants.CACertAndKeyBaseName, caCert)
@@ -394,7 +394,7 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 	// writes the kubeconfig to disk if it not exists
 	configBytes, err := clientcmd.Write(*config)
 	if err != nil {
-		return errors.Wrap(err, "failure while serializing admin kubeconfig")
+		return fmt.Errorf("failure while serializing admin kubeconfig: %w", err)
 	}
 
 	fmt.Fprintln(out, string(configBytes))
@@ -407,7 +407,7 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 	// to be used as a input for validating user provided kubeconfig files
 	caCert, intermediaries, err := pkiutil.TryLoadCertChainFromDisk(cfg.CertificatesDir, kubeadmconstants.CACertAndKeyBaseName)
 	if err != nil {
-		return errors.Wrapf(err, "the CA file couldn't be loaded")
+		return fmt.Errorf("the CA file couldn't be loaded: %w", err)
 	}
 
 	// Combine caCert and intermediaries into one array
@@ -437,7 +437,7 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 
 	for _, kubeConfigFileName := range kubeConfigFileNamesLocal {
 		if err = validateKubeConfig(outDir, kubeConfigFileName, validationConfigLocal); err != nil {
-			return errors.Wrapf(err, "the %s file does not exists or it is not valid", kubeConfigFileName)
+			return fmt.Errorf("the %s file does not exists or it is not valid: %w", kubeConfigFileName, err)
 		}
 	}
 
@@ -456,7 +456,7 @@ func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfigu
 
 	for _, kubeConfigFileName := range kubeConfigFileNamesCPE {
 		if err = validateKubeConfig(outDir, kubeConfigFileName, validationConfigCPE); err != nil {
-			return errors.Wrapf(err, "the %s file does not exists or it is not valid", kubeConfigFileName)
+			return fmt.Errorf("the %s file does not exists or it is not valid: %w", kubeConfigFileName, err)
 		}
 	}
 
@@ -526,25 +526,25 @@ func getKubeConfigSpecsBase(cfg *kubeadmapi.InitConfiguration) (map[string]*kube
 
 func createKubeConfigAndCSR(kubeConfigDir string, kubeadmConfig *kubeadmapi.InitConfiguration, name string, spec *kubeConfigSpec) error {
 	if kubeConfigDir == "" {
-		return errors.Errorf("%s: kubeConfigDir was empty", errInvalid)
+		return fmt.Errorf("%s: kubeConfigDir was empty", errInvalid)
 	}
 	if kubeadmConfig == nil {
-		return errors.Errorf("%s: kubeadmConfig was nil", errInvalid)
+		return fmt.Errorf("%s: kubeadmConfig was nil", errInvalid)
 	}
 	if name == "" {
-		return errors.Errorf("%s: name was empty", errInvalid)
+		return fmt.Errorf("%s: name was empty", errInvalid)
 	}
 	if spec == nil {
-		return errors.Errorf("%s: spec was nil", errInvalid)
+		return fmt.Errorf("%s: spec was nil", errInvalid)
 	}
 	kubeConfigPath := filepath.Join(kubeConfigDir, name)
 	if _, err := os.Stat(kubeConfigPath); err == nil {
-		return errors.Errorf("%s: kube config: %s", errExist, kubeConfigPath)
+		return fmt.Errorf("%s: kube config: %s", errExist, kubeConfigPath)
 	} else if !os.IsNotExist(err) {
-		return errors.Wrapf(err, "unexpected error while checking if file exists: %s", kubeConfigPath)
+		return fmt.Errorf("unexpected error while checking if file exists: %s: %w", kubeConfigPath, err)
 	}
 	if pkiutil.CSROrKeyExist(kubeConfigDir, name) {
-		return errors.Errorf("%s: csr: %s", errExist, kubeConfigPath)
+		return fmt.Errorf("%s: csr: %s", errExist, kubeConfigPath)
 	}
 
 	clientCertConfig := newClientCertConfigFromKubeConfigSpec(spec)
@@ -704,7 +704,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 					return true, nil
 				} else {
 					// Retry on any other error type.
-					lastError = errors.Wrap(err, "unable to create ClusterRoleBinding")
+					lastError = fmt.Errorf("unable to create ClusterRoleBinding: %w", err)
 					return false, nil
 				}
 			}
@@ -722,7 +722,7 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 
 	// If the superAdminClient is nil at this point we cannot proceed creating the CRB; return an error.
 	if superAdminClient == nil {
-		return nil, errors.Errorf("the ClusterRoleBinding for the %s Group is missing but there is no %s to create it",
+		return nil, fmt.Errorf("the ClusterRoleBinding for the %s Group is missing but there is no %s to create it",
 			kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
 			kubeadmconstants.SuperAdminKubeConfigFileName)
 	}
@@ -753,9 +753,10 @@ func EnsureAdminClusterRoleBindingImpl(ctx context.Context, adminClient, superAd
 			return true, nil
 		})
 	if err != nil {
-		return nil, errors.Wrapf(lastError, "unable to create the %s ClusterRoleBinding by using %s",
+		return nil, fmt.Errorf("unable to create the %s ClusterRoleBinding by using %s: %w",
 			kubeadmconstants.ClusterAdminsGroupAndClusterRoleBinding,
-			kubeadmconstants.SuperAdminKubeConfigFileName)
+			kubeadmconstants.SuperAdminKubeConfigFileName,
+			lastError)
 	}
 
 	// Once the CRB is in place, start using the admin.conf client.

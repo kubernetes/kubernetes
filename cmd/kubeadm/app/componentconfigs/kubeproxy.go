@@ -17,7 +17,8 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
+
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
@@ -55,8 +56,8 @@ func kubeProxyConfigFromCluster(h *handler, clientset clientset.Interface, _ *ku
 	klog.V(1).Infof("attempting to download the KubeProxyConfiguration from ConfigMap %q", configMapName)
 	cm, err := h.fromConfigMap(clientset, configMapName, kubeadmconstants.KubeProxyConfigMapKey, false)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not download the kube-proxy configuration from ConfigMap %q",
-			configMapName)
+		return nil, fmt.Errorf("could not download the kube-proxy configuration from ConfigMap %q: %w",
+			configMapName, err)
 	}
 	return cm, nil
 }

@@ -19,6 +19,7 @@ package etcd
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -27,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
@@ -156,13 +156,13 @@ func NewFromCluster(client clientset.Interface, certificatesDir string) (*Client
 		filepath.Join(certificatesDir, constants.EtcdHealthcheckClientKeyName),
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error creating etcd client for %v endpoints", endpoints)
+		return nil, fmt.Errorf("error creating etcd client for %v endpoints: %w", endpoints, err)
 	}
 
 	// synchronizes client's endpoints with the known endpoints from the etcd membership.
 	err = etcdClient.Sync()
 	if err != nil {
-		return nil, errors.Wrap(err, "error syncing endpoints with etcd")
+		return nil, fmt.Errorf("error syncing endpoints with etcd: %w", err)
 	}
 	klog.V(1).Infof("update etcd endpoints: %s", strings.Join(etcdClient.Endpoints, ","))
 
@@ -201,9 +201,9 @@ func getRawEtcdEndpointsFromPodAnnotation(client clientset.Interface, interval, 
 	if err != nil {
 		const message = "could not retrieve the list of etcd endpoints"
 		if lastErr != nil {
-			return []string{}, errors.Wrap(lastErr, message)
+			return []string{}, fmt.Errorf("%s: %w", message, lastErr)
 		}
-		return []string{}, errors.Wrap(err, message)
+		return []string{}, fmt.Errorf("%s: %w", message, err)
 	}
 	return etcdEndpoints, nil
 }
@@ -432,7 +432,7 @@ func (c *Client) addMember(name string, peerAddrs string, isLearner bool) ([]Mem
 	// if this fails no member addition is performed on the etcd cluster.
 	parsedPeerAddrs, err := url.Parse(peerAddrs)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error parsing peer address %s", peerAddrs)
+		return nil, fmt.Errorf("error parsing peer address %s: %w", peerAddrs, err)
 	}
 
 	cli, err := c.newEtcdClient(c.Endpoints)

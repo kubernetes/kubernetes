@@ -17,9 +17,9 @@ limitations under the License.
 package discovery
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
-
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -43,7 +43,7 @@ func For(client clientset.Interface, cfg *kubeadmapi.JoinConfiguration) (*client
 	// we also need an ability for the user to configure the client to validate received CA cert against a checksum
 	config, err := DiscoverValidatedKubeConfig(client, cfg)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't validate the identity of the API Server")
+		return nil, fmt.Errorf("couldn't validate the identity of the API Server: %w", err)
 	}
 
 	// If the users has provided a TLSBootstrapToken use it for the join process.

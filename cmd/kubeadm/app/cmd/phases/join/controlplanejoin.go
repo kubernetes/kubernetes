@@ -17,9 +17,9 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -136,7 +136,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	// gets access to the cluster using the identity defined in admin.conf
 	client, err := data.Client()
 	if err != nil {
-		return errors.Wrap(err, "couldn't create Kubernetes client")
+		return fmt.Errorf("couldn't create Kubernetes client: %w", err)
 	}
 	cfg, err := data.InitCfg()
 	if err != nil {
@@ -168,7 +168,7 @@ func runEtcdPhase(c workflow.RunData) error {
 	// etcdctl member add informs the cluster about the new member and the new member successfully establishing a connection to the
 	// existing one."
 	if err := etcdphase.CreateStackedEtcdStaticPodManifestFile(client, data.ManifestDir(), data.PatchesDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, data.DryRun(), data.CertificateWriteDir()); err != nil {
-		return errors.Wrap(err, "error creating local etcd static pod manifest file")
+		return fmt.Errorf("error creating local etcd static pod manifest file: %w", err)
 	}
 
 	return nil
@@ -187,7 +187,7 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 	// gets access to the cluster using the identity defined in admin.conf
 	client, err := data.Client()
 	if err != nil {
-		return errors.Wrap(err, "couldn't create Kubernetes client")
+		return fmt.Errorf("couldn't create Kubernetes client: %w", err)
 	}
 	cfg, err := data.InitCfg()
 	if err != nil {
@@ -196,7 +196,7 @@ func runMarkControlPlanePhase(c workflow.RunData) error {
 
 	if !data.DryRun() {
 		if err := markcontrolplanephase.MarkControlPlane(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.Taints); err != nil {
-			return errors.Wrap(err, "error applying control-plane label and taints")
+			return fmt.Errorf("error applying control-plane label and taints: %w", err)
 		}
 	} else {
 		fmt.Printf("[control-plane-join] Would mark node %s as a control-plane\n", cfg.NodeRegistration.Name)

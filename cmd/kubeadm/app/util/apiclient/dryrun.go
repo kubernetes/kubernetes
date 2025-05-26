@@ -20,12 +20,12 @@ package apiclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -77,7 +77,7 @@ func NewDryRun() *DryRun {
 func (d *DryRun) WithKubeConfigFile(file string) error {
 	config, err := clientcmd.LoadFromFile(file)
 	if err != nil {
-		return errors.Wrap(err, "failed to load kubeconfig")
+		return fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 	return d.WithKubeConfig(config)
 }
@@ -86,7 +86,7 @@ func (d *DryRun) WithKubeConfigFile(file string) error {
 func (d *DryRun) WithKubeConfig(config *clientcmdapi.Config) error {
 	restConfig, err := clientcmd.NewDefaultClientConfig(*config, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		return errors.Wrap(err, "failed to create API client configuration from kubeconfig")
+		return fmt.Errorf("failed to create API client configuration from kubeconfig: %w", err)
 	}
 	return d.WithRestConfig(restConfig)
 }

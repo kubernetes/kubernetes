@@ -17,9 +17,8 @@ limitations under the License.
 package preflight
 
 import (
+	"errors"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	utilsexec "k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"

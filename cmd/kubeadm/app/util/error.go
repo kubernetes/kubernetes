@@ -17,13 +17,12 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )

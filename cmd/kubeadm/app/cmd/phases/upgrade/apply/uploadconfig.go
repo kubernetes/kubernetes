@@ -18,9 +18,8 @@ limitations under the License.
 package apply
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -85,7 +84,7 @@ func runUploadKubeadmConfig(c workflow.RunData) error {
 
 	klog.V(1).Infoln("[upgrade/upload-config] Uploading the kubeadm ClusterConfiguration to a ConfigMap")
 	if err := uploadconfig.UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading the kubeadm ClusterConfiguration")
+		return fmt.Errorf("error uploading the kubeadm ClusterConfiguration: %w", err)
 	}
 	return nil
 }
@@ -105,13 +104,13 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 
 	klog.V(1).Infoln("[upgrade/upload-config] Uploading the kubelet configuration to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(&cfg.ClusterConfiguration, client); err != nil {
-		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
+		return fmt.Errorf("error creating kubelet configuration ConfigMap: %w", err)
 	}
 
 	if !features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
 		klog.V(1).Infoln("[upgrade/upload-config] Preserving the CRISocket information for this control-plane node")
 		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-			return errors.Wrap(err, "error writing CRISocket for this node")
+			return fmt.Errorf("error writing CRISocket for this node: %w", err)
 		}
 	} else {
 		if err := patchnodephase.RemoveCRISocketAnnotation(client, cfg.NodeRegistration.Name); err != nil {

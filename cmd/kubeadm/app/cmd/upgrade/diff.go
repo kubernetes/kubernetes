@@ -17,10 +17,11 @@ limitations under the License.
 package upgrade
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -94,12 +95,12 @@ func validateManifestsPath(manifests ...string) (err error) {
 		s, err := os.Stat(manifestPath)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return errors.Wrapf(err, "the manifest file %q does not exist", manifestPath)
+				return fmt.Errorf("the manifest file %q does not exist: %w", manifestPath, err)
 			}
-			return errors.Wrapf(err, "error obtaining stats for manifest file %q", manifestPath)
+			return fmt.Errorf("error obtaining stats for manifest file %q: %w", manifestPath, err)
 		}
 		if s.IsDir() {
-			return errors.Errorf("%q is a directory", manifestPath)
+			return fmt.Errorf("%q is a directory", manifestPath)
 		}
 	}
 	return nil
@@ -117,7 +118,7 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 	}
 	client, err := kubeconfigutil.ClientSetFromFile(flags.kubeConfigPath)
 	if err != nil {
-		return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
+		return fmt.Errorf("couldn't create a Kubernetes client from file %q: %w", flags.kubeConfigPath, err)
 	}
 	initCfg, err := fetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", false, true)
 	if err != nil {
@@ -185,7 +186,7 @@ func runDiff(fs *pflag.FlagSet, flags *diffFlags, args []string, fetchInitConfig
 		}
 
 		if err = difflib.WriteUnifiedDiff(flags.out, diff); err != nil {
-			return errors.Wrap(err, "error writing unified diff")
+			return fmt.Errorf("error writing unified diff: %w", err)
 		}
 	}
 	return nil

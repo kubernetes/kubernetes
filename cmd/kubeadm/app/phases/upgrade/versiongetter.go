@@ -18,9 +18,8 @@ package upgrade
 
 import (
 	"context"
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
@@ -79,13 +78,13 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 	} else {
 		clusterVersionInfo, err = g.client.Discovery().ServerVersion()
 		if err != nil {
-			return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
+			return "", nil, fmt.Errorf("Couldn't fetch cluster version from the API Server: %w", err)
 		}
 	}
 
 	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
 	if err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't parse cluster version")
+		return "", nil, fmt.Errorf("Couldn't parse cluster version: %w", err)
 	}
 	return clusterVersionInfo.String(), clusterVersion, nil
 }
@@ -96,7 +95,7 @@ func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, erro
 
 	kubeadmVersion, err := versionutil.ParseSemantic(kubeadmVersionInfo.String())
 	if err != nil {
-		return "", nil, errors.Wrap(err, "Couldn't parse kubeadm version")
+		return "", nil, fmt.Errorf("Couldn't parse kubeadm version: %w", err)
 	}
 	return kubeadmVersionInfo.String(), kubeadmVersion, nil
 }
@@ -105,12 +104,12 @@ func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, erro
 func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description string) (string, *versionutil.Version, error) {
 	versionStr, err := kubeadmutil.KubernetesReleaseVersion(ciVersionLabel)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "Couldn't fetch latest %s from the internet", description)
+		return "", nil, fmt.Errorf("Couldn't fetch latest %s from the internet: %w", description, err)
 	}
 
 	ver, err := versionutil.ParseSemantic(versionStr)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "Couldn't parse latest %s", description)
+		return "", nil, fmt.Errorf("Couldn't parse latest %s: %w", description, err)
 	}
 	return versionStr, ver, nil
 }
@@ -142,7 +141,7 @@ func (g *KubeVersionGetter) ComponentVersions(name string) (map[string][]string,
 		},
 	)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't list pods in cluster")
+		return nil, fmt.Errorf("couldn't list pods in cluster: %w", err)
 	}
 
 	componentVersions := make(map[string][]string)
@@ -175,7 +174,7 @@ func (o *OfflineVersionGetter) VersionFromCILabel(ciVersionLabel, description st
 	}
 	ver, err := versionutil.ParseSemantic(o.version)
 	if err != nil {
-		return "", nil, errors.Wrapf(err, "Couldn't parse version %s", description)
+		return "", nil, fmt.Errorf("Couldn't parse version %s: %w", description, err)
 	}
 	return o.version, ver, nil
 }

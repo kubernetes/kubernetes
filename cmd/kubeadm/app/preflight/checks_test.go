@@ -18,6 +18,7 @@ package preflight
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -30,7 +31,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"

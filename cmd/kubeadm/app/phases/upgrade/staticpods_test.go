@@ -19,6 +19,7 @@ package upgrade
 import (
 	"crypto/sha256"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -27,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 
 	v1 "k8s.io/api/core/v1"
@@ -150,22 +150,22 @@ type fakeStaticPodPathManager struct {
 func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (StaticPodPathManager, error) {
 	kubernetesDir, err := os.MkdirTemp("", "kubeadm-pathmanager-")
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a temporary directory for the upgrade")
+		return nil, fmt.Errorf("couldn't create a temporary directory for the upgrade: %w", err)
 	}
 
 	realManifestDir := filepath.Join(kubernetesDir, constants.ManifestsSubDirName)
 	if err := os.Mkdir(realManifestDir, 0700); err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a realManifestDir for the upgrade")
+		return nil, fmt.Errorf("couldn't create a realManifestDir for the upgrade: %w", err)
 	}
 
 	upgradedManifestDir := filepath.Join(kubernetesDir, "upgraded-manifests")
 	if err := os.Mkdir(upgradedManifestDir, 0700); err != nil {
-		return nil, errors.Wrapf(err, "couldn't create a upgradedManifestDir for the upgrade")
+		return nil, fmt.Errorf("couldn't create a upgradedManifestDir for the upgrade: %w", err)
 	}
 
 	backupManifestDir := filepath.Join(kubernetesDir, "backup-manifests")
 	if err := os.Mkdir(backupManifestDir, 0700); err != nil {
-		return nil, errors.Wrap(err, "couldn't create a backupManifestDir for the upgrade")
+		return nil, fmt.Errorf("couldn't create a backupManifestDir for the upgrade: %w", err)
 	}
 
 	backupEtcdDir := filepath.Join(kubernetesDir, "kubeadm-backup-etcd")
@@ -905,7 +905,7 @@ func getEmbeddedCerts(tmpDir, kubeConfig string) ([]*x509.Certificate, error) {
 	kubeconfigPath := filepath.Join(tmpDir, kubeConfig)
 	newConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to load kubeconfig file %s", kubeconfigPath)
+		return nil, fmt.Errorf("failed to load kubeconfig file %s: %w", kubeconfigPath, err)
 	}
 
 	authInfoName := newConfig.Contexts[newConfig.CurrentContext].AuthInfo

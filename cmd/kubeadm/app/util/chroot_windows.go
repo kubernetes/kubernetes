@@ -20,7 +20,7 @@ limitations under the License.
 package util
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // Chroot chroot()s to the new path.

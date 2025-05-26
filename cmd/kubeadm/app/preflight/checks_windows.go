@@ -20,7 +20,8 @@ limitations under the License.
 package preflight
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+
 	"golang.org/x/sys/windows"
 	utilsexec "k8s.io/utils/exec"
 )

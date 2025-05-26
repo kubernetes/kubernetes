@@ -17,12 +17,12 @@ limitations under the License.
 package workflow
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -316,7 +316,7 @@ func phaseBuilder6(name string, args cobra.PositionalArgs, phases ...Phase) Phas
 func customArgs(cmd *cobra.Command, args []string) error {
 	for _, a := range args {
 		if a != "qux" {
-			return errors.Errorf("arg %s does not equal qux", a)
+			return fmt.Errorf("arg %s does not equal qux", a)
 		}
 	}
 	return nil
@@ -607,12 +607,12 @@ func cmdHasFlags(cmd *cobra.Command, expectedFlags ...string) error {
 			}
 		}
 		if !found {
-			return errors.Errorf("flag %q does not exists in %s", e, flags)
+			return fmt.Errorf("flag %q does not exists in %s", e, flags)
 		}
 	}
 
 	if len(flags) != len(expectedFlags) {
-		return errors.Errorf("expected flags %s, got %s", expectedFlags, flags)
+		return fmt.Errorf("expected flags %s, got %s", expectedFlags, flags)
 	}
 
 	return nil

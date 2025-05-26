@@ -20,11 +20,11 @@ limitations under the License.
 package phases
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 
 	"k8s.io/klog/v2"
@@ -71,9 +71,9 @@ func unmountKubeletDirectory(kubeletRunDirectory string, flags []string) error {
 		}
 		klog.V(5).Infof("[reset] Unmounting %q", m[1])
 		if err := syscall.Unmount(m[1], flagsInt); err != nil {
-			errList = append(errList, errors.WithMessagef(err, "failed to unmount %q", m[1]))
+			errList = append(errList, fmt.Errorf("failed to unmount %q: %w", m[1], err))
 		}
 	}
-	return errors.Wrapf(utilerrors.NewAggregate(errList),
-		"encountered the following errors while unmounting directories in %q", kubeletRunDirectory)
+	return fmt.Errorf("encountered the following errors while unmounting directories in %q: %w",
+		kubeletRunDirectory, utilerrors.NewAggregate(errList))
 }

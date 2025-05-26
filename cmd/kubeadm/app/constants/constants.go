@@ -17,14 +17,13 @@ limitations under the License.
 package constants
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -565,7 +564,7 @@ func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString s
 		if desiredVersion > max {
 			etcdStringVersion = supportedEtcdVersion[max]
 		}
-		warning = errors.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
+		warning = fmt.Errorf("could not find officially supported version of etcd for Kubernetes %s, falling back to the nearest etcd version (%s)",
 			versionString, etcdStringVersion)
 	}
 
@@ -629,11 +628,11 @@ func CreateTempDir(parent, dirName string) (string, error) {
 
 func createTmpDir(tempDir, dirName string) (string, error) {
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
+		return "", fmt.Errorf("failed to create directory %q: %w", tempDir, err)
 	}
 	tempDir, err := os.MkdirTemp(tempDir, dirName)
 	if err != nil {
-		return "", errors.Wrapf(err, "could not create a temporary directory in %q", tempDir)
+		return "", fmt.Errorf("could not create a temporary directory in %q: %w", tempDir, err)
 	}
 	return tempDir, nil
 }
@@ -647,13 +646,13 @@ func CreateTimestampDir(kubernetesDir, dirName string) (string, error) {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(tempDir, 0700); err != nil {
-		return "", errors.Wrapf(err, "failed to create directory %q", tempDir)
+		return "", fmt.Errorf("failed to create directory %q: %w", tempDir, err)
 	}
 
 	timestampDirName := fmt.Sprintf("%s-%s", dirName, time.Now().Format("2006-01-02-15-04-05"))
 	timestampDir := filepath.Join(tempDir, timestampDirName)
 	if err := os.Mkdir(timestampDir, 0700); err != nil {
-		return "", errors.Wrap(err, "could not create timestamp directory")
+		return "", fmt.Errorf("could not create timestamp directory: %w", err)
 	}
 
 	return timestampDir, nil
@@ -664,13 +663,13 @@ func GetDNSIP(svcSubnetList string) (net.IP, error) {
 	// Get the service subnet CIDR
 	svcSubnetCIDR, err := GetKubernetesServiceCIDR(svcSubnetList)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", svcSubnetList)
+		return nil, fmt.Errorf("unable to get internal Kubernetes Service IP from the given service CIDR (%s): %w", svcSubnetList, err)
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
 	dnsIP, err := netutils.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
+		return nil, fmt.Errorf("unable to get internal Kubernetes Service IP from the given service CIDR: %w", err)
 	}
 
 	return dnsIP, nil
@@ -683,7 +682,7 @@ func GetKubernetesServiceCIDR(svcSubnetList string) (*net.IPNet, error) {
 	// of the kube-controller-manager and kube-apiserver.
 	svcSubnets, err := netutils.ParseCIDRs(strings.Split(svcSubnetList, ","))
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
+		return nil, fmt.Errorf("unable to parse ServiceSubnet %v: %w", svcSubnetList, err)
 	}
 	if len(svcSubnets) == 0 {
 		return nil, errors.New("received empty ServiceSubnet")
@@ -695,11 +694,11 @@ func GetKubernetesServiceCIDR(svcSubnetList string) (*net.IPNet, error) {
 func GetAPIServerVirtualIP(svcSubnetList string) (net.IP, error) {
 	svcSubnet, err := GetKubernetesServiceCIDR(svcSubnetList)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
+		return nil, fmt.Errorf("unable to get internal Kubernetes Service IP from the given service CIDR: %w", err)
 	}
 	internalAPIServerVirtualIP, err := netutils.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
+		return nil, fmt.Errorf("unable to get the first IP address from the given CIDR: %s: %w", svcSubnet.String(), err)
 	}
 	return internalAPIServerVirtualIP, nil
 }

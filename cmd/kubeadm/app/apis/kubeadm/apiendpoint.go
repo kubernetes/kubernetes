@@ -17,26 +17,25 @@ limitations under the License.
 package kubeadm
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 
 	netutils "k8s.io/utils/net"
-
-	"github.com/pkg/errors"
 )
 
 // APIEndpointFromString returns an APIEndpoint struct based on a "host:port" raw string.
 func APIEndpointFromString(apiEndpoint string) (APIEndpoint, error) {
 	apiEndpointHost, apiEndpointPortStr, err := net.SplitHostPort(apiEndpoint)
 	if err != nil {
-		return APIEndpoint{}, errors.Wrapf(err, "invalid advertise address endpoint: %s", apiEndpoint)
+		return APIEndpoint{}, fmt.Errorf("invalid advertise address endpoint: %s: %w", apiEndpoint, err)
 	}
 	if netutils.ParseIPSloppy(apiEndpointHost) == nil {
-		return APIEndpoint{}, errors.Errorf("invalid API endpoint IP: %s", apiEndpointHost)
+		return APIEndpoint{}, fmt.Errorf("invalid API endpoint IP: %s", apiEndpointHost)
 	}
 	apiEndpointPort, err := net.LookupPort("tcp", apiEndpointPortStr)
 	if err != nil {
-		return APIEndpoint{}, errors.Wrapf(err, "invalid advertise address endpoint port: %s", apiEndpointPortStr)
+		return APIEndpoint{}, fmt.Errorf("invalid advertise address endpoint port: %s: %w", apiEndpointPortStr, err)
 	}
 	return APIEndpoint{
 		AdvertiseAddress: apiEndpointHost,

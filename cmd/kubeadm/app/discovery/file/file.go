@@ -18,9 +18,9 @@ package file
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -109,8 +109,8 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 			return true, nil
 		})
 	if err != nil {
-		return nil, errors.Wrapf(lastError, "Abort reading the %s ConfigMap after timeout of %v",
-			bootstrapapi.ConfigMapClusterInfo, discoveryTimeout)
+		return nil, fmt.Errorf("Abort reading the %s ConfigMap after timeout of %v: %w",
+			bootstrapapi.ConfigMapClusterInfo, discoveryTimeout, lastError)
 	}
 
 	// If we couldn't fetch the cluster-info ConfigMap, just return the cluster-info object the user provided
@@ -142,11 +142,11 @@ func ValidateConfigInfo(config *clientcmdapi.Config, discoveryTimeout time.Durat
 func tryParseClusterInfoFromConfigMap(cm *v1.ConfigMap) (*clientcmdapi.Config, error) {
 	kubeConfigString, ok := cm.Data[bootstrapapi.KubeConfigKey]
 	if !ok || len(kubeConfigString) == 0 {
-		return nil, errors.Errorf("no %s key in ConfigMap", bootstrapapi.KubeConfigKey)
+		return nil, fmt.Errorf("no %s key in ConfigMap", bootstrapapi.KubeConfigKey)
 	}
 	parsedKubeConfig, err := clientcmd.Load([]byte(kubeConfigString))
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't parse the kubeconfig file in the %s ConfigMap", bootstrapapi.ConfigMapClusterInfo)
+		return nil, fmt.Errorf("couldn't parse the kubeconfig file in the %s ConfigMap: %w", bootstrapapi.ConfigMapClusterInfo, err)
 	}
 	return parsedKubeConfig, nil
 }

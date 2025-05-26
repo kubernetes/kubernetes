@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	authv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -82,7 +80,7 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	// Also, the config map really should be KubeadmConfigConfigMap...
 	configMap, err := apiclient.GetConfigMapWithShortRetry(client, metav1.NamespaceSystem, constants.KubeadmConfigConfigMap)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get config map")
+		return nil, fmt.Errorf("failed to get config map: %w", err)
 	}
 
 	// Take an empty versioned InitConfiguration, statically default it and convert it to the internal type
@@ -90,13 +88,13 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 	kubeadmscheme.Scheme.Default(versionedInitcfg)
 	initcfg := &kubeadmapi.InitConfiguration{}
 	if err := kubeadmscheme.Scheme.Convert(versionedInitcfg, initcfg, nil); err != nil {
-		return nil, errors.Wrap(err, "could not prepare a defaulted InitConfiguration")
+		return nil, fmt.Errorf("could not prepare a defaulted InitConfiguration: %w", err)
 	}
 
 	// gets ClusterConfiguration from kubeadm-config
 	clusterConfigurationData, ok := configMap.Data[constants.ClusterConfigurationConfigMapKey]
 	if !ok {
-		return nil, errors.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
+		return nil, fmt.Errorf("unexpected error when reading kubeadm-config ConfigMap: %s key value pair missing", constants.ClusterConfigurationConfigMapKey)
 	}
 	// If ClusterConfiguration was patched by something other than kubeadm, it may have errors. Warn about them.
 	if err := strict.VerifyUnmarshalStrict([]*runtime.Scheme{kubeadmscheme.Scheme},
@@ -105,13 +103,13 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		klog.Warning(err.Error())
 	}
 	if err := runtime.DecodeInto(kubeadmscheme.Codecs.UniversalDecoder(), []byte(clusterConfigurationData), &initcfg.ClusterConfiguration); err != nil {
-		return nil, errors.Wrap(err, "failed to decode cluster configuration data")
+		return nil, fmt.Errorf("failed to decode cluster configuration data: %w", err)
 	}
 
 	if !skipComponentConfigs {
 		// get the component configs from the corresponding config maps
 		if err := componentconfigs.FetchFromCluster(&initcfg.ClusterConfiguration, client); err != nil {
-			return nil, errors.Wrap(err, "failed to get component configs")
+			return nil, fmt.Errorf("failed to get component configs: %w", err)
 		}
 	}
 
@@ -121,11 +119,11 @@ func getInitConfigurationFromCluster(kubeconfigDir string, client clientset.Inte
 		// gets the nodeRegistration for the current from the node object
 		kubeconfigFile := filepath.Join(kubeconfigDir, constants.KubeletKubeConfigFileName)
 		if err := GetNodeRegistration(kubeconfigFile, client, &initcfg.NodeRegistration, &initcfg.ClusterConfiguration); err != nil {
-			return nil, errors.Wrap(err, "failed to get node registration")
+			return nil, fmt.Errorf("failed to get node registration: %w", err)
 		}
 		// gets the APIEndpoint for the current node
 		if err := getAPIEndpoint(client, initcfg.NodeRegistration.Name, &initcfg.LocalAPIEndpoint); err != nil {
-			return nil, errors.Wrap(err, "failed to getAPIEndpoint")
+			return nil, fmt.Errorf("failed to getAPIEndpoint: %w", err)
 		}
 	}
 	return initcfg, nil
@@ -157,7 +155,7 @@ func GetNodeName(kubeconfigFile string) (string, error) {
 	}
 	nodeName, err = nodeutil.GetHostname("")
 	if err != nil {
-		return "", errors.Wrapf(err, "could not get node name")
+		return "", fmt.Errorf("could not get node name: %w", err)
 	}
 	return nodeName, nil
 }
@@ -173,13 +171,13 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 	// gets the corresponding node and retrieves attributes stored there.
 	node, err := client.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "failed to get corresponding node")
+		return fmt.Errorf("failed to get corresponding node: %w", err)
 	}
 
 	var (
 		criSocket              string
 		ok                     bool
-		missingAnnotationError = errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
+		missingAnnotationError = fmt.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
 	)
 	if features.Enabled(clusterCfg.FeatureGates, features.NodeLocalCRISocket) {
 		_, err = os.Stat(filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName))
@@ -191,7 +189,7 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 		} else {
 			kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
 			if err != nil {
-				return errors.Wrapf(err, "node %q does not have a kubelet instance configuration", nodeName)
+				return fmt.Errorf("node %q does not have a kubelet instance configuration: %w", nodeName, err)
 			}
 			criSocket = kubeletConfig.ContainerRuntimeEndpoint
 		}
@@ -225,11 +223,11 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 	// gets the info about the current user
 	currentContext, exists := config.Contexts[config.CurrentContext]
 	if !exists {
-		return "", errors.Errorf("invalid kubeconfig file %s: missing context %s", fileName, config.CurrentContext)
+		return "", fmt.Errorf("invalid kubeconfig file %s: missing context %s", fileName, config.CurrentContext)
 	}
 	authInfo, exists := config.AuthInfos[currentContext.AuthInfo]
 	if !exists {
-		return "", errors.Errorf("invalid kubeconfig file %s: missing AuthInfo %s", fileName, currentContext.AuthInfo)
+		return "", fmt.Errorf("invalid kubeconfig file %s: missing AuthInfo %s", fileName, currentContext.AuthInfo)
 	}
 
 	// gets the X509 certificate with current user credentials
@@ -245,7 +243,7 @@ func getNodeNameFromKubeletConfig(fileName string) (string, error) {
 			return "", err
 		}
 	} else {
-		return "", errors.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
+		return "", fmt.Errorf("invalid kubeconfig file %s. x509 certificate expected", fileName)
 	}
 
 	// Safely pick the first one because the sender's certificate must come first in the list.
@@ -266,7 +264,7 @@ func getNodeNameFromSSR(client clientset.Interface) (string, error) {
 	}
 	user := ssr.Status.UserInfo.Username
 	if !strings.HasPrefix(user, constants.NodesUserPrefix) {
-		return "", errors.Errorf("%q is not a node client, must have %q prefix in the name",
+		return "", fmt.Errorf("%q is not a node client, must have %q prefix in the name",
 			user, constants.NodesUserPrefix)
 	}
 	return strings.TrimPrefix(user, constants.NodesUserPrefix), nil
@@ -285,7 +283,7 @@ func getAPIEndpointWithRetry(client clientset.Interface, nodeName string, apiEnd
 	if err = getAPIEndpointFromPodAnnotation(client, nodeName, apiEndpoint, interval, timeout); err == nil {
 		return nil
 	}
-	errs = append(errs, errors.WithMessagef(err, "could not retrieve API endpoints for node %q using pod annotations", nodeName))
+	errs = append(errs, fmt.Errorf("could not retrieve API endpoints for node %q using pod annotations: %w", nodeName, err))
 	return errorsutil.NewAggregate(errs)
 }
 
@@ -305,7 +303,7 @@ func getAPIEndpointFromPodAnnotation(client clientset.Interface, nodeName string
 	}
 	parsedAPIEndpoint, err := kubeadmapi.APIEndpointFromString(rawAPIEndpoint)
 	if err != nil {
-		return errors.Wrapf(err, "could not parse API endpoint for node %q", nodeName)
+		return fmt.Errorf("could not parse API endpoint for node %q: %w", nodeName, err)
 	}
 	*apiEndpoint = parsedAPIEndpoint
 	return nil
@@ -320,15 +318,15 @@ func getRawAPIEndpointFromPodAnnotationWithoutRetry(ctx context.Context, client 
 		},
 	)
 	if err != nil {
-		return "", errors.Wrap(err, "could not retrieve list of pods to determine api server endpoints")
+		return "", fmt.Errorf("could not retrieve list of pods to determine api server endpoints: %w", err)
 	}
 	if len(podList.Items) != 1 {
-		return "", errors.Errorf("API server pod for node name %q has %d entries, only one was expected", nodeName, len(podList.Items))
+		return "", fmt.Errorf("API server pod for node name %q has %d entries, only one was expected", nodeName, len(podList.Items))
 	}
 	if apiServerEndpoint, ok := podList.Items[0].Annotations[constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey]; ok {
 		return apiServerEndpoint, nil
 	}
-	return "", errors.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
+	return "", fmt.Errorf("API server pod for node name %q hasn't got a %q annotation, cannot retrieve API endpoint", nodeName, constants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey)
 }
 
 // readKubeletConfig reads a KubeletConfiguration from the specified file.
@@ -337,12 +335,12 @@ func readKubeletConfig(kubeletDir, fileName string) (*kubeletconfig.KubeletConfi
 
 	data, err := os.ReadFile(kubeletFile)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not read kubelet configuration file %q", kubeletFile)
+		return nil, fmt.Errorf("could not read kubelet configuration file %q: %w", kubeletFile, err)
 	}
 
 	var config kubeletconfig.KubeletConfiguration
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, errors.Wrapf(err, "could not parse kubelet configuration file %q", kubeletFile)
+		return nil, fmt.Errorf("could not parse kubelet configuration file %q: %w", kubeletFile, err)
 	}
 
 	return &config, nil

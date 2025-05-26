@@ -18,10 +18,9 @@ limitations under the License.
 package apply
 
 import (
+	"errors"
 	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -65,7 +64,7 @@ func runControlPlane(c workflow.RunData) error {
 
 	waiter := apiclient.NewKubeWaiter(client, upgradeCfg.Timeouts.UpgradeManifests.Duration, os.Stdout)
 	if err := upgrade.PerformStaticPodUpgrade(client, waiter, initCfg, data.EtcdUpgrade(), data.RenewCerts(), patchesDir); err != nil {
-		return errors.Wrap(err, "couldn't complete the static pod upgrade")
+		return fmt.Errorf("couldn't complete the static pod upgrade: %w", err)
 	}
 
 	fmt.Println("[upgrade/control-plane] The control plane instance for this node was successfully upgraded!")

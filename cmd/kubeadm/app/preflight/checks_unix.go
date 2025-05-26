@@ -20,9 +20,8 @@ limitations under the License.
 package preflight
 
 import (
+	"errors"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 // Check validates if an user has elevated (root) privileges.

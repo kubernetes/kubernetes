@@ -20,8 +20,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // CreateRandBytes returns a cryptographically secure slice of random bytes with a given size

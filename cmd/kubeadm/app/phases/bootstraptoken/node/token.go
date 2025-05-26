@@ -18,8 +18,7 @@ package node
 
 import (
 	"context"
-
-	"github.com/pkg/errors"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -47,7 +46,7 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 		secretName := bootstraputil.BootstrapTokenSecretName(token.Token.ID)
 		secret, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
 		if secret != nil && err == nil && failIfExists {
-			return errors.Errorf("a token with id %q already exists", token.Token.ID)
+			return fmt.Errorf("a token with id %q already exists", token.Token.ID)
 		}
 
 		updatedOrNewSecret := bootstraptokenv1.BootstrapTokenToSecret(&token)
@@ -59,7 +58,7 @@ func UpdateOrCreateTokens(client clientset.Interface, failIfExists bool, tokens 
 			kubeadmapi.GetActiveTimeouts().KubernetesAPICall.Duration,
 			true, func(_ context.Context) (bool, error) {
 				if err := apiclient.CreateOrUpdate(secretsClient, updatedOrNewSecret); err != nil {
-					lastError = errors.Wrapf(err, "failed to create or update bootstrap token with name %s", secretName)
+					lastError = fmt.Errorf("failed to create or update bootstrap token with name %s: %w", secretName, err)
 					return false, nil
 				}
 				return true, nil

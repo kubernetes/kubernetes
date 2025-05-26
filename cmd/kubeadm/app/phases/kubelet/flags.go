@@ -22,8 +22,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/klog/v2"
 
 	nodeutil "k8s.io/component-helpers/node/util"
@@ -127,10 +125,10 @@ func writeKubeletFlagBytesToDisk(b []byte, kubeletDir string) error {
 
 	// creates target folder if not already exists
 	if err := os.MkdirAll(kubeletDir, 0700); err != nil {
-		return errors.Wrapf(err, "failed to create directory %q", kubeletDir)
+		return fmt.Errorf("failed to create directory %q: %w", kubeletDir, err)
 	}
 	if err := os.WriteFile(kubeletEnvFilePath, b, 0644); err != nil {
-		return errors.Wrapf(err, "failed to write kubelet configuration to the file %q", kubeletEnvFilePath)
+		return fmt.Errorf("failed to write kubelet configuration to the file %q: %w", kubeletEnvFilePath, err)
 	}
 	return nil
 }
@@ -154,7 +152,7 @@ func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
 	// Check if the content starts with the expected kubelet environment variable prefix.
 	const prefix = constants.KubeletEnvFileVariableName + "="
 	if !strings.HasPrefix(content, prefix) {
-		return nil, errors.Errorf("the file %q does not contain the  expected prefix %q", kubeletEnvFilePath, prefix)
+		return nil, fmt.Errorf("the file %q does not contain the  expected prefix %q", kubeletEnvFilePath, prefix)
 	}
 
 	// Trim the prefix and the surrounding double quotes.
@@ -164,7 +162,7 @@ func ReadKubeletDynamicEnvFile(kubeletEnvFilePath string) ([]string, error) {
 	// Split the flags string by whitespace to get individual arguments.
 	trimmedFlags := strings.Fields(flags)
 	if len(trimmedFlags) == 0 {
-		return nil, errors.Errorf("no flags found in file %q", kubeletEnvFilePath)
+		return nil, fmt.Errorf("no flags found in file %q", kubeletEnvFilePath)
 	}
 
 	var updatedFlags []string

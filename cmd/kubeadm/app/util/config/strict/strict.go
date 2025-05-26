@@ -17,7 +17,7 @@ limitations under the License.
 package strict
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -35,14 +35,14 @@ func VerifyUnmarshalStrict(schemes []*runtime.Scheme, gvk schema.GroupVersionKin
 		}
 	}
 	if scheme == nil {
-		return errors.Errorf("unknown configuration %#v", gvk)
+		return fmt.Errorf("unknown configuration %#v", gvk)
 	}
 
 	opt := json.SerializerOptions{Yaml: true, Pretty: false, Strict: true}
 	serializer := json.NewSerializerWithOptions(json.DefaultMetaFactory, scheme, scheme, opt)
 	_, _, err := serializer.Decode(bytes, &gvk, nil)
 	if err != nil {
-		return errors.Wrapf(err, "error unmarshaling configuration %#v", gvk)
+		return fmt.Errorf("error unmarshaling configuration %#v: %w", gvk, err)
 	}
 
 	return nil

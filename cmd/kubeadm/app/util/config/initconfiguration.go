@@ -18,13 +18,13 @@ package config
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"net"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -85,7 +85,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]bootstraptokenv1.BootstrapToken) e
 
 		tokenStr, err := bootstraputil.GenerateBootstrapToken()
 		if err != nil {
-			return errors.Wrap(err, "couldn't generate random token")
+			return fmt.Errorf("couldn't generate random token: %w", err)
 		}
 		token, err := bootstraptokenv1.NewBootstrapTokenString(tokenStr)
 		if err != nil {
@@ -138,7 +138,7 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	// validate cfg.API.AdvertiseAddress.
 	addressIP := netutils.ParseIPSloppy(cfg.AdvertiseAddress)
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
-		return errors.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
+		return fmt.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
 
 	// kubeadm allows users to specify address=Loopback as a selector for global unicast IP address that can be found on loopback interface.
@@ -262,7 +262,7 @@ func LoadInitConfigurationFromFile(cfgPath string, opts LoadOrDefaultConfigurati
 
 	b, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to read config from %q ", cfgPath)
+		return nil, fmt.Errorf("unable to read config from %q : %w", cfgPath, err)
 	}
 
 	return BytesToInitConfiguration(b, opts.SkipCRIDetect)

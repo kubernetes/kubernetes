@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -32,8 +33,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -132,18 +131,18 @@ func (sc ServiceCheck) Check() (warnings, errorList []error) {
 	}
 
 	if !initSystem.ServiceExists(sc.Service) {
-		return []error{errors.Errorf("%s service does not exist", sc.Service)}, nil
+		return []error{fmt.Errorf("%s service does not exist", sc.Service)}, nil
 	}
 
 	if !initSystem.ServiceIsEnabled(sc.Service) {
 		warnings = append(warnings,
-			errors.Errorf("%s service is not enabled, please run '%s'",
+			fmt.Errorf("%s service is not enabled, please run '%s'",
 				sc.Service, initSystem.EnableCommand(sc.Service)))
 	}
 
 	if sc.CheckIfActive && !initSystem.ServiceIsActive(sc.Service) {
 		errorList = append(errorList,
-			errors.Errorf("%s service is not active, please run 'systemctl start %s.service'",
+			fmt.Errorf("%s service is not active, please run 'systemctl start %s.service'",
 				sc.Service, sc.Service))
 	}
 
@@ -174,7 +173,7 @@ func (fc FirewalldCheck) Check() (warnings, errorList []error) {
 	}
 
 	if initSystem.ServiceIsActive("firewalld") {
-		err := errors.Errorf("firewalld is active, please ensure ports %v are open or your cluster may not function correctly",
+		err := fmt.Errorf("firewalld is active, please ensure ports %v are open or your cluster may not function correctly",
 			fc.ports)
 		return []error{err}, nil
 	}
@@ -202,12 +201,12 @@ func (poc PortOpenCheck) Check() (warnings, errorList []error) {
 
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
-		errorList = []error{errors.Errorf("Port %d is in use", poc.port)}
+		errorList = []error{fmt.Errorf("Port %d is in use", poc.port)}
 	}
 	if ln != nil {
 		if err = ln.Close(); err != nil {
 			warnings = append(warnings,
-				errors.Errorf("when closing port %d, encountered %v", poc.port, err))
+				fmt.Errorf("when closing port %d, encountered %v", poc.port, err))
 		}
 	}
 
@@ -247,13 +246,13 @@ func (dac DirAvailableCheck) Check() (warnings, errorList []error) {
 
 	f, err := os.Open(dac.Path)
 	if err != nil {
-		return nil, []error{errors.Wrapf(err, "unable to check if %s is empty", dac.Path)}
+		return nil, []error{fmt.Errorf("unable to check if %s is empty: %w", dac.Path, err)}
 	}
 	defer f.Close()
 
 	_, err = f.Readdirnames(1)
 	if err != io.EOF {
-		return nil, []error{errors.Errorf("%s is not empty", dac.Path)}
+		return nil, []error{fmt.Errorf("%s is not empty", dac.Path)}
 	}
 
 	return nil, nil
@@ -278,7 +277,7 @@ func (fac FileAvailableCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence of file %s", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err == nil {
-		return nil, []error{errors.Errorf("%s already exists", fac.Path)}
+		return nil, []error{fmt.Errorf("%s already exists", fac.Path)}
 	}
 	return nil, nil
 }
@@ -302,7 +301,7 @@ func (fac FileExistingCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating the existence of file %s", fac.Path)
 
 	if _, err := os.Stat(fac.Path); err != nil {
-		return nil, []error{errors.Errorf("%s doesn't exist", fac.Path)}
+		return nil, []error{fmt.Errorf("%s doesn't exist", fac.Path)}
 	}
 	return nil, nil
 }
@@ -327,7 +326,7 @@ func (fcc FileContentCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infof("validating the contents of file %s", fcc.Path)
 	f, err := os.Open(fcc.Path)
 	if err != nil {
-		return nil, []error{errors.Errorf("%s does not exist", fcc.Path)}
+		return nil, []error{fmt.Errorf("%s does not exist", fcc.Path)}
 	}
 
 	lr := io.LimitReader(f, int64(len(fcc.Content)))
@@ -336,11 +335,11 @@ func (fcc FileContentCheck) Check() (warnings, errorList []error) {
 	buf := &bytes.Buffer{}
 	_, err = io.Copy(buf, lr)
 	if err != nil {
-		return nil, []error{errors.Errorf("%s could not be read", fcc.Path)}
+		return nil, []error{fmt.Errorf("%s could not be read", fcc.Path)}
 	}
 
 	if !bytes.Equal(buf.Bytes(), fcc.Content) {
-		return nil, []error{errors.Errorf("%s contents are not set to %s", fcc.Path, fcc.Content)}
+		return nil, []error{fmt.Errorf("%s contents are not set to %s", fcc.Path, fcc.Content)}
 	}
 	return nil, []error{}
 
@@ -370,7 +369,7 @@ func (ipc InPathCheck) Check() (warnings, errs []error) {
 	if err != nil {
 		if ipc.mandatory {
 			// Return as an error:
-			return nil, []error{errors.Errorf("%s not found in system path", ipc.executable)}
+			return nil, []error{fmt.Errorf("%s not found in system path", ipc.executable)}
 		}
 		// Return as a warning:
 		warningMessage := fmt.Sprintf("%s not found in system path", ipc.executable)
@@ -398,15 +397,15 @@ func (HostnameCheck) Name() string {
 func (hc HostnameCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("checking whether the given node name is valid and reachable using net.LookupHost")
 	for _, msg := range validation.IsQualifiedName(hc.nodeName) {
-		warnings = append(warnings, errors.Errorf("invalid node name format %q: %s", hc.nodeName, msg))
+		warnings = append(warnings, fmt.Errorf("invalid node name format %q: %s", hc.nodeName, msg))
 	}
 
 	addr, err := net.LookupHost(hc.nodeName)
 	if addr == nil {
-		warnings = append(warnings, errors.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\" could not be reached", hc.nodeName))
 	}
 	if err != nil {
-		warnings = append(warnings, errors.Wrapf(err, "hostname \"%s\"", hc.nodeName))
+		warnings = append(warnings, fmt.Errorf("hostname \"%s\": %w", hc.nodeName, err))
 	}
 	return warnings, errorList
 }
@@ -441,7 +440,7 @@ func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 		return nil, []error{err}
 	}
 	if proxy != nil {
-		return []error{errors.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", u, proxy)}, nil
+		return []error{fmt.Errorf("Connection to %q uses proxy %q. If that is not intended, adjust your proxy settings", u, proxy)}, nil
 	}
 	return nil, nil
 }
@@ -471,12 +470,12 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 
 	_, cidr, err := netutils.ParseCIDRSloppy(subnet.CIDR)
 	if err != nil {
-		return nil, []error{errors.Wrapf(err, "error parsing CIDR %q", subnet.CIDR)}
+		return nil, []error{fmt.Errorf("error parsing CIDR %q: %w", subnet.CIDR, err)}
 	}
 
 	testIP, err := netutils.GetIndexedIP(cidr, 1)
 	if err != nil {
-		return nil, []error{errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", cidr.String())}
+		return nil, []error{fmt.Errorf("unable to get first IP address from the given CIDR (%s): %w", cidr.String(), err)}
 	}
 
 	testIPstring := testIP.String()
@@ -496,7 +495,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 		return nil, []error{err}
 	}
 	if proxy != nil {
-		return []error{errors.Errorf("connection to %q uses proxy %q. This may lead to malfunctional cluster setup. Make sure that Pod and Services IP ranges specified correctly as exceptions in proxy configuration", subnet.CIDR, proxy)}, nil
+		return []error{fmt.Errorf("connection to %q uses proxy %q. This may lead to malfunctional cluster setup. Make sure that Pod and Services IP ranges specified correctly as exceptions in proxy configuration", subnet.CIDR, proxy)}, nil
 	}
 	return nil, nil
 }
@@ -566,12 +565,12 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 
 	kadmVersion, err := versionutil.ParseSemantic(kubever.KubeadmVersion)
 	if err != nil {
-		return nil, []error{errors.Wrapf(err, "couldn't parse kubeadm version %q", kubever.KubeadmVersion)}
+		return nil, []error{fmt.Errorf("couldn't parse kubeadm version %q: %w", kubever.KubeadmVersion, err)}
 	}
 
 	k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
 	if err != nil {
-		return nil, []error{errors.Wrapf(err, "couldn't parse Kubernetes version %q", kubever.KubernetesVersion)}
+		return nil, []error{fmt.Errorf("couldn't parse Kubernetes version %q: %w", kubever.KubernetesVersion, err)}
 	}
 
 	// Checks if k8sVersion greater or equal than the first unsupported versions by current version of kubeadm,
@@ -580,7 +579,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 	//     thus setting the value to x.y.0-0 we are defining the very first patch - pre-releases within x.y minor release.
 	firstUnsupportedVersion := versionutil.MustParseSemantic(fmt.Sprintf("%d.%d.%s", kadmVersion.Major(), kadmVersion.Minor()+1, "0-0"))
 	if k8sVersion.AtLeast(firstUnsupportedVersion) {
-		return []error{errors.Errorf("Kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. Kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
+		return []error{fmt.Errorf("Kubernetes version is greater than kubeadm version. Please consider to upgrade kubeadm. Kubernetes version: %s. Kubeadm version: %d.%d.x", k8sVersion, kadmVersion.Components()[0], kadmVersion.Components()[1])}, nil
 	}
 
 	return nil, nil
@@ -603,22 +602,22 @@ func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating kubelet version")
 	kubeletVersion, err := GetKubeletVersion(kubever.exec)
 	if err != nil {
-		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
+		return nil, []error{fmt.Errorf("couldn't get kubelet version: %w", err)}
 	}
 	if kubever.minKubeletVersion == nil {
 		kubever.minKubeletVersion = kubeadmconstants.MinimumKubeletVersion
 	}
 	if kubeletVersion.LessThan(kubever.minKubeletVersion) {
-		return nil, []error{errors.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
+		return nil, []error{fmt.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
 
 	if kubever.KubernetesVersion != "" {
 		k8sVersion, err := versionutil.ParseSemantic(kubever.KubernetesVersion)
 		if err != nil {
-			return nil, []error{errors.Wrapf(err, "couldn't parse Kubernetes version %q", kubever.KubernetesVersion)}
+			return nil, []error{fmt.Errorf("couldn't parse Kubernetes version %q: %w", kubever.KubernetesVersion, err)}
 		}
 		if kubeletVersion.Major() > k8sVersion.Major() || kubeletVersion.Minor() > k8sVersion.Minor() {
-			return nil, []error{errors.Errorf("the kubelet version is higher than the control plane version. This is not a supported version skew and may lead to a malfunctional cluster. Kubelet version: %q Control plane version: %q", kubeletVersion, k8sVersion)}
+			return nil, []error{fmt.Errorf("the kubelet version is higher than the control plane version. This is not a supported version skew and may lead to a malfunctional cluster. Kubelet version: %q Control plane version: %q", kubeletVersion, k8sVersion)}
 		}
 	}
 	return nil, nil
@@ -647,7 +646,7 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 		buf = append(buf, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return []error{errors.Wrap(err, "error parsing /proc/swaps")}, nil
+		return []error{fmt.Errorf("error parsing /proc/swaps: %w", err)}, nil
 	}
 
 	if len(buf) > 1 {
@@ -698,14 +697,14 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 	client := evc.getHTTPClient(config)
 	for _, endpoint := range evc.Etcd.External.Endpoints {
 		if _, err := url.Parse(endpoint); err != nil {
-			errorList = append(errorList, errors.Wrapf(err, "failed to parse external etcd endpoint %s", endpoint))
+			errorList = append(errorList, fmt.Errorf("failed to parse external etcd endpoint %s: %w", endpoint, err))
 			continue
 		}
 		resp := etcdVersionResponse{}
 		var err error
 		versionURL := fmt.Sprintf("%s/%s", endpoint, "version")
 		if tmpVersionURL, err := normalizeURLString(versionURL); err != nil {
-			errorList = append(errorList, errors.Wrapf(err, "failed to normalize external etcd version url %s", versionURL))
+			errorList = append(errorList, fmt.Errorf("failed to normalize external etcd version url %s: %w", versionURL, err))
 			continue
 		} else {
 			versionURL = tmpVersionURL
@@ -717,11 +716,11 @@ func (evc ExternalEtcdVersionCheck) Check() (warnings, errorList []error) {
 
 		etcdVersion, err := versionutil.ParseSemantic(resp.Etcdserver)
 		if err != nil {
-			errorList = append(errorList, errors.Wrapf(err, "couldn't parse external etcd version %q", resp.Etcdserver))
+			errorList = append(errorList, fmt.Errorf("couldn't parse external etcd version %q: %w", resp.Etcdserver, err))
 			continue
 		}
 		if etcdVersion.LessThan(minExternalEtcdVersion) {
-			errorList = append(errorList, errors.Errorf("this version of kubeadm only supports external etcd version >= %s. Current version: %s", kubeadmconstants.MinExternalEtcdVersion, resp.Etcdserver))
+			errorList = append(errorList, fmt.Errorf("this version of kubeadm only supports external etcd version >= %s. Current version: %s", kubeadmconstants.MinExternalEtcdVersion, resp.Etcdserver))
 			continue
 		}
 	}
@@ -735,7 +734,7 @@ func (evc ExternalEtcdVersionCheck) configRootCAs(config *tls.Config) (*tls.Conf
 	if evc.Etcd.External.CAFile != "" {
 		CACert, err := os.ReadFile(evc.Etcd.External.CAFile)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't load external etcd's server certificate %s", evc.Etcd.External.CAFile)
+			return nil, fmt.Errorf("couldn't load external etcd's server certificate %s: %w", evc.Etcd.External.CAFile, err)
 		}
 		CACertPool = x509.NewCertPool()
 		CACertPool.AppendCertsFromPEM(CACert)
@@ -756,7 +755,7 @@ func (evc ExternalEtcdVersionCheck) configCertAndKey(config *tls.Config) (*tls.C
 		var err error
 		cert, err = tls.LoadX509KeyPair(evc.Etcd.External.CertFile, evc.Etcd.External.KeyFile)
 		if err != nil {
-			return nil, errors.Wrapf(err, "couldn't load external etcd's certificate and key pair %s, %s", evc.Etcd.External.CertFile, evc.Etcd.External.KeyFile)
+			return nil, fmt.Errorf("couldn't load external etcd's certificate and key pair %s, %s: %w", evc.Etcd.External.CertFile, evc.Etcd.External.KeyFile, err)
 		}
 		if config == nil {
 			config = &tls.Config{}
@@ -797,7 +796,7 @@ func getEtcdVersionResponse(client *http.Client, url string, target interface{})
 
 			if r.StatusCode >= 500 && r.StatusCode <= 599 {
 				loopCount--
-				return false, errors.Errorf("server responded with non-successful status: %s", r.Status)
+				return false, fmt.Errorf("server responded with non-successful status: %s", r.Status)
 			}
 			return true, json.NewDecoder(r.Body).Decode(target)
 
@@ -834,7 +833,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 		klog.V(1).Infof("skipping the pull of all images due to policy: %s", policy)
 		return warnings, errorList
 	default:
-		errorList = append(errorList, errors.Errorf("unsupported pull policy %q", policy))
+		errorList = append(errorList, fmt.Errorf("unsupported pull policy %q", policy))
 		return warnings, errorList
 	}
 
@@ -867,7 +866,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 		case v1.PullAlways:
 			klog.V(1).Infof("pulling: %s", image)
 			if err := ipc.runtime.PullImage(image); err != nil {
-				errorList = append(errorList, errors.WithMessagef(err, "failed to pull image %s", image))
+				errorList = append(errorList, fmt.Errorf("failed to pull image %s: %w", image, err))
 			}
 		}
 	}
@@ -889,7 +888,7 @@ func (NumCPUCheck) Name() string {
 func (ncc NumCPUCheck) Check() (warnings, errorList []error) {
 	numCPU := runtime.NumCPU()
 	if numCPU < ncc.NumCPU {
-		errorList = append(errorList, errors.Errorf("the number of available CPUs %d is less than the required %d", numCPU, ncc.NumCPU))
+		errorList = append(errorList, fmt.Errorf("the number of available CPUs %d is less than the required %d", numCPU, ncc.NumCPU))
 	}
 	return warnings, errorList
 }

@@ -19,10 +19,10 @@ package util
 import (
 	"bytes"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"html/template"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcertutil "k8s.io/client-go/util/cert"
@@ -53,7 +53,7 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	// load the kubeconfig file to get the CA certificate and endpoint
 	config, err := clientcmd.LoadFromFile(kubeConfigFile)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to load kubeconfig")
+		return "", fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 
 	// load the default cluster config
@@ -67,12 +67,12 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	if clusterConfig.CertificateAuthorityData != nil {
 		caCerts, err = clientcertutil.ParseCertsPEM(clusterConfig.CertificateAuthorityData)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to parse CA certificate from kubeconfig")
+			return "", fmt.Errorf("failed to parse CA certificate from kubeconfig: %w", err)
 		}
 	} else if clusterConfig.CertificateAuthority != "" {
 		caCerts, err = clientcertutil.CertsFromFile(clusterConfig.CertificateAuthority)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to load CA certificate referenced by kubeconfig")
+			return "", fmt.Errorf("failed to load CA certificate referenced by kubeconfig: %w", err)
 		}
 	} else {
 		return "", errors.New("no CA certificates found in kubeconfig")
@@ -102,7 +102,7 @@ func getJoinCommand(kubeConfigFile, token, key string, controlPlane, skipTokenPr
 	var out bytes.Buffer
 	err = joinCommandTemplate.Execute(&out, ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to render join command template")
+		return "", fmt.Errorf("failed to render join command template: %w", err)
 	}
 	return out.String(), nil
 }

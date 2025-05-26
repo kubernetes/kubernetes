@@ -17,10 +17,9 @@ limitations under the License.
 package kubeconfig
 
 import (
+	"errors"
 	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -73,7 +72,7 @@ func CreateWithToken(serverURL, clusterName, userName string, caCert []byte, tok
 func ClientSetFromFile(path string) (clientset.Interface, error) {
 	config, err := clientcmd.LoadFromFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load admin kubeconfig")
+		return nil, fmt.Errorf("failed to load admin kubeconfig: %w", err)
 	}
 	return ToClientSet(config)
 }
@@ -83,12 +82,12 @@ func ToClientSet(config *clientcmdapi.Config) (clientset.Interface, error) {
 	overrides := clientcmd.ConfigOverrides{Timeout: "10s"}
 	clientConfig, err := clientcmd.NewDefaultClientConfig(*config, &overrides).ClientConfig()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create API client configuration from kubeconfig")
+		return nil, fmt.Errorf("failed to create API client configuration from kubeconfig: %w", err)
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create API client")
+		return nil, fmt.Errorf("failed to create API client: %w", err)
 	}
 	return client, nil
 }
@@ -165,7 +164,7 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 	if len(authInfo.ClientCertificateData) == 0 && len(authInfo.ClientCertificate) != 0 {
 		clientCert, err := os.ReadFile(authInfo.ClientCertificate)
 		if err != nil {
-			return errors.Wrap(err, "error while reading client cert file defined in kubeconfig")
+			return fmt.Errorf("error while reading client cert file defined in kubeconfig: %w", err)
 		}
 		authInfo.ClientCertificateData = clientCert
 		authInfo.ClientCertificate = ""
@@ -173,7 +172,7 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 	if len(authInfo.ClientKeyData) == 0 && len(authInfo.ClientKey) != 0 {
 		clientKey, err := os.ReadFile(authInfo.ClientKey)
 		if err != nil {
-			return errors.Wrap(err, "error while reading client key file defined in kubeconfig")
+			return fmt.Errorf("error while reading client key file defined in kubeconfig: %w", err)
 		}
 		authInfo.ClientKeyData = clientKey
 		authInfo.ClientKey = ""
@@ -181,7 +180,7 @@ func EnsureAuthenticationInfoAreEmbedded(config *clientcmdapi.Config) error {
 	if len(authInfo.Token) == 0 && len(authInfo.TokenFile) != 0 {
 		tokenBytes, err := os.ReadFile(authInfo.TokenFile)
 		if err != nil {
-			return errors.Wrap(err, "error while reading token file defined in kubeconfig")
+			return fmt.Errorf("error while reading token file defined in kubeconfig: %w", err)
 		}
 		authInfo.Token = string(tokenBytes)
 		authInfo.TokenFile = ""
@@ -200,7 +199,7 @@ func EnsureCertificateAuthorityIsEmbedded(cluster *clientcmdapi.Cluster) error {
 	if len(cluster.CertificateAuthorityData) == 0 && len(cluster.CertificateAuthority) != 0 {
 		ca, err := os.ReadFile(cluster.CertificateAuthority)
 		if err != nil {
-			return errors.Wrap(err, "error while reading certificate authority file defined in kubeconfig")
+			return fmt.Errorf("error while reading certificate authority file defined in kubeconfig: %w", err)
 		}
 		cluster.CertificateAuthorityData = ca
 		cluster.CertificateAuthority = ""

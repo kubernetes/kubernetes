@@ -20,11 +20,11 @@ limitations under the License.
 package componentconfigs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/utils/ptr"
@@ -48,7 +48,7 @@ func (kc *kubeletConfig) Mutate() error {
 	// Get the drive from where the kubeadm binary was called.
 	exe, err := os.Executable()
 	if err != nil {
-		return errors.Wrap(err, "could not obtain information about the kubeadm executable")
+		return fmt.Errorf("could not obtain information about the kubeadm executable: %w", err)
 	}
 	drive := filepath.VolumeName(filepath.Dir(exe))
 	klog.V(2).Infof("[componentconfig] Assuming Windows drive %q", drive)

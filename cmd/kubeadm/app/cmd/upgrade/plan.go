@@ -17,6 +17,7 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -24,7 +25,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -69,7 +69,7 @@ func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return errors.Wrap(err, "could not construct output printer")
+				return fmt.Errorf("could not construct output printer: %w", err)
 			}
 
 			if err := validation.ValidateMixedArguments(cmd.Flags()); err != nil {
@@ -122,14 +122,14 @@ func runPlan(flagSet *pflag.FlagSet, flags *planFlags, args []string, printer ou
 
 	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, *allowExperimentalUpgrades, *allowRCUpgrades, client, printer)
 	if err != nil {
-		return errors.Wrap(err, "[upgrade/versions] FATAL")
+		return fmt.Errorf("[upgrade/versions] FATAL: %w", err)
 	}
 
 	// Fetch the current state of the component configs
 	klog.V(1).Infoln("[upgrade/plan] analysing component config version states")
 	configVersionStates, err := componentconfigs.GetVersionStates(&initCfg.ClusterConfiguration, client)
 	if err != nil {
-		return errors.WithMessage(err, "[upgrade/versions] FATAL")
+		return fmt.Errorf("[upgrade/versions] FATAL: %w", err)
 	}
 
 	// No upgrades available
@@ -262,7 +262,7 @@ type upgradePlanTextPrinter struct {
 func (printer *upgradePlanTextPrinter) PrintObj(obj runtime.Object, writer io.Writer) error {
 	plan, ok := obj.(*outputapiv1alpha3.UpgradePlan)
 	if !ok {
-		return errors.Errorf("expected UpgradePlan, but got %+v", obj)
+		return fmt.Errorf("expected UpgradePlan, but got %+v", obj)
 	}
 
 	for _, au := range plan.AvailableUpgrades {
@@ -290,7 +290,7 @@ func (printer *upgradePlanTextPrinter) printAvailableUpgrade(writer io.Writer, a
 
 	newK8sVersion, err := version.ParseSemantic(kubeVersion)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to parse normalized version %q as a semantic version", kubeVersion)
+		return fmt.Errorf("Unable to parse normalized version %q as a semantic version: %w", kubeVersion, err)
 	}
 
 	unstableVersionFlag := ""

@@ -17,9 +17,8 @@ limitations under the License.
 package node
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/pkg/errors"
 
 	utilsexec "k8s.io/utils/exec"
 

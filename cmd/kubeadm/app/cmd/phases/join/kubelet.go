@@ -18,12 +18,11 @@ package phases
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
-
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -145,7 +144,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	} else {
 		client, err = kubeconfigutil.ToClientSet(tlsBootstrapCfg)
 		if err != nil {
-			return errors.Errorf("could not create client from bootstrap kubeconfig")
+			return fmt.Errorf("could not create client from bootstrap kubeconfig")
 		}
 	}
 
@@ -156,7 +155,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 			for c, conf := range tlsBootstrapCfg.Clusters {
 				conf.Server, err = kubeadmutil.GetLocalAPIEndpoint(&cfg.ControlPlane.LocalAPIEndpoint)
 				if err != nil {
-					return errors.Wrapf(err, "could not get LocalAPIEndpoint when %s is enabled", features.ControlPlaneKubeletLocalMode)
+					return fmt.Errorf("could not get LocalAPIEndpoint when %s is enabled: %w", features.ControlPlaneKubeletLocalMode, err)
 				}
 				tlsBootstrapCfg.Clusters[c] = conf
 			}
@@ -166,7 +165,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	// Write the bootstrap kubelet config file or the TLS-Bootstrapped kubelet config file down to disk
 	klog.V(1).Infof("[kubelet-start] writing bootstrap kubelet config file at %s", bootstrapKubeConfigFile)
 	if err := kubeconfigutil.WriteToDisk(bootstrapKubeConfigFile, tlsBootstrapCfg); err != nil {
-		return errors.Wrap(err, "couldn't save bootstrap-kubelet.conf to disk")
+		return fmt.Errorf("couldn't save bootstrap-kubelet.conf to disk: %w", err)
 	}
 
 	// Write the ca certificate to disk so kubelet can use it for authentication
@@ -181,7 +180,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	if _, err := os.Stat(caPath); os.IsNotExist(err) {
 		klog.V(1).Infof("[kubelet-start] writing CA certificate at %s", caPath)
 		if err := certutil.WriteCert(caPath, tlsBootstrapCfg.Clusters[cluster].CertificateAuthorityData); err != nil {
-			return errors.Wrap(err, "couldn't save the CA certificate to disk")
+			return fmt.Errorf("couldn't save the CA certificate to disk: %w", err)
 		}
 	}
 
@@ -198,11 +197,11 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 	klog.V(1).Infof("[kubelet-start] Checking for an existing Node in the cluster with name %q and status %q", nodeName, v1.NodeReady)
 	node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
-		return errors.Wrapf(err, "cannot get Node %q", nodeName)
+		return fmt.Errorf("cannot get Node %q: %w", nodeName, err)
 	}
 	for _, cond := range node.Status.Conditions {
 		if cond.Type == v1.NodeReady && cond.Status == v1.ConditionTrue {
-			return errors.Errorf("a Node with name %q and status %q already exists in the cluster. "+
+			return fmt.Errorf("a Node with name %q and status %q already exists in the cluster. "+
 				"You must delete the existing Node or change the name of this new joining Node", nodeName, v1.NodeReady)
 		}
 	}
@@ -222,7 +221,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 			ContainerRuntimeEndpoint: data.Cfg().NodeRegistration.CRISocket,
 		}
 		if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, data.KubeletDir()); err != nil {
-			return errors.Wrap(err, "error writing instance kubelet configuration to disk")
+			return fmt.Errorf("error writing instance kubelet configuration to disk: %w", err)
 		}
 	}
 
@@ -244,7 +243,7 @@ func runKubeletStartJoinPhase(c workflow.RunData) (returnErr error) {
 		// If we're dry-running, print the kubelet config manifests and print static pod manifests if joining a control plane.
 		// TODO: think of a better place to move this call - e.g. a hidden phase.
 		if err := dryrunutil.PrintFilesIfDryRunning(cfg.ControlPlane != nil, data.ManifestDir(), data.OutputWriter()); err != nil {
-			return errors.Wrap(err, "error printing files on dryrun")
+			return fmt.Errorf("error printing files on dryrun: %w", err)
 		}
 		return nil
 	}
@@ -284,7 +283,7 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 
 		// Use the dry-run client.
 		if client, err = data.Client(); err != nil {
-			return errors.Wrap(err, "could not get client for dry-run")
+			return fmt.Errorf("could not get client for dry-run: %w", err)
 		}
 	} else {
 		bootstrapKubeConfigFile := filepath.Join(data.KubeConfigDir(), kubeadmconstants.KubeletBootstrapKubeConfigFileName)
@@ -298,7 +297,7 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		// the kubelet.yaml written to disk. This should be done after WriteConfigToDisk because both use the same config
 		// in memory and we don't want patches to be applied two times to the config that is written to disk.
 		if err := kubeletphase.ApplyPatchesToConfig(&initCfg.ClusterConfiguration, data.PatchesDir()); err != nil {
-			return errors.Wrap(err, "could not apply patches to the in-memory kubelet configuration")
+			return fmt.Errorf("could not apply patches to the in-memory kubelet configuration: %w", err)
 		}
 
 		// Now the kubelet will perform the TLS Bootstrap, transforming /etc/kubernetes/bootstrap-kubelet.conf to /etc/kubernetes/kubelet.conf
@@ -313,12 +312,12 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 		}
 		if err := waiter.WaitForKubelet(kubeletConfigTyped.HealthzBindAddress, *kubeletConfigTyped.HealthzPort); err != nil {
 			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
-			return errors.Wrap(err, "failed while waiting for the kubelet to start")
+			return fmt.Errorf("failed while waiting for the kubelet to start: %w", err)
 		}
 
 		if err := waitForTLSBootstrappedClient(cfg.Timeouts.TLSBootstrap.Duration); err != nil {
 			apiclient.PrintKubeletErrorHelpScreen(data.OutputWriter())
-			return errors.Wrap(err, "failed while waiting for TLS bootstrap")
+			return fmt.Errorf("failed while waiting for TLS bootstrap: %w", err)
 		}
 
 		// When we know the /etc/kubernetes/kubelet.conf file is available, get the client
@@ -331,7 +330,7 @@ func runKubeletWaitBootstrapPhase(c workflow.RunData) (returnErr error) {
 	if !features.Enabled(initCfg.ClusterConfiguration.FeatureGates, features.NodeLocalCRISocket) {
 		klog.V(1).Infoln("[kubelet-start] preserving the crisocket information for the node")
 		if err := patchnodephase.AnnotateCRISocket(client, cfg.NodeRegistration.Name, cfg.NodeRegistration.CRISocket); err != nil {
-			return errors.Wrap(err, "error writing CRISocket for this node")
+			return fmt.Errorf("error writing CRISocket for this node: %w", err)
 		}
 	}
 

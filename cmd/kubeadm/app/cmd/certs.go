@@ -17,13 +17,13 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"text/tabwriter"
 	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -443,7 +443,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return errors.Wrap(err, "could not construct output printer")
+				return fmt.Errorf("could not construct output printer: %w", err)
 			}
 
 			// Get cluster configuration (from --config, kubeadm-config ConfigMap, or default as a fallback)

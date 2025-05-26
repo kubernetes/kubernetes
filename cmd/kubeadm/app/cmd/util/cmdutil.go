@@ -18,11 +18,11 @@ package util
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -60,12 +60,12 @@ func ValidateExactArgNumber(args []string, supportedArgs []string) error {
 		}
 		// break early for too many arguments
 		if validArgs > lenSupported {
-			return errors.Errorf("too many arguments. Required arguments: %v", supportedArgs)
+			return fmt.Errorf("too many arguments. Required arguments: %v", supportedArgs)
 		}
 	}
 
 	if validArgs < lenSupported {
-		return errors.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
+		return fmt.Errorf("missing one or more required arguments. Required arguments: %v", supportedArgs)
 	}
 	return nil
 }
@@ -101,7 +101,7 @@ func InteractivelyConfirmAction(action, question string, r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Scan()
 	if err := scanner.Err(); err != nil {
-		return errors.Wrap(err, "couldn't read from standard input")
+		return fmt.Errorf("couldn't read from standard input: %w", err)
 	}
 	answer := scanner.Text()
 	if strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes") {
@@ -129,5 +129,5 @@ func ValueFromFlagsOrConfig(flagSet *pflag.FlagSet, name string, cfgValue interf
 
 // TypeMismatchErr return an error which indicates how the type is mismatched.
 func TypeMismatchErr(opt, rType string) error {
-	return errors.Errorf("type mismatch, %s is expected to be a pointer to %s", opt, rType)
+	return fmt.Errorf("type mismatch, %s is expected to be a pointer to %s", opt, rType)
 }

@@ -17,11 +17,10 @@ limitations under the License.
 package phases
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -222,7 +221,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 			if data.DryRun() {
 				err := kubeadmutil.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CACertName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CACertName))
 				if err != nil {
-					return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CACertName, data.CertificateWriteDir())
+					return fmt.Errorf("could not copy %s to dry run directory %s: %w", kubeadmconstants.CACertName, data.CertificateWriteDir(), err)
 				}
 			}
 			if _, err := pkiutil.TryLoadKeyFromDisk(data.CertificateDir(), ca.BaseName); err == nil {
@@ -230,7 +229,7 @@ func runCAPhase(ca *certsphase.KubeadmCert) func(c workflow.RunData) error {
 				if data.DryRun() {
 					err := kubeadmutil.CopyFile(filepath.Join(data.CertificateDir(), kubeadmconstants.CAKeyName), filepath.Join(data.CertificateWriteDir(), kubeadmconstants.CAKeyName))
 					if err != nil {
-						return errors.Wrapf(err, "could not copy %s to dry run directory %s", kubeadmconstants.CAKeyName, data.CertificateWriteDir())
+						return fmt.Errorf("could not copy %s to dry run directory %s: %w", kubeadmconstants.CAKeyName, data.CertificateWriteDir(), err)
 					}
 				}
 				fmt.Printf("[certs] Using existing %s certificate authority\n", ca.BaseName)
@@ -268,13 +267,13 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 
 			caCertData, err := pkiutil.TryLoadCertFromDisk(data.CertificateDir(), caCert.BaseName)
 			if err != nil {
-				return errors.Wrapf(err, "couldn't load CA certificate %s", caCert.Name)
+				return fmt.Errorf("couldn't load CA certificate %s: %w", caCert.Name, err)
 			}
 
 			certsphase.CheckCertificatePeriodValidity(caCert.BaseName, caCertData)
 
 			if err := pkiutil.VerifyCertChain(certData, intermediates, caCertData); err != nil {
-				return errors.Wrapf(err, "[certs] certificate %s not signed by CA certificate %s", cert.BaseName, caCert.BaseName)
+				return fmt.Errorf("[certs] certificate %s not signed by CA certificate %s: %w", cert.BaseName, caCert.BaseName, err)
 			}
 
 			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)

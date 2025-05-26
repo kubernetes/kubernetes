@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,7 +26,6 @@ import (
 	"strings"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
@@ -166,7 +166,7 @@ func getDefaultComponentConfigBytes(group string) ([]byte, error) {
 
 	componentCfg, ok := defaultedInitConfig.ComponentConfigs[group]
 	if !ok {
-		return []byte{}, errors.Errorf("cannot get defaulted config for component group %q", group)
+		return []byte{}, fmt.Errorf("cannot get defaulted config for component group %q", group)
 	}
 
 	return componentCfg.Marshal()
@@ -195,7 +195,7 @@ func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
 		if ok {
 			groups = append(groups, group)
 		} else {
-			return nil, errors.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigKinds())
+			return nil, fmt.Errorf("--component-configs needs to contain some of %v", getSupportedComponentConfigKinds())
 		}
 	}
 	return groups, nil
@@ -295,7 +295,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 				fmt.Fprint(out, string(outputBytes))
 			} else {
 				if err := os.WriteFile(newCfgPath, outputBytes, 0644); err != nil {
-					return errors.Wrapf(err, "failed to write the new configuration to the file %q", newCfgPath)
+					return fmt.Errorf("failed to write the new configuration to the file %q: %w", newCfgPath, err)
 				}
 			}
 			return nil
@@ -328,7 +328,7 @@ func newCmdConfigValidate(out io.Writer) *cobra.Command {
 		`), kubeadmapiv1.SchemeGroupVersion),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(cfgPath) == 0 {
-				return errors.Errorf("the --%s flag is mandatory", options.CfgPath)
+				return fmt.Errorf("the --%s flag is mandatory", options.CfgPath)
 			}
 
 			cfgBytes, err := os.ReadFile(cfgPath)
@@ -402,7 +402,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 	images := images.GetControlPlaneImages(cfg)
 	for _, image := range images {
 		if err := runtime.PullImage(image); err != nil {
-			return errors.Wrapf(err, "failed to pull image %q", image)
+			return fmt.Errorf("failed to pull image %q: %w", image, err)
 		}
 		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
@@ -435,7 +435,7 @@ func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
-				return errors.Wrap(err, "could not construct output printer")
+				return fmt.Errorf("could not construct output printer: %w", err)
 			}
 
 			imagesList, err := NewImagesList(cfgPath, externalcfg)
@@ -458,7 +458,7 @@ func NewImagesList(cfgPath string, cfg *kubeadmapiv1.ClusterConfiguration) (*Ima
 		SkipCRIDetect: true,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
+		return nil, fmt.Errorf("could not convert cfg to an internal cfg: %w", err)
 	}
 
 	return &ImagesList{
@@ -503,7 +503,7 @@ func (i *ImagesList) Run(out io.Writer, printer output.Printer) error {
 	imgs := images.GetControlPlaneImages(&i.cfg.ClusterConfiguration)
 
 	if err := printer.PrintObj(&outputapiv1alpha3.Images{Images: imgs}, out); err != nil {
-		return errors.Wrap(err, "unable to print images")
+		return fmt.Errorf("unable to print images: %w", err)
 	}
 
 	return nil

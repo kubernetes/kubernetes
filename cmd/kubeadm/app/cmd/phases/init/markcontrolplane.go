@@ -17,7 +17,7 @@ limitations under the License.
 package phases
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
