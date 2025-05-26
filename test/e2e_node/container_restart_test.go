@@ -29,7 +29,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	v1 "k8s.io/api/core/v1"
@@ -165,7 +164,7 @@ func extractObservedBackoff(ctx context.Context, f *framework.Framework, podName
 			}
 		}
 	}
-	return r, errors.Errorf("Could not find container status for container %s in pod %s", containerName, podName)
+	return r, fmt.Errorf("Could not find container status for container %s in pod %s", containerName, podName)
 }
 
 func newFailAlwaysPod() *v1.Pod {
