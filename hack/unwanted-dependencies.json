@@ -223,7 +223,6 @@
       "github.com/pkg/errors": [
         "github.com/Microsoft/hnslib",
         "github.com/google/cadvisor",
-        "k8s.io/kubectl",
         "k8s.io/kubernetes",
         "sigs.k8s.io/kustomize/api",
         "sigs.k8s.io/kustomize/kustomize/v5"
