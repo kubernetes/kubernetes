@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"path"
 	"sort"
 	"strings"
 	"testing"
@@ -39,11 +40,9 @@ import (
 )
 
 const (
-	nodeName  = "worker"
-	pluginA   = "pluginA"
-	endpointA = "endpointA"
-	pluginB   = "pluginB"
-	endpointB = "endpointB"
+	nodeName = "worker"
+	pluginA  = "pluginA"
+	pluginB  = "pluginB"
 )
 
 func getFakeNode() (*v1.Node, error) {
@@ -51,6 +50,8 @@ func getFakeNode() (*v1.Node, error) {
 }
 
 func TestRegistrationHandler(t *testing.T) {
+	endpointA := path.Join(t.TempDir(), "dra-plugin-a.sock")
+	endpointB := path.Join(t.TempDir(), "dra-plugin-b.sock")
 	slice := &resourceapi.ResourceSlice{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-slice"},
 		Spec: resourceapi.ResourceSliceSpec{
@@ -121,6 +122,16 @@ func TestRegistrationHandler(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 
+			// Run GRPC services for both plugins.
+			service := drapb.DRAPluginService
+			teardownA, err := setupFakeGRPCServer(service, endpointA)
+			require.NoError(t, err)
+			tCtx.Cleanup(teardownA)
+
+			teardown, err := setupFakeGRPCServer(service, test.endpoint)
+			require.NoError(t, err)
+			tCtx.Cleanup(teardown)
+
 			// Stand-alone kubelet has no connection to an
 			// apiserver, so faking one is optional.
 			var client kubernetes.Interface
@@ -185,8 +196,12 @@ func TestRegistrationHandler(t *testing.T) {
 			requireNoSlices()
 
 			// Simulate one existing plugin A.
-			err := handler.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
+			err = handler.RegisterPlugin(pluginA, endpointA, []string{service}, nil)
 			require.NoError(t, err)
+
+			err = WaitForConnection(tCtx, pluginA, endpointA, ConnectionPollInterval, ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to plugin %s at %s", pluginA, endpointA)
+
 			t.Cleanup(func() {
 				tCtx.Logf("Removing plugin %s", pluginA)
 				handler.DeRegisterPlugin(pluginA, endpointA)
@@ -212,8 +227,13 @@ func TestRegistrationHandler(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+
+			err = WaitForConnection(tCtx, test.pluginName, test.endpoint, ConnectionPollInterval, ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to plugin %s at %s", test.pluginName, test.endpoint)
+
 			plugin := draPlugins.get(test.pluginName)
-			assert.NotNil(t, plugin, "plugin should be registered")
+			require.NotNil(t, plugin, "plugin should be registered and connected")
+
 			t.Cleanup(func() {
 				if client != nil {
 					// Create the slice as if the plugin had done that while it runs.

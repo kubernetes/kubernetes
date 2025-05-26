@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -56,25 +56,19 @@ func (f *fakeGRPCServer) NodeUnprepareResources(ctx context.Context, in *drapbv1
 
 type tearDown func()
 
-func setupFakeGRPCServer(service string) (string, tearDown, error) {
-	p, err := os.MkdirTemp("", "dra_plugin")
-	if err != nil {
-		return "", nil, err
-	}
-
+func setupFakeGRPCServer(service, endpoint string) (tearDown, error) {
 	closeCh := make(chan struct{})
-	addr := filepath.Join(p, "server.sock")
 	teardown := func() {
 		close(closeCh)
-		if err := os.RemoveAll(addr); err != nil {
+		if err := os.RemoveAll(endpoint); err != nil {
 			panic(err)
 		}
 	}
 
-	listener, err := net.Listen("unix", addr)
+	listener, err := net.Listen("unix", endpoint)
 	if err != nil {
 		teardown()
-		return "", nil, err
+		return nil, err
 	}
 
 	s := grpc.NewServer()
@@ -85,7 +79,7 @@ func setupFakeGRPCServer(service string) (string, tearDown, error) {
 	case drapbv1alpha4.NodeService:
 		drapbv1alpha4.RegisterNodeServer(s, drapbv1alpha4.V1Beta1ServerWrapper{DRAPluginServer: fakeGRPCServer})
 	default:
-		return "", nil, fmt.Errorf("unsupported gRPC service: %s", service)
+		return nil, fmt.Errorf("unsupported gRPC service: %s", service)
 	}
 
 	go func() {
@@ -98,27 +92,25 @@ func setupFakeGRPCServer(service string) (string, tearDown, error) {
 		s.GracefulStop()
 	}()
 
-	return addr, teardown, nil
+	return teardown, nil
 }
 
 func TestGRPCConnIsReused(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	service := drapbv1beta1.DRAPluginService
-	addr, teardown, err := setupFakeGRPCServer(service)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer teardown()
 
-	reusedConns := make(map[*grpc.ClientConn]int)
-	wg := sync.WaitGroup{}
-	m := sync.Mutex{}
+	endpoint := path.Join(t.TempDir(), "dra-plugin-test.sock")
+
+	// Create a plugin gRPC server.
+	service := drapbv1beta1.DRAPluginService
+	teardown, err := setupFakeGRPCServer(service, endpoint)
+	require.NoError(t, err)
+	defer teardown()
 
 	pluginName := "dummy-plugin"
 	p := &Plugin{
 		name:              pluginName,
 		backgroundCtx:     tCtx,
-		endpoint:          addr,
+		endpoint:          endpoint,
 		chosenService:     service,
 		clientCallTimeout: defaultClientCallTimeout,
 	}
@@ -126,136 +118,131 @@ func TestGRPCConnIsReused(t *testing.T) {
 	conn, err := p.getOrCreateGRPCConn()
 	defer func() {
 		err := conn.Close()
-		if err != nil {
-			t.Error(err)
-		}
+		require.NoError(t, err, "failed to close gRPC connection")
 	}()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "failed to create gRPC connection for plugin %s", pluginName)
 
-	// ensure the plugin we are using is registered
+	// Add the plugin to the draPlugins store.
 	draPlugins.add(p)
-	defer draPlugins.remove(pluginName, addr)
+	defer draPlugins.remove(pluginName, endpoint)
 
-	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
-	for i := 0; i < 2; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			client, err := NewDRAPluginClient(pluginName)
-			if err != nil {
-				t.Error(err)
-				return
-			}
+	// Wait for the plugin to be connected.
+	err = WaitForConnection(tCtx, pluginName, endpoint, ConnectionPollInterval, ConnectionTimeout)
+	require.NoError(t, err, "failed to connect to plugin %s at %s", pluginName, endpoint)
 
-			req := &drapbv1beta1.NodePrepareResourcesRequest{
-				Claims: []*drapbv1beta1.Claim{
-					{
-						Namespace: "dummy-namespace",
-						UID:       "dummy-uid",
-						Name:      "dummy-claim",
-					},
-				},
-			}
-
-			_, err = client.NodePrepareResources(tCtx, req)
-			assert.NoError(t, err)
-
-			client.mutex.Lock()
-			conn := client.conn
-			client.mutex.Unlock()
-
-			m.Lock()
-			defer m.Unlock()
-			reusedConns[conn]++
-		}()
+	// Call NodePrepareResources to initiate a gRPC call.
+	req := &drapbv1beta1.NodePrepareResourcesRequest{
+		Claims: []*drapbv1beta1.Claim{
+			{
+				Namespace: "dummy-namespace",
+				UID:       "dummy-uid",
+				Name:      "dummy-claim",
+			},
+		},
 	}
 
-	wg.Wait()
-	// We should have only one entry otherwise it means another gRPC connection has been created
-	if len(reusedConns) != 1 {
-		t.Errorf("expected length to be 1 but got %d", len(reusedConns))
-	}
-	if counter, ok := reusedConns[conn]; ok && counter != 2 {
-		t.Errorf("expected counter to be 2 but got %d", counter)
-	}
+	cl, err := NewDRAPluginClient(pluginName)
+	require.NoError(t, err, "failed to create DRA plugin client for plugin %s", pluginName)
+
+	_, err = cl.NodePrepareResources(tCtx, req)
+	require.NoError(t, err, "failed to call NodePrepareResources for plugin %s", pluginName)
+
+	assert.Equal(t, conn, cl.conn, "expected the same gRPC connection to be reused")
 }
 
 func TestNewDRAPluginClient(t *testing.T) {
+	// Create a plugin gRPC server.
+	service := drapbv1beta1.DRAPluginService
+	endpoint := path.Join(t.TempDir(), "dra-plugin-test.sock")
+	teardown, err := setupFakeGRPCServer(service, endpoint)
+	require.NoError(t, err)
+	defer teardown()
+
 	for _, test := range []struct {
 		description string
-		setup       func(string) tearDown
 		pluginName  string
 		shouldError bool
 	}{
 		{
 			description: "plugin name is empty",
-			setup: func(_ string) tearDown {
-				return func() {}
-			},
 			pluginName:  "",
 			shouldError: true,
 		},
 		{
 			description: "plugin name not found in the list",
-			setup: func(_ string) tearDown {
-				return func() {}
-			},
 			pluginName:  "plugin-name-not-found-in-the-list",
 			shouldError: true,
 		},
 		{
-			description: "plugin exists",
-			setup: func(name string) tearDown {
-				draPlugins.add(&Plugin{name: name})
-				return func() {
-					draPlugins.remove(name, "")
-				}
-			},
-			pluginName: "dummy-plugin",
+			description: "plugin not connected",
+			pluginName:  "dummy-plugin",
+			shouldError: true,
+		},
+		{
+			description: "plugin connected",
+			pluginName:  "dummy-plugin",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			teardown := test.setup(test.pluginName)
-			defer teardown()
+			tCtx := ktesting.Init(t)
 
-			client, err := NewDRAPluginClient(test.pluginName)
+			plugin := &Plugin{
+				name:              test.pluginName,
+				backgroundCtx:     tCtx,
+				endpoint:          endpoint,
+				chosenService:     service,
+				clientCallTimeout: defaultClientCallTimeout,
+			}
+
+			// Add plugin to the store.
+			require.NoError(t, draPlugins.add(plugin))
+			defer draPlugins.remove(test.pluginName, endpoint)
+
 			if test.shouldError {
+				client, err := NewDRAPluginClient(test.pluginName)
 				assert.Nil(t, client)
 				assert.Error(t, err)
-			} else {
-				assert.NotNil(t, client)
-				assert.NoError(t, err)
+				return
 			}
+			// Connect to the plugin.
+			conn, err := plugin.getOrCreateGRPCConn()
+			defer func() {
+				err := conn.Close()
+				require.NoError(t, err, "failed to close gRPC connection")
+			}()
+			require.NoError(t, err, "failed to create gRPC connection for plugin %s", test.pluginName)
+
+			err = WaitForConnection(tCtx, test.pluginName, endpoint, ConnectionPollInterval, ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to plugin %s at %s", test.pluginName, endpoint)
+
+			client, err := NewDRAPluginClient(test.pluginName)
+			assert.NotNil(t, client)
+			assert.NoError(t, err)
 		})
 	}
 }
 
 func TestGRPCMethods(t *testing.T) {
+	endpoint := path.Join(t.TempDir(), "dra-plugin-test.sock")
 	for _, test := range []struct {
 		description   string
-		serverSetup   func(string) (string, tearDown, error)
 		service       string
 		chosenService string
 		expectError   string
 	}{
 		{
 			description:   "v1alpha4",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1alpha4.NodeService,
 			chosenService: drapbv1alpha4.NodeService,
 		},
 		{
 			description:   "v1beta1",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: drapbv1beta1.DRAPluginService,
 		},
 		{
 			// In practice, such a mismatch between plugin and kubelet should not happen.
 			description:   "mismatch",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: drapbv1alpha4.NodeService,
 			expectError:   "unknown service v1alpha3.Node",
@@ -263,7 +250,6 @@ func TestGRPCMethods(t *testing.T) {
 		{
 			// In practice, kubelet wouldn't choose an invalid service.
 			description:   "internal-error",
-			serverSetup:   setupFakeGRPCServer,
 			service:       drapbv1beta1.DRAPluginService,
 			chosenService: "some-other-service",
 			expectError:   "unsupported chosen service",
@@ -271,7 +257,7 @@ func TestGRPCMethods(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			addr, teardown, err := setupFakeGRPCServer(test.service)
+			teardown, err := setupFakeGRPCServer(test.service, endpoint)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -281,7 +267,7 @@ func TestGRPCMethods(t *testing.T) {
 			p := &Plugin{
 				name:              pluginName,
 				backgroundCtx:     tCtx,
-				endpoint:          addr,
+				endpoint:          endpoint,
 				chosenService:     test.chosenService,
 				clientCallTimeout: defaultClientCallTimeout,
 			}
@@ -289,16 +275,16 @@ func TestGRPCMethods(t *testing.T) {
 			conn, err := p.getOrCreateGRPCConn()
 			defer func() {
 				err := conn.Close()
-				if err != nil {
-					t.Error(err)
-				}
+				require.NoError(t, err, "failed to close gRPC connection")
 			}()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err, "failed to create gRPC connection for plugin %s", pluginName)
 
 			draPlugins.add(p)
-			defer draPlugins.remove(pluginName, addr)
+			defer draPlugins.remove(pluginName, endpoint)
+
+			// Wait for the plugin to be connected.
+			err = WaitForConnection(tCtx, pluginName, endpoint, ConnectionPollInterval, ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to plugin %s at %s", pluginName, endpoint)
 
 			client, err := NewDRAPluginClient(pluginName)
 			if err != nil {

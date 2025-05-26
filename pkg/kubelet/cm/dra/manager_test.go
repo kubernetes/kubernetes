@@ -412,9 +412,10 @@ func TestPrepareResources(t *testing.T) {
 		},
 		{
 			description:    "unknown driver",
+			driverName:     driverName,
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
-			expectedErrMsg: "plugin name unknown driver not found in the list of registered DRA plugins",
+			expectedErrMsg: "plugin unknown driver not found in the list of registered DRA plugins",
 		},
 		{
 			description:            "should prepare resources, driver returns nil value",
@@ -589,15 +590,18 @@ func TestPrepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
-			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+			handler := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+			if err := handler.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
-			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
+			defer handler.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
 			}
+
+			err = plugin.WaitForConnection(tCtx, test.driverName, draServerInfo.socketName, plugin.ConnectionPollInterval, plugin.ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to DRA plugin %s at %s", test.driverName, draServerInfo.socketName)
 
 			err = manager.PrepareResources(tCtx, test.pod)
 
@@ -652,10 +656,11 @@ func TestUnprepareResources(t *testing.T) {
 	}{
 		{
 			description:    "unknown driver",
+			driverName:     "unknown driver",
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
 			claimInfo:      genTestClaimInfo(claimUID, []string{podUID}, true),
-			expectedErrMsg: "plugin name test-driver not found in the list of registered DRA plugins",
+			expectedErrMsg: "plugin test-driver not found in the list of registered DRA plugins",
 		},
 		{
 			description:         "resource claim referenced by other pod(s)",
@@ -731,6 +736,9 @@ func TestUnprepareResources(t *testing.T) {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
+
+			err = plugin.WaitForConnection(tCtx, test.driverName, draServerInfo.socketName, plugin.ConnectionPollInterval, plugin.ConnectionTimeout)
+			require.NoError(t, err, "failed to connect to DRA plugin %s at %s", test.driverName, draServerInfo.socketName)
 
 			manager := &ManagerImpl{
 				kubeClient: fakeKubeClient,
