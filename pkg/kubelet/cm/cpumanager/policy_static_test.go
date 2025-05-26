@@ -887,6 +887,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		topo            *topology.CPUTopology
 		stAssignments   state.ContainerCPUAssignments
 		stDefaultCPUSet cpuset.CPUSet
+		reusableCPUSet  cpuset.CPUSet
 		numRequested    int
 		socketMask      bitmask.BitMask
 		expCSet         cpuset.CPUSet
@@ -896,6 +897,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			topo:            topoDualSocketHT,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(),
 			numRequested:    2,
 			socketMask:      nil,
 			expCSet:         cpuset.New(0, 6),
@@ -905,6 +907,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			topo:            topoDualSocketHT,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(),
 			numRequested:    2,
 			socketMask: func() bitmask.BitMask {
 				mask, _ := bitmask.NewBitMask(0)
@@ -917,6 +920,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			topo:            topoDualSocketHT,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(),
 			numRequested:    2,
 			socketMask: func() bitmask.BitMask {
 				mask, _ := bitmask.NewBitMask(1)
@@ -929,6 +933,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			topo:            topoDualSocketHT,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(),
 			numRequested:    8,
 			socketMask: func() bitmask.BitMask {
 				mask, _ := bitmask.NewBitMask(0)
@@ -941,12 +946,44 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			topo:            topoDualSocketHT,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(),
 			numRequested:    8,
 			socketMask: func() bitmask.BitMask {
 				mask, _ := bitmask.NewBitMask(1)
 				return mask
 			}(),
 			expCSet: cpuset.New(1, 7, 3, 9, 5, 11, 0, 6),
+		},
+		// The following case is designed to test reusable cpus
+		{
+			description:     "Request 2 CPUs, 1 reusable CPU, No BitMask",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(1),
+			numRequested:    2,
+			socketMask:      nil,
+			expCSet:         cpuset.New(1, 7),
+		},
+		{
+			description:     "Request 2 CPUs, 2 reusable CPUs, No BitMask",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(2, 8),
+			numRequested:    2,
+			socketMask:      nil,
+			expCSet:         cpuset.New(2, 8),
+		},
+		{
+			description:     "Request 2 CPUs, 3 reusable CPUs, No BitMask",
+			topo:            topoDualSocketHT,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			reusableCPUSet:  cpuset.New(1, 6, 7),
+			numRequested:    2,
+			socketMask:      nil,
+			expCSet:         cpuset.New(1, 7),
 		},
 	}
 	for _, tc := range testCases {
@@ -965,7 +1002,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 			continue
 		}
 
-		cpuAlloc, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, cpuset.New())
+		cpuAlloc, err := policy.allocateCPUs(st, tc.numRequested, tc.socketMask, tc.reusableCPUSet)
 		if err != nil {
 			t.Errorf("StaticPolicy allocateCPUs() error (%v). expected CPUSet %v not error %v",
 				tc.description, tc.expCSet, err)
