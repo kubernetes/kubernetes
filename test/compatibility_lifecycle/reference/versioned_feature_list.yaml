@@ -1685,7 +1685,7 @@
   versionedSpecs:
   - default: false
     lockToDefault: false
-    preRelease: Alpha
+    preRelease: Beta
     version: "1.34"
 - name: WatchFromStorageWithoutResourceVersion
   versionedSpecs:

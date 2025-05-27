@@ -467,6 +467,12 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 	if c.WatchPrevKv {
 		reverseKeyFunc = nil
 	}
+
+	if !c.WatchPrevKv && reverseKeyFunc == nil {
+		// this should not happen.
+		// Because it breaks the Storage behaviors.
+		return nil, nil, fmt.Errorf("watch prevkv disabled without reverseKeyFunc")
+	}
 	store := etcd3.New(client, c.Codec, newFunc, newListFunc, reverseKeyFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
 	return store, destroyFunc, nil
 }

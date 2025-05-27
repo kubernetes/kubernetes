@@ -412,7 +412,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	WatchFromStorageWithoutPrevKV: {
-		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	WatchFromStorageWithoutResourceVersion: {
