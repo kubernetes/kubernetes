@@ -1,6 +1,10 @@
 {
   "spec": {
     "pinnedModules": {
+      "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc": {
+        "Version": "v0.60.0",
+        "Reason": "Need an etcd release with https://github.com/etcd-io/etcd/pull/20017"
+      },
       "github.com/libopenstorage/openstorage": {
         "Version": "v1.0.0",
         "Reason": "portworx csi driver has been deprecated and will be removed - https://github.com/kubernetes/enhancements/issues/2589"
