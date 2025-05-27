@@ -378,6 +378,26 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				return kubeletPlugin.CountCalls("/NodePrepareResources")
 			}).WithTimeout(retryTestTimeout).Should(gomega.Equal(calls))
 		})
+
+		ginkgo.It("must be functional when plugin starts to listen on a service socket after registration", func(ctx context.Context) {
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("start DRA plugin service")
+			plugin := newPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
+
+			ginkgo.By("wait for NodePrepareResources call to succeed")
+			gomega.Eventually(plugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
+
+			ginkgo.By("wait for pod to succeed")
+			err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
+		})
 	})
 
 	f.Context("Two resource Kubelet Plugins", f.WithSerial(), func() {
@@ -567,6 +587,48 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			kubeletPlugin.Stop()
 			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
 			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
+		})
+
+		f.It("must be removed if plugin stops after registration", func(ctx context.Context) {
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("start DRA plugin service")
+			kubeletPlugin := newPlugin(ctx, f.ClientSet, nodeName, driverName)
+
+			ginkgo.By("wait for ResourceSlice to be created by plugin")
+			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
+			gomega.Eventually(ctx, listResources).Should(matchNode, "ResourceSlices")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchNode, "ResourceSlices")
+
+			ginkgo.By("stop plugin")
+			kubeletPlugin.Stop()
+
+			ginkgo.By("wait for ResourceSlice removal")
+			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices")
+		})
+
+		f.It("must be removed if plugin doesn't connect after registration", func(ctx context.Context) {
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("create a ResourceSlice")
+			createTestResourceSlice(ctx, f.ClientSet, nodeName, driverName)
+			gomega.Eventually(ctx, listResources).Should(gomega.ConsistOf(matchResourcesByNodeName(nodeName)), "ResourceSlices without plugin")
+
+			ginkgo.By("wait for ResourceSlice removal")
+			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
 		})
 	})
 })
