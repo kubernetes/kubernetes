@@ -46,7 +46,6 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -176,30 +175,18 @@ func GetNodeRegistration(kubeconfigFile string, client clientset.Interface, node
 		return errors.Wrap(err, "failed to get corresponding node")
 	}
 
-	var (
-		criSocket              string
-		ok                     bool
-		missingAnnotationError = errors.Errorf("node %s doesn't have %s annotation", nodeName, constants.AnnotationKubeadmCRISocket)
-	)
-	if features.Enabled(clusterCfg.FeatureGates, features.NodeLocalCRISocket) {
-		_, err = os.Stat(filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName))
+	criSocket, ok := node.Annotations[constants.AnnotationKubeadmCRISocket]
+	if !ok {
+		configFilePath := filepath.Join(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
+		_, err := os.Stat(configFilePath)
 		if os.IsNotExist(err) {
-			criSocket, ok = node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
-			if !ok {
-				return missingAnnotationError
-			}
-		} else {
-			kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
-			if err != nil {
-				return errors.Wrapf(err, "node %q does not have a kubelet instance configuration", nodeName)
-			}
-			criSocket = kubeletConfig.ContainerRuntimeEndpoint
+			return errors.Errorf("node %s doesn't have %s annotation, or kubelet instance config %s", nodeName, constants.AnnotationKubeadmCRISocket, configFilePath)
 		}
-	} else {
-		criSocket, ok = node.ObjectMeta.Annotations[constants.AnnotationKubeadmCRISocket]
-		if !ok {
-			return missingAnnotationError
+		kubeletConfig, err := readKubeletConfig(constants.KubeletRunDirectory, constants.KubeletInstanceConfigurationFileName)
+		if err != nil {
+			return errors.Wrapf(err, "could not read kubelet instance configuration on node %q", nodeName)
 		}
+		criSocket = kubeletConfig.ContainerRuntimeEndpoint
 	}
 
 	// returns the nodeRegistration attributes
