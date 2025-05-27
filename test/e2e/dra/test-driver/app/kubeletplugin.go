@@ -47,6 +47,7 @@ import (
 )
 
 type ExamplePlugin struct {
+	drahealthv1alpha1.UnimplementedNodeHealthServer
 	stopCh     <-chan struct{}
 	logger     klog.Logger
 	kubeClient kubernetes.Interface
@@ -621,9 +622,18 @@ func (ex *ExamplePlugin) WatchResources(req *drahealthv1alpha1.WatchResourcesReq
 			for i := range mockDevices {
 				mockDevices[i].LastUpdated = time.Now().Unix()
 			}
-			resp := &drahealthv1alpha1.WatchResourcesResponse{
-				Devices: mockDevices,
+
+			// Create a slice of pointers for the response
+			healthUpdates := make([]*drahealthv1alpha1.DeviceHealth, len(mockDevices))
+			for i := range mockDevices {
+				// Create a new variable for the address to avoid capturing loop variable
+				deviceCopy := mockDevices[i]
+				healthUpdates[i] = &deviceCopy
 			}
+			resp := &drahealthv1alpha1.WatchResourcesResponse{
+				Devices: healthUpdates,
+			}
+
 			if err := srv.Send(resp); err != nil {
 				logger.Error(err, "Failed to send health update")
 				return err
