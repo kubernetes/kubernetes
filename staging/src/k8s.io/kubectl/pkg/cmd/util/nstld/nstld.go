@@ -4,9 +4,9 @@ import (
     "fmt"
 )
 
-// CommonTDLs contains a set of common top-level domains that should be
+// CommonTLDs contains a set of common top-level domains that should be
 // avoided when naming Kubernetes namespaces to prevent DNS resolution issues.
-var CommonTDLs = map[string]struct{}{
+var CommonTLDs = map[string]struct{}{
     "com":  {},
     "org":  {},
     "net":  {},
@@ -21,7 +21,7 @@ var CommonTDLs = map[string]struct{}{
 // IsTLD checks if the provided namespace name is a common top-level domain.
 // Returns true if the namespace name matches a known TLD.
 func IsTLD(nsName string) bool {
-    _, isTLD := CommonTDLs[nsName]
+    _, isTLD := CommonTLDs[nsName]
     return isTLD
 }
 
