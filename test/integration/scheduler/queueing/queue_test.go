@@ -33,14 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -454,7 +451,6 @@ func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleSt
 // TestRequeueByPermitRejection verify Pods failed by permit plugins in the binding cycle are
 // put back to the queue, according to the correct scheduling cycle number.
 func TestRequeueByPermitRejection(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{
