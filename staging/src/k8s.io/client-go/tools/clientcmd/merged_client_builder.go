@@ -36,8 +36,9 @@ type DeferredLoadingClientConfig struct {
 	overrides      *ConfigOverrides
 	fallbackReader io.Reader
 
-	clientConfig ClientConfig
-	loadingLock  sync.Mutex
+	clientConfig            ClientConfig
+	clientConfigNoOverrides ClientConfig
+	loadingLock             sync.Mutex
 
 	// provided for testing
 	icc InClusterConfig
@@ -59,16 +60,16 @@ func NewInteractiveDeferredLoadingClientConfig(loader ClientConfigLoader, overri
 	return &DeferredLoadingClientConfig{loader: loader, overrides: overrides, icc: &inClusterClientConfig{overrides: overrides}, fallbackReader: fallbackReader}
 }
 
-func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, error) {
+func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, ClientConfig, error) {
 	config.loadingLock.Lock()
 	defer config.loadingLock.Unlock()
 
-	if config.clientConfig != nil {
-		return config.clientConfig, nil
+	if config.clientConfig != nil && config.clientConfigNoOverrides != nil {
+		return config.clientConfig, config.clientConfigNoOverrides, nil
 	}
 	mergedConfig, err := config.loader.Load()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var currentContext string
@@ -80,11 +81,12 @@ func (config *DeferredLoadingClientConfig) createClientConfig() (ClientConfig, e
 	} else {
 		config.clientConfig = NewNonInteractiveClientConfig(*mergedConfig, currentContext, config.overrides, config.loader)
 	}
-	return config.clientConfig, nil
+	config.clientConfigNoOverrides = NewNonInteractiveClientConfig(*mergedConfig, "", nil, config.loader)
+	return config.clientConfig, config.clientConfigNoOverrides, nil
 }
 
 func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, error) {
-	mergedConfig, err := config.createClientConfig()
+	mergedConfig, _, err := config.createClientConfig()
 	if err != nil {
 		return clientcmdapi.Config{}, err
 	}
@@ -94,7 +96,7 @@ func (config *DeferredLoadingClientConfig) RawConfig() (clientcmdapi.Config, err
 
 // ClientConfig implements ClientConfig
 func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, error) {
-	mergedClientConfig, err := config.createClientConfig()
+	mergedClientConfig, mergedClientConfigNoOverrides, err := config.createClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -109,9 +111,12 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 			return nil, err
 		}
 	case mergedConfig != nil:
-		// the configuration is valid, but if this is equal to the defaults we should try
-		// in-cluster configuration
-		if !config.loader.IsDefaultConfig(mergedConfig) {
+		mergedConfigNoOverrides, err := mergedClientConfigNoOverrides.ClientConfig()
+		if err != nil {
+			return mergedConfig, nil
+		}
+
+		if mergedConfigNoOverrides != nil && !config.loader.IsDefaultConfig(mergedConfigNoOverrides) {
 			return mergedConfig, nil
 		}
 	}
@@ -128,7 +133,7 @@ func (config *DeferredLoadingClientConfig) ClientConfig() (*restclient.Config, e
 
 // Namespace implements KubeConfig
 func (config *DeferredLoadingClientConfig) Namespace() (string, bool, error) {
-	mergedKubeConfig, err := config.createClientConfig()
+	mergedKubeConfig, _, err := config.createClientConfig()
 	if err != nil {
 		return "", false, err
 	}
