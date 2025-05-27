@@ -42,7 +42,7 @@ import (
 func GetPodFullName(pod *v1.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format).
-	return pod.Name + "_" + pod.Namespace
+	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
 }
 
 // GetPodStartTime returns start time of the given pod or current timestamp

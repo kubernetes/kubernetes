@@ -748,7 +748,7 @@ func (p *Pod) IsEmpty() bool {
 func GetPodFullName(pod *v1.Pod) string {
 	// Use underscore as the delimiter because it is not allowed in pod name
 	// (DNS subdomain format), while allowed in the container name format.
-	return pod.Name + "_" + pod.Namespace
+	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
 }
 
 // BuildPodFullName builds the pod full name from pod name and namespace.
