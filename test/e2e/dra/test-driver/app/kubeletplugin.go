@@ -128,6 +128,22 @@ type FileOperations struct {
 
 // StartPlugin sets up the servers that are necessary for a DRA kubelet plugin.
 func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+	return internalStart(ctx, cdiDir, driverName, kubeClient, nodeName, fileOps, true, true, opts...)
+}
+
+// StartOnlyRegistrar sets up only the registrar serice.
+func StartOnlyRegistrar(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+	return internalStart(ctx, cdiDir, driverName, kubeClient, nodeName, fileOps, false, true, opts...)
+}
+
+// StartOnlyPlugin sets up only the plugin service, without the registrar.
+func StartOnlyPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
+	return internalStart(ctx, cdiDir, driverName, kubeClient, nodeName, fileOps, true, false, opts...)
+}
+
+// internalStart is the common code for all Start* functions.
+// It sets up either both plugin and registrar, or only one of them.
+func internalStart(ctx context.Context, cdiDir, driverName string, kubeClient kubernetes.Interface, nodeName string, fileOps FileOperations, startPlugin, startReg bool, opts ...kubeletplugin.Option) (*ExamplePlugin, error) {
 	logger := klog.FromContext(ctx)
 
 	if fileOps.Create == nil {
@@ -161,7 +177,19 @@ func StartPlugin(ctx context.Context, cdiDir, driverName string, kubeClient kube
 		kubeletplugin.GRPCInterceptor(ex.recordGRPCCall),
 		kubeletplugin.GRPCStreamInterceptor(ex.recordGRPCStream),
 	)
-	d, err := kubeletplugin.Start(ctx, ex, opts...)
+
+	d, err := func() (*kubeletplugin.Helper, error) {
+		switch {
+		case startPlugin && startReg:
+			return kubeletplugin.Start(ctx, ex, opts...)
+		case startPlugin:
+			return kubeletplugin.StartOnlyPlugin(ctx, ex, opts...)
+		case startReg:
+			return kubeletplugin.StartOnlyRegistrar(ctx, ex, opts...)
+		default:
+			return nil, fmt.Errorf("no services to start")
+		}
+	}()
 	if err != nil {
 		return nil, fmt.Errorf("start kubelet plugin: %w", err)
 	}

@@ -622,6 +622,67 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	return plugin
 }
 
+// newRegistrar starts a registrar for the specified plugin name.
+// Returns a pointer to the ExamplePlugin.
+func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, pluginName string) *testdriver.ExamplePlugin {
+	ginkgo.By("start only Kubelet plugin registrar")
+	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin registrar "+pluginName))
+	ctx = klog.NewContext(ctx, logger)
+	registrar, err := testdriver.StartOnlyRegistrar(ctx, cdiDir, pluginName, clientSet, nodeName, testdriver.FileOperations{})
+	framework.ExpectNoError(err, "start only Kubelet plugin registrar")
+	return registrar
+}
+
+// newPlugin starts a plugin for the specified plugin name.
+// Returns a pointer to the ExamplePlugin.
+func newPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeName, pluginName string) *testdriver.ExamplePlugin {
+	ginkgo.By("start only Kubelet plugin")
+	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+pluginName), "node", nodeName)
+	ctx = klog.NewContext(ctx, logger)
+
+	// Ensure that directories exist, creating them if necessary. We want
+	// to know early if there is a setup problem that would prevent
+	// creating those directories.
+	err := os.MkdirAll(cdiDir, os.FileMode(0750))
+	framework.ExpectNoError(err, "create CDI directory")
+	datadir := path.Join(kubeletplugin.KubeletPluginsDir, pluginName) // The default, not set below.
+	err = os.MkdirAll(datadir, 0750)
+	framework.ExpectNoError(err, "create DRA socket directory")
+
+	plugin, err := testdriver.StartOnlyPlugin(
+		ctx,
+		cdiDir,
+		pluginName,
+		clientSet,
+		nodeName,
+		testdriver.FileOperations{
+			DriverResources: &resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodeName: {
+						Slices: []resourceslice.Slice{{
+							Devices: []resourceapiv1beta2.Device{
+								{
+									Name: "device-00",
+								},
+							},
+						}},
+					},
+				},
+			},
+		},
+	)
+	framework.ExpectNoError(err)
+
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		// kubelet should do this eventually, but better make sure.
+		// A separate test checks this explicitly.
+		framework.ExpectNoError(clientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
+	})
+	ginkgo.DeferCleanup(plugin.Stop)
+
+	return plugin
+}
+
 // createTestObjects creates objects required by the test
 // NOTE: as scheduler and controller manager are not running by the Node e2e,
 // the objects must contain all required data to be processed correctly by the API server

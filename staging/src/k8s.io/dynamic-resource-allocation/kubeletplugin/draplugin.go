@@ -447,6 +447,22 @@ type Helper struct {
 // If the plugin will be used to publish resources, [NodeName]
 // is also mandatory.
 func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helper, finalErr error) {
+	return internalStart(ctx, plugin, true, true, opts...)
+}
+
+// StartOnlyRegistrar starts the DRA registrar service.
+// It does not start the DRA node plugin service.
+func StartOnlyRegistrar(ctx context.Context, plugin DRAPlugin, opts ...Option) (*Helper, error) {
+	return internalStart(ctx, plugin, false, true, opts...)
+}
+
+// StartOnlyPlugin starts the DRA node plugin service.
+// It does not start the DRA registrar service.
+func StartOnlyPlugin(ctx context.Context, plugin DRAPlugin, opts ...Option) (*Helper, error) {
+	return internalStart(ctx, plugin, true, false, opts...)
+}
+
+func internalStart(ctx context.Context, plugin DRAPlugin, startPlugin, startReg bool, opts ...Option) (result *Helper, finalErr error) {
 	logger := klog.FromContext(ctx)
 	o := options{
 		logger:        klog.Background(),
@@ -531,27 +547,33 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		file:       "dra" + uidPart + ".sock", // "dra" is hard-coded. The directory is unique, so we get a unique full path also without the UID.
 		listenFunc: o.draEndpointListen,
 	}
-	pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
-		if o.nodeV1beta1 {
-			logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
-			drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
-			supportedServices = append(supportedServices, drapb.DRAPluginService)
+	if startPlugin {
+		pluginServer, err := startGRPCServer(klog.LoggerWithName(logger, "dra"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, draEndpoint, func(grpcServer *grpc.Server) {
+			if o.nodeV1beta1 {
+				logger.V(5).Info("registering v1beta1.DRAPlugin gRPC service")
+				drapb.RegisterDRAPluginServer(grpcServer, &nodePluginImplementation{Helper: d})
+				supportedServices = append(supportedServices, drapb.DRAPluginService)
+			}
+		})
+		if err != nil {
+			return nil, fmt.Errorf("start node client: %w", err)
 		}
-	})
-	if err != nil {
-		return nil, fmt.Errorf("start node client: %v", err)
-	}
-	d.pluginServer = pluginServer
-	if len(supportedServices) == 0 {
-		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+		d.pluginServer = pluginServer
+		if len(supportedServices) == 0 {
+			return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+		}
 	}
 
-	// Now make it available to kubelet.
-	registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("start registrar: %v", err)
+	if startReg {
+		if o.nodeV1beta1 && len(supportedServices) == 0 {
+			supportedServices = append(supportedServices, drapb.DRAPluginService)
+		}
+		registrar, err := startRegistrar(klog.LoggerWithName(logger, "registrar"), o.grpcVerbosity, o.unaryInterceptors, o.streamInterceptors, o.driverName, supportedServices, draEndpoint.path(), o.pluginRegistrationEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("start registrar: %w", err)
+		}
+		d.registrar = registrar
 	}
-	d.registrar = registrar
 
 	// startGRPCServer and startRegistrar don't implement cancellation
 	// themselves, we add that for both here.
@@ -561,8 +583,13 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		<-ctx.Done()
 
 		// Time to stop.
-		d.pluginServer.stop()
-		d.registrar.stop()
+		if startPlugin {
+			d.pluginServer.stop()
+		}
+
+		if startReg {
+			d.registrar.stop()
+		}
 
 		// d.resourceSliceController is set concurrently.
 		d.mutex.Lock()
