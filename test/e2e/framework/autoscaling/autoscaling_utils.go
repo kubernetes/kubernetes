@@ -61,7 +61,7 @@ const (
 	port                            = 80
 	targetPort                      = 8080
 	sidecarTargetPort               = 8081
-	timeoutRC                       = 5 * time.Minute
+	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
 	invalidKind                     = "ERROR: invalid workload kind for resource consumer"
