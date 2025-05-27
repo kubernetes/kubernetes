@@ -19,5 +19,7 @@ limitations under the License.
 // +k8s:conversion-gen-external-types=k8s.io/api/apps/v1beta1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/api/apps/v1beta1
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/apps/v1beta1
 
 package v1beta1
