@@ -36,6 +36,7 @@ type PodTemplateSpecApplyConfiguration struct {
 func PodTemplateSpec() *PodTemplateSpecApplyConfiguration {
 	return &PodTemplateSpecApplyConfiguration{}
 }
+func (b PodTemplateSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -191,4 +192,10 @@ func (b *PodTemplateSpecApplyConfiguration) WithSpec(value *PodSpecApplyConfigur
 func (b *PodTemplateSpecApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *PodTemplateSpecApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

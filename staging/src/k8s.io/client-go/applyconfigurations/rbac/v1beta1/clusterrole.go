@@ -80,6 +80,7 @@ func extractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager strin
 	b.WithAPIVersion("rbac.authorization.k8s.io/v1beta1")
 	return b, nil
 }
+func (b ClusterRoleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -260,8 +261,24 @@ func (b *ClusterRoleApplyConfiguration) WithAggregationRule(value *AggregationRu
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ClusterRoleApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ClusterRoleApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

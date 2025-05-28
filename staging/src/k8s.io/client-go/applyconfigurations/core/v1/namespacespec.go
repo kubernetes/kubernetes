@@ -33,6 +33,7 @@ type NamespaceSpecApplyConfiguration struct {
 func NamespaceSpec() *NamespaceSpecApplyConfiguration {
 	return &NamespaceSpecApplyConfiguration{}
 }
+func (b NamespaceSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFinalizers adds the given value to the Finalizers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

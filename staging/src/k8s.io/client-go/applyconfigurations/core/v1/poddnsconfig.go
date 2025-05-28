@@ -31,6 +31,7 @@ type PodDNSConfigApplyConfiguration struct {
 func PodDNSConfig() *PodDNSConfigApplyConfiguration {
 	return &PodDNSConfigApplyConfiguration{}
 }
+func (b PodDNSConfigApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNameservers adds the given value to the Nameservers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

@@ -31,6 +31,7 @@ type NetworkDeviceDataApplyConfiguration struct {
 func NetworkDeviceData() *NetworkDeviceDataApplyConfiguration {
 	return &NetworkDeviceDataApplyConfiguration{}
 }
+func (b NetworkDeviceDataApplyConfiguration) IsApplyConfiguration() {}
 
 // WithInterfaceName sets the InterfaceName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

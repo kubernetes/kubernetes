@@ -31,6 +31,7 @@ type ImageReviewSpecApplyConfiguration struct {
 func ImageReviewSpec() *ImageReviewSpecApplyConfiguration {
 	return &ImageReviewSpecApplyConfiguration{}
 }
+func (b ImageReviewSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithContainers adds the given value to the Containers field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

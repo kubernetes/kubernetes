@@ -46,6 +46,7 @@ type ObjectMetaApplyConfiguration struct {
 func ObjectMeta() *ObjectMetaApplyConfiguration {
 	return &ObjectMetaApplyConfiguration{}
 }
+func (b ObjectMetaApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -173,4 +174,9 @@ func (b *ObjectMetaApplyConfiguration) WithFinalizers(values ...string) *ObjectM
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *ObjectMetaApplyConfiguration) GetName() *string {
 	return b.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *ObjectMetaApplyConfiguration) GetNamespace() *string {
+	return b.Namespace
 }

@@ -29,6 +29,7 @@ type IngressRuleValueApplyConfiguration struct {
 func IngressRuleValue() *IngressRuleValueApplyConfiguration {
 	return &IngressRuleValueApplyConfiguration{}
 }
+func (b IngressRuleValueApplyConfiguration) IsApplyConfiguration() {}
 
 // WithHTTP sets the HTTP field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

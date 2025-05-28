@@ -36,6 +36,7 @@ type PersistentVolumeClaimTemplateApplyConfiguration struct {
 func PersistentVolumeClaimTemplate() *PersistentVolumeClaimTemplateApplyConfiguration {
 	return &PersistentVolumeClaimTemplateApplyConfiguration{}
 }
+func (b PersistentVolumeClaimTemplateApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -191,4 +192,10 @@ func (b *PersistentVolumeClaimTemplateApplyConfiguration) WithSpec(value *Persis
 func (b *PersistentVolumeClaimTemplateApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *PersistentVolumeClaimTemplateApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

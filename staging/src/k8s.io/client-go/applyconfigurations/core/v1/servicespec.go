@@ -52,6 +52,7 @@ type ServiceSpecApplyConfiguration struct {
 func ServiceSpec() *ServiceSpecApplyConfiguration {
 	return &ServiceSpecApplyConfiguration{}
 }
+func (b ServiceSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPorts adds the given value to the Ports field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

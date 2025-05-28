@@ -30,6 +30,7 @@ type VariableApplyConfiguration struct {
 func Variable() *VariableApplyConfiguration {
 	return &VariableApplyConfiguration{}
 }
+func (b VariableApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

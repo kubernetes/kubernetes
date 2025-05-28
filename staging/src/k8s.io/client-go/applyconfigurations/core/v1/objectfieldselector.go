@@ -30,6 +30,7 @@ type ObjectFieldSelectorApplyConfiguration struct {
 func ObjectFieldSelector() *ObjectFieldSelectorApplyConfiguration {
 	return &ObjectFieldSelectorApplyConfiguration{}
 }
+func (b ObjectFieldSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAPIVersion sets the APIVersion field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

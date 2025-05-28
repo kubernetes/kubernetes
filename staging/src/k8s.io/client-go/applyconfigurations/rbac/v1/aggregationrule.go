@@ -33,6 +33,7 @@ type AggregationRuleApplyConfiguration struct {
 func AggregationRule() *AggregationRuleApplyConfiguration {
 	return &AggregationRuleApplyConfiguration{}
 }
+func (b AggregationRuleApplyConfiguration) IsApplyConfiguration() {}
 
 // WithClusterRoleSelectors adds the given value to the ClusterRoleSelectors field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

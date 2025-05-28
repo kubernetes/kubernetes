@@ -31,6 +31,7 @@ type RuntimeClassSpecApplyConfiguration struct {
 func RuntimeClassSpec() *RuntimeClassSpecApplyConfiguration {
 	return &RuntimeClassSpecApplyConfiguration{}
 }
+func (b RuntimeClassSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRuntimeHandler sets the RuntimeHandler field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

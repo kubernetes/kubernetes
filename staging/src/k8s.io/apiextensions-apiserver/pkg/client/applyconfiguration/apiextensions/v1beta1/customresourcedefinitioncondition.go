@@ -38,6 +38,7 @@ type CustomResourceDefinitionConditionApplyConfiguration struct {
 func CustomResourceDefinitionCondition() *CustomResourceDefinitionConditionApplyConfiguration {
 	return &CustomResourceDefinitionConditionApplyConfiguration{}
 }
+func (b CustomResourceDefinitionConditionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

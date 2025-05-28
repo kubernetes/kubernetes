@@ -33,6 +33,7 @@ type VolumeProjectionApplyConfiguration struct {
 func VolumeProjection() *VolumeProjectionApplyConfiguration {
 	return &VolumeProjectionApplyConfiguration{}
 }
+func (b VolumeProjectionApplyConfiguration) IsApplyConfiguration() {}
 
 // WithSecret sets the Secret field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

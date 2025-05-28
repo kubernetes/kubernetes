@@ -30,6 +30,7 @@ type LocalVolumeSourceApplyConfiguration struct {
 func LocalVolumeSource() *LocalVolumeSourceApplyConfiguration {
 	return &LocalVolumeSourceApplyConfiguration{}
 }
+func (b LocalVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPath sets the Path field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
