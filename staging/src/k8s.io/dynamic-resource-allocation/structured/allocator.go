@@ -987,8 +987,15 @@ func (alloc *allocator) allocateDevice(r deviceIndices, device deviceWithID, mus
 		return false, nil, nil
 	}
 
+	// Devices that consume counters can not be allocated if the PartitionableDevices feature
+	// is not enabled.
+	if !alloc.features.PartitionableDevices && len(device.basic.ConsumesCounters) > 0 {
+		alloc.logger.V(7).Info("Device consumes counters, but the partitionable devices feature is not enabled", "device", device.id)
+		return false, nil, nil
+	}
+
 	// The API validation logic has checked the ConsumesCounters referred should exist inside SharedCounters.
-	if alloc.features.PartitionableDevices && len(device.basic.ConsumesCounters) > 0 {
+	if len(device.basic.ConsumesCounters) > 0 {
 		// If a device consumes capacity from a capacity pool, verify that
 		// there is sufficient capacity available.
 		ok, err := alloc.checkAvailableCapacity(device)

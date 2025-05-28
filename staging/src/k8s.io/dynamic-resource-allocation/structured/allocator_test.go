@@ -2742,7 +2742,7 @@ func TestAllocator(t *testing.T) {
 			node:          node(node1, region1),
 			expectResults: nil,
 		},
-		"partitionable-devices-disabled": {
+		"partitionable-devices-disabled-device-consumes-counters": {
 			features: Features{
 				PartitionableDevices: false,
 			},
@@ -2767,6 +2767,58 @@ func TestAllocator(t *testing.T) {
 							"memory": resource.MustParse("18Gi"),
 						},
 					),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: nil,
+		},
+		"partitionable-devices-disabled-other-device-do-not-consume-counters": {
+			features: Features{
+				PartitionableDevices: false,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1,
+							map[string]resource.Quantity{
+								"memory": resource.MustParse("4Gi"),
+							},
+						),
+					),
+					device(device2, nil, nil),
+				).withCounterSet(
+					counterSet(counterSet1,
+						map[string]resource.Quantity{
+							"memory": resource.MustParse("18Gi"),
+						},
+					),
+				),
+			),
+			node: node(node1, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node1),
+				deviceAllocationResult(req0, driverA, pool1, device2, false),
+			)},
+		},
+		"partitionable-devices-disabled-per-device-node-selection": {
+			features: Features{
+				PartitionableDevices: false,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil,
+					request(req0, classA, 1),
+				),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrap(
+				slice(slice1, nodeSelectionPerDevice, pool1, driverA,
+					device(device2, nil, nil).withNodeSelection(node1),
 				),
 			),
 			node:          node(node1, region1),

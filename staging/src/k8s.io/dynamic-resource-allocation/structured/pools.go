@@ -54,7 +54,7 @@ func GatherPools(ctx context.Context, slices []*resourceapi.ResourceSlice, node 
 	pools := make(map[PoolID]*Pool)
 
 	for _, slice := range slices {
-		if !features.PartitionableDevices && (len(slice.Spec.SharedCounters) > 0 || slice.Spec.PerDeviceNodeSelection != nil) {
+		if !features.PartitionableDevices && slice.Spec.PerDeviceNodeSelection != nil {
 			continue
 		}
 
