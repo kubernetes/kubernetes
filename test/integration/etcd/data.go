@@ -564,34 +564,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		// --
 
 		// k8s.io/kubernetes/pkg/apis/resource/v1alpha3
-		gvr("resource.k8s.io", "v1alpha3", "deviceclasses"): {
-			Stub:              `{"metadata": {"name": "class1name"}}`,
-			ExpectedEtcdPath:  "/registry/deviceclasses/class1name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "DeviceClass"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
-		gvr("resource.k8s.io", "v1alpha3", "resourceclaims"): {
-			Stub:              `{"metadata": {"name": "claim1name"}, "spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}`,
-			ExpectedEtcdPath:  "/registry/resourceclaims/" + namespace + "/claim1name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceClaim"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
-		gvr("resource.k8s.io", "v1alpha3", "resourceclaimtemplates"): {
-			Stub:              `{"metadata": {"name": "claimtemplate1name"}, "spec": {"spec": {"devices": {"requests": [{"name": "req-0", "deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}]}}}}`,
-			ExpectedEtcdPath:  "/registry/resourceclaimtemplates/" + namespace + "/claimtemplate1name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceClaimTemplate"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
-		gvr("resource.k8s.io", "v1alpha3", "resourceslices"): {
-			Stub:              `{"metadata": {"name": "node1slice"}, "spec": {"nodeName": "worker1", "driver": "dra.example.com", "pool": {"name": "worker1", "resourceSliceCount": 1}}}`,
-			ExpectedEtcdPath:  "/registry/resourceslices/node1slice",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta1", "ResourceSlice"),
-			IntroducedVersion: "1.31",
-			RemovedVersion:    "1.37",
-		},
 		gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"): {
 			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
