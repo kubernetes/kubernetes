@@ -204,7 +204,7 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 		t.Fatal(err)
 	}
 
-	kubeAPIServerConfig, _, _, err := app.CreateKubeAPIServerConfig(completedOptions, genericConfig, versionedInformers, storageFactory)
+	kubeAPIServerConfig, _, err := app.CreateKubeAPIServerConfig(completedOptions, genericConfig, versionedInformers, storageFactory)
 	if err != nil {
 		t.Fatal(err)
 	}
