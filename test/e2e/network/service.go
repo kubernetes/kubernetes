@@ -733,9 +733,9 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	/*
-		Release: v1.9
-		Testname: Service, endpoints
-		Description: Create a service with a endpoint without any Pods, the service MUST run and show empty endpoints. Add a pod to the service and the service MUST validate to show all the endpoints for the ports exposed by the Pod. Add another Pod then the list of all Ports exposed by both the Pods MUST be valid and have corresponding service endpoint. Once the second Pod is deleted then set of endpoint MUST be validated to show only ports from the first container that are exposed. Once both pods are deleted the endpoints from the service MUST be empty.
+		Release: v1.9, v1.21, v1.34
+		Testname: Service and EndpointSlices
+		Description: Create a service with a endpoint without any Pods. The service MUST run and MUST have an EndpointSlice containing no endpoints. Add a pod to the service and there MUST be an EndpointSlice for the service pointing to the Pod and it MUST be possible to connect to the Pod via the clusterIP. Add another Pod the EndpointSlice MUST now point to both Pods. Delete the first Pod and the EndpointSlice MUST now point to only the second Pod, and it MUST still be possible to connect to the service via the clusterIP. Delete the second pod and the EndpointSlice MUST be deleted.
 	*/
 	framework.ConformanceIt("should serve a basic endpoint from pods", func(ctx context.Context) {
 		serviceName := "endpoint-test2"
@@ -803,9 +803,9 @@ var _ = common.SIGDescribe("Services", func() {
 	})
 
 	/*
-		Release: v1.9
-		Testname: Service, endpoints with multiple ports
-		Description: Create a service with two ports but no Pods are added to the service yet.  The service MUST run and show empty set of endpoints. Add a Pod to the first port, service MUST list one endpoint for the Pod on that port. Add another Pod to the second port, service MUST list both the endpoints. Delete the first Pod and the service MUST list only the endpoint to the second Pod. Delete the second Pod and the service must now have empty set of endpoints.
+		Release: v1.9, v1.21, v1.34
+		Testname: Service and EndpointSlices with multiple ports
+		Description: Create a service with two ports but no Pods.  The service MUST run and MUST have EndpointSlice(s) with no endpoints. Add a Pod to the service that serves only the first port. There must be EndpointSlice(s) for the service containing only an endpoint for that pod and its port. Add a second Pod serving only the second port. There MUST be EndpointSlice(s) for the service containing endpoints for both pods/ports. It MUST be possible to reach each pod via the clusterIP and the correct port. Delete the first Pod. There MUST be EndpointSlice(s) containing only an endpoint for the second pod. Delete the second pod. There MUST be no EndpointSlice(s) for the service containing endpoints.
 	*/
 	framework.ConformanceIt("should serve multiport endpoints from pods", func(ctx context.Context) {
 		// repacking functionality is intentionally not tested here - it's better to test it in an integration test.
