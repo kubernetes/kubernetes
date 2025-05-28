@@ -221,14 +221,13 @@ func (c *controller) newLease(base *coordinationv1.Lease) (*coordinationv1.Lease
 				Namespace: c.leaseNamespace,
 			},
 			Spec: coordinationv1.LeaseSpec{
-				HolderIdentity: ptr.To(c.holderIdentity),
+				HolderIdentity:       ptr.To(c.holderIdentity),
+				LeaseDurationSeconds: ptr.To(c.leaseDurationSeconds),
 			},
 		}
 	} else {
 		lease = base.DeepCopy()
 	}
-	// update the duration, the controller's config may have changed since lease creation
-	lease.Spec.LeaseDurationSeconds = ptr.To(c.leaseDurationSeconds)
 	lease.Spec.RenewTime = &metav1.MicroTime{Time: c.clock.Now()}
 
 	if c.newLeasePostProcessFunc != nil {

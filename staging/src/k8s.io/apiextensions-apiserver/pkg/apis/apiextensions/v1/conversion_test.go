@@ -504,7 +504,7 @@ func TestConversion(t *testing.T) {
 			In: &apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Conversion: &apiextensions.CustomResourceConversion{
-						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.String("http://example.com")},
 					},
 				},
 			},
@@ -513,7 +513,7 @@ func TestConversion(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Conversion: &CustomResourceConversion{
 						Webhook: &WebhookConversion{
-							ClientConfig: &WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+							ClientConfig: &WebhookClientConfig{URL: pointer.String("http://example.com")},
 						},
 					},
 				},
@@ -560,7 +560,7 @@ func TestConversion(t *testing.T) {
 				Spec: CustomResourceDefinitionSpec{
 					Conversion: &CustomResourceConversion{
 						Webhook: &WebhookConversion{
-							ClientConfig: &WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+							ClientConfig: &WebhookClientConfig{URL: pointer.String("http://example.com")},
 						},
 					},
 				},
@@ -569,7 +569,7 @@ func TestConversion(t *testing.T) {
 			ExpectOut: &apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Conversion: &apiextensions.CustomResourceConversion{
-						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.StringPtr("http://example.com")},
+						WebhookClientConfig: &apiextensions.WebhookClientConfig{URL: pointer.String("http://example.com")},
 					},
 					PreserveUnknownFields: ptr.To(false),
 				},

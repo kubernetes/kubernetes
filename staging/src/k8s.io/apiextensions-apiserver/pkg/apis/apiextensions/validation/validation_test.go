@@ -11197,57 +11197,57 @@ func Test_validateDeprecationWarning(t *testing.T) {
 		{
 			name:       "not deprecated, empty warning",
 			deprecated: false,
-			warning:    pointer.StringPtr(""),
+			warning:    pointer.String(""),
 			want:       []string{"can only be set for deprecated versions"},
 		},
 		{
 			name:       "not deprecated, set warning",
 			deprecated: false,
-			warning:    pointer.StringPtr("foo"),
+			warning:    pointer.String("foo"),
 			want:       []string{"can only be set for deprecated versions"},
 		},
 
 		{
 			name:       "utf-8",
 			deprecated: true,
-			warning:    pointer.StringPtr("Iñtërnâtiônàlizætiøn,💝🐹🌇⛔"),
+			warning:    pointer.String("Iñtërnâtiônàlizætiøn,💝🐹🌇⛔"),
 			want:       nil,
 		},
 		{
 			name:       "long warning",
 			deprecated: true,
-			warning:    pointer.StringPtr(strings.Repeat("x", 256)),
+			warning:    pointer.String(strings.Repeat("x", 256)),
 			want:       nil,
 		},
 
 		{
 			name:       "too long warning",
 			deprecated: true,
-			warning:    pointer.StringPtr(strings.Repeat("x", 257)),
+			warning:    pointer.String(strings.Repeat("x", 257)),
 			want:       []string{"must be <= 256 characters long"},
 		},
 		{
 			name:       "newline",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\nfoo"),
+			warning:    pointer.String("Test message\nfoo"),
 			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
 		},
 		{
 			name:       "non-printable character",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\u0008"),
+			warning:    pointer.String("Test message\u0008"),
 			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
 		},
 		{
 			name:       "null character",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\u0000"),
+			warning:    pointer.String("Test message\u0000"),
 			want:       []string{"must only contain printable UTF-8 characters; non-printable character found at index 12"},
 		},
 		{
 			name:       "non-utf-8",
 			deprecated: true,
-			warning:    pointer.StringPtr("Test message\xc5foo"),
+			warning:    pointer.String("Test message\xc5foo"),
 			want:       []string{"must only contain printable UTF-8 characters"},
 		},
 	}

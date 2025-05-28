@@ -48,7 +48,7 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
+					HolderIdentity:       pointer.String("kube-apiserver-12345"),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now()},
 				},
@@ -66,7 +66,7 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
+					HolderIdentity:       pointer.String("kube-apiserver-12345"),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-time.Minute)},
 				},
@@ -84,7 +84,7 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
+					HolderIdentity:       pointer.String("kube-apiserver-12345"),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-time.Minute)},
 				},
@@ -102,7 +102,7 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
+					HolderIdentity:       pointer.String("kube-apiserver-12345"),
 					LeaseDurationSeconds: pointer.Int32Ptr(10),
 					RenewTime:            nil,
 				},
@@ -120,7 +120,7 @@ func Test_Controller(t *testing.T) {
 					},
 				},
 				Spec: coordinationv1.LeaseSpec{
-					HolderIdentity:       pointer.StringPtr("kube-apiserver-12345"),
+					HolderIdentity:       pointer.String("kube-apiserver-12345"),
 					LeaseDurationSeconds: nil,
 					RenewTime:            &metav1.MicroTime{Time: fakeClock.Now().Add(-time.Minute)},
 				},
