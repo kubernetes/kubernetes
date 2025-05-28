@@ -297,14 +297,14 @@ func testAdminAccess(tCtx ktesting.TContext, adminAccessEnabled bool) {
 	if adminAccessEnabled {
 		if err != nil {
 			// should result in validation error
-			assert.ErrorContains(tCtx, err, "admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace", "the error message should have contained the expected error message")
+			assert.ErrorContains(tCtx, err, "admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace", "the error message should have contained the expected error message")
 			return
 		} else {
 			tCtx.Fatal("expected validation error(s), got none")
 		}
 
 		// create claim with AdminAccess in admin namespace
-		adminNS := createTestNamespace(tCtx, map[string]string{"resource.k8s.io/admin-access": "true"})
+		adminNS := createTestNamespace(tCtx, map[string]string{"resource.kubernetes.io/admin-access": "true"})
 		claim2 := claim.DeepCopy()
 		claim2.Namespace = adminNS
 		claim2.Name = "claim2"
