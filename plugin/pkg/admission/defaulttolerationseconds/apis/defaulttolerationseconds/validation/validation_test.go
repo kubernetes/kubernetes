@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	internalapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
+	"k8s.io/utils/ptr"
 )
-
-func int64Ptr(i int64) *int64 { return &i }
 
 func TestValidateConfiguration(t *testing.T) {
 	tests := []struct {
@@ -39,8 +38,8 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "both zeros",
 			config: &internalapi.Configuration{
 				DefaultTolerationSecondsConfig: internalapi.DefaultTolerationSecondsConfig{
-					NotReadyTolerationSeconds:    int64Ptr(0),
-					UnreachableTolerationSeconds: int64Ptr(0),
+					NotReadyTolerationSeconds:    ptr.To[int64](0),
+					UnreachableTolerationSeconds: ptr.To[int64](0),
 				},
 			},
 			wantErr: false,
@@ -49,8 +48,8 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "both positive",
 			config: &internalapi.Configuration{
 				DefaultTolerationSecondsConfig: internalapi.DefaultTolerationSecondsConfig{
-					NotReadyTolerationSeconds:    int64Ptr(30),
-					UnreachableTolerationSeconds: int64Ptr(60),
+					NotReadyTolerationSeconds:    ptr.To[int64](30),
+					UnreachableTolerationSeconds: ptr.To[int64](60),
 				},
 			},
 			wantErr: false,
@@ -59,8 +58,8 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "negative NotReady",
 			config: &internalapi.Configuration{
 				DefaultTolerationSecondsConfig: internalapi.DefaultTolerationSecondsConfig{
-					NotReadyTolerationSeconds:    int64Ptr(-1),
-					UnreachableTolerationSeconds: int64Ptr(10),
+					NotReadyTolerationSeconds:    ptr.To[int64](-1),
+					UnreachableTolerationSeconds: ptr.To[int64](10),
 				},
 			},
 			wantErr: true,
@@ -69,8 +68,8 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "negative Unreachable",
 			config: &internalapi.Configuration{
 				DefaultTolerationSecondsConfig: internalapi.DefaultTolerationSecondsConfig{
-					NotReadyTolerationSeconds:    int64Ptr(10),
-					UnreachableTolerationSeconds: int64Ptr(-5),
+					NotReadyTolerationSeconds:    ptr.To[int64](10),
+					UnreachableTolerationSeconds: ptr.To[int64](-5),
 				},
 			},
 			wantErr: true,
@@ -79,8 +78,8 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "both negative",
 			config: &internalapi.Configuration{
 				DefaultTolerationSecondsConfig: internalapi.DefaultTolerationSecondsConfig{
-					NotReadyTolerationSeconds:    int64Ptr(-1),
-					UnreachableTolerationSeconds: int64Ptr(-5),
+					NotReadyTolerationSeconds:    ptr.To[int64](-1),
+					UnreachableTolerationSeconds: ptr.To[int64](-5),
 				},
 			},
 			wantErr: true,

@@ -26,15 +26,15 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 // PluginName indicates name of admission plugin.
 const PluginName = "DefaultTolerationSeconds"
 
 var (
-	defaultNotReadyTolerationSeconds    = pointer.Int64(300)
-	defaultUnreachableTolerationSeconds = pointer.Int64(300)
+	defaultNotReadyTolerationSeconds    = ptr.To[int64](300)
+	defaultUnreachableTolerationSeconds = ptr.To[int64](300)
 )
 
 // Register registers a plugin
