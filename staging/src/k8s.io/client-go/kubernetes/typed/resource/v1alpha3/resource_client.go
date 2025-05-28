@@ -28,11 +28,7 @@ import (
 
 type ResourceV1alpha3Interface interface {
 	RESTClient() rest.Interface
-	DeviceClassesGetter
 	DeviceTaintRulesGetter
-	ResourceClaimsGetter
-	ResourceClaimTemplatesGetter
-	ResourceSlicesGetter
 }
 
 // ResourceV1alpha3Client is used to interact with features provided by the resource.k8s.io group.
@@ -40,24 +36,8 @@ type ResourceV1alpha3Client struct {
 	restClient rest.Interface
 }
 
-func (c *ResourceV1alpha3Client) DeviceClasses() DeviceClassInterface {
-	return newDeviceClasses(c)
-}
-
 func (c *ResourceV1alpha3Client) DeviceTaintRules() DeviceTaintRuleInterface {
 	return newDeviceTaintRules(c)
-}
-
-func (c *ResourceV1alpha3Client) ResourceClaims(namespace string) ResourceClaimInterface {
-	return newResourceClaims(c, namespace)
-}
-
-func (c *ResourceV1alpha3Client) ResourceClaimTemplates(namespace string) ResourceClaimTemplateInterface {
-	return newResourceClaimTemplates(c, namespace)
-}
-
-func (c *ResourceV1alpha3Client) ResourceSlices() ResourceSliceInterface {
-	return newResourceSlices(c)
 }
 
 // NewForConfig creates a new ResourceV1alpha3Client for the given config.
