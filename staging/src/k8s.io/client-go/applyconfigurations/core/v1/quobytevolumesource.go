@@ -34,6 +34,7 @@ type QuobyteVolumeSourceApplyConfiguration struct {
 func QuobyteVolumeSource() *QuobyteVolumeSourceApplyConfiguration {
 	return &QuobyteVolumeSourceApplyConfiguration{}
 }
+func (b QuobyteVolumeSourceApplyConfiguration) IsApplyConfiguration() {}
 
 // WithRegistry sets the Registry field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

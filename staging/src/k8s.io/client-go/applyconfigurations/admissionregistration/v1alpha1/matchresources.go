@@ -38,6 +38,7 @@ type MatchResourcesApplyConfiguration struct {
 func MatchResources() *MatchResourcesApplyConfiguration {
 	return &MatchResourcesApplyConfiguration{}
 }
+func (b MatchResourcesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNamespaceSelector sets the NamespaceSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

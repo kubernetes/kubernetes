@@ -72,6 +72,7 @@ type PodSpecApplyConfiguration struct {
 func PodSpec() *PodSpecApplyConfiguration {
 	return &PodSpecApplyConfiguration{}
 }
+func (b PodSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithVolumes adds the given value to the Volumes field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

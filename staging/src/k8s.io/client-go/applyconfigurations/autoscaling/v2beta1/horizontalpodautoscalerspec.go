@@ -32,6 +32,7 @@ type HorizontalPodAutoscalerSpecApplyConfiguration struct {
 func HorizontalPodAutoscalerSpec() *HorizontalPodAutoscalerSpecApplyConfiguration {
 	return &HorizontalPodAutoscalerSpecApplyConfiguration{}
 }
+func (b HorizontalPodAutoscalerSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithScaleTargetRef sets the ScaleTargetRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

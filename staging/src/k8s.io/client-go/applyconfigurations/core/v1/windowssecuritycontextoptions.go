@@ -32,6 +32,7 @@ type WindowsSecurityContextOptionsApplyConfiguration struct {
 func WindowsSecurityContextOptions() *WindowsSecurityContextOptionsApplyConfiguration {
 	return &WindowsSecurityContextOptionsApplyConfiguration{}
 }
+func (b WindowsSecurityContextOptionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithGMSACredentialSpecName sets the GMSACredentialSpecName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

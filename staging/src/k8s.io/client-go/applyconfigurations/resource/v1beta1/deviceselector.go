@@ -29,6 +29,7 @@ type DeviceSelectorApplyConfiguration struct {
 func DeviceSelector() *DeviceSelectorApplyConfiguration {
 	return &DeviceSelectorApplyConfiguration{}
 }
+func (b DeviceSelectorApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCEL sets the CEL field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

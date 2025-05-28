@@ -35,6 +35,7 @@ type NetworkPolicyPeerApplyConfiguration struct {
 func NetworkPolicyPeer() *NetworkPolicyPeerApplyConfiguration {
 	return &NetworkPolicyPeerApplyConfiguration{}
 }
+func (b NetworkPolicyPeerApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPodSelector sets the PodSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
