@@ -1017,8 +1017,7 @@ func (nc *Controller) handleDisruption(ctx context.Context, zoneToNodeConditions
 	// At least one node was responding in previous pass or in the current pass. Semantics is as follows:
 	// - if the new state is "partialDisruption" we call a user defined function that returns a new limiter to use,
 	// - if the new state is "normal" we resume normal operation (go back to default limiter settings),
-	// - if new state is "fullDisruption" we restore normal eviction rate,
-	//   - unless all zones in the cluster are in "fullDisruption" - in that case we stop all evictions.
+	// - if new state is "fullDisruption" we restore normal eviction rate
 	if !allAreFullyDisrupted || !allWasFullyDisrupted {
 		// We're switching to full disruption mode
 		if allAreFullyDisrupted {
