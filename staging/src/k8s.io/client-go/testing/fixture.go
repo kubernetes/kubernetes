@@ -631,7 +631,7 @@ type managedFieldObjectTracker struct {
 	ObjectTracker
 	scheme          ObjectScheme
 	objectConverter runtime.ObjectConvertor
-	mapper          meta.RESTMapper
+	mapper          func() meta.RESTMapper
 	typeConverter   managedfields.TypeConverter
 }
 
@@ -644,8 +644,10 @@ func NewFieldManagedObjectTracker(scheme *runtime.Scheme, decoder runtime.Decode
 		ObjectTracker:   NewObjectTracker(scheme, decoder),
 		scheme:          scheme,
 		objectConverter: scheme,
-		mapper:          testrestmapper.TestOnlyStaticRESTMapper(scheme),
-		typeConverter:   typeConverter,
+		mapper: func() meta.RESTMapper {
+			return testrestmapper.TestOnlyStaticRESTMapper(scheme)
+		},
+		typeConverter: typeConverter,
 	}
 }
 
@@ -654,7 +656,7 @@ func (t *managedFieldObjectTracker) Create(gvr schema.GroupVersionResource, obj 
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}
@@ -698,8 +700,9 @@ func (t *managedFieldObjectTracker) Update(gvr schema.GroupVersionResource, obj 
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
+		println("kindfor")
 		return err
 	}
 	mgr, err := t.fieldManagerFor(gvk)
@@ -728,7 +731,7 @@ func (t *managedFieldObjectTracker) Patch(gvr schema.GroupVersionResource, patch
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}
@@ -757,7 +760,7 @@ func (t *managedFieldObjectTracker) Apply(gvr schema.GroupVersionResource, apply
 	if err != nil {
 		return err
 	}
-	gvk, err := t.mapper.KindFor(gvr)
+	gvk, err := t.mapper().KindFor(gvr)
 	if err != nil {
 		return err
 	}

@@ -661,3 +661,25 @@ var configMapTypedSchema = typed.YAMLObject(`types:
       namedType: __untyped_deduced_
     elementRelationship: separable
 `)
+
+func TestManagedFieldsObjectTrackerReloadsScheme(t *testing.T) {
+	cmResource := schema.GroupVersionResource{Version: "v1", Resource: "configmaps"}
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	// Create tracker without registered ConfigMap type
+	tracker := NewFieldManagedObjectTracker(scheme, codecs.UniversalDecoder(), configMapTypeConverter(scheme))
+
+	cm := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-cm",
+		},
+		Data: map[string]string{"key": "value"},
+	}
+
+	// Register the type in scheme
+	scheme.AddKnownTypes(cmResource.GroupVersion(), &v1.ConfigMap{})
+
+	err := tracker.Create(cmResource, cm, "default", metav1.CreateOptions{FieldManager: "test-manager"})
+	assert.NoError(t, err, "Create should succeed after registering type")
+}
