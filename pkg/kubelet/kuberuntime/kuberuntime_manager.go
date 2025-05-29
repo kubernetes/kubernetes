@@ -209,7 +209,7 @@ func NewKubeGenericRuntimeManager(
 	imagePullBurst int,
 	imagePullsCredentialVerificationPolicy string,
 	preloadedImagesCredentialVerificationWhitelist []string,
-	imageCredentialProviderConfigFile string,
+	imageCredentialProviderConfigPath string,
 	imageCredentialProviderBinDir string,
 	singleProcessOOMKill *bool,
 	cpuCFSQuota bool,
@@ -281,8 +281,8 @@ func NewKubeGenericRuntimeManager(
 		"version", typedVersion.RuntimeVersion,
 		"apiVersion", typedVersion.RuntimeApiVersion)
 
-	if imageCredentialProviderConfigFile != "" || imageCredentialProviderBinDir != "" {
-		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigFile, imageCredentialProviderBinDir, tokenManager.GetServiceAccountToken, getServiceAccount); err != nil {
+	if imageCredentialProviderConfigPath != "" || imageCredentialProviderBinDir != "" {
+		if err := plugin.RegisterCredentialProviderPlugins(imageCredentialProviderConfigPath, imageCredentialProviderBinDir, tokenManager.GetServiceAccountToken, getServiceAccount); err != nil {
 			klog.ErrorS(err, "Failed to register CRI auth plugins")
 			os.Exit(1)
 		}
