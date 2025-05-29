@@ -154,6 +154,9 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 func (cm *containerManagerStub) UpdateAllocatedMemory() {
 }
 
+func (cm *containerManagerStub) UpdateAllocatedCPUs() {
+}
+
 func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
 	return nil
 }
