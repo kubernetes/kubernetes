@@ -38,6 +38,10 @@ type TestStructWithKey struct {
 	D   string
 }
 
+type NonComparableKey struct {
+	I *int
+}
+
 type NonComparableStruct struct {
 	I int
 	S []string
@@ -338,6 +342,40 @@ func testEachMapKey[K ~string, V any](t *testing.T, name string, input map[K]V) 
 		_ = EachMapKey(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, vfn)
 		if calls != len(input) {
 			t.Errorf("expected %d calls, got %d", len(input), calls)
+		}
+	})
+}
+
+func TestEachMapKeyRatcheting(t *testing.T) {
+	testEachMapKeyRatcheting(t, "same data, 0 validation calls",
+		map[string]int{"one": 11, "two": 12, "three": 13},
+		map[string]int{"one": 11, "three": 13, "two": 12},
+		0,
+	)
+	testEachMapKeyRatcheting(t, "less data in new, exist in old, 0 validation calls",
+		map[string]int{"one": 11, "two": 12, "three": 13},
+		map[string]int{"one": 11, "three": 13},
+		0,
+	)
+	testEachMapKeyRatcheting(t, "new data, not exist in old, 1 validation call",
+		map[string]int{"one": 11, "two": 12, "three": 13},
+		map[string]int{"one": 11, "three": 13, "two": 12, "four": 14},
+		1,
+	)
+}
+
+func testEachMapKeyRatcheting[K ~string, V any](t *testing.T, name string, old, new map[K]V, wantCalls int) {
+	t.Helper()
+	var zero V
+	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
+		calls := 0
+		vfn := func(ctx context.Context, op operation.Operation, fldPath *field.Path, newVal, oldVal *K) field.ErrorList {
+			calls++
+			return nil
+		}
+		_ = EachMapKey(context.Background(), operation.Operation{Type: operation.Update}, field.NewPath("test"), new, old, vfn)
+		if calls != wantCalls {
+			t.Errorf("expected %d calls, got %d", wantCalls, calls)
 		}
 	})
 }

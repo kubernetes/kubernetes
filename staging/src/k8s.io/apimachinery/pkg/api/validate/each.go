@@ -102,6 +102,15 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	validator ValidateFunc[*K]) field.ErrorList {
 	var errs field.ErrorList
 	for key := range newMap {
+		var old *K
+		if _, found := oldMap[key]; found {
+			old = &key
+		}
+		// If the operation is an update, for validation ratcheting, skip re-validating if
+		// the key is found in oldMap.
+		if op.Type == operation.Update && old != nil {
+			continue
+		}
 		// Note: the field path is the field, not the key.
 		errs = append(errs, validator(ctx, op, fldPath, &key, nil)...)
 	}

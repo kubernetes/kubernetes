@@ -366,7 +366,7 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	result := Validations{}
 	result.OpaqueValType = validations.OpaqueType
 	equivArg := Identifier(validateSemanticDeepEqual)
-	if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(t.Elem))) {
 		equivArg = Identifier(validateDirectEqual)
 	}
 	for _, vfn := range validations.Functions {
@@ -425,6 +425,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		Parent: t,
 		Path:   context.Path.Child("(keys)"),
 	}
+
 	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
