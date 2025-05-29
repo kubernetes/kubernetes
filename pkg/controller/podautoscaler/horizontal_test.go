@@ -29,6 +29,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -5405,4 +5406,102 @@ func TestMultipleHPAs(t *testing.T) {
 	}
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
+}
+
+func TestScaleUpdateWithConflict(t *testing.T) {
+	tc := testCase{
+		minReplicas:             1,
+		maxReplicas:             5,
+		specReplicas:            3,
+		statusReplicas:          3,
+		initialReplicas:         3,
+		CPUTarget:               30,
+		CPUCurrent:              60,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{600, 600, 600},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodReadiness:    []v1.ConditionStatus{v1.ConditionTrue, v1.ConditionTrue, v1.ConditionTrue},
+		reportedPodStartTime:    []metav1.Time{coolCPUCreationTime(), coolCPUCreationTime(), coolCPUCreationTime()},
+		reportedPodPhase:        []v1.PodPhase{v1.PodRunning, v1.PodRunning, v1.PodRunning},
+		useMetricsAPI:           true,
+		expectedDesiredReplicas: 5,
+		resource: &fakeResource{
+			name:       "test-rc",
+			apiVersion: "v1",
+			kind:       "ReplicationController",
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
+			{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionTrue, Reason: "TooManyReplicas"},
+		},
+	}
+
+	maxConflicts := 3
+	conflictCount := 0
+
+	fakeScaleClient := &scalefake.FakeScaleClient{}
+	fakeScaleClient.AddReactor("get", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		obj := &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-rc",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: tc.initialReplicas,
+			},
+			Status: autoscalingv1.ScaleStatus{
+				Replicas: tc.initialReplicas,
+				Selector: "name=test-pod",
+			},
+		}
+		return true, obj, nil
+	})
+
+	fakeScaleClient.AddReactor("update", "replicationcontrollers", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		updateAction := action.(core.UpdateAction)
+		obj := updateAction.GetObject().(*autoscalingv1.Scale)
+
+		if conflictCount < maxConflicts {
+			conflictCount++
+			return true, nil, k8serrors.NewConflict(schema.GroupResource{Group: "autoscaling", Resource: "scale"}, "test-rc", fmt.Errorf("conflict"))
+		}
+
+		scale := &autoscalingv1.Scale{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-rc",
+				Namespace: metav1.NamespaceDefault,
+			},
+			Spec: autoscalingv1.ScaleSpec{
+				Replicas: obj.Spec.Replicas,
+			},
+			Status: autoscalingv1.ScaleStatus{
+				Replicas: obj.Spec.Replicas,
+				Selector: "name=test-pod",
+			},
+		}
+		tc.scaleUpdated = true
+		return true, scale, nil
+	})
+
+	tc.testScaleClient = fakeScaleClient
+	tc.scaleUpdated = false
+
+	tc.runTest(t)
+
+	if conflictCount != maxConflicts {
+		t.Errorf("expected %d conflicts, got %d", maxConflicts, conflictCount)
+	}
+
+	if !tc.scaleUpdated {
+		t.Error("expected scale to be updated")
+	}
 }
