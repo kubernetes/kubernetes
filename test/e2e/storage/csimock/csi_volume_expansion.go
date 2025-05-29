@@ -32,8 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
@@ -55,6 +53,8 @@ const (
 
 const (
 	resizePollInterval = 2 * time.Second
+	pvcCountQuotaKey   = "persistentvolumeclaims"
+	pvcSizeQuotaKey    = "requests.storage"
 )
 
 var (
@@ -71,6 +71,8 @@ type recoveryTest struct {
 	disableControllerExpansion bool
 	expectedResizeStatus       v1.ClaimResourceStatus
 	recoverySize               resource.Quantity
+	fullResourceQuota          *v1.ResourceQuota
+	expectedQuotaUsage         *v1.ResourceQuota
 }
 
 var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
@@ -396,7 +398,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 		}
 	})
 
-	f.Context("Expansion with recovery", feature.RecoverVolumeExpansionFailure, framework.WithFeatureGate(features.RecoverVolumeExpansionFailure), func() {
+	f.Context("Expansion with recovery", func() {
 		tests := []recoveryTest{
 			{
 				name:                       "should record target size in allocated resources",
@@ -405,6 +407,22 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				disableControllerExpansion: false,
 				simulatedCSIDriverError:    expansionSuccess,
 				expectedResizeStatus:       "",
+				fullResourceQuota: &v1.ResourceQuota{
+					Spec: v1.ResourceQuotaSpec{
+						Hard: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("20Gi"),
+							pvcCountQuotaKey: resource.MustParse("5"),
+						},
+					},
+				},
+				expectedQuotaUsage: &v1.ResourceQuota{
+					Status: v1.ResourceQuotaStatus{
+						Used: v1.ResourceList{
+							pvcSizeQuotaKey:  resource.MustParse("4Gi"),
+							pvcCountQuotaKey: resource.MustParse("1"),
+						},
+					},
+				},
 			},
 			{
 				name:                       "should allow recovery if controller expansion fails with infeasible error",
@@ -466,6 +484,10 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				m.init(ctx, params)
 				ginkgo.DeferCleanup(m.cleanup)
 
+				if test.fullResourceQuota != nil {
+					m.createResourceQuota(ctx, test.fullResourceQuota)
+				}
+
 				sc, pvc, pod := m.createPod(ctx, pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
@@ -493,11 +515,45 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 				} else {
 					validateRecoveryBehaviour(ctx, pvc, m, test)
 				}
+
+				if test.expectedQuotaUsage != nil {
+					validateQuotaUsage(ctx, m, test.expectedQuotaUsage)
+				}
 			})
 		}
-
 	})
 })
+
+func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, expectedQuota *v1.ResourceQuota) {
+	ginkgo.By("Waiting for resource quota usage to be updated")
+	var err error
+	var quota *v1.ResourceQuota
+	var usedCount resource.Quantity
+	var usedSize resource.Quantity
+
+	expectedCount := expectedQuota.Status.Used[pvcCountQuotaKey]
+	expectedUsedSize := expectedQuota.Status.Used[pvcSizeQuotaKey]
+
+	waitErr := wait.PollUntilContextTimeout(ctx, resizePollInterval, csiResizeWaitPeriod, true, func(pollContext context.Context) (bool, error) {
+		quota, err = m.cs.CoreV1().ResourceQuotas(expectedQuota.Namespace).Get(pollContext, expectedQuota.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("error fetching resource quota %q: %w", expectedQuota.Name, err)
+		}
+		if quota.Status.Used == nil {
+			return false, nil
+		}
+		usedCount = quota.Status.Used[pvcCountQuotaKey]
+		usedSize = quota.Status.Used[pvcSizeQuotaKey]
+		if usedCount.Cmp(expectedCount) == 0 && usedSize.Cmp(expectedUsedSize) == 0 {
+			return true, nil
+		}
+		return false, nil
+	})
+
+	if waitErr != nil {
+		framework.Failf("error while waiting for resource quota usage to be updated, currentlyUsed: %s/%s, expected: %s/%s: %v", usedCount.String(), usedSize.String(), expectedCount.String(), expectedUsedSize.String(), waitErr)
+	}
+}
 
 func validateRecoveryBehaviour(ctx context.Context, pvc *v1.PersistentVolumeClaim, m *mockDriverSetup, test recoveryTest) {
 	var err error

@@ -116,6 +116,7 @@ type mockDriverSetup struct {
 	pods        []*v1.Pod
 	pvcs        []*v1.PersistentVolumeClaim
 	pvs         []*v1.PersistentVolume
+	quotas      []*v1.ResourceQuota
 	sc          map[string]*storagev1.StorageClass
 	vsc         map[string]*unstructured.Unstructured
 	driver      drivers.MockCSITestDriver
@@ -257,6 +258,15 @@ func (m *mockDriverSetup) cleanup(ctx context.Context) {
 	for _, vsc := range m.vsc {
 		ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
 		m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+	}
+
+	for _, quota := range m.quotas {
+		ginkgo.By(fmt.Sprintf("Deleting quota %s", quota.Name))
+		if err := cs.CoreV1().ResourceQuotas(quota.Namespace).Delete(ctx, quota.Name, metav1.DeleteOptions{}); err != nil {
+			if !apierrors.IsNotFound(err) {
+				errs = append(errs, err)
+			}
+		}
 	}
 
 	err := utilerrors.NewAggregate(errs)
@@ -495,6 +505,22 @@ func (m *mockDriverSetup) createPodWithSELinux(ctx context.Context, accessModes 
 	}
 
 	return class, claim, pod
+}
+
+func (m *mockDriverSetup) createResourceQuota(ctx context.Context, quota *v1.ResourceQuota) (*v1.ResourceQuota, error) {
+	ginkgo.By("Creating Resource Quota")
+	f := m.f
+
+	quota.ObjectMeta = metav1.ObjectMeta{
+		Name:      f.UniqueName + "-quota",
+		Namespace: f.Namespace.Name,
+	}
+	var err error
+
+	quota, err = f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Create(ctx, quota, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Failed to create resourceQuota")
+	m.quotas = append(m.quotas, quota)
+	return quota, err
 }
 
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {

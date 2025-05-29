@@ -238,6 +238,9 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
 			l.resource.Pvc = npvc
 
+			err = VerifyAllocatedResources(l.resource.Pvc, v1.PersistentVolumeClaimNodeResizePending, pvcSize)
+			framework.ExpectNoError(err, "While verifying allocatedResources on PVC")
+
 			ginkgo.By("Creating a new pod with same volume")
 			podConfig = e2epod.Config{
 				NS:            f.Namespace.Name,
@@ -559,6 +562,19 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}
 	return updatedPVC, nil
+}
+
+func VerifyAllocatedResources(pvc *v1.PersistentVolumeClaim, resizeStatus v1.ClaimResourceStatus, allocatedSize resource.Quantity) error {
+	actualResizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
+	if actualResizeStatus != resizeStatus {
+		return fmt.Errorf("pvc %q had %s resize status, expected %s", pvc.Name, actualResizeStatus, resizeStatus)
+	}
+
+	actualAllocatedSize := pvc.Status.AllocatedResources.Storage()
+	if actualAllocatedSize.Cmp(allocatedSize) < 0 {
+		return fmt.Errorf("pvc %q had %s allocated size, expected %s", pvc.Name, actualAllocatedSize.String(), allocatedSize.String())
+	}
+	return nil
 }
 
 func VerifyRecoveryRelatedFields(pvc *v1.PersistentVolumeClaim) error {
