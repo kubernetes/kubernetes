@@ -33,14 +33,17 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testutils "k8s.io/kubernetes/test/utils"
 	ktesting "k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
+
+type verifyFunc func(t *testing.T, tCtx ktesting.TContext, op realOp) error
 
 func TestRunOp(t *testing.T) {
 	tests := []struct {
 		name            string
 		op              realOp
 		expectedFailure bool
-		verifyFuncs     []func(t *testing.T, tCtx ktesting.TContext, op realOp) error
+		verifyFuncs     []verifyFunc
 	}{
 		{
 			name: "Create Single Node",
@@ -48,7 +51,7 @@ func TestRunOp(t *testing.T) {
 				Opcode: createNodesOpcode,
 				Count:  1,
 			},
-			verifyFuncs: []func(t *testing.T, tCtx ktesting.TContext, op realOp) error{
+			verifyFuncs: []verifyFunc{
 				verifyCount(1),
 				verifyObj(
 					&v1.Node{
@@ -71,7 +74,7 @@ func TestRunOp(t *testing.T) {
 				Opcode: createNodesOpcode,
 				Count:  5,
 			},
-			verifyFuncs: []func(t *testing.T, tCtx ktesting.TContext, op realOp) error{
+			verifyFuncs: []verifyFunc{
 				verifyCount(5),
 				verifyObj(
 					&v1.Node{
@@ -95,9 +98,9 @@ func TestRunOp(t *testing.T) {
 				Count:                    3,
 				LabelNodePrepareStrategy: testutils.NewLabelNodePrepareStrategy("test-label", "value1", "value2", "value3"),
 			},
-			verifyFuncs: []func(t *testing.T, tCtx ktesting.TContext, op realOp) error{
+			verifyFuncs: []verifyFunc{
 				verifyCount(3),
-				verifyLabel("test-label", []string{"value1", "value2", "value3"}),
+				verifyLabelValuesAllowed("test-label", []string{"value1", "value2", "value3"}),
 			},
 		},
 		{
@@ -107,7 +110,7 @@ func TestRunOp(t *testing.T) {
 				Count:                   2,
 				UniqueNodeLabelStrategy: testutils.NewUniqueNodeLabelStrategy("unique-test-label"),
 			},
-			verifyFuncs: []func(t *testing.T, tCtx ktesting.TContext, op realOp) error{
+			verifyFuncs: []verifyFunc{
 				verifyCount(2),
 				verifyUniqueLabels("unique-test-label"),
 			},
@@ -126,7 +129,7 @@ func TestRunOp(t *testing.T) {
 					nil, // no migrated plugins
 				),
 			},
-			verifyFuncs: []func(t *testing.T, tCtx ktesting.TContext, op realOp) error{
+			verifyFuncs: []verifyFunc{
 				verifyCount(2),
 				verifyObj(
 					&v1.Node{
@@ -167,7 +170,7 @@ func TestRunOp(t *testing.T) {
 					},
 				),
 			},
-			verifyFuncs: []func(t *testing.T, tCtx ktesting.TContext, op realOp) error{
+			verifyFuncs: []verifyFunc{
 				verifyCount(2),
 				verifyObj(
 					&v1.Node{
@@ -190,7 +193,7 @@ func TestRunOp(t *testing.T) {
 			op: &createNodesOp{
 				Opcode:           createNodesOpcode,
 				Count:            1,
-				NodeTemplatePath: func() *string { path := "non-existent-file.json"; return &path }(),
+				NodeTemplatePath: ptr.To("non-existent-file.json"),
 			},
 			expectedFailure: true,
 		},
@@ -212,13 +215,13 @@ func TestRunOp(t *testing.T) {
 
 			if tt.expectedFailure {
 				if err == nil {
-					t.Fatalf("Expected error for %s but got none", tt.name)
+					t.Fatalf("Expected error but got none")
 				}
 				return
 			}
 
 			if err != nil {
-				t.Fatalf("Failed to run operation for test %q: %v", tt.name, err)
+				t.Fatalf("Failed to run operation: %v", err)
 			}
 
 			if tt.verifyFuncs != nil {
@@ -234,7 +237,7 @@ func TestRunOp(t *testing.T) {
 
 // verifyCount returns a verification function that checks if the number of existing objects
 // matches the expected count based on the operation type.
-func verifyCount(expectedCount int) func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
+func verifyCount(expectedCount int) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
 		switch op.(type) {
 		case *createNodesOp:
@@ -252,8 +255,8 @@ func verifyCount(expectedCount int) func(t *testing.T, tCtx ktesting.TContext, o
 	}
 }
 
-// verifyLabel returns a verification function that checks if the label values for a given key.
-func verifyLabel(key string, allowValues []string) func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
+// verifyLabelValuesAllowed returns a verification function that checks if the label values for a given key.
+func verifyLabelValuesAllowed(key string, allowValues []string) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
 		labelValues, err := objLabelValues(t, tCtx, op, key)
 		if err != nil {
@@ -271,7 +274,7 @@ func verifyLabel(key string, allowValues []string) func(t *testing.T, tCtx ktest
 }
 
 // verifyUniqueLabels returns a verification function that checks if the label values for a given key are unique.
-func verifyUniqueLabels(key string) func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
+func verifyUniqueLabels(key string) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
 		labelValues, err := objLabelValues(t, tCtx, op, key)
 		if err != nil {
@@ -318,23 +321,19 @@ func objLabelValues(t *testing.T, tCtx ktesting.TContext, op realOp, key string)
 }
 
 // verifyObj checks if listed objects match the expected template object using cmp.Diff.
-func verifyObj(expectedObj any) func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
+func verifyObj(expectedObj any) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
-		var cmpOpts []cmp.Option
 		var got, want any
+		var cmpOpts []cmp.Option
 		switch opDetails := op.(type) {
 		case *createNodesOp:
-			var gotNodes []v1.Node
-			var expectedNodeTemplate *v1.Node
-
-			nodesList, err := tCtx.Client().CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			if err != nil {
-				return fmt.Errorf("failed to list nodes: %w", err)
+			nodesList, listErr := tCtx.Client().CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			if listErr != nil {
+				return fmt.Errorf("failed to list nodes: %w", listErr)
 			}
-			gotNodes = nodesList.Items
+			gotNodes := nodesList.Items
 
-			var ok bool
-			expectedNodeTemplate, ok = expectedObj.(*v1.Node)
+			expectedNodeTemplate, ok := expectedObj.(*v1.Node)
 			if !ok {
 				return fmt.Errorf("expectedObj must be *v1.Node when op is *createNodesOp, got %T", expectedObj)
 			}
