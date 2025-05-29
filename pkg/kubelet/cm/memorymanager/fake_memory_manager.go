@@ -86,6 +86,10 @@ func (m *fakeManager) GetMemory(podUID, containerName string) []state.Block {
 	return []state.Block{}
 }
 
+func (m *fakeManager) RemoveStaleState() {
+	klog.InfoS("RemoveStaleState")
+}
+
 // NewFakeManager creates empty/fake memory manager
 func NewFakeManager() Manager {
 	return &fakeManager{

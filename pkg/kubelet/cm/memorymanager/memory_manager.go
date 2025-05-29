@@ -92,6 +92,9 @@ type Manager interface {
 
 	// GetMemory returns the memory allocated by a container from NUMA nodes
 	GetMemory(podUID, containerName string) []state.Block
+
+	// RemoveStaleState frees any Memory areas that are bound to terminated pods.
+	RemoveStaleState()
 }
 
 type manager struct {
@@ -107,7 +110,7 @@ type manager struct {
 	containerRuntime runtimeService
 
 	// activePods is a method for listing active pods on the node
-	// so all the containers can be updated during call to the removeStaleState.
+	// so all the containers can be updated during call to the RemoveStaleState.
 	activePods ActivePodsFunc
 
 	// podStatusProvider provides a method for obtaining pod statuses
@@ -259,7 +262,7 @@ func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.
 // Allocate is called to pre-allocate memory resources during Pod admission.
 func (m *manager) Allocate(pod *v1.Pod, container *v1.Container) error {
 	// Garbage collect any stranded resources before allocation
-	m.removeStaleState()
+	m.RemoveStaleState()
 
 	m.Lock()
 	defer m.Unlock()
@@ -297,7 +300,7 @@ func (m *manager) State() state.Reader {
 // GetPodTopologyHints returns the topology hints for the topology manager
 func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState()
+	m.RemoveStaleState()
 	// Delegate to active policy
 	return m.policy.GetPodTopologyHints(m.state, pod)
 }
@@ -305,13 +308,13 @@ func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.
 // GetTopologyHints returns the topology hints for the topology manager
 func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
 	// Garbage collect any stranded resources before providing TopologyHints
-	m.removeStaleState()
+	m.RemoveStaleState()
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
 }
 
 // TODO: move the method to the upper level, to re-use it under the CPU and memory managers
-func (m *manager) removeStaleState() {
+func (m *manager) RemoveStaleState() {
 	// Only once all sources are ready do we attempt to remove any stale state.
 	// This ensures that the call to `m.activePods()` below will succeed with
 	// the actual active pods list.

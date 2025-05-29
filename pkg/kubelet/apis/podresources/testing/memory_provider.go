@@ -133,6 +133,38 @@ func (_c *MockMemoryProvider_GetMemory_Call) RunAndReturn(run func(string, strin
 	return _c
 }
 
+// UpdateAllocatedMemory provides a mock function with no fields
+func (_m *MockMemoryProvider) UpdateAllocatedMemory() {
+	_m.Called()
+}
+
+// MockMemoryProvider_UpdateAllocatedMemory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAllocatedMemory'
+type MockMemoryProvider_UpdateAllocatedMemory_Call struct {
+	*mock.Call
+}
+
+// UpdateAllocatedMemory is a helper method to define mock.On call
+func (_e *MockMemoryProvider_Expecter) UpdateAllocatedMemory() *MockMemoryProvider_UpdateAllocatedMemory_Call {
+	return &MockMemoryProvider_UpdateAllocatedMemory_Call{Call: _e.mock.On("UpdateAllocatedMemory")}
+}
+
+func (_c *MockMemoryProvider_UpdateAllocatedMemory_Call) Run(run func()) *MockMemoryProvider_UpdateAllocatedMemory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockMemoryProvider_UpdateAllocatedMemory_Call) Return() *MockMemoryProvider_UpdateAllocatedMemory_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockMemoryProvider_UpdateAllocatedMemory_Call) RunAndReturn(run func()) *MockMemoryProvider_UpdateAllocatedMemory_Call {
+	_c.Run(run)
+	return _c
+}
+
 // NewMockMemoryProvider creates a new instance of MockMemoryProvider. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockMemoryProvider(t interface {

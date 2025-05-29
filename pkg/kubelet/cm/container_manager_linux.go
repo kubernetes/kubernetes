@@ -1004,6 +1004,10 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices() {
 	cm.deviceManager.UpdateAllocatedDevices()
 }
 
+func (cm *containerManagerImpl) UpdateAllocatedMemory() {
+	cm.memoryManager.RemoveStaleState()
+}
+
 func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresourcesapi.ContainerMemory {
 	var containerMemories []*podresourcesapi.ContainerMemory
 

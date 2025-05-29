@@ -47,6 +47,8 @@ type CPUsProvider interface {
 }
 
 type MemoryProvider interface {
+	// UpdateAllocatedMemory frees any Memory areas that are bound to terminated pods.
+	UpdateAllocatedMemory()
 	// GetMemory returns information about the memory assigned to containers
 	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
 	// GetAllocatableMemory returns the allocatable memory from the node
