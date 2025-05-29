@@ -1416,7 +1416,39 @@ func (_c *MockContainerManager_UnprepareDynamicResources_Call) RunAndReturn(run 
 	return _c
 }
 
-// UpdateAllocatedDevices provides a mock function with given fields:
+// UpdateAllocatedCPUs provides a mock function with no fields
+func (_m *MockContainerManager) UpdateAllocatedCPUs() {
+	_m.Called()
+}
+
+// MockContainerManager_UpdateAllocatedCPUs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAllocatedCPUs'
+type MockContainerManager_UpdateAllocatedCPUs_Call struct {
+	*mock.Call
+}
+
+// UpdateAllocatedCPUs is a helper method to define mock.On call
+func (_e *MockContainerManager_Expecter) UpdateAllocatedCPUs() *MockContainerManager_UpdateAllocatedCPUs_Call {
+	return &MockContainerManager_UpdateAllocatedCPUs_Call{Call: _e.mock.On("UpdateAllocatedCPUs")}
+}
+
+func (_c *MockContainerManager_UpdateAllocatedCPUs_Call) Run(run func()) *MockContainerManager_UpdateAllocatedCPUs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedCPUs_Call) Return() *MockContainerManager_UpdateAllocatedCPUs_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedCPUs_Call) RunAndReturn(run func()) *MockContainerManager_UpdateAllocatedCPUs_Call {
+	_c.Run(run)
+	return _c
+}
+
+// UpdateAllocatedDevices provides a mock function with no fields
 func (_m *MockContainerManager) UpdateAllocatedDevices() {
 	_m.Called()
 }

@@ -223,6 +223,13 @@ func (cm *FakeContainerManager) UpdateAllocatedMemory() {
 	return
 }
 
+func (cm *FakeContainerManager) UpdateAllocatedCPUs() {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "UpdateAllocatedCPUs")
+	return
+}
+
 func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
 	cm.Lock()
 	defer cm.Unlock()

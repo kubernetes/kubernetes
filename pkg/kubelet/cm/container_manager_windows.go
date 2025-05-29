@@ -331,6 +331,15 @@ func (cm *containerManagerImpl) UpdateAllocatedMemory() {
 	return
 }
 
+func (cm *containerManagerImpl) UpdateAllocatedCPUs() {
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
+		if cm.cpuManager != nil {
+			cm.cpuManager.RemoveStaleState()
+		}
+	}
+	return
+}
+
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		if cm.cpuManager != nil {

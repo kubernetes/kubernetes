@@ -40,6 +40,8 @@ type PodsProvider interface {
 
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
+	// UpdateAllocatedCPUs frees any exclusive CPU that are bound to terminated pods.
+	UpdateAllocatedCPUs()
 	// GetCPUs returns information about the cpus assigned to pods and containers
 	GetCPUs(podUID, containerName string) []int64
 	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
