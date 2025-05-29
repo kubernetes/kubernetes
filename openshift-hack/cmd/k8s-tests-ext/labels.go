@@ -38,6 +38,29 @@ func addLabelsToSpecs(specs et.ExtensionTestSpecs) {
 
 			"[sig-network] IngressClass [Feature:Ingress] should set default value on new IngressClass", //https://bugzilla.redhat.com/show_bug.cgi?id=1833583
 		},
+		"[sig-node]": {
+			"[NodeConformance]",
+			"NodeLease",
+			"lease API",
+			"[NodeFeature",
+			"[NodeAlphaFeature",
+			"Probing container",
+			"Security Context When creating a",
+			"Downward API should create a pod that prints his name and namespace",
+			"Liveness liveness pods should be automatically restarted",
+			"Secret should create a pod that reads a secret",
+			"Pods should delete a collection of pods",
+			"Pods should run through the lifecycle of Pods and PodStatus",
+		},
+		"[sig-cluster-lifecycle]": {
+			"Feature:ClusterAutoscalerScalability",
+			"recreate nodes and ensure they function",
+		},
+		"[sig-arch]": {
+			// not run, assigned to arch as catch-all
+			"[Feature:GKELocalSSD]",
+			"[Feature:GKENodePool]",
+		},
 	}
 
 	for label, names := range namesByLabel {
