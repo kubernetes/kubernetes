@@ -58,6 +58,7 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	pods := p.podsProvider.GetPods()
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
 	p.devicesProvider.UpdateAllocatedDevices()
+	p.memoryProvider.UpdateAllocatedMemory()
 
 	for i, pod := range pods {
 		pRes := podresourcesv1.PodResources{

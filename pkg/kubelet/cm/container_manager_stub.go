@@ -149,7 +149,9 @@ func (cm *containerManagerStub) GetAllocateResourcesPodAdmitHandler() lifecycle.
 }
 
 func (cm *containerManagerStub) UpdateAllocatedDevices() {
-	return
+}
+
+func (cm *containerManagerStub) UpdateAllocatedMemory() {
 }
 
 func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {

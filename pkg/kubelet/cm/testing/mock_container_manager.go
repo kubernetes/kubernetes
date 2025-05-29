@@ -1541,6 +1541,38 @@ func (_c *MockContainerManager_UpdateAllocatedDevices_Call) RunAndReturn(run fun
 	return _c
 }
 
+// UpdateAllocatedMemory provides a mock function with no fields
+func (_m *MockContainerManager) UpdateAllocatedMemory() {
+	_m.Called()
+}
+
+// MockContainerManager_UpdateAllocatedMemory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAllocatedMemory'
+type MockContainerManager_UpdateAllocatedMemory_Call struct {
+	*mock.Call
+}
+
+// UpdateAllocatedMemory is a helper method to define mock.On call
+func (_e *MockContainerManager_Expecter) UpdateAllocatedMemory() *MockContainerManager_UpdateAllocatedMemory_Call {
+	return &MockContainerManager_UpdateAllocatedMemory_Call{Call: _e.mock.On("UpdateAllocatedMemory")}
+}
+
+func (_c *MockContainerManager_UpdateAllocatedMemory_Call) Run(run func()) *MockContainerManager_UpdateAllocatedMemory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedMemory_Call) Return() *MockContainerManager_UpdateAllocatedMemory_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedMemory_Call) RunAndReturn(run func()) *MockContainerManager_UpdateAllocatedMemory_Call {
+	_c.Run(run)
+	return _c
+}
+
 // UpdateAllocatedResourcesStatus provides a mock function with given fields: pod, _a1
 func (_m *MockContainerManager) UpdateAllocatedResourcesStatus(pod *v1.Pod, _a1 *v1.PodStatus) {
 	_m.Called(pod, _a1)
