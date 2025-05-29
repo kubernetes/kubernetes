@@ -73,16 +73,23 @@ func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
 	return nil
 }
 
-// EachMapVal validates each element of newMap with the specified validation
-// function and, if the corresponding key is found in oldMap, the old value.
-// The value-type of the slices is assumed to not be nilable.
+// EachMapVal validates each value in newMap using the specified validation
+// function, passing the corresponding old value from oldMap if the key exists in oldMap.
+// For update operations, it implements validation ratcheting by skipping validation
+// when the old value exists and the equiv function confirms the values are equivalent.
+// The value-type of the map is assumed to not be nilable.
 func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]V,
-	validator ValidateFunc[*V]) field.ErrorList {
+	equiv CompareFunc[V], validator ValidateFunc[*V]) field.ErrorList {
 	var errs field.ErrorList
 	for key, val := range newMap {
 		var old *V
 		if o, found := oldMap[key]; found {
 			old = &o
+		}
+		// If the operation is an update, for validation ratcheting, skip re-validating if the old
+		// value is found and the equiv function confirms the values are equivalent.
+		if op.Type == operation.Update && old != nil && equiv != nil && equiv(val, *old) {
+			continue
 		}
 		errs = append(errs, validator(ctx, op, fldPath.Key(string(key)), &val, old)...)
 	}
