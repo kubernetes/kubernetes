@@ -12555,6 +12555,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.DeviceCounterConsumption
           elementRelationship: atomic
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: nodeName
       type:
         scalar: string
@@ -12581,6 +12587,24 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1alpha3.CounterSet
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.Counter
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.CounterSetMixin
   map:
     fields:
     - name: counters
@@ -12743,6 +12767,41 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1alpha3.Counter
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1alpha3.DeviceCounterConsumptionMixin
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.Counter
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1alpha3.DeviceMixin
+  map:
+    fields:
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1alpha3.DeviceRequest
   map:
     fields:
@@ -13083,6 +13142,27 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1alpha3.ResourceSliceSpec
       default: {}
+- name: io.k8s.api.resource.v1alpha3.ResourceSliceMixins
+  map:
+    fields:
+    - name: counterSet
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.CounterSetMixin
+          elementRelationship: atomic
+    - name: device
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceMixin
+          elementRelationship: atomic
+    - name: deviceCounterConsumption
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1alpha3.DeviceCounterConsumptionMixin
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1alpha3.ResourceSliceSpec
   map:
     fields:
@@ -13099,6 +13179,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: mixins
+      type:
+        namedType: io.k8s.api.resource.v1alpha3.ResourceSliceMixins
     - name: nodeName
       type:
         scalar: string
@@ -13179,6 +13262,12 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.DeviceCounterConsumption
           elementRelationship: atomic
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
     - name: nodeName
       type:
         scalar: string
@@ -13205,6 +13294,24 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.resource.v1beta1.CounterSet
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.Counter
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.CounterSetMixin
   map:
     fields:
     - name: counters
@@ -13373,6 +13480,41 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta1.Counter
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta1.DeviceCounterConsumptionMixin
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.Counter
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta1.DeviceMixin
+  map:
+    fields:
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta1.DeviceRequest
   map:
     fields:
@@ -13665,6 +13807,27 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1beta1.ResourceSliceSpec
       default: {}
+- name: io.k8s.api.resource.v1beta1.ResourceSliceMixins
+  map:
+    fields:
+    - name: counterSet
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.CounterSetMixin
+          elementRelationship: atomic
+    - name: device
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceMixin
+          elementRelationship: atomic
+    - name: deviceCounterConsumption
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta1.DeviceCounterConsumptionMixin
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta1.ResourceSliceSpec
   map:
     fields:
@@ -13681,6 +13844,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: mixins
+      type:
+        namedType: io.k8s.api.resource.v1beta1.ResourceSliceMixins
     - name: nodeName
       type:
         scalar: string
@@ -13760,6 +13926,24 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.Counter
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.CounterSetMixin
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.Counter
     - name: name
       type:
         scalar: string
@@ -13785,6 +13969,12 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.DeviceCounterConsumption
+          elementRelationship: atomic
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
           elementRelationship: atomic
     - name: name
       type:
@@ -13949,6 +14139,41 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             namedType: io.k8s.api.resource.v1beta2.Counter
+    - name: includes
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: atomic
+- name: io.k8s.api.resource.v1beta2.DeviceCounterConsumptionMixin
+  map:
+    fields:
+    - name: counters
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.Counter
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.resource.v1beta2.DeviceMixin
+  map:
+    fields:
+    - name: attributes
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceAttribute
+    - name: capacity
+      type:
+        map:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCapacity
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.resource.v1beta2.DeviceRequest
   map:
     fields:
@@ -14247,6 +14472,27 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.resource.v1beta2.ResourceSliceSpec
       default: {}
+- name: io.k8s.api.resource.v1beta2.ResourceSliceMixins
+  map:
+    fields:
+    - name: counterSet
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.CounterSetMixin
+          elementRelationship: atomic
+    - name: device
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceMixin
+          elementRelationship: atomic
+    - name: deviceCounterConsumption
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.resource.v1beta2.DeviceCounterConsumptionMixin
+          elementRelationship: atomic
 - name: io.k8s.api.resource.v1beta2.ResourceSliceSpec
   map:
     fields:
@@ -14263,6 +14509,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: mixins
+      type:
+        namedType: io.k8s.api.resource.v1beta2.ResourceSliceMixins
     - name: nodeName
       type:
         scalar: string
