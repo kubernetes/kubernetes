@@ -19,15 +19,11 @@ package request
 import (
 	"math"
 	"net/http"
-	"net/url"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/storage"
-	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/klog/v2"
 )
 
@@ -86,8 +82,13 @@ func (e *listWorkEstimator) estimate(r *http.Request, flowSchemaName, priorityLe
 			return WorkEstimate{InitialSeats: e.config.MinimumSeats}
 		}
 	}
-
-	isListFromCache := requestInfo.Verb == "watch" || !shouldListFromStorage(query, &listOptions)
+	// TODO: Check whether watchcache is enabled.
+	result, err := delegator.ShouldDelegateListMeta(&listOptions, delegator.CacheWithoutSnapshots{})
+	if err != nil {
+		return WorkEstimate{InitialSeats: maxSeats}
+	}
+	listFromStorage := result.ShouldDelegate
+	isListFromCache := requestInfo.Verb == "watch" || !listFromStorage
 
 	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
@@ -158,34 +159,4 @@ func key(requestInfo *apirequest.RequestInfo) string {
 		Resource: requestInfo.Resource,
 	}
 	return groupResource.String()
-}
-
-// NOTICE: Keep in sync with shouldDelegateList function in
-//
-//	staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func shouldListFromStorage(query url.Values, opts *metav1.ListOptions) bool {
-	// see https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
-	switch opts.ResourceVersionMatch {
-	case metav1.ResourceVersionMatchExact:
-		return true
-	case metav1.ResourceVersionMatchNotOlderThan:
-	case "":
-		// Legacy exact match
-		if opts.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return true
-		}
-	default:
-		return true
-	}
-	// Continue
-	if len(opts.Continue) > 0 {
-		return true
-	}
-	// Consistent Read
-	if opts.ResourceVersion == "" {
-		consistentListFromCacheEnabled := utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache)
-		requestWatchProgressSupported := etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		return !consistentListFromCacheEnabled || !requestWatchProgressSupported
-	}
-	return false
 }

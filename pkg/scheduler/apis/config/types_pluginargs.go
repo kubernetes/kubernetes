@@ -163,7 +163,7 @@ type VolumeBindingArgs struct {
 	// 1) 0 for 0 utilization
 	// 2) 10 for 100 utilization
 	// All points must be sorted in increasing order by utilization.
-	// +featureGate=VolumeCapacityPriority
+	// +featureGate=StorageCapacityScoring
 	// +optional
 	Shape []UtilizationShapePoint
 }

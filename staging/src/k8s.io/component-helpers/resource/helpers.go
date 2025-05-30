@@ -17,6 +17,8 @@ limitations under the License.
 package resource
 
 import (
+	"strings"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -56,14 +58,14 @@ type PodResourcesOptions struct {
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
 
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
-	return supportedPodLevelResources
+	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
 }
 
 // IsSupportedPodLevelResources checks if a given resource is supported by pod-level
 // resource management through the PodLevelResources feature. Returns true if
 // the resource is supported.
 func IsSupportedPodLevelResource(name v1.ResourceName) bool {
-	return supportedPodLevelResources.Has(name)
+	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
 }
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
@@ -223,18 +225,38 @@ func AggregateContainerRequests(pod *v1.Pod, opts PodResourcesOptions) v1.Resour
 
 // determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
 func determineContainerReqs(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
-		return cs.Resources.Requests.DeepCopy()
+	if IsPodResizeInfeasible(pod) {
+		return max(cs.Resources.Requests, cs.AllocatedResources)
 	}
-	return max(container.Resources.Requests, cs.Resources.Requests)
+	return max(container.Resources.Requests, cs.Resources.Requests, cs.AllocatedResources)
 }
 
 // determineContainerLimits will return a copy of the container limits based on if resizing is feasible or not.
 func determineContainerLimits(pod *v1.Pod, container *v1.Container, cs *v1.ContainerStatus) v1.ResourceList {
-	if pod.Status.Resize == v1.PodResizeStatusInfeasible {
+	if IsPodResizeInfeasible(pod) {
 		return cs.Resources.Limits.DeepCopy()
 	}
 	return max(container.Resources.Limits, cs.Resources.Limits)
+}
+
+// IsPodResizeInfeasible returns true if the pod condition PodResizePending is set to infeasible.
+func IsPodResizeInfeasible(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			return condition.Reason == v1.PodReasonInfeasible
+		}
+	}
+	return false
+}
+
+// IsPodResizeDeferred returns true if the pod condition PodResizePending is set to deferred.
+func IsPodResizeDeferred(pod *v1.Pod) bool {
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == v1.PodResizePending {
+			return condition.Reason == v1.PodReasonDeferred
+		}
+	}
+	return false
 }
 
 // applyNonMissing will return a copy of the given resource list with any missing values replaced by the nonMissing values
@@ -379,23 +401,12 @@ func maxResourceList(list, newList v1.ResourceList) {
 	}
 }
 
-// max returns the result of max(a, b) for each named resource and is only used if we can't
+// max returns the result of max(a, b...) for each named resource and is only used if we can't
 // accumulate into an existing resource list
-func max(a v1.ResourceList, b v1.ResourceList) v1.ResourceList {
-	result := v1.ResourceList{}
-	for key, value := range a {
-		if other, found := b[key]; found {
-			if value.Cmp(other) <= 0 {
-				result[key] = other.DeepCopy()
-				continue
-			}
-		}
-		result[key] = value.DeepCopy()
-	}
-	for key, value := range b {
-		if _, found := result[key]; !found {
-			result[key] = value.DeepCopy()
-		}
+func max(a v1.ResourceList, b ...v1.ResourceList) v1.ResourceList {
+	result := a.DeepCopy()
+	for _, other := range b {
+		maxResourceList(result, other)
 	}
 	return result
 }

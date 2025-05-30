@@ -56,7 +56,7 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.6.2"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.7.1"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -167,8 +167,7 @@ function usage {
             echo "Example 1: hack/local-up-cluster.sh -o _output/dockerized/bin/linux/amd64/ (run from docker output)"
             echo "Example 2: hack/local-up-cluster.sh -O (auto-guess the bin path for your platform)"
             echo "Example 3: hack/local-up-cluster.sh (build a local copy of the source)"
-            echo "Example 4: FEATURE_GATES=CPUManagerPolicyOptions=true \\"
-            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
+            echo "Example 4: TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
             echo "           CPUMANAGER_POLICY=\"static\" \\"
             echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
@@ -818,7 +817,7 @@ function start_kubelet {
     KUBELET_LOG=${LOG_DIR}/kubelet.log
     mkdir -p "${POD_MANIFEST_PATH}" &>/dev/null || sudo mkdir -p "${POD_MANIFEST_PATH}"
 
-    cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}" "--cloud-config=${CLOUD_CONFIG}")
+    cloud_config_arg=("--cloud-provider=${CLOUD_PROVIDER}")
     if [[ "${EXTERNAL_CLOUD_PROVIDER:-}" == "true" ]]; then
        cloud_config_arg=("--cloud-provider=external")
        if [[ "${CLOUD_PROVIDER:-}" == "aws" ]]; then

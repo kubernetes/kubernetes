@@ -312,7 +312,7 @@ func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, de
 				if errRead == io.EOF {
 					break
 				}
-				c.closeAllStreamReaders(fmt.Errorf("read message: %w", err))
+				c.closeAllStreamReaders(fmt.Errorf("read message: %w", errRead))
 				return
 			}
 		}

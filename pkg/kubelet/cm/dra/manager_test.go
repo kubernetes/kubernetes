@@ -385,7 +385,7 @@ func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClai
 }
 
 // genTestClaimInfo generates claim info object
-func genTestClaimInfo(podUIDs []string, prepared bool) *ClaimInfo {
+func genTestClaimInfo(claimUID types.UID, podUIDs []string, prepared bool) *ClaimInfo {
 	return &ClaimInfo{
 		ClaimInfoState: state.ClaimInfoState{
 			ClaimUID:  claimUID,
@@ -447,7 +447,7 @@ func TestGetResources(t *testing.T) {
 				},
 			},
 			pod:       genTestPod(),
-			claimInfo: genTestClaimInfo(nil, false),
+			claimInfo: genTestClaimInfo(claimUID, nil, false),
 		},
 		{
 			description: "nil claiminfo",
@@ -491,6 +491,7 @@ func getFakeNode() (*v1.Node, error) {
 func TestPrepareResources(t *testing.T) {
 	claimName := claimName
 	fakeKubeClient := fake.NewSimpleClientset()
+	anotherClaimUID := types.UID("another-claim-uid")
 
 	for _, test := range []struct {
 		description         string
@@ -585,7 +586,7 @@ func TestPrepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedClaimInfoState: genClaimInfoState(cdiID),
 			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
 				string(claimUID): {
@@ -607,7 +608,7 @@ func TestPrepareResources(t *testing.T) {
 			claim:                genTestClaim(claimName, driverName, deviceName, podUID),
 			wantTimeout:          true,
 			expectedPrepareCalls: 1,
-			expectedErrMsg:       "NodePrepareResources failed: rpc error: code = DeadlineExceeded desc = context deadline exceeded",
+			expectedErrMsg:       "NodePrepareResources failed: rpc error: code = DeadlineExceeded",
 		},
 		{
 			description:            "should prepare resource, claim not in cache",
@@ -634,7 +635,7 @@ func TestPrepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedClaimInfoState: genClaimInfoState(cdiID),
 			resp: &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{
 				string(claimUID): {
@@ -648,6 +649,14 @@ func TestPrepareResources(t *testing.T) {
 					},
 				},
 			}},
+		},
+		{
+			description:    "claim UIDs mismatch",
+			driverName:     driverName,
+			pod:            genTestPod(),
+			claim:          genTestClaim(claimName, driverName, deviceName, podUID),
+			claimInfo:      genTestClaimInfo(anotherClaimUID, []string{podUID}, false),
+			expectedErrMsg: fmt.Sprintf("old claim with same name %s/%s and different UID %s still exists", namespace, claimName, anotherClaimUID),
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -681,10 +690,11 @@ func TestPrepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager)
-			registerErr := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout)
-			require.NoError(t, registerErr) // Registration itself shouldn't fail for these cases
-			defer plg.DeRegisterPlugin(test.driverName)
+			plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager, time.Second /* very short wiping delay for testing */)
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+			}
+			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -768,23 +778,23 @@ func TestUnprepareResources(t *testing.T) {
 			description:         "resource claim referenced by other pod(s)",
 			driverName:          driverName,
 			pod:                 genTestPod(),
-			claimInfo:           genTestClaimInfo([]string{podUID, "another-pod-uid"}, true),
+			claimInfo:           genTestClaimInfo(claimUID, []string{podUID, "another-pod-uid"}, true),
 			wantResourceSkipped: true,
 		},
 		{
 			description:            "should timeout",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
-			expectedErrMsg:         "context deadline exceeded",
+			expectedErrMsg:         "NodeUnprepareResources failed: rpc error: code = DeadlineExceeded",
 		},
 		{
 			description:            "should fail when driver returns empty response",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}},
 			expectedUnprepareCalls: 1,
 			expectedErrMsg:         "NodeUnprepareResources left out 1 claims",
@@ -794,7 +804,7 @@ func TestUnprepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, false),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, false),
 			expectedUnprepareCalls: 1,
 		},
 		{
@@ -802,14 +812,14 @@ func TestUnprepareResources(t *testing.T) {
 			driverName:             driverName,
 			pod:                    genTestPod(),
 			claim:                  genTestClaim(claimName, driverName, deviceName, podUID),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			expectedUnprepareCalls: 1,
 		},
 		{
 			description:            "should unprepare resource when driver returns nil value",
 			driverName:             driverName,
 			pod:                    genTestPod(),
-			claimInfo:              genTestClaimInfo([]string{podUID}, true),
+			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{string(claimUID): nil}},
 			expectedUnprepareCalls: 1,
 		},
@@ -835,10 +845,11 @@ func TestUnprepareResources(t *testing.T) {
 			require.NoError(t, err)
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager)
-			registerErr := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout)
-			require.NoError(t, registerErr)             // Registration itself shouldn't fail for these cases
-			defer plg.DeRegisterPlugin(test.driverName) // for sake of next tests
+			plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager, time.Second /* very short wiping delay for testing */)
+			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
+				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
+			}
+			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -913,7 +924,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			description:       "should get claim info",
 			expectedClaimName: claimName,
 			pod:               genTestPod(),
-			claimInfo:         genTestClaimInfo([]string{podUID}, false),
+			claimInfo:         genTestClaimInfo(claimUID, []string{podUID}, false),
 		},
 		{
 			description:    "should fail when claim info not found",
@@ -949,7 +960,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 					},
 				},
 			},
-			claimInfo:      genTestClaimInfo([]string{podUID}, false),
+			claimInfo:      genTestClaimInfo(claimUID, []string{podUID}, false),
 			expectedErrMsg: "none of the supported fields are set",
 		},
 		{
@@ -1011,11 +1022,11 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 		update:     make(chan resourceupdates.Update, numGoroutines), // Larger buffer maybe needed
 	}
 
-	plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager)
+	plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager, time.Second /* very short wiping delay for testing */)
 	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
-	defer plg.DeRegisterPlugin(driverName)
+	defer plg.DeRegisterPlugin(driverName, draServerInfo.socketName)
 
 	// Call PrepareResources in parallel
 	var wgSync, wgStart sync.WaitGroup // groups to sync goroutines

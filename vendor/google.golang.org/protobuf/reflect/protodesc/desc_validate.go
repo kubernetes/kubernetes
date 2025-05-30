@@ -149,12 +149,6 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 					return errors.New("message field %q under proto3 optional semantics must be within a single element oneof", f.FullName())
 				}
 			}
-			if f.IsWeak() && !flags.ProtoLegacy {
-				return errors.New("message field %q is a weak field, which is a legacy proto1 feature that is no longer supported", f.FullName())
-			}
-			if f.IsWeak() && (!f.HasPresence() || !isOptionalMessage(f) || f.ContainingOneof() != nil) {
-				return errors.New("message field %q may only be weak for an optional message", f.FullName())
-			}
 			if f.IsPacked() && !isPackable(f) {
 				return errors.New("message field %q is not packable", f.FullName())
 			}
@@ -198,9 +192,6 @@ func validateMessageDeclarations(file *filedesc.File, ms []filedesc.Message, mds
 				f := o.Fields().Get(i)
 				if f.Cardinality() != protoreflect.Optional {
 					return errors.New("message field %q belongs in a oneof and must be optional", f.FullName())
-				}
-				if f.IsWeak() {
-					return errors.New("message field %q belongs in a oneof and must not be a weak reference", f.FullName())
 				}
 			}
 		}
@@ -253,9 +244,6 @@ func validateExtensionDeclarations(f *filedesc.File, xs []filedesc.Extension, xd
 			if !isMessageSet && !x.Number().IsValid() {
 				return errors.New("extension field %q has an invalid number: %d", x.FullName(), x.Number())
 			}
-		}
-		if xd.GetOptions().GetWeak() {
-			return errors.New("extension field %q cannot be a weak reference", x.FullName())
 		}
 		if x.IsPacked() && !isPackable(x) {
 			return errors.New("extension field %q is not packable", x.FullName())

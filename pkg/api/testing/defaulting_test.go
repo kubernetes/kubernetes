@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	apiv1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -135,14 +135,26 @@ func TestDefaulting(t *testing.T) {
 		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "ClusterRoleBindingList"}:                        {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBinding"}:                                   {},
 		{Group: "rbac.authorization.k8s.io", Version: "v1", Kind: "RoleBindingList"}:                               {},
+		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "DeviceTaintRule"}:                                   {},
+		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "DeviceTaintRuleList"}:                               {},
 		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaim"}:                                     {},
 		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimList"}:                                 {},
 		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimTemplate"}:                             {},
 		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceClaimTemplateList"}:                         {},
+		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceSlice"}:                                     {},
+		{Group: "resource.k8s.io", Version: "v1alpha3", Kind: "ResourceSliceList"}:                                 {},
 		{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceClaim"}:                                      {},
 		{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceClaimList"}:                                  {},
 		{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceClaimTemplate"}:                              {},
 		{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceClaimTemplateList"}:                          {},
+		{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceSlice"}:                                      {},
+		{Group: "resource.k8s.io", Version: "v1beta1", Kind: "ResourceSliceList"}:                                  {},
+		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceClaim"}:                                      {},
+		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceClaimList"}:                                  {},
+		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceClaimTemplate"}:                              {},
+		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceClaimTemplateList"}:                          {},
+		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceSlice"}:                                      {},
+		{Group: "resource.k8s.io", Version: "v1beta2", Kind: "ResourceSliceList"}:                                  {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicy"}:            {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicyList"}:        {},
 		{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "ValidatingAdmissionPolicyBinding"}:     {},
@@ -219,20 +231,20 @@ func TestDefaulting(t *testing.T) {
 		t.Run(gvk.String(), func(t *testing.T) {
 			// Each sub-tests gets its own fuzzer instance to make running it independent
 			// from what other tests ran before.
-			f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
+			f := randfill.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
 			f.Funcs(
-				func(s *runtime.RawExtension, c fuzz.Continue) {},
-				func(s *metav1.LabelSelector, c fuzz.Continue) {
-					c.FuzzNoCustom(s)
+				func(s *runtime.RawExtension, c randfill.Continue) {},
+				func(s *metav1.LabelSelector, c randfill.Continue) {
+					c.FillNoCustom(s)
 					s.MatchExpressions = nil // need to fuzz this specially
 				},
-				func(s *metav1.ListOptions, c fuzz.Continue) {
-					c.FuzzNoCustom(s)
+				func(s *metav1.ListOptions, c randfill.Continue) {
+					c.FillNoCustom(s)
 					s.LabelSelector = "" // need to fuzz requirement strings specially
 					s.FieldSelector = "" // need to fuzz requirement strings specially
 				},
-				func(s *extensionsv1beta1.ScaleStatus, c fuzz.Continue) {
-					c.FuzzNoCustom(s)
+				func(s *extensionsv1beta1.ScaleStatus, c randfill.Continue) {
+					c.FillNoCustom(s)
 					s.TargetSelector = "" // need to fuzz requirement strings specially
 				},
 			)
@@ -262,7 +274,7 @@ func TestDefaulting(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				f.Fuzz(src)
+				f.Fill(src)
 
 				src.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
 
@@ -289,10 +301,10 @@ func TestDefaulting(t *testing.T) {
 }
 
 func BenchmarkPodDefaulting(b *testing.B) {
-	f := fuzz.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
+	f := randfill.New().NilChance(.5).NumElements(1, 1).RandSource(rand.NewSource(1))
 	items := make([]apiv1.Pod, 100)
 	for i := range items {
-		f.Fuzz(&items[i])
+		f.Fill(&items[i])
 	}
 
 	scheme := legacyscheme.Scheme

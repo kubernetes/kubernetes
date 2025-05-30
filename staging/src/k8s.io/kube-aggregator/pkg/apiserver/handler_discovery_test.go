@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/require"
+	"sigs.k8s.io/randfill"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
 	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
@@ -395,16 +395,19 @@ func TestV2Beta1Skew(t *testing.T) {
 		err := apidiscoveryv2scheme.Convertv2APIGroupDiscoveryListTov2beta1APIGroupDiscoveryList(&apiGroup, &v2b, nil)
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		converted, err := json.Marshal(v2b)
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json;"+"g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList")
 		w.WriteHeader(200)
 		_, err = w.Write(converted)
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 	}))
 	testCtx, cancel := context.WithCancel(context.Background())
@@ -1008,16 +1011,16 @@ func TestNotModified(t *testing.T) {
 
 // copied from staging/src/k8s.io/apiserver/pkg/endpoints/discovery/v2/handler_test.go
 func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv2.APIGroupDiscoveryList {
-	fuzzer := fuzz.NewWithSeed(seed)
+	fuzzer := randfill.NewWithSeed(seed)
 	fuzzer.NumElements(atLeastNumGroups, maxNumGroups)
 	fuzzer.NilChance(0)
-	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c fuzz.Continue) {
-		c.FuzzNoCustom(o)
+	fuzzer.Funcs(func(o *apidiscoveryv2.APIGroupDiscovery, c randfill.Continue) {
+		c.FillNoCustom(o)
 
 		// The ResourceManager will just not serve the group if its versions
 		// list is empty
 		atLeastOne := apidiscoveryv2.APIVersionDiscovery{}
-		c.Fuzz(&atLeastOne)
+		c.Fill(&atLeastOne)
 		o.Versions = append(o.Versions, atLeastOne)
 
 		// clear invalid fuzzed values
@@ -1032,7 +1035,7 @@ func fuzzAPIGroups(atLeastNumGroups, maxNumGroups int, seed int64) apidiscoveryv
 	})
 
 	var apis []apidiscoveryv2.APIGroupDiscovery
-	fuzzer.Fuzz(&apis)
+	fuzzer.Fill(&apis)
 
 	return apidiscoveryv2.APIGroupDiscoveryList{
 		TypeMeta: metav1.TypeMeta{

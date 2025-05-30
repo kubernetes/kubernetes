@@ -35,11 +35,11 @@ import (
 
 	"github.com/google/go-cmp/cmp"         // nolint:depguard // this package provides test utilities
 	"github.com/google/go-cmp/cmp/cmpopts" // nolint:depguard // this package provides test utilities
-	fuzz "github.com/google/gofuzz"
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"sigs.k8s.io/randfill"
 )
 
 // Scheme is similar to runtime.Scheme, but for validation testing purposes. Scheme only supports validation,
@@ -47,18 +47,18 @@ import (
 // to also be used as a scheme builder.
 // Must only be used with tests that perform all registration before calls to validate.
 type Scheme struct {
-	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList
+	validationFuncs    map[reflect.Type]func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList
 	registrationErrors field.ErrorList
 }
 
 // New creates a new Scheme.
 func New() *Scheme {
-	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}, subresources ...string) field.ErrorList{}}
+	return &Scheme{validationFuncs: map[reflect.Type]func(ctx context.Context, op operation.Operation, object interface{}, oldObject interface{}) field.ErrorList{}}
 }
 
 // AddValidationFunc registers a validation function.
 // Last writer wins.
-func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}, subresources ...string) field.ErrorList) {
+func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList) {
 	s.validationFuncs[reflect.TypeOf(srcType)] = fn
 }
 
@@ -68,7 +68,7 @@ func (s *Scheme) Validate(ctx context.Context, opts sets.Set[string], object any
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Create, Options: opts}, object, nil, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: opts}, object, nil)
 	}
 	return nil
 }
@@ -79,7 +79,7 @@ func (s *Scheme) ValidateUpdate(ctx context.Context, opts sets.Set[string], obje
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Update}, object, oldObject, subresources...)
+		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: opts}, object, oldObject)
 	}
 	return nil
 }
@@ -150,7 +150,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 		if err := os.MkdirAll(path.Dir(testdataFilename), os.FileMode(0755)); err != nil {
 			s.Fatal("error making directory", err)
 		}
-		data, err := json.MarshalIndent(got, "  ", "  ")
+		data, err := json.MarshalIndent(got, "", "  ")
 		if err != nil {
 			s.Fatal(err)
 		}
@@ -221,15 +221,16 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 	}
 }
 
-func fuzzer() *fuzz.Fuzzer {
+func randfiller() *randfill.Filler {
 	// Ensure that lists and maps are not empty and use a deterministic seed.
-	return fuzz.New().NilChance(0.0).NumElements(2, 2).RandSource(rand.NewSource(0))
+	// But also, don't recurse infinitely.
+	return randfill.New().NilChance(0.0).NumElements(2, 2).MaxDepth(8).RandSource(rand.NewSource(0))
 }
 
-// ValueFuzzed automatically populates the given value using a deterministic fuzzer.
-// The fuzzer sets pointers to values and always includes a two map keys and slice elements.
+// ValueFuzzed automatically populates the given value using a deterministic filler.
+// The filler sets pointers to values and always includes a two map keys and slice elements.
 func (s *ValidationTestBuilder) ValueFuzzed(value any) *ValidationTester {
-	fuzzer().Fuzz(value)
+	randfiller().Fill(value)
 	return &ValidationTester{ValidationTestBuilder: s, value: value}
 }
 
@@ -243,9 +244,10 @@ func (s *ValidationTestBuilder) Value(value any) *ValidationTester {
 // tests for a validatable value.
 type ValidationTester struct {
 	*ValidationTestBuilder
-	value    any
-	oldValue any
-	opts     sets.Set[string]
+	value        any
+	oldValue     any
+	opts         sets.Set[string]
+	subresources []string
 }
 
 // OldValue sets the oldValue for this ValidationTester. When oldValue is set to
@@ -257,10 +259,10 @@ func (v *ValidationTester) OldValue(oldValue any) *ValidationTester {
 	return v
 }
 
-// OldValueFuzzed automatically populates the given value using a deterministic fuzzer.
-// The fuzzer sets pointers to values and always includes a two map keys and slice elements.
+// OldValueFuzzed automatically populates the given value using a deterministic filler.
+// The filler sets pointers to values and always includes a two map keys and slice elements.
 func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
-	fuzzer().Fuzz(oldValue)
+	randfiller().Fill(oldValue)
 	v.oldValue = oldValue
 	return v
 }
@@ -268,6 +270,12 @@ func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 // Opts sets the ValidationOpts to use.
 func (v *ValidationTester) Opts(opts sets.Set[string]) *ValidationTester {
 	v.opts = opts
+	return v
+}
+
+// Subresource sets the ValidationOpts to use.
+func (v *ValidationTester) Subresources(subresources []string) *ValidationTester {
+	v.subresources = subresources
 	return v
 }
 
@@ -529,9 +537,9 @@ func byFullError(err *field.Error) string {
 func (v *ValidationTester) validate() field.ErrorList {
 	var errs field.ErrorList
 	if v.oldValue == nil {
-		errs = v.s.Validate(context.Background(), v.opts, v.value)
+		errs = v.s.Validate(context.Background(), v.opts, v.value, v.subresources...)
 	} else {
-		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue)
+		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue, v.subresources...)
 	}
 	return errs
 }

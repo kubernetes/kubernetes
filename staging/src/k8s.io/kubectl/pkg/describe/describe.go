@@ -22,9 +22,11 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/url"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2527,18 +2529,14 @@ func (d *DaemonSetDescriber) Describe(namespace, name string, describerSettings 
 		events, _ = searchEvents(d.CoreV1(), daemon, describerSettings.ChunkSize)
 	}
 
-	return describeDaemonSet(daemon, events, running, waiting, succeeded, failed)
+	return describeDaemonSet(daemon, selector, events, running, waiting, succeeded, failed)
 }
 
-func describeDaemonSet(daemon *appsv1.DaemonSet, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
+func describeDaemonSet(daemon *appsv1.DaemonSet, selector labels.Selector, events *corev1.EventList, running, waiting, succeeded, failed int) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", daemon.Name)
-		selector, err := metav1.LabelSelectorAsSelector(daemon.Spec.Selector)
-		if err != nil {
-			// this shouldn't happen if LabelSelector passed validation
-			return err
-		}
+		w.Write(LEVEL_0, "Namespace:\t%s\n", daemon.Namespace)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		w.Write(LEVEL_0, "Node-Selector:\t%s\n", labels.FormatLabels(daemon.Spec.Template.Spec.NodeSelector))
 		printLabelsMultiline(w, "Labels", daemon.Labels)
@@ -2584,12 +2582,12 @@ func describeSecret(secret *corev1.Secret) (string, error) {
 		w.Write(LEVEL_0, "\nType:\t%s\n", secret.Type)
 
 		w.Write(LEVEL_0, "\nData\n====\n")
-		for k, v := range secret.Data {
+		for _, k := range slices.Sorted(maps.Keys(secret.Data)) {
 			switch {
 			case k == corev1.ServiceAccountTokenKey && secret.Type == corev1.SecretTypeServiceAccountToken:
-				w.Write(LEVEL_0, "%s:\t%s\n", k, string(v))
+				w.Write(LEVEL_0, "%s:\t%s\n", k, string(secret.Data[k]))
 			default:
-				w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(v))
+				w.Write(LEVEL_0, "%s:\t%d bytes\n", k, len(secret.Data[k]))
 			}
 		}
 
@@ -3158,6 +3156,9 @@ func describeService(service *corev1.Service, endpointSlices []discoveryv1.Endpo
 		}
 		if len(service.Spec.LoadBalancerSourceRanges) > 0 {
 			w.Write(LEVEL_0, "LoadBalancer Source Ranges:\t%v\n", strings.Join(service.Spec.LoadBalancerSourceRanges, ","))
+		}
+		if service.Spec.TrafficDistribution != nil {
+			w.Write(LEVEL_0, "Traffic Distribution:\t%s\n", *service.Spec.TrafficDistribution)
 		}
 		if events != nil {
 			DescribeEvents(events, w)

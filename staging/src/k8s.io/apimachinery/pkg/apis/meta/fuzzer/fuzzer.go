@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
@@ -38,29 +38,29 @@ import (
 
 func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(q *resource.Quantity, c fuzz.Continue) {
+		func(q *resource.Quantity, c randfill.Continue) {
 			*q = *resource.NewQuantity(c.Int63n(1000), resource.DecimalExponent)
 		},
-		func(j *int, c fuzz.Continue) {
+		func(j *int, c randfill.Continue) {
 			*j = int(c.Int31())
 		},
-		func(j **int, c fuzz.Continue) {
-			if c.RandBool() {
+		func(j **int, c randfill.Continue) {
+			if c.Bool() {
 				i := int(c.Int31())
 				*j = &i
 			} else {
 				*j = nil
 			}
 		},
-		func(j *runtime.TypeMeta, c fuzz.Continue) {
+		func(j *runtime.TypeMeta, c randfill.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
 			j.APIVersion = ""
 			j.Kind = ""
 		},
-		func(j *runtime.Object, c fuzz.Continue) {
+		func(j *runtime.Object, c randfill.Continue) {
 			// TODO: uncomment when round trip starts from a versioned object
-			if true { //c.RandBool() {
+			if true { // c.Bool() {
 				*j = &runtime.Unknown{
 					// We do not set TypeMeta here because it is not carried through a round trip
 					Raw:         []byte(`{"apiVersion":"unknown.group/unknown","kind":"Something","someKey":"someValue"}`),
@@ -69,15 +69,15 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			} else {
 				types := []runtime.Object{&metav1.Status{}, &metav1.APIGroup{}}
 				t := types[c.Rand.Intn(len(types))]
-				c.Fuzz(t)
+				c.Fill(t)
 				*j = t
 			}
 		},
-		func(r *runtime.RawExtension, c fuzz.Continue) {
+		func(r *runtime.RawExtension, c randfill.Continue) {
 			// Pick an arbitrary type and fuzz it
 			types := []runtime.Object{&metav1.Status{}, &metav1.APIGroup{}}
 			obj := types[c.Rand.Intn(len(types))]
-			c.Fuzz(obj)
+			c.Fill(obj)
 
 			// Find a codec for converting the object to raw bytes.  This is necessary for the
 			// api version and kind to be correctly set be serialization.
@@ -100,7 +100,7 @@ func genericFuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	}
 }
 
-// taken from gofuzz internals for RandString
+// taken from randfill (nee gofuzz) internals for RandString
 type charRange struct {
 	first, last rune
 }
@@ -114,7 +114,7 @@ func (c *charRange) choose(r *rand.Rand) rune {
 
 // randomLabelPart produces a valid random label value or name-part
 // of a label key.
-func randomLabelPart(c fuzz.Continue, canBeEmpty bool) string {
+func randomLabelPart(c randfill.Continue, canBeEmpty bool) string {
 	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'}}
 	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'A', 'Z'},
 		{'.', '.'}, {'-', '-'}, {'_', '_'}}
@@ -138,7 +138,7 @@ func randomLabelPart(c fuzz.Continue, canBeEmpty bool) string {
 	return string(runes)
 }
 
-func randomDNSLabel(c fuzz.Continue) string {
+func randomDNSLabel(c randfill.Continue) string {
 	validStartEnd := []charRange{{'0', '9'}, {'a', 'z'}}
 	validMiddle := []charRange{{'0', '9'}, {'a', 'z'}, {'-', '-'}}
 
@@ -154,11 +154,11 @@ func randomDNSLabel(c fuzz.Continue) string {
 	return string(runes)
 }
 
-func randomLabelKey(c fuzz.Continue) string {
+func randomLabelKey(c randfill.Continue) string {
 	namePart := randomLabelPart(c, false)
 	prefixPart := ""
 
-	usePrefix := c.RandBool()
+	usePrefix := c.Bool()
 	if usePrefix {
 		// we can fit, with dots, at most 3 labels in the 253 allotted characters
 		prefixPartsLen := c.Rand.Intn(2) + 1
@@ -175,28 +175,28 @@ func randomLabelKey(c fuzz.Continue) string {
 func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 	return []interface{}{
-		func(j *metav1.TypeMeta, c fuzz.Continue) {
+		func(j *metav1.TypeMeta, c randfill.Continue) {
 			// We have to customize the randomization of TypeMetas because their
 			// APIVersion and Kind must remain blank in memory.
 			j.APIVersion = ""
 			j.Kind = ""
 		},
-		func(j *metav1.ObjectMeta, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *metav1.ObjectMeta, c randfill.Continue) {
+			c.FillNoCustom(j)
 
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.UID = types.UID(c.RandString())
+			j.ResourceVersion = strconv.FormatUint(c.Uint64(), 10)
+			j.UID = types.UID(c.String(0))
 
 			// Fuzzing sec and nsec in a smaller range (uint32 instead of int64),
 			// so that the result Unix time is a valid date and can be parsed into RFC3339 format.
 			var sec, nsec uint32
-			c.Fuzz(&sec)
-			c.Fuzz(&nsec)
+			c.Fill(&sec)
+			c.Fill(&nsec)
 			j.CreationTimestamp = metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 
 			if j.DeletionTimestamp != nil {
-				c.Fuzz(&sec)
-				c.Fuzz(&nsec)
+				c.Fill(&sec)
+				c.Fill(&nsec)
 				t := metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 				j.DeletionTimestamp = &t
 			}
@@ -218,16 +218,16 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Finalizers = nil
 			}
 		},
-		func(j *metav1.ResourceVersionMatch, c fuzz.Continue) {
+		func(j *metav1.ResourceVersionMatch, c randfill.Continue) {
 			matches := []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan}
 			*j = matches[c.Rand.Intn(len(matches))]
 		},
-		func(j *metav1.ListMeta, c fuzz.Continue) {
-			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
-			j.SelfLink = c.RandString()
+		func(j *metav1.ListMeta, c randfill.Continue) {
+			j.ResourceVersion = strconv.FormatUint(c.Uint64(), 10)
+			j.SelfLink = c.String(0) //nolint:staticcheck // SA1019 backwards compatibility
 		},
-		func(j *metav1.LabelSelector, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *metav1.LabelSelector, c randfill.Continue) {
+			c.FillNoCustom(j)
 			// we can't have an entirely empty selector, so force
 			// use of MatchExpression if necessary
 			if len(j.MatchLabels) == 0 && len(j.MatchExpressions) == 0 {
@@ -257,7 +257,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 				for i := range j.MatchExpressions {
 					req := metav1.LabelSelectorRequirement{}
-					c.Fuzz(&req)
+					c.Fill(&req)
 					req.Key = randomLabelKey(c)
 					req.Operator = validOperators[c.Rand.Intn(len(validOperators))]
 					if req.Operator == metav1.LabelSelectorOpIn || req.Operator == metav1.LabelSelectorOpNotIn {
@@ -278,8 +278,8 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				sort.Slice(j.MatchExpressions, func(a, b int) bool { return j.MatchExpressions[a].Key < j.MatchExpressions[b].Key })
 			}
 		},
-		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
-			c.FuzzNoCustom(j)
+		func(j *metav1.ManagedFieldsEntry, c randfill.Continue) {
+			c.FillNoCustom(j)
 			j.FieldsV1 = nil
 		},
 	}
@@ -287,15 +287,15 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 
 func v1beta1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 	return []interface{}{
-		func(r *metav1beta1.TableOptions, c fuzz.Continue) {
-			c.FuzzNoCustom(r)
+		func(r *metav1beta1.TableOptions, c randfill.Continue) {
+			c.FillNoCustom(r)
 			// NoHeaders is not serialized to the wire but is allowed within the versioned
 			// type because we don't use meta internal types in the client and API server.
 			r.NoHeaders = false
 		},
-		func(r *metav1beta1.TableRow, c fuzz.Continue) {
-			c.Fuzz(&r.Object)
-			c.Fuzz(&r.Conditions)
+		func(r *metav1beta1.TableRow, c randfill.Continue) {
+			c.Fill(&r.Object)
+			c.Fill(&r.Conditions)
 			if len(r.Conditions) == 0 {
 				r.Conditions = nil
 			}
@@ -307,15 +307,15 @@ func v1beta1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				t := c.Intn(6)
 				switch t {
 				case 0:
-					r.Cells[i] = c.RandString()
+					r.Cells[i] = c.String(0)
 				case 1:
 					r.Cells[i] = c.Int63()
 				case 2:
-					r.Cells[i] = c.RandBool()
+					r.Cells[i] = c.Bool()
 				case 3:
 					x := map[string]interface{}{}
 					for j := c.Intn(10) + 1; j >= 0; j-- {
-						x[c.RandString()] = c.RandString()
+						x[c.String(0)] = c.String(0)
 					}
 					r.Cells[i] = x
 				case 4:

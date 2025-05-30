@@ -122,7 +122,20 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	rootCtx := context.Background()
-	return dra.NewRegistrationHandler(rootCtx, m.kubeClient, m.getNode, m)
+	// The time that DRA drivers have to come back after being unregistered
+	// before the kubelet removes their ResourceSlices.
+	//
+	// This must be long enough to actually allow stopping a pod and
+	// starting the replacement (otherwise ResourceSlices get deleted
+	// unnecessarily) and not too long (otherwise the time window were
+	// pods might still get scheduled to the node after removal of a
+	// driver is too long).
+	//
+	// 30 seconds might be long enough for a simple container restart.
+	// If a DRA driver wants to be sure that slices don't get wiped,
+	// it should use rolling updates.
+	wipingDelay := 30 * time.Second
+	return cache.PluginHandler(dra.NewRegistrationHandler(rootCtx, m.kubeClient, m.getNode, m, wipingDelay))
 }
 
 // Start starts the reconcile loop of the manager.
@@ -249,6 +262,9 @@ func (m *ManagerImpl) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				claimInfo = m.cache.add(ci)
 				logger.V(6).Info("Created new claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			} else {
+				if claimInfo.ClaimUID != resourceClaim.UID {
+					return fmt.Errorf("old claim with same name %s and different UID %s still exists (previous pod force-deleted?!)", klog.KObj(resourceClaim), claimInfo.ClaimUID)
+				}
 				logger.V(6).Info("Found existing claim info cache entry", "pod", klog.KObj(pod), "podClaim", podClaim.Name, "claim", klog.KObj(resourceClaim), "claimInfoEntry", claimInfo)
 			}
 

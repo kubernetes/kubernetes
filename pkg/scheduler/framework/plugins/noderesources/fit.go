@@ -227,7 +227,7 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
 		// Scheduler will calculate resources usage for a Pod containing
 		// restartable init containers that will be equal or more than kubelet will
@@ -294,7 +294,7 @@ func (f *Fit) isSchedulableAfterPodEvent(logger klog.Logger, pod *v1.Pod, oldObj
 	}
 
 	if modifiedPod == nil {
-		if originalPod.Spec.NodeName == "" {
+		if originalPod.Spec.NodeName == "" && originalPod.Status.NominatedNodeName == "" {
 			logger.V(5).Info("the deleted pod was unscheduled and it wouldn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
 			return framework.QueueSkip, nil
 		}
@@ -463,10 +463,16 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
 		failureReasons := make([]string, 0, len(insufficientResources))
+		statusCode := framework.Unschedulable
 		for i := range insufficientResources {
 			failureReasons = append(failureReasons, insufficientResources[i].Reason)
+
+			if insufficientResources[i].Unresolvable {
+				statusCode = framework.UnschedulableAndUnresolvable
+			}
 		}
-		return framework.NewStatus(framework.Unschedulable, failureReasons...)
+
+		return framework.NewStatus(statusCode, failureReasons...)
 	}
 	return nil
 }
@@ -489,6 +495,9 @@ type InsufficientResource struct {
 	Requested int64
 	Used      int64
 	Capacity  int64
+	// Unresolvable indicates whether this node could be schedulable for the pod by the preemption,
+	// which is determined by comparing the node's size and the pod's request.
+	Unresolvable bool
 }
 
 // Fits checks if node have enough resources to host the pod.
@@ -524,6 +533,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			Requested:    podRequest.MilliCPU,
 			Used:         nodeInfo.Requested.MilliCPU,
 			Capacity:     nodeInfo.Allocatable.MilliCPU,
+			Unresolvable: podRequest.MilliCPU > nodeInfo.Allocatable.MilliCPU,
 		})
 	}
 	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.Allocatable.Memory-nodeInfo.Requested.Memory) {
@@ -533,6 +543,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			Requested:    podRequest.Memory,
 			Used:         nodeInfo.Requested.Memory,
 			Capacity:     nodeInfo.Allocatable.Memory,
+			Unresolvable: podRequest.Memory > nodeInfo.Allocatable.Memory,
 		})
 	}
 	if podRequest.EphemeralStorage > 0 &&
@@ -543,6 +554,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 			Requested:    podRequest.EphemeralStorage,
 			Used:         nodeInfo.Requested.EphemeralStorage,
 			Capacity:     nodeInfo.Allocatable.EphemeralStorage,
+			Unresolvable: podRequest.EphemeralStorage > nodeInfo.Allocatable.EphemeralStorage,
 		})
 	}
 
@@ -571,6 +583,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 				Requested:    podRequest.ScalarResources[rName],
 				Used:         nodeInfo.Requested.ScalarResources[rName],
 				Capacity:     nodeInfo.Allocatable.ScalarResources[rName],
+				Unresolvable: rQuant > nodeInfo.Allocatable.ScalarResources[rName],
 			})
 		}
 	}
@@ -579,12 +592,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 }
 
 // Score invoked at the Score extension point.
-func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, err := f.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
-	if err != nil {
-		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
-	}
-
+func (f *Fit) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	s, err := getPreScoreState(state)
 	if err != nil {
 		s = &preScoreState{

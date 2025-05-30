@@ -50,15 +50,18 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=10.0.0.0/16",
+					"--advertise-address=10.1.1.1",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=10.0.0.0/16",
-						"--advertise-address=10.1.1.1",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -294,15 +297,18 @@ func TestCreateServiceSingleStackIPv6(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=2001:db8:1::/108",
+					"--advertise-address=2001:db8::10",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=2001:db8:1::/108",
-						"--advertise-address=2001:db8::10",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -525,15 +531,18 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
+					"--advertise-address=10.0.0.1",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=10.0.0.0/16,2001:db8:1::/108",
-						"--advertise-address=10.0.0.1",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -804,15 +813,18 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 				tCtx := ktesting.Init(t)
 				etcdOptions := framework.SharedEtcd()
 				apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
+				flags := []string{
+					"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
+					"--advertise-address=2001:db8::10",
+					"--disable-admission-plugins=ServiceAccount",
+					fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
+				}
+				if !enableMultiServiceCIDR {
+					flags = append(flags, "--emulated-version=1.33")
+				}
 				s := kubeapiservertesting.StartTestServerOrDie(t,
 					apiServerOptions,
-					[]string{
-						fmt.Sprintf("--runtime-config=networking.k8s.io/v1beta1=%v", enableMultiServiceCIDR),
-						"--service-cluster-ip-range=2001:db8:1::/108,10.0.0.0/16",
-						"--advertise-address=2001:db8::10",
-						"--disable-admission-plugins=ServiceAccount",
-						fmt.Sprintf("--feature-gates=%s=%v,%s=%v", features.MultiCIDRServiceAllocator, enableMultiServiceCIDR, features.DisableAllocatorDualWrite, disableAllocatorDualWrite),
-					},
+					flags,
 					etcdOptions)
 				defer s.TearDownFn()
 
@@ -1484,7 +1496,7 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	sharedEtcd := framework.SharedEtcd()
 	tCtx := ktesting.Init(t)
 
-	// Create an IPv4 only dual stack control-plane
+	// Create an IPv4 only control-plane
 	apiServerOptions := kubeapiservertesting.NewDefaultTestServerOptions()
 	s := kubeapiservertesting.StartTestServerOrDie(t,
 		apiServerOptions,
@@ -1531,6 +1543,10 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 			},
 		},
 	}
+
+	// create a copy of the service so we can test creating it again after reconfiguring the control plane
+	svcDual := svc.DeepCopy()
+	svcDual.Name = "svc-dual"
 
 	// create the service
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
@@ -1582,9 +1598,25 @@ func TestUpgradeServicePreferToDualStack(t *testing.T) {
 	if err = validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
 	}
+	// validate that new services created with prefer dual are now dual stack
+
+	// create the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svcDual, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was created correctly
+	svcDual, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svcDual.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svcDual.Name, err)
+	}
+	// service should be dual stack
+	if err = validateServiceAndClusterIPFamily(svcDual, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svcDual.Name, err)
+	}
 }
 
-func TestDowngradeServicePreferToDualStack(t *testing.T) {
+func TestDowngradeServicePreferFromDualStack(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
 	// Create a dual stack control-plane
@@ -1634,6 +1666,11 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 			},
 		},
 	}
+
+	// create a copy of the service so we can test creating it again after reconfiguring the control plane
+	svcSingle := svc.DeepCopy()
+	svcSingle.Name = "svc-single"
+
 	// create the service
 	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc, metav1.CreateOptions{})
 	if err != nil {
@@ -1683,6 +1720,23 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 	// service should remain dual stack
 	if err = validateServiceAndClusterIPFamily(svc, []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}); err != nil {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
+	}
+
+	// validate that new services created with prefer dual are now single stack
+
+	// create the service
+	_, err = client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svcSingle, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// validate the service was created correctly
+	svcSingle, err = client.CoreV1().Services(metav1.NamespaceDefault).Get(tCtx, svcSingle.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error to get the service %s %v", svcSingle.Name, err)
+	}
+	// service should be single stack
+	if err = validateServiceAndClusterIPFamily(svcSingle, []v1.IPFamily{v1.IPv4Protocol}); err != nil {
+		t.Fatalf("Unexpected error validating the service %s %v", svcSingle.Name, err)
 	}
 }
 

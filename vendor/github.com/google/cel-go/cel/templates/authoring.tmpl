@@ -1,0 +1,56 @@
+{{define "variable"}}{{.Name}} is a {{.Type}}
+{{- end -}}
+
+{{define "macro" -}}
+{{.Name}} macro{{if .Description}} - {{range split .Description}}{{.}} {{end}}
+{{end}}
+{{range .Children}}{{range split .Description}}      {{.}}
+{{end}}
+{{- end -}}
+{{- end -}}
+
+{{define "overload" -}}
+{{if .Children}}{{range .Children}}{{range split .Description}}      {{.}}
+{{end}}
+{{- end -}}
+{{else}}      {{.Signature}}
+{{end}}
+{{- end -}}
+
+{{define "function" -}}
+{{.Name}}{{if .Description}} - {{range split .Description}}{{.}} {{end}}
+{{end}}
+{{range .Children}}{{template "overload" .}}{{end}}
+{{- end -}}
+
+{{.Persona}}
+
+{{.FormatRules}}
+
+{{if or .Variables .Macros .Functions -}}
+Only use the following variables, macros, and functions in expressions.
+{{if .Variables}}
+Variables:
+
+{{range .Variables}}* {{template "variable" .}}
+{{end -}}
+
+{{end -}}
+{{if .Macros}}
+Macros:
+
+{{range .Macros}}* {{template "macro" .}}
+{{end -}}
+
+{{end -}}
+{{if .Functions}}
+Functions:
+
+{{range .Functions}}* {{template "function" .}}
+{{end -}}
+
+{{end -}}
+{{- end -}}
+{{.GeneralUsage}}
+
+{{.UserPrompt}}

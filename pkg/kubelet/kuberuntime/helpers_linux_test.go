@@ -24,193 +24,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/apimachinery/pkg/api/resource"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 )
 
 func seccompLocalhostRef(profileName string) string {
 	return filepath.Join(fakeSeccompProfileRoot, profileName)
-}
-
-func TestMilliCPUToQuota(t *testing.T) {
-	for _, testCase := range []struct {
-		msg      string
-		input    int64
-		expected int64
-		period   uint64
-	}{
-		{
-			msg:      "all-zero",
-			input:    int64(0),
-			expected: int64(0),
-			period:   uint64(0),
-		},
-		{
-			msg:      "5 input default quota and period",
-			input:    int64(5),
-			expected: int64(1000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "9 input default quota and period",
-			input:    int64(9),
-			expected: int64(1000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "10 input default quota and period",
-			input:    int64(10),
-			expected: int64(1000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "200 input 20k quota and default period",
-			input:    int64(200),
-			expected: int64(20000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "500 input 50k quota and default period",
-			input:    int64(500),
-			expected: int64(50000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "1k input 100k quota and default period",
-			input:    int64(1000),
-			expected: int64(100000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "1500 input 150k quota and default period",
-			input:    int64(1500),
-			expected: int64(150000),
-			period:   uint64(100000),
-		}} {
-		t.Run(testCase.msg, func(t *testing.T) {
-			quota := milliCPUToQuota(testCase.input, int64(testCase.period))
-			if quota != testCase.expected {
-				t.Errorf("Input %v and %v, expected quota %v, but got quota %v", testCase.input, testCase.period, testCase.expected, quota)
-			}
-		})
-	}
-}
-
-func TestMilliCPUToQuotaWithCustomCPUCFSQuotaPeriod(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CPUCFSQuotaPeriod, true)
-
-	for _, testCase := range []struct {
-		msg      string
-		input    int64
-		expected int64
-		period   uint64
-	}{
-		{
-			msg:      "all-zero",
-			input:    int64(0),
-			expected: int64(0),
-			period:   uint64(0),
-		},
-		{
-			msg:      "5 input default quota and period",
-			input:    int64(5),
-			expected: minQuotaPeriod,
-			period:   uint64(100000),
-		},
-		{
-			msg:      "9 input default quota and period",
-			input:    int64(9),
-			expected: minQuotaPeriod,
-			period:   uint64(100000),
-		},
-		{
-			msg:      "10 input default quota and period",
-			input:    int64(10),
-			expected: minQuotaPeriod,
-			period:   uint64(100000),
-		},
-		{
-			msg:      "200 input 20k quota and default period",
-			input:    int64(200),
-			expected: int64(20000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "500 input 50k quota and default period",
-			input:    int64(500),
-			expected: int64(50000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "1k input 100k quota and default period",
-			input:    int64(1000),
-			expected: int64(100000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "1500 input 150k quota and default period",
-			input:    int64(1500),
-			expected: int64(150000),
-			period:   uint64(100000),
-		},
-		{
-			msg:      "5 input 10k period and default quota expected",
-			input:    int64(5),
-			period:   uint64(10000),
-			expected: minQuotaPeriod,
-		},
-		{
-			msg:      "5 input 5k period and default quota expected",
-			input:    int64(5),
-			period:   uint64(5000),
-			expected: minQuotaPeriod,
-		},
-		{
-			msg:      "9 input 10k period and default quota expected",
-			input:    int64(9),
-			period:   uint64(10000),
-			expected: minQuotaPeriod,
-		},
-		{
-			msg:      "10 input 200k period and 2000 quota expected",
-			input:    int64(10),
-			period:   uint64(200000),
-			expected: int64(2000),
-		},
-		{
-			msg:      "200 input 200k period and 40k quota",
-			input:    int64(200),
-			period:   uint64(200000),
-			expected: int64(40000),
-		},
-		{
-			msg:      "500 input 20k period and 20k expected quota",
-			input:    int64(500),
-			period:   uint64(20000),
-			expected: int64(10000),
-		},
-		{
-			msg:      "1000 input 10k period and 10k expected quota",
-			input:    int64(1000),
-			period:   uint64(10000),
-			expected: int64(10000),
-		},
-		{
-			msg:      "1500 input 5000 period and 7500 expected quota",
-			input:    int64(1500),
-			period:   uint64(5000),
-			expected: int64(7500),
-		}} {
-		t.Run(testCase.msg, func(t *testing.T) {
-			quota := milliCPUToQuota(testCase.input, int64(testCase.period))
-			if quota != testCase.expected {
-				t.Errorf("Input %v and %v, expected quota %v, but got quota %v", testCase.input, testCase.period, testCase.expected, quota)
-			}
-		})
-	}
 }
 
 func TestGetSeccompProfile(t *testing.T) {
@@ -490,6 +310,233 @@ func TestQuotaToMilliCPU(t *testing.T) {
 			milliCPU := quotaToMilliCPU(tc.quota, tc.period)
 			if milliCPU != tc.expected {
 				t.Errorf("Test %s: Input quota %v and period %v, expected milliCPU %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCPU)
+			}
+		})
+	}
+}
+
+func TestSubtractOverheadFromResourceConfig(t *testing.T) {
+	podCPUMilli := resource.MustParse("200m")
+	podMemory := resource.MustParse("256Mi")
+	podOverheadCPUMilli := resource.MustParse("100m")
+	podOverheadMemory := resource.MustParse("64Mi")
+
+	resCfg := &cm.ResourceConfig{
+		Memory:    int64Ptr(335544320),
+		CPUShares: uint64Ptr(306),
+		CPUPeriod: uint64Ptr(100000),
+		CPUQuota:  int64Ptr(30000),
+	}
+
+	for _, tc := range []struct {
+		name     string
+		cfgInput *cm.ResourceConfig
+		pod      *v1.Pod
+		expected *cm.ResourceConfig
+	}{
+		{
+			name:     "withoutOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(306),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(30000),
+			},
+		},
+		{
+			name:     "withoutCPUOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceMemory: podOverheadMemory,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(268435456),
+				CPUShares: uint64Ptr(306),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(30000),
+			},
+		},
+		{
+			name:     "withoutMemoryOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: podOverheadCPUMilli,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(203),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(20000),
+			},
+		},
+		{
+			name: "withoutCPUPeriod",
+			cfgInput: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(306),
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: podOverheadCPUMilli,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUShares: uint64Ptr(203),
+			},
+		},
+		{
+			name: "withoutCPUShares",
+			cfgInput: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(30000),
+			},
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU: podOverheadCPUMilli,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(335544320),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(20000),
+			},
+		},
+		{
+			name:     "withOverhead",
+			cfgInput: resCfg,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "foo",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: podCPUMilli,
+								},
+								Limits: v1.ResourceList{
+									v1.ResourceCPU:    podCPUMilli,
+									v1.ResourceMemory: podMemory,
+								},
+							},
+						},
+					},
+					Overhead: v1.ResourceList{
+						v1.ResourceCPU:    podOverheadCPUMilli,
+						v1.ResourceMemory: podOverheadMemory,
+					},
+				},
+			},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(268435456),
+				CPUShares: uint64Ptr(203),
+				CPUPeriod: uint64Ptr(100000),
+				CPUQuota:  int64Ptr(20000),
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			gotCfg := subtractOverheadFromResourceConfig(tc.cfgInput, tc.pod)
+
+			if tc.expected.CPUPeriod != nil && *gotCfg.CPUPeriod != *tc.expected.CPUPeriod {
+				t.Errorf("Test %s: expected CPUPeriod %v, but got %v", tc.name, *tc.expected.CPUPeriod, *gotCfg.CPUPeriod)
+			}
+			if tc.expected.CPUQuota != nil && *gotCfg.CPUQuota != *tc.expected.CPUQuota {
+				t.Errorf("Test %s: expected CPUQuota %v, but got %v", tc.name, *tc.expected.CPUQuota, *gotCfg.CPUQuota)
+			}
+			if tc.expected.CPUShares != nil && *gotCfg.CPUShares != *tc.expected.CPUShares {
+				t.Errorf("Test %s: expected CPUShares %v, but got %v", tc.name, *tc.expected.CPUShares, *gotCfg.CPUShares)
+			}
+			if tc.expected.Memory != nil && *gotCfg.Memory != *tc.expected.Memory {
+				t.Errorf("Test %s: expected Memory %v, but got %v", tc.name, *tc.expected.Memory, *gotCfg.Memory)
 			}
 		})
 	}

@@ -73,6 +73,7 @@ func withAuthorization(handler http.Handler, a authorizer.Authorizer, s runtime.
 		authorizationFinish := time.Now()
 		defer func() {
 			metrics(ctx, authorized, err, authorizationStart, authorizationFinish)
+			request.TrackAuthorizationLatency(ctx, authorizationFinish.Sub(authorizationStart))
 		}()
 
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.

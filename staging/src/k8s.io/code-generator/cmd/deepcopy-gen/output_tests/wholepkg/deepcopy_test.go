@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	fuzz "github.com/google/gofuzz"
+	"sigs.k8s.io/randfill"
 )
 
 func TestDeepCopyPrimitives(t *testing.T) {
@@ -31,9 +31,9 @@ func TestDeepCopyPrimitives(t *testing.T) {
 		t.Errorf("objects should be equal to start, but are not")
 	}
 
-	fuzzer := fuzz.New()
-	fuzzer.Fuzz(&x)
-	fuzzer.Fuzz(&y)
+	fuzzer := randfill.New()
+	fuzzer.Fill(&x)
+	fuzzer.Fill(&y)
 
 	if reflect.DeepEqual(&x, &y) {
 		t.Errorf("objects should not be equal, but are")
@@ -53,14 +53,14 @@ func TestDeepCopyInterfaceFields(t *testing.T) {
 		t.Errorf("objects should be equal to start, but are not")
 	}
 
-	fuzzer := fuzz.New()
+	fuzzer := randfill.New()
 
 	obj := StructExplicitObject{}
-	fuzzer.Fuzz(&obj)
+	fuzzer.Fill(&obj)
 	x.ObjectField = &obj
 
 	sel := StructExplicitSelectorExplicitObject{}
-	fuzzer.Fuzz(&sel)
+	fuzzer.Fill(&sel)
 	x.SelectorField = &sel
 
 	if reflect.DeepEqual(&x, &y) {
@@ -115,8 +115,8 @@ func TestInterfaceTypes(t *testing.T) {
 func TestInterfaceDeepCopy(t *testing.T) {
 	x := StructExplicitObject{}
 
-	fuzzer := fuzz.New()
-	fuzzer.Fuzz(&x)
+	fuzzer := randfill.New()
+	fuzzer.Fill(&x)
 
 	yObj := x.DeepCopyObject()
 	y, ok := yObj.(*StructExplicitObject)
@@ -131,8 +131,8 @@ func TestInterfaceDeepCopy(t *testing.T) {
 func TestInterfaceNonPointerDeepCopy(t *testing.T) {
 	x := StructNonPointerExplicitObject{}
 
-	fuzzer := fuzz.New()
-	fuzzer.Fuzz(&x)
+	fuzzer := randfill.New()
+	fuzzer.Fill(&x)
 
 	yObj := x.DeepCopyObject()
 	y, ok := yObj.(StructNonPointerExplicitObject)

@@ -36,6 +36,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -65,6 +66,10 @@ const (
 	injectReason       = "injected status"
 	injectFilterReason = "injected filter status"
 )
+
+func init() {
+	metrics.Register()
+}
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
@@ -132,7 +137,7 @@ func (pl *TestScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, stat
 	return injectNormalizeRes(pl.inj, scores)
 }
 
-func (pl *TestScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *TestScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -154,7 +159,7 @@ func (pl *TestScorePlugin) PreScore(ctx context.Context, state *framework.CycleS
 	return framework.NewStatus(framework.Code(pl.inj.PreScoreStatus), injectReason)
 }
 
-func (pl *TestScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *TestScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -194,7 +199,7 @@ func (pl *TestPlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) b
 	return false
 }
 
-func (pl *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	return 0, framework.NewStatus(framework.Code(pl.inj.ScoreStatus), injectReason)
 }
 
@@ -202,7 +207,7 @@ func (pl *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return pl.inj.PreFilterResult, framework.NewStatus(framework.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
@@ -272,7 +277,7 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
 	return nil, nil
 }
@@ -292,7 +297,7 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	pl.PreFilterCalled++
 	return nil, nil
 }
@@ -320,7 +325,7 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
@@ -460,7 +465,6 @@ func newFrameworkWithQueueSortAndBind(ctx context.Context, r Registry, profile c
 }
 
 func TestInitFrameworkWithScorePlugins(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
@@ -1547,7 +1551,7 @@ func TestPreFilterPlugins(t *testing.T) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile)
+		f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
@@ -1739,6 +1743,7 @@ func TestRunPreFilterPlugins(t *testing.T) {
 				ctx,
 				r,
 				config.KubeSchedulerProfile{Plugins: &config.Plugins{PreFilter: config.PluginSet{Enabled: enabled}}},
+				WithSnapshotSharedLister(cache.NewEmptySnapshot()),
 			)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
@@ -2905,7 +2910,6 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 func TestRecordingMetrics(t *testing.T) {
 	state := &framework.CycleState{}
 	state.SetRecordPluginMetrics(true)
-	metrics.Register()
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -3065,6 +3069,7 @@ func TestRecordingMetrics(t *testing.T) {
 			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
 				withMetricsRecorder(recorder),
 				WithWaitingPods(NewWaitingPodsMap()),
+				WithSnapshotSharedLister(cache.NewEmptySnapshot()),
 			)
 			if err != nil {
 				cancel()
@@ -3089,7 +3094,6 @@ func TestRecordingMetrics(t *testing.T) {
 }
 
 func TestRunBindPlugins(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name       string
 		injects    []framework.Code
@@ -3206,7 +3210,6 @@ func TestRunBindPlugins(t *testing.T) {
 }
 
 func TestPermitWaitDurationMetric(t *testing.T) {
-	metrics.Register()
 	tests := []struct {
 		name    string
 		inject  injectedResult

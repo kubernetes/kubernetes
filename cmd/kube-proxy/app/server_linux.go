@@ -25,6 +25,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	goruntime "runtime"
 	"time"
 
@@ -50,7 +51,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/nftables"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	"k8s.io/utils/exec"
 )
 
 // timeoutForNodePodCIDR is the time to wait for allocators to assign a PodCIDR to the
@@ -82,8 +82,8 @@ func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfigur
 func (s *ProxyServer) platformSetup(ctx context.Context) error {
 	logger := klog.FromContext(ctx)
 	if s.Config.DetectLocalMode == proxyconfigapi.LocalModeNodeCIDR {
-		logger.Info("Watching for node, awaiting podCIDR allocation", "hostname", s.Hostname)
-		node, err := waitForPodCIDR(ctx, s.Client, s.Hostname)
+		logger.Info("Watching for node, awaiting podCIDR allocation", "node", s.NodeName)
+		node, err := waitForPodCIDR(ctx, s.Client, s.NodeName)
 		if err != nil {
 			return err
 		}
@@ -105,37 +105,16 @@ func isIPTablesBased(mode proxyconfigapi.ProxyMode) bool {
 	return mode == proxyconfigapi.ProxyModeIPTables || mode == proxyconfigapi.ProxyModeIPVS
 }
 
-// getIPTables returns an array of [IPv4, IPv6] utiliptables.Interfaces. If primaryFamily
-// is not v1.IPFamilyUnknown then it will also separately return the interface for just
-// that family.
-func getIPTables(primaryFamily v1.IPFamily) ([2]utiliptables.Interface, utiliptables.Interface) {
-	execer := exec.New()
-
-	// Create iptables handlers for both families. Always ordered as IPv4, IPv6
-	ipt := [2]utiliptables.Interface{
-		utiliptables.New(execer, utiliptables.ProtocolIPv4),
-		utiliptables.New(execer, utiliptables.ProtocolIPv6),
-	}
-
-	var iptInterface utiliptables.Interface
-	if primaryFamily == v1.IPv4Protocol {
-		iptInterface = ipt[0]
-	} else if primaryFamily == v1.IPv6Protocol {
-		iptInterface = ipt[1]
-	}
-
-	return ipt, iptInterface
-}
-
 // platformCheckSupported is called immediately before creating the Proxier, to check
 // what IP families are supported (and whether the configuration is usable at all).
 func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported, ipv6Supported, dualStackSupported bool, err error) {
 	logger := klog.FromContext(ctx)
 
 	if isIPTablesBased(s.Config.Mode) {
-		ipt, _ := getIPTables(v1.IPFamilyUnknown)
-		ipv4Supported = ipt[0].Present()
-		ipv6Supported = ipt[1].Present()
+		// Check for the iptables and ip6tables binaries.
+		ipts := utiliptables.NewDualStack()
+		ipv4Supported = ipts[v1.IPv4Protocol] != nil
+		ipv6Supported = ipts[v1.IPv6Protocol] != nil
 
 		if !ipv4Supported && !ipv6Supported {
 			err = fmt.Errorf("iptables is not available on this host")
@@ -145,9 +124,15 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 			logger.Info("No iptables support for family", "ipFamily", v1.IPv6Protocol)
 		}
 	} else {
-		// Assume support for both families.
-		// FIXME: figure out how to check for kernel IPv6 support using nft
+		// The nft CLI always supports both families.
 		ipv4Supported, ipv6Supported = true, true
+	}
+
+	// Check if the OS has IPv6 enabled, by verifying if the IPv6 interfaces are available
+	_, errIPv6 := os.Stat("/proc/net/if_inet6")
+	if errIPv6 != nil {
+		logger.Info("No kernel support for family", "ipFamily", v1.IPv6Protocol)
+		ipv6Supported = false
 	}
 
 	// The Linux proxies can always support dual-stack if they can support both IPv4
@@ -166,23 +151,21 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 
 	if config.Mode == proxyconfigapi.ProxyModeIPTables {
 		logger.Info("Using iptables Proxier")
+		ipts := utiliptables.NewDualStack()
 
 		if dualStack {
-			ipt, _ := getIPTables(s.PrimaryIPFamily)
-
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
 				ctx,
-				ipt,
+				ipts,
 				utilsysctl.New(),
-				exec.New(),
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
@@ -191,22 +174,20 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			)
 		} else {
 			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
-			_, iptInterface := getIPTables(s.PrimaryIPFamily)
 
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
 				ctx,
 				s.PrimaryIPFamily,
-				iptInterface,
+				ipts[s.PrimaryIPFamily],
 				utilsysctl.New(),
-				exec.New(),
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.Linux.MasqueradeAll,
 				*config.IPTables.LocalhostNodePorts,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
@@ -219,23 +200,21 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else if config.Mode == proxyconfigapi.ProxyModeIPVS {
-		execer := exec.New()
-		ipsetInterface := utilipset.New(execer)
+		ipsetInterface := utilipset.New()
 		ipvsInterface := utilipvs.New()
 		if err := ipvs.CanUseIPVSProxier(ctx, ipvsInterface, ipsetInterface, config.IPVS.Scheduler); err != nil {
 			return nil, fmt.Errorf("can't use the IPVS proxier: %v", err)
 		}
+		ipts := utiliptables.NewDualStack()
 
 		logger.Info("Using ipvs Proxier")
 		if dualStack {
-			ipt, _ := getIPTables(s.PrimaryIPFamily)
 			proxier, err = ipvs.NewDualStackProxier(
 				ctx,
-				ipt,
+				ipts,
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -246,7 +225,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
@@ -255,15 +234,13 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				initOnly,
 			)
 		} else {
-			_, iptInterface := getIPTables(s.PrimaryIPFamily)
 			proxier, err = ipvs.NewProxier(
 				ctx,
 				s.PrimaryIPFamily,
-				iptInterface,
+				ipts[s.PrimaryIPFamily],
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				execer,
 				config.SyncPeriod.Duration,
 				config.MinSyncPeriod.Duration,
 				config.IPVS.ExcludeCIDRs,
@@ -274,7 +251,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
@@ -298,7 +275,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors,
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
@@ -316,7 +293,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.
 				config.Linux.MasqueradeAll,
 				int(*config.NFTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
-				s.Hostname,
+				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
@@ -514,15 +491,8 @@ func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanup
 
 	// Clean up iptables and ipvs rules if switching to nftables, or if cleanupAndExit
 	if !isIPTablesBased(mode) || cleanupAndExit {
-		ipts, _ := getIPTables(v1.IPFamilyUnknown)
-		execer := exec.New()
-		ipsetInterface := utilipset.New(execer)
-		ipvsInterface := utilipvs.New()
-
-		for _, ipt := range ipts {
-			encounteredError = iptables.CleanupLeftovers(ctx, ipt) || encounteredError
-			encounteredError = ipvs.CleanupLeftovers(ctx, ipvsInterface, ipt, ipsetInterface) || encounteredError
-		}
+		encounteredError = iptables.CleanupLeftovers(ctx) || encounteredError
+		encounteredError = ipvs.CleanupLeftovers(ctx) || encounteredError
 	}
 
 	// Clean up nftables rules when switching to iptables or ipvs, or if cleanupAndExit

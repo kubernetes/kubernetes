@@ -1325,6 +1325,7 @@ func TestAggregatedServerGroups(t *testing.T) {
 			output, err = json.Marshal(agg)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
+				return
 			}
 			// Content-Type is "aggregated" discovery format. Add extra parameter
 			// to ensure we are resilient to these extra parameters.
@@ -1333,6 +1334,7 @@ func TestAggregatedServerGroups(t *testing.T) {
 			_, err = w.Write(output)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
+				return
 			}
 		}))
 		defer server.Close()
@@ -2399,6 +2401,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 					output, err = json.Marshal(agg)
 					if err != nil {
 						t.Errorf("unexpected error %v", err)
+						return
 					}
 				} else {
 					var agg *apidiscoveryv2beta1.APIGroupDiscoveryList
@@ -2414,6 +2417,7 @@ func TestAggregatedServerGroupsAndResources(t *testing.T) {
 					output, err = json.Marshal(&agg)
 					if err != nil {
 						t.Errorf("unexpected error %v", err)
+						return
 					}
 				}
 				// Content-Type is "aggregated" discovery format. Add extra parameter
@@ -2565,6 +2569,7 @@ func TestAggregatedServerGroupsAndResourcesWithErrors(t *testing.T) {
 			output, err = json.Marshal(agg)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
+				return
 			}
 			// Content-Type is "aggregated" discovery format. Add extra parameter
 			// to ensure we are resilient to these extra parameters.
@@ -3182,6 +3187,7 @@ func TestAggregatedServerPreferredResources(t *testing.T) {
 			output, err = json.Marshal(agg)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
+				return
 			}
 			// Content-Type is "aggregated" discovery format. Add extra parameter
 			// to ensure we are resilient to these extra parameters.

@@ -435,6 +435,16 @@ func newStoreSnapshotter() *storeSnapshotter {
 	return s
 }
 
+var _ Snapshotter = (*storeSnapshotter)(nil)
+
+type Snapshotter interface {
+	Reset()
+	GetLessOrEqual(rv uint64) (orderedLister, bool)
+	Add(rv uint64, indexer orderedLister)
+	RemoveLess(rv uint64)
+	Len() int
+}
+
 type storeSnapshotter struct {
 	mux       sync.RWMutex
 	snapshots *btree.BTreeG[rvSnapshot]
@@ -485,4 +495,11 @@ func (s *storeSnapshotter) RemoveLess(rv uint64) {
 		}
 		s.snapshots.DeleteMin()
 	}
+}
+
+func (s *storeSnapshotter) Len() int {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
+	return s.snapshots.Len()
 }

@@ -104,7 +104,7 @@ var (
 		},
 		[]string{
 			"topology",             // either "Auto" or "Disabled"
-			"traffic_distribution", // "PreferClose" or <empty>
+			"traffic_distribution", // a trafficDistribution value or <empty>
 		},
 	)
 

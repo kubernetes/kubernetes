@@ -307,6 +307,7 @@ func (o *AttachOptions) Run() error {
 	}
 
 	if !o.Quiet {
+		_, _ = fmt.Fprintln(o.ErrOut, "All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.")
 		fmt.Fprintln(o.ErrOut, "If you don't see a command prompt, try pressing enter.")
 	}
 	if err := t.Safe(o.AttachFunc(o, containerToAttach, t.Raw, sizeQueue)); err != nil {

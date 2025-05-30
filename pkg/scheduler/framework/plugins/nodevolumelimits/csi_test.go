@@ -647,7 +647,7 @@ func TestCSILimits(t *testing.T) {
 				translator:           csiTranslator,
 			}
 			_, ctx := ktesting.NewTestContext(t)
-			_, gotPreFilterStatus := p.PreFilter(ctx, nil, test.newPod)
+			_, gotPreFilterStatus := p.PreFilter(ctx, nil, test.newPod, nil)
 			if diff := cmp.Diff(test.wantPreFilterStatus, gotPreFilterStatus, statusCmpOpts...); diff != "" {
 				t.Errorf("PreFilter status does not match (-want, +got):\n%s", diff)
 			}
@@ -971,6 +971,100 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 			}
 			if qhint != test.wantQHint {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)
+			}
+		})
+	}
+}
+
+func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
+	p := &CSILimits{}
+	testPod := st.MakePod().Name("test-pod").Namespace("ns1").
+		PVC("csi-ebs.csi.aws.com-0").Obj()
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name       string
+		oldDrivers []storagev1.CSINodeDriver
+		newDrivers []storagev1.CSINodeDriver
+		wantQHint  framework.QueueingHint
+	}{
+		{
+			name: "limit raised, queue",
+			oldDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+				Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(1)),
+				},
+			}},
+			newDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+				Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(2)),
+				},
+			}},
+			wantQHint: framework.Queue,
+		},
+		{
+			name: "limit decreased, skip queueing",
+			oldDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+				Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(2)),
+				},
+			}},
+			newDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+				Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(1)),
+				},
+			}},
+			wantQHint: framework.QueueSkip,
+		},
+		{
+			name: "limit unchanged, skip queueing",
+			oldDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+				Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(1)),
+				},
+			}},
+			newDrivers: []storagev1.CSINodeDriver{{
+				Name:   "ebs.csi.aws.com",
+				NodeID: "test-node",
+				Allocatable: &storagev1.VolumeNodeResources{
+					Count: ptr.To(int32(1)),
+				},
+			}},
+			wantQHint: framework.QueueSkip,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldCSINode := &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Spec: storagev1.CSINodeSpec{
+					Drivers: tt.oldDrivers,
+				},
+			}
+			newCSINode := &storagev1.CSINode{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Spec: storagev1.CSINodeSpec{
+					Drivers: tt.newDrivers,
+				},
+			}
+			qhint, err := p.isSchedulableAfterCSINodeUpdated(logger, testPod, oldCSINode, newCSINode)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if qhint != tt.wantQHint {
+				t.Errorf("wrong qhint: got=%v, want=%v", qhint, tt.wantQHint)
 			}
 		})
 	}

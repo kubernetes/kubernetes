@@ -37,16 +37,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	cmapi "k8s.io/metrics/pkg/apis/custom_metrics/v1beta2"
 	emapi "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"
@@ -382,6 +385,13 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					assert.Equal(t, tc.CPUCurrent, *utilization, "the report CPU utilization percentage should be as expected")
 				}
 			}
+
+			if len(obj.Spec.Metrics) > 0 && obj.Spec.Metrics[0].Object != nil && len(obj.Status.CurrentMetrics) > 0 && obj.Status.CurrentMetrics[0].Object != nil {
+				assert.Equal(t, obj.Spec.Metrics[0].Object.DescribedObject.APIVersion, obj.Status.CurrentMetrics[0].Object.DescribedObject.APIVersion)
+				assert.Equal(t, obj.Spec.Metrics[0].Object.DescribedObject.Kind, obj.Status.CurrentMetrics[0].Object.DescribedObject.Kind)
+				assert.Equal(t, obj.Spec.Metrics[0].Object.DescribedObject.Name, obj.Status.CurrentMetrics[0].Object.DescribedObject.Name)
+			}
+
 			actualConditions := obj.Status.Conditions
 			// TODO: it's ok not to sort these because statusOk
 			// contains all the conditions, so we'll never be appending.
@@ -2207,6 +2217,107 @@ func TestTolerance(t *testing.T) {
 		},
 	}
 	tc.runTest(t)
+}
+
+func TestConfigurableTolerance(t *testing.T) {
+	onePercentQuantity := resource.MustParse("0.01")
+	ninetyPercentQuantity := resource.MustParse("0.9")
+
+	testCases := []struct {
+		name                      string
+		configurableToleranceGate bool
+		replicas                  int32
+		scaleUpRules              *autoscalingv2.HPAScalingRules
+		scaleDownRules            *autoscalingv2.HPAScalingRules
+		reportedLevels            []uint64
+		reportedCPURequests       []resource.Quantity
+		expectedDesiredReplicas   int32
+		expectedConditionReason   string
+		expectedActionLabel       monitor.ActionLabel
+	}{
+		{
+			name:                      "Scaling up because of a 1% configurable tolerance",
+			configurableToleranceGate: true,
+			replicas:                  3,
+			scaleUpRules: &autoscalingv2.HPAScalingRules{
+				Tolerance: &onePercentQuantity,
+			},
+			reportedLevels:          []uint64{1010, 1030, 1020},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+			expectedDesiredReplicas: 4,
+			expectedConditionReason: "SucceededRescale",
+			expectedActionLabel:     monitor.ActionLabelScaleUp,
+		},
+		{
+			name:                      "No scale-down because of a 90% configurable tolerance",
+			configurableToleranceGate: true,
+			replicas:                  3,
+			scaleDownRules: &autoscalingv2.HPAScalingRules{
+				Tolerance: &ninetyPercentQuantity,
+			},
+			reportedLevels:          []uint64{300, 300, 300},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+			expectedDesiredReplicas: 3,
+			expectedConditionReason: "ReadyForNewScale",
+			expectedActionLabel:     monitor.ActionLabelNone,
+		},
+		{
+			name:                      "No scaling because of the large default tolerance",
+			configurableToleranceGate: true,
+			replicas:                  3,
+			reportedLevels:            []uint64{1010, 1030, 1020},
+			reportedCPURequests:       []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+			expectedDesiredReplicas:   3,
+			expectedConditionReason:   "ReadyForNewScale",
+			expectedActionLabel:       monitor.ActionLabelNone,
+		},
+		{
+			name:                      "No scaling because the configurable tolerance is ignored as the feature gate is disabled",
+			configurableToleranceGate: false,
+			replicas:                  3,
+			scaleUpRules: &autoscalingv2.HPAScalingRules{
+				Tolerance: &onePercentQuantity,
+			},
+			reportedLevels:          []uint64{1010, 1030, 1020},
+			reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
+			expectedDesiredReplicas: 3,
+			expectedConditionReason: "ReadyForNewScale",
+			expectedActionLabel:     monitor.ActionLabelNone,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, tc.configurableToleranceGate)
+			tc := testCase{
+				minReplicas:             1,
+				maxReplicas:             5,
+				specReplicas:            tc.replicas,
+				statusReplicas:          tc.replicas,
+				scaleDownRules:          tc.scaleDownRules,
+				scaleUpRules:            tc.scaleUpRules,
+				expectedDesiredReplicas: tc.expectedDesiredReplicas,
+				CPUTarget:               100,
+				reportedLevels:          tc.reportedLevels,
+				reportedCPURequests:     tc.reportedCPURequests,
+				useMetricsAPI:           true,
+				expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+					Type:   autoscalingv2.AbleToScale,
+					Status: v1.ConditionTrue,
+					Reason: tc.expectedConditionReason,
+				}),
+				expectedReportedReconciliationActionLabel: tc.expectedActionLabel,
+				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+					autoscalingv2.ResourceMetricSourceType: tc.expectedActionLabel,
+				},
+				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+					autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+				},
+			}
+			tc.runTest(t)
+		})
+	}
 }
 
 func TestToleranceCM(t *testing.T) {

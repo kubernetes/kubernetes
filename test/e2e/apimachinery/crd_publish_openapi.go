@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"sigs.k8s.io/yaml"
 
+	"k8s.io/apiserver/pkg/cel/environment"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/utils/pointer"
 
@@ -698,7 +699,8 @@ func convertJSONSchemaProps(in []byte, out *spec.Schema) error {
 		return err
 	}
 	kubeOut := spec.Schema{}
-	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, validation.StripUnsupportedFormatsPostProcess); err != nil {
+	formatPostProcessor := validation.StripUnsupportedFormatsPostProcessorForVersion(environment.DefaultCompatibilityVersion())
+	if err := validation.ConvertJSONSchemaPropsWithPostProcess(&internal, &kubeOut, formatPostProcessor); err != nil {
 		return err
 	}
 	bs, err := json.Marshal(kubeOut)

@@ -146,3 +146,12 @@ func (r *resourceAllocationScorer) calculatePodResourceRequestList(pod *v1.Pod, 
 	}
 	return podRequests
 }
+
+func (r *resourceAllocationScorer) isBestEffortPod(podRequests []int64) bool {
+	for _, request := range podRequests {
+		if request != 0 {
+			return false
+		}
+	}
+	return true
+}

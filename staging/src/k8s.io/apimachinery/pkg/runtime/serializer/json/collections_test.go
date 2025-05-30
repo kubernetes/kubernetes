@@ -22,7 +22,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	fuzz "github.com/google/gofuzz"
+
+	"sigs.k8s.io/randfill"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -63,7 +64,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"Int\":1,\"Float32\":1,\"Float64\":1.1}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"Int\":1,\"Float32\":1,\"Float64\":1.1}]}\n",
 		},
 		{
 			name: "Unstructured object float",
@@ -102,7 +103,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{}}]}\n",
 		},
 		// Encoding Go strings containing invalid UTF-8 sequences without error
 		{
@@ -146,7 +147,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "CarpList map nil",
@@ -159,7 +160,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "UnstructuredList items nil",
@@ -237,7 +238,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "CarpList map empty",
@@ -250,7 +251,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "UnstructuredList items empty",
@@ -337,7 +338,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					},
 				},
 			},
-			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{\"creationTimestamp\":null},\"Slice\":\"AQID\",\"Array\":[1,2,3]}]}\n",
+			expect: "{\"metadata\":{},\"items\":[{\"metadata\":{},\"Slice\":\"AQID\",\"Array\":[1,2,3]}]}\n",
 		},
 		{
 			name: "UnstructuredList object raw bytes",
@@ -415,7 +416,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					}},
 				},
 			},
-			expect: "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{\"resourceVersion\":\"2345\",\"continue\":\"abc\",\"remainingItemCount\":1},\"items\":[{\"kind\":\"Carp\",\"apiVersion\":\"v1\",\"metadata\":{\"name\":\"pod\",\"namespace\":\"default\",\"creationTimestamp\":null},\"spec\":{},\"status\":{}}]}\n",
+			expect: "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{\"resourceVersion\":\"2345\",\"continue\":\"abc\",\"remainingItemCount\":1},\"items\":[{\"kind\":\"Carp\",\"apiVersion\":\"v1\",\"metadata\":{\"name\":\"pod\",\"namespace\":\"default\"},\"spec\":{},\"status\":{}}]}\n",
 		},
 		{
 			name: "List two elements",
@@ -438,7 +439,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 					}},
 				},
 			},
-			expect: `{"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"2345"},"items":[{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod","namespace":"default","creationTimestamp":null},"spec":{},"status":{}},{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod2","namespace":"default2","creationTimestamp":null},"spec":{},"status":{}}]}
+			expect: `{"kind":"List","apiVersion":"v1","metadata":{"resourceVersion":"2345"},"items":[{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod","namespace":"default"},"spec":{},"status":{}},{"kind":"Carp","apiVersion":"v1","metadata":{"name":"pod2","namespace":"default2"},"spec":{},"status":{}}]}
 `,
 		},
 		{
@@ -465,7 +466,7 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				},
 			},
 			cannotStream: true,
-			expect:       "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{\"creationTimestamp\":null},\"spec\":{},\"status\":{}}\n",
+			expect:       "{\"kind\":\"List\",\"apiVersion\":\"v1\",\"metadata\":{},\"spec\":{},\"status\":{}}\n",
 		},
 		{
 			name:   "UnstructuredList empty",
@@ -720,35 +721,35 @@ func (b *writeCountingBuffer) Reset() {
 }
 
 func TestFuzzCollectionsEncoding(t *testing.T) {
-	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c fuzz.Continue) {}
-	fuzzUnstructuredList := func(list *unstructured.UnstructuredList, c fuzz.Continue) {
+	disableFuzzFieldsV1 := func(field *metav1.FieldsV1, c randfill.Continue) {}
+	fuzzUnstructuredList := func(list *unstructured.UnstructuredList, c randfill.Continue) {
 		list.Object = map[string]interface{}{
-			"kind":         "List",
-			"apiVersion":   "v1",
-			c.RandString(): c.RandString(),
-			c.RandString(): c.RandUint64(),
-			c.RandString(): c.RandBool(),
+			"kind":       "List",
+			"apiVersion": "v1",
+			c.String(0):  c.String(0),
+			c.String(0):  c.Uint64(),
+			c.String(0):  c.Bool(),
 			"metadata": map[string]interface{}{
-				"resourceVersion":    fmt.Sprintf("%d", c.RandUint64()),
-				"continue":           c.RandString(),
-				"remainingItemCount": fmt.Sprintf("%d", c.RandUint64()),
-				c.RandString():       c.RandString(),
+				"resourceVersion":    fmt.Sprintf("%d", c.Uint64()),
+				"continue":           c.String(0),
+				"remainingItemCount": fmt.Sprintf("%d", c.Uint64()),
+				c.String(0):          c.String(0),
 			}}
-		c.Fuzz(&list.Items)
+		c.Fill(&list.Items)
 	}
-	fuzzMap := func(kvs map[string]interface{}, c fuzz.Continue) {
-		kvs[c.RandString()] = c.RandBool()
-		kvs[c.RandString()] = c.RandUint64()
-		kvs[c.RandString()] = c.RandString()
+	fuzzMap := func(kvs map[string]interface{}, c randfill.Continue) {
+		kvs[c.String(0)] = c.Bool()
+		kvs[c.String(0)] = c.Uint64()
+		kvs[c.String(0)] = c.String(0)
 	}
-	f := fuzz.New().Funcs(disableFuzzFieldsV1, fuzzUnstructuredList, fuzzMap)
+	f := randfill.New().Funcs(disableFuzzFieldsV1, fuzzUnstructuredList, fuzzMap)
 	streamingBuffer := &bytes.Buffer{}
 	normalSerializer := NewSerializerWithOptions(DefaultMetaFactory, nil, nil, SerializerOptions{StreamingCollectionsEncoding: false})
 	normalBuffer := &bytes.Buffer{}
 	t.Run("CarpList", func(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			list := &testapigroupv1.CarpList{}
-			f.Fuzz(list)
+			f.Fill(list)
 			streamingBuffer.Reset()
 			normalBuffer.Reset()
 			ok, err := streamEncodeCollections(list, streamingBuffer)
@@ -771,7 +772,7 @@ func TestFuzzCollectionsEncoding(t *testing.T) {
 	t.Run("UnstructuredList", func(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			list := &unstructured.UnstructuredList{}
-			f.Fuzz(list)
+			f.Fill(list)
 			streamingBuffer.Reset()
 			normalBuffer.Reset()
 			ok, err := streamEncodeCollections(list, streamingBuffer)

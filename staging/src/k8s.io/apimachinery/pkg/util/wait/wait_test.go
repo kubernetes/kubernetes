@@ -40,7 +40,10 @@ func TestUntil(t *testing.T) {
 
 	ch = make(chan struct{})
 	called := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		Until(func() {
 			called <- struct{}{}
 		}, 0, ch)
@@ -49,6 +52,7 @@ func TestUntil(t *testing.T) {
 	<-called
 	close(ch)
 	<-called
+	wg.Wait()
 }
 
 func TestUntilWithContext(t *testing.T) {
@@ -60,7 +64,10 @@ func TestUntilWithContext(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	called := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		UntilWithContext(ctx, func(context.Context) {
 			called <- struct{}{}
 		}, 0)
@@ -69,6 +76,7 @@ func TestUntilWithContext(t *testing.T) {
 	<-called
 	cancel()
 	<-called
+	wg.Wait()
 }
 
 func TestNonSlidingUntil(t *testing.T) {
@@ -80,7 +88,10 @@ func TestNonSlidingUntil(t *testing.T) {
 
 	ch = make(chan struct{})
 	called := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		NonSlidingUntil(func() {
 			called <- struct{}{}
 		}, 0, ch)
@@ -89,6 +100,7 @@ func TestNonSlidingUntil(t *testing.T) {
 	<-called
 	close(ch)
 	<-called
+	wg.Wait()
 }
 
 func TestNonSlidingUntilWithContext(t *testing.T) {
@@ -100,7 +112,10 @@ func TestNonSlidingUntilWithContext(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	called := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		NonSlidingUntilWithContext(ctx, func(context.Context) {
 			called <- struct{}{}
 		}, 0)
@@ -109,6 +124,7 @@ func TestNonSlidingUntilWithContext(t *testing.T) {
 	<-called
 	cancel()
 	<-called
+	wg.Wait()
 }
 
 func TestUntilReturnsImmediately(t *testing.T) {
@@ -138,7 +154,10 @@ func TestJitterUntil(t *testing.T) {
 
 	ch = make(chan struct{})
 	called := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		JitterUntil(func() {
 			called <- struct{}{}
 		}, 0, 1.0, true, ch)
@@ -147,6 +166,7 @@ func TestJitterUntil(t *testing.T) {
 	<-called
 	close(ch)
 	<-called
+	wg.Wait()
 }
 
 func TestJitterUntilWithContext(t *testing.T) {
@@ -158,7 +178,10 @@ func TestJitterUntilWithContext(t *testing.T) {
 
 	ctx, cancel = context.WithCancel(context.TODO())
 	called := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		JitterUntilWithContext(ctx, func(context.Context) {
 			called <- struct{}{}
 		}, 0, 1.0, true)
@@ -167,6 +190,7 @@ func TestJitterUntilWithContext(t *testing.T) {
 	<-called
 	cancel()
 	<-called
+	wg.Wait()
 }
 
 func TestJitterUntilReturnsImmediately(t *testing.T) {
@@ -220,7 +244,10 @@ func TestJitterUntilNegativeFactor(t *testing.T) {
 	ch := make(chan struct{})
 	called := make(chan struct{})
 	received := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		JitterUntil(func() {
 			called <- struct{}{}
 			<-received
@@ -238,6 +265,7 @@ func TestJitterUntilNegativeFactor(t *testing.T) {
 	if now.Add(3 * time.Second).Before(time.Now()) {
 		t.Errorf("JitterUntil did not returned after predefined period with negative jitter factor when the stop chan was closed inside the func")
 	}
+	wg.Wait()
 }
 
 func TestExponentialBackoff(t *testing.T) {
@@ -440,7 +468,10 @@ func TestPollForever(t *testing.T) {
 	errc := make(chan error, 1)
 	done := make(chan struct{}, 1)
 	complete := make(chan struct{})
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		f := ConditionFunc(func() (bool, error) {
 			ch <- struct{}{}
 			select {
@@ -479,7 +510,9 @@ func TestPollForever(t *testing.T) {
 
 	// at most one poll notification should be sent once we return from the condition
 	done <- struct{}{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for i := 0; i < 2; i++ {
 			_, open := <-ch
 			if !open {
@@ -493,6 +526,7 @@ func TestPollForever(t *testing.T) {
 	if len(errc) != 0 {
 		t.Fatal(<-errc)
 	}
+	wg.Wait()
 }
 
 func Test_waitFor(t *testing.T) {
@@ -631,8 +665,10 @@ func TestPollUntil(t *testing.T) {
 	stopCh := make(chan struct{})
 	called := make(chan bool)
 	pollDone := make(chan struct{})
-
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		PollUntil(time.Microsecond, ConditionFunc(func() (bool, error) {
 			called <- true
 			return false, nil
@@ -655,6 +691,7 @@ func TestPollUntil(t *testing.T) {
 	// make sure we finished the poll
 	<-pollDone
 	close(called)
+	wg.Wait()
 }
 
 func TestBackoff_Step(t *testing.T) {

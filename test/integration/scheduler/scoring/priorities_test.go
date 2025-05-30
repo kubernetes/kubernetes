@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -306,6 +307,9 @@ func TestNodeAffinityScoring(t *testing.T) {
 	labeledNode, err := createNode(testCtx.ClientSet, st.MakeNode().Name("testnode-4").Label(labelKey, labelValue).Obj())
 	if err != nil {
 		t.Fatalf("Cannot create labeled node: %v", err)
+	}
+	if err = testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 5); err != nil {
+		t.Fatalf("failed to wait for nodes in cache: %v", err)
 	}
 
 	// Create a pod with node affinity.
@@ -728,7 +732,10 @@ func TestPodAffinityScoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tt.enableMatchLabelKeysInAffinity)
+			if !tt.enableMatchLabelKeysInAffinity {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+			}
 
 			testCtx := initTestSchedulerForScoringTests(t, interpodaffinity.Name, interpodaffinity.Name)
 			if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
@@ -739,6 +746,9 @@ func TestPodAffinityScoring(t *testing.T) {
 				if _, err := createNode(testCtx.ClientSet, n); err != nil {
 					t.Fatalf("failed to create node: %v", err)
 				}
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("failed to wait for nodes in cache: %v", err)
 			}
 
 			for _, p := range tt.existingPods {
@@ -833,6 +843,9 @@ func TestTaintTolerationScoring(t *testing.T) {
 				if _, err := createNode(testCtx.ClientSet, n); err != nil {
 					t.Fatalf("Failed to create node: %v", err)
 				}
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 			pod, err := runPausePod(testCtx.ClientSet, initPausePod(&testutils.PausePodConfig{
 				Name:        fmt.Sprintf("test-pod-%v", i),
@@ -1082,7 +1095,11 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
+			if !tt.enableNodeInclusionPolicy {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tt.enableNodeInclusionPolicy)
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tt.enableMatchLabelKeys)
 
 			testCtx := initTestSchedulerForScoringTests(t, podtopologyspread.Name, podtopologyspread.Name)
@@ -1093,6 +1110,9 @@ func TestPodTopologySpreadScoring(t *testing.T) {
 				if _, err := createNode(cs, tt.nodes[i]); err != nil {
 					t.Fatalf("Cannot create node: %v", err)
 				}
+			}
+			if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, len(tt.nodes)); err != nil {
+				t.Fatalf("Failed to wait for nodes in cache: %v", err)
 			}
 
 			// set namespace to pods
@@ -1141,9 +1161,10 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 	testCtx := initTestSchedulerForScoringTests(t, podtopologyspread.Name, podtopologyspread.Name)
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
+	nodeNum := 300
 
 	zoneForNode := make(map[string]string)
-	for i := 0; i < 300; i++ {
+	for i := 0; i < nodeNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		zone := fmt.Sprintf("zone-%d", i%3)
 		zoneForNode[nodeName] = zone
@@ -1151,6 +1172,9 @@ func TestDefaultPodTopologySpreadScoring(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Cannot create node: %v", err)
 		}
+	}
+	if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, nodeNum); err != nil {
+		t.Fatalf("Failed to wait for nodes in cache: %v", err)
 	}
 
 	serviceName := "test-service"

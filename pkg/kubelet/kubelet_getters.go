@@ -120,8 +120,9 @@ func (kl *Kubelet) ListPodsFromDisk() ([]types.UID, error) {
 // user namespaces.
 func (kl *Kubelet) HandlerSupportsUserNamespaces(rtHandler string) (bool, error) {
 	rtHandlers := kl.runtimeState.runtimeHandlers()
-	if rtHandlers == nil {
-		return false, fmt.Errorf("runtime handlers are not set")
+	if len(rtHandlers) == 0 {
+		// The slice is empty if the runtime is old and doesn't support this message.
+		return false, nil
 	}
 	for _, h := range rtHandlers {
 		if h.Name == rtHandler {
@@ -138,6 +139,20 @@ func (kl *Kubelet) GetKubeletMappings() (uint32, uint32, error) {
 
 func (kl *Kubelet) GetMaxPods() int {
 	return kl.maxPods
+}
+
+func (kl *Kubelet) GetUserNamespacesIDsPerPod() uint32 {
+	userNs := kl.kubeletConfiguration.UserNamespaces
+	if userNs == nil {
+		return config.DefaultKubeletUserNamespacesIDsPerPod
+	}
+	idsPerPod := userNs.IDsPerPod
+	if idsPerPod == nil || *idsPerPod == 0 {
+		return config.DefaultKubeletUserNamespacesIDsPerPod
+	}
+	// The value is already validated to be <= MaxUint32,
+	// so we can safely drop the upper bits.
+	return uint32(*idsPerPod)
 }
 
 // getPodDir returns the full path to the per-pod directory for the pod with
@@ -263,11 +278,6 @@ func (kl *Kubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) {
 		return kl.podManager.GetPodByUID(podUID)
 	}
 	return nil, false
-}
-
-// GetHostname Returns the hostname as the kubelet sees it.
-func (kl *Kubelet) GetHostname() string {
-	return kl.hostname
 }
 
 // getRuntime returns the current Runtime implementation in use by the kubelet.
@@ -465,4 +475,14 @@ func (kl *Kubelet) setCachedMachineInfo(info *cadvisorapiv1.MachineInfo) {
 	kl.machineInfoLock.Lock()
 	defer kl.machineInfoLock.Unlock()
 	kl.machineInfo = info
+}
+
+// getLastStableNodeAddresses returns the last observed node addresses.
+func (kl *Kubelet) getLastObservedNodeAddresses() []v1.NodeAddress {
+	node, err := kl.GetNode()
+	if err != nil || node == nil {
+		klog.V(4).InfoS("fail to obtain node from local cache", "node", kl.nodeName, "error", err)
+		return nil
+	}
+	return node.Status.Addresses
 }

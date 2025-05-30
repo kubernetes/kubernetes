@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
+	helpers "k8s.io/component-helpers/resource"
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
@@ -142,29 +143,18 @@ func podLimits(pod *corev1.Pod) corev1.ResourceList {
 
 // determineContainerReqs will return a copy of the container requests based on if resizing is feasible or not.
 func determineContainerReqs(pod *corev1.Pod, container *corev1.Container, cs *corev1.ContainerStatus) corev1.ResourceList {
-	if pod.Status.Resize == corev1.PodResizeStatusInfeasible {
-		return cs.Resources.Requests.DeepCopy()
+	if helpers.IsPodResizeInfeasible(pod) {
+		return max(cs.Resources.Requests, cs.AllocatedResources)
 	}
-	return max(container.Resources.Requests, cs.Resources.Requests)
+	return max(container.Resources.Requests, cs.Resources.Requests, cs.AllocatedResources)
 }
 
-// max returns the result of max(a, b) for each named resource and is only used if we can't
+// max returns the result of max(a, b...) for each named resource and is only used if we can't
 // accumulate into an existing resource list
-func max(a corev1.ResourceList, b corev1.ResourceList) corev1.ResourceList {
-	result := corev1.ResourceList{}
-	for key, value := range a {
-		if other, found := b[key]; found {
-			if value.Cmp(other) <= 0 {
-				result[key] = other.DeepCopy()
-				continue
-			}
-		}
-		result[key] = value.DeepCopy()
-	}
-	for key, value := range b {
-		if _, found := result[key]; !found {
-			result[key] = value.DeepCopy()
-		}
+func max(a corev1.ResourceList, b ...corev1.ResourceList) corev1.ResourceList {
+	result := a.DeepCopy()
+	for _, other := range b {
+		maxResourceList(result, other)
 	}
 	return result
 }

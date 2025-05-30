@@ -8,3 +8,5 @@ reviewers:
   - sig-scheduling
   - luxas
   - sttts
+labels:
+  - sig/scheduling

@@ -208,7 +208,7 @@ message DeploymentStatus {
   // Total number of terminating pods targeted by this deployment. Terminating pods have a non-null
   // .metadata.deletionTimestamp and have not yet reached the Failed or Succeeded .status.phase.
   //
-  // This is an alpha field. Enable DeploymentPodReplacementPolicy to be able to use this field.
+  // This is an alpha field. Enable DeploymentReplicaSetTerminatingReplicas to be able to use this field.
   // +optional
   optional int32 terminatingReplicas = 9;
 
@@ -316,6 +316,9 @@ message Scale {
 message ScaleSpec {
   // replicas is the number of observed instances of the scaled object.
   // +optional
+  // +k8s:optional
+  // +default=0
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 }
 
@@ -462,6 +465,7 @@ message StatefulSetSpec {
   // the network identity of the set. Pods get DNS/hostnames that follow the
   // pattern: pod-specific-string.serviceName.default.svc.cluster.local
   // where "pod-specific-string" is managed by the StatefulSet controller.
+  // +optional
   optional string serviceName = 5;
 
   // podManagementPolicy controls how pods are created during initial scale up,

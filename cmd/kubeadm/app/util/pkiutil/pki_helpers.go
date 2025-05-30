@@ -32,6 +32,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -127,12 +128,7 @@ func NewCSRAndKey(config *CertConfig) (*x509.CertificateRequest, crypto.Signer, 
 
 // HasServerAuth returns true if the given certificate is a ServerAuth
 func HasServerAuth(cert *x509.Certificate) bool {
-	for i := range cert.ExtKeyUsage {
-		if cert.ExtKeyUsage[i] == x509.ExtKeyUsageServerAuth {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(cert.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
 }
 
 // WriteCertAndKey stores certificate and key at the specified location
@@ -578,8 +574,11 @@ func rsaKeySizeFromAlgorithmType(keyType kubeadmapi.EncryptionAlgorithmType) int
 
 // GeneratePrivateKey is the default function for generating private keys.
 func GeneratePrivateKey(keyType kubeadmapi.EncryptionAlgorithmType) (crypto.Signer, error) {
-	if keyType == kubeadmapi.EncryptionAlgorithmECDSAP256 {
+	switch keyType {
+	case kubeadmapi.EncryptionAlgorithmECDSAP256:
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	case kubeadmapi.EncryptionAlgorithmECDSAP384:
+		return ecdsa.GenerateKey(elliptic.P384(), cryptorand.Reader)
 	}
 
 	rsaKeySize := rsaKeySizeFromAlgorithmType(keyType)

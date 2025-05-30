@@ -1,22 +1,22 @@
 {
-    "*typedefs.E01": {
-      "": [
-        "E01, no flags"
-      ]
-    },
-    "*typedefs.E02": {
-      "": [
-        "E02, ShortCircuit"
-      ]
-    },
-    "*typedefs.E03": {
-      "": [
-        "E03, ShortCircuit"
-      ]
-    },
-    "*typedefs.EMultiple": {
-      "": [
-        "EMultiple, ShortCircuit 1"
-      ]
-    }
+  "*typedefs.E01": {
+    "": [
+      "E01, no flags"
+    ]
+  },
+  "*typedefs.E02": {
+    "": [
+      "E02, ShortCircuit"
+    ]
+  },
+  "*typedefs.E03": {
+    "": [
+      "E03, ShortCircuit"
+    ]
+  },
+  "*typedefs.EMultiple": {
+    "": [
+      "EMultiple, ShortCircuit 1"
+    ]
   }
+}

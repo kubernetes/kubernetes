@@ -84,26 +84,6 @@ const filterPluginName = "filter-plugin"
 
 var lowPriority, mediumPriority, highPriority = int32(100), int32(200), int32(300)
 
-func waitForNominatedNodeNameWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
-	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, func(ctx context.Context) (bool, error) {
-		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		if len(pod.Status.NominatedNodeName) > 0 {
-			return true, nil
-		}
-		return false, err
-	}); err != nil {
-		return fmt.Errorf(".status.nominatedNodeName of Pod %v/%v did not get set: %v", pod.Namespace, pod.Name, err)
-	}
-	return nil
-}
-
-func waitForNominatedNodeName(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error {
-	return waitForNominatedNodeNameWithTimeout(ctx, cs, pod, wait.ForeverTestTimeout)
-}
-
 const tokenFilterName = "token-filter"
 
 // tokenFilter is a fake plugin that implements PreFilter and Filter.
@@ -136,7 +116,7 @@ func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, 
 	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	if !fp.EnablePreFilter || fp.Tokens > 0 {
 		return nil, nil
 	}
@@ -504,7 +484,7 @@ func TestPreemption(t *testing.T) {
 				}
 				// Also check that the preemptor pod gets the NominatedNodeName field set.
 				if len(test.preemptedPodIndexes) > 0 {
-					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+					if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 					}
 				}
@@ -906,6 +886,9 @@ func TestAsyncPreemption(t *testing.T) {
 			}
 
 			logger, _ := ktesting.NewTestContext(t)
+			testCtx.Scheduler.SchedulingQueue.Run(logger)
+			defer testCtx.Scheduler.SchedulingQueue.Close()
+
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerAsyncPreemption, true)
 
 			createdPods := []*v1.Pod{}
@@ -1086,7 +1069,7 @@ func TestNonPreemption(t *testing.T) {
 					t.Fatalf("Error while creating preemptor: %v", err)
 				}
 
-				err = waitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptorPod, 5*time.Second)
+				err = testutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptorPod, 5*time.Second)
 				// test.PreemptionPolicy == nil means we expect the preemptor to be nominated.
 				expect := test.PreemptionPolicy == nil
 				// err == nil indicates the preemptor is indeed nominated.
@@ -1168,7 +1151,7 @@ func TestDisablePreemption(t *testing.T) {
 				}
 
 				// Ensure preemptor should not be nominated.
-				if err := waitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
+				if err := testutils.WaitForNominatedNodeNameWithTimeout(testCtx.Ctx, cs, preemptor, 5*time.Second); err == nil {
 					t.Errorf("Preemptor %v should not be nominated", preemptor.Name)
 				}
 
@@ -1381,7 +1364,7 @@ func TestPreemptionStarvation(t *testing.T) {
 					t.Errorf("Error while creating the preempting pod: %v", err)
 				}
 				// Check if .status.nominatedNodeName of the preemptor pod gets set.
-				if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+				if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 					t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 				}
 				// Make sure that preemptor is scheduled after preemptions.
@@ -1481,7 +1464,7 @@ func TestPreemptionRaces(t *testing.T) {
 						}
 					}
 					// Check that the preemptor pod gets nominated node name.
-					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+					if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf(".status.nominatedNodeName was not set for pod %v/%v: %v", preemptor.Namespace, preemptor.Name, err)
 					}
 					// Make sure that preemptor is scheduled after preemptions.
@@ -1543,14 +1526,16 @@ func newAlwaysFail(_ context.Context, _ runtime.Object, _ framework.Handle) (fra
 // properly in different scenarios.
 func TestNominatedNodeCleanUp(t *testing.T) {
 	tests := []struct {
-		name         string
+		name string
+		// Initial nodes to simulate special conditions.
+		initNodes    []*v1.Node
 		nodeCapacity map[v1.ResourceName]string
 		// A slice of pods to be created in batch.
 		podsToCreate [][]*v1.Pod
 		// Each postCheck function is run after each batch of pods' creation.
 		postChecks []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error
 		// Delete the fake node or not. Optional.
-		deleteNode bool
+		deleteFakeNode bool
 		// Pods to be deleted. Optional.
 		podNamesToDelete []string
 
@@ -1577,8 +1562,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
-				waitForNominatedNodeName,
-				waitForNominatedNodeName,
+				testutils.WaitForNominatedNodeName,
+				testutils.WaitForNominatedNodeName,
 			},
 		},
 		{
@@ -1597,7 +1582,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
-				waitForNominatedNodeName,
+				testutils.WaitForNominatedNodeName,
 				testutils.WaitForPodToSchedule,
 			},
 			podNamesToDelete: []string{"low"},
@@ -1615,10 +1600,41 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
-				waitForNominatedNodeName,
+				testutils.WaitForNominatedNodeName,
 			},
-			// Delete the node to simulate an ErrNoNodesAvailable error.
-			deleteNode:       true,
+			// Delete the fake node to simulate an ErrNoNodesAvailable error.
+			deleteFakeNode:   true,
+			podNamesToDelete: []string{"low"},
+		},
+		{
+			name: "mid-priority pod preempts low-priority pod at the beginning, but could not find candidates after the nominated node is deleted",
+			// Create a taint node to simulate the `UnschedulableAndUnresolvable` condition in `findCandidates` during preemption.
+			initNodes: []*v1.Node{
+				st.MakeNode().Name("taint-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).
+					Taints([]v1.Taint{
+						{
+							Key:    "taint-node",
+							Value:  "true",
+							Effect: v1.TaintEffectNoSchedule,
+						},
+					}).
+					Obj(),
+			},
+			nodeCapacity: map[v1.ResourceName]string{v1.ResourceCPU: "1"},
+			podsToCreate: [][]*v1.Pod{
+				{
+					st.MakePod().Name("low").Priority(lowPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+				{
+					st.MakePod().Name("medium").Priority(mediumPriority).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+				},
+			},
+			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
+				testutils.WaitForPodToSchedule,
+				testutils.WaitForNominatedNodeName,
+			},
+			// Delete the fake node to trigger the `UnschedulableAndUnresolvable` condition in `findCandidates`.
+			deleteFakeNode:   true,
 			podNamesToDelete: []string{"low"},
 		},
 		{
@@ -1634,7 +1650,7 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 			},
 			postChecks: []func(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error{
 				testutils.WaitForPodToSchedule,
-				waitForNominatedNodeName,
+				testutils.WaitForNominatedNodeName,
 			},
 			podNamesToDelete: []string{fmt.Sprintf("low-%v", doNotFailMe)},
 			customPlugins: &configv1.Plugins{
@@ -1665,6 +1681,12 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 				)
 
 				cs, ns := testCtx.ClientSet, testCtx.NS.Name
+				for _, node := range tt.initNodes {
+					if _, err := createNode(cs, node); err != nil {
+						t.Fatalf("Error creating initial node %v: %v", node.Name, err)
+					}
+				}
+
 				// Create a node with the specified capacity.
 				nodeName := "fake-node"
 				if _, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(tt.nodeCapacity).Obj()); err != nil {
@@ -1689,8 +1711,8 @@ func TestNominatedNodeCleanUp(t *testing.T) {
 					}
 				}
 
-				// Delete the node if necessary.
-				if tt.deleteNode {
+				// Delete the fake node if necessary.
+				if tt.deleteFakeNode {
 					if err := cs.CoreV1().Nodes().Delete(testCtx.Ctx, nodeName, *metav1.NewDeleteOptions(0)); err != nil {
 						t.Fatalf("Node %v cannot be deleted: %v", nodeName, err)
 					}
@@ -1990,7 +2012,7 @@ func TestPDBInPreemption(t *testing.T) {
 				}
 				// Also check if .status.nominatedNodeName of the preemptor pod gets set.
 				if len(test.preemptedPodIndexes) > 0 {
-					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+					if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf("Test [%v]: .status.nominatedNodeName was not set for pod %v/%v: %v", test.name, preemptor.Namespace, preemptor.Name, err)
 					}
 				}
@@ -2483,7 +2505,7 @@ func TestReadWriteOncePodPreemption(t *testing.T) {
 				}
 				// Also check that the preemptor pod gets the NominatedNodeName field set.
 				if len(test.preemptedPodIndexes) > 0 {
-					if err := waitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
+					if err := testutils.WaitForNominatedNodeName(testCtx.Ctx, cs, preemptor); err != nil {
 						t.Errorf("NominatedNodeName field was not set for pod %v: %v", preemptor.Name, err)
 					}
 				}

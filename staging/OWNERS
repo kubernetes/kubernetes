@@ -3,23 +3,34 @@
 options:
   # make root approval non-recursive
   no_parent_owners: true
-approvers:
-  - dchen1107
-  - dims
-  - liggitt
-  - smarterclayton
-  - thockin
-  - wojtek-t
-reviewers:
-  - caesarxuchao
-  - dchen1107
-  - deads2k
-  - dims
-  - liggitt
-  - mikedanese
-  - smarterclayton
-  - sttts
-  - thockin
-  - wojtek-t
-emeritus_approvers:
-  - lavalamp
+filters:
+  # to use filters all entries must be under filters https://go.k8s.io/owners/#filters
+  # use .* for approvers that should have all files
+  ".*":
+    approvers:
+      - dchen1107
+      - dims
+      - liggitt
+      - smarterclayton
+      - thockin
+      - wojtek-t
+    reviewers:
+      - caesarxuchao
+      - dchen1107
+      - deads2k
+      - dims
+      - liggitt
+      - mikedanese
+      - smarterclayton
+      - sttts
+      - thockin
+      - wojtek-t
+    emeritus_approvers:
+      - lavalamp
+  # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
+  # dep-approvers
+  "go\\.(mod|sum)$":
+    approvers:
+      - dep-approvers
+    reviewers:
+      - dep-reviewers

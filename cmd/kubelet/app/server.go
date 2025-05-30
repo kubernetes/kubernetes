@@ -75,7 +75,6 @@ import (
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/connrotation"
 	"k8s.io/client-go/util/keyutil"
-	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/featuregate"
@@ -86,6 +85,8 @@ import (
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	nodeutil "k8s.io/component-helpers/node/util"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -265,6 +266,13 @@ is checked every 20 seconds (also configurable with a flag).`,
 			kubeletDeps, err := UnsecuredDependencies(kubeletServer, utilfeature.DefaultFeatureGate)
 			if err != nil {
 				return fmt.Errorf("failed to construct kubelet dependencies: %w", err)
+			}
+
+			if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+				if cleanFlagSet != nil {
+					namedFlagSet := map[string]*pflag.FlagSet{server.ComponentKubelet: cleanFlagSet}
+					kubeletDeps.Flagz = flagz.NamedFlagSetsReader{FlagSets: cliflag.NamedFlagSets{FlagSets: namedFlagSet}}
+				}
 			}
 
 			if err := checkPermissions(); err != nil {
@@ -496,7 +504,6 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 	return &kubelet.Dependencies{
 		Auth:                nil, // default does not enforce auth[nz]
 		CAdvisorInterface:   nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
-		Cloud:               nil, // cloud provider might start background processes
 		ContainerManager:    nil,
 		KubeClient:          nil,
 		HeartbeatClient:     nil,
@@ -652,22 +659,11 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		}
 	}
 
-	if kubeDeps.Cloud == nil {
-		if !cloudprovider.IsExternal(s.CloudProvider) && len(s.CloudProvider) != 0 {
-			// internal cloud provider loops are disabled
-			cloudprovider.DisableWarningForProvider(s.CloudProvider)
-			return cloudprovider.ErrorForDisabledProvider(s.CloudProvider)
-		}
-	}
-
 	hostName, err := nodeutil.GetHostname(s.HostnameOverride)
 	if err != nil {
 		return err
 	}
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostName)
-	if err != nil {
-		return err
-	}
+	nodeName := types.NodeName(hostName)
 
 	// if in standalone mode, indicate as much by setting all clients to nil
 	switch {
@@ -817,14 +813,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			return fmt.Errorf("--qos-reserved value failed to parse: %w", err)
 		}
 
-		var cpuManagerPolicyOptions map[string]string
-		if utilfeature.DefaultFeatureGate.Enabled(features.CPUManagerPolicyOptions) {
-			cpuManagerPolicyOptions = s.CPUManagerPolicyOptions
-		} else if s.CPUManagerPolicyOptions != nil {
-			return fmt.Errorf("CPU Manager policy options %v require feature gates %q, %q enabled",
-				s.CPUManagerPolicyOptions, features.CPUManager, features.CPUManagerPolicyOptions)
-		}
-
 		var topologyManagerPolicyOptions map[string]string
 		if utilfeature.DefaultFeatureGate.Enabled(features.TopologyManagerPolicyOptions) {
 			topologyManagerPolicyOptions = s.TopologyManagerPolicyOptions
@@ -833,7 +821,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				s.TopologyManagerPolicyOptions, features.TopologyManagerPolicyOptions)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.NodeSwap) {
-			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == kubelettypes.LimitedSwap {
+			if !kubeletutil.IsCgroup2UnifiedMode() && s.MemorySwap.SwapBehavior == string(kubelettypes.LimitedSwap) {
 				// This feature is not supported for cgroupv1 so we are failing early.
 				return fmt.Errorf("swap feature is enabled and LimitedSwap but it is only supported with cgroupv2")
 			}
@@ -868,7 +856,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				},
 				QOSReserved:                  *experimentalQOSReserved,
 				CPUManagerPolicy:             s.CPUManagerPolicy,
-				CPUManagerPolicyOptions:      cpuManagerPolicyOptions,
+				CPUManagerPolicyOptions:      s.CPUManagerPolicyOptions,
 				CPUManagerReconcilePeriod:    s.CPUManagerReconcilePeriod.Duration,
 				MemoryManagerPolicy:          s.MemoryManagerPolicy,
 				MemoryManagerReservedMemory:  s.ReservedMemory,
@@ -1103,28 +1091,6 @@ func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclien
 	clientConfig.Burst = int(s.KubeAPIBurst)
 }
 
-// getNodeName returns the node name according to the cloud provider
-// if cloud provider is specified. Otherwise, returns the hostname of the node.
-func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName, error) {
-	if cloud == nil {
-		return types.NodeName(hostname), nil
-	}
-
-	instances, ok := cloud.Instances()
-	if !ok {
-		return "", fmt.Errorf("failed to get instances from cloud provider")
-	}
-
-	nodeName, err := instances.CurrentNodeName(context.TODO(), hostname)
-	if err != nil {
-		return "", fmt.Errorf("error fetching current node name from cloud provider: %w", err)
-	}
-
-	klog.V(2).InfoS("Cloud provider determined current node", "nodeName", klog.KRef("", string(nodeName)))
-
-	return nodeName, nil
-}
-
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
 func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletConfiguration) (*server.TLSOptions, error) {
@@ -1235,12 +1201,7 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 	if err != nil {
 		return err
 	}
-	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
-	if err != nil {
-		return err
-	}
-	hostnameOverridden := len(kubeServer.HostnameOverride) > 0
+	nodeName := types.NodeName(hostname)
 	// Setup event recorder if required.
 	makeEventRecorder(ctx, kubeDeps, nodeName)
 
@@ -1266,7 +1227,6 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 	k, err := createAndInitKubelet(kubeServer,
 		kubeDeps,
 		hostname,
-		hostnameOverridden,
 		nodeName,
 		nodeIPs)
 	if err != nil {
@@ -1307,7 +1267,6 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 func createAndInitKubelet(kubeServer *options.KubeletServer,
 	kubeDeps *kubelet.Dependencies,
 	hostname string,
-	hostnameOverridden bool,
 	nodeName types.NodeName,
 	nodeIPs []net.IP) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
@@ -1317,7 +1276,6 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
 		hostname,
-		hostnameOverridden,
 		nodeName,
 		nodeIPs,
 		kubeServer.ProviderID,
@@ -1325,7 +1283,7 @@ func createAndInitKubelet(kubeServer *options.KubeletServer,
 		kubeServer.CertDirectory,
 		kubeServer.RootDirectory,
 		kubeServer.PodLogsDir,
-		kubeServer.ImageCredentialProviderConfigFile,
+		kubeServer.ImageCredentialProviderConfigPath,
 		kubeServer.ImageCredentialProviderBinDir,
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,

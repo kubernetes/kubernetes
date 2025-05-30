@@ -66,6 +66,7 @@ import (
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
+	"k8s.io/component-base/zpages/flagz"
 	"k8s.io/component-base/zpages/statusz"
 	genericcontrollermanager "k8s.io/controller-manager/app"
 	"k8s.io/controller-manager/controller"
@@ -134,7 +135,8 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
+			ctx := context.Background()
+			c, err := s.Config(ctx, KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
 			if err != nil {
 				return err
 			}
@@ -142,7 +144,9 @@ controller, and serviceaccounts controller.`,
 			// add feature enablement metrics
 			fg := s.ComponentGlobalsRegistry.FeatureGateFor(basecompatibility.DefaultKubeComponent)
 			fg.(featuregate.MutableFeatureGate).AddMetrics()
-			return Run(context.Background(), c.Complete())
+			// add component version metrics
+			s.ComponentGlobalsRegistry.AddMetrics()
+			return Run(ctx, c.Complete())
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -156,6 +160,7 @@ controller, and serviceaccounts controller.`,
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault(), ControllerAliases())
+	s.ParsedFlags = &namedFlagSets
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name(), logs.SkipLoggingConfigurationFlags())
 	for _, f := range namedFlagSets.FlagSets {
@@ -213,6 +218,11 @@ func Run(ctx context.Context, c *config.CompletedConfig) error {
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 		slis.SLIMetricsWithReset{}.Install(unsecuredMux)
+		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+			if c.Flagz != nil {
+				flagz.Install(unsecuredMux, kubeControllerManager, c.Flagz)
+			}
+		}
 
 		if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
 			statusz.Install(unsecuredMux, kubeControllerManager, statusz.NewRegistry(c.ComponentGlobalsRegistry.EffectiveVersionFor(basecompatibility.DefaultKubeComponent)))
@@ -564,7 +574,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newServiceLBControllerDescriptor())          // cloud provider controller
 	register(newNodeRouteControllerDescriptor())          // cloud provider controller
 	register(newCloudNodeLifecycleControllerDescriptor()) // cloud provider controller
-	// TODO: persistent volume controllers into the IncludeCloudLoops only set as a cloud provider controller.
 
 	register(newPersistentVolumeBinderControllerDescriptor())
 	register(newPersistentVolumeAttachDetachControllerDescriptor())
@@ -581,6 +590,7 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	// feature gated
 	register(newStorageVersionGarbageCollectorControllerDescriptor())
 	register(newResourceClaimControllerDescriptor())
+	register(newDeviceTaintEvictionControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())
 	register(newTaintEvictionControllerDescriptor())

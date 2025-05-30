@@ -151,6 +151,10 @@ func (p *Plugin) HealthClient() drahealthv1alpha1.NodeHealthClient {
 	return p.healthClient
 }
 
+func (p *Plugin) Name() string {
+	return p.name
+}
+
 func (p *Plugin) NodePrepareResources(
 	ctx context.Context,
 	req *drapbv1beta1.NodePrepareResourcesRequest,

@@ -48,7 +48,6 @@ type fakeClockWaiter struct {
 	stepInterval  time.Duration
 	skipIfBlocked bool
 	destChan      chan time.Time
-	fired         bool
 	afterFunc     func()
 }
 
@@ -198,12 +197,10 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 			if w.skipIfBlocked {
 				select {
 				case w.destChan <- t:
-					w.fired = true
 				default:
 				}
 			} else {
 				w.destChan <- t
-				w.fired = true
 			}
 
 			if w.afterFunc != nil {
@@ -224,12 +221,24 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 	f.waiters = newWaiters
 }
 
-// HasWaiters returns true if After or AfterFunc has been called on f but not yet satisfied (so you can
-// write race-free tests).
+// HasWaiters returns true if Waiters() returns non-0 (so you can write race-free tests).
 func (f *FakeClock) HasWaiters() bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	return len(f.waiters) > 0
+}
+
+// Waiters returns the number of "waiters" on the clock (so you can write race-free
+// tests). A waiter exists for:
+//   - every call to After that has not yet signaled its channel.
+//   - every call to AfterFunc that has not yet called its callback.
+//   - every timer created with NewTimer which is currently ticking.
+//   - every ticker created with NewTicker which is currently ticking.
+//   - every ticker created with Tick.
+func (f *FakeClock) Waiters() int {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	return len(f.waiters)
 }
 
 // Sleep is akin to time.Sleep
@@ -305,44 +314,48 @@ func (f *fakeTimer) C() <-chan time.Time {
 	return f.waiter.destChan
 }
 
-// Stop stops the timer and returns true if the timer has not yet fired, or false otherwise.
+// Stop prevents the Timer from firing. It returns true if the call stops the
+// timer, false if the timer has already expired or been stopped.
 func (f *fakeTimer) Stop() bool {
 	f.fakeClock.lock.Lock()
 	defer f.fakeClock.lock.Unlock()
 
+	active := false
 	newWaiters := make([]*fakeClockWaiter, 0, len(f.fakeClock.waiters))
 	for i := range f.fakeClock.waiters {
 		w := f.fakeClock.waiters[i]
 		if w != &f.waiter {
 			newWaiters = append(newWaiters, w)
+			continue
 		}
+		// If timer is found, it has not been fired yet.
+		active = true
 	}
 
 	f.fakeClock.waiters = newWaiters
 
-	return !f.waiter.fired
+	return active
 }
 
-// Reset resets the timer to the fake clock's "now" + d. It returns true if the timer has not yet
-// fired, or false otherwise.
+// Reset changes the timer to expire after duration d. It returns true if the
+// timer had been active, false if the timer had expired or been stopped.
 func (f *fakeTimer) Reset(d time.Duration) bool {
 	f.fakeClock.lock.Lock()
 	defer f.fakeClock.lock.Unlock()
 
-	active := !f.waiter.fired
+	active := false
 
-	f.waiter.fired = false
 	f.waiter.targetTime = f.fakeClock.time.Add(d)
 
-	var isWaiting bool
 	for i := range f.fakeClock.waiters {
 		w := f.fakeClock.waiters[i]
 		if w == &f.waiter {
-			isWaiting = true
+			// If timer is found, it has not been fired yet.
+			active = true
 			break
 		}
 	}
-	if !isWaiting {
+	if !active {
 		f.fakeClock.waiters = append(f.fakeClock.waiters, &f.waiter)
 	}
 

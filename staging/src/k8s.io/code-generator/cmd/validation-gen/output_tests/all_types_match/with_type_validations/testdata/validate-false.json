@@ -1,15 +1,15 @@
 {
-    "*withtypevalidations.E1": {
-      "": [
-        "type E1"
-      ]
-    },
-    "*withtypevalidations.T1": {
-      "": [
-        "type T1"
-      ],
-      "s": [
-        "field T1.S"
-      ]
-    }
+  "*withtypevalidations.E1": {
+    "": [
+      "type E1"
+    ]
+  },
+  "*withtypevalidations.T1": {
+    "": [
+      "type T1"
+    ],
+    "s": [
+      "field T1.S"
+    ]
   }
+}

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/cpuset"
 
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -446,10 +447,10 @@ func runTopologyManagerPolicySuiteTests(ctx context.Context, f *framework.Framew
 	}
 
 	ginkgo.By("running a non-Gu pod")
-	runNonGuPodTest(ctx, f, cpuCap)
+	runNonGuPodTest(ctx, f, cpuCap, cpuset.New())
 
 	ginkgo.By("running a Gu pod")
-	runGuPodTest(ctx, f, 1)
+	runGuPodTest(ctx, f, 1, cpuset.New())
 
 	// Skip rest of the tests if CPU allocatable < 3.
 	if cpuAlloc < 3 {
@@ -679,7 +680,7 @@ func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *
 }
 
 func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
-	threadsPerCore := getSMTLevel()
+	smtLevel := smtLevelFromSysFS()
 	sd := setupSRIOVConfigOrFail(ctx, f, configMap)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
@@ -713,7 +714,7 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 	}
 	runTopologyManagerPositiveTest(ctx, f, 2, ctnAttrs, initCtnAttrs, envInfo)
 
-	numCores := threadsPerCore * coreCount
+	numCores := smtLevel * coreCount
 	coresReq := fmt.Sprintf("%dm", numCores*1000)
 	ginkgo.By(fmt.Sprintf("Admit a guaranteed pod requesting %d CPU cores, i.e., more than can be provided at every single NUMA node. Therefore, the request should be rejected.", numCores+1))
 	ctnAttrs = []tmCtnAttribute{
@@ -867,7 +868,7 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
-	threadsPerCore := getSMTLevel()
+	smtLevel := smtLevelFromSysFS()
 
 	waitForSRIOVResources(ctx, f, sd)
 
@@ -910,7 +911,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 	if reservedSystemCPUs != "" {
 		// to avoid false negatives, we have put reserved CPUs in such a way there is at least a NUMA node
 		// with 1+ SRIOV devices and not reserved CPUs.
-		numCores := threadsPerCore * coreCount
+		numCores := smtLevel * coreCount
 		allCoresReq := fmt.Sprintf("%dm", numCores*1000)
 		ginkgo.By(fmt.Sprintf("Successfully admit an entire socket (%d cores), 1 %s device", numCores, sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{
@@ -1081,7 +1082,7 @@ func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework
 	// this is the only policy that can guarantee reliable rejects
 	if policy == topologymanager.PolicySingleNumaNode {
 		// overflow NUMA node capacity: cores
-		numCores := 1 + (threadsPerCore * coreCount)
+		numCores := 1 + (smtLevel * coreCount)
 		excessCoresReq := fmt.Sprintf("%dm", numCores*1000)
 		ginkgo.By(fmt.Sprintf("Trying to admit a guaranteed pods, with %d cores, 1 %s device - and it should be rejected", numCores, sd.resourceName))
 		ctnAttrs = []tmCtnAttribute{

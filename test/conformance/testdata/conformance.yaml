@@ -511,7 +511,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, after owned pods
   codename: '[sig-api-machinery] Garbage collector should keep the rc around until
-    all its pods are deleted if the deleteOptions says so [Conformance]'
+    all its pods are deleted if the deleteOptions says so [Serial] [Conformance]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Foreground. Deleting the Replication
@@ -528,7 +528,8 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, multiple owners
   codename: '[sig-api-machinery] Garbage collector should not delete dependents that
-    have both valid owner and owner that''s waiting for dependents to be deleted [Conformance]'
+    have both valid owner and owner that''s waiting for dependents to be deleted [Serial]
+    [Conformance]'
   description: Create a replication controller RC1, with maximum allocatable Pods
     between 10 and 100 replicas. Create second replication controller RC2 and set
     RC2 as owner for half of those replicas. Once RC1 is created and the all Pods
@@ -549,7 +550,7 @@
   file: test/e2e/apimachinery/garbage_collector.go
 - testname: Garbage Collector, delete replication controller, propagation policy orphan
   codename: '[sig-api-machinery] Garbage collector should orphan pods created by rc
-    if delete options say so [Conformance]'
+    if delete options say so [Serial] [Conformance]'
   description: Create a replication controller with maximum allocatable Pods between
     10 and 100 replicas. Once RC is created and the all Pods are created, delete RC
     with deleteOptions.PropagationPolicy set to Orphan. Deleting the Replication Controller
@@ -1152,6 +1153,32 @@
   description: Create an indexed job with backoffLimitPerIndex and maxFailedIndexes.
     Verify the job execution is terminated as soon as the number of failed indexes
     exceeds maxFailedIndexes.
+  release: v1.33
+  file: test/e2e/apps/job.go
+- testname: Ensure that job with successPolicy succeeded when all indexes succeeded
+  codename: '[sig-apps] Job with successPolicy should succeeded when all indexes succeeded
+    [Conformance]'
+  description: Create an indexed job with successPolicy. Verify that job got SuccessCriteriaMet
+    with SuccessPolicy reason and Complete condition once all indexes succeeded.
+  release: v1.33
+  file: test/e2e/apps/job.go
+- testname: Ensure that job with successPolicy succeededCount rule succeeded even
+    when some indexes remain pending
+  codename: '[sig-apps] Job with successPolicy succeededCount rule should succeeded
+    even when some indexes remain pending [Conformance]'
+  description: Create an indexed job with successPolicy succeededCount rule. Verify
+    that the job got the SuccessCriteriaMet with SuccessPolicy reason condition and
+    Complete condition when the job met successPolicy even if some indexed remain
+    pending.
+  release: v1.33
+  file: test/e2e/apps/job.go
+- testname: Ensure that job with successPolicy succeededIndexes rule succeeded even
+    when some indexes remain pending
+  codename: '[sig-apps] Job with successPolicy succeededIndexes rule should succeeded
+    even when some indexes remain pending [Conformance]'
+  description: Create an indexed job with successPolicy succeededIndexes rule. Verify
+    that the job got SuccessCriteriaMet with SuccessPolicy reason condition and Complete
+    condition when the job met successPolicy even if some indexed remain pending.
   release: v1.33
   file: test/e2e/apps/job.go
 - testname: ReplicaSet, is created, Replaced and Patched
@@ -1834,6 +1861,27 @@
     and 50s for the 90th percentile.
   release: v1.9
   file: test/e2e/network/service_latency.go
+- testname: IPAddress API
+  codename: '[sig-network] ServiceCIDR and IPAddress API should support IPAddress
+    API operations [Conformance]'
+  description: ' The networking.k8s.io API group MUST exist in the /apis discovery
+    document. The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. The ipaddresses resources MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. The ipaddresses resource must support create, get, list, watch,
+    update, patch, delete, and deletecollection.'
+  release: v1.34
+  file: test/e2e/network/service_cidrs.go
+- testname: ServiceCIDR API
+  codename: '[sig-network] ServiceCIDR and IPAddress API should support ServiceCIDR
+    API operations [Conformance]'
+  description: ' The networking.k8s.io API group MUST exist in the /apis discovery
+    document. The networking.k8s.io/v1 API group/version MUST exist in the /apis/networking.k8s.io
+    discovery document. The servicecidrs resources MUST exist in the /apis/networking.k8s.io/v1
+    discovery document. The servicecidrs resource must support create, get, list,
+    watch, update, patch, delete, and deletecollection. The servicecidrs/status resource
+    must support update and patch'
+  release: v1.34
+  file: test/e2e/network/service_cidrs.go
 - testname: Service, change type, ClusterIP to ExternalName
   codename: '[sig-network] Services should be able to change the type from ClusterIP
     to ExternalName [Conformance]'

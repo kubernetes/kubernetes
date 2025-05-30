@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
@@ -175,29 +176,46 @@ func TestEndpointHandlers(t *testing.T) {
 					req.Header.Set(k, v)
 				}
 			}
-			r, err := client.Do(req)
-			if err != nil {
-				t.Fatalf("failed to GET %s from component: %v", tt.path, err)
-			}
 
-			body, err := io.ReadAll(r.Body)
+			err = retry.OnError(
+				retry.DefaultBackoff,
+				func(err error) bool {
+					// the endpoint /readyz/sched-handler-sync needs some time to finish
+					// the initialization, so we need to retry
+					return !tt.useBrokenConfig &&
+						(tt.path == "/readyz" || tt.path == "/readyz/sched-handler-sync") &&
+						strings.Contains(err.Error(), "handlers are not fully synchronized")
+				},
+				func() error {
+					r, err := client.Do(req)
+					if err != nil {
+						return fmt.Errorf("failed to GET %s from component: %w", tt.path, err)
+					}
+
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						return fmt.Errorf("failed to read response body: %w", err)
+					}
+					if err = r.Body.Close(); err != nil {
+						return fmt.Errorf("failed to close response body: %w", err)
+					}
+					if got, expected := r.StatusCode, tt.wantResponseCode; got != expected {
+						return fmt.Errorf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
+					}
+					if tt.wantResponseBodyRegx != "" {
+						matched, err := regexp.MatchString(tt.wantResponseBodyRegx, string(body))
+						if err != nil {
+							return fmt.Errorf("failed to compile regex: %w", err)
+						}
+						if !matched {
+							return fmt.Errorf("response body does not match regex.\nExpected:\n%s\n\nGot:\n%s", tt.wantResponseBodyRegx, string(body))
+						}
+					}
+					return nil
+				},
+			)
 			if err != nil {
-				t.Fatalf("failed to read response body: %v", err)
-			}
-			if err = r.Body.Close(); err != nil {
-				t.Fatalf("failed to close response body: %v", err)
-			}
-			if got, expected := r.StatusCode, tt.wantResponseCode; got != expected {
-				t.Fatalf("expected http %d at %s of component, got: %d %q", expected, tt.path, got, string(body))
-			}
-			if tt.wantResponseBodyRegx != "" {
-				matched, err := regexp.MatchString(tt.wantResponseBodyRegx, string(body))
-				if err != nil {
-					t.Fatalf("failed to compile regex: %v", err)
-				}
-				if !matched {
-					t.Fatalf("response body does not match regex.\nExpected:\n%s\n\nGot:\n%s", tt.wantResponseBodyRegx, string(body))
-				}
+				t.Fatal(err)
 			}
 		})
 	}

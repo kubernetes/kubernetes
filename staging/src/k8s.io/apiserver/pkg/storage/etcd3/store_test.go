@@ -20,7 +20,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -61,7 +61,7 @@ func init() {
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
 
-	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, io.Discard, os.Stderr))
 }
 
 func newPod() runtime.Object {
@@ -172,7 +172,7 @@ func TestListPaging(t *testing.T) {
 
 func TestGetListNonRecursive(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestGetListNonRecursive(ctx, t, compactStorage(client.Client), store)
+	storagetesting.RunTestGetListNonRecursive(ctx, t, increaseRV(client.Client), store)
 }
 
 func TestGetListRecursivePrefix(t *testing.T) {
@@ -249,12 +249,12 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, compactStorage(client.Client), false)
+	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false)
 }
 
 func TestConsistentList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestConsistentList(ctx, t, store, compactStorage(client.Client), false, true)
+	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true, false)
 }
 
 func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
@@ -313,15 +313,23 @@ func TestNamespaceScopedList(t *testing.T) {
 	storagetesting.RunTestNamespaceScopedList(ctx, t, store)
 }
 
-func compactStorage(etcdClient *clientv3.Client) storagetesting.Compaction {
+func compactStorage(client *clientv3.Client) storagetesting.Compaction {
 	return func(ctx context.Context, t *testing.T, resourceVersion string) {
 		versioner := storage.APIObjectVersioner{}
 		rv, err := versioner.ParseResourceVersion(resourceVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err = compact(ctx, etcdClient, 0, int64(rv)); err != nil {
+		if _, err = client.Compact(ctx, int64(rv)); err != nil {
 			t.Fatalf("Unable to compact, %v", err)
+		}
+	}
+}
+
+func increaseRV(client *clientv3.Client) storagetesting.IncreaseRVFunc {
+	return func(ctx context.Context, t *testing.T) {
+		if _, err := client.KV.Put(ctx, "increaseRV", "ok"); err != nil {
+			t.Fatalf("Could not update increaseRV: %v", err)
 		}
 	}
 }
@@ -686,129 +694,6 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
 	_, countErr := store.Count(invalidKey)
 	expectInvalidKey("Count", countErr)
-}
-
-func TestResolveGetListRev(t *testing.T) {
-	_, store, _ := testSetup(t)
-	testCases := []struct {
-		name          string
-		continueKey   string
-		continueRV    int64
-		rv            string
-		rvMatch       metav1.ResourceVersionMatch
-		recursive     bool
-		expectedError string
-		limit         int64
-		expectedRev   int64
-	}{
-		{
-			name:          "specifying resource versionwhen using continue",
-			continueKey:   "continue",
-			continueRV:    100,
-			rv:            "200",
-			expectedError: "specifying resource version is not allowed when using continue",
-		},
-		{
-			name:          "invalid resource version",
-			rv:            "invalid",
-			expectedError: "invalid resource version",
-		},
-		{
-			name:          "unknown ResourceVersionMatch value",
-			rv:            "200",
-			rvMatch:       "unknown",
-			expectedError: "unknown ResourceVersionMatch value",
-		},
-		{
-			name:        "use continueRV",
-			continueKey: "continue",
-			continueRV:  100,
-			rv:          "0",
-			expectedRev: 100,
-		},
-		{
-			name:        "use continueRV with empty rv",
-			continueKey: "continue",
-			continueRV:  100,
-			rv:          "",
-			expectedRev: 100,
-		},
-		{
-			name:        "continueRV = 0",
-			continueKey: "continue",
-			continueRV:  0,
-			rv:          "",
-			expectedRev: 0,
-		},
-		{
-			name:        "continueRV < 0",
-			continueKey: "continue",
-			continueRV:  -1,
-			rv:          "",
-			expectedRev: 0,
-		},
-		{
-			name:        "default",
-			expectedRev: 0,
-		},
-		{
-			name:        "rev resolve to 0 if ResourceVersionMatchNotOlderThan",
-			rv:          "200",
-			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
-			expectedRev: 0,
-		},
-		{
-			name:        "specified rev if ResourceVersionMatchExact",
-			rv:          "200",
-			rvMatch:     metav1.ResourceVersionMatchExact,
-			expectedRev: 200,
-		},
-		{
-			name:        "rev resolve to 0 if not recursive",
-			rv:          "200",
-			limit:       1,
-			expectedRev: 0,
-		},
-		{
-			name:        "rev resolve to 0 if limit unspecified",
-			rv:          "200",
-			recursive:   true,
-			expectedRev: 0,
-		},
-		{
-			name:        "specified rev if recursive with limit",
-			rv:          "200",
-			recursive:   true,
-			limit:       1,
-			expectedRev: 200,
-		},
-	}
-	for _, tt := range testCases {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			storageOpts := storage.ListOptions{
-				ResourceVersion:      tt.rv,
-				ResourceVersionMatch: tt.rvMatch,
-				Predicate: storage.SelectionPredicate{
-					Limit: tt.limit,
-				},
-				Recursive: tt.recursive,
-			}
-			rev, err := store.resolveGetListRev(tt.continueKey, tt.continueRV, storageOpts)
-			if len(tt.expectedError) > 0 {
-				if err == nil || !strings.Contains(err.Error(), tt.expectedError) {
-					t.Fatalf("expected error: %s, but got: %v", tt.expectedError, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("resolveRevForGetList failed: %v", err)
-			}
-			if rev != tt.expectedRev {
-				t.Errorf("%s: expecting rev = %d, but get %d", tt.name, tt.expectedRev, rev)
-			}
-		})
-	}
 }
 
 func BenchmarkStore_GetList(b *testing.B) {

@@ -150,6 +150,7 @@ aliases:
     - mauriciopoppe
     - msau42
     - saikat-royc
+    - sunnylovestiramisu
     - xing-yang
   # emeritus:
   # - chrishenzie
@@ -158,13 +159,14 @@ aliases:
   # - rootfs
   # - verult
   sig-scheduling-maintainers:
-    - alculquicondor
     - ahg-g
+    - dom4ha
     - Huang-Wei
     - kerthcet
     - macsko
     - sanposhiho
   # emeritus:
+  # - alculquicondor
   # - damemi
   # - bsalamat
   # - k82cn
@@ -265,28 +267,24 @@ aliases:
     - ffromani
     - tallclair
   sig-network-approvers:
-    - andrewsykim
     - aojea
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
+  # emeritus:
+  # - andrewsykim
+  # - caseydavenport
+  # - dcbw
+  # - freehan
+  # - khenidak
+  # - mrhohn
   sig-network-reviewers:
-    - andrewsykim
+    - adrianmoisey
     - aojea
     - aroradaman
     - bowei
-    - caseydavenport
     - danwinship
-    - dcbw
-    - freehan
-    - khenidak
-    - mrhohn
     - robscott
     - thockin
     - tnqn
@@ -310,7 +308,9 @@ aliases:
 
   sig-autoscaling-maintainers:
     - gjtempleton
-    - MaciekPytel
+    - jackfrancis
+    - raywainman
+    - towca
   sig-instrumentation-approvers:
     - logicalhan
     - dashpole
@@ -375,8 +375,7 @@ aliases:
     - smarterclayton
     - thockin
   sig-network-api-reviewers:
-    - andrewsykim
-    - caseydavenport
+    - aojea
     - danwinship
     - thockin
   sig-scheduling-api-approvers:
@@ -444,6 +443,7 @@ aliases:
   sig-cloud-provider-api-reviewers:
     - elmiko
     - cheftako
+    - joelspeed
     - dims
   # sig-cluster-lifecycle-api-reviewers:
   #   -
@@ -455,6 +455,7 @@ aliases:
     - palnabarun
     - kaslin
     - MadhavJivrajani
+    - mfahlandt
     - Priyankasaggu11929
   sig-docs-approvers:
     - jimangel
@@ -469,17 +470,22 @@ aliases:
   sig-scalability-approvers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
   sig-scalability-reviewers:
     - marseel
     - mborsz
+    - mengqiy
+    - shyamjvs
     - wojtek-t
   # emeritus:
   # - mm4tt
-  sig-scheduling-api-reviewers:
-    - alculquicondor
+  # sig-scheduling-api-reviewers:
+  # emeritus:
+  # - alculquicondor
   sig-storage-api-reviewers:
     - deads2k
     - saad-ali

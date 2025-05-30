@@ -26,6 +26,7 @@ import (
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/v2/types"
+	"k8s.io/kube-openapi/pkg/util"
 	utilproto "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
@@ -62,7 +63,7 @@ func newTypeModels(openAPISchemaFilePath string, pkgTypes map[string]*types.Pack
 			tags := genclientTags(t)
 			hasApply := tags.HasVerb("apply") || tags.HasVerb("applyStatus")
 			if tags.GenerateClient && hasApply {
-				openAPIType := friendlyName(typeName(t))
+				openAPIType := util.ToRESTFriendlyName(typeName(t))
 				gvk := gv.WithKind(clientgentypes.Kind(t.Name.Name))
 				rootDefs[openAPIType] = openAPISchema.Definitions[openAPIType]
 				gvkToOpenAPIType[gvk] = openAPIType

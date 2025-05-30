@@ -53,7 +53,7 @@ const (
 
 // In injects a matchExpression (with an operator IN) as a selectorTerm
 // to the inner nodeSelector.
-// NOTE: appended selecterTerms are ORed.
+// NOTE: appended selectorTerms are ORed.
 func (s *NodeSelectorWrapper) In(key string, vals []string, t NodeSelectorType) *NodeSelectorWrapper {
 	expression := v1.NodeSelectorRequirement{
 		Key:      key,
@@ -340,6 +340,14 @@ func (p *PodWrapper) Resources(resources v1.ResourceRequirements) *PodWrapper {
 	return p
 }
 
+func (p *PodWrapper) NodeAffinity(nodeAffinity *v1.NodeAffinity) *PodWrapper {
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	p.Spec.Affinity.NodeAffinity = nodeAffinity
+	return p
+}
+
 // OwnerReference updates the owning controller of the pod.
 func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *PodWrapper {
 	p.OwnerReferences = []metav1.OwnerReference{
@@ -409,6 +417,12 @@ func (p *PodWrapper) Node(s string) *PodWrapper {
 	return p
 }
 
+// Tolerations sets `tolerations` as the tolerations of the inner pod.
+func (p *PodWrapper) Tolerations(tolerations []v1.Toleration) *PodWrapper {
+	p.Spec.Tolerations = tolerations
+	return p
+}
+
 // NodeSelector sets `m` as the nodeSelector of the inner pod.
 func (p *PodWrapper) NodeSelector(m map[string]string) *PodWrapper {
 	p.Spec.NodeSelector = m
@@ -429,7 +443,7 @@ func (p *PodWrapper) NodeAffinityIn(key string, vals []string, t NodeSelectorTyp
 	return p
 }
 
-// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressinos and the operator NotIn)
+// NodeAffinityNotIn creates a HARD node affinity (with MatchExpressions and the operator NotIn)
 // and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
@@ -1104,6 +1118,28 @@ func (wrapper *ResourceClaimWrapper) Request(deviceClassName string) *ResourceCl
 	return wrapper
 }
 
+// RequestWithPrioritizedList adds one device request with one subrequest
+// per provided deviceClassName.
+func (wrapper *ResourceClaimWrapper) RequestWithPrioritizedList(deviceClassNames ...string) *ResourceClaimWrapper {
+	var prioritizedList []resourceapi.DeviceSubRequest
+	for i, deviceClassName := range deviceClassNames {
+		prioritizedList = append(prioritizedList, resourceapi.DeviceSubRequest{
+			Name:            fmt.Sprintf("subreq-%d", i+1),
+			AllocationMode:  resourceapi.DeviceAllocationModeExactCount,
+			Count:           1,
+			DeviceClassName: deviceClassName,
+		})
+	}
+
+	wrapper.Spec.Devices.Requests = append(wrapper.Spec.Devices.Requests,
+		resourceapi.DeviceRequest{
+			Name:           fmt.Sprintf("req-%d", len(wrapper.Spec.Devices.Requests)+1),
+			FirstAvailable: prioritizedList,
+		},
+	)
+	return wrapper
+}
+
 // Allocation sets the allocation of the inner object.
 func (wrapper *ResourceClaimWrapper) Allocation(allocation *resourceapi.AllocationResult) *ResourceClaimWrapper {
 	if !slices.Contains(wrapper.ResourceClaim.Finalizers, resourceapi.Finalizer) {
@@ -1160,9 +1196,23 @@ func (wrapper *ResourceSliceWrapper) Devices(names ...string) *ResourceSliceWrap
 	return wrapper
 }
 
-// Device sets the devices field of the inner object.
-func (wrapper *ResourceSliceWrapper) Device(name string, attrs map[resourceapi.QualifiedName]resourceapi.DeviceAttribute) *ResourceSliceWrapper {
-	wrapper.Spec.Devices = append(wrapper.Spec.Devices, resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{Attributes: attrs}})
+// Device extends the devices field of the inner object.
+// The device must have a name and may have arbitrary additional fields.
+func (wrapper *ResourceSliceWrapper) Device(name string, otherFields ...any) *ResourceSliceWrapper {
+	device := resourceapi.Device{Name: name, Basic: &resourceapi.BasicDevice{}}
+	for _, field := range otherFields {
+		switch typedField := field.(type) {
+		case map[resourceapi.QualifiedName]resourceapi.DeviceAttribute:
+			device.Basic.Attributes = typedField
+		case map[resourceapi.QualifiedName]resourceapi.DeviceCapacity:
+			device.Basic.Capacity = typedField
+		case resourceapi.DeviceTaint:
+			device.Basic.Taints = append(device.Basic.Taints, typedField)
+		default:
+			panic(fmt.Sprintf("expected a type which matches a field in BasicDevice, got %T", field))
+		}
+	}
+	wrapper.Spec.Devices = append(wrapper.Spec.Devices, device)
 	return wrapper
 }
 

@@ -21,6 +21,7 @@ package winkernel
 
 import (
 	"github.com/Microsoft/hnslib/hcn"
+
 	"k8s.io/klog/v2"
 )
 
@@ -48,6 +49,7 @@ type HcnService interface {
 	DsrSupported() error
 	// Policy functions
 	DeleteAllHnsLoadBalancerPolicy()
+	RemoteSubnetSupported() error
 }
 
 type hcnImpl struct{}
@@ -137,4 +139,8 @@ func (hcnObj hcnImpl) DeleteAllHnsLoadBalancerPolicy() {
 			klog.V(2).ErrorS(err, "Error deleting existing loadbalancer", "lb", lb)
 		}
 	}
+}
+
+func (hcnObj hcnImpl) RemoteSubnetSupported() error {
+	return hcn.RemoteSubnetSupported()
 }

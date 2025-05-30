@@ -110,6 +110,8 @@ cluster's shared state through which all other components interact.`,
 			}
 			// add feature enablement metrics
 			featureGate.(featuregate.MutableFeatureGate).AddMetrics()
+			// add component version metrics
+			s.GenericServerRunOptions.ComponentGlobalsRegistry.AddMetrics()
 			return Run(ctx, completedOptions)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {

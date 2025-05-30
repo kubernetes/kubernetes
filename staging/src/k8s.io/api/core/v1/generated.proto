@@ -1103,6 +1103,11 @@ message ContainerStatus {
   // +listType=map
   // +listMapKey=name
   repeated ResourceStatus allocatedResourcesStatus = 14;
+
+  // StopSignal reports the effective stop signal for this container
+  // +featureGate=ContainerStopSignals
+  // +optional
+  optional string stopSignal = 15;
 }
 
 // ContainerUser represents user identity information
@@ -2208,6 +2213,12 @@ message Lifecycle {
   // More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
   // +optional
   optional LifecycleHandler preStop = 2;
+
+  // StopSignal defines which signal will be sent to a container when it is being stopped.
+  // If not specified, the default is defined by the container runtime in use.
+  // StopSignal can only be set for Pods with a non-empty .spec.os.name
+  // +optional
+  optional string stopSignal = 3;
 }
 
 // LifecycleHandler defines a specific action that should be taken in a lifecycle
@@ -2872,6 +2883,13 @@ message NodeStatus {
   optional NodeFeatures features = 13;
 }
 
+// NodeSwapStatus represents swap memory information.
+message NodeSwapStatus {
+  // Total amount of swap memory in bytes.
+  // +optional
+  optional int64 capacity = 1;
+}
+
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 message NodeSystemInfo {
   // MachineID reported by the node. For unique machine identification
@@ -2907,6 +2925,9 @@ message NodeSystemInfo {
 
   // The Architecture reported by the node
   optional string architecture = 10;
+
+  // Swap Info reported by the node.
+  optional NodeSwapStatus swap = 11;
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -3625,7 +3646,6 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both matchLabelKeys and labelSelector.
   // Also, matchLabelKeys cannot be set when labelSelector isn't set.
-  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
   //
   // +listType=atomic
   // +optional
@@ -3639,7 +3659,6 @@ message PodAffinityTerm {
   // pod labels will be ignored. The default value is empty.
   // The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
   // Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-  // This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
   //
   // +listType=atomic
   // +optional
@@ -3665,8 +3684,8 @@ message PodAntiAffinity {
   // most preferred is the one with the greatest sum of weights, i.e.
   // for each node that meets all of the scheduling requirements (resource
   // request, requiredDuringScheduling anti-affinity expressions, etc.),
-  // compute a sum by iterating through the elements of this field and adding
-  // "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+  // compute a sum by iterating through the elements of this field and subtracting
+  // "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
   // node(s) with the highest sum are the most preferred.
   // +optional
   // +listType=atomic
@@ -3711,6 +3730,12 @@ message PodCondition {
   // Type is the type of the condition.
   // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-conditions
   optional string type = 1;
+
+  // If set, this represents the .metadata.generation that the pod condition was set based upon.
+  // This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 7;
 
   // Status is the status of the condition.
   // Can be True, False, Unknown.
@@ -4244,7 +4269,6 @@ message PodSpec {
   optional string nodeName = 10;
 
   // Host networking requested for this pod. Use the host's network namespace.
-  // If this option is set, the ports that will be used must be specified.
   // Default to false.
   // +k8s:conversion-gen=false
   // +optional
@@ -4497,6 +4521,12 @@ message PodSpec {
 // state of a system, especially if the node that hosts the pod cannot contact the control
 // plane.
 message PodStatus {
+  // If set, this represents the .metadata.generation that the pod status was set based upon.
+  // This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+  // +featureGate=PodObservedGenerationTracking
+  // +optional
+  optional int64 observedGeneration = 17;
+
   // The phase of a Pod is a simple, high-level summary of where the Pod is in its lifecycle.
   // The conditions array, the reason and message fields, and the individual container status
   // arrays contain more detail about the pod's status.
@@ -4628,6 +4658,9 @@ message PodStatus {
   // Status of resources resize desired for pod's containers.
   // It is empty if no resources resize is pending.
   // Any changes to container resources will automatically set this to "Proposed"
+  // Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
+  // PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
+  // PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
   // +featureGate=InPlacePodVerticalScaling
   // +optional
   optional string resize = 14;
@@ -5073,12 +5106,18 @@ message ReplicationControllerSpec {
   // Defaults to 1.
   // More info: https://kubernetes.io/docs/concepts/workloads/controllers/replicationcontroller#what-is-a-replicationcontroller
   // +optional
+  // +k8s:optional
+  // +default=1
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 
   // Minimum number of seconds for which a newly created pod should be ready
   // without any of its container crashing, for it to be considered available.
   // Defaults to 0 (pod will be considered available as soon as it is ready)
   // +optional
+  // +k8s:optional
+  // +default=0
+  // +k8s:minimum=0
   optional int32 minReadySeconds = 4;
 
   // Selector is a label query over pods that should match the Replicas count.
@@ -6120,13 +6159,12 @@ message ServiceSpec {
   // +optional
   optional string internalTrafficPolicy = 22;
 
-  // TrafficDistribution offers a way to express preferences for how traffic is
-  // distributed to Service endpoints. Implementations can use this field as a
-  // hint, but are not required to guarantee strict adherence. If the field is
-  // not set, the implementation will apply its default routing strategy. If set
-  // to "PreferClose", implementations should prioritize endpoints that are
-  // topologically close (e.g., same zone).
-  // This is a beta field and requires enabling ServiceTrafficDistribution feature.
+  // TrafficDistribution offers a way to express preferences for how traffic
+  // is distributed to Service endpoints. Implementations can use this field
+  // as a hint, but are not required to guarantee strict adherence. If the
+  // field is not set, the implementation will apply its default routing
+  // strategy. If set to "PreferClose", implementations should prioritize
+  // endpoints that are in the same zone.
   // +featureGate=ServiceTrafficDistribution
   // +optional
   optional string trafficDistribution = 23;
@@ -6262,7 +6300,6 @@ message Taint {
   optional string effect = 3;
 
   // TimeAdded represents the time at which the taint was added.
-  // It is only written for NoExecute taints.
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time timeAdded = 4;
 }
@@ -6421,7 +6458,6 @@ message TopologySpreadConstraint {
   // - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
   //
   // If this value is nil, the behavior is equivalent to the Honor policy.
-  // This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
   // +optional
   optional string nodeAffinityPolicy = 6;
 
@@ -6432,7 +6468,6 @@ message TopologySpreadConstraint {
   // - Ignore: node taints are ignored. All nodes are included.
   //
   // If this value is nil, the behavior is equivalent to the Ignore policy.
-  // This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
   // +optional
   optional string nodeTaintsPolicy = 7;
 
@@ -6864,7 +6899,7 @@ message VolumeSource {
   // The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
   // The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
   // The volume will be mounted read-only (ro) and non-executable files (noexec).
-  // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath).
+  // Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
   // The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
   // +featureGate=ImageVolume
   // +optional

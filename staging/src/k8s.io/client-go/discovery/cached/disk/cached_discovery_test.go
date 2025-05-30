@@ -352,6 +352,7 @@ func TestCachedDiscoveryClientUnaggregatedServerGroups(t *testing.T) {
 			output, err := json.Marshal(body)
 			if err != nil {
 				t.Errorf("unexpected error %v", err)
+				return
 			}
 			// Content-type is "unaggregated" discovery format -- no resources returned.
 			w.Header().Set("Content-Type", discovery.AcceptV1)

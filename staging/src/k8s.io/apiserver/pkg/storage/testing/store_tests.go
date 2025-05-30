@@ -30,6 +30,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp" //nolint:depguard
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -622,7 +624,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, ignoreWatchCacheTests bool) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -648,10 +650,8 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 		pod := obj.(*example.Pod)
 		return nil, fields.Set{"metadata.name": pod.Name, "spec.nodeName": pod.Spec.NodeName}, nil
 	}
-	// Use compact to increase etcd global revision without changes to any resources.
-	// The increase in resources version comes from Kubernetes compaction updating hidden key.
-	// Used to test consistent List to confirm it returns latest etcd revision.
-	compaction(ctx, t, initialRV)
+	// Increase RV to test consistent List.
+	increaseRV(ctx, t)
 	currentRV := fmt.Sprintf("%d", continueRV+1)
 
 	tests := []struct {
@@ -1186,7 +1186,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			prefix:       "/pods/empty",
 			pred:         storage.Everything,
 			rv:           "0",
-			expectRVFunc: resourceVersionNotOlderThan(list.ResourceVersion),
+			expectRVFunc: resourceVersionNotOlderThan(initialRV),
 			expectedOut:  []example.Pod{},
 		},
 		// match=Exact
@@ -1493,6 +1493,73 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: utilpointer.Int64(3),
 		},
+		{
+			name:   "test List with continue from second pod, negative resource version gives consistent read",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", -1),
+			},
+			expectedOut: []example.Pod{*createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			expectRV:    currentRV,
+		},
+		{
+			name:   "test List with continue from second pod and limit, negative resource version gives consistent read",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Limit:    2,
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", -1),
+			},
+			expectedOut:                []example.Pod{*createdPods[1], *createdPods[2]},
+			expectContinue:             true,
+			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(continueRV+1)),
+			expectRV:                   currentRV,
+			expectedRemainingItemCount: utilpointer.Int64(2),
+		},
+		{
+			name:   "test List with continue from third pod, negative resource version gives consistent read",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", -1),
+			},
+			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
+			expectRV:    currentRV,
+		},
+		{
+			name:   "test List with continue from empty fails",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie("", int64(continueRV)),
+			},
+			expectError: true,
+		},
+		{
+			name:   "test List with continue from first pod, empty resource version fails",
+			prefix: "/pods/",
+			pred: storage.SelectionPredicate{
+				Label:    labels.Everything(),
+				Field:    fields.Everything(),
+				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", 0),
+			},
+			expectError: true,
+		},
+		{
+			name:   "test List with negative rv fails",
+			prefix: "/pods/",
+			rv:     "-1",
+			pred: storage.SelectionPredicate{
+				Label: labels.Everything(),
+				Field: fields.Everything(),
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1591,64 +1658,96 @@ func ExpectContinueMatches(t *testing.T, expect, got string) {
 	t.Errorf("expected continue token: %s, got: %s", expectDecoded, gotDecoded)
 }
 
-func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction, cacheEnabled, consistentReadsSupported bool) {
+func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, cacheEnabled, consistentReadsSupported, listFromCacheSnapshot bool) {
 	outPod := &example.Pod{}
 	inPod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "foo"}}
 	err := store.Create(ctx, computePodKey(inPod), inPod, outPod, 0)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	lastObjecRV := outPod.ResourceVersion
-	compaction(ctx, t, outPod.ResourceVersion)
-	parsedRV, _ := strconv.Atoi(outPod.ResourceVersion)
-	currentRV := fmt.Sprintf("%d", parsedRV+1)
+	require.NoError(t, err)
+	lastResourceWriteRV, err := strconv.Atoi(outPod.ResourceVersion)
+	require.NoError(t, err)
 
-	firstNonConsistentReadRV := lastObjecRV
-	if consistentReadsSupported && !cacheEnabled {
-		firstNonConsistentReadRV = currentRV
-	}
-
-	secondNonConsistentReadRV := lastObjecRV
-	if consistentReadsSupported {
-		secondNonConsistentReadRV = currentRV
-	}
+	increaseRV(ctx, t)
+	consistentRV := lastResourceWriteRV + 1
+	cacheSyncRV := 0
 
 	tcs := []struct {
-		name             string
-		requestRV        string
-		expectResponseRV string
+		name               string
+		requestRV          string
+		continueToken      string
+		validateResponseRV func(*testing.T, int)
 	}{
 		{
-			name:             "Non-consistent list before sync",
-			requestRV:        "0",
-			expectResponseRV: firstNonConsistentReadRV,
+			name:      "Non-consistent list before consistent read",
+			requestRV: "0",
+			validateResponseRV: func(t *testing.T, rv int) {
+				if cacheEnabled {
+					// Cache might not yet observed write
+					assert.LessOrEqual(t, rv, lastResourceWriteRV)
+				} else {
+					// Etcd should always be up to date with consistent RV
+					assert.Equal(t, consistentRV, rv)
+				}
+			},
 		},
 		{
-			name:             "Consistent request returns currentRV",
-			requestRV:        "",
-			expectResponseRV: currentRV,
+			name:      "LIST without RV returns consistent RV",
+			requestRV: "",
+			validateResponseRV: func(t *testing.T, rv int) {
+				assert.Equal(t, consistentRV, rv)
+				cacheSyncRV = rv
+			},
 		},
 		{
-			name:             "Non-consistent request after sync returns currentRV",
-			requestRV:        "0",
-			expectResponseRV: secondNonConsistentReadRV,
+			name:          "List with negative continue RV returns consistent RV",
+			continueToken: encodeContinueOrDie("/pods/a", -1),
+			validateResponseRV: func(t *testing.T, rv int) {
+				assert.Equal(t, consistentRV, rv)
+				if listFromCacheSnapshot {
+					cacheSyncRV = rv
+				}
+			},
+		},
+		{
+			name:      "Non-consistent request after consistent read",
+			requestRV: "0",
+			validateResponseRV: func(t *testing.T, rv int) {
+				if cacheEnabled {
+					if consistentReadsSupported {
+						// Consistent read will sync cache
+						assert.Equal(t, cacheSyncRV, rv)
+					} else {
+						// Without consisten reads cache is not synced
+						assert.LessOrEqual(t, rv, lastResourceWriteRV)
+					}
+				} else {
+					// Etcd always points to newest RV
+					assert.Equal(t, consistentRV, rv)
+				}
+			},
 		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			out := &example.PodList{}
 			opts := storage.ListOptions{
+				Recursive:       true,
 				ResourceVersion: tc.requestRV,
-				Predicate:       storage.Everything,
+				Predicate: storage.SelectionPredicate{
+					Label:    labels.Everything(),
+					Field:    fields.Everything(),
+					Continue: tc.continueToken,
+				},
 			}
 			err = store.GetList(ctx, "/pods/empty", opts, out)
-			if err != nil {
-				t.Fatalf("GetList failed: %v", err)
-			}
-			if out.ResourceVersion != tc.expectResponseRV {
-				t.Errorf("resourceVersion in list response want=%s, got=%s", tc.expectResponseRV, out.ResourceVersion)
-			}
+			require.NoError(t, err)
+
+			parsedOutRV, err := strconv.Atoi(out.ResourceVersion)
+			require.NoError(t, err)
+			tc.validateResponseRV(t, parsedOutRV)
 		})
+		// Update RV on each read to test multiple reads for consistent RV.
+		increaseRV(ctx, t)
+		consistentRV++
 	}
 }
 
@@ -1749,7 +1848,7 @@ func seedMultiLevelData(ctx context.Context, store storage.Interface) (initialRV
 	return initialRV, created, updated, nil
 }
 
-func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Compaction, store storage.Interface) {
+func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV IncreaseRVFunc, store storage.Interface) {
 	key, prevStoredObj := testPropagateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}})
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
 
@@ -1763,10 +1862,8 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, compaction Co
 		t.Fatalf("update failed: %v", err)
 	}
 	objRV, _ := strconv.Atoi(storedObj.ResourceVersion)
-	// Use compact to increase etcd global revision without changes to any resources.
-	// The increase in resources version comes from Kubernetes compaction updating hidden key.
-	// Used to test consistent List to confirm it returns latest etcd revision.
-	compaction(ctx, t, prevStoredObj.ResourceVersion)
+	// Increase RV to test consistent List.
+	increaseRV(ctx, t)
 
 	tests := []struct {
 		name                 string
@@ -2320,12 +2417,9 @@ func RunTestListContinuationWithFilter(ctx context.Context, t *testing.T, store 
 }
 
 type Compaction func(ctx context.Context, t *testing.T, resourceVersion string)
+type IncreaseRVFunc func(ctx context.Context, t *testing.T)
 
 func RunTestListInconsistentContinuation(ctx context.Context, t *testing.T, store storage.Interface, compaction Compaction) {
-	if compaction == nil {
-		t.Skipf("compaction callback not provided")
-	}
-
 	// Setup storage with the following structure:
 	//  /
 	//   - first/

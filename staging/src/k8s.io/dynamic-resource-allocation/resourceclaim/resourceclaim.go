@@ -26,9 +26,12 @@ package resourceclaim
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourcev1beta2 "k8s.io/api/resource/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -105,4 +108,41 @@ func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
 func CanBeReserved(claim *resourceapi.ResourceClaim) bool {
 	// Currently no restrictions on sharing...
 	return true
+}
+
+// BaseRequestRef returns the request name if the reference is to a top-level
+// request and the name of the parent request if the reference is to a subrequest.
+func BaseRequestRef(requestRef string) string {
+	segments := strings.Split(requestRef, "/")
+	return segments[0]
+}
+
+// ConfigForResult returns the configs that are applicable to device
+// allocated for the provided result.
+//
+// Called by DRA drivers and therefore uses the v1beta2 API.
+// The other methods are called by control plane components
+// which still use v1beta1.
+func ConfigForResult(deviceConfigurations []resourcev1beta2.DeviceAllocationConfiguration, result resourcev1beta2.DeviceRequestAllocationResult) []resourcev1beta2.DeviceAllocationConfiguration {
+	var configs []resourcev1beta2.DeviceAllocationConfiguration
+	for _, deviceConfiguration := range deviceConfigurations {
+		if deviceConfiguration.Opaque != nil &&
+			isMatch(deviceConfiguration.Requests, result.Request) {
+			configs = append(configs, deviceConfiguration)
+		}
+	}
+	return configs
+}
+
+func isMatch(requests []string, requestRef string) bool {
+	if len(requests) == 0 {
+		return true
+	}
+
+	if slices.Contains(requests, requestRef) {
+		return true
+	}
+
+	baseRequestRef := BaseRequestRef(requestRef)
+	return slices.Contains(requests, baseRequestRef)
 }

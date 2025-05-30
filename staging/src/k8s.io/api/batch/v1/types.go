@@ -257,7 +257,7 @@ type PodFailurePolicy struct {
 type SuccessPolicy struct {
 	// rules represents the list of alternative rules for the declaring the Jobs
 	// as successful before `.status.succeeded >= .spec.completions`. Once any of the rules are met,
-	// the "SucceededCriteriaMet" condition is added, and the lingering pods are removed.
+	// the "SuccessCriteriaMet" condition is added, and the lingering pods are removed.
 	// The terminal state for such a Job has the "Complete" condition.
 	// Additionally, these rules are evaluated in order; Once the Job meets one of the rules,
 	// other rules are ignored. At most 20 elements are allowed.
@@ -343,13 +343,12 @@ type JobSpec struct {
 	// When the field is specified, it must be immutable and works only for the Indexed Jobs.
 	// Once the Job meets the SuccessPolicy, the lingering pods are terminated.
 	//
-	// This field is beta-level. To use this field, you must enable the
-	// `JobSuccessPolicy` feature gate (enabled by default).
 	// +optional
 	SuccessPolicy *SuccessPolicy `json:"successPolicy,omitempty" protobuf:"bytes,16,opt,name=successPolicy"`
 
 	// Specifies the number of retries before marking this job failed.
-	// Defaults to 6
+	// Defaults to 6, unless backoffLimitPerIndex (only Indexed Job) is specified.
+	// When backoffLimitPerIndex is specified, backoffLimit defaults to 2147483647.
 	// +optional
 	BackoffLimit *int32 `json:"backoffLimit,omitempty" protobuf:"varint,7,opt,name=backoffLimit"`
 
@@ -638,13 +637,9 @@ const (
 	JobReasonFailedIndexes string = "FailedIndexes"
 	// JobReasonSuccessPolicy reason indicates a SuccessCriteriaMet condition is added due to
 	// a Job met successPolicy.
-	// https://kep.k8s.io/3998
-	// This is currently a beta field.
 	JobReasonSuccessPolicy string = "SuccessPolicy"
 	// JobReasonCompletionsReached reason indicates a SuccessCriteriaMet condition is added due to
 	// a number of succeeded Job pods met completions.
-	// - https://kep.k8s.io/3998
-	// This is currently a beta field.
 	JobReasonCompletionsReached string = "CompletionsReached"
 )
 

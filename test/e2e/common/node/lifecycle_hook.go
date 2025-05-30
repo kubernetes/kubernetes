@@ -25,6 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -254,7 +256,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 	})
 })
 
-var _ = SIGDescribe(feature.SidecarContainers, "Restartable Init Container Lifecycle Hook", func() {
+var _ = SIGDescribe(feature.SidecarContainers, framework.WithFeatureGate(features.SidecarContainers), "Restartable Init Container Lifecycle Hook", func() {
 	f := framework.NewDefaultFramework("restartable-init-container-lifecycle-hook")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -550,7 +552,7 @@ func validDuration(duration time.Duration, low, high int64) bool {
 	return duration >= time.Second*time.Duration(low) && duration <= time.Second*time.Duration(high)
 }
 
-var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
+var _ = SIGDescribe(feature.PodLifecycleSleepAction, framework.WithFeatureGate(features.PodLifecycleSleepAction), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -629,7 +631,7 @@ var _ = SIGDescribe(feature.PodLifecycleSleepAction, func() {
 	})
 })
 
-var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
+var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, framework.WithFeatureGate(features.PodLifecycleSleepActionAllowZero), func() {
 	f := framework.NewDefaultFramework("pod-lifecycle-sleep-action-allow-zero")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var podClient *e2epod.PodClient
@@ -659,5 +661,45 @@ var _ = SIGDescribe(feature.PodLifecycleSleepActionAllowZero, func() {
 			}
 		})
 
+	})
+})
+
+var _ = SIGDescribe(feature.ContainerStopSignals, framework.WithFeatureGate(features.ContainerStopSignals), func() {
+	f := framework.NewDefaultFramework("container-stop-signals")
+	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
+	var podClient *e2epod.PodClient
+	sigterm := v1.SIGTERM
+	podName := "pod-" + utilrand.String(5)
+
+	ginkgo.Context("when create a pod with a StopSignal lifecycle", func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			podClient = e2epod.NewPodClient(f)
+		})
+		ginkgo.It("StopSignal defined with pod.OS", func(ctx context.Context) {
+
+			testPod := e2epod.MustMixinRestrictedPodSecurity(&v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					OS: &v1.PodOS{
+						Name: v1.Linux,
+					},
+					Containers: []v1.Container{
+						{
+							Name:  "test",
+							Image: imageutils.GetPauseImageName(),
+							Lifecycle: &v1.Lifecycle{
+								StopSignal: &sigterm,
+							},
+						},
+					},
+				},
+			})
+
+			ginkgo.By("submitting the pod to kubernetes")
+			pod := podClient.CreateSync(ctx, testPod)
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "Pod didn't start when custom StopSignal was passed in Lifecycle")
+		})
 	})
 })

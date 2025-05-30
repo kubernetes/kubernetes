@@ -3,27 +3,23 @@
 
 package netns
 
-import (
-	"errors"
-)
+import "errors"
 
-var (
-	ErrNotImplemented = errors.New("not implemented")
-)
+var ErrNotImplemented = errors.New("not implemented")
 
 // Setns sets namespace using golang.org/x/sys/unix.Setns on Linux. It
 // is not implemented on other platforms.
 //
 // Deprecated: Use golang.org/x/sys/unix.Setns instead.
-func Setns(ns NsHandle, nstype int) (err error) {
+func Setns(ns NsHandle, nstype int) error {
 	return ErrNotImplemented
 }
 
-func Set(ns NsHandle) (err error) {
+func Set(ns NsHandle) error {
 	return ErrNotImplemented
 }
 
-func New() (ns NsHandle, err error) {
+func New() (NsHandle, error) {
 	return -1, ErrNotImplemented
 }
 
@@ -51,7 +47,7 @@ func GetFromPid(pid int) (NsHandle, error) {
 	return -1, ErrNotImplemented
 }
 
-func GetFromThread(pid, tid int) (NsHandle, error) {
+func GetFromThread(pid int, tid int) (NsHandle, error) {
 	return -1, ErrNotImplemented
 }
 

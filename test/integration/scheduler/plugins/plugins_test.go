@@ -35,12 +35,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -309,14 +311,18 @@ var _ framework.PreFilterPlugin = &PreFilterPlugin{}
 var _ framework.PostFilterPlugin = &PostFilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
 var _ framework.FilterPlugin = &FilterPlugin{}
+var _ framework.EnqueueExtensions = &FilterPlugin{}
 var _ framework.ScorePlugin = &ScorePlugin{}
 var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
+var _ framework.EnqueueExtensions = &ScorePlugin{}
 var _ framework.ReservePlugin = &ReservePlugin{}
 var _ framework.PreScorePlugin = &PreScorePlugin{}
 var _ framework.PreBindPlugin = &PreBindPlugin{}
+var _ framework.EnqueueExtensions = &PreBindPlugin{}
 var _ framework.BindPlugin = &BindPlugin{}
 var _ framework.PostBindPlugin = &PostBindPlugin{}
 var _ framework.PermitPlugin = &PermitPlugin{}
+var _ framework.EnqueueExtensions = &PermitPlugin{}
 var _ framework.QueueSortPlugin = &QueueSortPlugin{}
 
 func (ep *QueueSortPlugin) Name() string {
@@ -355,7 +361,7 @@ func (sp *ScorePlugin) Name() string {
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -367,7 +373,7 @@ func (sp *ScorePlugin) Score(ctx context.Context, state *framework.CycleState, p
 	score := int64(1)
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
-		sp.highScoreNode = nodeName
+		sp.highScoreNode = nodeInfo.Node().Name
 		score = framework.MaxNodeScore
 	}
 	return score, nil
@@ -377,13 +383,17 @@ func (sp *ScorePlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
+func (sp *ScorePlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
+}
+
 // Name returns name of the score plugin.
 func (sp *ScoreWithNormalizePlugin) Name() string {
 	return scoreWithNormalizePluginName
 }
 
 // Score returns the score of scheduling a pod on a specific node.
-func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (sp *ScoreWithNormalizePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	sp.mutex.Lock()
 	defer sp.mutex.Unlock()
 
@@ -427,6 +437,12 @@ func (fp *FilterPlugin) Filter(ctx context.Context, state *framework.CycleState,
 	return nil
 }
 
+func (fp *FilterPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return []framework.ClusterEventWithHint{
+		{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}},
+	}, nil
+}
+
 // Name returns name of the plugin.
 func (rp *ReservePlugin) Name() string {
 	return rp.name
@@ -448,7 +464,10 @@ func (rp *ReservePlugin) Reserve(ctx context.Context, state *framework.CycleStat
 func (rp *ReservePlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
 	rp.numUnreserveCalled++
 	if rp.pluginInvokeEventChan != nil {
-		rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}
+		select {
+		case <-ctx.Done():
+		case rp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: rp.Name(), val: rp.numUnreserveCalled}:
+		}
 	}
 }
 
@@ -491,6 +510,10 @@ func (pp *PreBindPlugin) PreBind(ctx context.Context, state *framework.CycleStat
 	return nil
 }
 
+func (pp *PreBindPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
+}
+
 const bindPluginAnnotation = "bindPluginName"
 
 func (bp *BindPlugin) Name() string {
@@ -503,7 +526,10 @@ func (bp *BindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *
 
 	bp.numBindCalled++
 	if bp.pluginInvokeEventChan != nil {
-		bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}
+		select {
+		case <-ctx.Done():
+		case bp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: bp.Name(), val: bp.numBindCalled}:
+		}
 	}
 	if bp.bindStatus.IsSuccess() {
 		if err := bp.client.CoreV1().Pods(p.Namespace).Bind(ctx, &v1.Binding{
@@ -531,7 +557,10 @@ func (pp *PostBindPlugin) PostBind(ctx context.Context, state *framework.CycleSt
 
 	pp.numPostBindCalled++
 	if pp.pluginInvokeEventChan != nil {
-		pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}
+		select {
+		case <-ctx.Done():
+		case pp.pluginInvokeEventChan <- pluginInvokeEvent{pluginName: pp.Name(), val: pp.numPostBindCalled}:
+		}
 	}
 }
 
@@ -546,7 +575,7 @@ func (pp *PreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // PreFilter is a test function that returns (true, nil) or errors for testing.
-func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pp *PreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	pp.numPreFilterCalled++
 	if pp.failPreFilter {
 		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -649,6 +678,10 @@ func (pp *PermitPlugin) rejectAllPods() {
 	pp.mutex.Lock()
 	defer pp.mutex.Unlock()
 	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
+}
+
+func (pp *PermitPlugin) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+	return nil, nil
 }
 
 // TestPreFilterPlugin tests invocation of prefilter plugins.
@@ -2592,7 +2625,7 @@ func (j *JobPlugin) Name() string {
 	return jobPluginName
 }
 
-func (j *JobPlugin) PreFilter(_ context.Context, _ *framework.CycleState, p *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (j *JobPlugin) PreFilter(_ context.Context, _ *framework.CycleState, p *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	labelSelector := labels.SelectorFromSet(labels.Set{"driver": ""})
 	driverPods, err := j.podLister.Pods(p.Namespace).List(labelSelector)
 	if err != nil {
@@ -2731,6 +2764,7 @@ func (pl *SchedulingGatesPluginWithEvents) Name() string {
 
 func (pl *SchedulingGatesPluginWithEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
 	pl.called++
+	klog.FromContext(ctx).Info("PreEnqueue is called", "pod", klog.KObj(p), "count", pl.called)
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
@@ -2751,6 +2785,7 @@ func (pl *SchedulingGatesPluginWOEvents) Name() string {
 
 func (pl *SchedulingGatesPluginWOEvents) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
 	pl.called++
+	klog.FromContext(ctx).Info("PreEnqueue is called", "pod", klog.KObj(p), "count", pl.called)
 	return pl.SchedulingGates.PreEnqueue(ctx, p)
 }
 
@@ -2760,8 +2795,6 @@ func (pl *SchedulingGatesPluginWOEvents) EventsToRegister(_ context.Context) ([]
 
 // This test helps to verify registering nil events for PreEnqueue plugin works as expected.
 func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
-	testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
-
 	num := func(pl framework.Plugin) int {
 		switch item := pl.(type) {
 		case *SchedulingGatesPluginWithEvents:
@@ -2806,8 +2839,12 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 			expectedScheduled := tt.expectedScheduled[i]
 
 			t.Run(tt.name+fmt.Sprintf(" queueHint(%v)", queueHintEnabled), func(t *testing.T) {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, queueHintEnabled)
+				if !queueHintEnabled {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+				}
 
+				testContext := testutils.InitTestAPIServer(t, "preenqueue-plugin", nil)
 				// use new plugin every time to clear counts
 				var plugin framework.PreEnqueuePlugin
 				if tt.withEvents {
@@ -2843,6 +2880,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 				)
 				defer teardown()
 
+				t.Log("Create the gated pod")
+
 				// Create a pod with schedulingGates.
 				gatedPod := st.MakePod().Name("p").Namespace(testContext.NS.Name).
 					SchedulingGates([]string{"foo"}).
@@ -2863,6 +2902,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 					return
 				}
 
+				t.Log("Create the pause pod")
+
 				// Create a best effort pod.
 				pausePod, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
 					Name:      "pause-pod",
@@ -2879,6 +2920,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 					t.Errorf("Expected the pod to be schedulable, but got: %v", err)
 					return
 				}
+
+				t.Log("Update the pause pod")
 
 				// Update the pod which will trigger the requeue logic if plugin registers the events.
 				pausePod, err = testCtx.ClientSet.CoreV1().Pods(pausePod.Namespace).Get(testCtx.Ctx, pausePod.Name, metav1.GetOptions{})
@@ -2902,6 +2945,8 @@ func TestPreEnqueuePluginEventsToRegister(t *testing.T) {
 					t.Errorf("Expected the preEnqueue plugin to be called %v, but got %v", tt.count, num(plugin))
 					return
 				}
+
+				t.Log("Remove the scheduling gate")
 
 				// Remove gated pod's scheduling gates.
 				gatedPod, err = testCtx.ClientSet.CoreV1().Pods(gatedPod.Namespace).Get(testCtx.Ctx, gatedPod.Name, metav1.GetOptions{})

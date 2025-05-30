@@ -18,7 +18,7 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
-package format
+package immutable
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
@@ -49,13 +49,7 @@ type Struct struct {
 	SliceField []string `json:"sliceField"`
 
 	// +k8s:immutable
-	SlicePtrField []*string `json:"slicePtrField"`
-
-	// +k8s:immutable
 	MapField map[string]string `json:"mapField"`
-
-	// +k8s:immutable
-	MapPtrField map[string]*string `json:"mapPtrField"`
 
 	ImmutableField ImmutableType `json:"immutableField"`
 
@@ -63,7 +57,8 @@ type Struct struct {
 }
 
 type ComparableStruct struct {
-	StringField string `json:"stringField"`
+	StringField    string  `json:"stringField"`
+	StringPtrField *string `json:"stringPtrField"`
 }
 
 type NonComparableStruct struct {

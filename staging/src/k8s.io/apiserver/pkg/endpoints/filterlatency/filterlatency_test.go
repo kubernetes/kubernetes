@@ -31,6 +31,7 @@ import (
 )
 
 func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
+	ctx := t.Context()
 	filterName := "my-filter"
 	var (
 		callCount    int
@@ -47,7 +48,7 @@ func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
 	requestFilterStarted := time.Now()
 	wrapped := trackStarted(handler, noopoteltrace.NewTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
 
-	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
@@ -74,6 +75,7 @@ func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
 }
 
 func TestTrackStartedWithContextDoesNotHaveFilterRecord(t *testing.T) {
+	ctx := t.Context()
 	filterName := "my-filter"
 	var (
 		callCount    int
@@ -90,7 +92,7 @@ func TestTrackStartedWithContextDoesNotHaveFilterRecord(t *testing.T) {
 	requestFilterStarted := time.Now()
 	wrapped := trackStarted(handler, noopoteltrace.NewTracerProvider(), filterName, testingclock.NewFakeClock(requestFilterStarted))
 
-	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
@@ -113,6 +115,7 @@ func TestTrackStartedWithContextDoesNotHaveFilterRecord(t *testing.T) {
 }
 
 func TestTrackCompletedContextHasFilterRecord(t *testing.T) {
+	ctx := t.Context()
 	var (
 		handlerCallCount     int
 		actionCallCount      int
@@ -131,7 +134,7 @@ func TestTrackCompletedContextHasFilterRecord(t *testing.T) {
 		filterCompletedAtGot = completedAt
 	})
 
-	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
@@ -156,6 +159,7 @@ func TestTrackCompletedContextHasFilterRecord(t *testing.T) {
 }
 
 func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
+	ctx := t.Context()
 	var actionCallCount, handlerCallCount int
 	handler := http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 		handlerCallCount++
@@ -165,7 +169,7 @@ func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
 		actionCallCount++
 	})
 
-	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}
@@ -182,6 +186,7 @@ func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
 }
 
 func TestStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
+	ctx := t.Context()
 	filterName := "my-filter"
 	// Seup OTel for testing
 	fakeRecorder := tracetest.NewSpanRecorder()
@@ -197,7 +202,7 @@ func TestStartedAndCompletedOpenTelemetryTracing(t *testing.T) {
 	wrapped := TrackCompleted(handler)
 	wrapped = TrackStarted(wrapped, tp, filterName)
 
-	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
+	testRequest, err := http.NewRequestWithContext(ctx, http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
 		t.Fatalf("failed to create new http request - %v", err)
 	}

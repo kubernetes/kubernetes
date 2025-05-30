@@ -132,7 +132,11 @@ func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSe
 	podInformer := informerFactory.Core().V1().Pods()
 	claimInformer := informerFactory.Resource().V1beta1().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1beta1().ResourceClaimTemplates()
-	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), true /* admin access */, clientSet, podInformer, claimInformer, claimTemplateInformer)
+	features := resourceclaim.Features{
+		AdminAccess:     true,
+		PrioritizedList: true,
+	}
+	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), features, clientSet, podInformer, claimInformer, claimTemplateInformer)
 	if err != nil {
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}
@@ -1155,4 +1159,24 @@ func NextPodOrDie(t *testing.T, testCtx *TestContext) *schedulerframework.Queued
 		t.Fatalf("Timed out waiting for the Pod to be popped: %v", err)
 	}
 	return podInfo
+}
+
+func WaitForNominatedNodeNameWithTimeout(ctx context.Context, cs clientset.Interface, pod *v1.Pod, timeout time.Duration) error {
+	if err := wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, timeout, false, func(ctx context.Context) (bool, error) {
+		pod, err := cs.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if len(pod.Status.NominatedNodeName) > 0 {
+			return true, nil
+		}
+		return false, err
+	}); err != nil {
+		return fmt.Errorf(".status.nominatedNodeName of Pod %v/%v did not get set: %w", pod.Namespace, pod.Name, err)
+	}
+	return nil
+}
+
+func WaitForNominatedNodeName(ctx context.Context, cs clientset.Interface, pod *v1.Pod) error {
+	return WaitForNominatedNodeNameWithTimeout(ctx, cs, pod, wait.ForeverTestTimeout)
 }

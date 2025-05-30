@@ -43,6 +43,10 @@ var (
 	}
 )
 
+func init() {
+	metrics.Register()
+}
+
 func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]string, affinity, antiAffinity []v1.PodAffinityTerm) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -73,7 +77,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 	}
 	podLabel2 := map[string]string{"security": "S1"}
 	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labels1}}
-	metrics.Register()
 
 	tests := []struct {
 		pod                 *v1.Pod
@@ -548,9 +551,13 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
 			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			state := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -960,12 +967,16 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			nodeInfos, err := snapshot.NodeInfos().List()
+			if err != nil {
+				t.Fatal(err)
+			}
 			p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot,
 				[]runtime.Object{
 					&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "NS1"}},
 				})
 			state := framework.NewCycleState()
-			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod)
+			_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod, nodeInfos)
 			if diff := cmp.Diff(test.wantPreFilterStatus, preFilterStatus); diff != "" {
 				t.Errorf("PreFilter: status does not match (-want,+got):\n%s", diff)
 			}
@@ -1236,9 +1247,13 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				_, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
+				nodeInfos, err := snapshot.NodeInfos().List()
+				if err != nil {
+					t.Fatal(err)
+				}
 				p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, nil)
 				cycleState := framework.NewCycleState()
-				_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod)
+				_, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pendingPod, nodeInfos)
 				if !preFilterStatus.IsSuccess() {
 					t.Errorf("prefilter failed with status: %v", preFilterStatus)
 				}

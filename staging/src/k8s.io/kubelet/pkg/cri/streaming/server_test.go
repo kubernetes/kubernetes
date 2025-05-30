@@ -350,6 +350,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 		exec, err := remotecommand.NewSPDYExecutor(&restclient.Config{}, "POST", reqURL)
 		if err != nil {
 			t.Errorf("unexpected error %v", err)
+			return
 		}
 
 		opts := remotecommand.StreamOptions{

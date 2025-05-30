@@ -83,7 +83,7 @@ func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	s := getContainerPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -143,7 +143,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 	}
 
 	// If the deleted pod is unscheduled, it doesn't make the target pod schedulable.
-	if deletedPod.Spec.NodeName == "" {
+	if deletedPod.Spec.NodeName == "" && deletedPod.Status.NominatedNodeName == "" {
 		logger.V(4).Info("the deleted pod is unscheduled and it doesn't make the target pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
 		return framework.QueueSkip, nil
 	}

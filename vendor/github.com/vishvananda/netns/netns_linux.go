@@ -26,19 +26,19 @@ const bindMountPath = "/run/netns" /* Bind mount path for named netns */
 // Setns sets namespace using golang.org/x/sys/unix.Setns.
 //
 // Deprecated: Use golang.org/x/sys/unix.Setns instead.
-func Setns(ns NsHandle, nstype int) (err error) {
+func Setns(ns NsHandle, nstype int) error {
 	return unix.Setns(int(ns), nstype)
 }
 
 // Set sets the current network namespace to the namespace represented
 // by NsHandle.
-func Set(ns NsHandle) (err error) {
+func Set(ns NsHandle) error {
 	return unix.Setns(int(ns), unix.CLONE_NEWNET)
 }
 
 // New creates a new network namespace, sets it as current and returns
 // a handle to it.
-func New() (ns NsHandle, err error) {
+func New() (NsHandle, error) {
 	if err := unix.Unshare(unix.CLONE_NEWNET); err != nil {
 		return -1, err
 	}
@@ -49,7 +49,7 @@ func New() (ns NsHandle, err error) {
 // and returns a handle to it
 func NewNamed(name string) (NsHandle, error) {
 	if _, err := os.Stat(bindMountPath); os.IsNotExist(err) {
-		err = os.MkdirAll(bindMountPath, 0755)
+		err = os.MkdirAll(bindMountPath, 0o755)
 		if err != nil {
 			return None(), err
 		}
@@ -62,7 +62,7 @@ func NewNamed(name string) (NsHandle, error) {
 
 	namedPath := path.Join(bindMountPath, name)
 
-	f, err := os.OpenFile(namedPath, os.O_CREATE|os.O_EXCL, 0444)
+	f, err := os.OpenFile(namedPath, os.O_CREATE|os.O_EXCL, 0o444)
 	if err != nil {
 		newNs.Close()
 		return None(), err
@@ -217,11 +217,12 @@ func getPidForContainer(id string) (int, error) {
 	id += "*"
 
 	var pidFile string
-	if cgroupVer == 1 {
+	switch cgroupVer {
+	case 1:
 		pidFile = "tasks"
-	} else if cgroupVer == 2 {
+	case 2:
 		pidFile = "cgroup.procs"
-	} else {
+	default:
 		return -1, fmt.Errorf("Invalid cgroup version '%d'", cgroupVer)
 	}
 
@@ -247,6 +248,10 @@ func getPidForContainer(id string) (int, error) {
 		filepath.Join(cgroupRoot, "kubepods.slice", "*.slice", "*", "docker-"+id+".scope", pidFile),
 		// Same as above but for Guaranteed QoS
 		filepath.Join(cgroupRoot, "kubepods.slice", "*", "docker-"+id+".scope", pidFile),
+		// Support for nerdctl
+		filepath.Join(cgroupRoot, "system.slice", "nerdctl-"+id+".scope", pidFile),
+		// Support for finch
+		filepath.Join(cgroupRoot, "..", "systemd", "finch", id, pidFile),
 	}
 
 	var filename string
@@ -276,7 +281,7 @@ func getPidForContainer(id string) (int, error) {
 
 	pid, err = strconv.Atoi(result[0])
 	if err != nil {
-		return pid, fmt.Errorf("Invalid pid '%s': %s", result[0], err)
+		return pid, fmt.Errorf("Invalid pid '%s': %w", result[0], err)
 	}
 
 	return pid, nil

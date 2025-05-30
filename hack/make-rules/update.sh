@@ -37,6 +37,7 @@ fi
 
 BASH_TARGETS=(
 	update-codegen
+	update-featuregates
 	update-generated-api-compatibility-data
 	update-generated-docs
 	update-openapi-spec

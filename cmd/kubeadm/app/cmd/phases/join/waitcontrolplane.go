@@ -67,7 +67,12 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		return nil
 	}
 
-	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, nil, data.OutputWriter())
+	client, err := data.Client()
+	if err != nil {
+		return err
+	}
+
+	waiter, err := newControlPlaneWaiter(data.DryRun(), 0, client, data.OutputWriter())
 	if err != nil {
 		return errors.Wrap(err, "error creating waiter")
 	}

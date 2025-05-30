@@ -54,7 +54,9 @@ var (
 )
 
 func (stv subfieldTagValidator) GetValidations(context Context, args []string, payload string) (Validations, error) {
-	t := realType(context.Type)
+	// This tag can apply to value and pointer fields, as well as typedefs
+	// (which should never be pointers). We need to check the concrete type.
+	t := nonPointer(nativeType(context.Type))
 	if t.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on struct types")
 	}
@@ -100,7 +102,7 @@ func (stv subfieldTagValidator) GetValidations(context Context, args []string, p
 				Results:    []ParamResult{{"", nilableFieldType}},
 			}
 			getFn.Body = fmt.Sprintf("return %so.%s", fieldExprPrefix, submemb.Name)
-			f := Function(subfieldTagName, vfn.Flags(), validateSubfield, subname, getFn, WrapperFunction{vfn, submemb.Type})
+			f := Function(subfieldTagName, vfn.Flags, validateSubfield, subname, getFn, WrapperFunction{vfn, submemb.Type})
 			result.Functions = append(result.Functions, f)
 			result.Variables = append(result.Variables, validations.Variables...)
 		}

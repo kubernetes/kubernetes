@@ -34,19 +34,12 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
-	// owner: @ivelichkovich, @tallclair
-	// stable: v1.30
-	// kep: https://kep.k8s.io/3716
+	// owner: @jefftree
 	//
-	// Enables usage of MatchConditions fields to use CEL expressions for matching on admission webhooks
-	AdmissionWebhookMatchConditions featuregate.Feature = "AdmissionWebhookMatchConditions"
-
-	// owner: @jefftree @alexzielenski
-	// stable: v1.30
-	//
-	// Enables an single HTTP endpoint /discovery/<version> which supports native HTTP
-	// caching with ETags containing all APIResources known to the apiserver.
-	AggregatedDiscoveryEndpoint featuregate.Feature = "AggregatedDiscoveryEndpoint"
+	// Remove the v2beta1 apidiscovery.k8s.io/v2beta1 group version. Aggregated
+	// discovery implements its own handlers and follows a different lifecycle than
+	// traditional k8s resources.
+	AggregatedDiscoveryRemoveBetaType featuregate.Feature = "AggregatedDiscoveryRemoveBetaType"
 
 	// owner: @modulitos
 	//
@@ -142,13 +135,6 @@ const (
 	// in the spec returned from kube-apiserver.
 	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 
-	// owner: @caesarxuchao
-	// stable: 1.29
-	//
-	// Allow apiservers to show a count of remaining items in the response
-	// to a chunking list request.
-	RemainingItemCount featuregate.Feature = "RemainingItemCount"
-
 	// owner: @stlaz
 	//
 	// Enable kube-apiserver to accept UIDs via request header authentication.
@@ -218,8 +204,12 @@ const (
 	StorageVersionHash featuregate.Feature = "StorageVersionHash"
 
 	// owner: @serathius
-	// Allow API server to encode collections item by item, instead of all at once.
+	// Allow API server JSON encoder to encode collections item by item, instead of all at once.
 	StreamingCollectionEncodingToJSON featuregate.Feature = "StreamingCollectionEncodingToJSON"
+
+	// owner: @serathius
+	// Allow API server Protobuf encoder to encode collections item by item, instead of all at once.
+	StreamingCollectionEncodingToProtobuf featuregate.Feature = "StreamingCollectionEncodingToProtobuf"
 
 	// owner: @aramase, @enj, @nabokihms
 	// kep: https://kep.k8s.io/3331
@@ -256,7 +246,6 @@ const (
 )
 
 func init() {
-	runtime.Must(utilfeature.DefaultMutableFeatureGate.Add(defaultKubernetesFeatureGates)) //nolint:forbidigo // TODO(https://github.com/kubernetes/enhancements/tree/master/keps/sig-architecture/4330-compatibility-versions): Remove this once we complete the migration to versioned feature gates
 	runtime.Must(utilfeature.DefaultMutableFeatureGate.AddVersioned(defaultVersionedKubernetesFeatureGates))
 }
 
@@ -267,16 +256,9 @@ func init() {
 // Entries are alphabetized and separated from each other with blank lines to avoid sweeping gofmt changes
 // when adding or removing one entry.
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
-	AdmissionWebhookMatchConditions: {
-		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	AggregatedDiscoveryEndpoint: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.30"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	AggregatedDiscoveryRemoveBetaType: {
+		{Version: version.MustParse("1.0"), Default: false, PreRelease: featuregate.GA},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated},
 	},
 
 	AllowParsingUserUIDFromCertAuth: {
@@ -336,6 +318,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	CoordinatedLeaderElection: {
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	KMSv1: {
@@ -357,14 +340,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.24"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	RemainingItemCount: {
-		{Version: version.MustParse("1.15"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.16"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	RemoteRequestHeaderUID: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	ResilientWatchCacheInitialization: {
@@ -392,6 +370,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	},
 
 	StreamingCollectionEncodingToJSON: {
+		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
+	},
+
+	StreamingCollectionEncodingToProtobuf: {
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
 	},
 
@@ -433,9 +415,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	WatchList: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
+		// switch this back to false because the json and proto streaming encoders appear to work better.
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
 	},
 }
-
-// defaultKubernetesFeatureGates consists of legacy unversioned Kubernetes-specific feature keys.
-// Please do not add to this struct and use defaultVersionedKubernetesFeatureGates instead.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}

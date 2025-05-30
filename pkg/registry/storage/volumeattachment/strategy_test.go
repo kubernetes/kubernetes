@@ -25,8 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 func getValidVolumeAttachment(name string) *storage.VolumeAttachment {
@@ -176,6 +179,72 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 	StatusStrategy.PrepareForUpdate(ctx, newVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(newVolumeAttachment, volumeAttachment) {
 		t.Errorf("unexpected objects difference after modifying spec: %v", cmp.Diff(newVolumeAttachment, volumeAttachment))
+	}
+
+	// Verify that error codes are dropped when the feature gate is disabled.
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.MutableCSINodeAllocatableCount, false)
+
+	statusWithError := volumeAttachment.DeepCopy()
+	statusErrCode := int32(7)
+	statusWithError.Status = storage.VolumeAttachmentStatus{
+		Attached: true,
+		AttachError: &storage.VolumeError{
+			Message:   "attach error",
+			ErrorCode: &statusErrCode,
+		},
+		DetachError: &storage.VolumeError{
+			Message:   "detach error",
+			ErrorCode: &statusErrCode,
+		},
+	}
+
+	StatusStrategy.PrepareForUpdate(ctx, statusWithError, volumeAttachment)
+	if statusWithError.Status.AttachError != nil && statusWithError.Status.AttachError.ErrorCode != nil {
+		t.Errorf("expected AttachError.ErrorCode to be nil, got %v", *statusWithError.Status.AttachError.ErrorCode)
+	}
+	if statusWithError.Status.DetachError != nil && statusWithError.Status.DetachError.ErrorCode != nil {
+		t.Errorf("expected DetachError.ErrorCode to be nil, got %v", *statusWithError.Status.DetachError.ErrorCode)
+	}
+
+	// Verify that error codes are not dropped when set in the old object.
+	oldStatusWithError := volumeAttachment.DeepCopy()
+	oldStatusErrCode := int32(8)
+	oldStatusWithError.Status = storage.VolumeAttachmentStatus{
+		Attached: true,
+		AttachError: &storage.VolumeError{
+			Message:   "old attach error",
+			ErrorCode: &oldStatusErrCode,
+		},
+		DetachError: &storage.VolumeError{
+			Message:   "old detach error",
+			ErrorCode: &oldStatusErrCode,
+		},
+	}
+
+	newStatusWithError := oldStatusWithError.DeepCopy()
+	newStatusErrCode := int32(9)
+	newStatusWithError.Status = storage.VolumeAttachmentStatus{
+		Attached: true,
+		AttachError: &storage.VolumeError{
+			Message:   "new attach error",
+			ErrorCode: &newStatusErrCode,
+		},
+		DetachError: &storage.VolumeError{
+			Message:   "new detach error",
+			ErrorCode: &newStatusErrCode,
+		},
+	}
+
+	StatusStrategy.PrepareForUpdate(ctx, newStatusWithError, oldStatusWithError)
+	if newStatusWithError.Status.AttachError == nil || newStatusWithError.Status.AttachError.ErrorCode == nil {
+		t.Errorf("expected AttachError.ErrorCode to be preserved, got nil")
+	} else if *newStatusWithError.Status.AttachError.ErrorCode != newStatusErrCode {
+		t.Errorf("expected AttachError.ErrorCode to be %v, got %v", newStatusErrCode, *newStatusWithError.Status.AttachError.ErrorCode)
+	}
+	if newStatusWithError.Status.DetachError == nil || newStatusWithError.Status.DetachError.ErrorCode == nil {
+		t.Errorf("expected DetachError.ErrorCode to be preserved, got nil")
+	} else if *newStatusWithError.Status.DetachError.ErrorCode != newStatusErrCode {
+		t.Errorf("expected DetachError.ErrorCode to be %v, got %v", newStatusErrCode, *newStatusWithError.Status.DetachError.ErrorCode)
 	}
 }
 

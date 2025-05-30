@@ -48,6 +48,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
@@ -111,10 +112,11 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 
 type dummyStorage struct {
 	sync.RWMutex
-	err       error
-	getListFn func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
-	getRVFn   func(_ context.Context) (uint64, error)
-	watchFn   func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
+	getlistErr error
+	watchErr   error
+	getListFn  func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error
+	getRVFn    func(_ context.Context) (uint64, error)
+	watchFn    func(_ context.Context, _ string, _ storage.ListOptions) (watch.Interface, error)
 
 	// use getRequestWatchProgressCounter when reading
 	// the value of the counter
@@ -166,13 +168,12 @@ func (d *dummyStorage) Watch(ctx context.Context, key string, opts storage.ListO
 	d.RLock()
 	defer d.RUnlock()
 
-	return newDummyWatch(), d.err
+	return newDummyWatch(), d.watchErr
 }
 func (d *dummyStorage) Get(_ context.Context, _ string, _ storage.GetOptions, _ runtime.Object) error {
 	d.RLock()
 	defer d.RUnlock()
-
-	return d.err
+	return d.getlistErr
 }
 func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts storage.ListOptions, listObj runtime.Object) error {
 	if d.getListFn != nil {
@@ -182,7 +183,7 @@ func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts stora
 	defer d.RUnlock()
 	podList := listObj.(*example.PodList)
 	podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
-	return d.err
+	return d.getlistErr
 }
 func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
@@ -193,11 +194,11 @@ func (d *dummyStorage) Count(_ string) (int64, error) {
 func (d *dummyStorage) ReadinessCheck() error {
 	return nil
 }
-func (d *dummyStorage) injectError(err error) {
+func (d *dummyStorage) injectGetListError(err error) {
 	d.Lock()
 	defer d.Unlock()
 
-	d.err = err
+	d.getlistErr = err
 }
 
 func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
@@ -207,55 +208,125 @@ func (d *dummyStorage) GetCurrentResourceVersion(ctx context.Context) (uint64, e
 	return 100, nil
 }
 
-func TestGetListCacheBypass(t *testing.T) {
+type dummyCacher struct {
+	dummyStorage
+	ready bool
+}
+
+func (d *dummyCacher) Ready() bool {
+	return d.ready
+}
+
+func TestShouldDelegateList(t *testing.T) {
 	type opts struct {
+		Recursive            bool
 		ResourceVersion      string
 		ResourceVersionMatch metav1.ResourceVersionMatch
 		Limit                int64
 		Continue             string
 	}
+	toInternalOpts := func(opt opts) *internalversion.ListOptions {
+		return &internalversion.ListOptions{
+			ResourceVersion:      opt.ResourceVersion,
+			ResourceVersionMatch: opt.ResourceVersionMatch,
+			Limit:                opt.Limit,
+			Continue:             opt.Continue,
+		}
+	}
+
+	toStorageOpts := func(opt opts) storage.ListOptions {
+		return storage.ListOptions{
+			Recursive:            opt.Recursive,
+			ResourceVersion:      opt.ResourceVersion,
+			ResourceVersionMatch: opt.ResourceVersionMatch,
+			Predicate: storage.SelectionPredicate{
+				Continue: opt.Continue,
+				Limit:    opt.Limit,
+			},
+		}
+	}
+	oldRV := "80"
+	cacheRV := "100"
+	etcdRV := "120"
+
+	keyPrefix := "/pods/"
+	continueOnOldRV, err := storage.EncodeContinue(keyPrefix+"foo", keyPrefix, int64(mustAtoi(oldRV)))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	continueOnCacheRV, err := storage.EncodeContinue(keyPrefix+"foo", keyPrefix, int64(mustAtoi(cacheRV)))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	// Continue from different apiserver that is forward in RVs
+	continueOnEtcdRV, err := storage.EncodeContinue(keyPrefix+"foo", keyPrefix, int64(mustAtoi(etcdRV)))
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	continueOnNegativeRV, err := storage.EncodeContinue(keyPrefix+"foo", keyPrefix, -1)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	testCases := map[opts]bool{}
-	testCases[opts{}] = false
-	testCases[opts{Limit: 100}] = false
-	testCases[opts{Continue: "continue"}] = true
-	testCases[opts{Limit: 100, Continue: "continue"}] = true
+	testCases[opts{}] = true
+	testCases[opts{Limit: 100}] = true
 	testCases[opts{ResourceVersion: "0"}] = false
 	testCases[opts{ResourceVersion: "0", Limit: 100}] = false
-	testCases[opts{ResourceVersion: "0", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "0", Limit: 100, Continue: "continue"}] = true
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
 	testCases[opts{ResourceVersion: "0", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
-	testCases[opts{ResourceVersion: "1"}] = false
-	testCases[opts{ResourceVersion: "1", Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", Limit: 100, Continue: "continue"}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
-	testCases[opts{ResourceVersion: "1", ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
+	// Continue
+	for _, continueToken := range []string{continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
+		testCases[opts{Continue: continueToken}] = true
+		testCases[opts{Limit: 100, Continue: continueToken}] = true
+		testCases[opts{ResourceVersion: "0", Continue: continueToken}] = true
+		testCases[opts{ResourceVersion: "0", Limit: 100, Continue: continueToken}] = true
+	}
+	// With RV
+	for _, rv := range []string{oldRV, cacheRV, etcdRV} {
+		testCases[opts{ResourceVersion: rv}] = false
+		testCases[opts{ResourceVersion: rv, Limit: 100}] = true
+		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = true
+		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = true
+		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan}] = false
+		testCases[opts{ResourceVersion: rv, ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan, Limit: 100}] = false
+	}
 
-	for _, rv := range []string{"", "0", "1"} {
+	// Bypass for most requests doesn't depend on Recursive
+	for opts, expectBypass := range testCases {
+		opts.Recursive = true
+		testCases[opts] = expectBypass
+	}
+	// Continue is ignored on non recursive LIST
+	for _, rv := range []string{oldRV, etcdRV} {
+		for _, continueToken := range []string{continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
+			testCases[opts{ResourceVersion: rv, Continue: continueToken}] = true
+			testCases[opts{ResourceVersion: rv, Continue: continueToken, Limit: 100}] = true
+		}
+	}
+
+	for _, rv := range []string{"", "0", oldRV, etcdRV} {
 		for _, match := range []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan} {
-			for _, c := range []string{"", "continue"} {
+			for _, continueKey := range []string{"", continueOnOldRV, continueOnCacheRV, continueOnEtcdRV, continueOnNegativeRV} {
 				for _, limit := range []int64{0, 100} {
-					errs := validation.ValidateListOptions(&internalversion.ListOptions{
-						ResourceVersion:      rv,
-						ResourceVersionMatch: match,
-						Limit:                limit,
-						Continue:             c,
-					}, false)
-					if len(errs) != 0 {
-						continue
-					}
-					opt := opts{
-						ResourceVersion:      rv,
-						ResourceVersionMatch: match,
-						Limit:                limit,
-						Continue:             c,
-					}
-					_, found := testCases[opt]
-					if !found {
-						t.Errorf("Test case not covered, but passes validation: %+v", opt)
+					for _, recursive := range []bool{true, false} {
+						opt := opts{
+							Recursive:            recursive,
+							ResourceVersion:      rv,
+							ResourceVersionMatch: match,
+							Limit:                limit,
+							Continue:             continueKey,
+						}
+						if errs := validation.ValidateListOptions(toInternalOpts(opt), false); len(errs) != 0 {
+							continue
+						}
+						if _, _, err = storage.ValidateListOptions(keyPrefix, storage.APIObjectVersioner{}, toStorageOpts(opt)); err != nil {
+							continue
+						}
+						_, found := testCases[opt]
+						if !found {
+							t.Errorf("Test case not covered, but passes validation: %+v", opt)
+						}
 					}
 
 				}
@@ -264,37 +335,86 @@ func TestGetListCacheBypass(t *testing.T) {
 	}
 
 	for opt := range testCases {
-		errs := validation.ValidateListOptions(&internalversion.ListOptions{
-			ResourceVersion:      opt.ResourceVersion,
-			ResourceVersionMatch: opt.ResourceVersionMatch,
-			Limit:                opt.Limit,
-			Continue:             opt.Continue,
-		}, false)
-		if len(errs) != 0 {
+		if errs := validation.ValidateListOptions(toInternalOpts(opt), false); len(errs) != 0 {
+			t.Errorf("Invalid LIST request that should not be tested %+v", opt)
+			continue
+		}
+		if _, _, err = storage.ValidateListOptions(keyPrefix, storage.APIObjectVersioner{}, toStorageOpts(opt)); err != nil {
 			t.Errorf("Invalid LIST request that should not be tested %+v", opt)
 			continue
 		}
 	}
 
-	t.Run("ConsistentListFromStorage", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-		testCases[opts{}] = true
-		testCases[opts{Limit: 100}] = true
+	runTestCases := func(t *testing.T, snapshotAvailable bool, testcases map[opts]bool, overrides ...map[opts]bool) {
 		for opt, expectBypass := range testCases {
-			testGetListCacheBypass(t, storage.ListOptions{
-				ResourceVersion:      opt.ResourceVersion,
-				ResourceVersionMatch: opt.ResourceVersionMatch,
-				Predicate: storage.SelectionPredicate{
-					Continue: opt.Continue,
-					Limit:    opt.Limit,
-				},
-			}, expectBypass)
+			for _, override := range overrides {
+				if bypass, ok := override[opt]; ok {
+					expectBypass = bypass
+				}
+			}
+			backingStorage := &dummyStorage{}
+			backingStorage.getListFn = func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+				podList := listObj.(*example.PodList)
+				podList.ListMeta = metav1.ListMeta{ResourceVersion: cacheRV}
+				return nil
+			}
+			cacher, _, err := newTestCacher(backingStorage)
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			if snapshotAvailable {
+				cacher.watchCache.snapshots.Add(uint64(mustAtoi(oldRV)), fakeOrderedLister{})
+			}
+			result, err := delegator.ShouldDelegateList(toStorageOpts(opt), cacher)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.ShouldDelegate != expectBypass {
+				t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", opt, expectBypass, result.ShouldDelegate)
+			}
 		}
+	}
 
+	// Exacts and continue on current cache RV.
+	listFromSnapshotEnabledOverrides := map[opts]bool{}
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, Limit: 100}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: cacheRV, Limit: 100, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnCacheRV}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnCacheRV}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnCacheRV}] = false
+	listFromSnapshotEnabledOverrides[opts{Recursive: true, Continue: continueOnCacheRV}] = false
+
+	// Exacts and continue RV with a snapshot.
+	snapshotAvailableOverrides := map[opts]bool{}
+	snapshotAvailableOverrides[opts{Recursive: true, Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnOldRV}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, Limit: 100}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+
+	t.Run("ConsistentListFromCache=false", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
+		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+			runTestCases(t, false, testCases)
+		})
+
+		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+			t.Run("SnapshotAvailable=false", func(t *testing.T) {
+				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides)
+			})
+			t.Run("SnapshotAvailable=true", func(t *testing.T) {
+				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, snapshotAvailableOverrides)
+			})
+		})
 	})
-	t.Run("ConsistentListFromCache", func(t *testing.T) {
+	t.Run("ConsistentListFromCache=true", func(t *testing.T) {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-
 		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
 		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
 		//
@@ -303,61 +423,49 @@ func TestGetListCacheBypass(t *testing.T) {
 		// initialize the storage layer so that the mentioned method evaluates to true
 		forceRequestWatchProgressSupport(t)
 
-		testCases[opts{}] = false
-		testCases[opts{Limit: 100}] = false
-		for opt, expectBypass := range testCases {
-			testGetListCacheBypass(t, storage.ListOptions{
-				ResourceVersion:      opt.ResourceVersion,
-				ResourceVersionMatch: opt.ResourceVersionMatch,
-				Predicate: storage.SelectionPredicate{
-					Continue: opt.Continue,
-					Limit:    opt.Limit,
-				},
-			}, expectBypass)
+		consistentListFromCacheOverrides := map[opts]bool{}
+		for _, recursive := range []bool{true, false} {
+			consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
+			consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
 		}
+
+		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+			runTestCases(t, false, testCases, consistentListFromCacheOverrides)
+		})
+		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
+
+			consistentReadWithSnapshotOverrides := map[opts]bool{}
+			// Continues with negative RV are same as consistent read.
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 0, Continue: continueOnNegativeRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnNegativeRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 0, Continue: continueOnNegativeRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
+			// Exact on RV not yet observed by cache
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
+			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV, Limit: 100}] = false
+			t.Run("SnapshotAvailable=false", func(t *testing.T) {
+				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides)
+			})
+			t.Run("SnapshotAvailable=true", func(t *testing.T) {
+				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides, snapshotAvailableOverrides)
+			})
+		})
 	})
 }
 
-func testGetListCacheBypass(t *testing.T, options storage.ListOptions, expectBypass bool) {
-	backingStorage := &dummyStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
+func mustAtoi(s string) int {
+	value, err := strconv.Atoi(s)
 	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
+		panic(err)
 	}
-	defer cacher.Stop()
-	delegator := NewCacheDelegator(cacher, backingStorage)
-	result := &example.PodList{}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
-		currentResourceVersion := "42"
-		switch {
-		// request made by getCurrentResourceVersionFromStorage by checking Limit
-		case key == cacher.resourcePrefix:
-			podList := listObj.(*example.PodList)
-			podList.ResourceVersion = currentResourceVersion
-			return nil
-		// request made by storage.GetList with revision from original request or
-		// returned by getCurrentResourceVersionFromStorage
-		case opts.ResourceVersion == options.ResourceVersion || opts.ResourceVersion == currentResourceVersion:
-			return errDummy
-		default:
-			t.Fatalf("Unexpected request %+v", opts)
-			return nil
-		}
-	}
-	err = delegator.GetList(context.TODO(), "pods/ns", options, result)
-	gotBypass := errors.Is(err, errDummy)
-	if err != nil && !gotBypass {
-		t.Fatalf("Unexpected error for List request with options: %v, err: %v", options, err)
-	}
-	if gotBypass != expectBypass {
-		t.Errorf("Unexpected bypass result for List request with options %+v, bypass expected: %v, got: %v", options, expectBypass, gotBypass)
-	}
+	return value
 }
 
 func TestConsistentReadFallback(t *testing.T) {
@@ -384,7 +492,7 @@ func TestConsistentReadFallback(t *testing.T) {
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="false", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
 `,
 		},
 		{
@@ -398,7 +506,7 @@ apiserver_watch_cache_consistent_read_total{fallback="false", resource="pods", s
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", success="true"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
 `,
 		},
 		{
@@ -413,7 +521,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 			expectMetric: `
 # HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
 # TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", success="false"} 1
+apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="false"} 1
 `,
 		},
 		{
@@ -450,6 +558,7 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 			}
 			defer cacher.Stop()
 			delegator := NewCacheDelegator(cacher, backingStorage)
+			defer delegator.Stop()
 			if err := cacher.ready.wait(context.Background()); err != nil {
 				t.Fatalf("unexpected error waiting for the cache to be ready")
 			}
@@ -524,6 +633,91 @@ apiserver_watch_cache_consistent_read_total{fallback="true", resource="pods", su
 	}
 }
 
+func TestMatchExactResourceVersionFallback(t *testing.T) {
+	tcs := []struct {
+		name               string
+		snapshotsAvailable []bool
+
+		expectStoreRequests    int
+		expectSnapshotRequests int
+	}{
+		{
+			name:                   "Disabled",
+			snapshotsAvailable:     []bool{false, false},
+			expectStoreRequests:    2,
+			expectSnapshotRequests: 1,
+		},
+		{
+			name:                   "Enabled",
+			snapshotsAvailable:     []bool{true, true},
+			expectStoreRequests:    1,
+			expectSnapshotRequests: 2,
+		},
+		{
+			name:                   "Fallback",
+			snapshotsAvailable:     []bool{true, false},
+			expectSnapshotRequests: 2,
+			expectStoreRequests:    2,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			backingStorage := &dummyStorage{}
+			expectStoreRequests := 0
+			backingStorage.getListFn = func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+				expectStoreRequests++
+				podList := listObj.(*example.PodList)
+				switch opts.ResourceVersionMatch {
+				case "":
+					podList.ResourceVersion = "42"
+				case metav1.ResourceVersionMatchExact:
+					podList.ResourceVersion = opts.ResourceVersion
+				}
+				return nil
+			}
+			cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			defer cacher.Stop()
+			snapshotRequestCount := 0
+			cacher.watchCache.RWMutex.Lock()
+			cacher.watchCache.snapshots = &fakeSnapshotter{
+				getLessOrEqual: func(rv uint64) (orderedLister, bool) {
+					snapshotAvailable := tc.snapshotsAvailable[snapshotRequestCount]
+					snapshotRequestCount++
+					if snapshotAvailable {
+						return fakeOrderedLister{}, true
+					} else {
+						return nil, false
+					}
+				},
+			}
+			cacher.watchCache.RWMutex.Unlock()
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready")
+			}
+			delegator := NewCacheDelegator(cacher, backingStorage)
+
+			result := &example.PodList{}
+			err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: "20", ResourceVersionMatch: metav1.ResourceVersionMatchExact, Recursive: true}, result)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			if result.ResourceVersion != "20" {
+				t.Fatalf("Unexpected List response RV, got: %q, want: %d", result.ResourceVersion, 20)
+			}
+			if expectStoreRequests != tc.expectStoreRequests {
+				t.Fatalf("Unexpected number of requests to storage, got: %d, want: %d", expectStoreRequests, tc.expectStoreRequests)
+			}
+			if snapshotRequestCount != tc.expectSnapshotRequests {
+				t.Fatalf("Unexpected number of requests to snapshots, got: %d, want: %d", snapshotRequestCount, tc.expectSnapshotRequests)
+			}
+
+		})
+	}
+}
+
 func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
 	backingStorage := &dummyStorage{}
@@ -533,6 +727,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	pred := storage.SelectionPredicate{
 		Limit: 500,
@@ -546,7 +741,7 @@ func TestGetListNonRecursiveCacheBypass(t *testing.T) {
 	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
+	backingStorage.injectGetListError(errDummy)
 	err = delegator.GetList(context.TODO(), "pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       pred,
@@ -572,6 +767,7 @@ func TestGetCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	result := &example.Pod{}
 
@@ -582,7 +778,7 @@ func TestGetCacheBypass(t *testing.T) {
 	}
 
 	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.injectError(errDummy)
+	backingStorage.injectGetListError(errDummy)
 	err = delegator.Get(context.TODO(), "pods/ns/pod-0", storage.GetOptions{
 		IgnoreNotFound:  true,
 		ResourceVersion: "0",
@@ -608,6 +804,7 @@ func TestWatchCacheBypass(t *testing.T) {
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err := cacher.ready.wait(context.Background()); err != nil {
@@ -638,13 +835,14 @@ func TestTooManyRequestsNotReturned(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResilientWatchCacheInitialization, false)
 
 	dummyErr := fmt.Errorf("dummy")
-	backingStorage := &dummyStorage{err: dummyErr}
+	backingStorage := &dummyStorage{getlistErr: dummyErr}
 	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	opts := storage.ListOptions{
 		ResourceVersion: "0",
@@ -765,7 +963,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Configure cacher so that it can't initialize, because of
 	// constantly failing lists to the underlying storage.
 	dummyErr := fmt.Errorf("dummy")
-	backingStorage := &dummyStorage{err: dummyErr}
+	backingStorage := &dummyStorage{watchErr: dummyErr}
 	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, testingclock.NewFakeClock(time.Now()))
 	if err != nil {
 		t.Fatalf("Couldn't create cacher: %v", err)
@@ -789,7 +987,7 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 			t.Errorf("Unexpected error: %#v", err)
 		}
 	} else {
-		if err == nil || err.Error() != apierrors.NewTooManyRequests("storage is (re)initializing", 1).Error() {
+		if err == nil || !strings.Contains(err.Error(), "storage is (re)initializing") {
 			t.Errorf("Unexpected error: %#v", err)
 		}
 	}
@@ -890,6 +1088,7 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 		if err := cacher.ready.wait(context.Background()); err != nil {
@@ -2326,6 +2525,7 @@ func BenchmarkCacher_GetList(b *testing.B) {
 				}
 				defer cacher.Stop()
 				delegator := NewCacheDelegator(cacher, store)
+				defer delegator.Stop()
 
 				// prepare result and pred
 				parsedField, err := fields.ParseSelector("spec.nodeName=node-0")
@@ -2870,6 +3070,7 @@ func TestWatchStreamSeparation(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize cacher: %v", err)
 			}
+			defer cacher.Stop()
 
 			if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
 				if err := cacher.ready.wait(context.TODO()); err != nil {
@@ -3172,7 +3373,7 @@ func TestListIndexer(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pred := storagetesting.CreatePodPredicate(tt.fieldSelector, true, tt.indexFields)
-			_, usedIndex, err := cacher.cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, pred, tt.recursive)
+			_, usedIndex, err := cacher.cacher.listItems(ctx, 0, "/pods/"+tt.requestedNamespace, storage.ListOptions{Predicate: pred, Recursive: tt.recursive})
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -3198,7 +3399,7 @@ func TestRetryAfterForUnreadyCache(t *testing.T) {
 		t.Fatalf("Unexpected error waiting for the cache to be ready")
 	}
 
-	cacher.ready.set(false)
+	cacher.ready.setError(nil)
 	clock.Step(14 * time.Second)
 
 	opts := storage.ListOptions{
@@ -3207,6 +3408,7 @@ func TestRetryAfterForUnreadyCache(t *testing.T) {
 	}
 	result := &example.PodList{}
 	delegator := NewCacheDelegator(cacher, backingStorage)
+	defer delegator.Stop()
 	err = delegator.GetList(context.TODO(), "/pods/ns", opts, result)
 
 	if !apierrors.IsTooManyRequests(err) {

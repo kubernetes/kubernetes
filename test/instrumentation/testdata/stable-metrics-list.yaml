@@ -1,3 +1,43 @@
+- name: automatic_reload_last_timestamp_seconds
+  subsystem: authentication_config_controller
+  namespace: apiserver
+  help: Timestamp of the last automatic reload of authentication configuration split
+    by status and apiserver identity.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reloads_total
+  subsystem: authentication_config_controller
+  namespace: apiserver
+  help: Total number of automatic reloads of authentication configuration split by
+    status and apiserver identity.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reload_last_timestamp_seconds
+  subsystem: authorization_config_controller
+  namespace: apiserver
+  help: Timestamp of the last automatic reload of authorization configuration split
+    by status and apiserver identity.
+  type: Gauge
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
+- name: automatic_reloads_total
+  subsystem: authorization_config_controller
+  namespace: apiserver
+  help: Total number of automatic reloads of authorization configuration split by
+    status and apiserver identity.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - apiserver_id_hash
+  - status
 - name: compilation_duration_seconds
   subsystem: cel
   namespace: apiserver
@@ -122,6 +162,19 @@
   - error_type
   - policy
   - policy_binding
+- name: declarative_validation_mismatch_total
+  subsystem: validation
+  namespace: apiserver
+  help: Number of times declarative validation results differed from handwritten validation
+    results for core types.
+  type: Counter
+  stabilityLevel: BETA
+- name: declarative_validation_panic_total
+  subsystem: validation
+  namespace: apiserver
+  help: Number of times declarative validation has panicked during validation.
+  type: Counter
+  stabilityLevel: BETA
 - name: disabled_metrics_total
   help: The count of disabled metrics.
   type: Counter
@@ -138,6 +191,19 @@
   labels:
   - name
   - stage
+- name: probe_total
+  subsystem: prober
+  help: Cumulative number of a liveness, readiness or startup probe for a container
+    by result.
+  type: Counter
+  stabilityLevel: BETA
+  labels:
+  - container
+  - namespace
+  - pod
+  - pod_uid
+  - probe_type
+  - result
 - name: registered_metrics_total
   help: The count of registered metrics broken by stability level and deprecation
     version.

@@ -1,0 +1,11 @@
+apiVersion: kubectl.config.k8s.io/v1beta1
+kind: Preference
+defaults:
+  - command: v1beta1-apply
+    options:
+      - name: server-side
+        default: "true"
+  - command: v1beta1-delete
+    options:
+      - name: interactive
+        default: "true"

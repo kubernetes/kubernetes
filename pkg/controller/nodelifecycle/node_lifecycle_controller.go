@@ -125,8 +125,7 @@ const (
 
 const (
 	// The amount of time the nodecontroller should sleep between retrying node health updates
-	retrySleepTime   = 20 * time.Millisecond
-	nodeNameKeyIndex = "spec.nodeName"
+	retrySleepTime = 20 * time.Millisecond
 	// podUpdateWorkerSizes assumes that in most cases pod will be handled by monitorNodeHealth pass.
 	// Pod update workers will only handle lagging cache pods. 4 workers should be enough.
 	podUpdateWorkerSize = 4
@@ -388,22 +387,10 @@ func NewNodeLifecycleController(
 		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
-	podInformer.Informer().AddIndexers(cache.Indexers{
-		nodeNameKeyIndex: func(obj interface{}) ([]string, error) {
-			pod, ok := obj.(*v1.Pod)
-			if !ok {
-				return []string{}, nil
-			}
-			if len(pod.Spec.NodeName) == 0 {
-				return []string{}, nil
-			}
-			return []string{pod.Spec.NodeName}, nil
-		},
-	})
-
+	controller.AddPodNodeNameIndexer(podInformer.Informer())
 	podIndexer := podInformer.Informer().GetIndexer()
 	nc.getPodsAssignedToNode = func(nodeName string) ([]*v1.Pod, error) {
-		objs, err := podIndexer.ByIndex(nodeNameKeyIndex, nodeName)
+		objs, err := podIndexer.ByIndex(controller.PodNodeNameKeyIndex, nodeName)
 		if err != nil {
 			return nil, err
 		}

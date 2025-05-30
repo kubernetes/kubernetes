@@ -220,7 +220,7 @@ type VolumeSource struct {
 	// The types of objects that may be mounted by this volume are defined by the container runtime implementation on a host machine and at minimum must include all valid types supported by the container image field.
 	// The OCI object gets mounted in a single directory (spec.containers[*].volumeMounts.mountPath) by merging the manifest layers in the same way as for container images.
 	// The volume will be mounted read-only (ro) and non-executable files (noexec).
-	// Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath).
+	// Sub path mounts for containers are not supported (spec.containers[*].volumeMounts.subpath) before 1.33.
 	// The field spec.securityContext.fsGroupChangePolicy has no effect on this volume type.
 	// +featureGate=ImageVolume
 	// +optional
@@ -2673,6 +2673,78 @@ type GRPCAction struct {
 	Service *string
 }
 
+// Signal defines the stop signal of containers
+// +enum
+type Signal string
+
+const (
+	SIGABRT         Signal = "SIGABRT"
+	SIGALRM         Signal = "SIGALRM"
+	SIGBUS          Signal = "SIGBUS"
+	SIGCHLD         Signal = "SIGCHLD"
+	SIGCLD          Signal = "SIGCLD"
+	SIGCONT         Signal = "SIGCONT"
+	SIGFPE          Signal = "SIGFPE"
+	SIGHUP          Signal = "SIGHUP"
+	SIGILL          Signal = "SIGILL"
+	SIGINT          Signal = "SIGINT"
+	SIGIO           Signal = "SIGIO"
+	SIGIOT          Signal = "SIGIOT"
+	SIGKILL         Signal = "SIGKILL"
+	SIGPIPE         Signal = "SIGPIPE"
+	SIGPOLL         Signal = "SIGPOLL"
+	SIGPROF         Signal = "SIGPROF"
+	SIGPWR          Signal = "SIGPWR"
+	SIGQUIT         Signal = "SIGQUIT"
+	SIGSEGV         Signal = "SIGSEGV"
+	SIGSTKFLT       Signal = "SIGSTKFLT"
+	SIGSTOP         Signal = "SIGSTOP"
+	SIGSYS          Signal = "SIGSYS"
+	SIGTERM         Signal = "SIGTERM"
+	SIGTRAP         Signal = "SIGTRAP"
+	SIGTSTP         Signal = "SIGTSTP"
+	SIGTTIN         Signal = "SIGTTIN"
+	SIGTTOU         Signal = "SIGTTOU"
+	SIGURG          Signal = "SIGURG"
+	SIGUSR1         Signal = "SIGUSR1"
+	SIGUSR2         Signal = "SIGUSR2"
+	SIGVTALRM       Signal = "SIGVTALRM"
+	SIGWINCH        Signal = "SIGWINCH"
+	SIGXCPU         Signal = "SIGXCPU"
+	SIGXFSZ         Signal = "SIGXFSZ"
+	SIGRTMIN        Signal = "SIGRTMIN"
+	SIGRTMINPLUS1   Signal = "SIGRTMIN+1"
+	SIGRTMINPLUS2   Signal = "SIGRTMIN+2"
+	SIGRTMINPLUS3   Signal = "SIGRTMIN+3"
+	SIGRTMINPLUS4   Signal = "SIGRTMIN+4"
+	SIGRTMINPLUS5   Signal = "SIGRTMIN+5"
+	SIGRTMINPLUS6   Signal = "SIGRTMIN+6"
+	SIGRTMINPLUS7   Signal = "SIGRTMIN+7"
+	SIGRTMINPLUS8   Signal = "SIGRTMIN+8"
+	SIGRTMINPLUS9   Signal = "SIGRTMIN+9"
+	SIGRTMINPLUS10  Signal = "SIGRTMIN+10"
+	SIGRTMINPLUS11  Signal = "SIGRTMIN+11"
+	SIGRTMINPLUS12  Signal = "SIGRTMIN+12"
+	SIGRTMINPLUS13  Signal = "SIGRTMIN+13"
+	SIGRTMINPLUS14  Signal = "SIGRTMIN+14"
+	SIGRTMINPLUS15  Signal = "SIGRTMIN+15"
+	SIGRTMAXMINUS14 Signal = "SIGRTMAX-14"
+	SIGRTMAXMINUS13 Signal = "SIGRTMAX-13"
+	SIGRTMAXMINUS12 Signal = "SIGRTMAX-12"
+	SIGRTMAXMINUS11 Signal = "SIGRTMAX-11"
+	SIGRTMAXMINUS10 Signal = "SIGRTMAX-10"
+	SIGRTMAXMINUS9  Signal = "SIGRTMAX-9"
+	SIGRTMAXMINUS8  Signal = "SIGRTMAX-8"
+	SIGRTMAXMINUS7  Signal = "SIGRTMAX-7"
+	SIGRTMAXMINUS6  Signal = "SIGRTMAX-6"
+	SIGRTMAXMINUS5  Signal = "SIGRTMAX-5"
+	SIGRTMAXMINUS4  Signal = "SIGRTMAX-4"
+	SIGRTMAXMINUS3  Signal = "SIGRTMAX-3"
+	SIGRTMAXMINUS2  Signal = "SIGRTMAX-2"
+	SIGRTMAXMINUS1  Signal = "SIGRTMAX-1"
+	SIGRTMAX        Signal = "SIGRTMAX"
+)
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -2693,6 +2765,11 @@ type Lifecycle struct {
 	// More info: https://kubernetes.io/docs/concepts/containers/container-lifecycle-hooks/#container-hooks
 	// +optional
 	PreStop *LifecycleHandler
+	// StopSignal defines which signal will be sent to a container when it is being stopped.
+	// If not specified, the default is defined by the container runtime in use.
+	// StopSignal can only be set for Pods with a non-empty .spec.os.name
+	// +optional
+	StopSignal *Signal
 }
 
 // The below types are used by kube_client and api_server.
@@ -2831,6 +2908,12 @@ type ContainerStatus struct {
 	// +featureGate=ResourceHealthStatus
 	// +optional
 	AllocatedResourcesStatus []ResourceStatus
+	// StopSignal is the signal which will be sent to this container when it is stopped.  This might be
+	// the stop signal specified by the user, the signal specified in the container image, or the default
+	// stop signal of the container runtime on this node.
+	// +featureGate=ContainerStopSignals
+	// +optional
+	StopSignal *Signal
 }
 
 type ResourceStatus struct {
@@ -2951,12 +3034,26 @@ const (
 	// DisruptionTarget indicates the pod is about to be terminated due to a
 	// disruption (such as preemption, eviction API or garbage-collection).
 	DisruptionTarget PodConditionType = "DisruptionTarget"
+	// PodResizePending indicates that the pod has been resized, but kubelet has not
+	// yet allocated the resources. If both PodResizePending and PodResizeInProgress
+	// are set, it means that a new resize was requested in the middle of a previous
+	// pod resize that is still in progress.
+	PodResizePending PodConditionType = "PodResizePending"
+	// PodResizeInProgress indicates that a resize is in progress, and is present whenever
+	// the Kubelet has allocated resources for the resize, but has not yet actuated all of
+	// the required changes.
+	// If both PodResizePending and PodResizeInProgress are set, it means that a new resize was
+	// requested in the middle of a previous pod resize that is still in progress.
+	PodResizeInProgress PodConditionType = "PodResizeInProgress"
 )
 
 // PodCondition represents pod's condition
 type PodCondition struct {
-	Type   PodConditionType
-	Status ConditionStatus
+	Type PodConditionType
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64
+	Status             ConditionStatus
 	// +optional
 	LastProbeTime metav1.Time
 	// +optional
@@ -2967,12 +3064,10 @@ type PodCondition struct {
 	Message string
 }
 
-// PodResizeStatus shows status of desired resize of a pod's containers.
+// Deprecated: PodResizeStatus shows status of desired resize of a pod's containers.
 type PodResizeStatus string
 
 const (
-	// Pod resources resize has been requested and will be evaluated by node.
-	PodResizeStatusProposed PodResizeStatus = "Proposed"
 	// Pod resources resize has been accepted by node and is being actuated.
 	PodResizeStatusInProgress PodResizeStatus = "InProgress"
 	// Node cannot resize the pod at this time and will keep retrying.
@@ -3201,8 +3296,8 @@ type PodAntiAffinity struct {
 	// most preferred is the one with the greatest sum of weights, i.e.
 	// for each node that meets all of the scheduling requirements (resource
 	// request, requiredDuringScheduling anti-affinity expressions, etc.),
-	// compute a sum by iterating through the elements of this field and adding
-	// "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the
+	// compute a sum by iterating through the elements of this field and subtracting
+	// "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the
 	// node(s) with the highest sum are the most preferred.
 	// +optional
 	PreferredDuringSchedulingIgnoredDuringExecution []WeightedPodAffinityTerm
@@ -3256,7 +3351,6 @@ type PodAffinityTerm struct {
 	// pod labels will be ignored. The default value is empty.
 	// The same key is forbidden to exist in both matchLabelKeys and labelSelector.
 	// Also, matchLabelKeys cannot be set when labelSelector isn't set.
-	// This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
 	//
 	// +listType=atomic
 	// +optional
@@ -3269,7 +3363,6 @@ type PodAffinityTerm struct {
 	// pod labels will be ignored. The default value is empty.
 	// The same key is forbidden to exist in both mismatchLabelKeys and labelSelector.
 	// Also, mismatchLabelKeys cannot be set when labelSelector isn't set.
-	// This is a beta field and requires enabling MatchLabelKeysInPodAffinity feature gate (enabled by default).
 	//
 	// +listType=atomic
 	// +optional
@@ -3330,7 +3423,6 @@ type Taint struct {
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	Effect TaintEffect
 	// TimeAdded represents the time at which the taint was added.
-	// It is only written for NoExecute taints.
 	// +optional
 	TimeAdded *metav1.Time
 }
@@ -3957,7 +4049,7 @@ type AppArmorProfile struct {
 	//   Localhost - a profile pre-loaded on the node.
 	//   RuntimeDefault - the container runtime's default profile.
 	//   Unconfined - no AppArmor enforcement.
-	// +unionDescriminator
+	// +unionDiscriminator
 	Type AppArmorProfileType
 
 	// localhostProfile indicates a profile loaded on the node that should be used.
@@ -4164,6 +4256,11 @@ type EphemeralContainer struct {
 // PodStatus represents information about the status of a pod. Status may trail the actual
 // state of a system.
 type PodStatus struct {
+	// If set, this represents the .metadata.generation that the pod status was set based upon.
+	// This is an alpha field. Enable PodObservedGenerationTracking to be able to use this field.
+	// +featureGate=PodObservedGenerationTracking
+	// +optional
+	ObservedGeneration int64
 	// +optional
 	Phase PodPhase
 	// +optional
@@ -4245,6 +4342,9 @@ type PodStatus struct {
 	// Status of resources resize desired for pod's containers.
 	// It is empty if no resources resize is pending.
 	// Any changes to container resources will automatically set this to "Proposed"
+	// Deprecated: Resize status is moved to two pod conditions PodResizePending and PodResizeInProgress.
+	// PodResizePending will track states where the spec has been resized, but the Kubelet has not yet allocated the resources.
+	// PodResizeInProgress will track in-progress resizes, and should be present whenever allocated resources != acknowledged resources.
 	// +featureGate=InPlacePodVerticalScaling
 	// +optional
 	Resize PodResizeStatus
@@ -4326,7 +4426,7 @@ type PodTemplateList struct {
 // a TemplateRef or a Template set.
 type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.
-	Replicas int32
+	Replicas *int32
 
 	// Minimum number of seconds for which a newly created pod should be ready
 	// without any of its container crashing, for it to be considered available.
@@ -4542,14 +4642,27 @@ const (
 
 // These are valid values for the TrafficDistribution field of a Service.
 const (
-	// Indicates a preference for routing traffic to endpoints that are
-	// topologically proximate to the client. The interpretation of "topologically
-	// proximate" may vary across implementations and could encompass endpoints
-	// within the same node, rack, zone, or even region. Setting this value gives
-	// implementations permission to make different tradeoffs, e.g. optimizing for
-	// proximity rather than equal distribution of load. Users should not set this
-	// value if such tradeoffs are not acceptable.
+	// Indicates a preference for routing traffic to endpoints that are in the same
+	// zone as the client. Users should not set this value unless they have ensured
+	// that clients and endpoints are distributed in such a way that the "same zone"
+	// preference will not result in endpoints getting overloaded.
 	ServiceTrafficDistributionPreferClose = "PreferClose"
+
+	// Indicates a preference for routing traffic to endpoints that are in the same
+	// zone as the client. Users should not set this value unless they have ensured
+	// that clients and endpoints are distributed in such a way that the "same zone"
+	// preference will not result in endpoints getting overloaded.
+	// This is an alias for "PreferClose", but it is an Alpha feature and is only
+	// recognized if the PreferSameTrafficDistribution feature gate is enabled.
+	ServiceTrafficDistributionPreferSameZone = "PreferSameZone"
+
+	// Indicates a preference for routing traffic to endpoints that are on the same
+	// node as the client. Users should not set this value unless they have ensured
+	// that clients and endpoints are distributed in such a way that the "same node"
+	// preference will not result in endpoints getting overloaded.
+	// This is an Alpha feature and is only recognized if the
+	// PreferSameTrafficDistribution feature gate is enabled.
+	ServiceTrafficDistributionPreferSameNode = "PreferSameNode"
 )
 
 // These are the valid conditions of a service.
@@ -4816,12 +4929,12 @@ type ServiceSpec struct {
 	// +optional
 	InternalTrafficPolicy *ServiceInternalTrafficPolicy
 
-	// TrafficDistribution offers a way to express preferences for how traffic is
-	// distributed to Service endpoints. Implementations can use this field as a
-	// hint, but are not required to guarantee strict adherence. If the field is
-	// not set, the implementation will apply its default routing strategy. If set
-	// to "PreferClose", implementations should prioritize endpoints that are
-	// topologically close (e.g., same zone).
+	// TrafficDistribution offers a way to express preferences for how traffic
+	// is distributed to Service endpoints. Implementations can use this field
+	// as a hint, but are not required to guarantee strict adherence. If the
+	// field is not set, the implementation will apply its default routing
+	// strategy. If set to "PreferClose", implementations should prioritize
+	// endpoints that are in the same zone.
 	// +optional
 	TrafficDistribution *string
 }
@@ -5172,6 +5285,15 @@ type NodeSystemInfo struct {
 	OperatingSystem string
 	// The Architecture reported by the node
 	Architecture string
+	// Swap Info reported by the node.
+	Swap *NodeSwapStatus
+}
+
+// NodeSwapStatus represents swap memory information.
+type NodeSwapStatus struct {
+	// Total amount of swap memory in bytes.
+	// +optional
+	Capacity *int64
 }
 
 // NodeConfigStatus describes the status of the config assigned by Node.Spec.ConfigSource.
@@ -6044,6 +6166,9 @@ const (
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
+
+	// Match all pvc objects that have volume attributes class mentioned.
+	ResourceQuotaScopeVolumeAttributesClass ResourceQuotaScope = "VolumeAttributesClass"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -6680,7 +6805,6 @@ type TopologySpreadConstraint struct {
 	// - Ignore: nodeAffinity/nodeSelector are ignored. All nodes are included in the calculations.
 	//
 	// If this value is nil, the behavior is equivalent to the Honor policy.
-	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeAffinityPolicy *NodeInclusionPolicy
 	// NodeTaintsPolicy indicates how we will treat node taints when calculating
@@ -6690,7 +6814,6 @@ type TopologySpreadConstraint struct {
 	// - Ignore: node taints are ignored. All nodes are included.
 	//
 	// If this value is nil, the behavior is equivalent to the Ignore policy.
-	// This is a beta-level feature default enabled by the NodeInclusionPolicyInPodTopologySpread feature flag.
 	// +optional
 	NodeTaintsPolicy *NodeInclusionPolicy
 	// MatchLabelKeys is a set of pod label keys to select the pods over which

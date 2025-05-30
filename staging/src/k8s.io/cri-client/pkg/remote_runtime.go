@@ -104,8 +104,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		// Even if there is no TracerProvider, the otelgrpc still handles context propagation.
 		// See https://github.com/open-telemetry/opentelemetry-go/tree/main/example/passthrough
 		dialOpts = append(dialOpts,
-			grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor(tracingOpts...)),
-			grpc.WithStreamInterceptor(otelgrpc.StreamClientInterceptor(tracingOpts...)))
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
 
 	connParams := grpc.ConnectParams{
@@ -606,6 +605,23 @@ func (r *remoteRuntimeService) portForwardV1(ctx context.Context, req *runtimeap
 		r.logErr(err, "PortForward failed")
 		return nil, err
 	}
+
+	return resp, nil
+}
+
+// UpdatePodSandboxResources synchronously updates the PodSandboxConfig with
+// the pod-level resource configuration.
+func (r *remoteRuntimeService) UpdatePodSandboxResources(ctx context.Context, req *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error) {
+	r.log(10, "[RemoteRuntimeService] UpdatePodSandboxResources", "PodSandboxId", req.PodSandboxId, "timeout", r.timeout)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	resp, err := r.runtimeClient.UpdatePodSandboxResources(ctx, req)
+	if err != nil {
+		r.logErr(err, "UpdatePodSandboxResources from runtime service failed", "podSandboxID", req.PodSandboxId)
+		return nil, err
+	}
+	r.log(10, "[RemoteRuntimeService] UpdatePodSandboxResources Response", "podSandboxID", req.PodSandboxId)
 
 	return resp, nil
 }

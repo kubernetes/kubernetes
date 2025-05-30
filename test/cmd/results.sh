@@ -53,6 +53,11 @@ Error from server (NotFound): pods "no-such-pod" not found
 EOF
   kube::test::results::diff "${TEMP}/actual_stdout" "${TEMP}/actual_stderr" "$res" "${TEMP}/empty" "${TEMP}/expected_stderr" 1 "kubectl get pod/no-such-pod"
 
+  output_message=$(kubectl get namespace kube-system 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_not_string "${output_message}" "command headers turned on"
+  output_message=$(kubectl get namespace kube-system 2>&1 "${kube_flags[@]:?}" -v=5)
+  kube::test::if_has_string "${output_message}" "command headers turned on"
+
   set +o nounset
   set +o errexit
 }

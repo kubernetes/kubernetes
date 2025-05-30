@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -30,6 +31,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/utils/ptr"
 )
@@ -38,6 +40,14 @@ type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecon
 
 func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	return f(uid, name, namespace)
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+func uint64Ptr(i uint64) *uint64 {
+	return &i
 }
 
 func TestIsInitContainerFailed(t *testing.T) {
@@ -98,27 +108,83 @@ func TestIsInitContainerFailed(t *testing.T) {
 	}
 }
 
-func TestStableKey(t *testing.T) {
-	container := &v1.Container{
-		Name:  "test_container",
-		Image: "foo/image:v1",
-	}
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test_pod",
-			Namespace: "test_pod_namespace",
-			UID:       "test_pod_uid",
+func TestGetBackoffKey(t *testing.T) {
+	testSpecs := map[string]v1.PodSpec{
+		"empty resources": {
+			Containers: []v1.Container{{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+			}},
 		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{*container},
+		"with resources": {
+			Containers: []v1.Container{{
+				Name:  "test_container",
+				Image: "foo/image:v1",
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("100m"),
+						v1.ResourceMemory: resource.MustParse("100Mi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("200m"),
+						v1.ResourceMemory: resource.MustParse("200Mi"),
+					},
+				},
+			}},
 		},
 	}
-	oldKey := GetStableKey(pod, container)
 
-	// Updating the container image should change the key.
-	container.Image = "foo/image:v2"
-	newKey := GetStableKey(pod, container)
-	assert.NotEqual(t, oldKey, newKey)
+	for name, spec := range testSpecs {
+		t.Run(name, func(t *testing.T) {
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test_pod",
+					Namespace: "test_pod_namespace",
+					UID:       "test_pod_uid",
+				},
+				Spec: spec,
+			}
+			secondContainer := v1.Container{
+				Name:  "second_container",
+				Image: "registry.k8s.io/pause",
+			}
+			pod.Spec.Containers = append(pod.Spec.Containers, secondContainer)
+			originalKey := GetBackoffKey(pod, &pod.Spec.Containers[0])
+
+			podCopy := pod.DeepCopy()
+			podCopy.Spec.ActiveDeadlineSeconds = int64Ptr(1)
+			assert.Equal(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Unrelated change should not change the key")
+
+			podCopy = pod.DeepCopy()
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[1]),
+				"Different container change should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Name = "other-pod"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Different pod name should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Namespace = "other-namespace"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Different pod namespace should change the key")
+
+			podCopy = pod.DeepCopy()
+			podCopy.Spec.Containers[0].Image = "foo/image:v2"
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the container image should change the key")
+
+			podCopy = pod.DeepCopy()
+			c := &podCopy.Spec.Containers[0]
+			if c.Resources.Requests == nil {
+				c.Resources.Requests = v1.ResourceList{}
+			}
+			c.Resources.Requests[v1.ResourceCPU] = resource.MustParse("200m")
+			assert.NotEqual(t, originalKey, GetBackoffKey(podCopy, &podCopy.Spec.Containers[0]),
+				"Updating the resources should change the key")
+		})
+	}
 }
 
 func TestToKubeContainer(t *testing.T) {
@@ -440,4 +506,84 @@ func TestGetAppArmorProfile(t *testing.T) {
 			assert.Equal(t, test.expectedOldProfile, actualOld, "old (deprecated) profile string")
 		})
 	}
+}
+
+func TestMergeResourceConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		source   *cm.ResourceConfig
+		update   *cm.ResourceConfig
+		expected *cm.ResourceConfig
+	}{
+		{
+			name:   "merge all fields",
+			source: &cm.ResourceConfig{Memory: int64Ptr(1024), CPUShares: uint64Ptr(2)},
+			update: &cm.ResourceConfig{Memory: int64Ptr(2048), CPUQuota: int64Ptr(5000)},
+			expected: &cm.ResourceConfig{
+				Memory:    int64Ptr(2048),
+				CPUShares: uint64Ptr(2),
+				CPUQuota:  int64Ptr(5000),
+			},
+		},
+		{
+			name:   "merge HugePageLimit and Unified",
+			source: &cm.ResourceConfig{HugePageLimit: map[int64]int64{2048: 1024}, Unified: map[string]string{"key1": "value1"}},
+			update: &cm.ResourceConfig{HugePageLimit: map[int64]int64{4096: 2048}, Unified: map[string]string{"key1": "newValue1", "key2": "value2"}},
+			expected: &cm.ResourceConfig{
+				HugePageLimit: map[int64]int64{2048: 1024, 4096: 2048},
+				Unified:       map[string]string{"key1": "newValue1", "key2": "value2"},
+			},
+		},
+		{
+			name:   "update nil source",
+			source: nil,
+			update: &cm.ResourceConfig{Memory: int64Ptr(4096)},
+			expected: &cm.ResourceConfig{
+				Memory: int64Ptr(4096),
+			},
+		},
+		{
+			name:   "update nil update",
+			source: &cm.ResourceConfig{Memory: int64Ptr(1024)},
+			update: nil,
+			expected: &cm.ResourceConfig{
+				Memory: int64Ptr(1024),
+			},
+		},
+		{
+			name:   "update empty source",
+			source: &cm.ResourceConfig{},
+			update: &cm.ResourceConfig{Memory: int64Ptr(8192)},
+			expected: &cm.ResourceConfig{
+				Memory: int64Ptr(8192),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			merged := mergeResourceConfig(tt.source, tt.update)
+
+			assert.Equal(t, tt.expected, merged)
+		})
+	}
+}
+
+func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
+	resCfg := &cm.ResourceConfig{
+		Memory:        int64Ptr(2048),
+		CPUShares:     uint64Ptr(2),
+		CPUPeriod:     uint64Ptr(10000),
+		CPUQuota:      int64Ptr(5000),
+		HugePageLimit: map[int64]int64{4096: 2048},
+		Unified:       map[string]string{"key1": "value1"},
+	}
+
+	lcr := convertResourceConfigToLinuxContainerResources(resCfg)
+
+	assert.Equal(t, int64(*resCfg.CPUPeriod), lcr.CpuPeriod)
+	assert.Equal(t, *resCfg.CPUQuota, lcr.CpuQuota)
+	assert.Equal(t, int64(*resCfg.CPUShares), lcr.CpuShares)
+	assert.Equal(t, *resCfg.Memory, lcr.MemoryLimitInBytes)
+	assert.Equal(t, resCfg.Unified, lcr.Unified)
 }

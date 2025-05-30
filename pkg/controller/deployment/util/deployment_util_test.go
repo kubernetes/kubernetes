@@ -1455,14 +1455,14 @@ func TestMinAvailable(t *testing.T) {
 
 func TestGetReplicaSetFraction(t *testing.T) {
 	tests := []struct {
-		name                                 string
-		enableDeploymentPodReplacementPolicy bool
-		deploymentReplicas                   int32
-		deploymentStatusReplicas             int32
-		deploymentMaxSurge                   int32
-		rsReplicas                           int32
-		rsAnnotations                        map[string]string
-		expectedFraction                     int32
+		name                                          string
+		enableDeploymentReplicaSetTerminatingReplicas bool
+		deploymentReplicas                            int32
+		deploymentStatusReplicas                      int32
+		deploymentMaxSurge                            int32
+		rsReplicas                                    int32
+		rsAnnotations                                 map[string]string
+		expectedFraction                              int32
 	}{
 		{
 			name:               "empty deployment always scales to 0",

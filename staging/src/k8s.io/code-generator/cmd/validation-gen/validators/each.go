@@ -76,10 +76,8 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	t := nativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
@@ -88,7 +86,8 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 	case "atomic", "set":
 		// Allowed but no special handling.
 	case "map":
-		if realType(t.Elem).Kind != types.Struct {
+		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
+		if nativeType(t.Elem).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 		}
 
@@ -105,19 +104,6 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 	// This tag doesn't generate any validations.  It just accumulates
 	// information for other tags to use.
 	return Validations{}, nil
-}
-
-func realType(t *types.Type) *types.Type {
-	for {
-		if t.Kind == types.Alias {
-			t = t.Underlying
-		} else if t.Kind == types.Pointer {
-			t = t.Elem
-		} else {
-			break
-		}
-	}
-	return t
 }
 
 func (lttv listTypeTagValidator) Docs() TagDoc {
@@ -148,22 +134,21 @@ func (listMapKeyTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	t := nativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
-	if realType(t.Elem).Kind != types.Struct {
+	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
+	if nativeType(t.Elem).Kind != types.Struct {
 		return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 	}
 
 	var fieldName string
-	if memb := getMemberByJSON(realType(t.Elem), payload); memb == nil {
+	if memb := getMemberByJSON(nativeType(t.Elem), payload); memb == nil {
 		return Validations{}, fmt.Errorf("no field for JSON name %q", payload)
-	} else if k := realType(memb.Type).Kind; k != types.Builtin {
-		return Validations{}, fmt.Errorf("only primitive types can be list-map keys, not %s", k)
+	} else if k := nativeType(memb.Type).Kind; k != types.Builtin {
+		return Validations{}, fmt.Errorf("only primitive types can be list-map keys (%s)", k)
 	} else {
 		fieldName = memb.Name
 	}
@@ -214,17 +199,13 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 func (eachValTagValidator) LateTagValidator() {}
 
 var (
-	validateEachSliceVal        = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
-	validateEachSliceValNilable = types.Name{Package: libValidationPkg, Name: "EachSliceValNilable"}
-	validateEachMapVal          = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
-	validateEachMapValNilable   = types.Name{Package: libValidationPkg, Name: "EachMapValNilable"}
+	validateEachSliceVal = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
+	validateEachMapVal   = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 )
 
 func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// NOTE: pointers to lists and maps are not supported, so we should never see a pointer here.
+	t := nativeType(context.Type)
 	switch t.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
@@ -284,16 +265,6 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		listMap = lm
 	}
 	for _, vfn := range validations.Functions {
-		// Which function we call depends on whether the value-type is
-		// already nilable or not.
-		var validateEach types.Name
-
-		if isNilableType(t.Elem) {
-			validateEach = validateEachSliceValNilable
-		} else {
-			validateEach = validateEachSliceVal
-		}
-
 		var cmpArg any = Literal("nil")
 		if listMap != nil {
 			cmpFn := FunctionLiteral{
@@ -302,6 +273,8 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			}
 			buf := strings.Builder{}
 			buf.WriteString("return ")
+			// Note: this does not handle pointer fields, which are not
+			// supposed to be used as listMap keys.
 			for i, fld := range listMap.keyFields {
 				if i > 0 {
 					buf.WriteString(" && ")
@@ -311,7 +284,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 			cmpFn.Body = buf.String()
 			cmpArg = cmpFn
 		}
-		f := Function(eachValTagName, vfn.Flags(), validateEach, cmpArg, WrapperFunction{vfn, t.Elem})
+		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, cmpArg, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
 	}
 
@@ -323,17 +296,7 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	result.OpaqueValType = validations.OpaqueType
 
 	for _, vfn := range validations.Functions {
-		// Which function we call depends on whether the value-type is
-		// already nilable or not.
-		var validateEach types.Name
-
-		if isNilableType(t.Elem) {
-			validateEach = validateEachMapValNilable
-		} else {
-			validateEach = validateEachMapVal
-		}
-
-		f := Function(eachValTagName, vfn.Flags(), validateEach, WrapperFunction{vfn, t.Elem})
+		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, WrapperFunction{vfn, t.Elem})
 		result.Functions = append(result.Functions, f)
 	}
 
@@ -374,10 +337,8 @@ var (
 )
 
 func (ektv eachKeyTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
-	t := context.Type
-	if t.Kind == types.Alias {
-		t = t.Underlying
-	}
+	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
+	t := nativeType(context.Type)
 	if t.Kind != types.Map {
 		return Validations{}, fmt.Errorf("can only be used on map types")
 	}
@@ -404,7 +365,7 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 	result := Validations{}
 	result.OpaqueKeyType = validations.OpaqueType
 	for _, vfn := range validations.Functions {
-		f := Function(eachKeyTagName, vfn.Flags(), validateEachMapKey, WrapperFunction{vfn, t.Key})
+		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, t.Key})
 		result.Functions = append(result.Functions, f)
 	}
 	return result, nil

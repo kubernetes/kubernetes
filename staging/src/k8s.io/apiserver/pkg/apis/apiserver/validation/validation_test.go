@@ -586,6 +586,61 @@ func TestValidateAuthenticationConfiguration(t *testing.T) {
 			want: "",
 		},
 		{
+			name: "valid authentication configuration that uses verified email via claim validation rule",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:       "https://issuer-url",
+							Audiences: []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								// By explicitly comparing the value to true, we let type-checking see the result will be
+								// a boolean, and to make sure a non-boolean email_verified claim will be caught at runtime.
+								Expression: `claims.?email_verified.orValue(true) == true`,
+							},
+						},
+						// allow email claim only when email_verified is present and true
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Expression: `{claims.?email: "panda"}`,
+							},
+						},
+					},
+				},
+			},
+			want: "",
+		},
+		{
+			name: "valid authentication configuration that uses verified email via claim validation rule incorrectly",
+			in: &api.AuthenticationConfiguration{
+				JWT: []api.JWTAuthenticator{
+					{
+						Issuer: api.Issuer{
+							URL:       "https://issuer-url",
+							Audiences: []string{"audience"},
+						},
+						ClaimValidationRules: []api.ClaimValidationRule{
+							{
+								// This expression was previously documented in the godoc for the JWT authenticator
+								// and was incorrect. It was changed to the above expression in the previous test case.
+								// Testing the old expression here to confirm it fails validation.
+								Expression: `claims.?email_verified.orValue(true)`,
+							},
+						},
+						// allow email claim only when email_verified is present and true
+						ClaimMappings: api.ClaimMappings{
+							Username: api.PrefixedClaimOrExpression{
+								Expression: `{claims.?email: "panda"}`,
+							},
+						},
+					},
+				},
+			},
+			want: `[jwt[0].claimValidationRules[0].expression: Invalid value: "claims.?email_verified.orValue(true)": must evaluate to bool, jwt[0].claimMappings.username.expression: Invalid value: "{claims.?email: \"panda\"}": claims.email_verified must be used in claimMappings.username.expression or claimMappings.extra[*].valueExpression or claimValidationRules[*].expression when claims.email is used in claimMappings.username.expression]`,
+		},
+		{
 			name: "valid authentication configuration",
 			in: &api.AuthenticationConfiguration{
 				JWT: []api.JWTAuthenticator{

@@ -168,7 +168,7 @@ type ProxyServer struct {
 	Recorder        events.EventRecorder
 	NodeRef         *v1.ObjectReference
 	HealthzServer   *healthcheck.ProxyHealthServer
-	Hostname        string
+	NodeName        string
 	PrimaryIPFamily v1.IPFamily
 	NodeIPs         map[v1.IPFamily]net.IP
 	flagz           flagz.Reader
@@ -197,7 +197,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		metrics.SetShowHidden()
 	}
 
-	s.Hostname, err = nodeutil.GetHostname(config.HostnameOverride)
+	s.NodeName, err = nodeutil.GetHostname(config.HostnameOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		return nil, err
 	}
 
-	rawNodeIPs := getNodeIPs(ctx, s.Client, s.Hostname)
+	rawNodeIPs := getNodeIPs(ctx, s.Client, s.NodeName)
 	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(ctx, rawNodeIPs, config.BindAddress)
 
 	if len(config.NodePortAddresses) == 1 && config.NodePortAddresses[0] == kubeproxyconfig.NodePortAddressesPrimary {
@@ -226,8 +226,8 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 
 	s.NodeRef = &v1.ObjectReference{
 		Kind:      "Node",
-		Name:      s.Hostname,
-		UID:       types.UID(s.Hostname),
+		Name:      s.NodeName,
+		UID:       types.UID(s.NodeName),
 		Namespace: "",
 	}
 

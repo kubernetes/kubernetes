@@ -18,11 +18,14 @@ package pod
 
 import (
 	"fmt"
+	"iter"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -103,28 +106,40 @@ func skipEmptyNames(visitor Visitor) Visitor {
 // visiting is short-circuited. VisitContainers returns true if visiting completes,
 // false if visiting was short-circuited.
 func VisitContainers(podSpec *v1.PodSpec, mask ContainerType, visitor ContainerVisitor) bool {
-	if mask&InitContainers != 0 {
-		for i := range podSpec.InitContainers {
-			if !visitor(&podSpec.InitContainers[i], InitContainers) {
-				return false
-			}
-		}
-	}
-	if mask&Containers != 0 {
-		for i := range podSpec.Containers {
-			if !visitor(&podSpec.Containers[i], Containers) {
-				return false
-			}
-		}
-	}
-	if mask&EphemeralContainers != 0 {
-		for i := range podSpec.EphemeralContainers {
-			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
-				return false
-			}
+	for c, t := range ContainerIter(podSpec, mask) {
+		if !visitor(c, t) {
+			return false
 		}
 	}
 	return true
+}
+
+// ContainerIter returns an iterator over all containers in the given pod spec with a masked type.
+// The iteration order is InitContainers, then main Containers, then EphemeralContainers.
+func ContainerIter(podSpec *v1.PodSpec, mask ContainerType) iter.Seq2[*v1.Container, ContainerType] {
+	return func(yield func(*v1.Container, ContainerType) bool) {
+		if mask&InitContainers != 0 {
+			for i := range podSpec.InitContainers {
+				if !yield(&podSpec.InitContainers[i], InitContainers) {
+					return
+				}
+			}
+		}
+		if mask&Containers != 0 {
+			for i := range podSpec.Containers {
+				if !yield(&podSpec.Containers[i], Containers) {
+					return
+				}
+			}
+		}
+		if mask&EphemeralContainers != 0 {
+			for i := range podSpec.EphemeralContainers {
+				if !yield((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainers) {
+					return
+				}
+			}
+		}
+	}
 }
 
 // VisitPodSecretNames invokes the visitor function with the name of every secret
@@ -415,4 +430,37 @@ func IsRestartableInitContainer(initContainer *v1.Container) bool {
 		return false
 	}
 	return *initContainer.RestartPolicy == v1.ContainerRestartPolicyAlways
+}
+
+// CalculatePodStatusObservedGeneration calculates the observedGeneration for the pod status.
+// This is used to track the generation of the pod that was observed by the kubelet.
+// The observedGeneration is set to the pod's generation when the feature gate
+// PodObservedGenerationTracking is enabled OR if status.observedGeneration is already set.
+// This protects against an infinite loop of kubelet trying to clear the value after the FG is turned off, and
+// the API server preserving existing values when an incoming update tries to clear it.
+func CalculatePodStatusObservedGeneration(pod *v1.Pod) int64 {
+	if pod.Status.ObservedGeneration != 0 || utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) {
+		return pod.Generation
+	}
+	return 0
+}
+
+// CalculatePodConditionObservedGeneration calculates the observedGeneration for a particular pod condition.
+// The observedGeneration is set to the pod's generation when the feature gate
+// PodObservedGenerationTracking is enabled OR if condition[].observedGeneration is already set.
+// This protects against an infinite loop of kubelet trying to clear the value after the FG is turned off, and
+// the API server preserving existing values when an incoming update tries to clear it.
+func CalculatePodConditionObservedGeneration(podStatus *v1.PodStatus, generation int64, conditionType v1.PodConditionType) int64 {
+	if podStatus == nil {
+		return 0
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodObservedGenerationTracking) {
+		return generation
+	}
+	for _, condition := range podStatus.Conditions {
+		if condition.Type == conditionType && condition.ObservedGeneration != 0 {
+			return generation
+		}
+	}
+	return 0
 }

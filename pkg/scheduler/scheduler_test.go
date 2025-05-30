@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
@@ -63,6 +64,10 @@ import (
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
 	utiltesting "k8s.io/kubernetes/test/utils/ktesting"
 )
+
+func init() {
+	metrics.Register()
+}
 
 func TestSchedulerCreation(t *testing.T) {
 	invalidRegistry := map[string]frameworkruntime.PluginFactory{
@@ -316,11 +321,11 @@ func TestFailureHandler(t *testing.T) {
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
-				head, e := queue.Pop(logger)
-				if e != nil {
-					t.Fatalf("Cannot pop pod from the activeQ: %v", e)
+				pInfo, ok := queue.GetPod(testPod.Name, testPod.Namespace)
+				if !ok {
+					t.Fatalf("Failed to get pod %s/%s from queue", testPod.Namespace, testPod.Name)
 				}
-				got = head.Pod
+				got = pInfo.Pod
 			} else {
 				got = getPodFromPriorityQueue(queue, testPod)
 			}
@@ -711,7 +716,11 @@ func Test_buildQueueingHintMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, !tt.featuregateDisabled)
+			if tt.featuregateDisabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+			}
+
 			logger, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -918,7 +927,10 @@ func Test_UnionedGVKs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, tt.enableInPlacePodVerticalScaling)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, tt.enableSchedulerQueueingHints)
+			if !tt.enableSchedulerQueueingHints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
+			}
 
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)

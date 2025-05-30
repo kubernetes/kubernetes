@@ -22,6 +22,7 @@ package v1beta1
 // with apply.
 type EndpointHintsApplyConfiguration struct {
 	ForZones []ForZoneApplyConfiguration `json:"forZones,omitempty"`
+	ForNodes []ForNodeApplyConfiguration `json:"forNodes,omitempty"`
 }
 
 // EndpointHintsApplyConfiguration constructs a declarative configuration of the EndpointHints type for use with
@@ -39,6 +40,19 @@ func (b *EndpointHintsApplyConfiguration) WithForZones(values ...*ForZoneApplyCo
 			panic("nil value passed to WithForZones")
 		}
 		b.ForZones = append(b.ForZones, *values[i])
+	}
+	return b
+}
+
+// WithForNodes adds the given value to the ForNodes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the ForNodes field.
+func (b *EndpointHintsApplyConfiguration) WithForNodes(values ...*ForNodeApplyConfiguration) *EndpointHintsApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithForNodes")
+		}
+		b.ForNodes = append(b.ForNodes, *values[i])
 	}
 	return b
 }

@@ -26,11 +26,11 @@ import (
 )
 
 // NewVolumeOwnership returns an interface that can be used to recursively change volume permissions and ownership
-func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) *VolumeOwnership {
-	return nil
+func NewVolumeOwnership(mounter Mounter, dir string, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) VolumeOwnershipChanger {
+	return &VolumeOwnership{}
 }
 
-func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) *VolumeOwnership {
+func (vo *VolumeOwnership) AddProgressNotifier(pod *v1.Pod, recorder record.EventRecorder) VolumeOwnershipChanger {
 	return vo
 }
 

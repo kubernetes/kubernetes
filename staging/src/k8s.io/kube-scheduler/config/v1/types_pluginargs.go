@@ -159,17 +159,17 @@ type VolumeBindingArgs struct {
 	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds,omitempty"`
 
 	// Shape specifies the points defining the score function shape, which is
-	// used to score nodes based on the utilization of statically provisioned
-	// PVs. The utilization is calculated by dividing the total requested
+	// used to score nodes based on the utilization of provisioned PVs.
+	// The utilization is calculated by dividing the total requested
 	// storage of the pod by the total capacity of feasible PVs on each node.
 	// Each point contains utilization (ranges from 0 to 100) and its
 	// associated score (ranges from 0 to 10). You can turn the priority by
 	// specifying different scores for different utilization numbers.
 	// The default shape points are:
-	// 1) 0 for 0 utilization
-	// 2) 10 for 100 utilization
+	// 1) 10 for 0 utilization
+	// 2) 0 for 100 utilization
 	// All points must be sorted in increasing order by utilization.
-	// +featureGate=VolumeCapacityPriority
+	// +featureGate=StorageCapacityScoring
 	// +optional
 	// +listType=atomic
 	Shape []UtilizationShapePoint `json:"shape,omitempty"`

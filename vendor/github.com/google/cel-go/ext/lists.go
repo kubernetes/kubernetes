@@ -134,7 +134,7 @@ var comparableTypes = []*cel.Type{
 //
 //	<list(T)>.sortBy(<bindingName>, <keyExpr>) -> <list(T)>
 //	keyExpr returns a value in {int, uint, double, bool, duration, timestamp, string, bytes}
-
+//
 // Examples:
 //
 //	[
@@ -143,7 +143,6 @@ var comparableTypes = []*cel.Type{
 //	  Player { name: "baz", score: 1000 },
 //	].sortBy(e, e.score).map(e, e.name)
 //	== ["bar", "foo", "baz"]
-
 func Lists(options ...ListsOption) cel.EnvOption {
 	l := &listsLib{version: math.MaxUint32}
 	for _, o := range options {

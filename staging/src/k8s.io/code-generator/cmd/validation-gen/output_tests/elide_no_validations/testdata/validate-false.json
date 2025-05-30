@@ -1,13 +1,13 @@
 {
-    "*elidenovalidations.T1": {
-      "hasFieldVal.s": [
-        "field HasFieldVal.S"
-      ],
-      "hasNoValFieldVal": [
-        "field T1.HasNoValFieldVal"
-      ],
-      "hasTypeVal": [
-        "type HasTypeVal"
-      ]
-    }
+  "*elidenovalidations.T1": {
+    "hasFieldVal.s": [
+      "field HasFieldVal.S"
+    ],
+    "hasNoValFieldVal": [
+      "field T1.HasNoValFieldVal"
+    ],
+    "hasTypeVal": [
+      "type HasTypeVal"
+    ]
   }
+}

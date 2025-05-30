@@ -17,10 +17,8 @@ limitations under the License.
 package logs
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -370,22 +368,22 @@ func TestCompressLog(t *testing.T) {
 	testFile.Close()
 
 	testLog := testFile.Name()
+	testLogInfo, err := os.Stat(testLog)
+	assert.NoError(t, err)
 	c := &containerLogManager{osInterface: container.RealOS{}}
 	require.NoError(t, c.compressLog(testLog))
-	_, err = os.Stat(testLog + compressSuffix)
+	testLogCompressInfo, err := os.Stat(testLog + compressSuffix)
 	assert.NoError(t, err, "log should be compressed")
+	if testLogInfo.Mode() != testLogCompressInfo.Mode() {
+		t.Errorf("compressed and uncompressed test log file modes do not match")
+	}
+	if err := c.compressLog("test-unknown-log"); err == nil {
+		t.Errorf("compressing unknown log should return error")
+	}
 	_, err = os.Stat(testLog + tmpSuffix)
 	assert.Error(t, err, "temporary log should be renamed")
 	_, err = os.Stat(testLog)
 	assert.Error(t, err, "original log should be removed")
-
-	rc, err := UncompressLog(testLog + compressSuffix)
-	require.NoError(t, err)
-	defer rc.Close()
-	var buf bytes.Buffer
-	_, err = io.Copy(&buf, rc)
-	require.NoError(t, err)
-	assert.Equal(t, testContent, buf.String())
 }
 
 func TestRotateLatestLog(t *testing.T) {

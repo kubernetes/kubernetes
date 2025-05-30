@@ -289,7 +289,7 @@ func TestPodResourceRequests(t *testing.T) {
 		description           string
 		options               PodResourcesOptions
 		overhead              v1.ResourceList
-		podResizeStatus       v1.PodResizeStatus
+		podResizeStatus       []v1.PodCondition
 		initContainers        []v1.Container
 		initContainerStatuses []v1.ContainerStatus
 		containers            []v1.Container
@@ -432,8 +432,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("2"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: true},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: true},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -447,6 +451,41 @@ func TestPodResourceRequests(t *testing.T) {
 			containerStatus: []v1.ContainerStatus{
 				{
 					Name: "container-1",
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("2"),
+						},
+					},
+				},
+			},
+		},
+		{
+			description: "resized, infeasible & in-progress",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("4"),
+			},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU: resource.MustParse("6"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU: resource.MustParse("4"),
+					},
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{
 							v1.ResourceCPU: resource.MustParse("2"),
@@ -483,12 +522,55 @@ func TestPodResourceRequests(t *testing.T) {
 			},
 		},
 		{
+			description: "resized: per-resource 3-way maximum",
+			expectedRequests: v1.ResourceList{
+				v1.ResourceCPU:    resource.MustParse("30m"),
+				v1.ResourceMemory: resource.MustParse("30M"),
+				// Note: EphemeralStorage is not resizable, but that doesn't matter for the purposes of this test.
+				v1.ResourceEphemeralStorage: resource.MustParse("30G"),
+			},
+			options: PodResourcesOptions{UseStatusResources: true},
+			containers: []v1.Container{
+				{
+					Name: "container-1",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("30m"),
+							v1.ResourceMemory:           resource.MustParse("20M"),
+							v1.ResourceEphemeralStorage: resource.MustParse("10G"),
+						},
+					},
+				},
+			},
+			containerStatus: []v1.ContainerStatus{
+				{
+					Name: "container-1",
+					AllocatedResources: v1.ResourceList{
+						v1.ResourceCPU:              resource.MustParse("20m"),
+						v1.ResourceMemory:           resource.MustParse("10M"),
+						v1.ResourceEphemeralStorage: resource.MustParse("30G"),
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:              resource.MustParse("10m"),
+							v1.ResourceMemory:           resource.MustParse("30M"),
+							v1.ResourceEphemeralStorage: resource.MustParse("20G"),
+						},
+					},
+				},
+			},
+		},
+		{
 			description: "resized, infeasible, but don't use status",
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: false},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: false},
 			containers: []v1.Container{
 				{
 					Name: "container-1",
@@ -515,8 +597,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("2"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: true},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: true},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -572,8 +658,12 @@ func TestPodResourceRequests(t *testing.T) {
 			expectedRequests: v1.ResourceList{
 				v1.ResourceCPU: resource.MustParse("4"),
 			},
-			podResizeStatus: v1.PodResizeStatusInfeasible,
-			options:         PodResourcesOptions{UseStatusResources: false},
+			podResizeStatus: []v1.PodCondition{{
+				Type:   v1.PodResizePending,
+				Status: v1.ConditionTrue,
+				Reason: v1.PodReasonInfeasible,
+			}},
+			options: PodResourcesOptions{UseStatusResources: false},
 			initContainers: []v1.Container{
 				{
 					Name:          "restartable-init-1",
@@ -789,7 +879,7 @@ func TestPodResourceRequests(t *testing.T) {
 				Status: v1.PodStatus{
 					ContainerStatuses:     tc.containerStatus,
 					InitContainerStatuses: tc.initContainerStatuses,
-					Resize:                tc.podResizeStatus,
+					Conditions:            tc.podResizeStatus,
 				},
 			}
 			request := PodRequests(p, tc.options)
@@ -1710,12 +1800,165 @@ func TestPodLevelResourceRequests(t *testing.T) {
 			opts:             PodResourcesOptions{SkipPodLevelResources: false},
 			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("15Mi"), v1.ResourceCPU: resource.MustParse("18m")},
 		},
+		{
+			name: "pod-level resources, hugepage request/limit single page size",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceMemory:                  resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi")},
+		},
+		{
+			name: "pod-level resources, hugepage request/limit multiple page sizes",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("2Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
+		},
+		{
+			name: "pod-level resources, container-level resources, hugepage request/limit single page size",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("6Mi"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi")},
+		},
+		{
+			name: "pod-level resources, container-level resources, hugepage request/limit multiple page sizes",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+					v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:                     resource.MustParse("1"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("2Gi")},
+		},
+		{
+			name: "pod-level resources, container-level resources, hugepage request/limit multiple page sizes between pod-level and container-level",
+			podResources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:                     resource.MustParse("1"),
+					v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"),
+				},
+			},
+			containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Limits: v1.ResourceList{
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+						},
+						Requests: v1.ResourceList{
+							v1.ResourceMemory:                  resource.MustParse("4Mi"),
+							v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi"),
+						},
+					},
+				},
+			},
+			opts:             PodResourcesOptions{SkipPodLevelResources: false},
+			expectedRequests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("4Mi"), v1.ResourceHugePagesPrefix + "2Mi": resource.MustParse("10Mi"), v1.ResourceHugePagesPrefix + "1Gi": resource.MustParse("1Gi")},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			podReqs := PodRequests(getPodLevelResourcesPod(tc.podResources, tc.overhead, tc.containers, tc.initContainers), tc.opts)
 			if diff := cmp.Diff(podReqs, tc.expectedRequests); diff != "" {
 				t.Errorf("got=%v, want=%v, diff=%s", podReqs, tc.expectedRequests, diff)
+			}
+		})
+	}
+}
+
+func TestIsSupportedPodLevelResource(t *testing.T) {
+	testCases := []struct {
+		name     string
+		resource v1.ResourceName
+		expected bool
+	}{
+		{
+			name:     v1.ResourceCPU.String(),
+			resource: v1.ResourceCPU,
+			expected: true,
+		},
+		{
+			name:     v1.ResourceMemory.String(),
+			resource: v1.ResourceMemory,
+			expected: true,
+		},
+		{
+			name:     v1.ResourceEphemeralStorage.String(),
+			resource: v1.ResourceEphemeralStorage,
+			expected: false,
+		},
+		{
+			name:     v1.ResourceHugePagesPrefix + "2Mi",
+			resource: v1.ResourceHugePagesPrefix + "2Mi",
+			expected: true,
+		},
+		{
+			name:     v1.ResourceHugePagesPrefix + "1Gi",
+			resource: v1.ResourceHugePagesPrefix + "1Gi",
+			expected: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := IsSupportedPodLevelResource(tc.resource); got != tc.expected {
+				t.Errorf("Supported pod level resource %s: got=%t, want=%t", tc.resource.String(), got, tc.expected)
 			}
 		})
 	}

@@ -17,7 +17,10 @@ limitations under the License.
 package v1alpha3
 
 import (
+	"time"
+
 	resourceapi "k8s.io/api/resource/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -26,11 +29,33 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_DeviceRequest(obj *resourceapi.DeviceRequest) {
+	// If the deviceClassName is not set, then the request will have
+	// subrequests and the allocationMode and count fields should not
+	// be set.
+	if obj.DeviceClassName == "" {
+		return
+	}
 	if obj.AllocationMode == "" {
 		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
 	}
 
 	if obj.AllocationMode == resourceapi.DeviceAllocationModeExactCount && obj.Count == 0 {
 		obj.Count = 1
+	}
+}
+
+func SetDefaults_DeviceSubRequest(obj *resourceapi.DeviceSubRequest) {
+	if obj.AllocationMode == "" {
+		obj.AllocationMode = resourceapi.DeviceAllocationModeExactCount
+	}
+
+	if obj.AllocationMode == resourceapi.DeviceAllocationModeExactCount && obj.Count == 0 {
+		obj.Count = 1
+	}
+}
+
+func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
+	if obj.TimeAdded == nil {
+		obj.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
 	}
 }

@@ -96,12 +96,13 @@ func (ne *NodeExpander) runPreCheck() bool {
 		ne.markExpansionInfeasibleOnFailure = true
 	}
 
+	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 && ne.resizeStatus == "" {
+		ne.pvcAlreadyUpdated = true
+	}
+
 	// PVC is already expanded but we are still trying to expand the volume because
 	// last recorded size in ASOW is older. This can happen for RWX volume types.
-	if ne.pvcStatusCap.Cmp(ne.pluginResizeOpts.NewSize) >= 0 &&
-		ne.resizeStatus == "" &&
-		storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) {
-		ne.pvcAlreadyUpdated = true
+	if ne.pvcAlreadyUpdated && storage.ContainsAccessMode(ne.pvc.Spec.AccessModes, v1.ReadWriteMany) {
 		return true
 	}
 
@@ -124,6 +125,14 @@ func (ne *NodeExpander) runPreCheck() bool {
 func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 	allowExpansion := ne.runPreCheck()
 	if !allowExpansion {
+		if ne.pvcAlreadyUpdated {
+			// if pvc is already updated, then we could be here because size stored in ASOW is smaller and controller did full
+			// expansion and hence no node expansion is needed.
+			// This will stop reconciler from retrying expansion on the node.
+			ne.testStatus = testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: false}
+			return true, ne.pluginResizeOpts.NewSize, nil
+		}
+
 		klog.V(3).Infof("NodeExpandVolume is not allowed to proceed for volume %s with resizeStatus %s", ne.vmt.VolumeName, ne.resizeStatus)
 		ne.testStatus = testResponseData{false /* resizeCalledOnPlugin */, true /* assumeResizeFinished */}
 		return false, ne.pluginResizeOpts.OldSize, nil
@@ -144,6 +153,26 @@ func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 	}
 	_, resizeErr := ne.volumePlugin.NodeExpand(ne.pluginResizeOpts)
 	if resizeErr != nil {
+		// In order to support node volume expansion for RWX volumes on different nodes,
+		// we bypass the check for VolumeExpansionPendingOnNode state during the pre-check
+		// and then directly call the NodeExpandVolume method on the plugin.
+		//
+		// However, it does not make sense where the csi driver does not support node expansion.
+		// We should not treat this as a failure. It is a workaround for this issue:
+		// https://github.com/kubernetes/kubernetes/issues/131381.
+		//
+		// For other access modes, we should not hit this state, because we will wait for
+		// VolumeExpansionPendingOnNode before trying to expand volume in kubelet.
+		// See runPreCheck() above.
+		//
+		// If volume is already expanded, then we should not retry expansion on the node if
+		// driver returns OperationNotSupportedError.
+		if volumetypes.IsOperationNotSupportedError(resizeErr) && ne.pvcAlreadyUpdated {
+			klog.V(4).InfoS(ne.vmt.GenerateMsgDetailed("MountVolume.NodeExpandVolume failed", "NodeExpandVolume not supported"), "pod", klog.KObj(ne.vmt.Pod))
+			ne.testStatus = testResponseData{assumeResizeFinished: true, resizeCalledOnPlugin: false}
+			return true, ne.pluginResizeOpts.NewSize, nil
+		}
+
 		if volumetypes.IsOperationFinishedError(resizeErr) {
 			var markFailedError error
 			ne.actualStateOfWorld.MarkVolumeExpansionFailedWithFinalError(ne.vmt.VolumeName)
@@ -184,7 +213,7 @@ func (ne *NodeExpander) expandOnPlugin() (bool, resource.Quantity, error) {
 	}
 
 	// File system resize succeeded, now update the PVC's Capacity to match the PV's
-	ne.pvc, err = util.MarkFSResizeFinished(ne.pvc, ne.pluginResizeOpts.NewSize, ne.kubeClient)
+	ne.pvc, err = util.MarkNodeExpansionFinishedWithRecovery(ne.pvc, ne.pluginResizeOpts.NewSize, ne.kubeClient)
 	if err != nil {
 		return true, ne.pluginResizeOpts.NewSize, fmt.Errorf("mountVolume.NodeExpandVolume update pvc status failed: %w", err)
 	}

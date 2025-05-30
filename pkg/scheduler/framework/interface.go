@@ -476,9 +476,14 @@ type QueueSortPlugin interface {
 // This is because such temporal errors cannot be resolved by specific cluster events,
 // and we have no choose but keep retrying scheduling until the failure is resolved.
 //
-// Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) should implement this interface,
+// Plugins that make pod unschedulable (PreEnqueue, PreFilter, Filter, Reserve, and Permit plugins) must implement this interface,
 // otherwise the default implementation will be used, which is less efficient in requeueing Pods rejected by the plugin.
-// And, if plugins other than above extension points support this interface, they are just ignored.
+//
+// Also, if EventsToRegister returns an empty list, that means the Pods failed by the plugin are not requeued by any events,
+// which doesn't make sense in most cases (very likely misuse)
+// since the pods rejected by the plugin could be stuck in the unschedulable pod pool forever.
+//
+// If plugins other than above extension points support this interface, they are just ignored.
 type EnqueueExtensions interface {
 	Plugin
 	// EventsToRegister returns a series of possible events that may cause a Pod
@@ -520,7 +525,7 @@ type PreFilterPlugin interface {
 	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
-	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) (*PreFilterResult, *Status)
+	PreFilter(ctx context.Context, state *CycleState, p *v1.Pod, nodes []*NodeInfo) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -609,7 +614,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status)
+	Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions

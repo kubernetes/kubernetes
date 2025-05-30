@@ -327,7 +327,6 @@ Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
-          creationTimestamp: null
           name: pending-pod
           namespace: default
         spec:
@@ -350,7 +349,6 @@ Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
-          creationTimestamp: null
           name: pending-pod
           namespace: default
         spec:
@@ -369,7 +367,6 @@ In [It] at: wait_test.go:71 <time>
 Expected pod to reach phase "Running", got final phase "Failed" instead:
     <*v1.Pod>: 
         metadata:
-          creationTimestamp: null
           name: failed-pod
           namespace: default
         spec:
@@ -390,7 +387,6 @@ In [It] at: wait_test.go:75 <time>
 Expected pod to reach phase "Running", got final phase "Failed" instead:
     <*v1.Pod>: 
         metadata:
-          creationTimestamp: null
           name: failed-pod
           namespace: default
         spec:
@@ -425,7 +421,6 @@ Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
-          creationTimestamp: null
           name: pending-pod
           namespace: default
         spec:
@@ -459,7 +454,6 @@ Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
-          creationTimestamp: null
           name: pending-pod
           namespace: default
         spec:

@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	baseversion "k8s.io/component-base/version"
 )
 
@@ -42,6 +43,9 @@ type EffectiveVersion interface {
 	// AllowedMinCompatibilityVersionRange returns the string of the allowed range of min compatibility version.
 	// Used only for docs/help.
 	AllowedMinCompatibilityVersionRange() string
+
+	// Info returns the version information of a component.
+	Info() *apimachineryversion.Info
 }
 
 type MutableEffectiveVersion interface {
@@ -75,13 +79,7 @@ func (m *effectiveVersion) BinaryVersion() *version.Version {
 }
 
 func (m *effectiveVersion) EmulationVersion() *version.Version {
-	ver := m.emulationVersion.Load()
-	if ver != nil {
-		// Emulation version can have "alpha" as pre-release to continue serving expired apis while we clean up the test.
-		// The pre-release should not be accessible to the users.
-		return ver.WithPreRelease(m.BinaryVersion().PreRelease())
-	}
-	return ver
+	return m.emulationVersion.Load()
 }
 
 func (m *effectiveVersion) MinCompatibilityVersion() *version.Version {
@@ -136,7 +134,7 @@ func (m *effectiveVersion) AllowedEmulationVersionRange() string {
 		floor = version.MajorMinor(0, 0)
 	}
 
-	return fmt.Sprintf("%s..%s (default=%s)", floor.String(), binaryVersion.String(), m.EmulationVersion().String())
+	return fmt.Sprintf("%s..%s(default:%s)", floor.String(), binaryVersion.String(), m.EmulationVersion().String())
 }
 
 func (m *effectiveVersion) AllowedMinCompatibilityVersionRange() string {
@@ -153,7 +151,7 @@ func (m *effectiveVersion) AllowedMinCompatibilityVersionRange() string {
 		floor = version.MajorMinor(0, 0)
 	}
 
-	return fmt.Sprintf("%s..%s (default=%s)", floor.String(), binaryVersion.String(), m.MinCompatibilityVersion().String())
+	return fmt.Sprintf("%s..%s(default:%s)", floor.String(), binaryVersion.String(), m.MinCompatibilityVersion().String())
 }
 
 func (m *effectiveVersion) Validate() []error {
@@ -171,6 +169,34 @@ func (m *effectiveVersion) Validate() []error {
 		errs = append(errs, fmt.Errorf("minCompatibilityVersion version %s is not between [%s, %s]", minCompatibilityVersion.String(), m.minCompatibilityVersionFloor.String(), emulationVersion.String()))
 	}
 	return errs
+}
+
+// Info returns the version information of a component.
+// If the binary version is nil, it returns nil.
+func (m *effectiveVersion) Info() *apimachineryversion.Info {
+	binVer := m.BinaryVersion()
+	if binVer == nil {
+		return nil
+	}
+
+	info := baseversion.Get()
+	info.Major = version.Itoa(binVer.Major())
+	info.Minor = version.Itoa(binVer.Minor())
+	if info.GitVersion == "" {
+		info.GitVersion = binVer.String()
+	}
+
+	if ev := m.EmulationVersion(); ev != nil {
+		info.EmulationMajor = version.Itoa(ev.Major())
+		info.EmulationMinor = version.Itoa(ev.Minor())
+	}
+
+	if mcv := m.MinCompatibilityVersion(); mcv != nil {
+		info.MinCompatibilityMajor = version.Itoa(mcv.Major())
+		info.MinCompatibilityMinor = version.Itoa(mcv.Minor())
+	}
+
+	return &info
 }
 
 // NewEffectiveVersion creates a MutableEffectiveVersion from the binaryVersion.
@@ -209,5 +235,5 @@ func NewEffectiveVersionFromString(binaryVer, emulationVerFloor, minCompatibilit
 
 func defaultBuildBinaryVersion() *version.Version {
 	verInfo := baseversion.Get()
-	return version.MustParse(verInfo.String()).WithInfo(verInfo)
+	return version.MustParse(verInfo.String())
 }

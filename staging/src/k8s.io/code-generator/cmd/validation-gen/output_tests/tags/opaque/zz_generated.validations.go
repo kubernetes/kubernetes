@@ -37,35 +37,40 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
-	scheme.AddValidationFunc((*OtherString)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((*OtherString)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
 			return Validate_OtherString(ctx, op, nil /* fldPath */, obj.(*OtherString), safe.Cast[*OtherString](oldObj))
 		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	scheme.AddValidationFunc((*OtherStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((*OtherStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
 			return Validate_OtherStruct(ctx, op, nil /* fldPath */, obj.(*OtherStruct), safe.Cast[*OtherStruct](oldObj))
 		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
 			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
 		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	scheme.AddValidationFunc((TypedefMapOther)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((TypedefMapOther)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
 			return Validate_TypedefMapOther(ctx, op, nil /* fldPath */, obj.(TypedefMapOther), safe.Cast[TypedefMapOther](oldObj))
 		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
-	scheme.AddValidationFunc((TypedefSliceOther)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}, subresources ...string) field.ErrorList {
-		if len(subresources) == 0 {
+	scheme.AddValidationFunc((TypedefSliceOther)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
 			return Validate_TypedefSliceOther(ctx, op, nil /* fldPath */, obj.(TypedefSliceOther), safe.Cast[TypedefSliceOther](oldObj))
 		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresources: %v", obj, subresources))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
 }
@@ -143,17 +148,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("sliceOfStructField"), obj.SliceOfStructField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.SliceOfStructField }))...)
 
-	// field Struct.SliceOfStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []*OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfStructPtrField")...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfStructPtrField vals")
-			})...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, nil, Validate_OtherStruct)...)
-			return
-		}(fldPath.Child("sliceOfStructPtrField"), obj.SliceOfStructPtrField, safe.Field(oldObj, func(oldObj *Struct) []*OtherStruct { return oldObj.SliceOfStructPtrField }))...)
-
 	// field Struct.SliceOfOpaqueStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []OtherStruct) (errs field.ErrorList) {
@@ -163,16 +157,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			})...)
 			return
 		}(fldPath.Child("sliceOfOpaqueStructField"), obj.SliceOfOpaqueStructField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.SliceOfOpaqueStructField }))...)
-
-	// field Struct.SliceOfOpaqueStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []*OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfOpaqueStructPtrField")...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.SliceOfOpaqueStructPtrField vals")
-			})...)
-			return
-		}(fldPath.Child("sliceOfOpaqueStructPtrField"), obj.SliceOfOpaqueStructPtrField, safe.Field(oldObj, func(oldObj *Struct) []*OtherStruct { return oldObj.SliceOfOpaqueStructPtrField }))...)
 
 	// field Struct.ListMapOfStructField
 	errs = append(errs,
@@ -185,17 +169,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("listMapOfStructField"), obj.ListMapOfStructField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListMapOfStructField }))...)
 
-	// field Struct.ListMapOfStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []*OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfStructPtrField")...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfStructPtrField vals")
-			})...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, Validate_OtherStruct)...)
-			return
-		}(fldPath.Child("listMapOfStructPtrField"), obj.ListMapOfStructPtrField, safe.Field(oldObj, func(oldObj *Struct) []*OtherStruct { return oldObj.ListMapOfStructPtrField }))...)
-
 	// field Struct.ListMapOfOpaqueStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []OtherStruct) (errs field.ErrorList) {
@@ -205,16 +178,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			})...)
 			return
 		}(fldPath.Child("listMapOfOpaqueStructField"), obj.ListMapOfOpaqueStructField, safe.Field(oldObj, func(oldObj *Struct) []OtherStruct { return oldObj.ListMapOfOpaqueStructField }))...)
-
-	// field Struct.ListMapOfOpaqueStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []*OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfOpaqueStructPtrField")...)
-			errs = append(errs, validate.EachSliceValNilable(ctx, op, fldPath, obj, oldObj, func(a *OtherStruct, b *OtherStruct) bool { return a.StringField == b.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.ListMapOfOpaqueStructPtrField vals")
-			})...)
-			return
-		}(fldPath.Child("listMapOfOpaqueStructPtrField"), obj.ListMapOfOpaqueStructPtrField, safe.Field(oldObj, func(oldObj *Struct) []*OtherStruct { return oldObj.ListMapOfOpaqueStructPtrField }))...)
 
 	// field Struct.MapOfStringToStructField
 	errs = append(errs,
@@ -231,21 +194,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("mapOfStringToStructField"), obj.MapOfStringToStructField, safe.Field(oldObj, func(oldObj *Struct) map[OtherString]OtherStruct { return oldObj.MapOfStringToStructField }))...)
 
-	// field Struct.MapOfStringToStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[OtherString]*OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherString) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToStructPtrField keys")
-			})...)
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToStructPtrField")...)
-			errs = append(errs, validate.EachMapValNilable(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToStructPtrField vals")
-			})...)
-			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, Validate_OtherString)...)
-			errs = append(errs, validate.EachMapValNilable(ctx, op, fldPath, obj, oldObj, Validate_OtherStruct)...)
-			return
-		}(fldPath.Child("mapOfStringToStructPtrField"), obj.MapOfStringToStructPtrField, safe.Field(oldObj, func(oldObj *Struct) map[OtherString]*OtherStruct { return oldObj.MapOfStringToStructPtrField }))...)
-
 	// field Struct.MapOfStringToOpaqueStructField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj map[OtherString]OtherStruct) (errs field.ErrorList) {
@@ -258,19 +206,6 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			})...)
 			return
 		}(fldPath.Child("mapOfStringToOpaqueStructField"), obj.MapOfStringToOpaqueStructField, safe.Field(oldObj, func(oldObj *Struct) map[OtherString]OtherStruct { return oldObj.MapOfStringToOpaqueStructField }))...)
-
-	// field Struct.MapOfStringToOpaqueStructPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[OtherString]*OtherStruct) (errs field.ErrorList) {
-			errs = append(errs, validate.EachMapKey(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherString) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToOpaqueStructPtrField keys")
-			})...)
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToOpaqueStructPtrField")...)
-			errs = append(errs, validate.EachMapValNilable(ctx, op, fldPath, obj, oldObj, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.MapOfStringToOpaqueStructPtrField vals")
-			})...)
-			return
-		}(fldPath.Child("mapOfStringToOpaqueStructPtrField"), obj.MapOfStringToOpaqueStructPtrField, safe.Field(oldObj, func(oldObj *Struct) map[OtherString]*OtherStruct { return oldObj.MapOfStringToOpaqueStructPtrField }))...)
 
 	return errs
 }

@@ -23,6 +23,7 @@ import (
 
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/internal"
+	"google.golang.org/grpc/stats"
 )
 
 func init() {
@@ -34,7 +35,7 @@ var logger = grpclog.Component("metrics-registry")
 // DefaultMetrics are the default metrics registered through global metrics
 // registry. This is written to at initialization time only, and is read only
 // after initialization.
-var DefaultMetrics = NewMetrics()
+var DefaultMetrics = stats.NewMetricSet()
 
 // MetricDescriptor is the data for a registered metric.
 type MetricDescriptor struct {
@@ -42,7 +43,7 @@ type MetricDescriptor struct {
 	// (including any per call metrics). See
 	// https://github.com/grpc/proposal/blob/master/A79-non-per-call-metrics-architecture.md#metric-instrument-naming-conventions
 	// for metric naming conventions.
-	Name Metric
+	Name string
 	// The description of this metric.
 	Description string
 	// The unit (e.g. entries, seconds) of this metric.
@@ -154,27 +155,27 @@ func (h *Int64GaugeHandle) Record(recorder MetricsRecorder, incr int64, labels .
 }
 
 // registeredMetrics are the registered metric descriptor names.
-var registeredMetrics = make(map[Metric]bool)
+var registeredMetrics = make(map[string]bool)
 
 // metricsRegistry contains all of the registered metrics.
 //
 // This is written to only at init time, and read only after that.
-var metricsRegistry = make(map[Metric]*MetricDescriptor)
+var metricsRegistry = make(map[string]*MetricDescriptor)
 
 // DescriptorForMetric returns the MetricDescriptor from the global registry.
 //
 // Returns nil if MetricDescriptor not present.
-func DescriptorForMetric(metric Metric) *MetricDescriptor {
-	return metricsRegistry[metric]
+func DescriptorForMetric(metricName string) *MetricDescriptor {
+	return metricsRegistry[metricName]
 }
 
-func registerMetric(name Metric, def bool) {
-	if registeredMetrics[name] {
-		logger.Fatalf("metric %v already registered", name)
+func registerMetric(metricName string, def bool) {
+	if registeredMetrics[metricName] {
+		logger.Fatalf("metric %v already registered", metricName)
 	}
-	registeredMetrics[name] = true
+	registeredMetrics[metricName] = true
 	if def {
-		DefaultMetrics = DefaultMetrics.Add(name)
+		DefaultMetrics = DefaultMetrics.Add(metricName)
 	}
 }
 
@@ -256,8 +257,8 @@ func snapshotMetricsRegistryForTesting() func() {
 	oldRegisteredMetrics := registeredMetrics
 	oldMetricsRegistry := metricsRegistry
 
-	registeredMetrics = make(map[Metric]bool)
-	metricsRegistry = make(map[Metric]*MetricDescriptor)
+	registeredMetrics = make(map[string]bool)
+	metricsRegistry = make(map[string]*MetricDescriptor)
 	maps.Copy(registeredMetrics, registeredMetrics)
 	maps.Copy(metricsRegistry, metricsRegistry)
 

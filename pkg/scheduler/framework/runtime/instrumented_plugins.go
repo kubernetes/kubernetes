@@ -45,8 +45,8 @@ type instrumentedPreFilterPlugin struct {
 
 var _ framework.PreFilterPlugin = &instrumentedPreFilterPlugin{}
 
-func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (*framework.PreFilterResult, *framework.Status) {
-	result, status := p.PreFilterPlugin.PreFilter(ctx, state, pod)
+func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+	result, status := p.PreFilterPlugin.PreFilter(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()
 	}
@@ -77,7 +77,7 @@ type instrumentedScorePlugin struct {
 
 var _ framework.ScorePlugin = &instrumentedScorePlugin{}
 
-func (p *instrumentedScorePlugin) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (p *instrumentedScorePlugin) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	p.metric.Inc()
-	return p.ScorePlugin.Score(ctx, state, pod, nodeName)
+	return p.ScorePlugin.Score(ctx, state, pod, nodeInfo)
 }

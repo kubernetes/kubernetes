@@ -71,11 +71,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when OIDC and ServiceAccounts are valid",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers:  []string{"http://foo.bar.com"},
@@ -85,10 +85,10 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when OIDC is invalid",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers:  []string{"http://foo.bar.com"},
@@ -99,11 +99,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccounts doesn't have key file",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://foo.bar.com"},
@@ -113,11 +113,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccounts doesn't have issuer",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{},
@@ -127,11 +127,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccounts has empty string as issuer",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{""},
@@ -141,11 +141,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccounts has duplicate issuers",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://foo.bar.com", "http://foo.bar.com"},
@@ -155,11 +155,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccount has bad issuer",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuers: []string{"http://[::1]:namedport"},
@@ -169,11 +169,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccounts has invalid JWKSURI",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				KeyFiles: []string{"cert", "key"},
@@ -185,11 +185,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when ServiceAccounts has invalid JWKSURI (not https scheme)",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				KeyFiles: []string{"cert", "key"},
@@ -201,11 +201,11 @@ func TestAuthenticationValidate(t *testing.T) {
 		{
 			name: "test when WebHook has invalid retry attempts",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				KeyFiles: []string{"cert", "key"},
@@ -234,11 +234,11 @@ func TestAuthenticationValidate(t *testing.T) {
 			name:                         "test when authentication config file and oidc-* flags are set",
 			testAuthenticationConfigFile: "configfile",
 			testOIDC: &OIDCAuthenticationOptions{
-				UsernameClaim:      "sub",
-				SigningAlgs:        []string{"RS256"},
-				IssuerURL:          "https://testIssuerURL",
-				ClientID:           "testClientID",
-				areFlagsConfigured: func() bool { return true },
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "https://testIssuerURL",
+				ClientID:      "testClientID",
+				FlagsSet:      true,
 			},
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
 		},
@@ -247,8 +247,8 @@ func TestAuthenticationValidate(t *testing.T) {
 			disabledFeatures:             []featuregate.Feature{features.AnonymousAuthConfigurableEndpoints},
 			testAuthenticationConfigFile: "configfile",
 			testAnonymous: &AnonymousAuthenticationOptions{
-				Allow:       true,
-				areFlagsSet: func() bool { return true },
+				Allow:    true,
+				FlagsSet: true,
 			},
 		},
 	}
@@ -413,7 +413,8 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 	expected := &BuiltInAuthenticationOptions{
 		APIAudiences: []string{"foo"},
 		Anonymous: &AnonymousAuthenticationOptions{
-			Allow: true,
+			Allow:    true,
+			FlagsSet: true,
 		},
 		BootstrapToken: &BootstrapTokenAuthenticationOptions{
 			Enable: true,
@@ -428,6 +429,7 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 			UsernameClaim:  "sub",
 			UsernamePrefix: "-",
 			SigningAlgs:    []string{"RS256"},
+			FlagsSet:       true,
 		},
 		RequestHeader: &apiserveroptions.RequestHeaderAuthenticationOptions{
 			ClientCAFile:    "testdata/root.pem",
@@ -469,19 +471,6 @@ func TestBuiltInAuthenticationOptionsAddFlags(t *testing.T) {
 	if err := pf.Parse(args); err != nil {
 		t.Fatal(err)
 	}
-
-	if !opts.OIDC.areFlagsConfigured() {
-		t.Fatal("OIDC flags should be configured")
-	}
-	// nil these out because you cannot compare functions
-	opts.OIDC.areFlagsConfigured = nil
-
-	if !opts.Anonymous.areFlagsSet() {
-		t.Fatalf("Anonymous flags should be configured")
-	}
-
-	// nil these out because you cannot compare functions
-	opts.Anonymous.areFlagsSet = nil
 
 	if !reflect.DeepEqual(opts, expected) {
 		t.Error(cmp.Diff(opts, expected, cmp.AllowUnexported(OIDCAuthenticationOptions{}, AnonymousAuthenticationOptions{})))
@@ -557,7 +546,7 @@ func TestToAuthenticationConfig_Anonymous(t *testing.T) {
 			name: "file-anonymous-disabled-AnonymousAuthConfigurableEndpoints-disabled",
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -570,7 +559,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -583,7 +572,7 @@ anonymous:
 					Anonymous: &apiserver.AnonymousAuthConfig{Enabled: false},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -596,7 +585,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -609,7 +598,7 @@ anonymous:
 					Anonymous: &apiserver.AnonymousAuthConfig{Enabled: true},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -622,7 +611,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: false
@@ -637,7 +626,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   conditions:
@@ -651,7 +640,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -680,7 +669,7 @@ anonymous:
 					},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -695,7 +684,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{"--anonymous-auth=True",
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 anonymous:
   enabled: true
@@ -708,7 +697,7 @@ anonymous:
 			enableAnonymousEndpoints: true,
 			args: []string{"--anonymous-auth=True",
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -740,7 +729,7 @@ jwt:
 					},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -993,7 +982,7 @@ func TestToAuthenticationConfig_OIDC(t *testing.T) {
 			name: "basic authentication configuration",
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1024,7 +1013,7 @@ jwt:
 					},
 				},
 				AuthenticationConfigData: `
-apiVersion: apiserver.config.k8s.io/v1alpha1
+apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
 jwt:
 - issuer:
@@ -1471,6 +1460,82 @@ jwt:
 			expectedConfig: &apiserver.AuthenticationConfiguration{},
 			expectedContentData: `{
 							"apiVersion":"apiserver.config.k8s.io/v1beta1",
+							"kind":"AuthenticationConfiguration"}`,
+		},
+		{
+			name: "v1 - json",
+			file: func() string {
+				return writeTempFile(t, `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{
+				JWT: []apiserver.JWTAuthenticator{
+					{
+						Issuer: apiserver.Issuer{
+							URL: "https://test-issuer",
+						},
+					},
+				},
+			},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
+							"kind":"AuthenticationConfiguration",
+							"jwt":[{"issuer":{"url": "https://test-issuer"}}]}`,
+		},
+		{
+			name: "v1 - yaml",
+			file: func() string {
+				return writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{
+				JWT: []apiserver.JWTAuthenticator{
+					{
+						Issuer: apiserver.Issuer{
+							URL: "https://test-issuer",
+						},
+						ClaimMappings: apiserver.ClaimMappings{
+							Username: apiserver.PrefixedClaimOrExpression{
+								Claim:  "sub",
+								Prefix: pointer.String(""),
+							},
+						},
+					},
+				},
+			},
+			expectedContentData: `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+jwt:
+- issuer:
+    url: https://test-issuer
+  claimMappings:
+    username:
+      claim: sub
+      prefix: ""
+`,
+		},
+		{
+			name: "v1 - no jwt",
+			file: func() string {
+				return writeTempFile(t, `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
+							"kind":"AuthenticationConfiguration"}`)
+			},
+			expectedConfig: &apiserver.AuthenticationConfiguration{},
+			expectedContentData: `{
+							"apiVersion":"apiserver.config.k8s.io/v1",
 							"kind":"AuthenticationConfiguration"}`,
 		},
 	}

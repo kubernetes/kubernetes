@@ -186,6 +186,10 @@ func (s String) Value() any {
 	return string(s)
 }
 
+func (s String) format(sb *strings.Builder) {
+	sb.WriteString(strconv.Quote(string(s)))
+}
+
 // StringContains returns whether the string contains a substring.
 func StringContains(s, sub ref.Val) ref.Val {
 	str, ok := s.(String)

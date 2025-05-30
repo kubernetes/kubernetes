@@ -21,6 +21,10 @@ filters:
   # go.{mod,sum} files relate to go dependencies, and should be reviewed by the
   # dep-approvers
   "go\\.(mod|sum)$":
+    approvers:
+      - dep-approvers
+    reviewers:
+      - dep-reviewers
     required_reviewers:
       - kubernetes/dep-approvers
     labels:

@@ -74,7 +74,6 @@ but when marshalled to YAML, produces:
 	metadata:
 	  name: myHPA
 	  namespace: myNamespace
-	  creationTimestamp: null
 	spec:
 	  scaleTargetRef:
 	    kind: ""

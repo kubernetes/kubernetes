@@ -1,23 +1,23 @@
 {
-    "*withfieldvalidations.T1": {
-      "e1": [
-        "field T1.E1",
-        "type E1"
-      ],
-      "e2": [
-        "field T1.E2"
-      ],
-      "s": [
-        "field T1.S"
-      ],
-      "t2": [
-        "field T1.T2"
-      ],
-      "t2.s": [
-        "field T2.S"
-      ],
-      "t3": [
-        "field T1.T3"
-      ]
-    }
+  "*withfieldvalidations.T1": {
+    "e1": [
+      "field T1.E1",
+      "type E1"
+    ],
+    "e2": [
+      "field T1.E2"
+    ],
+    "s": [
+      "field T1.S"
+    ],
+    "t2": [
+      "field T1.T2"
+    ],
+    "t2.s": [
+      "field T2.S"
+    ],
+    "t3": [
+      "field T1.T3"
+    ]
   }
+}

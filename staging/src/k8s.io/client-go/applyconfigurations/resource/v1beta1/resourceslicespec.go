@@ -25,12 +25,14 @@ import (
 // ResourceSliceSpecApplyConfiguration represents a declarative configuration of the ResourceSliceSpec type for use
 // with apply.
 type ResourceSliceSpecApplyConfiguration struct {
-	Driver       *string                            `json:"driver,omitempty"`
-	Pool         *ResourcePoolApplyConfiguration    `json:"pool,omitempty"`
-	NodeName     *string                            `json:"nodeName,omitempty"`
-	NodeSelector *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
-	AllNodes     *bool                              `json:"allNodes,omitempty"`
-	Devices      []DeviceApplyConfiguration         `json:"devices,omitempty"`
+	Driver                 *string                            `json:"driver,omitempty"`
+	Pool                   *ResourcePoolApplyConfiguration    `json:"pool,omitempty"`
+	NodeName               *string                            `json:"nodeName,omitempty"`
+	NodeSelector           *v1.NodeSelectorApplyConfiguration `json:"nodeSelector,omitempty"`
+	AllNodes               *bool                              `json:"allNodes,omitempty"`
+	Devices                []DeviceApplyConfiguration         `json:"devices,omitempty"`
+	PerDeviceNodeSelection *bool                              `json:"perDeviceNodeSelection,omitempty"`
+	SharedCounters         []CounterSetApplyConfiguration     `json:"sharedCounters,omitempty"`
 }
 
 // ResourceSliceSpecApplyConfiguration constructs a declarative configuration of the ResourceSliceSpec type for use with
@@ -88,6 +90,27 @@ func (b *ResourceSliceSpecApplyConfiguration) WithDevices(values ...*DeviceApply
 			panic("nil value passed to WithDevices")
 		}
 		b.Devices = append(b.Devices, *values[i])
+	}
+	return b
+}
+
+// WithPerDeviceNodeSelection sets the PerDeviceNodeSelection field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PerDeviceNodeSelection field is set to the value of the last call.
+func (b *ResourceSliceSpecApplyConfiguration) WithPerDeviceNodeSelection(value bool) *ResourceSliceSpecApplyConfiguration {
+	b.PerDeviceNodeSelection = &value
+	return b
+}
+
+// WithSharedCounters adds the given value to the SharedCounters field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SharedCounters field.
+func (b *ResourceSliceSpecApplyConfiguration) WithSharedCounters(values ...*CounterSetApplyConfiguration) *ResourceSliceSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSharedCounters")
+		}
+		b.SharedCounters = append(b.SharedCounters, *values[i])
 	}
 	return b
 }

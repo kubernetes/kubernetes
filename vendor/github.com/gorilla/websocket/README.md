@@ -10,10 +10,10 @@ Gorilla WebSocket is a [Go](http://golang.org/) implementation of the
 ### Documentation
 
 * [API Reference](https://pkg.go.dev/github.com/gorilla/websocket?tab=doc)
-* [Chat example](https://github.com/gorilla/websocket/tree/master/examples/chat)
-* [Command example](https://github.com/gorilla/websocket/tree/master/examples/command)
-* [Client and server example](https://github.com/gorilla/websocket/tree/master/examples/echo)
-* [File watch example](https://github.com/gorilla/websocket/tree/master/examples/filewatch)
+* [Chat example](https://github.com/gorilla/websocket/tree/main/examples/chat)
+* [Command example](https://github.com/gorilla/websocket/tree/main/examples/command)
+* [Client and server example](https://github.com/gorilla/websocket/tree/main/examples/echo)
+* [File watch example](https://github.com/gorilla/websocket/tree/main/examples/filewatch)
 
 ### Status
 
@@ -29,5 +29,4 @@ package API is stable.
 
 The Gorilla WebSocket package passes the server tests in the [Autobahn Test
 Suite](https://github.com/crossbario/autobahn-testsuite) using the application in the [examples/autobahn
-subdirectory](https://github.com/gorilla/websocket/tree/master/examples/autobahn).
-
+subdirectory](https://github.com/gorilla/websocket/tree/main/examples/autobahn).

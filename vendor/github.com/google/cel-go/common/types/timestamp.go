@@ -179,6 +179,10 @@ func (t Timestamp) Value() any {
 	return t.Time
 }
 
+func (t Timestamp) format(sb *strings.Builder) {
+	fmt.Fprintf(sb, `timestamp("%s")`, t.Time.UTC().Format(time.RFC3339Nano))
+}
+
 var (
 	timestampValueType = reflect.TypeOf(&tpb.Timestamp{})
 

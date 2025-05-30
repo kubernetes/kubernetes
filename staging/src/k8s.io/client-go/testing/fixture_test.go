@@ -572,7 +572,7 @@ func configMapTypeConverter(scheme *runtime.Scheme) managedfields.TypeConverter 
 		panic(fmt.Sprintf("Failed to parse schema: %v", err))
 	}
 
-	return TypeConverter{Scheme: scheme, TypeResolver: parser}
+	return managedfields.NewSchemeTypeConverter(scheme, parser)
 }
 
 var configMapTypedSchema = typed.YAMLObject(`types:

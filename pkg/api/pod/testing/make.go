@@ -270,6 +270,12 @@ func SetContainerImage(image string) TweakContainer {
 	}
 }
 
+func SetContainerLifecycle(lifecycle api.Lifecycle) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.Lifecycle = &lifecycle
+	}
+}
+
 func MakeResourceRequirements(requests, limits map[string]string) api.ResourceRequirements {
 	rr := api.ResourceRequirements{Requests: api.ResourceList{}, Limits: api.ResourceList{}}
 	for k, v := range requests {
@@ -327,6 +333,18 @@ func SetContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStat
 	}
 }
 
+func SetInitContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStatus {
+	return func(podstatus *api.PodStatus) {
+		podstatus.InitContainerStatuses = containerStatuses
+	}
+}
+
+func SetEphemeralContainerStatuses(containerStatuses ...api.ContainerStatus) TweakPodStatus {
+	return func(podstatus *api.PodStatus) {
+		podstatus.EphemeralContainerStatuses = containerStatuses
+	}
+}
+
 func MakeContainerStatus(name string, allocatedResources api.ResourceList) api.ContainerStatus {
 	cs := api.ContainerStatus{
 		Name:               name,
@@ -334,12 +352,6 @@ func MakeContainerStatus(name string, allocatedResources api.ResourceList) api.C
 	}
 
 	return cs
-}
-
-func SetResizeStatus(resizeStatus api.PodResizeStatus) TweakPodStatus {
-	return func(podstatus *api.PodStatus) {
-		podstatus.Resize = resizeStatus
-	}
 }
 
 // TweakContainers applies the container tweaks to all containers (regular & init) in the pod.

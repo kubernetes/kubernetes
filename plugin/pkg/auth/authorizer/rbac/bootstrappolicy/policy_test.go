@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-helpers/auth/rbac/validation"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -173,6 +175,26 @@ func TestBootstrapClusterRoles(t *testing.T) {
 		list.Items = append(list.Items, roles[name])
 	}
 	testObjects(t, list, "cluster-roles.yaml")
+}
+
+func TestBootstrapClusterRolesWithFeatureGatesEnabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllAlpha", true)
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, "AllBeta", true)
+
+	bootstrapRoles := bootstrappolicy.ClusterRoles()
+	featureGateList := &api.List{}
+	featureGateNames := sets.NewString()
+	featureGateRoles := map[string]runtime.Object{}
+	for i := range bootstrapRoles {
+		role := bootstrapRoles[i]
+		featureGateNames.Insert(role.Name)
+		featureGateRoles[role.Name] = &role
+	}
+	for _, featureGateName := range featureGateNames.List() {
+		featureGateList.Items = append(featureGateList.Items, featureGateRoles[featureGateName])
+	}
+
+	testObjects(t, featureGateList, "cluster-roles-featuregates.yaml")
 }
 
 func TestBootstrapClusterRoleBindings(t *testing.T) {

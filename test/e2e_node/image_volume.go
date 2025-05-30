@@ -30,11 +30,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -44,10 +46,11 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 	f := framework.NewDefaultFramework("image-volume-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
+	volumeImage := imageutils.GetE2EImage(imageutils.Kitten)
+
 	const (
 		podName             = "test-pod"
 		containerName       = "test-container"
-		validImageRef       = "quay.io/crio/artifact:v1"
 		invalidImageRef     = "localhost/invalid"
 		volumeName          = "volume"
 		volumePathPrefix    = "/volume"
@@ -87,7 +90,16 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 
 		ginkgo.By(fmt.Sprintf("Creating a pod (%s/%s)", f.Namespace.Name, podName))
 		e2epod.NewPodClient(f).Create(ctx, pod)
+	}
 
+	verifyFileContents := func(podName, volumePath string) {
+		ginkgo.By(fmt.Sprintf("Verifying the volume mount contents for path: %s", volumePath))
+
+		firstFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePath, "data.json"))
+		gomega.Expect(firstFileContents).To(gomega.ContainSubstring("kitten.jpg"))
+
+		secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePath, "etc", "os-release"))
+		gomega.Expect(secondFileContents).To(gomega.ContainSubstring("Alpine Linux"))
 	}
 
 	f.It("should succeed with pod and pull policy of Always", func(ctx context.Context) {
@@ -105,7 +117,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		createPod(ctx,
 			podName,
 			"",
-			[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: validImageRef, PullPolicy: v1.PullAlways}}}},
+			[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage, PullPolicy: v1.PullAlways}}}},
 			[]v1.VolumeMount{{Name: volumeName, MountPath: volumePathPrefix}},
 			selinuxOptions,
 		)
@@ -114,13 +126,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
 		framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
 
-		ginkgo.By(fmt.Sprintf("Verifying the volume mount contents for path: %s", volumePathPrefix))
-
-		firstFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "dir", "file"))
-		gomega.Expect(firstFileContents).To(gomega.Equal("1"))
-
-		secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "file"))
-		gomega.Expect(secondFileContents).To(gomega.Equal("2"))
+		verifyFileContents(podName, volumePathPrefix)
 	})
 
 	f.It("should succeed with pod and multiple volumes", func(ctx context.Context) {
@@ -139,8 +145,8 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 			podName,
 			"",
 			[]v1.Volume{
-				{Name: volumeName + "-0", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: validImageRef}}},
-				{Name: volumeName + "-1", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: validImageRef}}},
+				{Name: volumeName + "-0", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage}}},
+				{Name: volumeName + "-1", VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage}}},
 			},
 			[]v1.VolumeMount{
 				{Name: volumeName + "-0", MountPath: volumePathPrefix + "-0"},
@@ -155,13 +161,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 
 		for i := range 2 {
 			volumePath := fmt.Sprintf("%s-%d", volumePathPrefix, i)
-			ginkgo.By(fmt.Sprintf("Verifying the volume mount contents for path: %s", volumePath))
-
-			firstFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePath, "dir", "file"))
-			gomega.Expect(firstFileContents).To(gomega.Equal("1"))
-
-			secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePath, "file"))
-			gomega.Expect(secondFileContents).To(gomega.Equal("2"))
+			verifyFileContents(podName, volumePath)
 		}
 	})
 
@@ -187,7 +187,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 
 		ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to fail", f.Namespace.Name, podName))
 		err := e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, f.Namespace.Name, podName, 0, images.ErrImagePullBackOff.Error(), time.Minute)
-		framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
+		framework.ExpectNoError(err, "Failed to await for the pod to be failed: (%s/%s)", f.Namespace.Name, podName)
 	})
 
 	f.It("should succeed if image volume is not existing but unused", func(ctx context.Context) {
@@ -254,7 +254,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 			createPod(ctx,
 				podName,
 				node.Name,
-				[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: validImageRef}}}},
+				[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage}}}},
 				[]v1.VolumeMount{{Name: volumeName, MountPath: volumePathPrefix}},
 				selinuxOptions,
 			)
@@ -263,13 +263,7 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
 			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
 
-			ginkgo.By(fmt.Sprintf("Verifying the volume mount contents for path: %s", volumePathPrefix))
-
-			firstFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "dir", "file"))
-			gomega.Expect(firstFileContents).To(gomega.Equal("1"))
-
-			secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "file"))
-			gomega.Expect(secondFileContents).To(gomega.Equal("2"))
+			verifyFileContents(podName, volumePathPrefix)
 		}
 
 		podName := baseName + "-0"
@@ -277,12 +271,74 @@ var _ = SIGDescribe("ImageVolume", feature.ImageVolume, func() {
 		err = e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
 		framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
 
-		ginkgo.By(fmt.Sprintf("Verifying the volume mount contents for path: %s", volumePathPrefix))
+		verifyFileContents(podName, volumePathPrefix)
+	})
 
-		firstFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "dir", "file"))
-		gomega.Expect(firstFileContents).To(gomega.Equal("1"))
+	f.Context("subPath", func() {
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			runtime, _, err := getCRIClient()
+			framework.ExpectNoError(err, "Failed to get CRI client")
 
-		secondFileContents := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "file"))
-		gomega.Expect(secondFileContents).To(gomega.Equal("2"))
+			version, err := runtime.Version(context.Background(), "")
+			framework.ExpectNoError(err, "Failed to get runtime version")
+
+			// TODO: enable the subpath tests if containerd main branch has support for it.
+			if version.GetRuntimeName() != "cri-o" {
+				e2eskipper.Skip("runtime is not CRI-O")
+			}
+		})
+
+		f.It("should succeed when using a valid subPath", func(ctx context.Context) {
+			var selinuxOptions *v1.SELinuxOptions
+			if selinux.GetEnabled() {
+				selinuxOptions = &v1.SELinuxOptions{
+					User:  defaultSELinuxUser,
+					Role:  defaultSELinuxRole,
+					Type:  defaultSELinuxType,
+					Level: defaultSELinuxLevel,
+				}
+				ginkgo.By(fmt.Sprintf("Using SELinux on pod: %v", selinuxOptions))
+			}
+
+			createPod(ctx,
+				podName,
+				"",
+				[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage}}}},
+				[]v1.VolumeMount{{Name: volumeName, MountPath: volumePathPrefix, SubPath: "etc"}},
+				selinuxOptions,
+			)
+
+			ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to be running", f.Namespace.Name, podName))
+			err := e2epod.WaitForPodNameRunningInNamespace(ctx, f.ClientSet, podName, f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed to await for the pod to be running: (%s/%s)", f.Namespace.Name, podName)
+
+			fileContent := e2epod.ExecCommandInContainer(f, podName, containerName, "/bin/cat", filepath.Join(volumePathPrefix, "os-release"))
+			gomega.Expect(fileContent).To(gomega.ContainSubstring("Alpine Linux"))
+		})
+
+		f.It("should fail if subPath in volume is not existing", func(ctx context.Context) {
+			var selinuxOptions *v1.SELinuxOptions
+			if selinux.GetEnabled() {
+				selinuxOptions = &v1.SELinuxOptions{
+					User:  defaultSELinuxUser,
+					Role:  defaultSELinuxRole,
+					Type:  defaultSELinuxType,
+					Level: defaultSELinuxLevel,
+				}
+				ginkgo.By(fmt.Sprintf("Using SELinux on pod: %v", selinuxOptions))
+			}
+
+			createPod(ctx,
+				podName,
+				"",
+				[]v1.Volume{{Name: volumeName, VolumeSource: v1.VolumeSource{Image: &v1.ImageVolumeSource{Reference: volumeImage}}}},
+				[]v1.VolumeMount{{Name: volumeName, MountPath: volumePathPrefix, SubPath: "not-existing"}},
+				selinuxOptions,
+			)
+
+			ginkgo.By(fmt.Sprintf("Waiting for the pod (%s/%s) to fail", f.Namespace.Name, podName))
+			err := e2epod.WaitForPodContainerToFail(ctx, f.ClientSet, f.Namespace.Name, podName, 0, kuberuntime.ErrCreateContainer.Error(), time.Minute)
+			framework.ExpectNoError(err, "Failed to await for the pod to be failed: (%s/%s)", f.Namespace.Name, podName)
+		})
 	})
 })

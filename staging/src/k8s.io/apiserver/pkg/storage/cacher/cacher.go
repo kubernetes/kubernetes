@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
@@ -463,31 +464,19 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
-	// The 'usable' lock is always 'RLock'able when it is safe to use the cache.
-	// It is safe to use the cache after a successful list until a disconnection.
-	// We start with usable (write) locked. The below OnReplace function will
-	// unlock it after a successful list. The below defer will then re-lock
-	// it when this function exits (always due to disconnection), only if
-	// we actually got a successful list. This cycle will repeat as needed.
-	successfulList := false
 	c.watchCache.SetOnReplace(func() {
-		successfulList = true
-		c.ready.set(true)
-		klog.V(1).Infof("cacher (%v): initialized", c.groupResource.String())
-		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.String()).Inc()
+		c.ready.setReady()
+		klog.V(1).InfoS("cacher initialized", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
+		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 	})
+	var err error
 	defer func() {
-		if successfulList {
-			c.ready.set(false)
-		}
+		c.ready.setError(err)
 	}()
 
 	c.terminateAllWatchers()
-	// Note that since onReplace may be not called due to errors, we explicitly
-	// need to retry it on errors under lock.
-	// Also note that startCaching is called in a loop, so there's no need
-	// to have another loop here.
-	if err := c.reflector.ListAndWatch(stopChannel); err != nil {
+	err = c.reflector.ListAndWatch(stopChannel)
+	if err != nil {
 		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
 	}
 }
@@ -506,11 +495,11 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 
 	var readyGeneration int
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		var ok bool
+		var err error
 		var downtime time.Duration
-		readyGeneration, downtime, ok = c.ready.checkAndReadGeneration()
-		if !ok {
-			return nil, errors.NewTooManyRequests("storage is (re)initializing", calculateRetryAfterForUnreadyCache(downtime))
+		readyGeneration, downtime, err = c.ready.checkAndReadGeneration()
+		if err != nil {
+			return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 		}
 	} else {
 		readyGeneration, err = c.ready.waitAndReadGeneration(ctx)
@@ -631,7 +620,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		c.Lock()
 		defer c.Unlock()
 
-		if generation, _, ok := c.ready.checkAndReadGeneration(); generation != readyGeneration || !ok {
+		if generation, _, err := c.ready.checkAndReadGeneration(); generation != readyGeneration || err != nil {
 			// We went unready or are already on a different generation.
 			// Avoid registering and starting the watch as it will have to be
 			// terminated immediately anyway.
@@ -709,8 +698,8 @@ func computeListLimit(opts storage.ListOptions) int64 {
 	return opts.Predicate.Limit
 }
 
-func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred storage.SelectionPredicate, recursive bool) (listResp, string, error) {
-	if !recursive {
+func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, opts storage.ListOptions) (listResp, string, error) {
+	if !opts.Recursive {
 		obj, exists, readResourceVersion, err := c.watchCache.WaitUntilFreshAndGet(ctx, listRV, key)
 		if err != nil {
 			return listResp{}, "", err
@@ -720,7 +709,7 @@ func (c *Cacher) listItems(ctx context.Context, listRV uint64, key string, pred 
 		}
 		return listResp{ResourceVersion: readResourceVersion}, "", nil
 	}
-	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, pred.MatcherIndex(ctx))
+	return c.watchCache.WaitUntilFreshAndList(ctx, listRV, key, opts)
 }
 
 type listResp struct {
@@ -729,9 +718,7 @@ type listResp struct {
 }
 
 // GetList implements storage.Interface
-func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object, listRV uint64) error {
-	recursive := opts.Recursive
-	pred := opts.Predicate
+func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	// For recursive lists, we need to make sure the key ended with "/" so that we only
 	// get children "directories". e.g. if we have key "/a", "/a/b", "/ab", getting keys
 	// with prefix "/a" will return all three, while with prefix "/a/" will return only
@@ -740,6 +727,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		preparedKey += "/"
 	}
+	listRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
+	if err != nil {
+		return err
+	}
 
 	ctx, span := tracing.Start(ctx, "cacher.GetList",
 		attribute.String("audit-id", audit.GetAuditIDTruncated(ctx)),
@@ -747,10 +738,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	defer span.End(500 * time.Millisecond)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if downtime, ok := c.ready.check(); !ok {
+		if downtime, err := c.ready.check(); err != nil {
 			// If Cacher is not initialized, reject List requests
 			// as described in https://kep.k8s.io/4568
-			return errors.NewTooManyRequests("storage is (re)initializing", calculateRetryAfterForUnreadyCache(downtime))
+			return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 		}
 	} else {
 		if err := c.ready.wait(ctx); err != nil {
@@ -772,7 +763,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 
-	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, pred, recursive)
+	resp, indexUsed, err := c.listItems(ctx, listRV, preparedKey, opts)
 	if err != nil {
 		return err
 	}
@@ -790,7 +781,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if !ok {
 			return fmt.Errorf("non *storeElement returned from storage: %v", obj)
 		}
-		if pred.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
 			lastSelectedObjectKey = elem.Key
 		}
@@ -821,7 +812,7 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 			return err
 		}
 	}
-	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(resp.Items), listVal.Len())
+	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())
 	return nil
 }
 
@@ -900,7 +891,7 @@ func (c *Cacher) dispatchEvents() {
 				c.dispatchEvent(&event)
 			}
 			lastProcessedResourceVersion = event.ResourceVersion
-			metrics.EventsCounter.WithLabelValues(c.groupResource.String()).Inc()
+			metrics.EventsCounter.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
 			bookmarkEvent := &watchCacheEvent{
@@ -1302,8 +1293,8 @@ func (c *Cacher) setInitialEventsEndBookmarkIfRequested(cacheInterval *watchCach
 }
 
 func (c *Cacher) Ready() bool {
-	_, ok := c.ready.check()
-	return ok
+	_, err := c.ready.check()
+	return err == nil
 }
 
 // errWatcher implements watch.Interface to return a single error
@@ -1334,6 +1325,55 @@ func newErrWatcher(err error) *errWatcher {
 	close(watcher.result)
 
 	return watcher
+}
+
+func (c *Cacher) ShouldDelegateExactRV(resourceVersion string, recursive bool) (delegator.Result, error) {
+	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
+	if !recursive || c.watchCache.snapshots == nil {
+		return delegator.Result{ShouldDelegate: true}, nil
+	}
+	listRV, err := c.versioner.ParseResourceVersion(resourceVersion)
+	if err != nil {
+		return delegator.Result{}, err
+	}
+	return c.shouldDelegateExactRV(listRV)
+}
+
+func (c *Cacher) ShouldDelegateContinue(continueToken string, recursive bool) (delegator.Result, error) {
+	// Not Recursive is not supported unitl exact RV is implemented for WaitUntilFreshAndGet.
+	if !recursive || c.watchCache.snapshots == nil {
+		return delegator.Result{ShouldDelegate: true}, nil
+	}
+	_, continueRV, err := storage.DecodeContinue(continueToken, c.resourcePrefix)
+	if err != nil {
+		return delegator.Result{}, err
+	}
+	if continueRV > 0 {
+		return c.shouldDelegateExactRV(uint64(continueRV))
+	} else {
+		// Continue with negative RV is a consistent read.
+		return c.ShouldDelegateConsistentRead()
+	}
+}
+
+func (c *Cacher) shouldDelegateExactRV(rv uint64) (delegator.Result, error) {
+	// Exact requests on future revision require support for consistent read, but are not a consistent read by themselves.
+	if c.watchCache.notFresh(rv) {
+		return delegator.Result{
+			ShouldDelegate: !delegator.ConsistentReadSupported(),
+		}, nil
+	}
+	_, canServe := c.watchCache.snapshots.GetLessOrEqual(rv)
+	return delegator.Result{
+		ShouldDelegate: !canServe,
+	}, nil
+}
+
+func (c *Cacher) ShouldDelegateConsistentRead() (delegator.Result, error) {
+	return delegator.Result{
+		ConsistentRead: true,
+		ShouldDelegate: !delegator.ConsistentReadSupported(),
+	}, nil
 }
 
 // Implements watch.Interface.

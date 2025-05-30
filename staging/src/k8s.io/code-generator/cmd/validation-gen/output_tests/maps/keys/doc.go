@@ -19,7 +19,7 @@ limitations under the License.
 // +k8s:validation-gen-test-fixture=validateFalse
 
 // This is a test package.
-package eachkey
+package keys
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 

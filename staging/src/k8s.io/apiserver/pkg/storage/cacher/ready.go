@@ -41,7 +41,8 @@ const (
 //	|                           ^
 //	└---------------------------┘
 type ready struct {
-	state       status        // represent the state of the variable
+	state       status // represent the state of the variable
+	lastErr     error
 	generation  int           // represent the number of times we have transtioned to ready
 	lock        sync.RWMutex  // protect the state and generation variables
 	restartLock sync.Mutex    // protect the transition from ready to pending where the channel is recreated
@@ -87,8 +88,7 @@ func (r *ready) waitAndReadGeneration(ctx context.Context) (int, error) {
 		}
 
 		r.lock.RLock()
-		switch r.state {
-		case Pending:
+		if r.state == Pending {
 			// since we allow to switch between the states Pending and Ready
 			// if there is a quick transition from Pending -> Ready -> Pending
 			// a process that was waiting can get unblocked and see a Pending
@@ -96,40 +96,61 @@ func (r *ready) waitAndReadGeneration(ctx context.Context) (int, error) {
 			// avoid an inconsistent state on the system, with some processes not
 			// waiting despite the state moved back to Pending.
 			r.lock.RUnlock()
-		case Ready:
-			generation := r.generation
-			r.lock.RUnlock()
-			return generation, nil
-		case Stopped:
-			r.lock.RUnlock()
-			return 0, fmt.Errorf("apiserver cacher is stopped")
-		default:
-			r.lock.RUnlock()
-			return 0, fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+			continue
 		}
+		generation, err := r.readGenerationLocked()
+		r.lock.RUnlock()
+		return generation, err
 	}
 }
 
 // check returns the time elapsed since the state was last changed and the current value.
-func (r *ready) check() (time.Duration, bool) {
-	_, elapsed, ok := r.checkAndReadGeneration()
-	return elapsed, ok
+func (r *ready) check() (time.Duration, error) {
+	_, elapsed, err := r.checkAndReadGeneration()
+	return elapsed, err
 }
 
 // checkAndReadGeneration returns the current generation, the time elapsed since the state was last changed and the current value.
-func (r *ready) checkAndReadGeneration() (int, time.Duration, bool) {
+func (r *ready) checkAndReadGeneration() (int, time.Duration, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
-	return r.generation, r.clock.Since(r.lastStateChangeTime), r.state == Ready
+	generation, err := r.readGenerationLocked()
+	return generation, r.clock.Since(r.lastStateChangeTime), err
+}
+
+func (r *ready) readGenerationLocked() (int, error) {
+	switch r.state {
+	case Pending:
+		if r.lastErr == nil {
+			return 0, fmt.Errorf("storage is (re)initializing")
+		} else {
+			return 0, fmt.Errorf("storage is (re)initializing: %w", r.lastErr)
+		}
+	case Ready:
+		return r.generation, nil
+	case Stopped:
+		return 0, fmt.Errorf("apiserver cacher is stopped")
+	default:
+		return 0, fmt.Errorf("unexpected apiserver cache state: %v", r.state)
+	}
+}
+
+func (r *ready) setReady() {
+	r.set(true, nil)
+}
+
+func (r *ready) setError(err error) {
+	r.set(false, err)
 }
 
 // set the state to Pending (false) or Ready (true), it does not have effect if the state is Stopped.
-func (r *ready) set(ok bool) {
+func (r *ready) set(ok bool, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	if r.state == Stopped {
 		return
 	}
+	r.lastErr = err
 	if ok && r.state == Pending {
 		r.state = Ready
 		r.generation++

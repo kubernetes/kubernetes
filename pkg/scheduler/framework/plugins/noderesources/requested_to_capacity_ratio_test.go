@@ -136,7 +136,11 @@ func TestRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 				if !status.IsSuccess() {
 					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 				}
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, n.Name)
+				nodeInfo, err := snapshot.Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.requestedPod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
@@ -333,7 +337,11 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 				if !status.IsSuccess() {
 					t.Errorf("PreScore is expected to return success, but didn't. Got status: %v", status)
 				}
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, n.Name)
+				nodeInfo, err := snapshot.Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}
@@ -562,7 +570,11 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 
 			var gotScores framework.NodeScoreList
 			for _, n := range test.nodes {
-				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, n.Name)
+				nodeInfo, err := snapshot.Get(n.Name)
+				if err != nil {
+					t.Errorf("failed to get node %q from snapshot: %v", n.Name, err)
+				}
+				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score is expected to return success, but didn't. Got status: %v", status)
 				}

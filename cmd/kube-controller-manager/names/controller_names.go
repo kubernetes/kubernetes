@@ -69,6 +69,7 @@ const (
 	NodeIpamController                                 = "node-ipam-controller"
 	NodeLifecycleController                            = "node-lifecycle-controller"
 	TaintEvictionController                            = "taint-eviction-controller"
+	DeviceTaintEvictionController                      = "device-taint-eviction-controller"
 	PersistentVolumeBinderController                   = "persistentvolume-binder-controller"
 	PersistentVolumeAttachDetachController             = "persistentvolume-attach-detach-controller"
 	PersistentVolumeExpanderController                 = "persistentvolume-expander-controller"

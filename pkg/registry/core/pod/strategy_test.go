@@ -36,10 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ptr "k8s.io/utils/ptr"
 
@@ -1338,7 +1340,11 @@ func TestNodeInclusionPolicyEnablementInCreating(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
+			if !tc.enableNodeInclusionPolicy {
+				// TODO: this will be removed in 1.36
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, tc.enableNodeInclusionPolicy)
+			}
 
 			pod := podtest.MakePod("foo", podtest.SetGeneration(1))
 			wantPod := pod.DeepCopy()
@@ -1392,6 +1398,7 @@ func TestNodeInclusionPolicyEnablementInUpdating(t *testing.T) {
 		t.Error("NodeInclusionPolicy created with unexpected result")
 	}
 
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
 	// Disable the Feature Gate and expect these fields still exist after updating.
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NodeInclusionPolicyInPodTopologySpread, false)
 
@@ -1780,12 +1787,471 @@ func Test_mutatePodAffinity(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, tc.featureGateEnabled)
+			if !tc.featureGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodAffinity, false)
+			}
 
 			pod := tc.pod
 			mutatePodAffinity(pod)
 			if diff := cmp.Diff(tc.wantPod.Spec.Affinity, pod.Spec.Affinity); diff != "" {
 				t.Errorf("unexpected affinity (-want, +got): %s\n", diff)
+			}
+		})
+	}
+}
+
+func Test_mutateTopologySpreadConstraints(t *testing.T) {
+	tests := []struct {
+		name                               string
+		pod                                *api.Pod
+		wantPod                            *api.Pod
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
+	}{
+		{
+			name:                               "matchLabelKeys are merged into labelSelector with In",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "country",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"Japan"},
+									},
+									{
+										Key:      "city",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"Tokyo"},
+									},
+								},
+							},
+							MatchLabelKeys: []string{"country", "city"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                               "keys, which are not found in Pod labels, are ignored",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "not-found"},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "country",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"Japan"},
+									},
+								},
+							},
+							MatchLabelKeys: []string{"country", "not-found"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                               "matchLabelKeys is ignored if the labelSelector is nil",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							MatchLabelKeys:    []string{"country"},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							MatchLabelKeys:    []string{"country"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                               "matchLabelKeys are not merged into labelSelector when MatchLabelKeysInPodTopologySpreadSelectorMerge is false",
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: false,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:                               "matchLabelKeys are not merged into labelSelector when MatchLabelKeysInPodTopologySpread is false and MatchLabelKeysInPodTopologySpreadSelectorMerge is true",
+			matchLabelKeysEnabled:              false,
+			matchLabelKeysSelectorMergeEnabled: true,
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+
+			pod := tc.pod
+			mutateTopologySpreadConstraints(pod)
+			if diff := cmp.Diff(tc.wantPod.Spec.TopologySpreadConstraints, pod.Spec.TopologySpreadConstraints); diff != "" {
+				t.Errorf("unexpected TopologySpreadConstraints (-want, +got): %s\n", diff)
+			}
+		})
+	}
+}
+
+func TestUpdateLabelOnPodWithTopologySpreadConstraintsEnabled(t *testing.T) {
+	defaultTerminationGracePeriodSeconds := int64(30)
+	tests := []struct {
+		name                               string
+		pod                                *api.Pod
+		wantPod                            *api.Pod
+		updateLabels                       map[string]string
+		matchLabelKeysEnabled              bool
+		matchLabelKeysSelectorMergeEnabled bool
+	}{
+		{
+			name: "adding to a new label specified at matchLabelKeys isn't supported",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+					Labels: map[string]string{
+						"country": "Japan",
+					},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+					TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "country",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"Japan"},
+									},
+								},
+							},
+							MatchLabelKeys: []string{"country", "city"},
+						},
+					},
+					TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
+				},
+			},
+			updateLabels:                       map[string]string{"city": "Tokyo"},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+		},
+		{
+			name: "updating a label specified at matchLabelKeys isn't supported",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Tokyo",
+					},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector:     &metav1.LabelSelector{},
+							MatchLabelKeys:    []string{"country", "city"},
+						},
+					},
+					TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
+				},
+			},
+			wantPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+					Labels: map[string]string{
+						"country": "Japan",
+						"city":    "Hokkaido",
+					},
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{
+						{
+							Name:                     "container",
+							Image:                    "image",
+							ImagePullPolicy:          "IfNotPresent",
+							TerminationMessagePolicy: "File",
+						},
+					},
+					TopologySpreadConstraints: []api.TopologySpreadConstraint{
+						{
+							MaxSkew:           1,
+							TopologyKey:       "kubernetes.io/hostname",
+							WhenUnsatisfiable: api.DoNotSchedule,
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "country",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"Japan"},
+									},
+									{
+										Key:      "city",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"Tokyo"},
+									},
+								},
+							},
+							MatchLabelKeys: []string{"country", "city"},
+						},
+					},
+					TerminationGracePeriodSeconds: &defaultTerminationGracePeriodSeconds,
+				},
+			},
+			updateLabels:                       map[string]string{"city": "Hokkaido"},
+			matchLabelKeysEnabled:              true,
+			matchLabelKeysSelectorMergeEnabled: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpread, tc.matchLabelKeysEnabled)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MatchLabelKeysInPodTopologySpreadSelectorMerge, tc.matchLabelKeysSelectorMergeEnabled)
+
+			Strategy.PrepareForCreate(genericapirequest.NewContext(), tc.pod)
+			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) != 0 {
+				t.Errorf("Unexpected error: %v", errs.ToAggregate())
+			}
+			updatedPod := tc.pod.DeepCopy()
+
+			for k, v := range tc.updateLabels {
+				updatedPod.Labels[k] = v
+			}
+
+			Strategy.PrepareForUpdate(genericapirequest.NewContext(), updatedPod, tc.pod)
+			if diff := cmp.Diff(tc.wantPod.Labels, updatedPod.Labels); diff != "" {
+				t.Errorf("unexpected modification to Labelss (-want, +got): %s\n", diff)
+			}
+			if diff := cmp.Diff(tc.wantPod.Spec.TopologySpreadConstraints, updatedPod.Spec.TopologySpreadConstraints); diff != "" {
+				t.Errorf("unexpected modification to TopologySpreadConstraints (-want, +got): %s\n", diff)
 			}
 		})
 	}
@@ -2643,15 +3109,25 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 			),
 			expected: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("2"),
-				podtest.SetContainers(podtest.MakeContainer("container1",
-					podtest.SetContainerResources(api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100m"),
-							api.ResourceMemory: resource.MustParse("1Gi"),
-						},
-					}),
-				)),
-				podtest.SetGeneration(1),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
+				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
@@ -2713,17 +3189,26 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 			),
 			expected: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("2"),
-				podtest.SetContainers(podtest.MakeContainer("container1",
-					podtest.SetContainerResources(api.ResourceRequirements{
-						Requests: api.ResourceList{
-							api.ResourceCPU:    resource.MustParse("100m"),
-							api.ResourceMemory: resource.MustParse("2Gi"), // Updated resource
-						},
-					}),
-				)),
+				podtest.SetContainers(
+					podtest.MakeContainer("container1",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("2Gi"), // Updated resource
+							},
+						}),
+					),
+					podtest.MakeContainer("container2",
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("100m"),
+								api.ResourceMemory: resource.MustParse("1Gi"),
+							},
+						}),
+					),
+				),
 				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(podtest.MakeContainerStatus("container1",
 						api.ResourceList{
 							api.ResourceCPU:    resource.MustParse("100m"),
@@ -2809,15 +3294,7 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 			expected: podtest.MakePod("test-pod",
 				podtest.SetResourceVersion("2"),
 				podtest.SetContainers(
-					podtest.MakeContainer("container1",
-						podtest.SetContainerResources(api.ResourceRequirements{
-							Requests: api.ResourceList{
-								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
-								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
-							},
-						}),
-					),
-					podtest.MakeContainer("container2",
+					podtest.MakeContainer("container2", // Order changed
 						podtest.SetContainerResources(api.ResourceRequirements{
 							Requests: api.ResourceList{
 								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
@@ -2825,10 +3302,17 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 							},
 						}),
 					),
+					podtest.MakeContainer("container1", // Order changed
+						podtest.SetContainerResources(api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:    resource.MustParse("200m"), // Updated resource
+								api.ResourceMemory: resource.MustParse("4Gi"),  // Updated resource
+							},
+						}),
+					),
 				),
 				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("container1",
 							api.ResourceList{
@@ -2984,7 +3468,6 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 				),
 				podtest.SetGeneration(2),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(api.PodResizeStatusProposed), // Resize status set
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("init-container1",
 							api.ResourceList{
@@ -3055,7 +3538,6 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 				),
 				podtest.SetGeneration(1),
 				podtest.SetStatus(podtest.MakePodStatus(
-					podtest.SetResizeStatus(""), // Resize status not set
 					podtest.SetContainerStatuses(
 						podtest.MakeContainerStatus("init-container1",
 							api.ResourceList{
@@ -3071,7 +3553,6 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingAllocatedStatus, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SidecarContainers, true)
 			ctx := context.Background()
 			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)
@@ -3303,6 +3784,344 @@ func TestEphemeralContainersPrepareForUpdate(t *testing.T) {
 			actual := tc.newPod.Generation
 			if actual != tc.expectedGeneration {
 				t.Errorf("invalid generation for pod %s, expected: %d, actual: %d", tc.oldPod.Name, tc.expectedGeneration, actual)
+			}
+		})
+	}
+}
+
+func TestStatusPrepareForUpdate(t *testing.T) {
+	testCases := []struct {
+		description string
+		oldPod      *api.Pod
+		newPod      *api.Pod
+		expected    *api.Pod
+		features    map[featuregate.Feature]bool
+	}{
+		{
+			description: "preserve old owner references",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ReplicaSet", Name: "rs-1"}},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ReplicaSet", Name: "rs-2"}},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "pod",
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: "v1", Kind: "ReplicaSet", Name: "rs-1"}},
+				},
+			},
+		},
+		{
+			description: "preserve old qos if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					QOSClass: "Guaranteed",
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					QOSClass: "Guaranteed",
+				},
+			},
+		},
+		{
+			description: "drop disabled status fields/InPlacePodVerticalScaling=false",
+			features: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScaling: false,
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status:     api.PodStatus{},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{
+						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{Resources: &api.ResourceRequirements{}},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{{}},
+				},
+			},
+		},
+		{
+			description: "drop disabled status fields/InPlacePodVerticalScaling=true",
+			features: map[featuregate.Feature]bool{
+				features.InPlacePodVerticalScaling: true,
+			},
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status:     api.PodStatus{},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ResourceClaimStatuses: []api.PodResourceClaimStatus{
+						{Name: "my-claim", ResourceClaimName: ptr.To("pod-my-claim")},
+					},
+					ContainerStatuses: []api.ContainerStatus{
+						{Resources: &api.ResourceRequirements{}},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{Resources: &api.ResourceRequirements{}},
+					},
+				},
+			},
+		},
+		{
+			description: "preserve old status.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					ObservedGeneration: 20,
+				},
+			},
+		},
+		{
+			description: "preserve old conditions.observedGeneration if empty",
+			oldPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:   "old=without,new=with",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "removed-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			newPod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:   "old=with,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:   "duplicate type",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+			expected: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod"},
+				Status: api.PodStatus{
+					Conditions: []api.PodCondition{
+						{
+							Type:   "old=without,new=without",
+							Status: api.ConditionTrue,
+						},
+						{
+							Type:               "old=with,new=without",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=without,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "old=with,new=with",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 20,
+						},
+						{
+							Type:               "new-condition",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 1,
+						},
+						{
+							Type:               "duplicate type",
+							Status:             api.ConditionTrue,
+							ObservedGeneration: 2,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			for f, v := range tc.features {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, v)
+			}
+			StatusStrategy.PrepareForUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod)
+			if !cmp.Equal(tc.expected, tc.newPod) {
+				t.Errorf("StatusStrategy.PrepareForUpdate() diff = %v", cmp.Diff(tc.expected, tc.newPod))
+			}
+		})
+	}
+}
+
+func TestWarningsOnUpdate(t *testing.T) {
+	tests := []struct {
+		name     string
+		pod      *api.Pod
+		warnings []string
+	}{
+		{
+			name:     "no podIPs/hostIPs",
+			pod:      &api.Pod{Status: api.PodStatus{}},
+			warnings: nil,
+		},
+		{
+			name: "valid podIPs/hostIPs",
+			pod: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "1.2.3.4"},
+					},
+					HostIPs: []api.HostIP{
+						{IP: "5.6.7.8"},
+						{IP: "fd00::5678"},
+					},
+				},
+			},
+			warnings: nil,
+		},
+		{
+			name: "bad podIPs/hostIPs",
+			pod: &api.Pod{
+				Status: api.PodStatus{
+					PodIPs: []api.PodIP{
+						{IP: "01.02.03.04"},
+					},
+					HostIPs: []api.HostIP{
+						{IP: "5.6.7.8"},
+						{IP: "::ffff:9.10.11.12"},
+					},
+				},
+			},
+			warnings: []string{
+				"status.podIPs[0].ip",
+				"status.hostIPs[1].ip",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			warnings := StatusStrategy.WarningsOnUpdate(context.Background(), test.pod, test.pod)
+			ok := len(warnings) == len(test.warnings)
+			if ok {
+				for i := range warnings {
+					if !strings.HasPrefix(warnings[i], test.warnings[i]) {
+						ok = false
+						break
+					}
+				}
+			}
+			if !ok {
+				t.Errorf("Expected warnings for %v, got %v", test.warnings, warnings)
 			}
 		})
 	}

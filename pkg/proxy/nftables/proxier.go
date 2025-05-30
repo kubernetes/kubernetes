@@ -19,16 +19,11 @@ limitations under the License.
 
 package nftables
 
-//
-// NOTE: this needs to be tested in e2e since it uses nftables for everything.
-//
-
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
-	"golang.org/x/time/rate"
 	"net"
 	"os"
 	"os/exec"
@@ -38,6 +33,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/time/rate"
 
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
@@ -113,7 +110,7 @@ func NewDualStackProxier(
 	masqueradeAll bool,
 	masqueradeBit int,
 	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
-	hostname string,
+	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
@@ -123,7 +120,7 @@ func NewDualStackProxier(
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
-		localDetectors[v1.IPv4Protocol], hostname, nodeIPs[v1.IPv4Protocol],
+		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol],
 		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
@@ -131,7 +128,7 @@ func NewDualStackProxier(
 
 	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol,
 		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
-		localDetectors[v1.IPv6Protocol], hostname, nodeIPs[v1.IPv6Protocol],
+		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol],
 		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
@@ -142,7 +139,7 @@ func NewDualStackProxier(
 	return metaproxier.NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
 }
 
-// Proxier is an nftables based proxy
+// Proxier is an nftables-based proxy
 type Proxier struct {
 	// ipFamily defines the IP family which this proxier is tracking.
 	ipFamily v1.IPFamily
@@ -177,9 +174,8 @@ type Proxier struct {
 	masqueradeMark string
 	conntrack      conntrack.Interface
 	localDetector  proxyutil.LocalTrafficDetector
-	hostname       string
+	nodeName       string
 	nodeIP         net.IP
-	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       *healthcheck.ProxyHealthServer
@@ -211,9 +207,7 @@ type Proxier struct {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// NewProxier returns a new nftables Proxier. Once a proxier is created, it will keep
-// nftables up to date in the background and will not terminate if a particular nftables
-// call fails.
+// NewProxier returns a new single-stack NFTables proxier.
 func NewProxier(ctx context.Context,
 	ipFamily v1.IPFamily,
 	syncPeriod time.Duration,
@@ -221,7 +215,7 @@ func NewProxier(ctx context.Context,
 	masqueradeAll bool,
 	masqueradeBit int,
 	localDetector proxyutil.LocalTrafficDetector,
-	hostname string,
+	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
@@ -247,14 +241,14 @@ func NewProxier(ctx context.Context,
 
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, nodePortAddresses, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
 		svcPortMap:          make(proxy.ServicePortMap),
 		serviceChanges:      proxy.NewServiceChangeTracker(ipFamily, newServiceInfo, nil),
 		endpointsMap:        make(proxy.EndpointsMap),
-		endpointsChanges:    proxy.NewEndpointsChangeTracker(ipFamily, hostname, newEndpointInfo, nil),
+		endpointsChanges:    proxy.NewEndpointsChangeTracker(ipFamily, nodeName, newEndpointInfo, nil),
 		needFullSync:        true,
 		syncPeriod:          syncPeriod,
 		nftables:            nft,
@@ -262,9 +256,8 @@ func NewProxier(ctx context.Context,
 		masqueradeMark:      masqueradeMark,
 		conntrack:           conntrack.New(),
 		localDetector:       localDetector,
-		hostname:            hostname,
+		nodeName:            nodeName,
 		nodeIP:              nodeIP,
-		recorder:            recorder,
 		serviceHealthServer: serviceHealthServer,
 		healthzServer:       healthzServer,
 		nodePortAddresses:   nodePortAddresses,
@@ -462,7 +455,7 @@ func ensureChain(chain string, tx *knftables.Transaction, createdChains sets.Set
 
 func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	noLocalhost := "ip daddr != 127.0.0.0/8"
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
@@ -730,11 +723,12 @@ func CleanupLeftovers(ctx context.Context) bool {
 
 	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
 		nft, err := knftables.New(family, kubeProxyTable)
-		if err == nil {
-			tx := nft.NewTransaction()
-			tx.Delete(&knftables.Table{})
-			err = nft.Run(ctx, tx)
+		if err != nil {
+			continue
 		}
+		tx := nft.NewTransaction()
+		tx.Delete(&knftables.Table{})
+		err = nft.Run(ctx, tx)
 		if err != nil && !knftables.IsNotFound(err) {
 			logger.Error(err, "Error cleaning up nftables rules")
 			encounteredError = true
@@ -795,7 +789,6 @@ func (proxier *Proxier) OnServiceUpdate(oldService, service *v1.Service) {
 // object is observed.
 func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 	proxier.OnServiceUpdate(service, nil)
-
 }
 
 // OnServiceSynced is called once all the initial event handlers were
@@ -849,9 +842,9 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 // OnNodeAdd is called whenever creation of new node object
 // is observed.
 func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
-	if node.Name != proxier.hostname {
+	if node.Name != proxier.nodeName {
 		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.hostname)
+			"eventNode", node.Name, "currentNode", proxier.nodeName)
 		return
 	}
 
@@ -874,9 +867,9 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 // OnNodeUpdate is called whenever modification of an existing
 // node object is observed.
 func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
-	if node.Name != proxier.hostname {
+	if node.Name != proxier.nodeName {
 		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.hostname)
+			"eventNode", node.Name, "currentNode", proxier.nodeName)
 		return
 	}
 
@@ -899,9 +892,9 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 // OnNodeDelete is called whenever deletion of an existing node
 // object is observed.
 func (proxier *Proxier) OnNodeDelete(node *v1.Node) {
-	if node.Name != proxier.hostname {
+	if node.Name != proxier.nodeName {
 		proxier.logger.Error(nil, "Received a watch event for a node that doesn't match the current node",
-			"eventNode", node.Name, "currentNode", proxier.hostname)
+			"eventNode", node.Name, "currentNode", proxier.nodeName)
 		return
 	}
 
@@ -1259,7 +1252,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
 	ipX := "ip"
-	ipvX_addr := "ipv4_addr" //nolint:stylecheck // var name intentionally resembles value
+	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
 		ipvX_addr = "ipv6_addr"
@@ -1317,7 +1310,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// from this node, given the service's traffic policies. hasEndpoints is true
 		// if the service has any usable endpoints on any node, not just this one.
 		allEndpoints := proxier.endpointsMap[svcName]
-		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeLabels)
+		clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, hasEndpoints := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.nodeLabels)
 
 		// skipServiceUpdate is used for all service-related chains and their elements.
 		// If no changes were done to the service or its endpoints, these objects may be skipped.
@@ -1593,7 +1586,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						protocol, "dport", svcInfo.Port(),
 						"jump", markMasqChain,
 					),
 				})
@@ -1607,7 +1599,6 @@ func (proxier *Proxier) syncProxyRules() {
 					Chain: internalTrafficChain,
 					Rule: knftables.Concat(
 						ipX, "daddr", svcInfo.ClusterIP(),
-						protocol, "dport", svcInfo.Port(),
 						proxier.localDetector.IfNotLocalNFT(),
 						"jump", markMasqChain,
 					),

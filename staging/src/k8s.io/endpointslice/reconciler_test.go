@@ -2017,11 +2017,13 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 		desc string
 
 		trafficDistributionFeatureGateEnabled bool
+		preferSameFeatureGateEnabled          bool
 		trafficDistribution                   *string
 		topologyAnnotation                    string
 
-		// Defines how many hints belong to a particular zone.
+		// Defines how many hints belong to a particular zone/node
 		wantHintsDistributionByZone map[string]int
+		wantHintsDistributionByNode map[string]int
 		// Number of endpoints where the zone hints are different from the zone of
 		// the endpoint itself.
 		wantEndpointsWithCrossZoneHints int
@@ -2123,6 +2125,62 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
 			},
 		},
+		{
+			name:                                  "trafficDistribution=PreferSameNode, PSTD enabled",
+			desc:                                  "When trafficDistribution is PreferSameNode and PreferSameTrafficDistribution is enabled, both zone and node hints should be filled out",
+			trafficDistributionFeatureGateEnabled: true,
+			preferSameFeatureGateEnabled:          true,
+			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferSameNode),
+			topologyAnnotation:                    "Disabled",
+			wantHintsDistributionByZone: map[string]int{
+				"zone-a": 1, // {pod-0}
+				"zone-b": 3, // {pod-1, pod-2, pod-3}
+				"zone-c": 2, // {pod-4, pod-5}
+			},
+			wantHintsDistributionByNode: map[string]int{
+				"node-0": 1, // {pod-0}
+				"node-1": 3, // {pod-1, pod-2, pod-3}
+				"node-2": 2, // {pod-4, pod-5}
+			},
+			wantMetrics: expectedMetrics{
+				desiredSlices:                   1,
+				actualSlices:                    1,
+				desiredEndpoints:                6,
+				addedPerSync:                    6,
+				removedPerSync:                  0,
+				numCreated:                      1,
+				numUpdated:                      0,
+				numDeleted:                      0,
+				slicesChangedPerSync:            0, // 0 means either topologyAnnotation or trafficDistribution was used.
+				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
+				slicesChangedPerSyncTrafficDist: 1, // 1 EPS configured using trafficDistribution.
+				servicesCountByTrafficDistribution: map[string]int{
+					"PreferSameNode": 1,
+				},
+			},
+		},
+		{
+			name:                                  "trafficDistribution=PreferSameZone, PSTD disabled",
+			desc:                                  "When trafficDistribution is PreferSameZone and PreferSameTrafficDistribution is disabled, no hints should be set",
+			trafficDistributionFeatureGateEnabled: true,
+			preferSameFeatureGateEnabled:          false,
+			trafficDistribution:                   ptr.To(corev1.ServiceTrafficDistributionPreferSameZone),
+			topologyAnnotation:                    "Disabled",
+			wantHintsDistributionByZone:           map[string]int{"": 6}, // Equivalent to no hints.
+			wantMetrics: expectedMetrics{
+				desiredSlices:                   1,
+				actualSlices:                    1,
+				desiredEndpoints:                6,
+				addedPerSync:                    6,
+				removedPerSync:                  0,
+				numCreated:                      1,
+				numUpdated:                      0,
+				numDeleted:                      0,
+				slicesChangedPerSync:            1, // 1 means both topologyAnnotation and trafficDistribution were not used.
+				slicesChangedPerSyncTopology:    0, // 0 means topologyAnnotation was not used.
+				slicesChangedPerSyncTrafficDist: 0, // 0 means trafficDistribution was not used.
+			},
+		},
 	}
 
 	// Make assertions.
@@ -2135,6 +2193,7 @@ func TestReconcile_TrafficDistribution(t *testing.T) {
 
 			r := newReconciler(client, nodes, defaultMaxEndpointsPerSlice)
 			r.trafficDistributionEnabled = tc.trafficDistributionFeatureGateEnabled
+			r.preferSameTrafficDistribution = tc.preferSameFeatureGateEnabled
 			r.topologyCache = topologycache.NewTopologyCache()
 			r.topologyCache.SetNodes(logger, nodes)
 
@@ -2397,8 +2456,13 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected slicesChangedPerSyncTopology to be %d, got %v", em.slicesChangedPerSyncTopology, actualSlicesChangedPerSyncTopology)
 	}
 
-	actualSlicesChangedPerSyncTrafficDist, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferClose"))
-	handleErr(t, err, "slicesChangedPerSyncTrafficDist")
+	actualSlicesChangedPreferClose, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferClose"))
+	handleErr(t, err, "slicesChangedPreferClose")
+	actualSlicesChangedPreferSameZone, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferSameZone"))
+	handleErr(t, err, "slicesChangedPreferSameZone")
+	actualSlicesChangedPreferSameNode, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled", "PreferSameNode"))
+	handleErr(t, err, "slicesChangedPreferSameNode")
+	actualSlicesChangedPerSyncTrafficDist := actualSlicesChangedPreferClose + actualSlicesChangedPreferSameZone + actualSlicesChangedPreferSameNode
 	if actualSlicesChangedPerSyncTrafficDist != float64(em.slicesChangedPerSyncTrafficDist) {
 		t.Errorf("Expected slicesChangedPerSyncTrafficDist to be %d, got %v", em.slicesChangedPerSyncTrafficDist, actualSlicesChangedPerSyncTopology)
 	}

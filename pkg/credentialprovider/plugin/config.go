@@ -19,32 +19,84 @@ package plugin
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	credentialproviderv1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
-// readCredentialProviderConfigFile receives a path to a config file and decodes it
-// into the internal CredentialProviderConfig type.
-func readCredentialProviderConfigFile(configPath string) (*kubeletconfig.CredentialProviderConfig, error) {
+// readCredentialProviderConfig receives a path to a config file or directory.
+// If the path is a directory, it reads all "*.json", "*.yaml" and "*.yml" files in lexicographic order,
+// decodes them, and merges their entries into a single CredentialProviderConfig object.
+// If the path is a file, it decodes the file into a CredentialProviderConfig object directly
+func readCredentialProviderConfig(configPath string) (*kubeletconfig.CredentialProviderConfig, error) {
 	if configPath == "" {
 		return nil, fmt.Errorf("credential provider config path is empty")
 	}
 
-	data, err := os.ReadFile(configPath)
+	fileInfo, err := os.Stat(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read external registry credential provider configuration from %q: %w", configPath, err)
+		return nil, fmt.Errorf("unable to access path %q: %w", configPath, err)
 	}
 
-	config, err := decode(data)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding config %s: %w", configPath, err)
+	var configs []*kubeletconfig.CredentialProviderConfig
+	var configFiles []string
+
+	if fileInfo.IsDir() {
+		entries, err := os.ReadDir(configPath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read directory %q: %w", configPath, err)
+		}
+
+		// Filter and sort *.json/*.yaml/*.yml files in lexicographic order
+		for _, entry := range entries {
+			ext := filepath.Ext(entry.Name())
+			if !entry.IsDir() && (ext == ".json" || ext == ".yaml" || ext == ".yml") {
+				configFiles = append(configFiles, filepath.Join(configPath, entry.Name()))
+			}
+		}
+		sort.Strings(configFiles)
+
+		if len(configFiles) == 0 {
+			return nil, fmt.Errorf("no configuration files found in directory %q", configPath)
+		}
+	} else {
+		configFiles = append(configFiles, configPath)
 	}
 
-	return config, nil
+	for _, filePath := range configFiles {
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read file %q: %w", filePath, err)
+		}
+
+		config, err := decode(data)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding config %q: %w", filePath, err)
+		}
+		configs = append(configs, config)
+	}
+
+	// Merge all configs into a single CredentialProviderConfig
+	mergedConfig := &kubeletconfig.CredentialProviderConfig{}
+	providerNames := sets.NewString()
+	for _, config := range configs {
+		for _, provider := range config.Providers {
+			if providerNames.Has(provider.Name) {
+				return nil, fmt.Errorf("duplicate provider name %q found in configuration file(s)", provider.Name)
+			}
+			providerNames.Insert(provider.Name)
+			mergedConfig.Providers = append(mergedConfig.Providers, provider)
+		}
+	}
+
+	return mergedConfig, nil
 }
 
 // decode decodes data into the internal CredentialProviderConfig type.
@@ -70,7 +122,7 @@ func decode(data []byte) (*kubeletconfig.CredentialProviderConfig, error) {
 }
 
 // validateCredentialProviderConfig validates CredentialProviderConfig.
-func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderConfig) field.ErrorList {
+func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderConfig, saTokenForCredentialProviders bool) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	if len(config.Providers) == 0 {
@@ -125,7 +177,56 @@ func validateCredentialProviderConfig(config *kubeletconfig.CredentialProviderCo
 		if provider.DefaultCacheDuration != nil && provider.DefaultCacheDuration.Duration < 0 {
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("defaultCacheDuration"), provider.DefaultCacheDuration.Duration, "defaultCacheDuration must be greater than or equal to 0"))
 		}
+
+		if provider.TokenAttributes != nil {
+			fldPath := fieldPath.Child("tokenAttributes")
+			if !saTokenForCredentialProviders {
+				allErrs = append(allErrs, field.Forbidden(fldPath, "tokenAttributes is not supported when KubeletServiceAccountTokenForCredentialProviders feature gate is disabled"))
+			}
+			if len(provider.TokenAttributes.ServiceAccountTokenAudience) == 0 {
+				allErrs = append(allErrs, field.Required(fldPath.Child("serviceAccountTokenAudience"), "serviceAccountTokenAudience is required"))
+			}
+			if provider.TokenAttributes.RequireServiceAccount == nil {
+				allErrs = append(allErrs, field.Required(fldPath.Child("requireServiceAccount"), "requireServiceAccount is required"))
+			}
+			if provider.APIVersion != credentialproviderv1.SchemeGroupVersion.String() {
+				allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("tokenAttributes is only supported for %s API version", credentialproviderv1.SchemeGroupVersion.String())))
+			}
+
+			if provider.TokenAttributes.RequireServiceAccount != nil && !*provider.TokenAttributes.RequireServiceAccount && len(provider.TokenAttributes.RequiredServiceAccountAnnotationKeys) > 0 {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("requiredServiceAccountAnnotationKeys"), "requireServiceAccount cannot be false when requiredServiceAccountAnnotationKeys is set"))
+			}
+
+			allErrs = append(allErrs, validateServiceAccountAnnotationKeys(fldPath.Child("requiredServiceAccountAnnotationKeys"), provider.TokenAttributes.RequiredServiceAccountAnnotationKeys)...)
+			allErrs = append(allErrs, validateServiceAccountAnnotationKeys(fldPath.Child("optionalServiceAccountAnnotationKeys"), provider.TokenAttributes.OptionalServiceAccountAnnotationKeys)...)
+
+			requiredServiceAccountAnnotationKeys := sets.New[string](provider.TokenAttributes.RequiredServiceAccountAnnotationKeys...)
+			optionalServiceAccountAnnotationKeys := sets.New[string](provider.TokenAttributes.OptionalServiceAccountAnnotationKeys...)
+			duplicateAnnotationKeys := requiredServiceAccountAnnotationKeys.Intersection(optionalServiceAccountAnnotationKeys)
+			if duplicateAnnotationKeys.Len() > 0 {
+				allErrs = append(allErrs, field.Invalid(fldPath, sets.List(duplicateAnnotationKeys), "annotation keys cannot be both required and optional"))
+			}
+		}
 	}
 
+	return allErrs
+}
+
+// validateServiceAccountAnnotationKeys validates the service account annotation keys.
+func validateServiceAccountAnnotationKeys(fldPath *field.Path, keys []string) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	seenAnnotationKeys := sets.New[string]()
+	// Using the validation logic for keys from https://github.com/kubernetes/kubernetes/blob/69dbc74417304328a9fd3c161643dc4f0a057f41/staging/src/k8s.io/apimachinery/pkg/api/validation/objectmeta.go#L46-L51
+	for _, k := range keys {
+		// The rule is QualifiedName except that case doesn't matter, so convert to lowercase before checking.
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
+		}
+		if seenAnnotationKeys.Has(k) {
+			allErrs = append(allErrs, field.Duplicate(fldPath, k))
+		}
+		seenAnnotationKeys.Insert(k)
+	}
 	return allErrs
 }

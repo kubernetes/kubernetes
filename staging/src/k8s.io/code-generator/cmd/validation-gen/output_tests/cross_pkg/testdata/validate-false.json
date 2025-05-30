@@ -1,202 +1,202 @@
 {
-    "*crosspkg.T1": {
-      "primitivest1.anothert2.b": [
-        "field T2.B"
-      ],
-      "primitivest1.anothert2.f": [
-        "field T2.F"
-      ],
-      "primitivest1.anothert2.i": [
-        "field T2.I"
-      ],
-      "primitivest1.anothert2.s": [
-        "field T2.S"
-      ],
-      "primitivest1.b": [
-        "field T1.B"
-      ],
-      "primitivest1.f": [
-        "field T1.F"
-      ],
-      "primitivest1.i": [
-        "field T1.I"
-      ],
-      "primitivest1.s": [
-        "field T1.S"
-      ],
-      "primitivest1.t2": [
-        "field T1.T2"
-      ],
-      "primitivest1.t2.b": [
-        "field T2.B"
-      ],
-      "primitivest1.t2.f": [
-        "field T2.F"
-      ],
-      "primitivest1.t2.i": [
-        "field T2.I"
-      ],
-      "primitivest1.t2.s": [
-        "field T2.S"
-      ],
-      "primitivest1Ptr.anothert2.b": [
-        "field T2.B"
-      ],
-      "primitivest1Ptr.anothert2.f": [
-        "field T2.F"
-      ],
-      "primitivest1Ptr.anothert2.i": [
-        "field T2.I"
-      ],
-      "primitivest1Ptr.anothert2.s": [
-        "field T2.S"
-      ],
-      "primitivest1Ptr.b": [
-        "field T1.B"
-      ],
-      "primitivest1Ptr.f": [
-        "field T1.F"
-      ],
-      "primitivest1Ptr.i": [
-        "field T1.I"
-      ],
-      "primitivest1Ptr.s": [
-        "field T1.S"
-      ],
-      "primitivest1Ptr.t2": [
-        "field T1.T2"
-      ],
-      "primitivest1Ptr.t2.b": [
-        "field T2.B"
-      ],
-      "primitivest1Ptr.t2.f": [
-        "field T2.F"
-      ],
-      "primitivest1Ptr.t2.i": [
-        "field T2.I"
-      ],
-      "primitivest1Ptr.t2.s": [
-        "field T2.S"
-      ],
-      "primitivest2.b": [
-        "field T2.B"
-      ],
-      "primitivest2.f": [
-        "field T2.F"
-      ],
-      "primitivest2.i": [
-        "field T2.I"
-      ],
-      "primitivest2.s": [
-        "field T2.S"
-      ],
-      "primitivest2Ptr.anothert2.b": [
-        "field T2.B"
-      ],
-      "primitivest2Ptr.anothert2.f": [
-        "field T2.F"
-      ],
-      "primitivest2Ptr.anothert2.i": [
-        "field T2.I"
-      ],
-      "primitivest2Ptr.anothert2.s": [
-        "field T2.S"
-      ],
-      "primitivest2Ptr.b": [
-        "field T1.B"
-      ],
-      "primitivest2Ptr.f": [
-        "field T1.F"
-      ],
-      "primitivest2Ptr.i": [
-        "field T1.I"
-      ],
-      "primitivest2Ptr.s": [
-        "field T1.S"
-      ],
-      "primitivest2Ptr.t2": [
-        "field T1.T2"
-      ],
-      "primitivest2Ptr.t2.b": [
-        "field T2.B"
-      ],
-      "primitivest2Ptr.t2.f": [
-        "field T2.F"
-      ],
-      "primitivest2Ptr.t2.i": [
-        "field T2.I"
-      ],
-      "primitivest2Ptr.t2.s": [
-        "field T2.S"
-      ],
-      "primitivest3Ptr.anothert2.b": [
-        "field T2.B"
-      ],
-      "primitivest3Ptr.anothert2.f": [
-        "field T2.F"
-      ],
-      "primitivest3Ptr.anothert2.i": [
-        "field T2.I"
-      ],
-      "primitivest3Ptr.anothert2.s": [
-        "field T2.S"
-      ],
-      "primitivest3Ptr.b": [
-        "field T1.B"
-      ],
-      "primitivest3Ptr.f": [
-        "field T1.F"
-      ],
-      "primitivest3Ptr.i": [
-        "field T1.I"
-      ],
-      "primitivest3Ptr.s": [
-        "field T1.S"
-      ],
-      "primitivest3Ptr.t2": [
-        "field T1.T2"
-      ],
-      "primitivest3Ptr.t2.b": [
-        "field T2.B"
-      ],
-      "primitivest3Ptr.t2.f": [
-        "field T2.F"
-      ],
-      "primitivest3Ptr.t2.i": [
-        "field T2.I"
-      ],
-      "primitivest3Ptr.t2.s": [
-        "field T2.S"
-      ],
-      "typedefse1": [
-        "type E1"
-      ],
-      "typedefse1Ptr": [
-        "type E1"
-      ],
-      "typedefse2": [
-        "type E2"
-      ],
-      "typedefse2Ptr": [
-        "type E2"
-      ],
-      "typedefse3": [
-        "type E3"
-      ],
-      "typedefse3Ptr": [
-        "type E3"
-      ],
-      "typedefse4": [
-        "type E4"
-      ],
-      "typedefse4.s": [
-        "field T2.S"
-      ],
-      "typedefse4Ptr": [
-        "type E4"
-      ],
-      "typedefse4Ptr.s": [
-        "field T2.S"
-      ]
-    }
+  "*crosspkg.T1": {
+    "primitivest1.anothert2.b": [
+      "field T2.B"
+    ],
+    "primitivest1.anothert2.f": [
+      "field T2.F"
+    ],
+    "primitivest1.anothert2.i": [
+      "field T2.I"
+    ],
+    "primitivest1.anothert2.s": [
+      "field T2.S"
+    ],
+    "primitivest1.b": [
+      "field T1.B"
+    ],
+    "primitivest1.f": [
+      "field T1.F"
+    ],
+    "primitivest1.i": [
+      "field T1.I"
+    ],
+    "primitivest1.s": [
+      "field T1.S"
+    ],
+    "primitivest1.t2": [
+      "field T1.T2"
+    ],
+    "primitivest1.t2.b": [
+      "field T2.B"
+    ],
+    "primitivest1.t2.f": [
+      "field T2.F"
+    ],
+    "primitivest1.t2.i": [
+      "field T2.I"
+    ],
+    "primitivest1.t2.s": [
+      "field T2.S"
+    ],
+    "primitivest1Ptr.anothert2.b": [
+      "field T2.B"
+    ],
+    "primitivest1Ptr.anothert2.f": [
+      "field T2.F"
+    ],
+    "primitivest1Ptr.anothert2.i": [
+      "field T2.I"
+    ],
+    "primitivest1Ptr.anothert2.s": [
+      "field T2.S"
+    ],
+    "primitivest1Ptr.b": [
+      "field T1.B"
+    ],
+    "primitivest1Ptr.f": [
+      "field T1.F"
+    ],
+    "primitivest1Ptr.i": [
+      "field T1.I"
+    ],
+    "primitivest1Ptr.s": [
+      "field T1.S"
+    ],
+    "primitivest1Ptr.t2": [
+      "field T1.T2"
+    ],
+    "primitivest1Ptr.t2.b": [
+      "field T2.B"
+    ],
+    "primitivest1Ptr.t2.f": [
+      "field T2.F"
+    ],
+    "primitivest1Ptr.t2.i": [
+      "field T2.I"
+    ],
+    "primitivest1Ptr.t2.s": [
+      "field T2.S"
+    ],
+    "primitivest2.b": [
+      "field T2.B"
+    ],
+    "primitivest2.f": [
+      "field T2.F"
+    ],
+    "primitivest2.i": [
+      "field T2.I"
+    ],
+    "primitivest2.s": [
+      "field T2.S"
+    ],
+    "primitivest2Ptr.anothert2.b": [
+      "field T2.B"
+    ],
+    "primitivest2Ptr.anothert2.f": [
+      "field T2.F"
+    ],
+    "primitivest2Ptr.anothert2.i": [
+      "field T2.I"
+    ],
+    "primitivest2Ptr.anothert2.s": [
+      "field T2.S"
+    ],
+    "primitivest2Ptr.b": [
+      "field T1.B"
+    ],
+    "primitivest2Ptr.f": [
+      "field T1.F"
+    ],
+    "primitivest2Ptr.i": [
+      "field T1.I"
+    ],
+    "primitivest2Ptr.s": [
+      "field T1.S"
+    ],
+    "primitivest2Ptr.t2": [
+      "field T1.T2"
+    ],
+    "primitivest2Ptr.t2.b": [
+      "field T2.B"
+    ],
+    "primitivest2Ptr.t2.f": [
+      "field T2.F"
+    ],
+    "primitivest2Ptr.t2.i": [
+      "field T2.I"
+    ],
+    "primitivest2Ptr.t2.s": [
+      "field T2.S"
+    ],
+    "primitivest3Ptr.anothert2.b": [
+      "field T2.B"
+    ],
+    "primitivest3Ptr.anothert2.f": [
+      "field T2.F"
+    ],
+    "primitivest3Ptr.anothert2.i": [
+      "field T2.I"
+    ],
+    "primitivest3Ptr.anothert2.s": [
+      "field T2.S"
+    ],
+    "primitivest3Ptr.b": [
+      "field T1.B"
+    ],
+    "primitivest3Ptr.f": [
+      "field T1.F"
+    ],
+    "primitivest3Ptr.i": [
+      "field T1.I"
+    ],
+    "primitivest3Ptr.s": [
+      "field T1.S"
+    ],
+    "primitivest3Ptr.t2": [
+      "field T1.T2"
+    ],
+    "primitivest3Ptr.t2.b": [
+      "field T2.B"
+    ],
+    "primitivest3Ptr.t2.f": [
+      "field T2.F"
+    ],
+    "primitivest3Ptr.t2.i": [
+      "field T2.I"
+    ],
+    "primitivest3Ptr.t2.s": [
+      "field T2.S"
+    ],
+    "typedefse1": [
+      "type E1"
+    ],
+    "typedefse1Ptr": [
+      "type E1"
+    ],
+    "typedefse2": [
+      "type E2"
+    ],
+    "typedefse2Ptr": [
+      "type E2"
+    ],
+    "typedefse3": [
+      "type E3"
+    ],
+    "typedefse3Ptr": [
+      "type E3"
+    ],
+    "typedefse4": [
+      "type E4"
+    ],
+    "typedefse4.s": [
+      "field T2.S"
+    ],
+    "typedefse4Ptr": [
+      "type E4"
+    ],
+    "typedefse4Ptr.s": [
+      "field T2.S"
+    ]
   }
+}

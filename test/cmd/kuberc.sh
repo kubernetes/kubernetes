@@ -25,11 +25,8 @@ run_kuberc_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing kuberc"
 
-  # Enable KUBERC feature
-  export KUBECTL_KUBERC=true
-
   cat > "${TMPDIR:-/tmp}"/kuberc_file << EOF
-apiVersion: kubectl.config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
 aliases:
 - name: crns
@@ -40,22 +37,22 @@ aliases:
   command: get
   prependArgs:
    - namespace
-  flags:
+  options:
    - name: output
      default: wide
 - name: crole
   command: create role
-  flags:
+  options:
   - name: verb
     default: get,watch
 - name: getrole
   command: get
-  flags:
+  options:
   - name: output
     default: json
 - name: runx
   command: run
-  flags:
+  options:
   - name: image
     default: nginx
   - name: labels
@@ -74,9 +71,9 @@ aliases:
   appendArgs:
   - pod/test-pod-2
   - test-pod-2=busybox
-overrides:
+defaults:
 - command: apply
-  flags:
+  options:
   - name: server-side
     default: "true"
   - name: dry-run
@@ -84,11 +81,11 @@ overrides:
   - name: validate
     default: "strict"
 - command: delete
-  flags:
+  options:
   - name: interactive
     default: "true"
 - command: get
-  flags:
+  options:
   - name: namespace
     default: "test-kuberc-ns"
   - name: output
@@ -155,11 +152,11 @@ EOF
 
   cat > "${TMPDIR:-/tmp}"/kuberc_file_multi << EOF
 ---
-apiVersion: kubectl.config.k8s.io/v1alpha1
+apiVersion: kubectl.config.k8s.io/v1beta1
 kind: Preference
-overrides:
+defaults:
 - command: get
-  flags:
+  options:
   - name: namespace
     default: "test-kuberc-ns"
   - name: output
@@ -184,12 +181,22 @@ EOF
   # assure that warning message is also printed for the notexist kuberc version
   kube::test::if_has_string "${output_message}" "strict decoding error" "unknown"
 
+  touch "${TMPDIR:-/tmp}"/empty_kuberc_file
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_not_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file -v=5)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 -v 5 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --v=5 --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+  output_message=$(kubectl get --v 5 namespace test-kuberc-ns 2>&1 "${kube_flags[@]:?}" --kuberc="${TMPDIR:-/tmp}"/empty_kuberc_file)
+  kube::test::if_has_string "${output_message}" "kuberc: no preferences found in"
+
   # explicitly overwriting the value that is also defaulted in kuberc and
   # assure that explicit value supersedes
   output_message=$(kubectl delete namespace/test-kuberc-ns --interactive=false --kuberc="${TMPDIR:-/tmp}"/kuberc_file)
   kube::test::if_has_string "${output_message}" 'namespace "test-kuberc-ns" deleted'
-
-  unset KUBECTL_KUBERC
 
   set +o nounset
   set +o errexit

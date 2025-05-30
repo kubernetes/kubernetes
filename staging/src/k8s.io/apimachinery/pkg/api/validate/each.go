@@ -43,26 +43,6 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 	return errs
 }
 
-// EachSliceValNilable validates each element of newSlice with the specified
-// validation function.  The comparison function is used to find the
-// corresponding value in oldSlice.  The value-type of the slices is assumed to
-// be nilable.
-func EachSliceValNilable[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
-	cmp CompareFunc[T], validator ValidateFunc[T]) field.ErrorList {
-	var errs field.ErrorList
-	for i, val := range newSlice {
-		var old T
-		if cmp != nil && len(oldSlice) > 0 {
-			p := lookup(oldSlice, val, cmp)
-			if p != nil {
-				old = *p
-			}
-		}
-		errs = append(errs, validator(ctx, op, fldPath.Index(i), val, old)...)
-	}
-	return errs
-}
-
 // lookup returns a pointer to the first element in the list that matches the
 // target, according to the provided comparison function, or else nil.
 func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
@@ -86,22 +66,6 @@ func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, f
 			old = &o
 		}
 		errs = append(errs, validator(ctx, op, fldPath.Key(string(key)), &val, old)...)
-	}
-	return errs
-}
-
-// EachMapValNilable validates each element of newMap with the specified
-// validation function and, if the corresponding key is found in oldMap, the
-// old value. The value-type of the slices is assumed to be nilable.
-func EachMapValNilable[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]V,
-	validator ValidateFunc[V]) field.ErrorList {
-	var errs field.ErrorList
-	for key, val := range newMap {
-		var old V
-		if o, found := oldMap[key]; found {
-			old = o
-		}
-		errs = append(errs, validator(ctx, op, fldPath.Key(string(key)), val, old)...)
 	}
 	return errs
 }

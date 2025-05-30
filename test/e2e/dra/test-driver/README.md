@@ -15,7 +15,7 @@ testing.
 
 Valid parameters are key/value string pairs stored in a ConfigMap.
 Those get copied into the ResourceClaimStatus with "user_" and "admin_" as
-prefix, depending on whether they came from the ResourceClaim or ResourceClass.
+prefix, depending on whether they came from the ResourceClaim or DeviceClass.
 They get stored in the `ResourceHandle` field as JSON map by the controller.
 The kubelet plugin then sets these attributes as environment variables in each
 container that uses the resource.
@@ -60,14 +60,18 @@ RUNTIME_CONFIG="resource.k8s.io/v1alpha3" FEATURE_GATES=DynamicResourceAllocatio
 
 In another:
 ```
-sudo mkdir -p /var/run/cdi && sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry
+sudo mkdir -p /var/run/cdi
+sudo mkdir -p /var/lib/kubelet/plugins/test-driver.cdi.k8s.io
+sudo mkdir -p /var/lib/kubelet/plugins_registry
+sudo chmod a+rx /var/lib/kubelet /var/lib/kubelet/plugins
+sudo chmod a+rwx /var/run/cdi /var/lib/kubelet/plugins_registry /var/lib/kubelet/plugins/test-driver.cdi.k8s.io
 KUBECONFIG=/var/run/kubernetes/admin.kubeconfig go run ./test/e2e/dra/test-driver -v=5 kubelet-plugin --node-name=127.0.0.1
 ```
 
 And finally:
 ```console
 $ export KUBECONFIG=/var/run/kubernetes/admin.kubeconfig
-$ kubectl create -f test/e2e/dra/test-driver/deploy/example/resourceclass.yaml
+$ kubectl create -f test/e2e/dra/test-driver/deploy/example/deviceclass.yaml
 resourceclass/example created
 $ kubectl create -f test/e2e/dra/test-driver/deploy/example/pod-inline.yaml
 configmap/pause-claim-parameters created

@@ -12,6 +12,7 @@ go_library(
     ],
     importpath = "github.com/google/cel-go/common/stdlib",
     deps = [
+        "//common:go_default_library",
         "//common/decls:go_default_library",
         "//common/functions:go_default_library",
         "//common/operators:go_default_library",
