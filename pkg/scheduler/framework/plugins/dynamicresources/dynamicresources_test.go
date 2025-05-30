@@ -39,7 +39,10 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -261,6 +264,14 @@ func updateDeviceClassName(claim *resourceapi.ResourceClaim, deviceClassName str
 		}
 	}
 	return claim
+}
+
+func getDefaultDynamicResourcesArgs() *config.DynamicResourcesArgs {
+	v1dra := &kubeschedulerconfigv1.DynamicResourcesArgs{}
+	configv1.SetDefaults_DynamicResourcesArgs(v1dra)
+	dra := &config.DynamicResourcesArgs{}
+	configv1.Convert_v1_DynamicResourcesArgs_To_config_DynamicResourcesArgs(v1dra, dra, nil)
+	return dra
 }
 
 // result defines the expected outcome of some operation. It covers
@@ -991,6 +1002,7 @@ func TestPlugin(t *testing.T) {
 			features := feature.Features{
 				EnableDRAAdminAccess:            tc.enableDRAAdminAccess,
 				EnableDRADeviceTaints:           tc.enableDRADeviceTaints,
+				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: !tc.disableDRA,
 				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
 			}
@@ -1285,7 +1297,7 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 		t.Fatal(err)
 	}
 
-	pl, err := New(tCtx, nil, fh, features)
+	pl, err := New(tCtx, getDefaultDynamicResourcesArgs(), fh, features)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1474,6 +1486,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, tCtx := ktesting.NewTestContext(t)
 			features := feature.Features{
+				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
 			testCtx := setup(t, nil, tc.claims, nil, nil, features)
@@ -1597,6 +1610,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			features := feature.Features{
+				EnableDRASchedulerFilterTimeout: true,
 				EnableDynamicResourceAllocation: true,
 			}
 			testCtx := setup(t, nil, tc.claims, nil, tc.objs, features)
