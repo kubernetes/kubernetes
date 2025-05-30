@@ -1249,6 +1249,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyNFTablesConfiguration":                                      schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyNFTablesConfiguration(ref),
 		"k8s.io/kube-proxy/config/v1alpha1.KubeProxyWinkernelConfiguration":                                     schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyWinkernelConfiguration(ref),
 		"k8s.io/kube-scheduler/config/v1.DefaultPreemptionArgs":                                                 schema_k8sio_kube_scheduler_config_v1_DefaultPreemptionArgs(ref),
+		"k8s.io/kube-scheduler/config/v1.DynamicResourcesArgs":                                                  schema_k8sio_kube_scheduler_config_v1_DynamicResourcesArgs(ref),
 		"k8s.io/kube-scheduler/config/v1.Extender":                                                              schema_k8sio_kube_scheduler_config_v1_Extender(ref),
 		"k8s.io/kube-scheduler/config/v1.ExtenderManagedResource":                                               schema_k8sio_kube_scheduler_config_v1_ExtenderManagedResource(ref),
 		"k8s.io/kube-scheduler/config/v1.ExtenderTLSConfig":                                                     schema_k8sio_kube_scheduler_config_v1_ExtenderTLSConfig(ref),
@@ -64221,6 +64222,42 @@ func schema_k8sio_kube_scheduler_config_v1_DefaultPreemptionArgs(ref common.Refe
 				},
 			},
 		},
+	}
+}
+
+func schema_k8sio_kube_scheduler_config_v1_DynamicResourcesArgs(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "DynamicResourcesArgs holds arguments used to configure the DynamicResources plugin.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"filterTimeout": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FilterTimeout limits the amount of time that the filter operation may take per node to search for devices that can be allocated to scheduler a pod to that node.\n\nIn typical scenarios, this operation should complete in 10 to 200 milliseconds, but could also be longer depending on the number of requests per ResourceClaim, number of ResourceClaims, number of published devices in ResourceSlices, and the complexity of the requests. Other checks besides CEL evaluation also take time (usage checks, match attributes, etc.).\n\nTherefore the scheduler plugin applies this timeout. If the timeout is reached, the Pod is considered unschedulable for the node. If filtering succeeds for some other node(s), those are picked instead. If filtering fails for all of them, the Pod is placed in the unschedulable queue. It will get checked again if changes in e.g. ResourceSlices or ResourceClaims indicate that another scheduling attempt might succeed. If this fails repeatedly, exponential backoff slows down future attempts.\n\nThe default is 10 seconds. This is sufficient to prevent worst-case scenarios while not impacting normal usage of DRA. However, slow filtering can slow down Pod scheduling also for Pods not using DRA. Administators can reduce the timeout after checking the `scheduler_framework_extension_point_duration_seconds` metrics.\n\nSetting it to zero completely disables the timeout.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Duration"),
+						},
+					},
+				},
+				Required: []string{"filterTimeout"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Duration"},
 	}
 }
 

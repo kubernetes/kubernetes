@@ -41,6 +41,8 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -121,6 +123,14 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 	if !fts.EnableDynamicResourceAllocation {
 		// Disabled, won't do anything.
 		return &DynamicResources{}, nil
+	}
+
+	args, ok := plArgs.(*config.DynamicResourcesArgs)
+	if !ok {
+		return nil, fmt.Errorf("got args of type %T, want *DynamicResourcesArgs", plArgs)
+	}
+	if err := validation.ValidateDynamicResourcesArgs(nil, args, fts); err != nil {
+		return nil, err
 	}
 
 	pl := &DynamicResources{
