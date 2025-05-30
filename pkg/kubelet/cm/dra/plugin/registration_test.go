@@ -19,6 +19,7 @@ package plugin
 import (
 	"context"
 	"path"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -116,6 +117,9 @@ func requireNoSlices(t *testing.T, ctx context.Context, client kubernetes.Interf
 }
 
 func TestRegistrationHandler(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("DRA is not currently supported on Windows.")
+	}
 	endpointA := path.Join(t.TempDir(), "dra-plugin-a.sock")
 	endpointB := path.Join(t.TempDir(), "dra-plugin-b.sock")
 	slice := &resourceapi.ResourceSlice{

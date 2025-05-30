@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -895,6 +896,9 @@ func TestGetContainerClaimInfos(t *testing.T) {
 // TestParallelPrepareUnprepareResources calls PrepareResources and UnprepareResources APIs in parallel
 // to detect possible data races
 func TestParallelPrepareUnprepareResources(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("DRA is not currently supported on Windows.")
+	}
 	tCtx := ktesting.Init(t)
 
 	// Setup and register fake DRA driver

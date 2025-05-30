@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path"
+	goruntime "runtime"
 	"strings"
 	"testing"
 
@@ -151,6 +152,9 @@ func TestGRPCConnIsReused(t *testing.T) {
 }
 
 func TestNewDRAPluginClient(t *testing.T) {
+	if goruntime.GOOS == "windows" {
+		t.Skip("DRA is not currently supported on Windows.")
+	}
 	// Create a plugin gRPC server.
 	service := drapbv1beta1.DRAPluginService
 	endpoint := path.Join(t.TempDir(), "dra-plugin-test.sock")
