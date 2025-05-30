@@ -113,6 +113,9 @@ func (a *Allocator) ClaimsToAllocate() []*resourceapi.ResourceClaim {
 // additional value. A name can also be useful because log messages do not
 // have a common prefix. V(5) is used for one-time log entries, V(6) for important
 // progress reports, and V(7) for detailed debug output.
+//
+// Context cancellation is supported. An error wrapping the contexts error will
+// be returned in case of cancellation.
 func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []resourceapi.AllocationResult, finalErr error) {
 	alloc := &allocator{
 		Allocator:            a,
@@ -682,6 +685,10 @@ func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeNam
 // This allows the logic for subrequests to call allocateOne with the same
 // device index without causing infinite recursion.
 func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (bool, error) {
+	if alloc.ctx.Err() != nil {
+		return false, fmt.Errorf("filter operation aborted: %w", alloc.ctx.Err())
+	}
+
 	if r.claimIndex >= len(alloc.claimsToAllocate) {
 		// Done! If we were doing scoring, we would compare the current allocation result
 		// against the previous one, keep the best, and continue. Without scoring, we stop
