@@ -115,12 +115,12 @@ func (info *ClaimInfo) isPrepared() bool {
 func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error) {
 	checkpointer, err := state.NewCheckpointer(stateDir, checkpointName)
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove dra state file, err: %w", err)
+		return nil, fmt.Errorf("could not initialize checkpoint manager, please drain node and remove DRA state file, err: %w", err)
 	}
 
 	checkpoint, err := checkpointer.GetOrCreate()
 	if err != nil {
-		return nil, fmt.Errorf("error calling GetOrCreate() on checkpoint state: %w", err)
+		return nil, fmt.Errorf("GetOrCreate() on checkpoint state: %w", err)
 	}
 
 	cache := &claimInfoCache{
@@ -130,7 +130,7 @@ func newClaimInfoCache(stateDir, checkpointName string) (*claimInfoCache, error)
 
 	entries, err := checkpoint.GetClaimInfoStateList()
 	if err != nil {
-		return nil, fmt.Errorf("error calling GetEntries() on checkpoint: %w", err)
+		return nil, fmt.Errorf("GetEntries() on checkpoint: %w", err)
 
 	}
 	for _, entry := range entries {
@@ -156,9 +156,8 @@ func (cache *claimInfoCache) withRLock(f func() error) error {
 }
 
 // add adds a new claim info object into the claim info cache.
-func (cache *claimInfoCache) add(info *ClaimInfo) *ClaimInfo {
+func (cache *claimInfoCache) add(info *ClaimInfo) {
 	cache.claimInfo[info.Namespace+"/"+info.ClaimName] = info
-	return info
 }
 
 // contains checks to see if a specific claim info object is already in the cache.
