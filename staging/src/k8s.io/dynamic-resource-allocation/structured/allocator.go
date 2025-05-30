@@ -61,10 +61,10 @@ type Allocator struct {
 	// about each slice is never updated once set the first time.
 	// This is computed bsed on information on the Allocator, so it will
 	// be correct even for multiple usages of the Allocator.
-	// The keys in the map is ResourceSlice names.
+	// The keys in the map are ResourceSlice names.
 	// The allocator might be accessed by different goroutines, so
 	// access to this map must be synchronized.
-	availableCounters map[draapi.UniqueString]counterSets
+	availableCounters map[string]counterSets
 	mutex             sync.RWMutex
 }
 
@@ -94,7 +94,7 @@ func NewAllocator(ctx context.Context,
 		classLister:       classLister,
 		slices:            slices,
 		celCache:          celCache,
-		availableCounters: make(map[draapi.UniqueString]counterSets),
+		availableCounters: make(map[string]counterSets),
 	}, nil
 }
 
@@ -134,7 +134,7 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		node:                 node,
 		deviceMatchesRequest: make(map[matchKey]bool),
 		constraints:          make([][]constraint, len(a.claimsToAllocate)),
-		consumedCounters:     make(map[draapi.UniqueString]counterSets),
+		consumedCounters:     make(map[string]counterSets),
 		requestData:          make(map[requestIndices]requestData),
 		result:               make([]internalAllocationResult, len(a.claimsToAllocate)),
 	}
@@ -483,7 +483,8 @@ type allocator struct {
 	constraints          [][]constraint // one list of constraints per claim
 	// consumedCounters keeps track of the counters consumed by all devices
 	// that are in the process of being allocated.
-	consumedCounters map[draapi.UniqueString]counterSets
+	// The keys in the map are ResourceSlice names.
+	consumedCounters map[string]counterSets
 	requestData      map[requestIndices]requestData // one entry per request with no subrequests and one entry per subrequest
 	// allocatingDevices tracks which devices will be newly allocated for a
 	// particular attempt to find a solution. The map is indexed by device
@@ -1125,7 +1126,7 @@ func taintTolerated(taint resourceapi.DeviceTaint, request requestAccessor) bool
 // consumes counters.
 func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error) {
 	slice := device.slice
-	sliceName := draapi.MakeUniqueString(slice.Name)
+	sliceName := slice.Name
 
 	// Check first if the available counters for this slice have already been
 	// calculated.
@@ -1246,7 +1247,7 @@ func (alloc *allocator) allocatingDeviceForClaim(deviceID DeviceID, claimIndex i
 // device from the consumedCounters data structure.
 func (alloc *allocator) deallocateCountersForDevice(device deviceWithID) {
 	slice := device.slice
-	sliceName := draapi.MakeUniqueString(slice.Name)
+	sliceName := slice.Name
 
 	consumedCountersForSlice := alloc.consumedCounters[sliceName]
 	for _, deviceCounterConsumption := range device.basic.ConsumesCounters {
