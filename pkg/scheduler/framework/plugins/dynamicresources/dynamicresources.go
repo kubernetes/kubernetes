@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -111,6 +113,8 @@ type DynamicResources struct {
 	enableSchedulingQueueHint  bool
 	enablePartitionableDevices bool
 	enableDeviceTaints         bool
+	enableFilterTimeout        bool
+	filterTimeout              time.Duration
 
 	fh         framework.Handle
 	clientset  kubernetes.Interface
@@ -138,8 +142,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh framework.Handle, fts fe
 		enableAdminAccess:          fts.EnableDRAAdminAccess,
 		enableDeviceTaints:         fts.EnableDRADeviceTaints,
 		enablePrioritizedList:      fts.EnableDRAPrioritizedList,
+		enableFilterTimeout:        fts.EnableDRASchedulerFilterTimeout,
 		enableSchedulingQueueHint:  fts.EnableSchedulingQueueHint,
 		enablePartitionableDevices: fts.EnablePartitionableDevices,
+		filterTimeout:              ptr.Deref(args.FilterTimeout, metav1.Duration{}).Duration,
 
 		fh:        fh,
 		clientset: fh.ClientSet(),
@@ -563,8 +569,20 @@ func (pl *DynamicResources) Filter(ctx context.Context, cs fwk.CycleState, pod *
 			allocCtx = klog.NewContext(allocCtx, klog.LoggerWithValues(logger, "node", klog.KObj(node)))
 		}
 
+		// Apply timeout to the operation?
+		if pl.enableFilterTimeout && pl.filterTimeout > 0 {
+			c, cancel := context.WithTimeout(allocCtx, pl.filterTimeout)
+			defer cancel()
+			allocCtx = c
+		}
+
 		a, err := state.allocator.Allocate(allocCtx, node, state.claimsToAllocate)
-		if err != nil {
+		switch {
+		case errors.Is(err, context.DeadlineExceeded):
+			return statusUnschedulable(logger, "timed out trying to allocate devices", "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
+		case ctx.Err() != nil:
+			return statusUnschedulable(logger, fmt.Sprintf("asked by caller to stop allocating devices: %v", context.Cause(ctx)), "pod", klog.KObj(pod), "node", klog.KObj(node), "resourceclaims", klog.KObjSlice(state.claimsToAllocate))
+		case err != nil:
 			// This should only fail if there is something wrong with the claim or class.
 			// Return an error to abort scheduling of it.
 			//

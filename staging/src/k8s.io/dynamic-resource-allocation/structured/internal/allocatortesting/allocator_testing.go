@@ -18,10 +18,12 @@ package allocatortesting
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
@@ -3605,6 +3607,64 @@ func TestAllocator(t *testing.T,
 			}
 		})
 	}
+
+	t.Run("interrupt", func(t *testing.T) {
+		for _, name := range []string{"off", "timeout", "deadline", "cancel"} {
+			t.Run(name, func(t *testing.T) {
+				_, ctx := ktesting.NewTestContext(t)
+				g := gomega.NewWithT(t)
+
+				// This testcase is a smaller variant of the one in https://github.com/kubernetes/kubernetes/issues/131730#issuecomment-2873598287.
+				// That one took over 30 seconds, this one here only 0.07 seconds.
+				// But even that is too long when we interrupt in the near future or
+				// even before starting...
+				classLister := informerLister[resourceapi.DeviceClass]{
+					objs: []*resourceapi.DeviceClass{class(classA, driverA)},
+				}
+				claimsToAllocate := unwrap(claimWithRequests(claim0, nil,
+					request(req0, classA, 6),
+				))
+				slices := unwrap(slice(slice1, node1, pool1, driverA,
+					device(device1, nil, nil),
+					device(device2, nil, nil),
+					device(device3, nil, nil),
+					device(device4, nil, nil),
+					device("device-5", nil, nil),
+				))
+				node := node(node1, region1)
+
+				switch name {
+				case "off":
+				case "timeout":
+					c, cancel := context.WithTimeout(ctx, time.Nanosecond)
+					defer cancel()
+					ctx = c
+				case "deadline":
+					c, cancel := context.WithDeadline(ctx, time.Now())
+					defer cancel()
+					ctx = c
+				case "cancel":
+					c, cancel := context.WithCancel(ctx)
+					cancel()
+					ctx = c
+				}
+
+				allocator, err := newAllocator(ctx, Features{}, nil, classLister, slices, cel.NewCache(1))
+				g.Expect(err).ToNot(gomega.HaveOccurred())
+				_, err = allocator.Allocate(ctx, node, claimsToAllocate)
+				t.Logf("got error %v", err)
+				if ctx.Err() != nil {
+					if !errors.Is(err, ctx.Err()) {
+						t.Fatalf("expected %v, got error: %v", ctx.Err(), err)
+					}
+				} else {
+					if err != nil {
+						t.Fatalf("expected no error, got %v", err)
+					}
+				}
+			})
+		}
+	})
 }
 
 type informerLister[T any] struct {
