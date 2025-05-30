@@ -34,6 +34,8 @@ type PodStartupLatencyTracker interface {
 	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
 	RecordImageStartedPulling(podUID types.UID)
 	RecordImageFinishedPulling(podUID types.UID)
+	RecordInitContainerStarted(podUID types.UID, startedAt time.Time)
+	RecordInitContainerFinished(podUID types.UID, finishedAt time.Time)
 	RecordStatusUpdated(pod *v1.Pod)
 	DeletePodStartupState(podUID types.UID)
 }
@@ -49,11 +51,10 @@ type basicPodStartupLatencyTracker struct {
 }
 
 type perPodState struct {
-	firstStartedPulling    time.Time
-	lastFinishedPulling    time.Time
-	initContainerStartTime time.Time
-	// when all main containers are running
-	containersRunningTime time.Time
+	firstStartedPulling     time.Time
+	lastFinishedPulling     time.Time
+	firstInitContainerStart time.Time
+	lastInitContainerFinish time.Time
 	// first time, when pod status changed into Running
 	observedRunningTime time.Time
 	// log, if pod latency was already Observed
@@ -106,7 +107,7 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 		logger := klog.FromContext(ctx)
 		podStartingDuration := when.Sub(pod.CreationTimestamp.Time)
 		imagePullingDuration := state.lastFinishedPulling.Sub(state.firstStartedPulling)
-		initContainerDuration := state.containersRunningTime.Sub(state.initContainerStartTime)
+		initContainerDuration := state.lastInitContainerFinish.Sub(state.firstInitContainerStart)
 		podStartSLOduration := (podStartingDuration - imagePullingDuration - initContainerDuration).Seconds()
 
 		logger.Info("Observed pod startup duration",
@@ -116,6 +117,8 @@ func (p *basicPodStartupLatencyTracker) ObservedPodOnWatch(pod *v1.Pod, when tim
 			"podCreationTimestamp", pod.CreationTimestamp.Time,
 			"firstStartedPulling", state.firstStartedPulling,
 			"lastFinishedPulling", state.lastFinishedPulling,
+			"firstInitContainerStart", state.firstInitContainerStart,
+			"lastInitContainerFinish", state.lastInitContainerFinish,
 			"observedRunningTime", state.observedRunningTime,
 			"watchObservedRunningTime", when)
 
@@ -159,6 +162,34 @@ func (p *basicPodStartupLatencyTracker) RecordImageFinishedPulling(podUID types.
 	}
 }
 
+func (p *basicPodStartupLatencyTracker) RecordInitContainerStarted(podUID types.UID, startedAt time.Time) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	state := p.pods[podUID]
+	if state == nil {
+		return
+	}
+
+	if state.firstInitContainerStart.IsZero() || startedAt.Before(state.firstInitContainerStart) {
+		state.firstInitContainerStart = startedAt
+	}
+}
+
+func (p *basicPodStartupLatencyTracker) RecordInitContainerFinished(podUID types.UID, finishedAt time.Time) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	state := p.pods[podUID]
+	if state == nil {
+		return
+	}
+
+	if finishedAt.After(state.lastInitContainerFinish) {
+		state.lastInitContainerFinish = finishedAt
+	}
+}
+
 func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -171,36 +202,6 @@ func (p *basicPodStartupLatencyTracker) RecordStatusUpdated(pod *v1.Pod) {
 	if state.metricRecorded {
 		// skip, pod latency already recorded
 		return
-	}
-
-	// Find earliest init container start time as long as it isnt the waiting state
-	for _, cs := range pod.Status.InitContainerStatuses {
-		if cs.State.Running != nil && !cs.State.Running.StartedAt.IsZero() {
-			if state.initContainerStartTime.IsZero() || cs.State.Running.StartedAt.Time.Before(state.initContainerStartTime) {
-				state.initContainerStartTime = cs.State.Running.StartedAt.Time
-			}
-		}
-		if cs.State.Terminated != nil && !cs.State.Terminated.StartedAt.IsZero() {
-			if state.initContainerStartTime.IsZero() || cs.State.Terminated.StartedAt.Time.Before(state.initContainerStartTime) {
-				state.initContainerStartTime = cs.State.Terminated.StartedAt.Time
-			}
-		}
-	}
-
-	// Find when all main containers are running
-	allContainersRunning := true
-	latestStartedAtTime := time.Time{}
-	for _, cs := range pod.Status.ContainerStatuses {
-		if cs.State.Running == nil || cs.State.Running.StartedAt.IsZero() {
-			allContainersRunning = false
-			break
-		}
-		if cs.State.Running.StartedAt.Time.After(latestStartedAtTime) {
-			latestStartedAtTime = cs.State.Running.StartedAt.Time
-		}
-	}
-	if allContainersRunning && state.containersRunningTime.IsZero() {
-		state.containersRunningTime = latestStartedAtTime
 	}
 
 	if !state.observedRunningTime.IsZero() {
