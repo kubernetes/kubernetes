@@ -1207,6 +1207,15 @@ func (pi *PodInfo) calculateResource() podResource {
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
 func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
+	for _, container := range pod.Spec.InitContainers {
+		for _, podPort := range container.Ports {
+			if add {
+				n.UsedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			} else {
+				n.UsedPorts.Remove(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			}
+		}
+	}
 	for _, container := range pod.Spec.Containers {
 		for _, podPort := range container.Ports {
 			if add {

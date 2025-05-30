@@ -814,6 +814,8 @@ type PausePodConfig struct {
 	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
 	Volumes                           []v1.Volume
+	ContainerPorts                    []v1.ContainerPort
+	InitContainerPorts                []v1.ContainerPort
 }
 
 // InitPausePod initializes a pod API object from the given config. It is used
@@ -833,6 +835,7 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 				{
 					Name:  conf.Name,
 					Image: imageutils.GetPauseImageName(),
+					Ports: conf.ContainerPorts,
 				},
 			},
 			Tolerations:       conf.Tolerations,
@@ -846,6 +849,15 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 	}
 	if conf.Resources != nil {
 		pod.Spec.Containers[0].Resources = *conf.Resources
+	}
+	if conf.InitContainerPorts != nil {
+		pod.Spec.InitContainers = []v1.Container{
+			{
+				Name:  conf.Name + "-init",
+				Image: imageutils.GetPauseImageName(),
+				Ports: conf.InitContainerPorts,
+			},
+		}
 	}
 	return pod
 }
