@@ -61,7 +61,7 @@ func TestDefaultBinder(t *testing.T) {
 				podCopy.UID = "another"
 			}
 
-			status := testCtx.Scheduler.Profiles["default-scheduler"].RunBindPlugins(testCtx.Ctx, nil, podCopy, node.Name)
+			status := testCtx.Scheduler.Profiles["default-scheduler"].RunBindPlugins(testCtx.Ctx, framework.NewCycleState(), podCopy, node.Name)
 			if code := status.Code(); code != tc.wantStatusCode {
 				t.Errorf("Bind returned code %s, want %s", code, tc.wantStatusCode)
 			}
