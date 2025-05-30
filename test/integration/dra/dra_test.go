@@ -17,7 +17,9 @@ limitations under the License.
 package dra
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -41,8 +43,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1beta1"
 	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -192,6 +196,28 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("APIDisabled", testAPIDisabled)
 			},
 		},
+		"GA": {
+			// TODO (https://github.com/kubernetes/kubernetes/issues/131903): remove enabling the beta when promoting to GA.
+			apis: map[schema.GroupVersion]bool{
+				resourceapi.SchemeGroupVersion:     true,
+				resourcev1beta2.SchemeGroupVersion: true,
+			},
+			features: map[featuregate.Feature]bool{
+				features.DynamicResourceAllocation: true,
+				// TODO: replace specific list with AllBeta once DRA is not beta.
+				features.DRAResourceClaimDeviceStatus: false,
+				// featuregate.Feature("AllBeta"):     false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				tCtx.Run("AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+				tCtx.Run("Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
+				})
+				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+			},
+		},
 		"core": {
 			apis: map[schema.GroupVersion]bool{
 				resourceapi.SchemeGroupVersion:     true,
@@ -205,6 +231,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) {
 					testPublishResourceSlices(tCtx, features.DRADeviceTaints, features.DRAPartitionableDevices)
 				})
+				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 			},
 		},
 		"v1beta1": {
@@ -250,6 +277,7 @@ func TestDRA(t *testing.T) {
 				tCtx.Run("Convert", testConvert)
 				tCtx.Run("PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				tCtx.Run("PublishResourceSlices", func(tCtx ktesting.TContext) { testPublishResourceSlices(tCtx) })
+				tCtx.Run("ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, true) })
 				tCtx.Run("MaxResourceSlice", testMaxResourceSlice)
 			},
 		},
@@ -666,6 +694,178 @@ func testPublishResourceSlices(tCtx ktesting.TContext, disabledFeatures ...featu
 		return gotValidationError.Load()
 	}).WithTimeout(time.Minute).Should(gomega.BeTrueBecause("Should have gotten another error because the slice is invalid."))
 
+}
+
+// testResourceClaimDeviceStatus creates a ResourceClaim with an invalid device (not allocated device)
+// and checks that the object is not validated (feature enabled) resp. accepted without the field (disabled).
+//
+// When enabled, it tries server-side-apply (SSA) with different clients. This is what DRA drivers should be using.
+func testResourceClaimDeviceStatus(tCtx ktesting.TContext, enabled bool) {
+	namespace := createTestNamespace(tCtx, nil)
+
+	claim := &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: claimName,
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{
+					{
+						Name:            "foo",
+						DeviceClassName: "foo",
+					},
+				},
+			},
+		},
+	}
+
+	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
+	tCtx.ExpectNoError(err, "create ResourceClaim")
+
+	deviceStatus := []resourceapi.AllocatedDeviceStatus{{
+		Driver: "one",
+		Pool:   "global",
+		Device: "my-device",
+		Data: &runtime.RawExtension{
+			Raw: []byte(`{"kind": "foo", "apiVersion": "dra.example.com/v1"}`),
+		},
+		NetworkData: &resourceapi.NetworkDeviceData{
+			InterfaceName: "net-1",
+			IPs: []string{
+				"10.9.8.0/24",
+				"2001:db8::/64",
+			},
+			HardwareAddress: "ea:9f:cb:40:b1:7b",
+		},
+	}}
+	claim.Status.Devices = deviceStatus
+	updatedClaim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	if !enabled {
+		tCtx.ExpectNoError(err, "updating the status with an invalid AllocatedDeviceStatus should have worked because the field should have been dropped")
+		require.Empty(tCtx, updatedClaim.Status.Devices, "field should have been dropped")
+		return
+	}
+
+	// Tests for enabled feature follow.
+
+	if err == nil {
+		tCtx.Fatal("updating the status with an invalid AllocatedDeviceStatus should have failed and didn't")
+	}
+
+	// Add an allocation result.
+	claim.Status.Allocation = &resourceapi.AllocationResult{
+		Devices: resourceapi.DeviceAllocationResult{
+			Results: []resourceapi.DeviceRequestAllocationResult{
+				{
+					Request: "foo",
+					Driver:  "one",
+					Pool:    "global",
+					Device:  "my-device",
+				},
+				{
+					Request: "foo",
+					Driver:  "two",
+					Pool:    "global",
+					Device:  "another-device",
+				},
+				{
+					Request: "foo",
+					Driver:  "three",
+					Pool:    "global",
+					Device:  "my-device",
+				},
+			},
+		},
+	}
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "add allocation result")
+
+	// Now adding the device status should work.
+	claim.Status.Devices = deviceStatus
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "add device status")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after adding device status")
+
+	// Strip the RawExtension. SSA re-encodes it, which causes negligble differences that nonetheless break assert.Equal.
+	claim.Status.Devices[0].Data = nil
+	deviceStatus[0].Data = nil
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).UpdateStatus(tCtx, claim, metav1.UpdateOptions{})
+	tCtx.ExpectNoError(err, "add device status")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after stripping RawExtension")
+
+	// Exercise SSA.
+	deviceStatusAC := resourceapiac.AllocatedDeviceStatus().
+		WithDriver("two").
+		WithPool("global").
+		WithDevice("another-device").
+		WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("net-2"))
+	deviceStatus = append(deviceStatus, resourceapi.AllocatedDeviceStatus{
+		Driver: "two",
+		Pool:   "global",
+		Device: "another-device",
+		NetworkData: &resourceapi.NetworkDeviceData{
+			InterfaceName: "net-2",
+		},
+	})
+	claimAC := resourceapiac.ResourceClaim(claim.Name, claim.Namespace).
+		WithStatus(resourceapiac.ResourceClaimStatus().WithDevices(deviceStatusAC))
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
+		Force:        true,
+		FieldManager: "manager-1",
+	})
+	tCtx.ExpectNoError(err, "apply device status two")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after applying device status two")
+
+	deviceStatusAC = resourceapiac.AllocatedDeviceStatus().
+		WithDriver("three").
+		WithPool("global").
+		WithDevice("my-device").
+		WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("net-3"))
+	deviceStatus = append(deviceStatus, resourceapi.AllocatedDeviceStatus{
+		Driver: "three",
+		Pool:   "global",
+		Device: "my-device",
+		NetworkData: &resourceapi.NetworkDeviceData{
+			InterfaceName: "net-3",
+		},
+	})
+	claimAC = resourceapiac.ResourceClaim(claim.Name, claim.Namespace).
+		WithStatus(resourceapiac.ResourceClaimStatus().WithDevices(deviceStatusAC))
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
+		Force:        true,
+		FieldManager: "manager-2",
+	})
+	tCtx.ExpectNoError(err, "apply device status three")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after applying device status three")
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetIndent("   ", "   ")
+	tCtx.ExpectNoError(encoder.Encode(claim))
+	tCtx.Logf("Final ResourceClaim:\n%s", buffer.String())
+
+	// Update one entry, remove the other.
+	deviceStatusAC = resourceapiac.AllocatedDeviceStatus().
+		WithDriver("two").
+		WithPool("global").
+		WithDevice("another-device").
+		WithNetworkData(resourceapiac.NetworkDeviceData().WithInterfaceName("yet-another-net"))
+	deviceStatus[1].NetworkData.InterfaceName = "yet-another-net"
+	claimAC = resourceapiac.ResourceClaim(claim.Name, claim.Namespace).
+		WithStatus(resourceapiac.ResourceClaimStatus().WithDevices(deviceStatusAC))
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
+		Force:        true,
+		FieldManager: "manager-1",
+	})
+	tCtx.ExpectNoError(err, "update device status two")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after updating device status two")
+	claimAC = resourceapiac.ResourceClaim(claim.Name, claim.Namespace)
+	deviceStatus = deviceStatus[0:2]
+	claim, err = tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).ApplyStatus(tCtx, claimAC, metav1.ApplyOptions{
+		Force:        true,
+		FieldManager: "manager-2",
+	})
+	tCtx.ExpectNoError(err, "remove device status three")
+	require.Equal(tCtx, deviceStatus, claim.Status.Devices, "after removing device status three")
 }
 
 // testMaxResourceSlice creates a ResourceSlice that is as large as possible
