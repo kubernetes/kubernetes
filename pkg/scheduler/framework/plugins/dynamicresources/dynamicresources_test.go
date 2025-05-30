@@ -99,8 +99,9 @@ var (
 					Obj()
 
 	// Node with "instance-1" device and no device attributes.
-	workerNode      = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
-	workerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	workerNode           = &st.MakeNode().Name(nodeName).Label("kubernetes.io/hostname", nodeName).Node
+	workerNodeSlice      = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Obj()
+	largeWorkerNodeSlice = st.MakeResourceSlice(nodeName, driver).Device("instance-1").Device("instance-2").Device("instance-3").Device("instance-4").Obj()
 
 	// Node with same device, but now with a "healthy" boolean attribute.
 	workerNode2      = &st.MakeNode().Name(node2Name).Label("kubernetes.io/hostname", node2Name).Node
@@ -122,6 +123,15 @@ var (
 		Namespace(namespace).
 		Request(className).
 		Obj()
+	largeClaim = st.MakeResourceClaim().
+			Name(claimName).
+			Namespace(namespace).
+			Request(className).
+			Request(className).
+			Request(className).
+			Request(className).
+			Request(className).
+			Obj()
 	claimWithPrioritzedList = st.MakeResourceClaim().
 				Name(claimName).
 				Namespace(namespace).
@@ -270,7 +280,7 @@ func getDefaultDynamicResourcesArgs() *config.DynamicResourcesArgs {
 	v1dra := &kubeschedulerconfigv1.DynamicResourcesArgs{}
 	configv1.SetDefaults_DynamicResourcesArgs(v1dra)
 	dra := &config.DynamicResourcesArgs{}
-	configv1.Convert_v1_DynamicResourcesArgs_To_config_DynamicResourcesArgs(v1dra, dra, nil)
+	_ = configv1.Convert_v1_DynamicResourcesArgs_To_config_DynamicResourcesArgs(v1dra, dra, nil)
 	return dra
 }
 
@@ -351,6 +361,7 @@ type prepare struct {
 
 func TestPlugin(t *testing.T) {
 	testcases := map[string]struct {
+		args    *config.DynamicResourcesArgs
 		nodes   []*v1.Node // default if unset is workerNode
 		pod     *v1.Pod
 		claims  []*resourceapi.ResourceClaim
@@ -985,6 +996,25 @@ func TestPlugin(t *testing.T) {
 				},
 			},
 		},
+		"timeout": {
+			args: &config.DynamicResourcesArgs{
+				FilterTimeout: &metav1.Duration{Duration: time.Nanosecond},
+			},
+			pod:     podWithClaimName,
+			claims:  []*resourceapi.ResourceClaim{largeClaim},
+			classes: []*resourceapi.DeviceClass{deviceClass},
+			objs:    []apiruntime.Object{largeWorkerNodeSlice},
+			want: want{
+				filter: perNodeResult{
+					workerNode.Name: {
+						status: framework.NewStatus(framework.UnschedulableAndUnresolvable, `timed out trying to allocate devices`),
+					},
+				},
+				postfilter: result{
+					status: framework.NewStatus(framework.Unschedulable, `still not schedulable`),
+				},
+			},
+		},
 	}
 
 	for name, tc := range testcases {
@@ -1002,7 +1032,7 @@ func TestPlugin(t *testing.T) {
 				EnableDynamicResourceAllocation: !tc.disableDRA,
 				EnableDRAPrioritizedList:        tc.enableDRAPrioritizedList,
 			}
-			testCtx := setup(t, nodes, tc.claims, tc.classes, tc.objs, features)
+			testCtx := setup(t, tc.args, nodes, tc.claims, tc.classes, tc.objs, features)
 			initialObjects := testCtx.listAll(t)
 
 			status := testCtx.p.PreEnqueue(testCtx.ctx, tc.pod)
@@ -1258,7 +1288,7 @@ func update(t *testing.T, objects []metav1.Object, updates change) []metav1.Obje
 	return updated
 }
 
-func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features) (result *testContext) {
+func setup(t *testing.T, args *config.DynamicResourcesArgs, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, classes []*resourceapi.DeviceClass, objs []apiruntime.Object, features feature.Features) (result *testContext) {
 	t.Helper()
 
 	tc := &testContext{}
@@ -1290,7 +1320,10 @@ func setup(t *testing.T, nodes []*v1.Node, claims []*resourceapi.ResourceClaim, 
 		t.Fatal(err)
 	}
 
-	pl, err := New(tCtx, getDefaultDynamicResourcesArgs(), fh, features)
+	if args == nil {
+		args = getDefaultDynamicResourcesArgs()
+	}
+	pl, err := New(tCtx, args, fh, features)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1481,7 +1514,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 			features := feature.Features{
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, tc.claims, nil, nil, features)
+			testCtx := setup(t, nil, nil, tc.claims, nil, nil, features)
 			oldObj := tc.oldObj
 			newObj := tc.newObj
 			if claim, ok := tc.newObj.(*resourceapi.ResourceClaim); ok {
@@ -1604,7 +1637,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			features := feature.Features{
 				EnableDynamicResourceAllocation: true,
 			}
-			testCtx := setup(t, nil, tc.claims, nil, tc.objs, features)
+			testCtx := setup(t, nil, nil, tc.claims, nil, tc.objs, features)
 			gotHint, err := testCtx.p.isSchedulableAfterPodChange(logger, tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
