@@ -34,8 +34,9 @@ type pluginsStore struct {
 // and their corresponding sockets.
 var draPlugins = &pluginsStore{}
 
-// Get lets you retrieve a DRA Plugin by name.
-// This method is protected by a mutex.
+// get returns the most recent connected plugin instance
+// for the given plugin name or nil if no connected plugin
+// instance is found.
 func (s *pluginsStore) get(pluginName string) *Plugin {
 	s.RLock()
 	defer s.RUnlock()
@@ -44,10 +45,17 @@ func (s *pluginsStore) get(pluginName string) *Plugin {
 	if len(instances) == 0 {
 		return nil
 	}
-	// Heuristic: pick the most recent one. It's most likely
-	// the newest, except when kubelet got restarted and registered
-	// all running plugins in random order.
-	return instances[len(instances)-1]
+	// Heuristic: pick the most recent connected one. It's most likely
+	// the newest, except when plugin disconnects or kubelet got restarted
+	// and registered all running plugins in random order.
+	for i := len(instances) - 1; i >= 0; i-- {
+		instances[i].mutex.Lock()
+		defer instances[i].mutex.Unlock()
+		if instances[i].connected {
+			return instances[i]
+		}
+	}
+	return nil
 }
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
@@ -93,4 +101,17 @@ func (s *pluginsStore) remove(pluginName, endpoint string) (*Plugin, bool) {
 		p.cancel(errors.New("plugin got removed"))
 	}
 	return p, last
+}
+
+// pluginConnected checks if at least one plugin with the
+// specified name is connected.
+func (s *pluginsStore) pluginConnected(pluginName string) bool {
+	s.RLock()
+	defer s.RUnlock()
+
+	return slices.ContainsFunc(s.store[pluginName], func(p *Plugin) bool {
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
+		return p.name == pluginName && p.connected
+	})
 }

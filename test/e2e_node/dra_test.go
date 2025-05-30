@@ -378,6 +378,26 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				return kubeletPlugin.CountCalls("/NodePrepareResources")
 			}).WithTimeout(retryTestTimeout).Should(gomega.Equal(calls))
 		})
+
+		ginkgo.It("must be functional when plugin starts to listen on a service socket after registration", func(ctx context.Context) {
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("start DRA plugin service")
+			plugin := newPlugin(ctx, f.ClientSet, getNodeName(ctx, f), driverName)
+
+			pod := createTestObjects(ctx, f.ClientSet, getNodeName(ctx, f), f.Namespace.Name, "draclass", "external-claim", "drapod", false, []string{driverName})
+
+			ginkgo.By("wait for NodePrepareResources call to succeed")
+			gomega.Eventually(plugin.GetGRPCCalls).WithTimeout(retryTestTimeout).Should(testdrivergomega.NodePrepareResourcesSucceeded)
+
+			ginkgo.By("wait for pod to succeed")
+			err := e2epod.WaitForPodSuccessInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name)
+			framework.ExpectNoError(err)
+		})
 	})
 
 	f.Context("Two resource Kubelet Plugins", f.WithSerial(), func() {
@@ -568,6 +588,48 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
 			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices with no plugin")
 		})
+
+		f.It("must be removed if plugin stops after registration", func(ctx context.Context) {
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("start DRA plugin service")
+			kubeletPlugin := newPlugin(ctx, f.ClientSet, nodeName, driverName)
+
+			ginkgo.By("wait for ResourceSlice to be created by plugin")
+			matchNode := gomega.ConsistOf(matchResourcesByNodeName(nodeName))
+			gomega.Eventually(ctx, listResources).Should(matchNode, "ResourceSlices")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(matchNode, "ResourceSlices")
+
+			ginkgo.By("stop plugin")
+			kubeletPlugin.Stop()
+
+			ginkgo.By("wait for ResourceSlice removal")
+			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices")
+		})
+
+		f.It("must be removed if plugin doesn't connect after registration", func(ctx context.Context) {
+			nodeName := getNodeName(ctx, f)
+
+			ginkgo.By("start DRA registrar")
+			registrar := newRegistrar(ctx, f.ClientSet, nodeName, driverName)
+			ginkgo.By("wait for registration to complete")
+			gomega.Eventually(registrar.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+			ginkgo.By("create a ResourceSlice")
+			createTestResourceSlice(ctx, f.ClientSet, nodeName, driverName)
+			gomega.Eventually(ctx, listResources).Should(gomega.ConsistOf(matchResourcesByNodeName(nodeName)), "ResourceSlices without plugin")
+
+			ginkgo.By("wait for ResourceSlice removal")
+			gomega.Eventually(ctx, listResources).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
+			gomega.Consistently(ctx, listResources).WithTimeout(5*time.Second).Should(gomega.BeEmpty(), "ResourceSlices without plugin")
+		})
 	})
 })
 
@@ -611,6 +673,67 @@ func newKubeletPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeN
 	framework.ExpectNoError(err)
 
 	gomega.Eventually(plugin.GetGRPCCalls).WithTimeout(pluginRegistrationTimeout).Should(testdrivergomega.BeRegistered)
+
+	ginkgo.DeferCleanup(func(ctx context.Context) {
+		// kubelet should do this eventually, but better make sure.
+		// A separate test checks this explicitly.
+		framework.ExpectNoError(clientSet.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: resourceapi.ResourceSliceSelectorDriver + "=" + driverName}))
+	})
+	ginkgo.DeferCleanup(plugin.Stop)
+
+	return plugin
+}
+
+// newRegistrar starts a registrar for the specified plugin name.
+// Returns a pointer to the ExamplePlugin.
+func newRegistrar(ctx context.Context, clientSet kubernetes.Interface, nodeName, pluginName string) *testdriver.ExamplePlugin {
+	ginkgo.By("start only Kubelet plugin registrar")
+	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin registrar "+pluginName))
+	ctx = klog.NewContext(ctx, logger)
+	registrar, err := testdriver.StartOnlyRegistrar(ctx, cdiDir, pluginName, clientSet, nodeName, testdriver.FileOperations{})
+	framework.ExpectNoError(err, "start only Kubelet plugin registrar")
+	return registrar
+}
+
+// newPlugin starts a plugin for the specified plugin name.
+// Returns a pointer to the ExamplePlugin.
+func newPlugin(ctx context.Context, clientSet kubernetes.Interface, nodeName, pluginName string) *testdriver.ExamplePlugin {
+	ginkgo.By("start only Kubelet plugin")
+	logger := klog.LoggerWithValues(klog.LoggerWithName(klog.Background(), "kubelet plugin "+pluginName), "node", nodeName)
+	ctx = klog.NewContext(ctx, logger)
+
+	// Ensure that directories exist, creating them if necessary. We want
+	// to know early if there is a setup problem that would prevent
+	// creating those directories.
+	err := os.MkdirAll(cdiDir, os.FileMode(0750))
+	framework.ExpectNoError(err, "create CDI directory")
+	datadir := path.Join(kubeletplugin.KubeletPluginsDir, pluginName) // The default, not set below.
+	err = os.MkdirAll(datadir, 0750)
+	framework.ExpectNoError(err, "create DRA socket directory")
+
+	plugin, err := testdriver.StartOnlyPlugin(
+		ctx,
+		cdiDir,
+		pluginName,
+		clientSet,
+		nodeName,
+		testdriver.FileOperations{
+			DriverResources: &resourceslice.DriverResources{
+				Pools: map[string]resourceslice.Pool{
+					nodeName: {
+						Slices: []resourceslice.Slice{{
+							Devices: []resourceapiv1beta2.Device{
+								{
+									Name: "device-00",
+								},
+							},
+						}},
+					},
+				},
+			},
+		},
+	)
+	framework.ExpectNoError(err)
 
 	ginkgo.DeferCleanup(func(ctx context.Context) {
 		// kubelet should do this eventually, but better make sure.
