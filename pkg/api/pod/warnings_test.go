@@ -1852,7 +1852,7 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 		expected    []string
 	}{
 		{
-			name: "annotations",
+			name: "AppArmor annotations",
 			template: &api.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{
 					`container.apparmor.security.beta.kubernetes.io/foo`: `unconfined`,
@@ -1878,7 +1878,9 @@ func TestTemplateOnlyWarnings(t *testing.T) {
 					}},
 				},
 			},
-			expected: []string{},
+			expected: []string{
+				`template.metadata.annotations[container.apparmor.security.beta.kubernetes.io/foo]: deprecated since v1.30; use the "appArmorProfile" field instead`,
+			},
 		},
 		{
 			name: "AppArmor container field",
