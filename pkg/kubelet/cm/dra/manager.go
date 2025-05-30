@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -36,7 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
@@ -76,8 +77,8 @@ type ManagerImpl struct {
 }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
-	claimInfoCache, err := newClaimInfoCache(stateFileDirectory, draManagerStateFileName)
+func NewManagerImpl(logger klog.Logger, kubeClient clientset.Interface, stateFileDirectory string, nodeName types.NodeName) (*ManagerImpl, error) {
+	claimInfoCache, err := newClaimInfoCache(logger, stateFileDirectory, draManagerStateFileName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create claimInfo cache: %w", err)
 	}
@@ -95,6 +96,10 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 	}
 
 	return manager, nil
+}
+
+func (m *ManagerImpl) NewMetricsCollector() metrics.StableCollector {
+	return &claimInfoCollector{cache: m.cache}
 }
 
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
@@ -179,7 +184,7 @@ func (m *ManagerImpl) reconcileLoop(ctx context.Context) {
 func (m *ManagerImpl) PrepareResources(ctx context.Context, pod *v1.Pod) error {
 	startTime := time.Now()
 	err := m.prepareResources(ctx, pod)
-	metrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
+	kubeletmetrics.DRAOperationsDuration.WithLabelValues("PrepareResources", strconv.FormatBool(err == nil)).Observe(time.Since(startTime).Seconds())
 	return err
 }
 
@@ -408,7 +413,7 @@ func (m *ManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*Conta
 func (m *ManagerImpl) UnprepareResources(ctx context.Context, pod *v1.Pod) error {
 	var err error = nil
 	defer func(startTime time.Time) {
-		metrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err != nil)).Observe(time.Since(startTime).Seconds())
+		kubeletmetrics.DRAOperationsDuration.WithLabelValues("UnprepareResources", strconv.FormatBool(err != nil)).Observe(time.Since(startTime).Seconds())
 	}(time.Now())
 	var claimNames []string
 	for i := range pod.Spec.ResourceClaims {
