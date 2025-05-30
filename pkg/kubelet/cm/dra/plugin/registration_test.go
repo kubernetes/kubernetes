@@ -332,16 +332,14 @@ func TestConnectionHandling(t *testing.T) {
 				requireNoSlices(t, tCtx, client)
 			} else {
 				// Simulate reconnect
-				plugin.conn = nil
+				plugin.closeConnection()
 				conn, err := plugin.getOrCreateGRPCConn()
 				require.NoError(t, err, "failed to create gRPC connection for plugin %s", pluginName)
 				assert.NotNil(t, conn, "gRPC connection should be created")
 
 				// There shouldn't be any pending wipes for the plugin.
 				require.Eventuallyf(t, func() bool {
-					handler.mutex.Lock()
-					defer handler.mutex.Unlock()
-					return handler.pendingWipes != nil && handler.pendingWipes[pluginName] == nil
+					return !plugin.cleanupHandler.isCleanupPending(pluginName)
 				}, time.Minute, time.Second, "wiping should be stopped for plugin %s", pluginName)
 
 				// Slice should still be there

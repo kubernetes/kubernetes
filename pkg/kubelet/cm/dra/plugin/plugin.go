@@ -56,14 +56,13 @@ type Plugin struct {
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
-	mutex               sync.Mutex
-	conn                *grpc.ClientConn
-	connected           bool
-	endpoint            string
-	chosenService       string // e.g. drapbv1beta1.DRAPluginService
-	registrationHandler *RegistrationHandler
-	clientCallTimeout   time.Duration
-	cancelCleanup       *context.CancelCauseFunc
+	mutex             sync.Mutex
+	conn              *grpc.ClientConn
+	connected         bool
+	endpoint          string
+	chosenService     string // e.g. drapbv1beta1.DRAPluginService
+	cleanupHandler    *cleanupHandler
+	clientCallTimeout time.Duration
 }
 
 // getOrCreateGRPCConn creates and triggers a gRPC client connection to the
@@ -111,6 +110,22 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	return p.conn, nil
 }
 
+// closeConnection safely closes the current plugin connection if it exists,
+// sets the connection to nil, and marks the plugin as disconnected.
+// This method is thread-safe and should be used to reset the plugin's state
+// when the connection is no longer valid or needs to be re-established.
+func (p *Plugin) closeConnection() {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if p.conn != nil {
+		p.conn.Close()
+		p.conn = nil
+	}
+
+	p.connected = false
+}
+
 // isConnected returns true if the plugin is currently connected.
 func (p *Plugin) isConnected() bool {
 	p.mutex.Lock()
@@ -126,26 +141,7 @@ func (p *Plugin) setConnected(connected bool) {
 	p.mutex.Lock()
 	p.connected = connected
 	p.mutex.Unlock()
-	if p.registrationHandler != nil {
-		if connected {
-			p.registrationHandler.cancelPendingWipes(p.name, "connection established")
-		} else {
-			p.setCancelCleanup(p.registrationHandler.cleanupResourceSlices(p.name))
-		}
-	}
-}
 
-// setCancelCleanup sets the cancelCleanup function for the Plugin instance.
-// The cancelCleanup parameter is a pointer to a context.CancelCauseFunc,
-// which can be used to cancel and clean up resources associated with the Plugin.
-func (p *Plugin) setCancelCleanup(cancelClenup *context.CancelCauseFunc) {
-	p.mutex.Lock()
-	defer p.mutex.Unlock()
-	if p.cancelCleanup != nil {
-		// If cancelCleanup is already set, we don't need to do anything.
-		return
-	}
-	p.cancelCleanup = cancelClenup
 }
 
 func (p *Plugin) NodePrepareResources(
@@ -231,18 +227,15 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 func (p *Plugin) HandleConn(ctx context.Context, connStats stats.ConnStats) {
 	logger := klog.FromContext(ctx)
 
-	if !draPlugins.pluginRegistered(p.name, p.endpoint) {
-		logger.V(2).Info("Plugin not registered, skipping connection stats handling", "plugin", p.name, "endpoint", p.endpoint)
-		return
-	}
-
 	switch connStats.(type) {
 	case *stats.ConnBegin:
 		logger.V(2).Info("Connection begin", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
 		p.setConnected(true)
+		p.cleanupHandler.cancelPendingWipe(p.name, "plugin connection established")
 	case *stats.ConnEnd:
 		logger.V(2).Info("Connection end", "plugin", p.name, "endpoint", p.endpoint, "stats", connStats)
 		p.setConnected(false)
+		p.cleanupHandler.cleanupResourceSlices(p.name)
 		if p.conn != nil {
 			logger.V(2).Info("Trigger reconnecting to plugin", "plugin", p.name, "endpoint", p.endpoint)
 			p.conn.Connect()

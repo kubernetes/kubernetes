@@ -103,14 +103,15 @@ func (s *pluginsStore) remove(pluginName, endpoint string) (*Plugin, bool) {
 	return p, last
 }
 
-// pluginRegistered checks if the plugin with the specified name and
-// endpoint is registered in the pluginsStore.
-// Returns true if a plugin registered, otherwise returns false.
-func (s *pluginsStore) pluginRegistered(pluginName, endpoint string) bool {
+// pluginConnected checks if at least one plugin with the
+// specified name is connected.
+func (s *pluginsStore) pluginConnected(pluginName string) bool {
 	s.RLock()
 	defer s.RUnlock()
 
 	return slices.ContainsFunc(s.store[pluginName], func(p *Plugin) bool {
-		return p.name == pluginName && p.endpoint == endpoint
+		p.mutex.Lock()
+		defer p.mutex.Unlock()
+		return p.name == pluginName && p.connected
 	})
 }

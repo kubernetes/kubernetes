@@ -21,15 +21,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	resourceapi "k8s.io/api/resource/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
@@ -51,23 +45,8 @@ type RegistrationHandler struct {
 	// backgroundCtx is used for all future activities of the handler.
 	// This is necessary because it implements APIs which don't
 	// provide a context.
-	backgroundCtx context.Context
-	cancel        func(err error)
-	kubeClient    kubernetes.Interface
-	getNode       func() (*v1.Node, error)
-	wipingDelay   time.Duration
-
-	wg    sync.WaitGroup
-	mutex sync.Mutex
-
-	// pendingWipes maps a plugin name to a cancel function for
-	// wiping of that plugin's ResourceSlices. Entries get added
-	// in DeRegisterPlugin and check in RegisterPlugin. If
-	// wiping is pending during RegisterPlugin, it gets canceled.
-	//
-	// Must use pointers to functions because the entries have to
-	// be comparable.
-	pendingWipes map[string]*context.CancelCauseFunc
+	backgroundCtx  context.Context
+	cleanupHandler *cleanupHandler
 }
 
 var _ cache.PluginHandler = &RegistrationHandler{}
@@ -83,101 +62,15 @@ func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1
 }
 
 func newRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
-	ctx, cancel := context.WithCancelCause(ctx)
-	handler := &RegistrationHandler{
-		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
-		cancel:        cancel,
-		kubeClient:    kubeClient,
-		getNode:       getNode,
-		wipingDelay:   wipingDelay,
-		pendingWipes:  make(map[string]*context.CancelCauseFunc),
+	return &RegistrationHandler{
+		backgroundCtx:  klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
+		cleanupHandler: newCleanupHandler(ctx, kubeClient, getNode, wipingDelay),
 	}
-
-	// When kubelet starts up, no DRA driver has registered yet. None of
-	// the drivers are usable until they come back, which might not happen
-	// at all. Therefore it is better to not advertise any local resources
-	// because pods could get stuck on the node waiting for the driver
-	// to start up.
-	//
-	// This has to run in the background.
-	handler.wg.Add(1)
-	go func() {
-		defer handler.wg.Done()
-
-		logger := klog.LoggerWithName(klog.FromContext(handler.backgroundCtx), "startup")
-		ctx := klog.NewContext(handler.backgroundCtx, logger)
-		handler.wipeResourceSlices(ctx, 0 /* no delay */, "" /* all drivers */)
-	}()
-
-	return handler
 }
 
-// Stop cancels any remaining background activities and blocks until all goroutines have stopped.
+// Stop stops the cleanup handler, which will cancel all pending cleanups.
 func (h *RegistrationHandler) Stop() {
-	h.cancel(errors.New("Stop was called"))
-	h.wg.Wait()
-}
-
-// wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
-// Wiping will delay for a while and can be canceled by canceling the context.
-func (h *RegistrationHandler) wipeResourceSlices(ctx context.Context, delay time.Duration, driver string) {
-	if h.kubeClient == nil {
-		return
-	}
-	logger := klog.FromContext(ctx)
-
-	if delay != 0 {
-		// Before we start deleting, give the driver time to bounce back.
-		// Perhaps it got removed as part of a DaemonSet update and the
-		// replacement pod is about to start.
-		logger.V(4).Info("Starting to wait before wiping ResourceSlices", "delay", delay)
-		select {
-		case <-ctx.Done():
-			logger.V(4).Info("Aborting wiping of ResourceSlices", "reason", context.Cause(ctx))
-		case <-time.After(delay):
-			logger.V(4).Info("Starting to wipe ResourceSlices after waiting", "delay", delay)
-		}
-	}
-
-	backoff := wait.Backoff{
-		Duration: time.Second,
-		Factor:   2,
-		Jitter:   0.2,
-		Cap:      5 * time.Minute,
-		Steps:    100,
-	}
-
-	// Error logging is done inside the loop. Context cancellation doesn't get logged.
-	_ = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		node, err := h.getNode()
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		if err != nil {
-			logger.Error(err, "Unexpected error checking for node")
-			return false, nil
-		}
-		fieldSelector := fields.Set{resourceapi.ResourceSliceSelectorNodeName: node.Name}
-		if driver != "" {
-			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
-		}
-
-		err = h.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
-		switch {
-		case err == nil:
-			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)
-			return true, nil
-		case apierrors.IsUnauthorized(err):
-			// This can happen while kubelet is still figuring out
-			// its credentials.
-			logger.V(5).Info("Deleting ResourceSlice failed, retrying", "fieldSelector", fieldSelector, "err", err)
-			return false, nil
-		default:
-			// Log and retry for other errors.
-			logger.V(3).Info("Deleting ResourceSlice failed, retrying", "fieldSelector", fieldSelector, "err", err)
-			return false, nil
-		}
-	})
+	h.cleanupHandler.Stop()
 }
 
 // RegisterPlugin is called when a plugin can be registered.
@@ -217,14 +110,13 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	ctx, cancel := context.WithCancelCause(ctx)
 
 	pluginInstance := &Plugin{
-		name:                pluginName,
-		backgroundCtx:       ctx,
-		cancel:              cancel,
-		conn:                nil,
-		endpoint:            endpoint,
-		chosenService:       chosenService,
-		clientCallTimeout:   timeout,
-		registrationHandler: h,
+		name:              pluginName,
+		backgroundCtx:     ctx,
+		conn:              nil,
+		endpoint:          endpoint,
+		chosenService:     chosenService,
+		clientCallTimeout: timeout,
+		cleanupHandler:    h.cleanupHandler,
 	}
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
@@ -247,30 +139,20 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		return err
 	}
 
-	// Now cancel any pending ResourceSlice wiping for this plugin.
-	// Only needs to be done once.
-	h.cancelPendingWipes(pluginName, "new plugin instance registered")
-
-	if !pluginInstance.isConnected() {
+	if pluginInstance.isConnected() {
+		// Now cancel any pending ResourceSlice wiping for this plugin.
+		// Only needs to be done once.
+		h.cleanupHandler.cancelPendingWipe(pluginName, "new plugin instance registered")
+	} else {
 		// If the plugin is not connected, it means that the gRPC connection
 		// is not established yet, so we need to set up the cleanup for
 		// ResourceSlices. This will ensure that if the plugin never comes
 		// online, the ResourceSlices will be cleaned up after a delay.
 		logger.V(3).Info("Plugin is not connected, scheduling cleanup of ResourceSlices")
-		pluginInstance.setCancelCleanup(h.cleanupResourceSlices(pluginName))
+		h.cleanupHandler.cleanupResourceSlices(pluginName)
 	}
 
 	return nil
-}
-
-func (h *RegistrationHandler) cancelPendingWipes(pluginName, errMsg string) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	if cancel, ok := h.pendingWipes[pluginName]; ok {
-		(*cancel)(errors.New(errMsg))
-		delete(h.pendingWipes, pluginName)
-	}
 }
 
 // validateSupportedServices identifies the highest supported gRPC service for
@@ -314,74 +196,11 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 		if !last {
 			return
 		}
-		h.cleanupResourceSlices(pluginName)
+		h.cleanupHandler.cleanupResourceSlices(pluginName)
 	}
 
 	logger := klog.FromContext(h.backgroundCtx)
 	logger.V(3).Info("Deregister DRA plugin not necessary, was already removed")
-}
-
-// cleanupResourceSlices initiates the cleanup process for ResourceSlices
-// associated with a given plugin. It prepares a new context and logger for
-// the cleanup operation, ensuring that any previous cleanup for the same
-// plugin is canceled if still pending. The cleanup is performed
-// asynchronously in a background goroutine, which will remove the
-// ResourceSlices after a delay unless the plugin is back online before the
-// cleanup completes.
-func (h *RegistrationHandler) cleanupResourceSlices(pluginName string) *context.CancelCauseFunc {
-	// Prepare for canceling the background wiping. This needs to run
-	// in the context of the registration handler, the one from
-	// the plugin is canceled.
-	logger := klog.FromContext(h.backgroundCtx)
-	logger = klog.LoggerWithName(logger, "driver-cleanup")
-	logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
-
-	logger.V(3).Info("Starting ResourceSlices cleanup")
-
-	// Clean up the ResourceSlices for the Plugin since it
-	// may have died without doing so itself and might never come
-	// back.
-	//
-	// May get canceled if the plugin comes back quickly enough
-	// (see RegisterPlugin).
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-	if cancel := h.pendingWipes[pluginName]; cancel != nil {
-		logger.V(3).Info("Previously started cleanup detected, do nothing")
-		return nil
-	}
-
-	ctx, cancel := context.WithCancelCause(h.backgroundCtx)
-	ctx = klog.NewContext(ctx, logger)
-	h.pendingWipes[pluginName] = &cancel
-
-	h.wg.Add(1)
-	go func() {
-		defer h.wg.Done()
-		defer h.cancelCleanup(pluginName, &cancel)
-		h.wipeResourceSlices(ctx, h.wipingDelay, pluginName)
-	}()
-
-	return &cancel
-}
-
-// cancelCleanup cancels the cleanup context for the specified plugin by invoking the provided
-// cancel function. It also removes the entry from the pendingWipes map if the cancel function
-// matches the entry.
-func (h *RegistrationHandler) cancelCleanup(pluginName string, cancel *context.CancelCauseFunc) {
-	h.mutex.Lock()
-	defer h.mutex.Unlock()
-
-	if cancel == nil {
-		return
-	}
-
-	// Cancel our own context, but remove it from the map only if it
-	// is the current entry. Perhaps it already got replaced.
-	(*cancel)(errors.New("wiping done"))
-	if cancel == h.pendingWipes[pluginName] {
-		delete(h.pendingWipes, pluginName)
-	}
 }
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
