@@ -292,8 +292,8 @@ func newTestKubeletWithImageList(
 	kubelet.configMapManager = configMapManager
 	kubelet.mirrorPodClient = fakeMirrorClient
 	kubelet.podManager = kubepod.NewBasicPodManager()
-	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
-	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
+	kubelet.podStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
+	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, kubelet.podStartupLatencyTracker)
 	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
 
 	kubelet.containerRuntime = fakeRuntime
@@ -3135,10 +3135,11 @@ func TestSyncPodSpans(t *testing.T) {
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubelet.containerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
-		kubeletutil.NewPodStartupLatencyTracker(),
+		kubelet.podStartupLatencyTracker,
 		tp,
 		token.NewManager(kubelet.kubeClient),
 		func(string, string) (*v1.ServiceAccount, error) { return nil, nil },
+		kubelet.podStartupLatencyTracker,
 	)
 	assert.NoError(t, err)
 	kubelet.allocationManager.SetContainerRuntime(kubelet.containerRuntime)
