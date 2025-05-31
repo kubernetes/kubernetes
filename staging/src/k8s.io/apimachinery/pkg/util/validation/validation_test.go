@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
@@ -633,5 +634,88 @@ func TestIsRelaxedEnvVarName(t *testing.T) {
 		if msgs := IsRelaxedEnvVarName(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
+	}
+}
+
+func TestIsDNS1123SubdomainWithUnderscore(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected []string
+	}{
+		{
+			name:     "valid subdomain",
+			value:    "example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with underscore",
+			value:    "_example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with multiple segments",
+			value:    "sub._example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with hyphen",
+			value:    "sub-domain.example.com",
+			expected: nil,
+		},
+		{
+			name:     "valid subdomain with underscore in middle",
+			value:    "sub_domain.example.com",
+			expected: nil,
+		},
+		{
+			name:     "empty string",
+			value:    "",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid uppercase characters",
+			value:    "Example.com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid starting character",
+			value:    "-example.com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid ending character",
+			value:    "example.com-",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "invalid characters",
+			value:    "example@.com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "too long subdomain",
+			value:    "a." + string(make([]byte, 251)) + ".com",
+			expected: []string{MaxLenError(DNS1123SubdomainMaxLength), RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "multiple dots",
+			value:    "example..com",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+		{
+			name:     "underscore only",
+			value:    "_",
+			expected: []string{RegexError(dns1123SubdomainErrorMsgFG, dns1123SubdomainFmtWithUnderscore, "example.com")},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsDNS1123SubdomainWithUnderscore(tt.value)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("IsDNS1123SubdomainWithUnderscore(%q) = %v; want %v", tt.value, result, tt.expected)
+			}
+		})
 	}
 }
