@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -28,7 +29,9 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/klog/v2/ktesting"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func newTokenCleaner() (*TokenCleaner, *fake.Clientset, coreinformers.SecretInformer, error) {
@@ -146,4 +149,43 @@ func TestCleanerExpiredAt(t *testing.T) {
 			}),
 	}
 	verifyFunc()
+}
+
+func TestTokenCleanerLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, cleaner *TokenCleaner)
+	}{
+		"run": {
+			runner: func(ctx context.Context, cleaner *TokenCleaner) { cleaner.Run(ctx) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, cleaner *TokenCleaner) { cleaner.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, tCtx := ktesting.NewTestContext(t)
+
+			cl := fake.NewSimpleClientset()
+
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			secrets := informerFactory.Core().V1().Secrets()
+			informerFactory.Start(tCtx.Done())
+
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			options := DefaultTokenCleanerOptions()
+			cleaner, err := NewTokenCleaner(cl, secrets, options)
+			if err != nil {
+				t.Fatalf("error creating TokenCleaner: %v", err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, cleaner)
+		},
+		)
+	}
 }
