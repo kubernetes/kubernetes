@@ -690,7 +690,7 @@ anonymous:
   enabled: true
 `),
 			},
-			expectErr: "--anonynous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
+			expectErr: "--anonymous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
 		},
 		{
 			name:                     "flag-anonymous-enabled-file-anonymous-notset-AnonymousAuthConfigurableEndpoints-enabled",
