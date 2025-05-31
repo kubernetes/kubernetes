@@ -1480,6 +1480,9 @@ var _ = SIGDescribe("StatefulSet", func() {
 			err = verifyStatefulSetPVCsExist(ctx, c, ss, []int{0, 1, 2})
 			framework.ExpectNoError(err)
 
+			ginkgo.By("Confirming all pods are running and ready")
+			e2estatefulset.WaitForStatusAvailableReplicas(ctx, c, ss, 3)
+
 			ginkgo.By("Orphaning the 3rd pod")
 			patch, err := json.Marshal(metav1.ObjectMeta{
 				OwnerReferences: []metav1.OwnerReference{},
