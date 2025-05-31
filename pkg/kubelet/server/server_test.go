@@ -268,6 +268,21 @@ func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace
 	return url.Parse(resp.GetUrl())
 }
 
+func (fk *fakeKubelet) GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error) {
+	if fk.getPortForwardCheck != nil {
+		fk.getPortForwardCheck(podName, podNamespace, podUID, portForwardOpts)
+	}
+	// Always use testPodSandboxID
+	resp, err := fk.streamingRuntime.GetPortForward(&runtimeapi.PortForwardRequest{
+		PodSandboxId: testPodSandboxID,
+		Port:         portForwardOpts.Ports,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return url.Parse(resp.GetUrl())
+}
+
 // Unused functions
 func (*fakeKubelet) GetNode() (*v1.Node, error)                       { return nil, nil }
 func (*fakeKubelet) GetNodeConfig() cm.NodeConfig                     { return cm.NodeConfig{} }
