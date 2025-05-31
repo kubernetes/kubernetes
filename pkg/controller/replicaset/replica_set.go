@@ -62,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -674,13 +675,19 @@ func (rsc *ReplicaSetController) manageReplicas(ctx context.Context, activePods 
 }
 
 // getRSPods returns the Pods that a given RS should manage.
-func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet) ([]*v1.Pod, error) {
+func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet, orphanedPods bool) ([]*v1.Pod, error) {
 	// Iterate over two keys:
 	//  The UID of the RS, which identifies Pods that are controlled by the RS.
 	//  The OrphanPodIndexKey, which helps identify orphaned Pods that are not currently managed by any controller,
 	//   but may be adopted later on if they have matching labels with the ReplicaSet.
 	podsForRS := []*v1.Pod{}
-	for _, key := range []string{string(rs.UID), controller.OrphanPodIndexKey} {
+
+	uidKeys := []string{string(rs.UID)}
+	if orphanedPods {
+		uidKeys = append(uidKeys, controller.OrphanPodIndexKey)
+	}
+
+	for _, key := range uidKeys {
 		podObjs, err := rsc.podIndexer.ByIndex(controller.PodControllerUIDIndex, key)
 		if err != nil {
 			return nil, err
@@ -729,7 +736,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	// List all pods indexed to RS UID and Orphan pods
-	allRSPods, err := rsc.getRSPods(rs)
+	allRSPods, err := rsc.getRSPods(rs, true)
 	if err != nil {
 		return err
 	}
@@ -749,6 +756,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	var manageReplicasErr error
+	var nextSyncInSeconds *int
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
@@ -762,13 +770,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		// Returning an error causes a requeue without forcing a hotloop
 		return err
 	}
+	if manageReplicasErr != nil {
+		return manageReplicasErr
+	}
 	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
-	if manageReplicasErr == nil && updatedRS.Spec.MinReadySeconds > 0 &&
+	if updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		rsc.queue.AddAfter(key, time.Duration(updatedRS.Spec.MinReadySeconds)*time.Second)
+		nextSyncInSeconds = ptr.To(int(updatedRS.Spec.MinReadySeconds))
 	}
-	return manageReplicasErr
+	if nextSyncInSeconds != nil {
+		rsc.queue.AddAfter(key, time.Duration(*nextSyncInSeconds)*time.Second)
+	}
+	return nil
 }
 
 func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {
