@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -106,6 +107,7 @@ func NewRemoteRuntimeService(endpoint string, connectionTimeout time.Duration, t
 		dialOpts = append(dialOpts,
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler(tracingOpts...)))
 	}
+	dialOpts = append(dialOpts, grpc.WithMaxMsgSize(math.MaxInt64))
 
 	connParams := grpc.ConnectParams{
 		Backoff: backoff.DefaultConfig,
