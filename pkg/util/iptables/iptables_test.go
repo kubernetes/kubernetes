@@ -152,8 +152,8 @@ func TestNew(t *testing.T) {
 			expected: &runner{
 				hasCheck:        true,
 				hasRandomFully:  true,
-				waitFlag:        []string{"-w", "5", "-W", "100000"},
-				restoreWaitFlag: []string{"-w", "5", "-W", "100000"},
+				waitFlag:        []string{"-w", "5"},
+				restoreWaitFlag: []string{"-w", "5"},
 			},
 		},
 		{
@@ -167,8 +167,8 @@ func TestNew(t *testing.T) {
 			expected: &runner{
 				hasCheck:        true,
 				hasRandomFully:  true,
-				waitFlag:        []string{"-w", "5", "-W", "100000"},
-				restoreWaitFlag: []string{"-w", "5", "-W", "100000"},
+				waitFlag:        []string{"-w", "5"},
+				restoreWaitFlag: []string{"-w", "5"},
 			},
 		},
 		{
@@ -226,7 +226,7 @@ func TestNewDualStack(t *testing.T) {
 				},
 				{
 					// ipv4 Present()
-					command: "iptables -w 5 -W 100000 -S POSTROUTING -t nat",
+					command: "iptables -w 5 -S POSTROUTING -t nat",
 					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
 				},
 				{
@@ -236,7 +236,7 @@ func TestNewDualStack(t *testing.T) {
 				},
 				{
 					// ipv6 Present()
-					command: "ip6tables -w 5 -W 100000 -S POSTROUTING -t nat",
+					command: "ip6tables -w 5 -S POSTROUTING -t nat",
 					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
 				},
 			},
@@ -253,7 +253,7 @@ func TestNewDualStack(t *testing.T) {
 				},
 				{
 					// ipv4 Present()
-					command: "iptables -w 5 -W 100000 -S POSTROUTING -t nat",
+					command: "iptables -w 5 -S POSTROUTING -t nat",
 					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
 				},
 				{
@@ -280,7 +280,7 @@ func TestNewDualStack(t *testing.T) {
 				},
 				{
 					// ipv4 Present()
-					command: "iptables -w 5 -W 100000 -S POSTROUTING -t nat",
+					command: "iptables -w 5 -S POSTROUTING -t nat",
 					action:  func() ([]byte, []byte, error) { return nil, nil, nil },
 				},
 				{
@@ -290,7 +290,7 @@ func TestNewDualStack(t *testing.T) {
 				},
 				{
 					// ipv6 Present()
-					command: "ip6tables -w 5 -W 100000 -S POSTROUTING -t nat",
+					command: "ip6tables -w 5 -S POSTROUTING -t nat",
 					action:  func() ([]byte, []byte, error) { return nil, nil, fmt.Errorf("ipv6 is broken") },
 				},
 			},
@@ -829,6 +829,113 @@ COMMIT
 	}
 }
 
+func TestGetIPTablesRestoreWaitFlag(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		version              string
+		restoreVersionOutput string
+		protocol             string
+		expected             []string
+	}{
+		{
+			name:     "version >= WaitRestoreMinVersion (1.6.2)",
+			version:  "1.6.2",
+			protocol: "ipv4",
+			expected: []string{WaitString, WaitSecondsValue},
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion (1.6.2) with valid restore version",
+			version:              "1.4.22",
+			restoreVersionOutput: "iptables v1.4.22",
+			protocol:             "ipv4",
+			expected:             []string{WaitString},
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion (1.6.2) with empty restore version",
+			version:              "1.4.21",
+			restoreVersionOutput: "",
+			protocol:             "ipv4",
+			expected:             nil,
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion (1.6.2) with unparseable restore version",
+			version:              "1.4.21",
+			restoreVersionOutput: "invalid-version",
+			protocol:             "ipv4",
+			expected:             nil,
+		},
+		{
+			name:                 "version < WaitRestoreMinVersion with restore command error",
+			version:              "1.4.21",
+			restoreVersionOutput: "error",
+			protocol:             "ipv4",
+			expected:             nil,
+		},
+		{
+			name:                 "IPv6 protocol test with valid restore version",
+			version:              "1.4.22",
+			restoreVersionOutput: "iptables v1.4.22",
+			protocol:             "ipv6",
+			expected:             []string{WaitString},
+		},
+		{
+			name:                 "Very old version (1.0.0)",
+			version:              "1.0.0",
+			restoreVersionOutput: "iptables v1.0.0",
+			protocol:             "ipv4",
+			expected:             []string{WaitString},
+		},
+		{
+			name:                 "Version just below WaitRestoreMinVersion (1.6.1)",
+			version:              "1.6.1",
+			restoreVersionOutput: "iptables v1.6.1",
+			protocol:             "ipv4",
+			expected:             []string{WaitString},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fcmd := fakeexec.FakeCmd{
+				CombinedOutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) {
+						if tc.restoreVersionOutput == "error" {
+							return nil, nil, fmt.Errorf("error getting version")
+						}
+						return []byte(tc.restoreVersionOutput), nil, nil
+					},
+				},
+			}
+			fexec := &fakeexec.FakeExec{
+				CommandScript: []fakeexec.FakeCommandAction{
+					func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
+				},
+			}
+
+			version := utilversion.MustParseGeneric(tc.version)
+
+			var protocol Protocol
+			if tc.protocol == "ipv6" {
+				protocol = ProtocolIPv6
+			} else {
+				protocol = ProtocolIPv4
+			}
+
+			result := getIPTablesRestoreWaitFlag(version, fexec, protocol)
+
+			if !reflect.DeepEqual(result, tc.expected) {
+				t.Errorf("Expected %v, got %v", tc.expected, result)
+			}
+
+			if version.LessThan(WaitRestoreMinVersion) && tc.restoreVersionOutput != "" && tc.restoreVersionOutput != "error" {
+				if fcmd.CombinedOutputCalls != 1 {
+					t.Errorf("Expected iptables-restore --version to be called once, got %d calls", fcmd.CombinedOutputCalls)
+				}
+			}
+		})
+	}
+}
+
 func TestCheckRuleWithoutCheckAbsent(t *testing.T) {
 	iptablesSaveOutput := `# Generated by iptables-save v1.4.7 on Wed Oct 29 14:56:01 2014
 *nat
@@ -879,7 +986,9 @@ func TestIPTablesWaitFlag(t *testing.T) {
 		{"1.4.21", []string{WaitString}},
 		{"1.4.22", []string{WaitString, WaitSecondsValue}},
 		{"1.5.0", []string{WaitString, WaitSecondsValue}},
-		{"2.0.0", []string{WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue}},
+		{"1.8.7", []string{WaitString, WaitSecondsValue}},
+		{"1.8.8", []string{WaitString, WaitSecondsValue}},
+		{"2.0.0", []string{WaitString, WaitSecondsValue}},
 	}
 
 	for _, testCase := range testCases {
@@ -984,37 +1093,6 @@ func TestWaitFlagNew(t *testing.T) {
 		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	if !sets.New(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue) {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
-	}
-}
-
-func TestWaitIntervalFlagNew(t *testing.T) {
-	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeAction{
-			// iptables version check
-			func() ([]byte, []byte, error) { return []byte("iptables v1.6.1"), nil, nil },
-			// iptables-restore version check
-			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
-			// Success.
-			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
-		},
-	}
-	fexec := &fakeexec.FakeExec{
-		CommandScript: []fakeexec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-	}
-	runner := newInternal(fexec, ProtocolIPv4, "", "")
-	err := runner.DeleteChain(TableNAT, Chain("FOOBAR"))
-	if err != nil {
-		t.Errorf("expected success, got %v", err)
-	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
-	}
-	if !sets.New(fcmd.CombinedOutputLog[2]...).HasAll("iptables", WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue) {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
 	}
 }
@@ -1251,7 +1329,7 @@ func TestRestoreAllWait(t *testing.T) {
 	}
 
 	commandSet := sets.New(fcmd.CombinedOutputLog[1]...)
-	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, WaitIntervalString, WaitIntervalUsecondsValue, "--counters", "--noflush") {
+	if !commandSet.HasAll("iptables-restore", WaitString, WaitSecondsValue, "--counters", "--noflush") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
 	}
 
