@@ -490,10 +490,10 @@ func testConvert(tCtx ktesting.TContext) {
 	claim.Namespace = namespace
 	claim, err := tCtx.Client().ResourceV1beta1().ResourceClaims(namespace).Create(tCtx, claim, metav1.CreateOptions{})
 	tCtx.ExpectNoError(err, "create claim")
-	claimAlpha, err := tCtx.Client().ResourceV1alpha3().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
+	claimBeta2, err := tCtx.Client().ResourceV1beta2().ResourceClaims(namespace).Get(tCtx, claim.Name, metav1.GetOptions{})
 	tCtx.ExpectNoError(err, "get claim")
 	// We could check more fields, but there are unit tests which cover this better.
-	assert.Equal(tCtx, claim.Name, claimAlpha.Name, "claim name")
+	assert.Equal(tCtx, claim.Name, claimBeta2.Name, "claim name")
 }
 
 // testAdminAccess creates a claim with AdminAccess and then checks
