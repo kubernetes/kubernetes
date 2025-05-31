@@ -4568,14 +4568,14 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 		printAnnotationsMultiline(w, "Annotations", configMap.Annotations)
 
 		w.Write(LEVEL_0, "\nData\n====\n")
-		for k, v := range configMap.Data {
-			w.Write(LEVEL_0, "%s:\n----\n", k)
-			w.Write(LEVEL_0, "%s\n", string(v))
-			w.Write(LEVEL_0, "\n")
+		for _, k := range slices.Sorted(maps.Keys(configMap.Data)) {
+			v := configMap.Data[k]
+			w.Write(LEVEL_0, "%s:\t%s\n", k, string(v))
 		}
 		w.Write(LEVEL_0, "\nBinaryData\n====\n")
-		for k, v := range configMap.BinaryData {
-			w.Write(LEVEL_0, "%s: %s bytes\n", k, strconv.Itoa(len(v)))
+		for _, k := range slices.Sorted(maps.Keys(configMap.BinaryData)) {
+			v := configMap.BinaryData[k]
+			w.Write(LEVEL_0, "%s:\t%s bytes\n", k, strconv.Itoa(len(v)))
 		}
 		w.Write(LEVEL_0, "\n")
 
