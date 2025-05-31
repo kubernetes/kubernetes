@@ -31,11 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/pod"
 	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -827,6 +830,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		errs   field.ErrorList
 	}
 
+	const enableUpdateVolumeClaimTemplate = "[enable UpdateVolumeClaimTemplate]"
+
 	successCases := []testCase{{
 		name:   "update replica count",
 		old:    mkStatefulSet(&validPodTemplate),
@@ -882,6 +887,10 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		name:   "update with invalid .spec.serviceName",
 		old:    mkStatefulSet(&validPodTemplate, tweakServiceName("Invalid.Name")),
 		update: mkStatefulSet(&validPodTemplate, tweakServiceName("Invalid.Name"), tweakReplicas(3)),
+	}, {
+		name:   "update pvc template size " + enableUpdateVolumeClaimTemplate,
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
 	},
 	}
 
@@ -906,21 +915,21 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 			tweakSelectorLabels(validLabels2),
 		),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "selector"), nil, ""),
 		},
 	}, {
 		name:   "update pod management policy 1",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy("")),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
 		},
 	}, {
 		name:   "update pod management policy 2",
 		old:    mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.ParallelPodManagement)),
 		update: mkStatefulSet(&validPodTemplate, tweakPodManagementPolicy(apps.OrderedReadyPodManagement)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "podManagementPolicy"), nil, ""),
 		},
 	}, {
 		name:   "update to negative replicas",
@@ -934,21 +943,35 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedSize)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
 		},
 	}, {
 		name:   "update pvc template storage class",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
+		},
+	}, {
+		name:   "update pvc template storage class " + enableUpdateVolumeClaimTemplate,
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplateChangedClass)),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates").Index(0), nil, ""),
 		},
 	}, {
 		name:   "add new pvc template",
 		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
 		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
 		errs: field.ErrorList{
-			field.Forbidden(field.NewPath("spec"), ""),
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
+		},
+	}, {
+		name:   "add new pvc template " + enableUpdateVolumeClaimTemplate,
+		old:    mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate)),
+		update: mkStatefulSet(&validPodTemplate, tweakPVCTemplate(validPVCTemplate, validPVCTemplate2)),
+		errs: field.ErrorList{
+			field.Invalid(field.NewPath("spec", "volumeClaimTemplates"), nil, ""),
 		},
 	},
 	}
@@ -968,6 +991,8 @@ func TestValidateStatefulSetUpdate(t *testing.T) {
 		}
 
 		t.Run(testTitle, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.UpdateVolumeClaimTemplate,
+				strings.Contains(name, enableUpdateVolumeClaimTemplate))
 			testCase.old.ObjectMeta.ResourceVersion = "1"
 			testCase.update.ObjectMeta.ResourceVersion = "1"
 
