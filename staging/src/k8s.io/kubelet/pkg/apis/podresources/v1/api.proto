@@ -33,7 +33,9 @@ message AllocatableResourcesResponse {
 }
 
 // ListPodResourcesRequest is the request made to the PodResourcesLister service
-message ListPodResourcesRequest {}
+message ListPodResourcesRequest {
+  bool active_only = 1;
+}
 
 // ListPodResourcesResponse is the response returned by List function
 message ListPodResourcesResponse {
