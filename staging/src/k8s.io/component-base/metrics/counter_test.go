@@ -292,7 +292,7 @@ func TestCounterWithLabelValueAllowList(t *testing.T) {
 }
 
 func TestCounterWithExemplar(t *testing.T) {
-	// Set exemplar.
+	// Create context.
 	fn := func(offset int) []byte {
 		arr := make([]byte, 16)
 		for i := 0; i < 16; i++ {
@@ -300,6 +300,13 @@ func TestCounterWithExemplar(t *testing.T) {
 		}
 		return arr
 	}
+	originalTraceID := trace.TraceID(fn(0))
+	originalSpanID := trace.SpanID(fn(1))
+	redundantCtxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     originalSpanID,
+		TraceID:    originalTraceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
 	traceID := trace.TraceID(fn(1))
 	spanID := trace.SpanID(fn(2))
 	ctxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
@@ -313,8 +320,7 @@ func TestCounterWithExemplar(t *testing.T) {
 	counter := NewCounter(&CounterOpts{
 		Name: "metric_exemplar_test",
 		Help: "helpless",
-	})
-	_ = counter.WithContext(ctxForSpanCtx)
+	}).WithContext(ctxForSpanCtx)
 
 	// Register counter.
 	registry := newKubeRegistry(apimachineryversion.Info{
@@ -324,17 +330,93 @@ func TestCounterWithExemplar(t *testing.T) {
 	})
 	registry.MustRegister(counter)
 
-	// Call underlying exemplar methods.
-	counter.Add(toAdd)
-	counter.Inc()
-	counter.Inc()
+	// Call underlying exemplar methods, overriding the original span context.
+	counter.WithContext(redundantCtxForSpanCtx).Add(toAdd) // This should be counted, but it's context should be overridden.
+	counter.WithContext(redundantCtxForSpanCtx).Inc()      // This should be counted, but it's context should be overridden.
+	counter.Inc()                                          // This should be counted, and it's (parent's) context should be used.
+
+	// Verify exemplar with the overridden span context.
+	exemplarGatherAndVerify(t, registry, traceID, spanID, 1, toAdd+2)
+
+	// Modify span context.
+	altTraceID := trace.TraceID(fn(2))
+	altSpanID := trace.SpanID(fn(3))
+	altCtxForSpanCtx := trace.ContextWithSpanContext(context.Background(), trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     altSpanID,
+		TraceID:    altTraceID,
+		TraceFlags: trace.FlagsSampled,
+	}))
+
+	// Call underlying exemplar methods with different span context.
+	counter.WithContext(ctxForSpanCtx).Add(toAdd) // This should be counted, but it's context should be overridden.
+	counter.WithContext(ctxForSpanCtx).Inc()      // This should be counted, but it's context should be overridden.
+	counter.WithContext(altCtxForSpanCtx).Inc()   // This should be counted, and it's context should be used.
+
+	// Verify exemplar with different span context.
+	exemplarGatherAndVerify(t, registry, altTraceID, altSpanID, 1, 2*toAdd+4)
+
+	// Verify that all contextual counter calls are exclusive.
+	contextualCounter := NewCounter(&CounterOpts{
+		Name: "contextual_counter",
+		Help: "helpless",
+	})
+	spanIDa := trace.SpanID(fn(3))
+	traceIDa := trace.TraceID(fn(4))
+	contextualCounterA := contextualCounter.WithContext(trace.ContextWithSpanContext(context.Background(),
+		trace.NewSpanContext(trace.SpanContextConfig{
+			SpanID:     spanIDa,
+			TraceID:    traceIDa,
+			TraceFlags: trace.FlagsSampled,
+		}),
+	))
+	spanIDb := trace.SpanID(fn(5))
+	traceIDb := trace.TraceID(fn(6))
+	contextualCounterB := contextualCounter.WithContext(trace.ContextWithSpanContext(context.Background(),
+		trace.NewSpanContext(trace.SpanContextConfig{
+			SpanID:     spanIDb,
+			TraceID:    traceIDb,
+			TraceFlags: trace.FlagsSampled,
+		}),
+	))
+
+	runs := []struct {
+		spanID            trace.SpanID
+		traceID           trace.TraceID
+		contextualCounter *CounterWithContext
+	}{
+		{
+			spanID:            spanIDa,
+			traceID:           traceIDa,
+			contextualCounter: contextualCounterA,
+		},
+		{
+			spanID:            spanIDb,
+			traceID:           traceIDb,
+			contextualCounter: contextualCounterB,
+		},
+	}
+	for i, run := range runs {
+		registry.MustRegister(run.contextualCounter)
+		run.contextualCounter.Inc()
+		exemplarGatherAndVerify(t, registry, run.traceID, run.spanID, 2, float64(i+1))
+		registry.Unregister(run.contextualCounter)
+	}
+}
+
+func exemplarGatherAndVerify(t *testing.T,
+	registry *kubeRegistry,
+	traceID trace.TraceID,
+	spanID trace.SpanID,
+	expectedMetricFamilies int,
+	expectedValue float64,
+) {
 
 	// Gather.
 	mfs, err := registry.Gather()
 	if err != nil {
 		t.Fatalf("Gather failed %v", err)
 	}
-	if len(mfs) != 1 {
+	if len(mfs) != expectedMetricFamilies {
 		t.Fatalf("Got %v metric families, Want: 1 metric family", len(mfs))
 	}
 
@@ -349,7 +431,7 @@ func TestCounterWithExemplar(t *testing.T) {
 	}
 
 	// Verify value.
-	want := toAdd + 2
+	want := expectedValue
 	got := m.GetCounter().GetValue()
 	if got != want {
 		t.Fatalf("Got %f, wanted %f as the count", got, want)
