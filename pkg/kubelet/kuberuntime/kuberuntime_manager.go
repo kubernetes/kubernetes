@@ -99,6 +99,11 @@ type podStateProvider interface {
 	ShouldPodRuntimeBeRemoved(kubetypes.UID) bool
 }
 
+type PodInitContainerTimeRecorder interface {
+	RecordInitContainerStarted(podUID kubetypes.UID, startedAt time.Time)
+	RecordInitContainerFinished(podUID kubetypes.UID, finishedAt time.Time)
+}
+
 type kubeGenericRuntimeManager struct {
 	runtimeName string
 	recorder    record.EventRecorder
@@ -180,6 +185,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Root directory used to store pod logs
 	podLogsDirectory string
+
+	// Records first initContainer start time and last initContainer finish time
+	podInitContainerTimeRecorder PodInitContainerTimeRecorder
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -228,36 +236,38 @@ func NewKubeGenericRuntimeManager(
 	tracerProvider trace.TracerProvider,
 	tokenManager *token.Manager,
 	getServiceAccount plugin.GetServiceAccountFunc,
+	podInitContainerTimeRecorder PodInitContainerTimeRecorder,
 ) (KubeGenericRuntime, []images.PostImageGCHook, error) {
 	ctx := context.Background()
 	runtimeService = newInstrumentedRuntimeService(runtimeService)
 	imageService = newInstrumentedImageManagerService(imageService)
 	tracer := tracerProvider.Tracer(instrumentationScope)
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:               recorder,
-		singleProcessOOMKill:   singleProcessOOMKill,
-		cpuCFSQuota:            cpuCFSQuota,
-		cpuCFSQuotaPeriod:      cpuCFSQuotaPeriod,
-		seccompProfileRoot:     filepath.Join(rootDirectory, "seccomp"),
-		livenessManager:        livenessManager,
-		readinessManager:       readinessManager,
-		startupManager:         startupManager,
-		machineInfo:            machineInfo,
-		osInterface:            osInterface,
-		runtimeHelper:          runtimeHelper,
-		runtimeService:         runtimeService,
-		imageService:           imageService,
-		containerManager:       containerManager,
-		internalLifecycle:      containerManager.InternalContainerLifecycle(),
-		logManager:             logManager,
-		runtimeClassManager:    runtimeClassManager,
-		allocationManager:      allocationManager,
-		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
-		seccompDefault:         seccompDefault,
-		memorySwapBehavior:     memorySwapBehavior,
-		getNodeAllocatable:     getNodeAllocatable,
-		memoryThrottlingFactor: memoryThrottlingFactor,
-		podLogsDirectory:       podLogsDirectory,
+		recorder:                     recorder,
+		singleProcessOOMKill:         singleProcessOOMKill,
+		cpuCFSQuota:                  cpuCFSQuota,
+		cpuCFSQuotaPeriod:            cpuCFSQuotaPeriod,
+		seccompProfileRoot:           filepath.Join(rootDirectory, "seccomp"),
+		livenessManager:              livenessManager,
+		readinessManager:             readinessManager,
+		startupManager:               startupManager,
+		machineInfo:                  machineInfo,
+		osInterface:                  osInterface,
+		runtimeHelper:                runtimeHelper,
+		runtimeService:               runtimeService,
+		imageService:                 imageService,
+		containerManager:             containerManager,
+		internalLifecycle:            containerManager.InternalContainerLifecycle(),
+		logManager:                   logManager,
+		runtimeClassManager:          runtimeClassManager,
+		allocationManager:            allocationManager,
+		logReduction:                 logreduction.NewLogReduction(identicalErrorDelay),
+		seccompDefault:               seccompDefault,
+		memorySwapBehavior:           memorySwapBehavior,
+		getNodeAllocatable:           getNodeAllocatable,
+		memoryThrottlingFactor:       memoryThrottlingFactor,
+		podLogsDirectory:             podLogsDirectory,
+		podInitContainerTimeRecorder: podInitContainerTimeRecorder,
 	}
 
 	typedVersion, err := kubeRuntimeManager.getTypedVersion(ctx)
@@ -1359,6 +1369,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			}
 			return err
 		}
+		if typeName == "init container" {
+			m.podInitContainerTimeRecorder.RecordInitContainerStarted(pod.UID, time.Now())
+		}
 
 		return nil
 	}
@@ -1400,6 +1413,15 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 			// Successfully started the container; clear the entry in the failure
 			klog.V(4).InfoS("Completed init container for pod", "containerName", container.Name, "pod", klog.KObj(pod))
+		}
+	}
+
+	for _, cs := range podStatus.ContainerStatuses {
+		// Check if this is an init container
+		for _, init := range pod.Spec.InitContainers {
+			if cs.Name == init.Name && cs.State == kubecontainer.ContainerStateExited && !cs.FinishedAt.IsZero() {
+				m.podInitContainerTimeRecorder.RecordInitContainerFinished(pod.UID, cs.FinishedAt)
+			}
 		}
 	}
 
