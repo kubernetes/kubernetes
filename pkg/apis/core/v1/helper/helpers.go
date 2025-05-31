@@ -125,8 +125,17 @@ func HugePageSizeFromMedium(medium v1.StorageMedium) (resource.Quantity, error) 
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name v1.ResourceName) bool {
-	return IsNativeResource(name) &&
-		!IsHugePageResourceName(name)
+	// Allow overcommit for native resources (except hugepages)
+	if IsNativeResource(name) && !IsHugePageResourceName(name) {
+		return true
+	}
+
+	// Allow overcommit for NVIDIA GPU resources
+	if strings.HasPrefix(string(name), "nvidia.com/gpu") {
+		return true
+	}
+
+	return false
 }
 
 // IsAttachableVolumeResourceName returns true when the resource name is prefixed in attachable volume

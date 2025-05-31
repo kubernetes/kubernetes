@@ -203,8 +203,17 @@ func IsNativeResource(name core.ResourceName) bool {
 // IsOvercommitAllowed returns true if the resource is in the default
 // namespace and is not hugepages.
 func IsOvercommitAllowed(name core.ResourceName) bool {
-	return IsNativeResource(name) &&
-		!IsHugePageResourceName(name)
+	// Allow overcommit for native resources (except hugepages)
+	if IsNativeResource(name) && !IsHugePageResourceName(name) {
+		return true
+	}
+
+	// Allow overcommit for NVIDIA GPU resources
+	if strings.HasPrefix(string(name), "nvidia.com/gpu") {
+		return true
+	}
+
+	return false
 }
 
 var standardLimitRangeTypes = sets.New(
