@@ -425,7 +425,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, resourcePrefix string) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc func() runtime.Object, reverseKeyFunc func(string) (string, string, error), resourcePrefix string) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
@@ -463,7 +463,16 @@ func newETCD3Storage(c storagebackend.ConfigForResource, newFunc, newListFunc fu
 
 	versioner := storage.APIObjectVersioner{}
 	decoder := etcd3.NewDefaultDecoder(c.Codec, versioner)
-	store := etcd3.New(client, c.Codec, newFunc, newListFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
+	if c.WatchPrevKv {
+		reverseKeyFunc = nil
+	}
+
+	if !c.WatchPrevKv && reverseKeyFunc == nil {
+		// this should not happen.
+		// Because it breaks the Storage behaviors.
+		return nil, nil, fmt.Errorf("watch prevkv disabled without reverseKeyFunc")
+	}
+	store := etcd3.New(client, c.Codec, newFunc, newListFunc, reverseKeyFunc, c.Prefix, resourcePrefix, c.GroupResource, transformer, c.LeaseManagerConfig, decoder, versioner)
 	return store, destroyFunc, nil
 }
 
