@@ -21,12 +21,13 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"os"
 	goruntime "runtime"
 	"runtime/debug"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -615,11 +616,7 @@ func completeOpenAPI(config *openapicommon.Config, version *version.Version) {
 	if config.SecurityDefinitions != nil {
 		// Setup OpenAPI security: all APIs will have the same authentication for now.
 		config.DefaultSecurity = []map[string][]string{}
-		keys := []string{}
-		for k := range *config.SecurityDefinitions {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(*config.SecurityDefinitions))
 		for _, k := range keys {
 			config.DefaultSecurity = append(config.DefaultSecurity, map[string][]string{k: {}})
 		}
@@ -654,11 +651,7 @@ func completeOpenAPIV3(config *openapicommon.OpenAPIV3Config, version *version.V
 	if config.SecuritySchemes != nil {
 		// Setup OpenAPI security: all APIs will have the same authentication for now.
 		config.DefaultSecurity = []map[string][]string{}
-		keys := []string{}
-		for k := range config.SecuritySchemes {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(config.SecuritySchemes))
 		for _, k := range keys {
 			config.DefaultSecurity = append(config.DefaultSecurity, map[string][]string{k: {}})
 		}
