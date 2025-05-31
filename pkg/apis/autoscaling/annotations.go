@@ -44,3 +44,10 @@ const ToleranceScaleDownAnnotation = "autoscaling.alpha.kubernetes.io/scale-down
 // ToleranceScaleUpAnnotation is the annotation which holds the HPA tolerance specs
 // when converting the `ScaleUp.Tolerance` field from autoscaling/v2
 const ToleranceScaleUpAnnotation = "autoscaling.alpha.kubernetes.io/scale-up-tolerance"
+
+// SelectionStrategyAnnotation is the annotation which holds the pod selection strategy
+// when converting the `PodSelectionStrategy` field from autoscaling/v2
+const SelectionStrategyAnnotation = "autoscaling.alpha.kubernetes.io/pod-selection-strategy"
+
+// DefaultSelectionStrategy is the default strategy for pod selection if none is specified
+const DefaultSelectionStrategy = "LabelSelector"

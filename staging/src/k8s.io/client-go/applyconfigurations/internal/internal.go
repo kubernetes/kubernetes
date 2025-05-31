@@ -2990,6 +2990,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerSpec
   map:
     fields:
+    - name: SelectionStrategy
+      type:
+        scalar: string
     - name: behavior
       type:
         namedType: io.k8s.api.autoscaling.v2.HorizontalPodAutoscalerBehavior
@@ -3030,6 +3033,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: currentReplicas
       type:
         scalar: numeric
+    - name: currentSelectionStrategy
+      type:
+        scalar: string
     - name: desiredReplicas
       type:
         scalar: numeric

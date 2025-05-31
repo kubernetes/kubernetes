@@ -148,12 +148,13 @@ func (HorizontalPodAutoscalerList) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerSpec = map[string]string{
-	"":               "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
-	"scaleTargetRef": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
-	"minReplicas":    "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
-	"maxReplicas":    "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
-	"metrics":        "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the default metric will be set to 80% average CPU utilization.",
-	"behavior":       "behavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively). If not set, the default HPAScalingRules for scale up and scale down are used.",
+	"":                  "HorizontalPodAutoscalerSpec describes the desired functionality of the HorizontalPodAutoscaler.",
+	"scaleTargetRef":    "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
+	"minReplicas":       "minReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the alpha feature gate HPAScaleToZero is enabled and at least one Object or External metric is configured.  Scaling is active as long as at least one metric value is available.",
+	"maxReplicas":       "maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up. It cannot be less that minReplicas.",
+	"metrics":           "metrics contains the specifications for which to use to calculate the desired replica count (the maximum replica count across all metrics will be used).  The desired replica count is calculated multiplying the ratio between the target value and the current value by the current number of pods.  Ergo, metrics used must decrease as the pod count is increased, and vice-versa.  See the individual metric source types for more information about how each type of metric must respond. If not set, the default metric will be set to 80% average CPU utilization.",
+	"behavior":          "behavior configures the scaling behavior of the target in both Up and Down directions (scaleUp and scaleDown fields respectively). If not set, the default HPAScalingRules for scale up and scale down are used.",
+	"SelectionStrategy": "SelectionStrategy determines how pods are selected for metrics collection. Valid values are \"LabelSelector\" and \"OwnerReferences\". If not set, defaults to \"LabelSelector\" which is the legacy behavior.",
 }
 
 func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
@@ -161,13 +162,14 @@ func (HorizontalPodAutoscalerSpec) SwaggerDoc() map[string]string {
 }
 
 var map_HorizontalPodAutoscalerStatus = map[string]string{
-	"":                   "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
-	"observedGeneration": "observedGeneration is the most recent generation observed by this autoscaler.",
-	"lastScaleTime":      "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
-	"currentReplicas":    "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
-	"desiredReplicas":    "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
-	"currentMetrics":     "currentMetrics is the last read state of the metrics used by this autoscaler.",
-	"conditions":         "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
+	"":                         "HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.",
+	"observedGeneration":       "observedGeneration is the most recent generation observed by this autoscaler.",
+	"lastScaleTime":            "lastScaleTime is the last time the HorizontalPodAutoscaler scaled the number of pods, used by the autoscaler to control how often the number of pods is changed.",
+	"currentReplicas":          "currentReplicas is current number of replicas of pods managed by this autoscaler, as last seen by the autoscaler.",
+	"desiredReplicas":          "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
+	"currentMetrics":           "currentMetrics is the last read state of the metrics used by this autoscaler.",
+	"conditions":               "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
+	"currentSelectionStrategy": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {

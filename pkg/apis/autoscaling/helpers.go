@@ -34,23 +34,30 @@ package autoscaling
 //	  externalObj.Annotations[...] = json.Marshal(...)
 //	}
 func DropRoundTripHorizontalPodAutoscalerAnnotations(in map[string]string) (out map[string]string, copied bool) {
-	_, hasMetricsSpecs := in[MetricSpecsAnnotation]
-	_, hasBehaviorSpecs := in[BehaviorSpecsAnnotation]
-	_, hasToleranceScaleDown := in[ToleranceScaleDownAnnotation]
-	_, hasToleranceScaleUp := in[ToleranceScaleUpAnnotation]
-	_, hasMetricsStatuses := in[MetricStatusesAnnotation]
-	_, hasConditions := in[HorizontalPodAutoscalerConditionsAnnotation]
-	if hasMetricsSpecs || hasBehaviorSpecs || hasToleranceScaleDown || hasToleranceScaleUp || hasMetricsStatuses || hasConditions {
-		out = DeepCopyStringMap(in)
-		delete(out, MetricSpecsAnnotation)
-		delete(out, BehaviorSpecsAnnotation)
-		delete(out, ToleranceScaleDownAnnotation)
-		delete(out, ToleranceScaleUpAnnotation)
-		delete(out, MetricStatusesAnnotation)
-		delete(out, HorizontalPodAutoscalerConditionsAnnotation)
-		return out, true
-	}
-	return in, false
+    _, hasMetricsSpecs := in[MetricSpecsAnnotation]
+    _, hasBehaviorSpecs := in[BehaviorSpecsAnnotation]
+    _, hasToleranceScaleDown := in[ToleranceScaleDownAnnotation]
+    _, hasToleranceScaleUp := in[ToleranceScaleUpAnnotation]
+    _, hasMetricsStatuses := in[MetricStatusesAnnotation]
+    _, hasConditions := in[HorizontalPodAutoscalerConditionsAnnotation]
+    _, hasSelectionStrategy := in[SelectionStrategyAnnotation]
+
+    if hasMetricsSpecs || hasBehaviorSpecs || hasToleranceScaleDown || 
+       hasToleranceScaleUp || hasMetricsStatuses || hasConditions || 
+       hasSelectionStrategy {
+        
+        out = DeepCopyStringMap(in)
+        delete(out, MetricSpecsAnnotation)
+        delete(out, BehaviorSpecsAnnotation)
+        delete(out, ToleranceScaleDownAnnotation)
+        delete(out, ToleranceScaleUpAnnotation)
+        delete(out, MetricStatusesAnnotation)
+        delete(out, HorizontalPodAutoscalerConditionsAnnotation)
+        delete(out, SelectionStrategyAnnotation)
+        return out, true
+    }
+
+    return in, false
 }
 
 // DeepCopyStringMap returns a copy of the input map.

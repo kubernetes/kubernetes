@@ -180,7 +180,8 @@
         ],
         "tolerance": "0"
       }
-    }
+    },
+    "SelectionStrategy": "SelectionStrategyValue"
   },
   "status": {
     "observedGeneration": 1,
@@ -294,6 +295,7 @@
         "reason": "reasonValue",
         "message": "messageValue"
       }
-    ]
+    ],
+    "currentSelectionStrategy": "currentSelectionStrategyValue"
   }
 }
