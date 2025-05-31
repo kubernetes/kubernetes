@@ -271,6 +271,12 @@ message HorizontalPodAutoscalerSpec {
   // If not set, the default HPAScalingRules for scale up and scale down are used.
   // +optional
   optional HorizontalPodAutoscalerBehavior behavior = 5;
+
+  // SelectionStrategy determines how pods are selected for metrics collection.
+  // Valid values are "LabelSelector" and "OwnerReferences".
+  // If not set, defaults to "LabelSelector" which is the legacy behavior.
+  // +optional
+  optional string SelectionStrategy = 6;
 }
 
 // HorizontalPodAutoscalerStatus describes the current status of a horizontal pod autoscaler.
@@ -306,6 +312,11 @@ message HorizontalPodAutoscalerStatus {
   // +listMapKey=type
   // +optional
   repeated HorizontalPodAutoscalerCondition conditions = 6;
+
+  // CurrentSelectionStrategy indicates which pod selection strategy
+  // is currently being used
+  // +optional
+  optional string currentSelectionStrategy = 7;
 }
 
 // MetricIdentifier defines the name and optionally selector for a metric

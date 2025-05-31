@@ -15009,6 +15009,14 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 							Ref:         ref("k8s.io/api/autoscaling/v2.HorizontalPodAutoscalerBehavior"),
 						},
 					},
+					"SelectionStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SelectionStrategy determines how pods are selected for metrics collection. Valid values are \"LabelSelector\" and \"OwnerReferences\". If not set, defaults to \"LabelSelector\" which is the legacy behavior.\n\nPossible enum values:\n - `\"LabelSelector\"` selects all pods matching the target's label selector\n - `\"OwnerReferences\"` only selects pods owned by the target workload",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"LabelSelector", "OwnerReferences"},
+						},
+					},
 				},
 				Required: []string{"scaleTargetRef", "maxReplicas"},
 			},
@@ -15094,6 +15102,14 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerStatus(ref common.Re
 									},
 								},
 							},
+						},
+					},
+					"currentSelectionStrategy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CurrentSelectionStrategy indicates which pod selection strategy is currently being used\n\nPossible enum values:\n - `\"LabelSelector\"` selects all pods matching the target's label selector\n - `\"OwnerReferences\"` only selects pods owned by the target workload",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"LabelSelector", "OwnerReferences"},
 						},
 					},
 				},
