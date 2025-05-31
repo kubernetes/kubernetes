@@ -19,6 +19,7 @@ package kubelet
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	goruntime "runtime"
 	"sort"
@@ -519,18 +520,39 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 	}
 
 	node, changed := kl.updateNode(ctx, originalNode)
-	shouldPatchNodeStatus := changed || kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency
+	shouldPatchNodeStatus := changed || kl.isUpdateStatusPeriodExpired()
 
 	if !shouldPatchNodeStatus {
 		kl.markVolumesFromNode(node)
 		return nil
 	}
 
+	// There are 3 possible conditions that make shouldPatchNodeStatus to be true:
+	// 1. node is changed
+	// 2. isUpdateStatusPeriodExpired returns true due to lastStatusReportTime has Zero value. This will happen when kubelet restarts.
+	// 3. isUpdateStatusPeriodExpired returns true due to lastStatusReportTime expires with non-zero value.
+	// We want to calculate a new random delay for condition 1 and 2, so that we can avoid all the periodic node status
+	// updates to reach the apiserver at the same time.
+	// When condition 3 happens, random interval has already been used, and we want to reset the random delay, so that
+	// the node updates its status with fixed interval going forward.
+	if changed || kl.lastStatusReportTime.IsZero() {
+		kl.delayAfterNodeStatusChange = kl.calculateDelay()
+	} else {
+		kl.delayAfterNodeStatusChange = 0
+	}
 	updatedNode, err := kl.patchNodeStatus(originalNode, node)
 	if err == nil {
 		kl.markVolumesFromNode(updatedNode)
 	}
 	return err
+}
+
+func (kl *Kubelet) isUpdateStatusPeriodExpired() bool {
+	return kl.clock.Since(kl.lastStatusReportTime) >= kl.nodeStatusReportFrequency+kl.delayAfterNodeStatusChange
+}
+
+func (kl *Kubelet) calculateDelay() time.Duration {
+	return time.Duration(float64(kl.nodeStatusReportFrequency) * (-0.5 + rand.Float64()))
 }
 
 // updateNode creates a copy of originalNode and runs update logic on it.
