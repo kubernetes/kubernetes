@@ -87,7 +87,7 @@ type HorizontalPodAutoscalerSpec struct {
 	// Valid values are "LabelSelector" and "OwnerReferences".
 	// If not set, defaults to "LabelSelector" which is the legacy behavior.
 	// +optional
-	SelectionStrategy *SelectionStrategy `json:"SelectionStrategy,omitempty" protobuf:"bytes,6,opt,name=SelectionStrategy"`
+	SelectionStrategy *SelectionStrategy `json:"selectionStrategy,omitempty" protobuf:"bytes,6,opt,name=SelectionStrategy"`
 }
 
 // SelectionStrategy defines how pods are selected for metrics collection

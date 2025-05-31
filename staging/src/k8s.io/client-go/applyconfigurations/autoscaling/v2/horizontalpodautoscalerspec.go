@@ -30,7 +30,7 @@ type HorizontalPodAutoscalerSpecApplyConfiguration struct {
 	MaxReplicas       *int32                                             `json:"maxReplicas,omitempty"`
 	Metrics           []MetricSpecApplyConfiguration                     `json:"metrics,omitempty"`
 	Behavior          *HorizontalPodAutoscalerBehaviorApplyConfiguration `json:"behavior,omitempty"`
-	SelectionStrategy *autoscalingv2.SelectionStrategy                   `json:"SelectionStrategy,omitempty"`
+	SelectionStrategy *autoscalingv2.SelectionStrategy                   `json:"selectionStrategy,omitempty"`
 }
 
 // HorizontalPodAutoscalerSpecApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerSpec type for use with

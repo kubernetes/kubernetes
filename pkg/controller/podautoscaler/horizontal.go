@@ -1492,12 +1492,10 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 				ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
 			})
 			a.podFilterCache[hpaKey] = podFilter
-			fmt.Println("Created filter")
 		}
 		a.podFilterMux.Unlock()
 		return &podFilter
 	}
-	fmt.Println("Filtet already exists")
 	return &podFilter
 }
 
