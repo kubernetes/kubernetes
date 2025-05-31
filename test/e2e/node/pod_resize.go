@@ -36,6 +36,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -147,7 +148,7 @@ func doPodResizeAdmissionPluginsTests(f *framework.Framework) {
 
 			tStamp := strconv.Itoa(time.Now().Nanosecond())
 			testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, containers)
-			testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+			cgroups.ConfigureHostPathForPodCgroup(testPod1)
 			testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, containers)
 			testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 
@@ -287,7 +288,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
 		testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, c1)
-		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
+		cgroups.ConfigureHostPathForPodCgroup(testPod1)
 		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, c2)
 		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
 		e2epod.SetNodeAffinity(&testPod1.Spec, node.Name)
@@ -438,6 +439,7 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (scheduler-focused)", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-scheduler-tests")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged // for using HostPath
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
 		framework.ExpectNoError(err)
@@ -450,6 +452,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pod InPlace Resize Container (sched
 
 var _ = SIGDescribe("Pod InPlace Resize Container", framework.WithFeatureGate(features.InPlacePodVerticalScaling), func() {
 	f := framework.NewDefaultFramework("pod-resize-tests")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged // for using HostPath
 
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		node, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
