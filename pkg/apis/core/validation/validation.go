@@ -8185,6 +8185,9 @@ func ValidateMatchLabelKeysAndMismatchLabelKeys(fldPath *field.Path, matchLabelK
 	if labelSelector != nil {
 		labelKeysMap := map[string]int{}
 		for i, key := range matchLabelKeys {
+			if _, ok := labelKeysMap[key]; ok {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("matchLabelKeys").Index(i), key, "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"))
+			}
 			labelKeysMap[key] = i
 		}
 		labelSelectorKeys := sets.New[string]()
@@ -8235,11 +8238,18 @@ func ValidateMatchLabelKeysInTopologySpread(fldPath *field.Path, matchLabelKeys 
 		allErrs = append(allErrs, field.Forbidden(fldPath, "must not be specified when labelSelector is not set"))
 	}
 
+	// uniqueMatchLabelKeys is used to check if the keys in matchLabelKeys are unique.
+	uniqueMatchLabelKeys := sets.New[string]()
+
 	for i, key := range matchLabelKeys {
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabelName(key, fldPath.Index(i))...)
 		if labelSelectorKeys.Has(key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "exists in both matchLabelKeys and labelSelector").WithOrigin("duplicatedLabelKeys"))
 		}
+		if uniqueMatchLabelKeys.Has(key) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), key, "is duplicated in matchLabelKeys").WithOrigin("duplicatedMatchLabelKeys"))
+		}
+		uniqueMatchLabelKeys.Insert(key)
 	}
 
 	return allErrs
