@@ -24,7 +24,6 @@ import (
 	"github.com/google/cel-go/common/operators"
 	"github.com/google/cel-go/common/types/ref"
 
-	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -203,7 +202,6 @@ func mustBuildEnv(baseEnv *environment.EnvSet) *environment.EnvSet {
 }
 
 // buildRequestType generates a DeclType for SubjectAccessReviewSpec.
-// if attributes are added here, also add to convertObjectToUnstructured.
 func buildRequestType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	resourceAttributesType := buildResourceAttributesType(field, fields)
 	nonResourceAttributesType := buildNonResourceAttributesType(field, fields)
@@ -218,7 +216,6 @@ func buildRequestType(field func(name string, declType *apiservercel.DeclType, r
 }
 
 // buildResourceAttributesType generates a DeclType for ResourceAttributes.
-// if attributes are added here, also add to convertObjectToUnstructured.
 func buildResourceAttributesType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	resourceAttributesFields := []*apiservercel.DeclField{
 		field("namespace", apiservercel.StringType, false),
@@ -259,78 +256,9 @@ func buildSelectorRequirementType(field func(name string, declType *apiservercel
 }
 
 // buildNonResourceAttributesType generates a DeclType for NonResourceAttributes.
-// if attributes are added here, also add to convertObjectToUnstructured.
 func buildNonResourceAttributesType(field func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField, fields func(fields ...*apiservercel.DeclField) map[string]*apiservercel.DeclField) *apiservercel.DeclType {
 	return apiservercel.NewObjectType("kubernetes.NonResourceAttributes", fields(
 		field("path", apiservercel.StringType, false),
 		field("verb", apiservercel.StringType, false),
 	))
-}
-
-func convertObjectToUnstructured(obj *authorizationv1.SubjectAccessReviewSpec, includeFieldSelector, includeLabelSelector bool) map[string]interface{} {
-	// Construct version containing every SubjectAccessReview user and string attribute field, even omitempty ones, for evaluation by CEL
-	extra := obj.Extra
-	if extra == nil {
-		extra = map[string]authorizationv1.ExtraValue{}
-	}
-	ret := map[string]interface{}{
-		"user":   obj.User,
-		"groups": obj.Groups,
-		"uid":    string(obj.UID),
-		"extra":  extra,
-	}
-	if obj.ResourceAttributes != nil {
-		resourceAttributes := map[string]interface{}{
-			"namespace":   obj.ResourceAttributes.Namespace,
-			"verb":        obj.ResourceAttributes.Verb,
-			"group":       obj.ResourceAttributes.Group,
-			"version":     obj.ResourceAttributes.Version,
-			"resource":    obj.ResourceAttributes.Resource,
-			"subresource": obj.ResourceAttributes.Subresource,
-			"name":        obj.ResourceAttributes.Name,
-		}
-
-		if includeFieldSelector && obj.ResourceAttributes.FieldSelector != nil {
-			if len(obj.ResourceAttributes.FieldSelector.Requirements) > 0 {
-				requirements := make([]map[string]interface{}, 0, len(obj.ResourceAttributes.FieldSelector.Requirements))
-				for _, r := range obj.ResourceAttributes.FieldSelector.Requirements {
-					requirements = append(requirements, map[string]interface{}{
-						"key":      r.Key,
-						"operator": r.Operator,
-						"values":   r.Values,
-					})
-				}
-				resourceAttributes[fieldSelectorVarName] = map[string]interface{}{"requirements": requirements}
-			}
-			if len(obj.ResourceAttributes.FieldSelector.RawSelector) > 0 {
-				resourceAttributes[fieldSelectorVarName] = map[string]interface{}{"rawSelector": obj.ResourceAttributes.FieldSelector.RawSelector}
-			}
-		}
-
-		if includeLabelSelector && obj.ResourceAttributes.LabelSelector != nil {
-			if len(obj.ResourceAttributes.LabelSelector.Requirements) > 0 {
-				requirements := make([]map[string]interface{}, 0, len(obj.ResourceAttributes.LabelSelector.Requirements))
-				for _, r := range obj.ResourceAttributes.LabelSelector.Requirements {
-					requirements = append(requirements, map[string]interface{}{
-						"key":      r.Key,
-						"operator": r.Operator,
-						"values":   r.Values,
-					})
-				}
-				resourceAttributes[labelSelectorVarName] = map[string]interface{}{"requirements": requirements}
-			}
-			if len(obj.ResourceAttributes.LabelSelector.RawSelector) > 0 {
-				resourceAttributes[labelSelectorVarName] = map[string]interface{}{"rawSelector": obj.ResourceAttributes.LabelSelector.RawSelector}
-			}
-		}
-
-		ret["resourceAttributes"] = resourceAttributes
-	}
-	if obj.NonResourceAttributes != nil {
-		ret["nonResourceAttributes"] = map[string]string{
-			"verb": obj.NonResourceAttributes.Verb,
-			"path": obj.NonResourceAttributes.Path,
-		}
-	}
-	return ret
 }
