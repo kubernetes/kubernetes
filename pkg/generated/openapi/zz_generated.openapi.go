@@ -6710,6 +6710,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionCondition(ref com
 					"message": {
 						SchemaProps: spec.SchemaProps{
 							Description: "A human readable message indicating details about the transition.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19732,6 +19733,7 @@ func schema_k8sio_api_coordination_v1alpha2_LeaseCandidateSpec(ref common.Refere
 					"strategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Strategy is the strategy that coordinated leader election will use for picking the leader. If multiple candidates for the same Lease return different strategies, the strategy provided by the candidate with the latest BinaryVersion will be used. If there is still conflict, this is a user error and coordinated leader election will not operate the Lease until resolved.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -19927,6 +19929,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseCandidateSpec(ref common.Referen
 					"strategy": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Strategy is the strategy that coordinated leader election will use for picking the leader. If multiple candidates for the same Lease return different strategies, the strategy provided by the candidate with the latest BinaryVersion will be used. If there is still conflict, this is a user error and coordinated leader election will not operate the Lease until resolved.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -42427,6 +42430,7 @@ func schema_k8sio_api_networking_v1_ParentReference(ref common.ReferenceCallback
 					"resource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Resource is the resource of the object being referenced.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -42441,6 +42445,7 @@ func schema_k8sio_api_networking_v1_ParentReference(ref common.ReferenceCallback
 					"name": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Name is the name of the object being referenced.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -43465,6 +43470,7 @@ func schema_k8sio_api_networking_v1beta1_ParentReference(ref common.ReferenceCal
 					"resource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Resource is the resource of the object being referenced.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -43479,6 +43485,7 @@ func schema_k8sio_api_networking_v1beta1_ParentReference(ref common.ReferenceCal
 					"name": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Name is the name of the object being referenced.",
+							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
 						},
