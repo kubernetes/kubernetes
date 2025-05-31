@@ -57,19 +57,11 @@ func watchSecret(fakeClient clientset.Interface) watchObjectFunc {
 	}
 }
 
-func isSecretImmutable(object runtime.Object) bool {
-	if secret, ok := object.(*v1.Secret); ok {
-		return secret.Immutable != nil && *secret.Immutable
-	}
-	return false
-}
-
 func newSecretCache(fakeClient clientset.Interface, fakeClock clock.Clock, maxIdleTime time.Duration) *objectCache {
 	return &objectCache{
 		listObject:    listSecret(fakeClient),
 		watchObject:   watchSecret(fakeClient),
 		newObject:     func() runtime.Object { return &v1.Secret{} },
-		isImmutable:   isSecretImmutable,
 		groupResource: corev1.Resource("secret"),
 		clock:         fakeClock,
 		maxIdleTime:   maxIdleTime,
@@ -205,138 +197,6 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	}
 	actions = fakeClient.Actions()
 	assert.Len(t, actions, 2, "unexpected actions")
-}
-
-func TestImmutableSecretStopsTheReflector(t *testing.T) {
-	secret := func(rv string, immutable bool) *v1.Secret {
-		result := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "name",
-				Namespace:       "ns",
-				ResourceVersion: rv,
-			},
-		}
-		if immutable {
-			trueVal := true
-			result.Immutable = &trueVal
-		}
-		return result
-	}
-
-	tests := []struct {
-		desc     string
-		initial  *v1.Secret
-		eventual *v1.Secret
-	}{
-		{
-			desc:     "secret doesn't exist, created as mutable",
-			initial:  nil,
-			eventual: secret("200", false),
-		},
-		{
-			desc:     "secret doesn't exist, created as immutable",
-			initial:  nil,
-			eventual: secret("200", true),
-		},
-		{
-			desc:     "mutable secret modified to mutable",
-			initial:  secret("100", false),
-			eventual: secret("200", false),
-		},
-		{
-			desc:     "mutable secret modified to immutable",
-			initial:  secret("100", false),
-			eventual: secret("200", true),
-		},
-		{
-			desc:     "immutable secret",
-			initial:  secret("100", true),
-			eventual: nil,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.desc, func(t *testing.T) {
-			fakeClient := &fake.Clientset{}
-			listReactor := func(a core.Action) (bool, runtime.Object, error) {
-				result := &v1.SecretList{
-					ListMeta: metav1.ListMeta{
-						ResourceVersion: "100",
-					},
-				}
-				if tc.initial != nil {
-					result.Items = []v1.Secret{*tc.initial}
-				}
-				return true, result, nil
-			}
-			fakeClient.AddReactor("list", "secrets", listReactor)
-			fakeWatch := watch.NewFake()
-			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
-
-			fakeClock := testingclock.NewFakeClock(time.Now())
-			store := newSecretCache(fakeClient, fakeClock, time.Minute)
-
-			key := objectKey{namespace: "ns", name: "name"}
-			itemExists := func(_ context.Context) (bool, error) {
-				store.lock.Lock()
-				defer store.lock.Unlock()
-				_, ok := store.items[key]
-				return ok, nil
-			}
-			reflectorRunning := func() bool {
-				store.lock.Lock()
-				defer store.lock.Unlock()
-				item := store.items[key]
-
-				item.lock.Lock()
-				defer item.lock.Unlock()
-				return !item.stopped
-			}
-
-			// AddReference should start reflector.
-			store.AddReference("ns", "name", "pod")
-			tCtx := ktesting.Init(t)
-			if err := wait.PollUntilContextCancel(tCtx, 10*time.Millisecond, false, itemExists); err != nil {
-				t.Errorf("item wasn't added to cache")
-			}
-
-			obj, err := store.Get("ns", "name")
-			if tc.initial != nil {
-				assert.True(t, apiequality.Semantic.DeepEqual(tc.initial, obj))
-			} else {
-				assert.True(t, apierrors.IsNotFound(err))
-			}
-
-			// Reflector should already be stopped for immutable secrets.
-			assert.Equal(t, tc.initial == nil || !isSecretImmutable(tc.initial), reflectorRunning())
-
-			if tc.eventual == nil {
-				return
-			}
-			fakeWatch.Add(tc.eventual)
-
-			// Eventually Get should return that secret.
-			getFn := func(_ context.Context) (bool, error) {
-				object, err := store.Get("ns", "name")
-				if err != nil {
-					if apierrors.IsNotFound(err) {
-						return false, nil
-					}
-					return false, err
-				}
-				secret := object.(*v1.Secret)
-				return apiequality.Semantic.DeepEqual(tc.eventual, secret), nil
-			}
-			deadlineCtx, deadlineCancel := context.WithTimeout(tCtx, time.Second)
-			defer deadlineCancel()
-			if err := wait.PollUntilContextCancel(deadlineCtx, 10*time.Millisecond, true, getFn); err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			// Reflector should already be stopped for immutable secrets.
-			assert.Equal(t, tc.eventual == nil || !isSecretImmutable(tc.eventual), reflectorRunning())
-		})
-	}
 }
 
 func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
