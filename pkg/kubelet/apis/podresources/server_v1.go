@@ -55,7 +55,13 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 	metrics.PodResourcesEndpointRequestsTotalCount.WithLabelValues("v1").Inc()
 	metrics.PodResourcesEndpointRequestsListCount.WithLabelValues("v1").Inc()
 
-	pods := p.podsProvider.GetPods()
+	var pods []*v1.Pod
+	if req.GetActiveOnly() {
+		pods = p.podsProvider.GetActivePods()
+	} else {
+		pods = p.podsProvider.GetPods()
+	}
+
 	podResources := make([]*podresourcesv1.PodResources, len(pods))
 	p.devicesProvider.UpdateAllocatedDevices()
 
