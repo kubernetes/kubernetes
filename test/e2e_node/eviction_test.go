@@ -93,7 +93,7 @@ var _ = SIGDescribe("InodeEviction", framework.WithSlow(), framework.WithSerial(
 				evictionPriority: 1,
 				// TODO(#127864): Container runtime may not immediate free up the resources after the pod eviction,
 				// causing the test to fail. We provision an emptyDir volume to avoid relying on the runtime behavior.
-				pod: inodeConsumingPod("volume-inode-hog", lotsOfFiles, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}),
+				pod: inodeConsumingPod("volume-inode-hog", lotsOfFiles, &v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}}, v1.PullAlways),
 			},
 			{
 				evictionPriority: 0,
@@ -123,10 +123,6 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 			gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 		}
 		ginkgo.BeforeEach(prepull)
-		if framework.TestContext.PrepullImages {
-			ginkgo.AfterEach(prepull)
-		}
-
 		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
 			// Set the eviction threshold to inodesFree - inodesConsumed, so that using inodesConsumed causes an eviction.
 			summary := eventuallyGetSummary(ctx)
@@ -143,7 +139,7 @@ var _ = SIGDescribe("ImageGCNoEviction", framework.WithSlow(), framework.WithSer
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logDiskMetrics, []podEvictSpec{
 			{
 				evictionPriority: 0,
-				pod:              inodeConsumingPod("container-inode", 110000, nil),
+				pod:              inodeConsumingPod("container-inode", 110000, nil, v1.PullNever), // this is PullNever as prepulled images should be present in this test.
 			},
 		})
 	})
@@ -1035,13 +1031,13 @@ const (
 	volumeName      = "test-volume"
 )
 
-func inodeConsumingPod(name string, numFiles int, volumeSource *v1.VolumeSource) *v1.Pod {
+func inodeConsumingPod(name string, numFiles int, volumeSource *v1.VolumeSource, imagePullPolicy v1.PullPolicy) *v1.Pod {
 	path := ""
 	if volumeSource != nil {
 		path = volumeMountPath
 	}
 	// Each iteration creates an empty file
-	return podWithCommand(volumeSource, v1.ResourceRequirements{}, numFiles, name, fmt.Sprintf("touch %s${i}.txt; sleep 0.001;", filepath.Join(path, "file")))
+	return podWithCommand(volumeSource, v1.ResourceRequirements{}, numFiles, name, fmt.Sprintf("touch %s${i}.txt; sleep 0.001;", filepath.Join(path, "file")), imagePullPolicy)
 }
 
 func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSource, resources v1.ResourceRequirements) *v1.Pod {
@@ -1050,17 +1046,17 @@ func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSo
 		path = volumeMountPath
 	}
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
-	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1;", filepath.Join(path, "file")))
+	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1;", filepath.Join(path, "file")), v1.PullAlways)
 }
 
 func pidConsumingPod(name string, numProcesses int) *v1.Pod {
 	// Slowing down the iteration speed to prevent a race condition where eviction may occur
 	// before the correct number of processes is captured in the stats during a sudden surge in processes.
-	return podWithCommand(nil, v1.ResourceRequirements{}, numProcesses, name, "/bin/sleep 0.01; (/bin/sleep 3600)&")
+	return podWithCommand(nil, v1.ResourceRequirements{}, numProcesses, name, "/bin/sleep 0.01; (/bin/sleep 3600)&", v1.PullAlways)
 }
 
 // podWithCommand returns a pod with the provided volumeSource and resourceRequirements.
-func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, iterations int, name, command string) *v1.Pod {
+func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirements, iterations int, name, command string, imagePullPolicy v1.PullPolicy) *v1.Pod {
 	// Due to https://github.com/kubernetes/kubernetes/issues/115819,
 	// When evictionHard to used, we were setting grace period to 0 which meant the default setting (30 seconds)
 	// This could help with flakiness as we should send sigterm right away.
@@ -1078,8 +1074,9 @@ func podWithCommand(volumeSource *v1.VolumeSource, resources v1.ResourceRequirem
 			TerminationGracePeriodSeconds: &gracePeriod,
 			Containers: []v1.Container{
 				{
-					Image: busyboxImage,
-					Name:  fmt.Sprintf("%s-container", name),
+					Image:           busyboxImage,
+					ImagePullPolicy: imagePullPolicy,
+					Name:            fmt.Sprintf("%s-container", name),
 					Command: []string{
 						"sh",
 						"-c",
