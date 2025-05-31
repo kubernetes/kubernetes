@@ -83,23 +83,23 @@ type HorizontalPodAutoscalerSpec struct {
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" protobuf:"bytes,5,opt,name=behavior"`
 
-	// PodSelectionStrategy determines how pods are selected for metrics collection.
+	// SelectionStrategy determines how pods are selected for metrics collection.
 	// Valid values are "LabelSelector" and "OwnerReferences".
 	// If not set, defaults to "LabelSelector" which is the legacy behavior.
 	// +optional
-	PodSelectionStrategy *PodSelectionStrategy `json:"podSelectionStrategy,omitempty" protobuf:"bytes,6,opt,name=podSelectionStrategy"`
+	SelectionStrategy *SelectionStrategy `json:"SelectionStrategy,omitempty" protobuf:"bytes,6,opt,name=SelectionStrategy"`
 }
 
-// PodSelectionStrategy defines how pods are selected for metrics collection
+// SelectionStrategy defines how pods are selected for metrics collection
 // +enum
-type PodSelectionStrategy string
+type SelectionStrategy string
 
 const (
 	// LabelSelector selects all pods matching the target's label selector
-	LabelSelector PodSelectionStrategy = "LabelSelector"
+	LabelSelector SelectionStrategy = "LabelSelector"
 
 	// OwnerReferences only selects pods owned by the target workload
-	OwnerReferences PodSelectionStrategy = "OwnerReferences"
+	OwnerReferences SelectionStrategy = "OwnerReferences"
 )
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
@@ -447,10 +447,10 @@ type HorizontalPodAutoscalerStatus struct {
 	// +optional
 	Conditions []HorizontalPodAutoscalerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" listType:"map" protobuf:"bytes,6,rep,name=conditions"`
 
-	// CurrentPodSelectionStrategy indicates which pod selection strategy
+	// CurrentSelectionStrategy indicates which pod selection strategy
 	// is currently being used
 	// +optional
-	CurrentPodSelectionStrategy PodSelectionStrategy `json:"currentPodSelectionStrategy,omitempty" protobuf:"bytes,7,opt,name=currentPodSelectionStrategy"`
+	CurrentSelectionStrategy SelectionStrategy `json:"currentSelectionStrategy,omitempty" protobuf:"bytes,7,opt,name=currentSelectionStrategy"`
 }
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of

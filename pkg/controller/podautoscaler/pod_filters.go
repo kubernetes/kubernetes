@@ -5,39 +5,43 @@ import (
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 )
 
-func NewPodFilter(strategyName string) PodFilter {
-	if strategyName == string(autoscalingv2.LabelSelector) {
-		return &LabelSelectorFilter{}
-	}
+type FilterOptions struct {
+	ScaleTargetRef *autoscalingv2.CrossVersionObjectReference
+}
+
+// NewPodFilter creates a new PodFilter with the given strategy and options
+func NewPodFilter(strategyName string, opts FilterOptions) PodFilter {
 	if strategyName == string(autoscalingv2.OwnerReferences) {
-		return &OwnerReferencesFilter{}
+		return &OwnerReferencesFilter{
+			filterOptions: opts,
+		}
 	}
-	//default filer
-	return &LabelSelectorFilter{}
+	// default to LabelSelector
+	return &LabelSelectorFilter{
+		filterOptions: opts,
+	}
 }
 
 // PodFilter defines an interface for filtering pods based on various strategies
 type PodFilter interface {
-	// Filter returns a subset of pods that match the filtering criteria
-	Filter(hpa *autoscalingv2.HorizontalPodAutoscaler, pods []*v1.Pod, selector labels.Selector) ([]*v1.Pod, error)
-
+	// Filter returns the subset of pods that should be considered for metrics calculation
+	Filter(pods []*v1.Pod) ([]*v1.Pod, error)
 	// Name returns the name of the filter strategy for logging purposes
 	Name() string
 }
 
 // OwnerReferencesFilter filters pods by ownership chain
 type OwnerReferencesFilter struct {
-	// Dependencies needed for filtering
-	Client     kubernetes.Interface
-	RESTMapper apimeta.RESTMapper
+	filterOptions FilterOptions
+	Client        kubernetes.Interface
+	RESTMapper    apimeta.RESTMapper
 }
 
-func (f *OwnerReferencesFilter) Filter(hpa *autoscalingv2.HorizontalPodAutoscaler, pods []*v1.Pod, selector labels.Selector) ([]*v1.Pod, error) {
-	//TBD
+func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, error) {
+	// TBD
 	return nil, nil
 }
 
@@ -46,10 +50,12 @@ func (f *OwnerReferencesFilter) Name() string {
 }
 
 // LabelSelectorFilter uses the default label selector strategy
-type LabelSelectorFilter struct{}
+type LabelSelectorFilter struct {
+	filterOptions FilterOptions
+}
 
-// The default behavior is to return all pods that matched the label selector
-func (f *LabelSelectorFilter) Filter(hpa *autoscalingv2.HorizontalPodAutoscaler, pods []*v1.Pod, selector labels.Selector) ([]*v1.Pod, error) {
+// The default behavior - keep all pods
+func (f *LabelSelectorFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, error) {
 	return pods, nil
 }
 
