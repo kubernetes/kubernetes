@@ -101,7 +101,17 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	filteredPods, _ := podFilter.Filter(podList) //TODO: Check what to do about this err
+	filteredPods, unfilteredPods, err := podFilter.Filter(podList) //TODO: Check what to do about this err
+	if err != nil {
+		fmt.Println("error", err)
+	}
+
+	unfilteredPodNames := sets.New[string]()
+	for _, pod := range unfilteredPods {
+		unfilteredPodNames.Insert(pod.Name)
+	}
+
+	removeMetricsForPods(metrics, unfilteredPodNames)
 
 	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(filteredPods, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
@@ -215,7 +225,17 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	filteredPods, _ := podFilter.Filter(podList) //TODO: Check what to do about this err
+	filteredPods, unfilteredPods, err := podFilter.Filter(podList) //TODO: Check what to do about this err
+	if err != nil {
+		fmt.Println("error", err)
+	}
+
+	unfilteredPodNames := sets.New[string]()
+	for _, pod := range unfilteredPods {
+		unfilteredPodNames.Insert(pod.Name)
+	}
+
+	removeMetricsForPods(metrics, unfilteredPodNames)
 
 	readyPodCount, unreadyPods, missingPods, ignoredPods := groupPods(filteredPods, metrics, resource, c.cpuInitializationPeriod, c.delayOfInitialReadinessStatus)
 	removeMetricsForPods(metrics, ignoredPods)
