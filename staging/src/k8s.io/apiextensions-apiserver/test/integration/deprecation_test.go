@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 var deprecationFixture = &apiextensionsv1.CustomResourceDefinition{
@@ -45,7 +45,7 @@ var deprecationFixture = &apiextensionsv1.CustomResourceDefinition{
 				Name:               "v1alpha2",
 				Served:             true,
 				Deprecated:         true,
-				DeprecationWarning: pointer.StringPtr("custom deprecation warning"),
+				DeprecationWarning: ptr.To("custom deprecation warning"),
 				Schema:             &apiextensionsv1.CustomResourceValidation{OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{Type: "object"}},
 			},
 			{
