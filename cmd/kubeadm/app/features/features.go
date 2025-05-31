@@ -55,7 +55,7 @@ var InitFeatureGates = FeatureList{
 	},
 	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 	ControlPlaneKubeletLocalMode:     {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
-	NodeLocalCRISocket:               {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	NodeLocalCRISocket:               {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 }
 
 // Feature represents a feature being gated
