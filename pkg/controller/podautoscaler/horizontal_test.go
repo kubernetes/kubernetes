@@ -781,6 +781,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	hpaController := NewHorizontalController(
 		tCtx,
 		eventClient.CoreV1(),
+		testClient.AppsV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
@@ -5374,6 +5375,7 @@ func TestMultipleHPAs(t *testing.T) {
 	hpaController := NewHorizontalController(
 		tCtx,
 		testClient.CoreV1(),
+		testClient.AppsV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
