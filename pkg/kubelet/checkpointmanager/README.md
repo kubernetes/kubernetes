@@ -22,4 +22,7 @@ Below is the history of checkpointing support in Kubelet.
 |kubelet/dockershim | Feb 3, 2017 | [[CRI] Implement Dockershim Checkpoint](https://github.com/kubernetes/kubernetes/pull/39903)
 |devicemanager| Sep 6, 2017 | [Deviceplugin checkpoint](https://github.com/kubernetes/kubernetes/pull/51744)
 | kubelet/pod | Nov 22, 2017 | [Initial basic bootstrap-checkpoint support](https://github.com/kubernetes/kubernetes/pull/50984)
-|cpumanager| Oct 27, 2017 |[Add file backed state to cpu manager ](https://github.com/kubernetes/kubernetes/pull/54408)
+|cpumanager| Oct 27, 2017 |[Add file backed state to cpu manager](https://github.com/kubernetes/kubernetes/pull/54408)
+|memorymanager| Feb 9, 2021 |[Memory manager](https://github.com/kubernetes/kubernetes/pull/95479)
+|dra| Mar 12, 2023 |[kubelet dra: Add checkpointing mechanism in the DRA Manager ](https://github.com/kubernetes/kubernetes/pull/115912)
+|allocation| Feb 28, 2025 |[Move pod resource allocation management out of the status manager](https://github.com/kubernetes/kubernetes/pull/130254)
