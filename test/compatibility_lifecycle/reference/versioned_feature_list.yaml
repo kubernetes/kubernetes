@@ -767,16 +767,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.27"
-- name: LegacySidecarContainers
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: GA
-    version: "1.0"
-  - default: false
-    lockToDefault: false
-    preRelease: Deprecated
-    version: "1.33"
 - name: ListFromCacheSnapshot
   versionedSpecs:
   - default: false
