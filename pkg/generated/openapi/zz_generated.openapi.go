@@ -64710,8 +64710,16 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_NodeLifecycleControlle
 							Format:      "float",
 						},
 					},
+					"PauseEvictionOnFullDisruption": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Pauses all pod evictions in a zone when there is full zonal disruption",
+							Default:     false,
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
-				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold"},
+				Required: []string{"NodeEvictionRate", "SecondaryNodeEvictionRate", "NodeStartupGracePeriod", "NodeMonitorGracePeriod", "PodEvictionTimeout", "LargeClusterSizeThreshold", "UnhealthyZoneThreshold", "PauseEvictionOnFullDisruption"},
 			},
 		},
 		Dependencies: []string{
