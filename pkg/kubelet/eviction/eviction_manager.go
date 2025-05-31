@@ -143,16 +143,16 @@ func NewManager(
 }
 
 // Admit rejects a pod if its not safe to admit for node stability.
-func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) (lifecycle.PodAdmitResult, error) {
 	m.RLock()
 	defer m.RUnlock()
 	if len(m.nodeConditions) == 0 {
-		return lifecycle.PodAdmitResult{Admit: true}
+		return lifecycle.PodAdmitResult{Admit: true}, nil
 	}
 	// Admit Critical pods even under resource pressure since they are required for system stability.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
 	if kubelettypes.IsCriticalPod(attrs.Pod) {
-		return lifecycle.PodAdmitResult{Admit: true}
+		return lifecycle.PodAdmitResult{Admit: true}, nil
 	}
 
 	// Conditions other than memory pressure reject all pods
@@ -160,7 +160,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if nodeOnlyHasMemoryPressureCondition {
 		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
-			return lifecycle.PodAdmitResult{Admit: true}
+			return lifecycle.PodAdmitResult{Admit: true}, nil
 		}
 
 		// When node has memory pressure, check BestEffort Pod's toleration:
@@ -169,7 +169,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 			Key:    v1.TaintNodeMemoryPressure,
 			Effect: v1.TaintEffectNoSchedule,
 		}) {
-			return lifecycle.PodAdmitResult{Admit: true}
+			return lifecycle.PodAdmitResult{Admit: true}, nil
 		}
 	}
 
@@ -177,7 +177,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 		Admit:   false,
 		Reason:  Reason,
 		Message: fmt.Sprintf(nodeConditionMessageFmt, m.nodeConditions),
-	}
+	}, nil
 }
 
 // Start starts the control loop to observe and response to low compute resources.
