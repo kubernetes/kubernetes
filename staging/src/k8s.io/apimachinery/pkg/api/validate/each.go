@@ -17,6 +17,7 @@ limitations under the License.
 package validate
 
 import (
+	"fmt"
 	"context"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -33,12 +34,12 @@ type CompareFunc[T any] func(T, T) bool
 func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
 	cmp CompareFunc[T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
-	for i, val := range newSlice {
+	for _, val := range newSlice {
 		var old *T
 		if cmp != nil && len(oldSlice) > 0 {
 			old = lookup(oldSlice, val, cmp)
 		}
-		errs = append(errs, validator(ctx, op, fldPath.Index(i), &val, old)...)
+		errs = append(errs, validator(ctx, op, fldPath.Key(fmt.Sprintf("name=%v", val)), &val, old)...)
 	}
 	return errs
 }
