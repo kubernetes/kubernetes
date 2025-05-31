@@ -25,8 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -627,11 +625,6 @@ var _ = common.SIGDescribe("DNS", func() {
 		}
 		validateDNSResults(ctx, f, pod, append(agnhostFileNames, jessieFileNames...))
 	})
-})
-
-var _ = common.SIGDescribe("DNS", feature.RelaxedDNSSearchValidation, framework.WithFeatureGate(features.RelaxedDNSSearchValidation), func() {
-	f := framework.NewDefaultFramework("dns")
-	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
 	ginkgo.It("should work with a search path containing an underscore and a search path with a single dot", func(ctx context.Context) {
 		// All the names we need to be able to resolve.
