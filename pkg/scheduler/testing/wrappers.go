@@ -511,6 +511,20 @@ func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
 	return p
 }
 
+// InitContainerPort creates an initContainer with ports valued `ports`,
+// and injects into the inner pod.
+func (p *PodWrapper) InitContainerPort(ports []v1.ContainerPort) *PodWrapper {
+	p.Spec.InitContainers = append(p.Spec.InitContainers, MakeContainer().Name("init-container").Image("pause").ContainerPort(ports).Obj())
+	return p
+}
+
+// HostNetwork set hostNetwork: true and dnsPolicy: ClusterFirstWithHostNet.
+func (p *PodWrapper) HostNetwork() *PodWrapper {
+	p.Spec.HostNetwork = true
+	p.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
+	return p
+}
+
 // PVC creates a Volume with a PVC and injects into the inner pod.
 func (p *PodWrapper) PVC(name string) *PodWrapper {
 	p.Spec.Volumes = append(p.Spec.Volumes, v1.Volume{

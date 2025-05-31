@@ -638,3 +638,177 @@ func TestNodeEvents(t *testing.T) {
 	}
 
 }
+
+func TestConflictingHostPorts(t *testing.T) {
+	// The test verifies that pods with conflicting hostPorts are not scheduled
+	// on the same node. It tests conflicting hostPorts used by both containers
+	// and initContainers block scheduling (container blocks container,
+	// container blocks initContainer, initContainer blocks initContainer,
+	// initContainer blocks container).
+	//
+	// The scenario we are testing is the following:
+	// 1. Create node and c1 with container using hostPort 8081; c1 schedules on node
+	// 2. Create c2 with container using hostPort 8081, it should be unschedulable due to conflicting ports
+	// 3. Delete c1; c2 should schedule on node
+	// 4. Create i1 with initContainer using hostPort 8081, it should be unschedulable due to conflicting ports
+	// 5. Delete c2; i1 should schedule on node
+	// 6. Create i2 with initContainer using hostPort 8081, it should be unschedulable due to conflicting ports
+	// 7. Delete i1; i2 should schedule on node
+	// 8. Create c3 with container using hostPort 8081, it should be unschedulable due to conflicting ports
+	// 9. Delete i2; c3 should schedule on node
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "conflicting-host-ports")
+
+	// 1.1 Create node
+	node, err := testutils.CreateNode(testCtx.ClientSet, st.MakeNode().
+		Name("conflicting-host-ports-node").Obj())
+	if err != nil {
+		t.Fatalf("Failed to create %s: %v", node.Name, err)
+	}
+	// 1.2 create c1
+	c1, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+		Name:      "c1",
+		Namespace: testCtx.NS.Name,
+		ContainerPorts: []v1.ContainerPort{
+			{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("Failed to create Pod c1: %v", err)
+	}
+	// 1.3 verify c1 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, c1, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", c1.Name, err)
+	}
+
+	// 2.1 create c2
+	c2, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+		Name:      "c2",
+		Namespace: testCtx.NS.Name,
+		ContainerPorts: []v1.ContainerPort{
+			{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("Failed to create Pod c2: %v", err)
+	}
+	// 2.2 verify c2 is unscheduable
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, c2); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", c2.Name, err)
+	}
+
+	// 3.1 delete c1
+	if err := testutils.DeletePod(testCtx.ClientSet, c1.Name, testCtx.NS.Name); err != nil {
+		t.Errorf("Pod %v did not delete: %v", c1.Name, err)
+	}
+	// 3.2 verify c2 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, c2, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", c2.Name, err)
+	}
+
+	// 4.1 create i1
+	i1, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+		Name:      "i1",
+		Namespace: testCtx.NS.Name,
+		InitContainerPorts: []v1.ContainerPort{
+			{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("Failed to create Pod i1: %v", err)
+	}
+	// 4.2 verify i1 is unscheduable
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, i1); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", i1.Name, err)
+	}
+
+	// 5.1 delete c2
+	if err := testutils.DeletePod(testCtx.ClientSet, c2.Name, testCtx.NS.Name); err != nil {
+		t.Errorf("Pod %v did not delete: %v", c2.Name, err)
+	}
+	// 5.2 verify i1 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, i1, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", i1.Name, err)
+	}
+
+	// 6.1 create i2
+	i2, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+		Name:      "i2",
+		Namespace: testCtx.NS.Name,
+		InitContainerPorts: []v1.ContainerPort{
+			{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("Failed to create Pod i2: %v", err)
+	}
+	// 6.2 verify i2 is unscheduable
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, i2); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", i2.Name, err)
+	}
+
+	// 7.1 delete i1
+	if err := testutils.DeletePod(testCtx.ClientSet, i1.Name, testCtx.NS.Name); err != nil {
+		t.Errorf("Pod %v did not delete: %v", i1.Name, err)
+	}
+	// 7.2 verify i2 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, i2, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", i2.Name, err)
+	}
+
+	// 8.1 create c3
+	c3, err := testutils.CreatePausePod(testCtx.ClientSet, testutils.InitPausePod(&testutils.PausePodConfig{
+		Name:      "c3",
+		Namespace: testCtx.NS.Name,
+		InitContainerPorts: []v1.ContainerPort{
+			{
+				ContainerPort: 8001,
+				HostPort:      8001,
+				Protocol:      v1.ProtocolTCP,
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("Failed to create Pod c3: %v", err)
+	}
+	// 8.2 verify c3 is unscheduable
+	if err := testutils.WaitForPodUnschedulable(testCtx.Ctx, testCtx.ClientSet, c3); err != nil {
+		t.Errorf("Pod %v got scheduled: %v", c3.Name, err)
+	}
+
+	// 9.1 delete i2
+	if err := testutils.DeletePod(testCtx.ClientSet, i2.Name, testCtx.NS.Name); err != nil {
+		t.Errorf("Pod %v did not delete: %v", i2.Name, err)
+	}
+	// 9.2 verify c3 is scheduled
+	err = testutils.WaitForPodToScheduleWithTimeout(testCtx.Ctx, testCtx.ClientSet, c3, time.Second*5)
+	if err != nil {
+		t.Errorf("Pod %s didn't schedule: %v", c3.Name, err)
+	}
+
+	// Clean up
+	err = testCtx.ClientSet.CoreV1().Nodes().Delete(context.TODO(), node.Name, metav1.DeleteOptions{})
+	if err != nil {
+		t.Errorf("Failed to delete node: %v", err)
+	}
+}

@@ -69,6 +69,16 @@ func (pl *NodePorts) Name() string {
 func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 	ports := []*v1.ContainerPort{}
 	for _, pod := range pods {
+		for j := range pod.Spec.InitContainers {
+			container := &pod.Spec.InitContainers[j]
+			for k := range container.Ports {
+				// Only return ports with a host port specified.
+				if container.Ports[k].HostPort <= 0 {
+					continue
+				}
+				ports = append(ports, &container.Ports[k])
+			}
+		}
 		for j := range pod.Spec.Containers {
 			container := &pod.Spec.Containers[j]
 			for k := range container.Ports {
@@ -151,6 +161,13 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 
 	// Get the used host ports of the deleted pod.
 	usedPorts := make(framework.HostPortInfo)
+	for _, container := range deletedPod.Spec.InitContainers {
+		for _, podPort := range container.Ports {
+			if podPort.HostPort > 0 {
+				usedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
+			}
+		}
+	}
 	for _, container := range deletedPod.Spec.Containers {
 		for _, podPort := range container.Ports {
 			if podPort.HostPort > 0 {

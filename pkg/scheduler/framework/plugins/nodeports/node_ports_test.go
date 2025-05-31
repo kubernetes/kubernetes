@@ -143,6 +143,33 @@ func TestNodePorts(t *testing.T) {
 			name:             "UDP hostPort conflict due to 0.0.0.0 hostIP",
 			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
 		},
+		{
+			pod: newPod("m1", "UDP/127.0.0.1/8001"),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "TCP/0.0.0.0/8001", "UDP/0.0.0.0/8001")),
+			name:             "UDP hostPort conflict due to 0.0.0.0 hostIP",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+		},
+		{
+			pod: st.MakePod().
+				InitContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			nodeInfo: framework.NewNodeInfo(
+				newPod("m1", "TCP/0.0.0.0/8001")),
+			name:             "TCP hostPort initContainer conflict due to 0.0.0.0 hostIP",
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+		},
 	}
 
 	for _, test := range tests {
@@ -287,6 +314,44 @@ func TestGetContainerPorts(t *testing.T) {
 				{
 					ContainerPort: 8014,
 					HostPort:      8014,
+					Protocol:      v1.ProtocolTCP,
+				},
+			},
+		},
+		{
+			pod1: st.MakePod().
+				InitContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8001,
+						HostPort:      8001,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8002,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).
+				ContainerPort([]v1.ContainerPort{
+					{
+						ContainerPort: 8003,
+						HostPort:      8003,
+						Protocol:      v1.ProtocolTCP,
+					},
+					{
+						ContainerPort: 8004,
+						Protocol:      v1.ProtocolTCP,
+					},
+				}).Obj(),
+			pod2: st.MakePod().Obj(),
+			expected: []*v1.ContainerPort{
+				{
+					ContainerPort: 8001,
+					HostPort:      8001,
+					Protocol:      v1.ProtocolTCP,
+				},
+				{
+					ContainerPort: 8003,
+					HostPort:      8003,
 					Protocol:      v1.ProtocolTCP,
 				},
 			},
