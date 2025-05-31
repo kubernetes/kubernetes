@@ -220,7 +220,7 @@ func TestPodVolumeDeadlineAttachAndMount(t *testing.T) {
 	}
 
 	testKubelet := newTestKubeletWithImageList(t, nil /*imageList*/, false, /* controllerAttachDetachEnabled */
-		false /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+		false /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
 
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -282,7 +282,7 @@ func TestPodVolumeDeadlineUnmount(t *testing.T) {
 	}
 
 	testKubelet := newTestKubeletWithImageList(t, nil /*imageList*/, false, /* controllerAttachDetachEnabled */
-		true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+		true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
 
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
