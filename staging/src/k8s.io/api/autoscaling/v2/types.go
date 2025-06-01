@@ -87,6 +87,8 @@ type HorizontalPodAutoscalerSpec struct {
 	// Valid values are "LabelSelector" and "OwnerReferences".
 	// If not set, defaults to "LabelSelector" which is the legacy behavior.
 	// +optional
+	// This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+	// featureGate=HPAselectionStrategy
 	SelectionStrategy *SelectionStrategy `json:"selectionStrategy,omitempty" protobuf:"bytes,6,opt,name=SelectionStrategy"`
 }
 
