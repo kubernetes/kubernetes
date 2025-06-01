@@ -15011,7 +15011,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 					},
 					"selectionStrategy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "SelectionStrategy determines how pods are selected for metrics collection. Valid values are \"LabelSelector\" and \"OwnerReferences\". If not set, defaults to \"LabelSelector\" which is the legacy behavior.\n\nPossible enum values:\n - `\"LabelSelector\"` selects all pods matching the target's label selector\n - `\"OwnerReferences\"` only selects pods owned by the target workload",
+							Description: "SelectionStrategy determines how pods are selected for metrics collection. Valid values are \"LabelSelector\" and \"OwnerReferences\". If not set, defaults to \"LabelSelector\" which is the legacy behavior. This is an alpha field and requires enabling ServiceTrafficDistribution feature. featureGate=HPASelectionStrategy\n\nPossible enum values:\n - `\"LabelSelector\"` selects all pods matching the target's label selector\n - `\"OwnerReferences\"` only selects pods owned by the target workload",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"LabelSelector", "OwnerReferences"},

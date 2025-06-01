@@ -401,7 +401,7 @@
             "description": "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count."
           },
           "selectionStrategy": {
-            "description": "SelectionStrategy determines how pods are selected for metrics collection. Valid values are \"LabelSelector\" and \"OwnerReferences\". If not set, defaults to \"LabelSelector\" which is the legacy behavior.",
+            "description": "SelectionStrategy determines how pods are selected for metrics collection. Valid values are \"LabelSelector\" and \"OwnerReferences\". If not set, defaults to \"LabelSelector\" which is the legacy behavior. This is an alpha field and requires enabling ServiceTrafficDistribution feature. featureGate=HPASelectionStrategy",
             "type": "string"
           }
         },
