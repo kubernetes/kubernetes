@@ -451,7 +451,7 @@
             "type": "integer"
           },
           "currentSelectionStrategy": {
-            "description": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used",
+            "description": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPAselectionStrategy feature gate.",
             "type": "string"
           },
           "desiredReplicas": {

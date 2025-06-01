@@ -314,7 +314,10 @@ message HorizontalPodAutoscalerStatus {
   repeated HorizontalPodAutoscalerCondition conditions = 6;
 
   // CurrentSelectionStrategy indicates which pod selection strategy
-  // is currently being used
+  // is currently being used.
+  // This is an alpha field and requires enabling the HPAselectionStrategy
+  // feature gate.
+  // +featureGate=HPAselectionStrategy
   // +optional
   optional string currentSelectionStrategy = 7;
 }
