@@ -1,4 +1,3 @@
-// pod_filters.go
 package podautoscaler
 
 import (
@@ -92,6 +91,7 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 	ownedPods := make(map[types.UID]bool)
 
 	// Handle different resource types with specific ownership patterns
+	// TODO(omerap12): combine functions
 	switch targetKind {
 	case "Deployment":
 		if err := f.handleDeployment(namespace, targetName, pods, ownedPods); err != nil {
@@ -101,14 +101,14 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 		if err := f.handleStatefulSet(namespace, targetName, pods, ownedPods); err != nil {
 			return nil, nil, err
 		}
-	// case "ReplicaSet":
-	// 	if err := f.handleReplicaSet(namespace, targetName, pods, ownedPods); err != nil {
-	// 		return nil, err
-	// 	}
-	// case "DaemonSet":
-	// 	if err := f.handleDaemonSet(namespace, targetName, pods, ownedPods); err != nil {
-	// 		return nil, err
-	// 	}
+	case "ReplicaSet":
+		if err := f.handleReplicaSet(namespace, targetName, pods, ownedPods); err != nil {
+			return nil, nil, err
+		}
+	case "DaemonSet":
+		if err := f.handleDaemonSet(namespace, targetName, pods, ownedPods); err != nil {
+			return nil, nil, err
+		}
 	default:
 		f.handleGenericResource(targetKind, targetName, pods, ownedPods)
 	}
@@ -155,6 +155,44 @@ func (f *OwnerReferencesFilter) handleDeployment(namespace, name string, pods []
 		for _, ownerRef := range pod.OwnerReferences {
 			if ownerRef.Kind == "ReplicaSet" && deploymentRSs[ownerRef.UID] {
 				fmt.Println("Found pod ", pod.Name)
+				ownedPods[pod.UID] = true
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// Handle ReplicaSet -> Pod direct ownership
+func (f *OwnerReferencesFilter) handleReplicaSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
+	replicaSet, err := f.Client.ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get ReplicaSet %s/%s: %v", namespace, name, err)
+	}
+
+	for _, pod := range pods {
+		for _, ownerRef := range pod.OwnerReferences {
+			if ownerRef.Kind == "ReplicaSet" && ownerRef.Name == name && ownerRef.UID == replicaSet.UID {
+				ownedPods[pod.UID] = true
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
+// Handle DaemonSet -> Pod direct ownership
+func (f *OwnerReferencesFilter) handleDaemonSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
+	daemonSet, err := f.Client.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get DaemonSet %s/%s: %v", namespace, name, err)
+	}
+
+	for _, pod := range pods {
+		for _, ownerRef := range pod.OwnerReferences {
+			if ownerRef.Kind == "DaemonSet" && ownerRef.Name == name && ownerRef.UID == daemonSet.UID {
 				ownedPods[pod.UID] = true
 				break
 			}
