@@ -448,7 +448,10 @@ type HorizontalPodAutoscalerStatus struct {
 	Conditions []HorizontalPodAutoscalerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" listType:"map" protobuf:"bytes,6,rep,name=conditions"`
 
 	// CurrentSelectionStrategy indicates which pod selection strategy
-	// is currently being used
+	// is currently being used.
+	// This is an alpha field and requires enabling the HPAselectionStrategy
+	// feature gate.
+	// +featureGate=HPAselectionStrategy
 	// +optional
 	CurrentSelectionStrategy SelectionStrategy `json:"currentSelectionStrategy,omitempty" protobuf:"bytes,7,opt,name=currentSelectionStrategy"`
 }
