@@ -196,7 +196,7 @@ func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
 	}
 
 	isSelectionStrategyInUse := (oldHPA != nil && oldHPA.Spec.SelectionStrategy != nil)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAselectionStrategy) && !isSelectionStrategyInUse {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HPASelectionStrategy) && !isSelectionStrategyInUse {
 		newHPA.Spec.SelectionStrategy = nil
 	}
 }

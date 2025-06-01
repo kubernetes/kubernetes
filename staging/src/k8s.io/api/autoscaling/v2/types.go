@@ -88,7 +88,7 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, defaults to "LabelSelector" which is the legacy behavior.
 	// +optional
 	// This is an alpha field and requires enabling ServiceTrafficDistribution feature.
-	// featureGate=HPAselectionStrategy
+	// featureGate=HPASelectionStrategy
 	SelectionStrategy *SelectionStrategy `json:"selectionStrategy,omitempty" protobuf:"bytes,6,opt,name=SelectionStrategy"`
 }
 
@@ -451,9 +451,9 @@ type HorizontalPodAutoscalerStatus struct {
 
 	// CurrentSelectionStrategy indicates which pod selection strategy
 	// is currently being used.
-	// This is an alpha field and requires enabling the HPAselectionStrategy
+	// This is an alpha field and requires enabling the HPASelectionStrategy
 	// feature gate.
-	// +featureGate=HPAselectionStrategy
+	// +featureGate=HPASelectionStrategy
 	// +optional
 	CurrentSelectionStrategy SelectionStrategy `json:"currentSelectionStrategy,omitempty" protobuf:"bytes,7,opt,name=currentSelectionStrategy"`
 }

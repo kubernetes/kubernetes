@@ -561,7 +561,7 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.16"
-- name: HPAselectionStrategy
+- name: HPASelectionStrategy
   versionedSpecs:
   - default: false
     lockToDefault: false

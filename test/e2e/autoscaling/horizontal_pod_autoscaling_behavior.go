@@ -562,7 +562,7 @@ func usageForReplicas(replicas int) int {
 	return replicas*usagePerReplica - usagePerReplica/2
 }
 
-var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAselectionStrategy),
+var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelectionStrategy),
 	framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (selection strategy)", func() {
 		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
 		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

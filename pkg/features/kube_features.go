@@ -313,7 +313,7 @@ const (
 	// kep: https://kep.k8s.io/5325
 
 	// Improve pod selection accuracy across workload types
-	HPAselectionStrategy featuregate.Feature = "HPAselectionStrategy"
+	HPASelectionStrategy featuregate.Feature = "HPASelectionStrategy"
 
 	// owner: @deepakkinni @xing-yang
 	// kep: https://kep.k8s.io/2644
@@ -1385,7 +1385,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	HPAselectionStrategy: {
+	HPASelectionStrategy: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 

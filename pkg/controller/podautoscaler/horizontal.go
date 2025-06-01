@@ -1477,7 +1477,7 @@ func (a *HorizontalController) tolerancesForHpa(hpa *autoscalingv2.HorizontalPod
 
 func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodAutoscaler) *PodFilter {
 	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
-	allowSelectionStrategy := utilfeature.DefaultFeatureGate.Enabled(features.HPAselectionStrategy)
+	allowSelectionStrategy := utilfeature.DefaultFeatureGate.Enabled(features.HPASelectionStrategy)
 
 	a.podFilterMux.RLock()
 	podFilter, exists := a.podFilterCache[hpaKey]

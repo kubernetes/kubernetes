@@ -188,7 +188,7 @@ var (
 
 	// OWNER: sig-autoscaling
 	// Marks tests that require HPA configurable tolerance (https://kep.k8s.io/5325).
-	HPAselectionStrategy = framework.WithFeature(framework.ValidFeatures.Add("HPAselectionStrategy"))
+	HPASelectionStrategy = framework.WithFeature(framework.ValidFeatures.Add("HPASelectionStrategy"))
 
 	// owner: sig-node
 	HostAccess = framework.WithFeature(framework.ValidFeatures.Add("HostAccess"))

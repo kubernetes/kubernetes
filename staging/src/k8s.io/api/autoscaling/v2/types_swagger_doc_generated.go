@@ -169,7 +169,7 @@ var map_HorizontalPodAutoscalerStatus = map[string]string{
 	"desiredReplicas":          "desiredReplicas is the desired number of replicas of pods managed by this autoscaler, as last calculated by the autoscaler.",
 	"currentMetrics":           "currentMetrics is the last read state of the metrics used by this autoscaler.",
 	"conditions":               "conditions is the set of conditions required for this autoscaler to scale its target, and indicates whether or not those conditions are met.",
-	"currentSelectionStrategy": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPAselectionStrategy feature gate.",
+	"currentSelectionStrategy": "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPASelectionStrategy feature gate.",
 }
 
 func (HorizontalPodAutoscalerStatus) SwaggerDoc() map[string]string {

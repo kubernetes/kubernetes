@@ -15106,7 +15106,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerStatus(ref common.Re
 					},
 					"currentSelectionStrategy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPAselectionStrategy feature gate.\n\nPossible enum values:\n - `\"LabelSelector\"` selects all pods matching the target's label selector\n - `\"OwnerReferences\"` only selects pods owned by the target workload",
+							Description: "CurrentSelectionStrategy indicates which pod selection strategy is currently being used. This is an alpha field and requires enabling the HPASelectionStrategy feature gate.\n\nPossible enum values:\n - `\"LabelSelector\"` selects all pods matching the target's label selector\n - `\"OwnerReferences\"` only selects pods owned by the target workload",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"LabelSelector", "OwnerReferences"},
