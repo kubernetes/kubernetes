@@ -101,9 +101,11 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	filteredPods, unfilteredPods, err := podFilter.Filter(podList) //TODO: Check what to do about this err
+	filteredPods, unfilteredPods, err := podFilter.Filter(podList)
 	if err != nil {
-		fmt.Println("error", err)
+		// Fall back to default behavior: use all pods
+		filteredPods = podList
+		unfilteredPods = []*v1.Pod{} // empty slice since we're not filtering out any pods
 	}
 
 	unfilteredPodNames := sets.New[string]()
@@ -225,9 +227,11 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 		return 0, 0, fmt.Errorf("no pods returned by selector while calculating replica count")
 	}
 
-	filteredPods, unfilteredPods, err := podFilter.Filter(podList) //TODO: Check what to do about this err
+	filteredPods, unfilteredPods, err := podFilter.Filter(podList)
 	if err != nil {
-		fmt.Println("error", err)
+		// Fall back to default behavior: use all pods
+		filteredPods = podList
+		unfilteredPods = []*v1.Pod{} // empty slice since we're not filtering out any pods
 	}
 
 	unfilteredPodNames := sets.New[string]()
