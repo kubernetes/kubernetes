@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -30,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/fake"
 	testutils "k8s.io/kubernetes/test/utils"
 	ktesting "k8s.io/kubernetes/test/utils/ktesting"
@@ -100,7 +100,7 @@ func TestRunOp(t *testing.T) {
 			},
 			verifyFuncs: []verifyFunc{
 				verifyCount(3),
-				verifyLabelValuesAllowed("test-label", []string{"value1", "value2", "value3"}),
+				verifyLabelValuesAllowed("test-label", sets.New("value1", "value2", "value3")),
 			},
 		},
 		{
@@ -256,15 +256,15 @@ func verifyCount(expectedCount int) verifyFunc {
 }
 
 // verifyLabelValuesAllowed returns a verification function that checks if the label values for a given key.
-func verifyLabelValuesAllowed(key string, allowValues []string) verifyFunc {
+func verifyLabelValuesAllowed(key string, allowValues sets.Set[string]) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
-		labelValues, err := objLabelValues(t, tCtx, op, key)
+		labelValues, _, err := objLabelValues(t, tCtx, op, key)
 		if err != nil {
 			return fmt.Errorf("failed to get label values: %w", err)
 		}
 
-		for _, labelValue := range labelValues {
-			if !slices.Contains(allowValues, labelValue) {
+		for labelValue := range labelValues {
+			if !allowValues.Has(labelValue) {
 				return fmt.Errorf("Node has unexpected label value %s for key %s", labelValue, key)
 			}
 		}
@@ -276,17 +276,13 @@ func verifyLabelValuesAllowed(key string, allowValues []string) verifyFunc {
 // verifyUniqueLabels returns a verification function that checks if the label values for a given key are unique.
 func verifyUniqueLabels(key string) verifyFunc {
 	return func(t *testing.T, tCtx ktesting.TContext, op realOp) error {
-		labelValues, err := objLabelValues(t, tCtx, op, key)
+		_, duplicatedValues, err := objLabelValues(t, tCtx, op, key)
 		if err != nil {
 			return fmt.Errorf("failed to get label values: %w", err)
 		}
 
-		seen := make(map[string]bool)
-		for _, labelValue := range labelValues {
-			if seen[labelValue] {
-				return fmt.Errorf("Node has duplicate label value %s for key %s", labelValue, key)
-			}
-			seen[labelValue] = true
+		if duplicatedValues.Len() > 0 {
+			return fmt.Errorf("Node has duplicate label values %v for key %s", duplicatedValues.UnsortedList(), key)
 		}
 
 		return nil
@@ -295,29 +291,35 @@ func verifyUniqueLabels(key string) verifyFunc {
 
 // objLabelValues is a helper function to extract label values from the listed objects.
 // The listed objects are dependent on the operation type.
-func objLabelValues(t *testing.T, tCtx ktesting.TContext, op realOp, key string) ([]string, error) {
+// It returns two sets: one with deduplicated labelValues and second with duplicated labels.
+func objLabelValues(t *testing.T, tCtx ktesting.TContext, op realOp, key string) (sets.Set[string], sets.Set[string], error) {
 	t.Helper()
 
-	labelValues := []string{}
+	labelValues := sets.New[string]()
+	duplicatedValues := sets.New[string]()
+
 	switch op.(type) {
 	case *createNodesOp:
 		nodes, err := tCtx.Client().CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to list nodes for label verification: %w", err)
+			return nil, nil, fmt.Errorf("failed to list nodes for label verification: %w", err)
 		}
 
 		for _, node := range nodes.Items {
 			if labelValue, exists := node.Labels[key]; exists {
-				labelValues = append(labelValues, labelValue)
+				if labelValues.Has(labelValue) {
+					duplicatedValues.Insert(labelValue)
+				}
+				labelValues.Insert(labelValue)
 			} else {
-				return nil, fmt.Errorf("Node %s is missing expected label %s", node.Name, key)
+				return nil, nil, fmt.Errorf("Node %s is missing expected label %s", node.Name, key)
 			}
 		}
 	default:
-		return nil, fmt.Errorf("verifyLabel doesn't support this operation type: %T", op)
+		return nil, nil, fmt.Errorf("verifyLabel doesn't support this operation type: %T", op)
 	}
 
-	return labelValues, nil
+	return labelValues, duplicatedValues, nil
 }
 
 // verifyObj checks if listed objects match the expected template object using cmp.Diff.
