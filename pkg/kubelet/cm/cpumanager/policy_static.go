@@ -26,6 +26,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
@@ -35,11 +36,6 @@ import (
 )
 
 const (
-
-	// PolicyStatic is the name of the static policy.
-	// Should options be given, these will be ignored and backward (up to 1.21 included)
-	// compatible behaviour will be enforced
-	PolicyStatic policyName = "static"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
 )
@@ -186,7 +182,7 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reserv
 }
 
 func (p *staticPolicy) Name() string {
-	return string(PolicyStatic)
+	return kubeletconfig.StaticCPUManagerPolicy
 }
 
 func (p *staticPolicy) Start(s state.State) error {

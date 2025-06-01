@@ -91,6 +91,7 @@ var (
 		CrashLoopBackOff: kubeletconfig.CrashLoopBackOffConfig{
 			MaxContainerRestartPeriod: &metav1.Duration{Duration: 3 * time.Second},
 		},
+		CPUManagerPolicy: kubeletconfig.NoneCPUManagerPolicy,
 	}
 )
 
@@ -768,6 +769,20 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "unrecognized feature gate: invalid",
+		}, {
+			name: "invalid cpuManagerPolicy",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.CPUManagerPolicy = "invalid"
+				return conf
+			},
+			errMsg: "invalid configuration: option \"invalid\" specified for cpuManagerPolicy (--cpu-manager-policy). Valid options are \"none\" or \"static\"",
+		}, {
+			name: "systemreserved.cpu + kubereserved.cpu must to be greater than zero when cpuManagerPolicy (--cpu-manager-policy) is set to static",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.CPUManagerPolicy = kubeletconfig.StaticCPUManagerPolicy
+				return conf
+			},
+			errMsg: "invalid configuration: systemreserved.cpu + kubereserved.cpu must to be greater than zero when cpuManagerPolicy (--cpu-manager-policy) is set to \"static\"",
 		},
 	}
 
@@ -792,5 +807,47 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				t.Errorf("unexpected error: %s expected to contain %s", got, tc.errMsg)
 			}
 		})
+	}
+}
+
+func TestValueOfAllocatableResources(t *testing.T) {
+	testCases := []struct {
+		kubeReserved   map[string]string
+		systemReserved map[string]string
+		errorExpected  bool
+		name           string
+	}{
+		{
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "-150G", "ephemeral-storage": "10Gi"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
+			errorExpected:  true,
+			name:           "negative quantity value",
+		},
+		{
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "150Gi", "ephemeral-storage": "10Gi"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ky"},
+			errorExpected:  true,
+			name:           "invalid quantity unit",
+		},
+		{
+			kubeReserved:   map[string]string{"cpu": "200m", "memory": "15G", "ephemeral-storage": "10Gi"},
+			systemReserved: map[string]string{"cpu": "200m", "memory": "15Ki"},
+			errorExpected:  false,
+			name:           "Valid resource quantity",
+		},
+	}
+
+	for _, test := range testCases {
+		_, err1 := validation.ParseResourceList(test.kubeReserved)
+		_, err2 := validation.ParseResourceList(test.systemReserved)
+		if test.errorExpected {
+			if err1 == nil && err2 == nil {
+				t.Errorf("%s: error expected", test.name)
+			}
+		} else {
+			if err1 != nil || err2 != nil {
+				t.Errorf("%s: unexpected error: %v, %v", test.name, err1, err2)
+			}
+		}
 	}
 }
