@@ -520,11 +520,11 @@ func makePodStorageStats(s *statsapi.PodStats, terminatedContainerStats []statsa
 	if err != nil {
 		klog.V(6).ErrorS(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podNs, podName))
 	}
+	containers := s.Containers
 	if terminatedContainerStats != nil {
-		s.EphemeralStorage = calcEphemeralStorage(append(s.Containers, terminatedContainerStats...), ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
-	} else {
-		s.EphemeralStorage = calcEphemeralStorage(s.Containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
+		containers = append(containers, terminatedContainerStats...)
 	}
+	s.EphemeralStorage = calcEphemeralStorage(containers, ephemeralStats, rootFsInfo, logStats, etcHostsStats, isCRIStatsProvider)
 }
 
 func cadvisorPSIToStatsPSI(psi *cadvisorapiv1.PSIStats) *statsapi.PSIStats {

@@ -96,8 +96,8 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 
 	filteredInfos, terminatedInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(infos)
 	// Map each container to a pod and update the PodStats with container data.
-	podToStats := p.containerInfoToPodStats(filteredInfos, rootFsInfo, imageFsInfo)
-	podTerminatedContainersToStats := p.containerInfoToPodStats(terminatedInfos, rootFsInfo, imageFsInfo)
+	podToStats := p.containerInfosToPodStats(filteredInfos, rootFsInfo, imageFsInfo)
+	podTerminatedContainersToStats := p.containerInfosToPodStats(terminatedInfos, rootFsInfo, imageFsInfo)
 
 	// Add each PodStats to the result.
 	result := make([]statsapi.PodStats, 0, len(podToStats))
@@ -346,8 +346,9 @@ func getCadvisorPodInfoFromPodUID(podUID types.UID, infos map[string]cadvisorapi
 
 // filterTerminatedContainerInfoAndAssembleByPodCgroupKey returns the specified containerInfo but with
 // the stats of the terminated containers removed and all containerInfos assembled by pod cgroup key.
-// the first return map is container cgroup name <-> ContainerInfo and
-// the second return map is pod cgroup key <-> ContainerInfo.
+// the first return map is container cgroup name <-> ContainerInfo
+// the second return map is terminated container cgroup name <-> ContainerInfo
+// the third return map is pod cgroup key <-> ContainerInfo.
 // A ContainerInfo is considered to be of a terminated container if it has an
 // older CreationTime and zero CPU instantaneous and memory RSS usage.
 func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[string]cadvisorapiv2.ContainerInfo) (map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo, map[string]cadvisorapiv2.ContainerInfo) {
@@ -400,7 +401,7 @@ func filterTerminatedContainerInfoAndAssembleByPodCgroupKey(containerInfo map[st
 	return result, terminated, cinfosByPodCgroupKey
 }
 
-func (p *cadvisorStatsProvider) containerInfoToPodStats(containerInfos map[string]cadvisorapiv2.ContainerInfo, rootFsInfo, imageFsInfo cadvisorapiv2.FsInfo) map[statsapi.PodReference]*statsapi.PodStats {
+func (p *cadvisorStatsProvider) containerInfosToPodStats(containerInfos map[string]cadvisorapiv2.ContainerInfo, rootFsInfo, imageFsInfo cadvisorapiv2.FsInfo) map[statsapi.PodReference]*statsapi.PodStats {
 	podToStats := map[statsapi.PodReference]*statsapi.PodStats{}
 	for key, cinfo := range containerInfos {
 		// On systemd using devicemapper each mount into the container has an
