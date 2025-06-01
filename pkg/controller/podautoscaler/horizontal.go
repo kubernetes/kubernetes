@@ -1476,7 +1476,6 @@ func (a *HorizontalController) tolerancesForHpa(hpa *autoscalingv2.HorizontalPod
 }
 
 func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodAutoscaler) *PodFilter {
-	// needs to add feature flag
 	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
 	allowSelectionStrategy := utilfeature.DefaultFeatureGate.Enabled(features.HPAselectionStrategy)
 
@@ -1504,6 +1503,25 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 		a.podFilterMux.Unlock()
 		return &podFilter
 	}
+
+	// featue gate disabled - return only default strategy
+	if !allowSelectionStrategy {
+		defaultStrategy := string(autoscalingv2.LabelSelector)
+		if podFilter.Name() == defaultStrategy {
+			return &podFilter
+		}
+
+		// need to change the podFilter to LabelSelector (default) filter
+		podFilter = NewPodFilter(string(defaultStrategy), FilterOptions{
+			ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
+		}).WithClient(a.appsv1client).WithRESTMapper(a.mapper)
+		a.podFilterMux.Lock()
+		a.podFilterCache[hpaKey] = podFilter
+		a.podFilterMux.Unlock()
+		return &podFilter
+	}
+
+	// feature gate enabled return any pod filter
 	return &podFilter
 }
 

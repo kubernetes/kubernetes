@@ -58,7 +58,7 @@ func (f *OwnerReferencesFilter) WithRESTMapper(mapper apimeta.RESTMapper) PodFil
 }
 
 func (f *OwnerReferencesFilter) Name() string {
-	return "OwnerReferences"
+	return string(autoscalingv2.OwnerReferences)
 }
 
 func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, error) {
@@ -243,7 +243,7 @@ func (f *LabelSelectorFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, erro
 }
 
 func (f *LabelSelectorFilter) Name() string {
-	return "LabelSelector"
+	return string(autoscalingv2.LabelSelector)
 }
 
 func (f *LabelSelectorFilter) WithClient(client appsv1client.AppsV1Interface) PodFilter {
