@@ -3421,6 +3421,10 @@ func TestConditionFailedUpdateScale(t *testing.T) {
 			Type:   autoscalingv2.AbleToScale,
 			Status: v1.ConditionFalse,
 			Reason: "FailedUpdateScale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionFalse,
+			Reason: "ScaleUpdateFailed",
 		}),
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,

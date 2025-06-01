@@ -887,14 +887,25 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		})
 
 		if err != nil {
-			// An error occurred after retries, or a non-retryable error happened.
-			// In any case where err != nil, scaling ultimately failed.
-			failureReason := "FailedUpdateScale"
+			// Add logging as requested by the reviewer
+			logger := klog.FromContext(ctx)
+			logger.Error(err, "Failed to scale target after retries", "HPA", klog.KObj(hpa), "scaleTarget", reference)
+
+			// Determine the specific reason and message for AbleToScale
+			ableToScaleReason := "FailedUpdateScale"
+			ableToScaleMessage := fmt.Sprintf("the HPA controller was unable to update the target scale: %v", err)
+			if k8serrors.IsConflict(err) {
+				ableToScaleReason = "FailedUpdateScaleConflict"
+				ableToScaleMessage = fmt.Sprintf("failed to update scale target %s after retries due to conflict: %v", reference, err)
+			}
 
 			// Set AbleToScale condition to reflect the update failure
-			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, failureReason, "the HPA controller was unable to update the target scale: %v", err)
-			// Set ScalingLimited condition to DesiredWithinRange as expected by tests
-			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, "DesiredWithinRange", "")
+			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, ableToScaleReason, "%s", ableToScaleMessage)
+
+			// Set ScalingLimited to reflect that min/max was not the cause of this specific failure
+			// Status is False because it wasn't *limited by min/max*.
+			// Reason indicates *why* this scaling attempt failed in a way that overrides min/max considerations.
+			setCondition(hpa, autoscalingv2.ScalingLimited, v1.ConditionFalse, "ScaleUpdateFailed", "The HPA controller was unable to update the target scale.")
 
 			// Record the event indicating the ultimate failure
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
