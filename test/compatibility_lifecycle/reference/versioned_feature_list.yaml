@@ -561,6 +561,12 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.16"
+- name: HPAselectionStrategy
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.34"
 - name: ImageMaximumGCAge
   versionedSpecs:
   - default: false
