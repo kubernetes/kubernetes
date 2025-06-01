@@ -309,7 +309,7 @@ const (
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
-	// owner: @omerap12
+	// owner: @omerap12,@adrianmoisey
 	// kep: https://kep.k8s.io/5325
 
 	// Improve pod selection accuracy across workload types
