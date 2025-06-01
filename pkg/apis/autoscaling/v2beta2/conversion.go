@@ -95,11 +95,11 @@ func Convert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutosca
 		}
 		out.Spec.Behavior.ScaleUp.Tolerance = &q
 	}
-	
+
 	if strategyStr, ok := out.Annotations[autoscaling.SelectionStrategyAnnotation]; ok {
-        strategy := autoscaling.SelectionStrategy(strategyStr)
-        out.Spec.SelectionStrategy = &strategy
-    }
+		strategy := autoscaling.SelectionStrategy(strategyStr)
+		out.Spec.SelectionStrategy = &strategy
+	}
 	// Do not save round-trip annotations in internal resource
 	out.Annotations, _ = autoscaling.DropRoundTripHorizontalPodAutoscalerAnnotations(out.Annotations)
 	return nil
@@ -116,19 +116,17 @@ func Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(in *autoscal
 }
 
 func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *autoscalingv2beta2.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
-    if err := autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in, out, s); err != nil {
-        return err
-    }
-    // SelectionStrategy is handled in the HorizontalPodAutoscaler conversion function
-    return nil
+	if err := autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(in, out, s); err != nil {
+		return err
+	}
+	// SelectionStrategy is handled in the HorizontalPodAutoscaler conversion function
+	return nil
 }
-
 
 func Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in *autoscaling.HorizontalPodAutoscalerStatus, out *autoscalingv2beta2.HorizontalPodAutoscalerStatus, s conversion.Scope) error {
-    if err := autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in, out, s); err != nil {
-        return err
-    }
-    // CurrentSelectionStrategy is handled in the HorizontalPodAutoscaler conversion function
-    return nil
+	if err := autoConvert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(in, out, s); err != nil {
+		return err
+	}
+	// CurrentSelectionStrategy is handled in the HorizontalPodAutoscaler conversion function
+	return nil
 }
-

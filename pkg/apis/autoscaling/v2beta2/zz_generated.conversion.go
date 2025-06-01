@@ -136,18 +136,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerSpec)(nil), (*autoscalingv2beta2.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(a.(*autoscaling.HorizontalPodAutoscalerSpec), b.(*autoscalingv2beta2.HorizontalPodAutoscalerSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*autoscalingv2beta2.HorizontalPodAutoscalerStatus)(nil), (*autoscaling.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v2beta2_HorizontalPodAutoscalerStatus_To_autoscaling_HorizontalPodAutoscalerStatus(a.(*autoscalingv2beta2.HorizontalPodAutoscalerStatus), b.(*autoscaling.HorizontalPodAutoscalerStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*autoscaling.HorizontalPodAutoscalerStatus)(nil), (*autoscalingv2beta2.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(a.(*autoscaling.HorizontalPodAutoscalerStatus), b.(*autoscalingv2beta2.HorizontalPodAutoscalerStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -263,6 +253,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*autoscaling.HPAScalingRules)(nil), (*autoscalingv2beta2.HPAScalingRules)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_autoscaling_HPAScalingRules_To_v2beta2_HPAScalingRules(a.(*autoscaling.HPAScalingRules), b.(*autoscalingv2beta2.HPAScalingRules), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.HorizontalPodAutoscalerSpec)(nil), (*autoscalingv2beta2.HorizontalPodAutoscalerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(a.(*autoscaling.HorizontalPodAutoscalerSpec), b.(*autoscalingv2beta2.HorizontalPodAutoscalerSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.HorizontalPodAutoscalerStatus)(nil), (*autoscalingv2beta2.HorizontalPodAutoscalerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_HorizontalPodAutoscalerStatus_To_v2beta2_HorizontalPodAutoscalerStatus(a.(*autoscaling.HorizontalPodAutoscalerStatus), b.(*autoscalingv2beta2.HorizontalPodAutoscalerStatus), scope)
 	}); err != nil {
 		return err
 	}

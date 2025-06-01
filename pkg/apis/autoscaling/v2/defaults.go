@@ -102,10 +102,10 @@ func SetDefaults_HorizontalPodAutoscalerBehavior(obj *autoscalingv2.HorizontalPo
 		obj.Spec.Behavior.ScaleDown = GenerateHPAScaleDownRules(obj.Spec.Behavior.ScaleDown)
 	}
 	// Set default SelectionStrategy if not specified
-    if obj.Spec.SelectionStrategy == nil {
-        defaultStrategy := autoscalingv2.LabelSelector
-        obj.Spec.SelectionStrategy = &defaultStrategy
-    }
+	if obj.Spec.SelectionStrategy == nil {
+		defaultStrategy := autoscalingv2.LabelSelector
+		obj.Spec.SelectionStrategy = &defaultStrategy
+	}
 }
 
 // GenerateHPAScaleUpRules returns a fully-initialized HPAScalingRules value

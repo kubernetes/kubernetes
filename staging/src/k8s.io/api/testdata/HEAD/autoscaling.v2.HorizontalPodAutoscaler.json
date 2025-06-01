@@ -181,7 +181,7 @@
         "tolerance": "0"
       }
     },
-    "SelectionStrategy": "SelectionStrategyValue"
+    "selectionStrategy": "selectionStrategyValue"
   },
   "status": {
     "observedGeneration": 1,
