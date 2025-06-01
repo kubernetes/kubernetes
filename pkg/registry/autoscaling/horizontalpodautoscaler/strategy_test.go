@@ -159,3 +159,5 @@ func prepareHPA(hasZeroMinReplicas zeroMinReplicasSet, hasTolerance toleranceSet
 		},
 	}
 }
+
+// TODO(adrianmoisey): Add tests for selection strategy once implemented

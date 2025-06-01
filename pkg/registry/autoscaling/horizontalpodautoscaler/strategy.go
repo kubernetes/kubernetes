@@ -183,21 +183,21 @@ func validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA *autoscaling.Hor
 // dropDisabledFields will drop any disabled fields that have not previously been
 // set on the old HPA. oldHPA is ignored if nil.
 func dropDisabledFields(newHPA, oldHPA *autoscaling.HorizontalPodAutoscaler) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance) {
-		return
-	}
-	if toleranceInUse(oldHPA) {
-		return
-	}
-	newBehavior := newHPA.Spec.Behavior
-	if newBehavior == nil {
-		return
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAConfigurableTolerance) && !toleranceInUse(oldHPA) {
+		newBehavior := newHPA.Spec.Behavior
+		if newBehavior != nil {
+			for _, sr := range []*autoscaling.HPAScalingRules{newBehavior.ScaleDown, newBehavior.ScaleUp} {
+				if sr != nil {
+					sr.Tolerance = nil
+				}
+			}
+		}
 	}
 
-	for _, sr := range []*autoscaling.HPAScalingRules{newBehavior.ScaleDown, newBehavior.ScaleUp} {
-		if sr != nil {
-			sr.Tolerance = nil
-		}
+	isSelectionStrategyInUse := (oldHPA != nil && oldHPA.Spec.SelectionStrategy != nil)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAselectionStrategy) && !isSelectionStrategyInUse {
+		newHPA.Spec.SelectionStrategy = nil
 	}
 }
 
