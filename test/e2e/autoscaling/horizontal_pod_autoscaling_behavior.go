@@ -21,13 +21,18 @@ import (
 	"time"
 
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
+
 	"github.com/onsi/gomega"
 )
 
@@ -556,3 +561,76 @@ func usageForReplicas(replicas int) int {
 	usagePerReplica := podCPURequest * targetCPUUtilizationPercent / 100
 	return replicas*usagePerReplica - usagePerReplica/2
 }
+
+var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPAselectionStrategy),
+	framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (selection strategy)", func() {
+		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+		waitBuffer := 1 * time.Minute
+
+		ginkgo.Describe("with owner references strategy", func() {
+			ginkgo.It("should ignore CPU usage from pods not owned by target", func(ctx context.Context) {
+				ginkgo.By("setting up resource consumer and HPA")
+				initPods := 1
+				initCPUUsageTotal := usageForReplicas(initPods)
+
+				// Create deployment with resource consumer
+				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
+					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+				)
+				ginkgo.DeferCleanup(rc.CleanUp)
+
+				// Create independent pod with same labels
+				independentPod := &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "independent-consumer",
+						Labels: map[string]string{
+							"name": hpaName, // Same label that resource consumer uses
+						},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{{
+							Name:  "metrics-consumer",
+							Image: imageutils.GetE2EImage(imageutils.ResourceConsumer),
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU: *resource.NewMilliQuantity(podCPURequest, resource.DecimalSI),
+								},
+							},
+						}},
+					},
+				}
+				_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, independentPod, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete, independentPod.Name, metav1.DeleteOptions{})
+
+				// Create HPA with owner references strategy
+				ownerRefsStrategy := autoscalingv2.OwnerReferences
+				hpa := e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(ctx,
+					rc, int32(targetCPUUtilizationPercent), 1, 5)
+				hpa.Spec.SelectionStrategy = &ownerRefsStrategy
+				hpa, err = f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Update(ctx, hpa, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+
+				ginkgo.By("triggering high CPU usage in independent pod")
+				// Make independent pod consume CPU
+				rc.ConsumeCPU(usageForReplicas(4))
+
+				ginkgo.By("verifying HPA ignores independent pod's CPU usage")
+				rc.EnsureDesiredReplicasInRange(ctx, initPods, initPods, waitDeadline, hpa.Name)
+
+				ginkgo.By("verifying number of replicas")
+				replicas, err := rc.GetReplicas(ctx)
+				framework.ExpectNoError(err)
+				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods),
+					"had %d replicas, should have stayed at %d replicas despite high CPU in independent pod",
+					replicas, initPods)
+			})
+		})
+	})
