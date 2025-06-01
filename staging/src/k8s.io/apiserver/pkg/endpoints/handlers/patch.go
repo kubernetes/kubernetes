@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -696,13 +697,19 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 
 	transformers := []rest.TransformFunc{p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer}
 
-	wasCreated := false
+	// wasCreated indicates if the object was created during the update.
+	// Uses int32 for atomic access (1 = true, 0 = false).
+	var wasCreated int32
 	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, transformers...)
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
 		updateObject, created, updateErr := p.restPatcher.Update(ctx, p.name, p.updatedObjectInfo, p.createValidation, p.updateValidation, p.forceAllowCreate, options)
-		wasCreated = created
+		if created {
+			atomic.StoreInt32(&wasCreated, 1)
+		} else {
+			atomic.StoreInt32(&wasCreated, 0)
+		}
 		return updateObject, updateErr
 	}
 	result, err := finisher.FinishRequest(ctx, func() (runtime.Object, error) {
@@ -726,7 +733,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 		return result, err
 	})
-	return result, wasCreated, err
+	return result, atomic.LoadInt32(&wasCreated) == 1, err
 }
 
 // applyPatchToObject applies a strategic merge patch of <patchMap> to
