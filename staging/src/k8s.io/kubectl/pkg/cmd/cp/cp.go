@@ -527,7 +527,14 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 		// header.Name is a name of the REMOTE file, so we need to create
 		// a remotePath so that it goes through appropriate processing related
 		// with cleaning remote paths
-		destFileName := dest.Join(newRemotePath(header.Name[len(prefix):]))
+		// Validate and sanitize the header.Name to prevent directory traversal
+		sanitizedName := path.Clean(header.Name[len(prefix):])
+		if strings.HasPrefix(sanitizedName, "..") || path.IsAbs(sanitizedName) {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: invalid file path %q, skipping\n", sanitizedName)
+			continue
+		}
+
+		destFileName := dest.Join(newRemotePath(sanitizedName))
 
 		if !isRelative(dest, destFileName) {
 			fmt.Fprintf(o.IOStreams.ErrOut, "warning: file %q is outside target destination, skipping\n", destFileName)
