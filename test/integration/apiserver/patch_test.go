@@ -42,11 +42,7 @@ func TestPatchConflicts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(clientSet, "status-code", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 
-	// Performance depends on the system on which the test runs.
-	// In the Prow CI, more than 100 concurrent patches were possible
-	// when not using race detection. With race detection, 63 were
-	// possible.
-	numOfConcurrentPatches := 50
+	numOfConcurrentPatches := 100
 
 	UIDs := make([]types.UID, numOfConcurrentPatches)
 	ownerRefs := []metav1.OwnerReference{}
