@@ -154,7 +154,6 @@ func (f *OwnerReferencesFilter) handleDeployment(namespace, name string, pods []
 	for _, pod := range pods {
 		for _, ownerRef := range pod.OwnerReferences {
 			if ownerRef.Kind == "ReplicaSet" && deploymentRSs[ownerRef.UID] {
-				fmt.Println("Found pod ", pod.Name)
 				ownedPods[pod.UID] = true
 				break
 			}

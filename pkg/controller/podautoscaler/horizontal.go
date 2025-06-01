@@ -529,7 +529,6 @@ func (a *HorizontalController) computeReplicasForMetric(ctx context.Context, hpa
 			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get pods metric value: %v", err)
 		}
 	case autoscalingv2.ResourceMetricSourceType:
-		fmt.Println("In 532")
 		replicaCountProposal, timestampProposal, metricNameProposal, condition, err = a.computeStatusForResourceMetric(ctx, specReplicas, spec, hpa, selector, status)
 		if err != nil {
 			return 0, "", time.Time{}, condition, fmt.Errorf("failed to get %s resource metric value: %v", spec.Resource.Name, err)
@@ -1479,6 +1478,7 @@ func (a *HorizontalController) tolerancesForHpa(hpa *autoscalingv2.HorizontalPod
 func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodAutoscaler) *PodFilter {
 	// needs to add feature flag
 	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
+	allowSelectionStrategy := utilfeature.DefaultFeatureGate.Enabled(features.HPAselectionStrategy)
 
 	a.podFilterMux.RLock()
 	podFilter, exists := a.podFilterCache[hpaKey]
@@ -1490,9 +1490,12 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 		// Double-check after acquiring write lock
 		if podFilter, exists = a.podFilterCache[hpaKey]; !exists {
 			strategy := autoscalingv2.LabelSelector // default strategy
-			if hpa.Spec.SelectionStrategy != nil {
+
+			// only use custom strategy if feature flag is enabled
+			if allowSelectionStrategy && hpa.Spec.SelectionStrategy != nil {
 				strategy = *hpa.Spec.SelectionStrategy
 			}
+
 			podFilter = NewPodFilter(string(strategy), FilterOptions{
 				ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
 			}).WithClient(a.appsv1client).WithRESTMapper(a.mapper)

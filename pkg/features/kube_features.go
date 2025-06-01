@@ -309,6 +309,12 @@ const (
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
+	// owner: @omerap12
+	// kep: https://kep.k8s.io/5325
+
+	// Improve pod selection accuracy across workload types
+	HPAselectionStrategy featuregate.Feature = "HPAselectionStrategy"
+
 	// owner: @deepakkinni @xing-yang
 	// kep: https://kep.k8s.io/2644
 	//
@@ -1377,6 +1383,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	HPAScaleToZero: {
 		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	HPAselectionStrategy: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ImageMaximumGCAge: {
