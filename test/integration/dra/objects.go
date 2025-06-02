@@ -27,8 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
-
-	_ "k8s.io/kubernetes/pkg/apis/resource/install"
 )
 
 // NewMaxResourceSlice creates a slice that is as large as possible given the current validation constraints.
