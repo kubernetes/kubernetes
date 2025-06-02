@@ -1643,6 +1643,19 @@
     The event is deleted and MUST NOT show up when listing all events.
   release: v1.25
   file: test/e2e/instrumentation/core_events.go
+- testname: kubernetes.default Endpoints and EndpointSlices
+  codename: '[sig-network] API Server should have Endpoints and EndpointSlices pointing
+    to API Server [Conformance]'
+  description: The "kubernetes.default" service MUST have Endpoints and EndpointSlices
+    pointing to each API server instance.
+  release: v1.21
+  file: test/e2e/network/apiserver.go
+- testname: Kubernetes Service
+  codename: '[sig-network] API Server should provide secure master service [Conformance]'
+  description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
+    service running in the cluster.
+  release: v1.9
+  file: test/e2e/network/apiserver.go
 - testname: DNS, cluster
   codename: '[sig-network] DNS should provide /etc/hosts entries for the cluster [Conformance]'
   description: When a Pod is created, the pod MUST be able to resolve cluster dns
@@ -1717,13 +1730,6 @@
     for a Service that matches no pods.
   release: v1.21
   file: test/e2e/network/endpointslice.go
-- testname: kubernetes.default Endpoints and EndpointSlices
-  codename: '[sig-network] EndpointSlice should have Endpoints and EndpointSlices
-    pointing to API Server [Conformance]'
-  description: The "kubernetes.default" service MUST have Endpoints and EndpointSlices
-    pointing to each API server instance.
-  release: v1.21
-  file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice, multiple IPs, multiple ports
   codename: '[sig-network] EndpointSlice should support a Service with multiple endpoint
     IPs specified in multiple EndpointSlices [Conformance]'
@@ -1760,6 +1766,15 @@
     update, and delete actions.
   release: v1.21
   file: test/e2e/network/endpointslicemirroring.go
+- testname: Endpoint resource lifecycle
+  codename: '[sig-network] Endpoints should test the lifecycle of an Endpoint [Conformance]'
+  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
+    with a new label, a check after the update MUST find the changes. The endpoint
+    is then patched with a new IPv4 address and port, a check after the patch MUST
+    the changes. The endpoint is deleted by its label, a watch listens for the deleted
+    watch event.
+  release: v1.19
+  file: test/e2e/network/endpoints.go
 - testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
   codename: '[sig-network] HostPort validates that there is no conflict between pods
     with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]'
@@ -2032,12 +2047,6 @@
     Windows does not support session affinity.'
   release: v1.19
   file: test/e2e/network/service.go
-- testname: Kubernetes Service
-  codename: '[sig-network] Services should provide secure master service [Conformance]'
-  description: By default when a kubernetes cluster is running there MUST be a 'kubernetes'
-    service running in the cluster.
-  release: v1.9
-  file: test/e2e/network/service.go
 - testname: Service, endpoints
   codename: '[sig-network] Services should serve a basic endpoint from pods [Conformance]'
   description: Create a service with a endpoint without any Pods, the service MUST
@@ -2068,15 +2077,6 @@
     and the service MUST list only the endpoint to the second Pod. Delete the second
     Pod and the service must now have empty set of endpoints.
   release: v1.9
-  file: test/e2e/network/service.go
-- testname: Endpoint resource lifecycle
-  codename: '[sig-network] Services should test the lifecycle of an Endpoint [Conformance]'
-  description: Create an endpoint, the endpoint MUST exist. The endpoint is updated
-    with a new label, a check after the update MUST find the changes. The endpoint
-    is then patched with a new IPv4 address and port, a check after the patch MUST
-    the changes. The endpoint is deleted by it's label, a watch listens for the deleted
-    watch event.
-  release: v1.19
   file: test/e2e/network/service.go
 - testname: ConfigMap, from environment field with various prefixes
   codename: '[sig-node] ConfigMap should be consumable as environment variable names
