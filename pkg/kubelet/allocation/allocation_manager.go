@@ -77,7 +77,7 @@ type Manager interface {
 	// the pod cannot be admitted.
 	// allocatedPods should represent the pods that have already been admitted, along with their
 	// admitted (allocated) resources.
-	AddPod(allocatedPods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
+	AddPod(activePods []*v1.Pod, pod *v1.Pod) (ok bool, reason, message string)
 
 	// RemovePod removes any stored state for the given pod UID.
 	RemovePod(uid types.UID)
@@ -229,7 +229,7 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	}
 }
 
-func (m *manager) AddPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
+func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -240,6 +240,7 @@ func (m *manager) AddPod(allocatedPods []*v1.Pod, pod *v1.Pod) (bool, string, st
 	}
 
 	// Check if we can admit the pod; if so, update the allocation.
+	allocatedPods := m.getAllocatedPods(activePods)
 	ok, reason, message := m.canAdmitPod(allocatedPods, pod)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
@@ -472,6 +473,18 @@ func (m *manager) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecon
 				allocatedResources.Requests[v1.ResourceMemory].Equal(actuatedResources.Requests[v1.ResourceMemory]) &&
 				allocatedResources.Limits[v1.ResourceMemory].Equal(actuatedResources.Limits[v1.ResourceMemory])
 		})
+}
+
+func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
+		return activePods
+	}
+
+	allocatedPods := make([]*v1.Pod, len(activePods))
+	for i, pod := range activePods {
+		allocatedPods[i], _ = m.UpdatePodFromAllocation(pod)
+	}
+	return allocatedPods
 }
 
 func isResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {

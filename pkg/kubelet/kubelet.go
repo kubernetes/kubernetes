@@ -2630,12 +2630,10 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// we simply avoid doing any work.
 		// We also do not try to admit the pod that is already in terminated state.
 		if !kl.podWorkers.IsPodTerminationRequested(pod.UID) && !podutil.IsPodPhaseTerminal(pod.Status.Phase) {
-			// We failed pods that we rejected, so allocatedPods include all admitted
-			// pods that are alive.
-			allocatedPods := kl.getAllocatedPods()
-
 			// Check if we can admit the pod; if not, reject it.
-			if ok, reason, message := kl.allocationManager.AddPod(allocatedPods, pod); !ok {
+			// We failed pods that we rejected, so activePods include all admitted
+			// pods that are alive.
+			if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
 				kl.rejectPod(pod, reason, message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.
@@ -2652,6 +2650,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 			StartTime:  start,
 		})
 	}
+	// We call UpdatePod only after all pods have been added to avoid kicking off a SyncPod that
+	// could potentially resolve a pending resize before the existing pods have been admitted.
 	for _, update := range updates {
 		kl.podWorkers.UpdatePod(update)
 	}
