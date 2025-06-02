@@ -105,23 +105,13 @@ func (p *ResolverTypeProvider) FindIdent(identName string) (ref.Val, bool) {
 	return p.underlyingTypeProvider.FindIdent(identName)
 }
 
-// ResolverEnvOption creates the ResolverTypeProvider with a given DynamicTypeResolver,
-// and also returns the CEL ResolverEnvOption to apply it to the env.
+// ResolverEnvOption creates the ResolverTypeProvider with a given DynamicTypeResolver
+// and returns the CEL ResolverEnvOption to apply it to the env.
 func ResolverEnvOption(resolver TypeResolver) cel.EnvOption {
-	_, envOpt := NewResolverTypeProviderAndEnvOption(resolver)
-	return envOpt
-}
-
-// NewResolverTypeProviderAndEnvOption creates the ResolverTypeProvider with a given DynamicTypeResolver,
-// and also returns the CEL ResolverEnvOption to apply it to the env.
-func NewResolverTypeProviderAndEnvOption(resolver TypeResolver) (*ResolverTypeProvider, cel.EnvOption) {
-	tp := &ResolverTypeProvider{typeResolver: resolver}
-	var envOption cel.EnvOption = func(e *cel.Env) (*cel.Env, error) {
-		// wrap the existing type provider (acquired from the env)
-		// and set new type provider for the env.
-		tp.underlyingTypeProvider = e.CELTypeProvider()
+	return func(e *cel.Env) (*cel.Env, error) {
+		tp := &ResolverTypeProvider{typeResolver: resolver, underlyingTypeProvider: e.CELTypeProvider()}
+		// set new type provider for the env.
 		typeProviderOption := cel.CustomTypeProvider(tp)
 		return typeProviderOption(e)
 	}
-	return tp, envOption
 }
