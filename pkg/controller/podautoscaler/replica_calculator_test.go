@@ -99,6 +99,7 @@ type replicaCalcTestCase struct {
 	podStartTime         []metav1.Time
 	podPhase             []v1.PodPhase
 	podDeletionTimestamp []bool
+	PodFilter            *PodFilter
 }
 
 const (
@@ -364,8 +365,17 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 		tolerances = *tc.tolerances
 	}
 
+	//use default pod filter if no pod filter is specified in test case.
+	var podFilter *PodFilter
+	if tc.PodFilter != nil {
+		podFilter = tc.PodFilter // Use the existing pointer directly
+	} else {
+		defaultFilter := NewPodFilter(string(autoscalingv2.LabelSelector), FilterOptions{})
+		podFilter = &defaultFilter
+	}
+
 	if tc.resource != nil {
-		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container, nil)
+		outReplicas, outUtilization, outRawValue, outTimestamp, err := replicaCalc.GetResourceReplicas(context.TODO(), tc.currentReplicas, tc.resource.targetUtilization, tc.resource.name, tolerances, testNamespace, selector, tc.container, *podFilter)
 
 		if tc.expectedError != nil {
 			require.Error(t, err, "there should be an error calculating the replica count")
@@ -412,7 +422,7 @@ func (tc *replicaCalcTestCase) runTest(t *testing.T) {
 
 		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetExternalPerPodMetricReplicas(tc.currentReplicas, tc.metric.perPodTargetUsage, tc.metric.name, tolerances, testNamespace, tc.metric.selector)
 	case podMetric:
-		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, selector, nil, nil)
+		outReplicas, outUsage, outTimestamp, err = replicaCalc.GetMetricReplicas(tc.currentReplicas, tc.metric.targetUsage, tc.metric.name, tolerances, testNamespace, selector, nil, podFilter)
 	default:
 		t.Fatalf("Unknown metric type: %d", tc.metric.metricType)
 	}
