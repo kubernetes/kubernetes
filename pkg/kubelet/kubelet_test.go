@@ -175,7 +175,23 @@ func newTestKubelet(t *testing.T, controllerAttachDetachEnabled bool) *TestKubel
 			Size:     456,
 		},
 	}
-	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/)
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, false /*excludePodAdmitHandlers*/)
+}
+
+func newTestKubeletExcludeAdmitHandlers(t *testing.T, controllerAttachDetachEnabled bool) *TestKubelet {
+	imageList := []kubecontainer.Image{
+		{
+			ID:       "abc",
+			RepoTags: []string{"registry.k8s.io:v1", "registry.k8s.io:v2"},
+			Size:     123,
+		},
+		{
+			ID:       "efg",
+			RepoTags: []string{"registry.k8s.io:v3", "registry.k8s.io:v4"},
+			Size:     456,
+		},
+	}
+	return newTestKubeletWithImageList(t, imageList, controllerAttachDetachEnabled, true /*initFakeVolumePlugin*/, true /*localStorageCapacityIsolation*/, true /*excludePodAdmitHandlers*/)
 }
 
 func newTestKubeletWithImageList(
@@ -184,6 +200,7 @@ func newTestKubeletWithImageList(
 	controllerAttachDetachEnabled bool,
 	initFakeVolumePlugin bool,
 	localStorageCapacityIsolation bool,
+	excludeAdmitHandlers bool,
 ) *TestKubelet {
 	logger, _ := ktesting.NewTestContext(t)
 
@@ -277,7 +294,6 @@ func newTestKubeletWithImageList(
 	kubelet.podManager = kubepod.NewBasicPodManager()
 	podStartupLatencyTracker := kubeletutil.NewPodStartupLatencyTracker()
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, podStartupLatencyTracker)
-	kubelet.allocationManager = allocation.NewInMemoryManager()
 	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
 
 	kubelet.containerRuntime = fakeRuntime
@@ -304,6 +320,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 
+	kubelet.allocationManager = allocation.NewInMemoryManager(kubelet.containerManager, kubelet.statusManager)
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
@@ -358,7 +375,8 @@ func newTestKubeletWithImageList(
 		killPodNow(kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
 
 	kubelet.evictionManager = evictionManager
-	kubelet.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
+	handlers := []lifecycle.PodAdmitHandler{}
+	handlers = append(handlers, evictionAdmitHandler)
 
 	// setup shutdown manager
 	shutdownManager := nodeshutdown.NewManager(&nodeshutdown.Config{
@@ -377,10 +395,14 @@ func newTestKubeletWithImageList(
 	if err != nil {
 		t.Fatalf("Failed to create UserNsManager: %v", err)
 	}
-	kubelet.admitHandlers.AddPodAdmitHandler(shutdownManager)
+	handlers = append(handlers, shutdownManager)
 
 	// Add this as cleanup predicate pod admitter
-	kubelet.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(kubelet.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), kubelet.containerManager.UpdatePluginResources))
+
+	if !excludeAdmitHandlers {
+		kubelet.allocationManager.AddPodAdmitHandlers(handlers)
+	}
 
 	allPlugins := []volume.VolumePlugin{}
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
@@ -1043,7 +1065,7 @@ func TestHandleMemExceeded(t *testing.T) {
 // Tests that we handle result of interface UpdatePluginResources correctly
 // by setting corresponding status in status map.
 func TestHandlePluginResources(t *testing.T) {
-	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kl := testKubelet.kubelet
 
@@ -1096,8 +1118,7 @@ func TestHandlePluginResources(t *testing.T) {
 	}
 
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
-	kl.admitHandlers = lifecycle.PodAdmitHandlers{}
-	kl.admitHandlers.AddPodAdmitHandler(lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc))
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.getNodeAnyWay, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc)})
 
 	recorder := record.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
@@ -2391,7 +2412,7 @@ func TestHandlePodAdditionsInvokesPodAdmitHandlers(t *testing.T) {
 	podToAdmit := pods[1]
 	podsToReject := []*v1.Pod{podToReject}
 
-	kl.admitHandlers.AddPodAdmitHandler(&testPodAdmitHandler{podsToReject: podsToReject})
+	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{&testPodAdmitHandler{podsToReject: podsToReject}})
 
 	kl.HandlePodAdditions(pods)
 
@@ -2772,14 +2793,17 @@ func TestHandlePodResourcesResizeWithSwap(t *testing.T) {
 			for i, c := range originalPod.Spec.Containers {
 				setContainerStatus(podStatus, &c, i)
 			}
-			updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
+
+			updatedPod, err := kubelet.allocationManager.HandlePodResourcesResize(kubelet.containerRuntime, kubelet.getAllocatedPods(), newPod, podStatus)
 			require.NoError(t, err)
+
 			updatedPodCtr := updatedPod.Spec.Containers[0]
 			assert.Equal(t, tt.expectedAllocatedReqs, updatedPodCtr.Resources.Requests, "updated pod spec requests")
 
 			alloc, found := kubelet.allocationManager.GetContainerResourceAllocation(newPod.UID, updatedPodCtr.Name)
 			require.True(t, found, "container allocation")
 			assert.Equal(t, tt.expectedAllocatedReqs, alloc.Requests, "stored container request allocation")
+
 			resizeStatus := kubelet.statusManager.GetPodResizeConditions(newPod.UID)
 			for i := range resizeStatus {
 				// Ignore probe time and last transition time during comparison.
@@ -3177,7 +3201,7 @@ func TestHandlePodResourcesResize(t *testing.T) {
 					setContainerStatus(podStatus, &c, i+len(originalPod.Spec.InitContainers))
 				}
 
-				updatedPod, err := kubelet.handlePodResourcesResize(newPod, podStatus)
+				updatedPod, err := kubelet.allocationManager.HandlePodResourcesResize(kubelet.containerRuntime, kubelet.getAllocatedPods(), newPod, podStatus)
 				require.NoError(t, err)
 
 				var updatedPodCtr v1.Container
@@ -4218,7 +4242,7 @@ func TestIsPodResizeInProgress(t *testing.T) {
 			}
 			require.NoError(t, am.SetAllocatedResources(pod))
 
-			hasResizedResources := kl.isPodResizeInProgress(pod, podStatus)
+			hasResizedResources := kl.allocationManager.IsPodResizeInProgress(pod, podStatus)
 			require.Equal(t, test.expectHasResize, hasResizedResources, "hasResizedResources")
 		})
 	}
