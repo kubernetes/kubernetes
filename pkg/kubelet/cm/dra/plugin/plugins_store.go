@@ -23,20 +23,37 @@ import (
 	"sync"
 )
 
-// PluginsStore holds a list of DRA Plugins.
-type pluginsStore struct {
+// Store keeps track of how to reach plugins registered for DRA drivers.
+// Each plugin has a gRPC endpoint. There may be more than one plugin per driver.
+//
+// The null Store is usable.
+type Store struct {
 	sync.RWMutex
 	// plugin name -> Plugin in the order in which they got added
 	store map[string][]*Plugin
 }
 
-// draPlugins map keeps track of all registered DRA plugins on the node
-// and their corresponding sockets.
-var draPlugins = &pluginsStore{}
+// NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
+// driver kubelet plugin which need to be called by kubelet. The wrapper
+// handles gRPC connection management and logging. Connections are reused
+// across different NewDRAPluginClient calls.
+//
+// It returns an informative error message including the driver name
+// with an explanation why the driver is not usable.
+func (s *Store) NewDRAPluginClient(driverName string) (*Plugin, error) {
+	if driverName == "" {
+		return nil, errors.New("DRA driver name is empty")
+	}
+	client := s.get(driverName)
+	if client == nil {
+		return nil, fmt.Errorf("DRA driver %s is not registered", driverName)
+	}
+	return client, nil
+}
 
 // Get lets you retrieve a DRA Plugin by name.
 // This method is protected by a mutex.
-func (s *pluginsStore) get(pluginName string) *Plugin {
+func (s *Store) get(pluginName string) *Plugin {
 	s.RLock()
 	defer s.RUnlock()
 
@@ -52,7 +69,7 @@ func (s *pluginsStore) get(pluginName string) *Plugin {
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
 // This method is protected by a mutex.
-func (s *pluginsStore) add(p *Plugin) error {
+func (s *Store) add(p *Plugin) error {
 	s.Lock()
 	defer s.Unlock()
 
@@ -72,7 +89,7 @@ func (s *pluginsStore) add(p *Plugin) error {
 // remove lets you remove one endpoint for a DRA Plugin.
 // This method is protected by a mutex. It returns the
 // plugin if found and true if that was the last instance
-func (s *pluginsStore) remove(pluginName, endpoint string) (*Plugin, bool) {
+func (s *Store) remove(pluginName, endpoint string) (*Plugin, bool) {
 	s.Lock()
 	defer s.Unlock()
 

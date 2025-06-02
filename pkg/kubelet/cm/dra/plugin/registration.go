@@ -47,6 +47,7 @@ import (
 const defaultClientCallTimeout = 45 * time.Second
 
 // RegistrationHandler is the handler which is fed to the pluginwatcher API.
+// It updates a plugin store.
 type RegistrationHandler struct {
 	// backgroundCtx is used for all future activities of the handler.
 	// This is necessary because it implements APIs which don't
@@ -56,6 +57,7 @@ type RegistrationHandler struct {
 	kubeClient    kubernetes.Interface
 	getNode       func() (*v1.Node, error)
 	wipingDelay   time.Duration
+	draPlugins    *Store
 
 	wg    sync.WaitGroup
 	mutex sync.Mutex
@@ -72,17 +74,16 @@ type RegistrationHandler struct {
 
 var _ cache.PluginHandler = &RegistrationHandler{}
 
-// NewPluginHandler returns new registration handler.
+// NewRegistrationHandler creates a new registration handler.
 //
-// Must only be called once per process because it manages global state.
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
-func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
+func NewRegistrationHandler(draPlugins *Store, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
 	// The context and thus logger should come from the caller.
-	return newRegistrationHandler(context.TODO(), kubeClient, getNode, wipingDelay)
+	return newRegistrationHandler(context.TODO(), draPlugins, kubeClient, getNode, wipingDelay)
 }
 
-func newRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
+func newRegistrationHandler(ctx context.Context, draPlugins *Store, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
 	ctx, cancel := context.WithCancelCause(ctx)
 	handler := &RegistrationHandler{
 		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
@@ -91,6 +92,7 @@ func newRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
 		pendingWipes:  make(map[string]*context.CancelCauseFunc),
+		draPlugins:    draPlugins,
 	}
 
 	// When kubelet starts up, no DRA driver has registered yet. None of
@@ -228,7 +230,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	if err := draPlugins.add(pluginInstance); err != nil {
+	if err := h.draPlugins.add(pluginInstance); err != nil {
 		cancel(err)
 		// No wrapping, the error already contains details.
 		return err
@@ -280,7 +282,7 @@ func (h *RegistrationHandler) validateSupportedServices(pluginName string, suppo
 // DeRegisterPlugin is called when a plugin has removed its socket,
 // signaling it is no longer available.
 func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
-	if p, last := draPlugins.remove(pluginName, endpoint); p != nil {
+	if p, last := h.draPlugins.remove(pluginName, endpoint); p != nil {
 		// This logger includes endpoint and pluginName.
 		logger := klog.FromContext(p.backgroundCtx)
 		logger.V(3).Info("Deregister DRA plugin", "lastInstance", last)

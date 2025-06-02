@@ -37,8 +37,8 @@ func TestAddSameName(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
+	var draPlugins Store
 	require.NoError(t, draPlugins.add(p))
-	defer draPlugins.remove(p.name, p.endpoint)
 
 	assert.False(t, firstWasCancelled, "should not cancel context after the first call")
 
@@ -73,6 +73,7 @@ func TestDelete(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
+	var draPlugins Store
 	draPlugins.add(p)
 
 	draPlugins.remove(p.name, "")

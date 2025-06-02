@@ -35,24 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-// NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
-// driver kubelet plugin which need to be called by kubelet. The wrapper
-// handles gRPC connection management and logging. Connections are reused
-// across different NewDRAPluginClient calls.
-//
-// It returns an informative error message including the driver name
-// with an explanation why the driver is not usable.
-func NewDRAPluginClient(driverName string) (*Plugin, error) {
-	if driverName == "" {
-		return nil, errors.New("DRA driver name is empty")
-	}
-	client := draPlugins.get(driverName)
-	if client == nil {
-		return nil, fmt.Errorf("DRA driver %s is not registered", driverName)
-	}
-	return client, nil
-}
-
 type Plugin struct {
 	name          string
 	backgroundCtx context.Context

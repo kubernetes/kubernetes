@@ -167,7 +167,8 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// The handler wipes all slices at startup.
-			handler := newRegistrationHandler(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			var draPlugins Store
+			handler := newRegistrationHandler(tCtx, &draPlugins, client, getFakeNode, time.Second /* very short wiping delay for testing */)
 			tCtx.Cleanup(handler.Stop)
 			requireNoSlices := func() {
 				t.Helper()
@@ -213,7 +214,7 @@ func TestRegistrationHandler(t *testing.T) {
 				require.NoError(t, err)
 			}
 			plugin := draPlugins.get(test.pluginName)
-			assert.NotNil(t, plugin, "plugin should be registered")
+			require.NotNil(t, plugin, "plugin should be registered")
 			t.Cleanup(func() {
 				if client != nil {
 					// Create the slice as if the plugin had done that while it runs.

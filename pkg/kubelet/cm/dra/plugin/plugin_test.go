@@ -27,7 +27,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -135,15 +137,15 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins.add(p)
-	defer draPlugins.remove(pluginName, addr)
+	var draPlugins Store
+	tCtx.ExpectNoError(draPlugins.add(p), "add plugin")
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client, err := NewDRAPluginClient(pluginName)
+			client, err := draPlugins.NewDRAPluginClient(pluginName)
 			if err != nil {
 				t.Error(err)
 				return
@@ -185,42 +187,33 @@ func TestGRPCConnIsReused(t *testing.T) {
 func TestNewDRAPluginClient(t *testing.T) {
 	for _, test := range []struct {
 		description string
-		setup       func(string) tearDown
+		setup       func(*Store) error
 		pluginName  string
 		shouldError bool
 	}{
 		{
 			description: "plugin name is empty",
-			setup: func(_ string) tearDown {
-				return func() {}
-			},
-			pluginName:  "",
 			shouldError: true,
 		},
 		{
 			description: "plugin name not found in the list",
-			setup: func(_ string) tearDown {
-				return func() {}
-			},
 			pluginName:  "plugin-name-not-found-in-the-list",
 			shouldError: true,
 		},
 		{
 			description: "plugin exists",
-			setup: func(name string) tearDown {
-				draPlugins.add(&Plugin{name: name})
-				return func() {
-					draPlugins.remove(name, "")
-				}
+			setup: func(draPlugins *Store) error {
+				return draPlugins.add(&Plugin{name: "dummy-plugin"})
 			},
 			pluginName: "dummy-plugin",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			teardown := test.setup(test.pluginName)
-			defer teardown()
-
-			client, err := NewDRAPluginClient(test.pluginName)
+			var draPlugins Store
+			if test.setup != nil {
+				require.NoError(t, test.setup(&draPlugins), "setup plugin")
+			}
+			client, err := draPlugins.NewDRAPluginClient(test.pluginName)
 			if test.shouldError {
 				assert.Nil(t, client)
 				assert.Error(t, err)
@@ -297,10 +290,9 @@ func TestGRPCMethods(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			var draPlugins Store
 			draPlugins.add(p)
-			defer draPlugins.remove(pluginName, addr)
-
-			client, err := NewDRAPluginClient(pluginName)
+			client, err := draPlugins.NewDRAPluginClient(pluginName)
 			if err != nil {
 				t.Fatal(err)
 			}
