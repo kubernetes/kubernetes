@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -127,6 +128,7 @@ type manager struct {
 	containerRuntime kubecontainer.Runtime
 	statusManager    status.Manager
 	podcache         kubecontainer.Cache
+	sourcesReady     config.SourcesReady
 
 	triggerPodSync func(pod *v1.Pod)
 	getActivePods  func() []*v1.Pod
@@ -143,6 +145,7 @@ func NewManager(checkpointDirectory string,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	podCache kubecontainer.Cache,
+	sourcesReady config.SourcesReady,
 ) Manager {
 	return &manager{
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
@@ -152,6 +155,7 @@ func NewManager(checkpointDirectory string,
 		statusManager:    statusManager,
 		admitHandlers:    lifecycle.PodAdmitHandlers{},
 		podcache:         podCache,
+		sourcesReady:     sourcesReady,
 
 		triggerPodSync: triggerPodSync,
 		getActivePods:  getActivePods,
@@ -183,6 +187,7 @@ func NewInMemoryManager(containerManager cm.ContainerManager,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	podCache kubecontainer.Cache,
+	sourcesReady config.SourcesReady,
 ) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(nil),
@@ -192,6 +197,7 @@ func NewInMemoryManager(containerManager cm.ContainerManager,
 		statusManager:    statusManager,
 		admitHandlers:    lifecycle.PodAdmitHandlers{},
 		podcache:         podCache,
+		sourcesReady:     sourcesReady,
 
 		triggerPodSync: triggerPodSync,
 		getActivePods:  getActivePods,
@@ -224,6 +230,11 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 
 	ticker.Reset(retryPeriod)
 
+	if !m.sourcesReady.AllReady() {
+		klog.V(4).InfoS("Skipping evaluation of pending resizes; sources are not ready")
+		return nil
+	}
+
 	var newPendingResizes []types.UID
 	var successfulResizes []*v1.Pod
 
@@ -250,7 +261,7 @@ func (m *manager) RetryPendingResizes() []*v1.Pod {
 			klog.ErrorS(err, "Failed to handle pod resources resize", "pod", klog.KObj(pod))
 			newPendingResizes = append(newPendingResizes, uid)
 		case m.statusManager.IsPodResizeDeferred(uid):
-			klog.V(4).InfoS("Pod resize is still deferred; will retry", "pod", klog.KObj(pod))
+			klog.V(4).InfoS("Pod resize is deferred; will reevaluate later", "pod", klog.KObj(pod))
 			newPendingResizes = append(newPendingResizes, uid)
 		case m.statusManager.IsPodResizeInfeasible(uid):
 			klog.V(4).InfoS("Pod resize is infeasible", "pod", klog.KObj(pod))
