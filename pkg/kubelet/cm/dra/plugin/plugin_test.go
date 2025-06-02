@@ -137,7 +137,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	var draPlugins Store
+	draPlugins := NewStore(tCtx, nil, nil, 0)
 	tCtx.ExpectNoError(draPlugins.add(p), "add plugin")
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
@@ -203,15 +203,16 @@ func TestGetDRAPlugin(t *testing.T) {
 		{
 			description: "plugin exists",
 			setup: func(draPlugins *Store) error {
-				return draPlugins.add(&Plugin{driverName: "dummy-driver"})
+				return draPlugins.add(&Plugin{backgroundCtx: draPlugins.backgroundCtx, driverName: "dummy-driver"})
 			},
 			driverName: "dummy-driver",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			var draPlugins Store
+			tCtx := ktesting.Init(t)
+			draPlugins := NewStore(tCtx, nil, nil, 0)
 			if test.setup != nil {
-				require.NoError(t, test.setup(&draPlugins), "setup plugin")
+				require.NoError(t, test.setup(draPlugins), "setup plugin")
 			}
 			plugin, err := draPlugins.GetDRAPlugin(test.driverName)
 			if test.shouldError {
@@ -290,7 +291,7 @@ func TestGRPCMethods(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			var draPlugins Store
+			draPlugins := NewStore(tCtx, nil, nil, 0)
 			draPlugins.add(p)
 			plugin, err := draPlugins.GetDRAPlugin(driverName)
 			if err != nil {

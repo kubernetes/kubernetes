@@ -40,7 +40,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -561,6 +560,7 @@ func TestPrepareResources(t *testing.T) {
 
 			manager, err := NewManager(fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			manager.initPluginStore(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
 				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
@@ -582,8 +582,7 @@ func TestPrepareResources(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
-
-			plg := plugin.NewRegistrationHandler(manager.draPlugins, nil, nil, time.Second /* very short wiping delay for testing */)
+			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -717,8 +716,9 @@ func TestUnprepareResources(t *testing.T) {
 
 			manager, err := NewManager(fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
+			manager.initPluginStore(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
-			plg := plugin.NewRegistrationHandler(manager.draPlugins, nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -873,8 +873,9 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	manager, err := NewManager(fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
+	manager.initPluginStore(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
-	plg := plugin.NewRegistrationHandler(manager.draPlugins, nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+	plg := manager.GetWatcherHandler()
 	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}

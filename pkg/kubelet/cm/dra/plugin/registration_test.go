@@ -166,10 +166,9 @@ func TestRegistrationHandler(t *testing.T) {
 				client = fakeClient
 			}
 
-			// The handler wipes all slices at startup.
-			var draPlugins Store
-			handler := newRegistrationHandler(tCtx, &draPlugins, client, getFakeNode, time.Second /* very short wiping delay for testing */)
-			tCtx.Cleanup(handler.Stop)
+			// The store wipes all slices at startup.
+			draPlugins := NewStore(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			tCtx.Cleanup(draPlugins.Stop)
 			requireNoSlices := func() {
 				t.Helper()
 				if client == nil {
@@ -186,14 +185,14 @@ func TestRegistrationHandler(t *testing.T) {
 			requireNoSlices()
 
 			// Simulate one existing plugin A.
-			err := handler.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
+			err := draPlugins.RegisterPlugin(pluginA, endpointA, []string{drapb.DRAPluginService}, nil)
 			require.NoError(t, err)
 			t.Cleanup(func() {
 				tCtx.Logf("Removing plugin %s", pluginA)
-				handler.DeRegisterPlugin(pluginA, endpointA)
+				draPlugins.DeRegisterPlugin(pluginA, endpointA)
 			})
 
-			err = handler.ValidatePlugin(test.driverName, test.endpoint, test.supportedServices)
+			err = draPlugins.ValidatePlugin(test.driverName, test.endpoint, test.supportedServices)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -207,7 +206,7 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// Add plugin for the first time.
-			err = handler.RegisterPlugin(test.driverName, test.endpoint, test.supportedServices, nil)
+			err = draPlugins.RegisterPlugin(test.driverName, test.endpoint, test.supportedServices, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -223,9 +222,9 @@ func TestRegistrationHandler(t *testing.T) {
 				}
 
 				tCtx.Logf("Removing plugin %s", test.driverName)
-				handler.DeRegisterPlugin(test.driverName, test.endpoint)
+				draPlugins.DeRegisterPlugin(test.driverName, test.endpoint)
 				// Nop.
-				handler.DeRegisterPlugin(test.driverName, test.endpoint)
+				draPlugins.DeRegisterPlugin(test.driverName, test.endpoint)
 
 				requireNoSlices()
 			})

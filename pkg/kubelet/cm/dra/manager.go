@@ -46,6 +46,20 @@ const draManagerStateFileName = "dra_manager_state"
 // defaultReconcilePeriod is the default reconciliation period to keep all claim info state in sync.
 const defaultReconcilePeriod = 60 * time.Second
 
+// The time that DRA drivers have to come back after being unregistered
+// before the kubelet removes their ResourceSlices.
+//
+// This must be long enough to actually allow stopping a pod and
+// starting the replacement (otherwise ResourceSlices get deleted
+// unnecessarily) and not too long (otherwise the time window were
+// pods might still get scheduled to the node after removal of a
+// driver is too long).
+//
+// 30 seconds might be long enough for a simple container restart.
+// If a DRA driver wants to be sure that slices don't get wiped,
+// it should use rolling updates.
+const defaultWipingDelay = 30 * time.Second
+
 // ActivePodsFunc is a function that returns a list of pods to reconcile.
 type ActivePodsFunc func() []*v1.Pod
 
@@ -76,9 +90,6 @@ type Manager struct {
 
 	// KubeClient reference
 	kubeClient clientset.Interface
-
-	// getNode is a function that returns the node object using the kubelet's node lister.
-	getNode GetNodeFunc
 }
 
 // NewManager creates a new DRA manager.
@@ -102,7 +113,6 @@ func NewManager(kubeClient clientset.Interface, stateFileDirectory string) (*Man
 
 	manager := &Manager{
 		cache:           claimInfoCache,
-		draPlugins:      new(draplugin.Store),
 		kubeClient:      kubeClient,
 		reconcilePeriod: reconcilePeriod,
 		activePods:      nil,
@@ -112,31 +122,25 @@ func NewManager(kubeClient clientset.Interface, stateFileDirectory string) (*Man
 	return manager, nil
 }
 
+// GetWatcherHandler must be called after Start, it indirectly depends
+// on parameters which only get passed to Start, for example the context.
 func (m *Manager) GetWatcherHandler() cache.PluginHandler {
-	// The time that DRA drivers have to come back after being unregistered
-	// before the kubelet removes their ResourceSlices.
-	//
-	// This must be long enough to actually allow stopping a pod and
-	// starting the replacement (otherwise ResourceSlices get deleted
-	// unnecessarily) and not too long (otherwise the time window were
-	// pods might still get scheduled to the node after removal of a
-	// driver is too long).
-	//
-	// 30 seconds might be long enough for a simple container restart.
-	// If a DRA driver wants to be sure that slices don't get wiped,
-	// it should use rolling updates.
-	wipingDelay := 30 * time.Second
-	/* TODO: figure out where to get a context, NewRegistrationHandler runs with context.Background() */
-	return cache.PluginHandler(draplugin.NewRegistrationHandler(m.draPlugins, m.kubeClient, m.getNode, wipingDelay))
+	return m.draPlugins
 }
 
 // Start starts the reconcile loop of the manager.
 func (m *Manager) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+	m.initPluginStore(ctx, getNode, defaultWipingDelay)
 	m.activePods = activePods
-	m.getNode = getNode
 	m.sourcesReady = sourcesReady
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
 	return nil
+}
+
+// initPluginStore can be used instead of Start to make the manager useable
+// for calls to prepare/unprepare. It exists primarily for testing purposes.
+func (m *Manager) initPluginStore(ctx context.Context, getNode GetNodeFunc, wipingDelay time.Duration) {
+	m.draPlugins = draplugin.NewStore(ctx, m.kubeClient, getNode, wipingDelay)
 }
 
 // reconcileLoop ensures that any stale state in the manager's claimInfoCache gets periodically reconciled.

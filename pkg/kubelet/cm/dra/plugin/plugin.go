@@ -35,6 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+// defaultClientCallTimeout is the default amount of time that a DRA driver has
+// to respond to any of the gRPC calls. kubelet uses this value by passing nil
+// to RegisterPlugin. Some tests use a different, usually shorter timeout to
+// speed up testing.
+//
+// This is half of the kubelet retry period (according to
+// https://github.com/kubernetes/kubernetes/commit/0449cef8fd5217d394c5cd331d852bd50983e6b3).
+const defaultClientCallTimeout = 45 * time.Second
+
 // Plugin contains information about one registered plugin of a DRA driver.
 // It implements the kubelet operations for preparing/unpreparing by calling
 // a gRPC interface that is implemented by the plugin.

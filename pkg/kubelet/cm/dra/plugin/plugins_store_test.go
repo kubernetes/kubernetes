@@ -23,21 +23,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestAddSameName(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	// name will have a random value to avoid conflicts
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	firstWasCancelled := false
 	p := &Plugin{
-		driverName: driverName,
-		endpoint:   "old",
-		cancel:     func(err error) { firstWasCancelled = true },
+		driverName:    driverName,
+		backgroundCtx: tCtx,
+		endpoint:      "old",
+		cancel:        func(err error) { firstWasCancelled = true },
 	}
 
 	// ensure the plugin we are using is registered
-	var draPlugins Store
+	draPlugins := NewStore(tCtx, nil, nil, 0)
 	require.NoError(t, draPlugins.add(p))
 
 	assert.False(t, firstWasCancelled, "should not cancel context after the first call")
@@ -47,9 +50,10 @@ func TestAddSameName(t *testing.T) {
 
 	secondWasCancelled := false
 	p2 := &Plugin{
-		driverName: driverName,
-		endpoint:   "new",
-		cancel:     func(err error) { secondWasCancelled = true },
+		driverName:    driverName,
+		backgroundCtx: tCtx,
+		endpoint:      "new",
+		cancel:        func(err error) { secondWasCancelled = true },
 	}
 	require.NoError(t, draPlugins.add(p2))
 	defer draPlugins.remove(p2.driverName, p2.endpoint)
@@ -64,16 +68,18 @@ func TestAddSameName(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	wasCancelled := false
 	p := &Plugin{
-		driverName: driverName,
-		cancel:     func(err error) { wasCancelled = true },
+		driverName:    driverName,
+		backgroundCtx: tCtx,
+		cancel:        func(err error) { wasCancelled = true },
 	}
 
 	// ensure the plugin we are using is registered
-	var draPlugins Store
+	draPlugins := NewStore(tCtx, nil, nil, 0)
 	draPlugins.add(p)
 
 	draPlugins.remove(p.driverName, "")
