@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
 )
 
 const (
@@ -54,16 +55,17 @@ func (ifOptionTagValidator) ValidScopes() sets.Set[Scope] {
 	return ifOptionTagValidScopes
 }
 
-func (iotv ifOptionTagValidator) GetValidations(context Context, args []string, payload string) (Validations, error) {
-	if len(args) != 1 {
-		return Validations{}, fmt.Errorf("takes exactly 1 argument")
+func (iotv ifOptionTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	if len(tag.Args) != 1 || len(tag.Args[0].Name) != 0 || tag.Args[0].Type != codetags.ArgTypeString {
+		return Validations{}, fmt.Errorf("requires exactly 1 positional string argument")
 	}
-	optionName := args[0]
+	optionName := tag.Args[0].Value
+	if tag.ValueTag == nil {
+		return Validations{}, fmt.Errorf("missing validation tag")
+	}
 
 	result := Validations{}
-
-	fakeComments := []string{payload}
-	if validations, err := iotv.validator.ExtractValidations(context, fakeComments); err != nil {
+	if validations, err := iotv.validator.ExtractValidations(context, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		for _, fn := range validations.Functions {
@@ -76,7 +78,6 @@ func (iotv ifOptionTagValidator) GetValidations(context Context, args []string, 
 		}
 		return result, nil
 	}
-
 }
 
 func (iotv ifOptionTagValidator) Docs() TagDoc {

@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -53,17 +54,18 @@ var (
 	validateSubfield = types.Name{Package: libValidationPkg, Name: "Subfield"}
 )
 
-func (stv subfieldTagValidator) GetValidations(context Context, args []string, payload string) (Validations, error) {
+func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	t := NonPointer(NativeType(context.Type))
 	if t.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on struct types")
 	}
-	if len(args) != 1 {
-		return Validations{}, fmt.Errorf("requires exactly one arg")
+	if len(args) != 1 || len(args[0].Name) != 0 || args[0].Type != codetags.ArgTypeString {
+		return Validations{}, fmt.Errorf("requires exactly 1 positional string argument")
 	}
-	subname := args[0]
+	subname := args[0].Value
 	submemb := getMemberByJSON(t, subname)
 	if submemb == nil {
 		return Validations{}, fmt.Errorf("no field for json name %q", subname)
@@ -71,14 +73,16 @@ func (stv subfieldTagValidator) GetValidations(context Context, args []string, p
 
 	result := Validations{}
 
-	fakeComments := []string{payload}
 	subContext := Context{
 		Scope:  ScopeField,
 		Type:   submemb.Type,
 		Parent: t,
 		Path:   context.Path.Child(subname),
 	}
-	if validations, err := stv.validator.ExtractValidations(subContext, fakeComments); err != nil {
+	if tag.ValueTag == nil {
+		return Validations{}, fmt.Errorf("missing validation tag")
+	}
+	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {

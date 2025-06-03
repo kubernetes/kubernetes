@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -50,7 +51,7 @@ var (
 	dnsLabelValidator = types.Name{Package: libValidationPkg, Name: "DNSLabel"}
 )
 
-func (formatTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := NonPointer(NativeType(context.Type)); t != types.String {
@@ -58,7 +59,7 @@ func (formatTagValidator) GetValidations(context Context, _ []string, payload st
 	}
 
 	var result Validations
-	if formatFunction, err := getFormatValidationFunction(payload); err != nil {
+	if formatFunction, err := getFormatValidationFunction(tag.Value); err != nil {
 		return result, err
 	} else {
 		result.AddFunction(formatFunction)

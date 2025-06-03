@@ -17,11 +17,11 @@ limitations under the License.
 package validators
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
 )
@@ -123,18 +123,15 @@ func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 	return unionTagValidScopes
 }
 
-func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
 	if t := NonPointer(NativeType(context.Type)); t != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
-
-	p := &discriminatorParams{}
-	if len(payload) > 0 {
-		if err := json.Unmarshal([]byte(payload), &p); err != nil {
-			return Validations{}, fmt.Errorf("error parsing JSON value: %v (%q)", err, payload)
-		}
+	p, err := toDiscriminatorArgs(tag)
+	if err != nil {
+		return Validations{}, err
 	}
 	if udtv.shared[context.Parent] == nil {
 		udtv.shared[context.Parent] = unions{}
@@ -158,14 +155,10 @@ func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 		Tag:         udtv.TagName(),
 		Scopes:      udtv.ValidScopes().UnsortedList(),
 		Description: "Indicates that this field is the discriminator for a union.",
-		Payloads: []TagPayloadDoc{{
-			Description: "<json-object>",
-			Docs:        "",
-			Schema: []TagPayloadSchema{{
-				Key:   "union",
-				Value: "<string>",
-				Docs:  "the name of the union, if more than one exists",
-			}},
+		Args: []TagArgDoc{{
+			Name:        "union",
+			Description: "<string>",
+			Docs:        "the name of the union, if more than one exists",
 		}},
 	}
 }
@@ -184,7 +177,7 @@ func (unionMemberTagValidator) ValidScopes() sets.Set[Scope] {
 	return unionTagValidScopes
 }
 
-func (umtv unionMemberTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var fieldName string
 	jsonTag, ok := tags.LookupJSON(*context.Member)
 	if !ok {
@@ -195,12 +188,9 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, _ []string, 
 		return Validations{}, fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
 	}
 
-	p := &memberParams{MemberName: context.Member.Name}
-	if len(payload) > 0 {
-		// Name may optionally be overridden by tag's memberName field.
-		if err := json.Unmarshal([]byte(payload), &p); err != nil {
-			return Validations{}, fmt.Errorf("error parsing JSON value: %v (%q)", err, payload)
-		}
+	p, err := toMemberArgs(context, &tag)
+	if err != nil {
+		return Validations{}, err
 	}
 	if umtv.shared[context.Parent] == nil {
 		umtv.shared[context.Parent] = unions{}
@@ -219,44 +209,68 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 		Tag:         umtv.TagName(),
 		Scopes:      umtv.ValidScopes().UnsortedList(),
 		Description: "Indicates that this field is a member of a union.",
-		Payloads: []TagPayloadDoc{{
-			Description: "<json-object>",
-			Docs:        "",
-			Schema: []TagPayloadSchema{{
-				Key:   "union",
-				Value: "<string>",
-				Docs:  "the name of the union, if more than one exists",
-			}, {
-				Key:     "memberName",
-				Value:   "<string>",
-				Docs:    "the discriminator value for this member",
-				Default: "the field's name",
-			}},
+		Args: []TagArgDoc{{
+			Name:        "union",
+			Description: "<string>",
+			Docs:        "the name of the union, if more than one exists",
+		}, {
+			Name:        "memberName",
+			Description: "<string>",
+			Docs:        "the discriminator value for this member",
+			Default:     "the field's name",
 		}},
 	}
 }
 
-// discriminatorParams defines JSON the parameter value for the
+func toDiscriminatorArgs(tag codetags.Tag) (discriminatorArgs, error) {
+	var result discriminatorArgs
+	for _, arg := range tag.Args {
+		switch arg.Name {
+		case "union":
+			result.Union = arg.Value
+		default:
+			return discriminatorArgs{}, fmt.Errorf("unknown argument %q", arg.Name)
+		}
+	}
+	return result, nil
+}
+
+// discriminatorArgs defines JSON the parameter value for the
 // +k8s:unionDiscriminator tag.
-type discriminatorParams struct {
+type discriminatorArgs struct {
 	// Union sets the name of the union this discriminator belongs to.
 	// This is only needed for go structs that contain more than one union.
 	// Optional.
-	Union string `json:"union,omitempty"`
+	Union string
 }
 
-// memberParams defines the JSON parameter value for the +k8s:unionMember tag.
-type memberParams struct {
+func toMemberArgs(context Context, tag *codetags.Tag) (*memberArgs, error) {
+	result := &memberArgs{MemberName: context.Member.Name}
+	for _, arg := range tag.Args {
+		switch arg.Name {
+		case "union":
+			result.Union = arg.Value
+		case "memberName":
+			result.MemberName = arg.Value
+		default:
+			return nil, fmt.Errorf("unknown argument %q", arg.Name)
+		}
+	}
+	return result, nil
+}
+
+// memberArgs defines the JSON parameter value for the +k8s:unionMember tag.
+type memberArgs struct {
 	// Union sets the name of the union this member belongs to.
 	// This is only needed for go structs that contain more than one union.
 	// Optional.
-	Union string `json:"union,omitempty"`
+	Union string
 	// MemberName provides a name for a union member. If the union has a
 	// discriminator, the member name must match the value the discriminator
 	// is set to when this member is specified.
 	// Optional.
 	// Defaults to the go field name.
-	MemberName string `json:"memberName,omitempty"`
+	MemberName string
 }
 
 // union defines how a union validation will be generated, based
