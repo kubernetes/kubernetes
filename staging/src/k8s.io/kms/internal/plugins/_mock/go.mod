@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace k8s.io/gengo/v2 => github.com/jpbetz/gengo/v2 v2.0.0-20250603173426-b37a58d7aba8
