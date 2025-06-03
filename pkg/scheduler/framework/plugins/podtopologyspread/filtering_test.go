@@ -85,7 +85,7 @@ func TestPreFilterState(t *testing.T) {
 		objs                      []runtime.Object
 		defaultConstraints        []v1.TopologySpreadConstraint
 		want                      *preFilterState
-		wantPrefilterStatus       *framework.Status
+		wantPrefilterStatus       *fwk.Status
 		enableNodeInclusionPolicy bool
 		enableMatchLabelKeys      bool
 	}{
@@ -574,7 +574,7 @@ func TestPreFilterState(t *testing.T) {
 			objs: []runtime.Object{
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "kep"}}},
 			},
-			wantPrefilterStatus: framework.NewStatus(framework.Skip),
+			wantPrefilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "default constraints and a service, but pod has constraints",
@@ -612,7 +612,7 @@ func TestPreFilterState(t *testing.T) {
 			objs: []runtime.Object{
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": "bar"}}},
 			},
-			wantPrefilterStatus: framework.NewStatus(framework.Skip),
+			wantPrefilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "TpKeyToDomainsNum is calculated when MinDomains is enabled",
@@ -1479,7 +1479,7 @@ func TestPreFilterState(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 			},
-			wantPrefilterStatus: framework.NewStatus(framework.Skip),
+			wantPrefilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 	}
 	for _, tt := range tests {
@@ -2416,7 +2416,7 @@ func TestSingleConstraint(t *testing.T) {
 		pod                       *v1.Pod
 		nodes                     []*v1.Node
 		existingPods              []*v1.Pod
-		wantStatusCode            map[string]framework.Code
+		wantStatusCode            map[string]fwk.Code
 		enableNodeInclusionPolicy bool
 	}{
 		{
@@ -2430,11 +2430,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -2448,11 +2448,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -2472,11 +2472,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2494,11 +2494,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -2520,11 +2520,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -2546,11 +2546,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.UnschedulableAndUnresolvable,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.UnschedulableAndUnresolvable,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2562,9 +2562,9 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.UnschedulableAndUnresolvable,
-				"node-x": framework.UnschedulableAndUnresolvable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.UnschedulableAndUnresolvable,
+				"node-x": fwk.UnschedulableAndUnresolvable,
 			},
 		},
 		{
@@ -2586,11 +2586,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2612,11 +2612,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2642,11 +2642,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2674,11 +2674,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success, // in real case, it's false
-				"node-x": framework.Success, // in real case, it's false
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success, // in real case, it's false
+				"node-x": fwk.Success, // in real case, it's false
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2694,9 +2694,9 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Terminating().Obj(),
 				st.MakePod().Name("p-b").Node("node-b").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2717,11 +2717,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success, // in real case, it's Unschedulable
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success, // in real case, it's Unschedulable
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -2748,10 +2748,10 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-c": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-c": fwk.Success,
 			},
 		},
 		{
@@ -2778,10 +2778,10 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-c": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-c": fwk.Success,
 			},
 		},
 		{
@@ -2807,11 +2807,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -2837,11 +2837,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -2862,11 +2862,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Success, // in real case, when we disable NodeAffinity Plugin, node-y will be success.
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success, // in real case, when we disable NodeAffinity Plugin, node-y will be success.
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2888,11 +2888,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2914,11 +2914,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Success, // in real case, when we disable NodeAffinity Plugin, node-y will be success.
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success, // in real case, when we disable NodeAffinity Plugin, node-y will be success.
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2940,11 +2940,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2965,11 +2965,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Success, // in real case, when we disable TaintToleration Plugin, node-y will be success.
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success, // in real case, when we disable TaintToleration Plugin, node-y will be success.
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -2990,11 +2990,11 @@ func TestSingleConstraint(t *testing.T) {
 				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -3032,7 +3032,7 @@ func TestMultipleConstraints(t *testing.T) {
 		pod                       *v1.Pod
 		nodes                     []*v1.Node
 		existingPods              []*v1.Pod
-		wantStatusCode            map[string]framework.Code
+		wantStatusCode            map[string]fwk.Code
 		enableNodeInclusionPolicy bool
 	}{
 		{
@@ -3058,11 +3058,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3089,11 +3089,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3115,11 +3115,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3142,11 +3142,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3171,11 +3171,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Success,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Success,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3198,11 +3198,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-x1").Node("node-x").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("bar", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Success,
-				"node-b": framework.Success,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Success,
+				"node-b": fwk.Success,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3224,11 +3224,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Success,
-				"node-x": framework.UnschedulableAndUnresolvable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Success,
+				"node-x": fwk.UnschedulableAndUnresolvable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 		{
@@ -3252,11 +3252,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -3280,11 +3280,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -3309,11 +3309,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Success,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Success,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -3338,11 +3338,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Unschedulable,
 			},
 			enableNodeInclusionPolicy: true,
 		},
@@ -3369,11 +3369,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Success,
-				"node-y": framework.Success,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Success,
+				"node-y": fwk.Success,
 			},
 		},
 		{
@@ -3400,11 +3400,11 @@ func TestMultipleConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			wantStatusCode: map[string]framework.Code{
-				"node-a": framework.Unschedulable,
-				"node-b": framework.Unschedulable,
-				"node-x": framework.Unschedulable,
-				"node-y": framework.Unschedulable,
+			wantStatusCode: map[string]fwk.Code{
+				"node-a": fwk.Unschedulable,
+				"node-b": fwk.Unschedulable,
+				"node-x": fwk.Unschedulable,
+				"node-y": fwk.Unschedulable,
 			},
 		},
 	}
@@ -3444,7 +3444,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	p := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(*PodTopologySpread).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(fwk.ErrNotFound)
+	wantStatus := fwk.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
 		t.Errorf("Status does not match (-want,+got):\n%s", diff)
 	}

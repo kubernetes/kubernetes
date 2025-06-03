@@ -312,13 +312,13 @@ func TestFailureHandler(t *testing.T) {
 				queue.Delete(testPod)
 			}
 
-			s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+			s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-			s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable), nil, time.Now())
+			s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable), nil, time.Now())
 
 			var got *v1.Pod
 			if tt.podUpdatedDuringScheduling {
@@ -358,13 +358,13 @@ func TestFailureHandler_PodAlreadyBound(t *testing.T) {
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(logger, &nodeFoo)
 
-	s, fwk, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
+	s, schedFramework, err := initScheduler(ctx, schedulerCache, queue, client, informerFactory)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	testPodInfo := &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, testPod)}
-	s.FailureHandler(ctx, fwk, testPodInfo, framework.NewStatus(framework.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
+	s.FailureHandler(ctx, schedFramework, testPodInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fmt.Errorf("binding rejected: timeout")), nil, time.Now())
 
 	pod := getPodFromPriorityQueue(queue, testPod)
 	if pod != nil {
@@ -1151,7 +1151,7 @@ func (t *fakebindPlugin) Name() string {
 	return fakeBind
 }
 
-func (t *fakebindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (t *fakebindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *fwk.Status {
 	return nil
 }
 
@@ -1160,7 +1160,7 @@ type filterWithoutEnqueueExtensionsPlugin struct{}
 
 func (*filterWithoutEnqueueExtensionsPlugin) Name() string { return filterWithoutEnqueueExtensions }
 
-func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1174,7 +1174,7 @@ var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) 
 
 func (*fakeNodePlugin) Name() string { return fakeNode }
 
-func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1194,7 +1194,7 @@ var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (
 
 func (*fakePodPlugin) Name() string { return fakePod }
 
-func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1208,7 +1208,7 @@ type emptyEventPlugin struct{}
 
 func (*emptyEventPlugin) Name() string { return emptyEventExtensions }
 
-func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1221,7 +1221,7 @@ type errorEventsToRegisterPlugin struct{}
 
 func (*errorEventsToRegisterPlugin) Name() string { return errorEventsToRegister }
 
-func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1236,7 +1236,7 @@ type emptyEventsToRegisterPlugin struct{}
 
 func (*emptyEventsToRegisterPlugin) Name() string { return emptyEventsToRegister }
 
-func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
 	return nil
 }
 
@@ -1267,13 +1267,13 @@ const (
 	permitTimeout    = 10 * time.Second
 )
 
-func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	defer func() {
 		// Send event with podWaiting reason to broadcast this pod is already waiting in the permit stage.
 		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")
 	}()
 
-	return framework.NewStatus(framework.Wait), permitTimeout
+	return fwk.NewStatus(fwk.Wait), permitTimeout
 }
 
 var _ framework.PermitPlugin = &fakePermitPlugin{}

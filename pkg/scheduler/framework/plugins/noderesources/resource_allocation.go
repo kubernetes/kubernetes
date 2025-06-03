@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	resourcehelper "k8s.io/component-helpers/resource"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -49,13 +50,13 @@ func (r *resourceAllocationScorer) score(
 	ctx context.Context,
 	pod *v1.Pod,
 	nodeInfo *framework.NodeInfo,
-	podRequests []int64) (int64, *framework.Status) {
+	podRequests []int64) (int64, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	// resources not set, nothing scheduled,
 	if len(r.resources) == 0 {
-		return 0, framework.NewStatus(framework.Error, "resources not found")
+		return 0, fwk.NewStatus(fwk.Error, "resources not found")
 	}
 
 	requested := make([]int64, len(r.resources))

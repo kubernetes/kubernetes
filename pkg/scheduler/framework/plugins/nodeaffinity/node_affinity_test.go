@@ -44,8 +44,8 @@ func TestNodeAffinity(t *testing.T) {
 		pod                 *v1.Pod
 		labels              map[string]string
 		nodeName            string
-		wantStatus          *framework.Status
-		wantPreFilterStatus *framework.Status
+		wantStatus          *fwk.Status
+		wantPreFilterStatus *fwk.Status
 		wantPreFilterResult *framework.PreFilterResult
 		args                config.NodeAffinityArgs
 		runPreFilter        bool
@@ -55,7 +55,7 @@ func TestNodeAffinity(t *testing.T) {
 			pod: st.MakePod().NodeSelector(map[string]string{
 				"foo": "bar",
 			}).Obj(),
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -88,7 +88,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -229,7 +229,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -252,7 +252,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -261,7 +261,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 			runPreFilter:        true,
 		},
 		{
@@ -278,7 +278,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 			runPreFilter:        true,
 		},
 		{
@@ -341,7 +341,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"GPU": "NVIDIA-GRID-K1",
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -441,7 +441,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "barrrrrr",
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -470,7 +470,7 @@ func TestNodeAffinity(t *testing.T) {
 			labels: map[string]string{
 				"foo": "bar",
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -524,7 +524,7 @@ func TestNodeAffinity(t *testing.T) {
 				},
 			},
 			nodeName:            "node2",
-			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:          fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
 			runPreFilter:        true,
 		},
@@ -602,7 +602,7 @@ func TestNodeAffinity(t *testing.T) {
 			nodeName:            "node2",
 			labels:              map[string]string{"foo": "bar"},
 			wantPreFilterResult: &framework.PreFilterResult{NodeNames: sets.New("node1")},
-			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:          fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter:        true,
 		},
 		{
@@ -674,7 +674,7 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:     "node2",
 			labels:       map[string]string{"foo": "bar"},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -743,8 +743,8 @@ func TestNodeAffinity(t *testing.T) {
 			},
 			nodeName:            "node2",
 			labels:              map[string]string{"foo": "bar"},
-			wantPreFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonConflict),
-			wantStatus:          framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonConflict),
+			wantStatus:          fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter:        true,
 		},
 		{
@@ -825,7 +825,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonPod),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonPod),
 			runPreFilter: true,
 		},
 		{
@@ -848,7 +848,7 @@ func TestNodeAffinity(t *testing.T) {
 					},
 				},
 			},
-			wantStatus:   framework.NewStatus(framework.UnschedulableAndUnresolvable, errReasonEnforced),
+			wantStatus:   fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonEnforced),
 			runPreFilter: true,
 		},
 		{
@@ -915,7 +915,7 @@ func TestNodeAffinity(t *testing.T) {
 			}
 
 			state := framework.NewCycleState()
-			var gotStatus *framework.Status
+			var gotStatus *fwk.Status
 			if test.runPreFilter {
 				gotPreFilterResult, gotStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, state, test.pod, nil)
 				if diff := cmp.Diff(test.wantPreFilterStatus, gotStatus); diff != "" {
@@ -1015,7 +1015,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 		expectedList       framework.NodeScoreList
 		args               config.NodeAffinityArgs
 		runPreScore        bool
-		wantPreScoreStatus *framework.Status
+		wantPreScoreStatus *fwk.Status
 	}{
 		{
 			name: "all nodes are same priority as NodeAffinity is nil",
@@ -1043,7 +1043,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
 			},
 			runPreScore:        true,
-			wantPreScoreStatus: framework.NewStatus(framework.Skip),
+			wantPreScoreStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "PreScore returns error when an incoming Pod has a broken affinity",
@@ -1076,7 +1076,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: label1}},
 			},
 			runPreScore:        true,
-			wantPreScoreStatus: framework.AsStatus(fmt.Errorf(`[0].matchExpressions[0].key: Invalid value: "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`)),
+			wantPreScoreStatus: fwk.AsStatus(fmt.Errorf(`[0].matchExpressions[0].key: Invalid value: "invalid key": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`)),
 		},
 		{
 			name: "no node matches preferred scheduling requirements in NodeAffinity of pod so all nodes' priority is zero",
@@ -1197,7 +1197,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
 			}
-			var status *framework.Status
+			var status *fwk.Status
 			if test.runPreScore {
 				status = p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, tf.BuildNodeInfos(test.nodes))
 				if status.Code() != test.wantPreScoreStatus.Code() {

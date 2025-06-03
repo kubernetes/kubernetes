@@ -188,8 +188,8 @@ func (f *fakeCRPlugin) Name() string {
 	return "fakeCRPlugin"
 }
 
-func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
-	return framework.NewStatus(framework.Unschedulable, "always fail")
+func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Unschedulable, "always fail")
 }
 
 // EventsToRegister returns the possible events that may make a Pod
@@ -321,17 +321,17 @@ func TestCustomResourceEnqueue(t *testing.T) {
 
 	// Pop fake-pod out. It should be unschedulable.
 	podInfo := testutils.NextPodOrDie(t, testCtx)
-	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
+	schedFramework, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.SchedulePod(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
 	}
-	testCtx.Scheduler.FailureHandler(ctx, fwk, podInfo, framework.NewStatus(framework.Unschedulable).WithError(fitError), nil, time.Now())
+	testCtx.Scheduler.FailureHandler(ctx, schedFramework, podInfo, fwk.NewStatus(fwk.Unschedulable).WithError(fitError), nil, time.Now())
 
 	// Scheduling cycle is incremented from 0 to 1 after NextPod() is called, so
 	// pass a number larger than 1 to move Pod to unschedulablePods.
@@ -439,11 +439,11 @@ func (*firstFailBindPlugin) Name() string {
 	return "firstFailBindPlugin"
 }
 
-func (p *firstFailBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *framework.Status {
+func (p *firstFailBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *fwk.Status {
 	if p.counter == 0 {
 		// fail in the first Bind call.
 		p.counter++
-		return framework.NewStatus(framework.Error, "firstFailBindPlugin rejects the Pod")
+		return fwk.NewStatus(fwk.Error, "firstFailBindPlugin rejects the Pod")
 	}
 
 	return p.defaultBinderPlugin.Bind(ctx, state, pod, nodename)
@@ -569,8 +569,8 @@ func (p *fakePermitPlugin) Name() string {
 	return fakePermitPluginName
 }
 
-func (p *fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
-	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
+func (p *fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, _ *v1.Pod, _ string) (*fwk.Status, time.Duration) {
+	return fwk.NewStatus(fwk.Wait), wait.ForeverTestTimeout
 }
 
 func (p *fakePermitPlugin) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
