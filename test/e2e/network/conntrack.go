@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -172,9 +173,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -199,7 +201,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -248,9 +251,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -275,7 +279,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -343,7 +348,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 			framework.Failf("expected 1 pod, got %d pods", len(pods.Items))
 		}
 		podBackend1 := pods.Items[0].Name
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -420,9 +425,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod1.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.
@@ -447,7 +453,8 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.Logf("Cleaning up %s pod", podBackend1)
 		e2epod.NewPodClient(fr).DeleteSync(ctx, podBackend1, metav1.DeleteOptions{}, fr.Timeouts.PodDelete)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend2)
+		framework.ExpectNoError(err)
 
 		// Check that the second pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -516,9 +523,10 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
 
 		// wait until the endpoints are ready
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+		err = e2eendpointslice.WaitForEndpointPods(ctx, cs, ns, serviceName, podBackend1)
+		framework.ExpectNoError(err)
 
-		// Note that the fact that Endpoints object already exists, does NOT mean
+		// Note that the fact that EndpointSlice object already exists, does NOT mean
 		// that iptables (or whatever else is used) was already programmed.
 		// Additionally take into account that UDP conntract entries timeout is
 		// 30 seconds by default.

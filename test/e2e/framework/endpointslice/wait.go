@@ -85,3 +85,34 @@ func WaitForEndpointCount(ctx context.Context, cs clientset.Interface, namespace
 		return true, nil
 	})
 }
+
+// WaitForEndpointPods waits (up to ControllerUpdateTimeout) for the named service to have
+// at least one EndpointSlice, with the set of `Endpoints` across all slices covering
+// exactly the pods named in expectPods. (Note that if called on a dual-stack service, it
+// may return before both EndpointSlices have been written, since the first EndpointSlice
+// alone will normally target all pods.)
+func WaitForEndpointPods(ctx context.Context, cs clientset.Interface, namespace, serviceName string, expectPods ...string) error {
+	framework.Logf("Waiting for service %s/%s to have endpoints pointing to %v", namespace, serviceName, expectPods)
+	expectPodSet := sets.New(expectPods...)
+	return WaitForEndpointSlices(ctx, cs, namespace, serviceName, time.Second, ControllerUpdateTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+		if len(endpointSlices) == 0 {
+			framework.Logf("Waiting for at least 1 EndpointSlice to exist")
+			return false, nil
+		}
+
+		podSet := sets.Set[string]{}
+		for _, epSlice := range endpointSlices {
+			for _, ep := range epSlice.Endpoints {
+				if ep.TargetRef != nil && ep.TargetRef.Kind == "Pod" && ep.TargetRef.Namespace == namespace {
+					podSet.Insert(ep.TargetRef.Name)
+				}
+			}
+		}
+
+		if !podSet.Equal(expectPodSet) {
+			framework.Logf("Unexpected endpoints on slices, missing: %v, extra: %v", sets.List(expectPodSet.Difference(podSet)), sets.List(podSet.Difference(expectPodSet)))
+			return false, nil
+		}
+		return true, nil
+	})
+}
