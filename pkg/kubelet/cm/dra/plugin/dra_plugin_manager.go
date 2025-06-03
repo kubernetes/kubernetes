@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +37,7 @@ import (
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/utils/ptr"
 )
 
 // DRAPluginManager keeps track of how to reach plugins registered for DRA drivers.
@@ -44,7 +47,7 @@ import (
 // [cache.PluginHandler] interface and needs to be added to the
 // plugin manager.
 //
-// The null DRAPluginManager is not usable, use NewPluginManager.
+// The null DRAPluginManager is not usable, use NewDRAPluginManager.
 type DRAPluginManager struct {
 	// backgroundCtx is used for all future activities of the DRAPluginManager.
 	// This is necessary because it implements APIs which don't
@@ -58,7 +61,7 @@ type DRAPluginManager struct {
 	wg    sync.WaitGroup
 	mutex sync.RWMutex
 
-	// driver name -> Plugin in the order in which they got added
+	// driver name -> DRAPlugin in the order in which they got added
 	store map[string][]*DRAPlugin
 
 	// pendingWipes maps a driver name to a cancel function for
@@ -112,8 +115,20 @@ func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, g
 
 // Stop cancels any remaining background activities and blocks until all goroutines have stopped.
 func (pm *DRAPluginManager) Stop() {
+	defer pm.wg.Wait() // Must run after unlocking our mutex.
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
 	pm.cancel(errors.New("Stop was called"))
-	pm.wg.Wait()
+
+	// Close all connections, otherwise gRPC keeps doing things in the background.
+	for _, plugins := range pm.store {
+		for _, plugin := range plugins {
+			if err := plugin.conn.Close(); err != nil {
+				klog.FromContext(pm.backgroundCtx).Error(err, "Closing gRPC connection", "driverName", plugin.driverName, "endpoint", plugin.endpoint)
+			}
+		}
+	}
 }
 
 // wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
@@ -196,7 +211,7 @@ func (pm *DRAPluginManager) GetPlugin(driverName string) (*DRAPlugin, error) {
 	return plugin, nil
 }
 
-// get lets you retrieve a DRA Plugin by name.
+// get lets you retrieve a DRA DRAPlugin by name.
 func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 	pm.mutex.RLock()
 	defer pm.mutex.RUnlock()
@@ -223,46 +238,16 @@ func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
 // in advance which version to use resp. which optional services the plugin
 // supports.
 func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
-	// Prepare a context with its own logger for the plugin.
-	//
-	// The lifecycle of the plugin's background activities is tied to our
-	// root context, so canceling that will also cancel the plugin.
-	//
-	// The logger injects the driver name and endpoint as additional values
-	// into all log output related to the plugin.
-	ctx := pm.backgroundCtx
-	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithValues(logger, "driverName", driverName, "endpoint", endpoint)
-	ctx = klog.NewContext(ctx, logger)
-
 	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
 
-	var timeout time.Duration
-	if pluginClientTimeout == nil {
-		timeout = defaultClientCallTimeout
-	} else {
-		timeout = *pluginClientTimeout
-	}
+	timeout := ptr.Deref(pluginClientTimeout, defaultClientCallTimeout)
 
-	ctx, cancel := context.WithCancelCause(ctx)
-
-	plugin := &DRAPlugin{
-		driverName:        driverName,
-		backgroundCtx:     ctx,
-		cancel:            cancel,
-		conn:              nil,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: timeout,
-	}
-
-	// Storing endpoint of newly registered DRA Plugin into the map, where the DRA driver name will be the key
+	// Storing endpoint of newly registered DRA DRAPlugin into the map, where the DRA driver name will be the key
 	// under which the manager will be able to get a plugin when it needs to call it.
-	if err := pm.add(plugin); err != nil {
-		cancel(err)
+	if err := pm.add(driverName, endpoint, chosenService, timeout); err != nil {
 		// No wrapping, the error already contains details.
 		return err
 	}
@@ -270,23 +255,44 @@ func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, s
 	return nil
 }
 
-func (pm *DRAPluginManager) add(p *DRAPlugin) error {
+func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, clientCallTimeout time.Duration) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
 	if pm.store == nil {
 		pm.store = make(map[string][]*DRAPlugin)
 	}
-	for _, oldP := range pm.store[p.driverName] {
-		if oldP.endpoint == p.endpoint {
+	for _, oldP := range pm.store[driverName] {
+		if oldP.endpoint == endpoint {
 			// One plugin instance cannot hijack the endpoint of another instance.
-			return fmt.Errorf("endpoint %s already registered for plugin %s", p.endpoint, p.driverName)
+			return fmt.Errorf("endpoint %s already registered for DRA driver plugin %s", endpoint, driverName)
 		}
 	}
 
-	logger := klog.FromContext(p.backgroundCtx)
+	logger := klog.FromContext(pm.backgroundCtx)
+
+	// The gRPC connection gets created once. gRPC then connects to the gRPC server on demand.
+	target := "unix:" + endpoint
+	logger.V(4).Info("Creating new gRPC connection", "target", target)
+	conn, err := grpc.NewClient(
+		target,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(driverName)),
+	)
+	if err != nil {
+		return fmt.Errorf("create gRPC connection to DRA driver %s plugin at endpoint %s: %w", driverName, endpoint, err)
+	}
+
+	p := &DRAPlugin{
+		driverName:        driverName,
+		endpoint:          endpoint,
+		conn:              conn,
+		chosenService:     chosenService,
+		clientCallTimeout: clientCallTimeout,
+	}
+
 	pm.store[p.driverName] = append(pm.store[p.driverName], p)
-	logger.V(3).Info("Registered DRA plugin", "numInstances", len(pm.store[p.driverName]))
+	logger.V(3).Info("Registered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "chosenService", p.chosenService, "numPlugins", len(pm.store[p.driverName]))
 	pm.sync(p.driverName)
 	return nil
 }
@@ -317,13 +323,8 @@ func (pm *DRAPluginManager) remove(driverName, endpoint string) {
 	} else {
 		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
-	if p.cancel != nil {
-		// This cancels background attempts to establish a connection to the plugin.
-		// TODO: remove this in favor of non-blocking connection management.
-		p.cancel(errors.New("plugin got removed"))
-	}
-	logger := klog.FromContext(p.backgroundCtx)
-	logger.V(3).Info("Unregistered DRA plugin", "numInstances", len(pm.store[driverName]))
+	logger := klog.FromContext(pm.backgroundCtx)
+	logger.V(3).Info("Unregistered DRA plugin", "driverName", p.driverName, "endpoint", p.endpoint, "numPlugins", len(pm.store[driverName]))
 	pm.sync(driverName)
 }
 
@@ -350,7 +351,7 @@ func (pm *DRAPluginManager) sync(driverName string) {
 	ctx, cancel := context.WithCancelCause(pm.backgroundCtx)
 	ctx = klog.NewContext(ctx, logger)
 
-	// Clean up the ResourceSlices for the deleted Plugin since it
+	// Clean up the ResourceSlices for the deleted DRAPlugin since it
 	// may have died without doing so itself and might never come
 	// back.
 	//

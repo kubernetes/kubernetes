@@ -21,7 +21,6 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -31,58 +30,39 @@ func TestAddSameName(t *testing.T) {
 	// name will have a random value to avoid conflicts
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
-	firstWasCancelled := false
-	p := &DRAPlugin{
-		driverName:    driverName,
-		backgroundCtx: tCtx,
-		endpoint:      "old",
-		cancel:        func(err error) { firstWasCancelled = true },
-	}
-
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
-	require.NoError(t, draPlugins.add(p))
-
-	assert.False(t, firstWasCancelled, "should not cancel context after the first call")
+	tCtx.ExpectNoError(draPlugins.add(driverName, "old.sock", "", defaultClientCallTimeout), "add first plugin")
+	p, err := draPlugins.GetPlugin(driverName)
+	tCtx.ExpectNoError(err, "get first plugin")
 
 	// Same name, same endpoint -> error.
-	require.Error(t, draPlugins.add(p))
+	require.Error(tCtx, draPlugins.add(driverName, "old.sock", "", defaultClientCallTimeout))
 
-	secondWasCancelled := false
-	p2 := &DRAPlugin{
-		driverName:    driverName,
-		backgroundCtx: tCtx,
-		endpoint:      "new",
-		cancel:        func(err error) { secondWasCancelled = true },
+	tCtx.ExpectNoError(draPlugins.add(driverName, "new.sock", "", defaultClientCallTimeout), "add second plugin")
+	p2, err := draPlugins.GetPlugin(driverName)
+	tCtx.ExpectNoError(err, "get second plugin")
+	if p == p2 {
+		tCtx.Fatal("expected to get second plugin, got first one again")
 	}
-	require.NoError(t, draPlugins.add(p2))
-	defer draPlugins.remove(p2.driverName, p2.endpoint)
-
-	assert.False(t, firstWasCancelled, "should not cancel context after registering the second instance")
-	assert.False(t, secondWasCancelled, "should not cancel context of a new plugin")
 
 	// Remove old plugin.
 	draPlugins.remove(p.driverName, p.endpoint)
-	assert.True(t, firstWasCancelled, "should have canceled context after the explicit removal")
-	assert.False(t, secondWasCancelled, "should not cancel context of a new plugin")
+	plugin, err := draPlugins.GetPlugin(driverName)
+
+	// Now we should have p2 left.
+	tCtx.ExpectNoError(err, "get plugin")
+	if p2 != plugin {
+		tCtx.Fatal("expected to get second plugin again, got something else")
+	}
 }
 
 func TestDelete(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
-	wasCancelled := false
-	p := &DRAPlugin{
-		driverName:    driverName,
-		backgroundCtx: tCtx,
-		cancel:        func(err error) { wasCancelled = true },
-	}
-
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
-	draPlugins.add(p)
-
-	draPlugins.remove(p.driverName, "")
-
-	assert.True(t, wasCancelled, "should cancel context after the second call")
+	tCtx.ExpectNoError(draPlugins.add(driverName, "dra.sock", "", defaultClientCallTimeout), "add plugin")
+	draPlugins.remove(driverName, "")
 }
