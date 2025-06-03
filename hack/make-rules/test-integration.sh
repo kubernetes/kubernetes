@@ -95,7 +95,7 @@ runTests() {
       WHAT="${WHAT:-$(kube::test::find_integration_test_pkgs | paste -sd' ' -)}" \
       GOFLAGS="${GOFLAGS:-}" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \
-      KUBE_RACE="" \
+      KUBE_RACE=${KUBE_RACE:-""} \
       MAKEFLAGS="" \
       make -C "${KUBE_ROOT}" test
 
