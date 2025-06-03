@@ -71,6 +71,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 		iss                         string
 		backendSetKeyID             string
 		backendSetAlgorithm         string
+		backendHeaderType           string
 		supportedKeys               map[string]supportedKeyT
 		allowSigningWithNonOIDCKeys bool
 
@@ -98,6 +99,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -143,6 +145,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -174,6 +177,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			},
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -204,6 +208,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "empty key ID returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     "",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -217,6 +222,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "key id longer than 1024 bytes returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     string(make([]byte, 1025)),
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "RS256",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -230,6 +236,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "unsupported alg returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "something-unsupported",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -243,6 +250,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 			desc:                "empty alg returned from signer",
 			iss:                 "some-issuer",
 			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "JWT",
 			backendSetAlgorithm: "",
 			supportedKeys: map[string]supportedKeyT{
 				"key-id-1": {
@@ -251,6 +259,20 @@ func TestExternalTokenGenerator(t *testing.T) {
 				},
 			},
 			wantErr: fmt.Errorf("while validating header: bad signing algorithm \"\""),
+		},
+		{
+			desc:                "Invalid backend header type",
+			iss:                 "some-issuer",
+			backendSetKeyID:     "key-id-1",
+			backendHeaderType:   "WHAT",
+			backendSetAlgorithm: "RS256",
+			supportedKeys: map[string]supportedKeyT{
+				"key-id-1": {
+					key:             &rsaKey1.PublicKey,
+					excludeFromOidc: true,
+				},
+			},
+			wantErr: fmt.Errorf("while validating header: bad type"),
 		},
 	}
 
@@ -275,6 +297,7 @@ func TestExternalTokenGenerator(t *testing.T) {
 				supportedKeys:      tc.supportedKeys,
 				refreshHintSeconds: 10,
 				DataTimeStamp:      timestamppb.New(time.Time{}),
+				headerType:         tc.backendHeaderType,
 			}
 			externaljwtv1.RegisterExternalJWTSignerServer(grpcServer, backend)
 
@@ -391,6 +414,7 @@ type dummyExtrnalSigner struct {
 	keyID            string
 	signingAlgorithm string
 	signature        string
+	headerType       string
 
 	// required for FetchKeys()
 	keyLock               sync.Mutex
@@ -402,7 +426,7 @@ type dummyExtrnalSigner struct {
 
 func (des *dummyExtrnalSigner) Sign(ctx context.Context, r *externaljwtv1.SignJWTRequest) (*externaljwtv1.SignJWTResponse, error) {
 	header := &headerT{
-		Type:      "JWT",
+		Type:      des.headerType,
 		Algorithm: des.signingAlgorithm,
 		KeyID:     des.keyID,
 	}
