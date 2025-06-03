@@ -1467,6 +1467,91 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 }
 
+func TestSatisfyExistingPodsAntiAffinity(t *testing.T) {
+	tests := []struct {
+		name                       string
+		existingAntiAffinityCounts topologyToMatchedTermCount
+		nodeLabels                 map[string]string
+		want                       bool
+	}{
+		{
+			name:                       "no existing anti-affinity terms matched",
+			existingAntiAffinityCounts: topologyToMatchedTermCount{},
+			nodeLabels: map[string]string{
+				"region": "r1",
+				"zone":   "z1",
+			},
+			want: true,
+		},
+		{
+			name: "node labels >= anti-affinity counts, no match",
+			existingAntiAffinityCounts: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 1,
+				{key: "region", value: "r2"}: 1,
+			},
+			nodeLabels: map[string]string{
+				"region": "r3",
+			},
+			want: true,
+		},
+		{
+			name: "node labels >= anti-affinity counts, match",
+			existingAntiAffinityCounts: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 1,
+				{key: "region", value: "r2"}: 1,
+			},
+			nodeLabels: map[string]string{
+				"region": "r1",
+			},
+			want: false,
+		},
+		{
+			name: "node labels < anti-affinity counts, no match",
+			existingAntiAffinityCounts: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 1,
+				{key: "region", value: "r2"}: 1,
+				{key: "region", value: "r4"}: 1,
+			},
+			nodeLabels: map[string]string{
+				"region": "r3",
+				"zone":   "z1",
+			},
+			want: true,
+		},
+		{
+			name: "node labels < anti-affinity counts, match",
+			existingAntiAffinityCounts: topologyToMatchedTermCount{
+				{key: "region", value: "r1"}: 1,
+				{key: "region", value: "r2"}: 1,
+				{key: "region", value: "r4"}: 1,
+			},
+			nodeLabels: map[string]string{
+				"region": "r1",
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pfs := &preFilterState{
+				existingAntiAffinityCounts: tt.existingAntiAffinityCounts,
+			}
+			nodeInfo := &framework.NodeInfo{}
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: tt.nodeLabels,
+				},
+			}
+			nodeInfo.SetNode(node)
+			got := satisfyExistingPodsAntiAffinity(pfs, nodeInfo)
+			if got != tt.want {
+				t.Errorf("satisfyExistingPodsAntiAffinity() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) fwk.NodeInfo {
 	t.Helper()
 	nodeInfo, err := snapshot.NodeInfos().Get(name)
