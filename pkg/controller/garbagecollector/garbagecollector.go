@@ -77,6 +77,7 @@ type GarbageCollector struct {
 }
 
 var _ controller.Interface = (*GarbageCollector)(nil)
+
 var _ controller.Debuggable = (*GarbageCollector)(nil)
 
 // NewGarbageCollector creates a new GarbageCollector.
