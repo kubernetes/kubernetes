@@ -20,15 +20,16 @@ import (
 	"context"
 	"time"
 
-	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eautoscaling "k8s.io/kubernetes/test/e2e/framework/autoscaling"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/onsi/ginkgo/v2"
@@ -570,12 +571,12 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 		waitBuffer := 1 * time.Minute
 
 		ginkgo.Describe("with owner references strategy", func() {
-			ginkgo.It("should ignore CPU usage from pods not owned by target", func(ctx context.Context) {
+			ginkgo.It("should ignore CPU usage from other resources", func(ctx context.Context) {
 				ginkgo.By("setting up resource consumer and HPA")
 				initPods := 1
-				initCPUUsageTotal := usageForReplicas(initPods)
+				initCPUUsageTotal := 0 // Start with no CPU usage
 
-				// Create deployment with resource consumer
+				// Create the first deployment (equivalent to test-app)
 				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
 					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
 					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
@@ -583,54 +584,160 @@ var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelection
 				)
 				ginkgo.DeferCleanup(rc.CleanUp)
 
-				// Create independent pod with same labels
-				independentPod := &v1.Pod{
+				job := &batchv1.Job{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "independent-consumer",
-						Labels: map[string]string{
-							"name": hpaName, // Same label that resource consumer uses
-						},
+						Name:      hpaName + "-job",
+						Namespace: f.Namespace.Name,
 					},
-					Spec: v1.PodSpec{
-						Containers: []v1.Container{{
-							Name:  "metrics-consumer",
-							Image: imageutils.GetE2EImage(imageutils.ResourceConsumer),
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU: *resource.NewMilliQuantity(podCPURequest, resource.DecimalSI),
+					Spec: batchv1.JobSpec{
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": hpaName, // Match the deployment's labels
 								},
 							},
-						}},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{
+										Name:    "cpu-load",
+										Image:   "busybox",
+										Command: []string{"dd", "if=/dev/zero", "of=/dev/null"},
+										Resources: v1.ResourceRequirements{
+											Requests: v1.ResourceList{
+												v1.ResourceCPU: resource.MustParse("100m"),
+											},
+										},
+									},
+								},
+								RestartPolicy: v1.RestartPolicyNever,
+							},
+						},
 					},
 				}
-				_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(ctx, independentPod, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
-				ginkgo.DeferCleanup(f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete, independentPod.Name, metav1.DeleteOptions{})
 
-				// Create HPA with owner references strategy
+				job, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(func(ctx context.Context) error {
+					background := metav1.DeletePropagationBackground
+					return f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Delete(ctx, job.Name, metav1.DeleteOptions{
+						PropagationPolicy: &background,
+					})
+				})
+
+				// Create HPA with label selector strategy
 				ownerRefsStrategy := autoscalingv2.OwnerReferences
 				hpa := e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(ctx,
-					rc, int32(targetCPUUtilizationPercent), 1, 5)
+					rc, int32(50), // 50% CPU utilization target
+					1, // min replicas
+					2, // max replicas
+				)
 				hpa.Spec.SelectionStrategy = &ownerRefsStrategy
+
 				hpa, err = f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Update(ctx, hpa, metav1.UpdateOptions{})
 				framework.ExpectNoError(err)
 				ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
 
 				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
 
-				ginkgo.By("triggering high CPU usage in independent pod")
-				// Make independent pod consume CPU
-				rc.ConsumeCPU(usageForReplicas(4))
+				ginkgo.By("verifying HPA ignores the job CPU consumption")
 
-				ginkgo.By("verifying HPA ignores independent pod's CPU usage")
+				waitStart := time.Now()
+
 				rc.EnsureDesiredReplicasInRange(ctx, initPods, initPods, waitDeadline, hpa.Name)
+				timeWaited := time.Since(waitStart)
+
+				ginkgo.By("verifying time waited for a scale up")
+				framework.Logf("time waited for scale up: %s", timeWaited)
+				gomega.Expect(timeWaited).To(gomega.BeNumerically(">=", waitDeadline), "waited %s, wanted to wait more than %s", timeWaited, waitDeadline)
 
 				ginkgo.By("verifying number of replicas")
 				replicas, err := rc.GetReplicas(ctx)
 				framework.ExpectNoError(err)
-				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods),
-					"had %d replicas, should have stayed at %d replicas despite high CPU in independent pod",
-					replicas, initPods)
+				gomega.Expect(replicas).To(gomega.BeNumerically("==", initPods), "had %s replicas, still have %s replicas after time deadline", initPods, replicas)
+			})
+		})
+	})
+
+var _ = SIGDescribe(feature.HPA, framework.WithFeatureGate(features.HPASelectionStrategy),
+	framework.WithSerial(), framework.WithSlow(), "Horizontal pod autoscaling (selection strategy)", func() {
+		f := framework.NewDefaultFramework("horizontal-pod-autoscaling")
+		f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+
+		waitBuffer := 1 * time.Minute
+
+		ginkgo.Describe("with label selector strategy", func() {
+			ginkgo.It("should scale based on CPU usage from pods with matching labels", func(ctx context.Context) {
+				ginkgo.By("setting up resource consumer and HPA")
+				initPods := 1
+				initCPUUsageTotal := 0 // Start with no CPU usage
+
+				// Create the first deployment (equivalent to test-app)
+				rc := e2eautoscaling.NewDynamicResourceConsumer(ctx,
+					hpaName, f.Namespace.Name, e2eautoscaling.KindDeployment, initPods,
+					initCPUUsageTotal, 0, 0, int64(podCPURequest), 200,
+					f.ClientSet, f.ScalesGetter, e2eautoscaling.Disable, e2eautoscaling.Idle,
+				)
+				ginkgo.DeferCleanup(rc.CleanUp)
+
+				job := &batchv1.Job{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      hpaName + "-job",
+						Namespace: f.Namespace.Name,
+					},
+					Spec: batchv1.JobSpec{
+						Template: v1.PodTemplateSpec{
+							ObjectMeta: metav1.ObjectMeta{
+								Labels: map[string]string{
+									"name": hpaName, // Match the deployment's labels
+								},
+							},
+							Spec: v1.PodSpec{
+								Containers: []v1.Container{
+									{
+										Name:    "cpu-load",
+										Image:   "busybox",
+										Command: []string{"dd", "if=/dev/zero", "of=/dev/null"},
+										Resources: v1.ResourceRequirements{
+											Requests: v1.ResourceList{
+												v1.ResourceCPU: resource.MustParse("100m"),
+											},
+										},
+									},
+								},
+								RestartPolicy: v1.RestartPolicyNever,
+							},
+						},
+					},
+				}
+
+				job, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Create(ctx, job, metav1.CreateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(func(ctx context.Context) error {
+					background := metav1.DeletePropagationBackground
+					return f.ClientSet.BatchV1().Jobs(f.Namespace.Name).Delete(ctx, job.Name, metav1.DeleteOptions{
+						PropagationPolicy: &background,
+					})
+				})
+
+				// Create HPA with label selector strategy
+				labelSelectorStrategy := autoscalingv2.LabelSelector
+				hpa := e2eautoscaling.CreateCPUResourceHorizontalPodAutoscaler(ctx,
+					rc, int32(50), // 50% CPU utilization target
+					1, // min replicas
+					2, // max replicas
+				)
+				hpa.Spec.SelectionStrategy = &labelSelectorStrategy
+
+				hpa, err = f.ClientSet.AutoscalingV2().HorizontalPodAutoscalers(f.Namespace.Name).Update(ctx, hpa, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+				ginkgo.DeferCleanup(e2eautoscaling.DeleteHPAWithBehavior, rc, hpa.Name)
+
+				waitDeadline := maxHPAReactionTime + maxResourceConsumerDelay + waitBuffer
+
+				ginkgo.By("verifying HPA scales up the deployment")
+				framework.Logf("Waiting up to %v for HPA to scale based on CPU usage", waitDeadline)
+
+				rc.WaitForReplicas(ctx, 2, waitDeadline)
 			})
 		})
 	})
