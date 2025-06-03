@@ -1323,6 +1323,12 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
+		epsMap := proxier.endpointsMap[svcName]
+		klog.V(4).InfoS("TEST: Endpoints map for service", "svcName", svcName, "endpointsCount", len(epsMap))
+		for svcName := range proxier.endpointsMap {
+			klog.V(4).InfoS("TEST: Available services in endpointmap", "svcName", svcName, "endpointsCount", len(proxier.endpointsMap[svcName]))
+		}
+
 		for _, epInfo := range proxier.endpointsMap[svcName] {
 			ep, ok := epInfo.(*endpointInfo)
 			if !ok {
@@ -1356,9 +1362,11 @@ func (proxier *Proxier) syncProxyRules() {
 			// targetPort is zero if it is specified as a name in port.TargetPort, so the real port should be got from endpoints.
 			// Note that hnslib.AddLoadBalancer() doesn't support endpoints with different ports, so only port from first endpoint is used.
 			// TODO(feiskyer): add support of different endpoint ports after hnslib.AddLoadBalancer() add that.
-			if svcInfo.targetPort == 0 {
+			if svcInfo.targetPort != int(ep.port) {
+				klog.V(3).InfoS("Prince: svcInfo.targetPort == 0 ", "EpIP", ep.ip, " EpPort", ep.port)
 				svcInfo.targetPort = int(ep.port)
 			}
+			klog.V(3).InfoS("Prince: After svcInfo.targetPort == 0 ", "EpIP", ep.ip, " EpPort", ep.port)
 			// There is a bug in Windows Server 2019 that can cause two endpoints to be created with the same IP address, so we need to check using endpoint ID first.
 			// TODO: Remove lookup by endpoint ID, and use the IP address only, so we don't need to maintain multiple keys for lookup.
 			if len(ep.hnsID) > 0 {
@@ -1522,7 +1530,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if !proxier.requiresUpdateLoadbalancer(svcInfo.hnsID, len(clusterIPEndpoints)) {
 			proxier.deleteExistingLoadBalancer(hns, svcInfo.winProxyOptimization, &svcInfo.hnsID, svcInfo.ClusterIP().String(), Enum(svcInfo.Protocol()), uint16(svcInfo.targetPort), uint16(svcInfo.Port()), hnsEndpoints, queriedLoadBalancers)
 			if len(clusterIPEndpoints) > 0 {
-
+				klog.V(3).InfoS("Prince: Creating clusterip lb ", "svcInfo.targetPort", svcInfo.targetPort)
 				// If all endpoints are terminating, then no need to create Cluster IP LoadBalancer
 				// Cluster IP LoadBalancer creation
 				hnsLoadBalancer, err := hns.getLoadBalancer(
