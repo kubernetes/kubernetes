@@ -343,6 +343,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 		// Fill available CPU and memory stats for full set of required pod stats
 		cs := p.makeContainerCPUAndMemoryStats(stats, container)
 		p.addPodCPUMemoryStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
+		p.addSwapStats(ps, types.UID(podSandbox.Metadata.Uid), allInfos, cs)
 
 		// If cadvisor stats is available for the container, use it to populate
 		// container stats
@@ -743,6 +744,11 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 		StartTime: metav1.NewTime(time.Unix(0, container.CreatedAt)),
 		CPU:       &statsapi.CPUStats{},
 		Memory:    &statsapi.MemoryStats{},
+		Swap: &statsapi.SwapStats{
+			Time:               metav1.NewTime(time.Unix(0, time.Now().UnixNano())),
+			SwapUsageBytes:     uint64Ptr(0),
+			SwapAvailableBytes: uint64Ptr(0),
+		},
 		// UserDefinedMetrics is not supported by CRI.
 	}
 	if stats.Cpu != nil {
@@ -770,6 +776,15 @@ func (p *criStatsProvider) makeContainerCPUAndMemoryStats(
 	} else {
 		result.Memory.Time = metav1.NewTime(time.Unix(0, time.Now().UnixNano()))
 		result.Memory.WorkingSetBytes = uint64Ptr(0)
+	}
+	if stats.Swap != nil {
+		result.Swap.Time = metav1.NewTime(time.Unix(0, stats.Swap.Timestamp))
+		if stats.Swap.SwapUsageBytes != nil {
+			result.Swap.SwapUsageBytes = &stats.Swap.SwapUsageBytes.Value
+		}
+		if stats.Swap.SwapAvailableBytes != nil {
+			result.Swap.SwapAvailableBytes = &stats.Swap.SwapAvailableBytes.Value
+		}
 	}
 
 	return result
