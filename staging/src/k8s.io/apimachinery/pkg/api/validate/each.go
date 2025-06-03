@@ -28,17 +28,18 @@ import (
 // CompareFunc is a function that compares two values of the same type.
 type CompareFunc[T any] func(T, T) bool
 
-// EachSliceVal validates each element of newSlice with the specified
-// validation function.
-// It uses the match function to find corresponding values in oldSlice, which can perform
-// either full or partial comparison (e.g., matching on specific struct fields).
-// For update operations, it implements validation ratcheting by skipping validation
-// when the old value exists and either:
-//   - The match function provides full comparison (equiv is nil)
-//   - The equiv function confirms the values are equivalent (either directly or semantically)
+// EachSliceVal performs validation on each element of newSlice using the provided validation function.
 //
-// The equiv function provides equality comparison when match uses partial comparison.
-// The value-type of the slices must be non-nilable.
+// For update operations, the match function finds corresponding values in oldSlice for each
+// value in newSlice. This comparison can be either full or partial (e.g., matching only
+// specific struct fields that serve as a unique identifier). If match is nil, validation
+// proceeds without considering old values, and the equiv function is not used.
+//
+// For update operations, the equiv function checks if a new value is equivalent to its
+// corresponding old value, enabling validation ratcheting. If equiv is nil but match is
+// provided, the match function is assumed to perform full value comparison.
+//
+// Note: The slice element type must be non-nilable.
 func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newSlice, oldSlice []T,
 	match, equiv CompareFunc[T], validator ValidateFunc[*T]) field.ErrorList {
 	var errs field.ErrorList
@@ -48,9 +49,11 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 			old = lookup(oldSlice, val, match)
 		}
 		// If the operation is an update, for validation ratcheting, skip re-validating if the old
-		// value is present and one of the following is true:
-		// 1. The equiv function is nil, indicating that the match is full comparison.
-		// 2. The old value is equal to the new value.
+		// value exists and either:
+		// 1. The match function provides full comparison (equiv is nil)
+		// 2. The equiv function confirms the values are equivalent (either directly or semantically)
+		//
+		// The equiv function provides equality comparison when match uses partial comparison.
 		if op.Type == operation.Update && old != nil && (equiv == nil || equiv(val, *old)) {
 			continue
 		}
