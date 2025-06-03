@@ -117,28 +117,13 @@ func TestGRPCConnIsReused(t *testing.T) {
 	m := sync.Mutex{}
 
 	driverName := "dummy-driver"
-	p := &DRAPlugin{
-		driverName:        driverName,
-		backgroundCtx:     tCtx,
-		endpoint:          addr,
-		chosenService:     service,
-		clientCallTimeout: defaultClientCallTimeout,
-	}
-
-	conn, err := p.getOrCreateGRPCConn()
-	defer func() {
-		err := conn.Close()
-		if err != nil {
-			t.Error(err)
-		}
-	}()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// ensure the plugin we are using is registered
 	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
-	tCtx.ExpectNoError(draPlugins.add(p), "add plugin")
+	tCtx.ExpectNoError(draPlugins.add(driverName, addr, service, defaultClientCallTimeout), "add plugin")
+	plugin, err := draPlugins.GetPlugin(driverName)
+	tCtx.ExpectNoError(err, "get plugin")
+	conn := plugin.conn
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
 	for i := 0; i < 2; i++ {
@@ -164,9 +149,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 			_, err = plugin.NodePrepareResources(tCtx, req)
 			assert.NoError(t, err)
 
-			plugin.mutex.Lock()
 			conn := plugin.conn
-			plugin.mutex.Unlock()
 
 			m.Lock()
 			defer m.Unlock()
@@ -196,14 +179,14 @@ func TestGetDRAPlugin(t *testing.T) {
 			shouldError: true,
 		},
 		{
-			description: "driver-name not found in the list",
+			description: "driver name not found in the list",
 			driverName:  "driver-name-not-found-in-the-list",
 			shouldError: true,
 		},
 		{
 			description: "plugin exists",
 			setup: func(draPlugins *DRAPluginManager) error {
-				return draPlugins.add(&DRAPlugin{backgroundCtx: draPlugins.backgroundCtx, driverName: "dummy-driver"})
+				return draPlugins.add("dummy-driver", "/tmp/dra.sock", "", defaultClientCallTimeout)
 			},
 			driverName: "dummy-driver",
 		},
@@ -272,27 +255,8 @@ func TestGRPCMethods(t *testing.T) {
 			defer teardown()
 
 			driverName := "dummy-driver"
-			p := &DRAPlugin{
-				driverName:        driverName,
-				backgroundCtx:     tCtx,
-				endpoint:          addr,
-				chosenService:     test.chosenService,
-				clientCallTimeout: defaultClientCallTimeout,
-			}
-
-			conn, err := p.getOrCreateGRPCConn()
-			defer func() {
-				err := conn.Close()
-				if err != nil {
-					t.Error(err)
-				}
-			}()
-			if err != nil {
-				t.Fatal(err)
-			}
-
 			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
-			draPlugins.add(p)
+			tCtx.ExpectNoError(draPlugins.add(driverName, addr, test.chosenService, defaultClientCallTimeout))
 			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Fatal(err)
