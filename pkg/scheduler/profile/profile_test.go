@@ -287,7 +287,7 @@ func (p *fakePlugin) Less(*framework.QueuedPodInfo, *framework.QueuedPodInfo) bo
 	return false
 }
 
-func (p *fakePlugin) Bind(context.Context, fwk.CycleState, *v1.Pod, string) *framework.Status {
+func (p *fakePlugin) Bind(context.Context, fwk.CycleState, *v1.Pod, string) *fwk.Status {
 	return nil
 }
 
