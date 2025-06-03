@@ -171,6 +171,10 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 	})
 
 	ginkgo.JustBeforeEach(func(ctx context.Context) {
+		if !e2enodeCgroupV2Enabled {
+			e2eskipper.Skipf("Skipping since CgroupV2 not used")
+		}
+
 		// note intentionally NOT set reservedCPUs -  this must be initialized on a test-by-test basis
 
 		// use a closure to minimize the arguments, to make the usage more straightforward
@@ -966,10 +970,6 @@ var _ = SIGDescribe("CPU Manager", ginkgo.Ordered, framework.WithSerial(), featu
 
 	ginkgo.When("checking the CFS quota management", ginkgo.Label("cfs-quota"), func() {
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			if !e2enodeCgroupV2Enabled {
-				e2eskipper.Skipf("Skipping since CgroupV2 not used")
-			}
-
 			// WARNING: this assumes 2-way SMT systems - we don't know how to access other SMT levels.
 			//          this means on more-than-2-way SMT systems this test will prove nothing
 			reservedCPUs = cpuset.New(0)
