@@ -79,5 +79,7 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }

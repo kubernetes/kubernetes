@@ -124,6 +124,7 @@ func (frtv fixedResultTagValidator) Docs() TagDoc {
 		Tag:    frtv.TagName(),
 		Scopes: frtv.ValidScopes().UnsortedList(),
 	}
+	doc.PayloadsType = codetags.ValueTypeString
 	if frtv.error {
 		doc.Description = "Always fails code generation (useful for testing)."
 		doc.Payloads = []TagPayloadDoc{{
@@ -135,21 +136,19 @@ func (frtv fixedResultTagValidator) Docs() TagDoc {
 		doc.Payloads = []TagPayloadDoc{{
 			Description: "<none>",
 		}, {
-			Description: "<quoted-string>",
+			Description: "<string>",
 			Docs:        "The generated code will include this string.",
 		}}
 		doc.Args = []TagArgDoc{{
 			Name:        "flags",
-			Description: "<list-of-flag-string>",
+			Description: "<comma-separated-list-of-flag-string>",
 			Docs:        `values: ShortCircuit, NonError`,
-		}, {
-			Name:        "msg",
-			Description: "<string>",
-			Docs:        "The generated code will include this string.",
+			Type:        codetags.ArgTypeString,
 		}, {
 			Name:        "typeArg",
 			Description: "<string>",
 			Docs:        "The type arg in generated code (must be the value-type, not pointer).",
+			Type:        codetags.ArgTypeString,
 		}}
 		if frtv.result {
 			doc.Description = "Always passes validation (useful for testing)."

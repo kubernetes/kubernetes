@@ -62,25 +62,17 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	if t.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on struct types")
 	}
-	if len(args) != 1 || len(args[0].Name) != 0 || args[0].Type != codetags.ArgTypeString {
-		return Validations{}, fmt.Errorf("requires exactly 1 positional string argument")
-	}
 	subname := args[0].Value
 	submemb := getMemberByJSON(t, subname)
 	if submemb == nil {
 		return Validations{}, fmt.Errorf("no field for json name %q", subname)
 	}
-
 	result := Validations{}
-
 	subContext := Context{
 		Scope:  ScopeField,
 		Type:   submemb.Type,
 		Parent: t,
 		Path:   context.Path.Child(subname),
-	}
-	if tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("missing validation tag")
 	}
 	if validations, err := stv.validator.ExtractValidations(subContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
@@ -121,12 +113,16 @@ func (stv subfieldTagValidator) Docs() TagDoc {
 		Description: "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{
 			Description: "<field-json-name>",
+			Type:        codetags.ArgTypeString,
+			Required:    true,
 		}},
 		Docs: "The named subfield must be a direct field of the struct, or of an embedded struct.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for the subfield.",
 		}},
+		PayloadsType:     codetags.ValueTypeTag,
+		PayloadsRequired: true,
 	}
 	return doc
 }
