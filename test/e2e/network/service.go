@@ -1023,8 +1023,8 @@ var _ = common.SIGDescribe("Services", func() {
 			err := cs.CoreV1().Pods(ns).Delete(ctx, serverPodName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s on node", serverPodName)
 		})
-
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{serverPodName: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pause pod deployment")
 		deployment := createPausePodDeployment(ctx, cs, "pause-pod", ns, nodeCounts)
@@ -1079,7 +1079,8 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, pod.Name, f.Namespace.Name, framework.PodStartTimeout))
 
 		ginkgo.By("waiting for the service to expose an endpoint")
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{serverPodName: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if the pod can reach itself")
 		err = jig.CheckServiceReachability(ctx, svc, pod)
@@ -1981,7 +1982,8 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("error waiting for pod %s to be ready %v", webserverPod0.Name, err)
 		}
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 pause pods that will try to connect to the webservers")
 		pausePod1 := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil)
@@ -2100,7 +2102,8 @@ var _ = common.SIGDescribe("Services", func() {
 		if err != nil {
 			framework.Failf("error waiting for pod %s to be ready %v", webserverPod0.Name, err)
 		}
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 1 pause pods that will try to connect to the webservers")
 		pausePod1 := e2epod.NewAgnhostPod(ns, "pause-pod-1", nil, nil, nil)
@@ -2433,34 +2436,8 @@ var _ = common.SIGDescribe("Services", func() {
 			e2epod.SetNodeSelection(&pod.Spec, nodeSelection)
 		})
 
-		if epErr := wait.PollImmediate(framework.Poll, e2eservice.ServiceEndpointsTimeout, func() (bool, error) {
-			endpoints, err := cs.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-			if err != nil {
-				framework.Logf("error fetching '%s/%s' Endpoints: %s", namespace, serviceName, err.Error())
-				return false, err
-			}
-			if len(endpoints.Subsets) > 0 {
-				framework.Logf("expected '%s/%s' Endpoints to be empty, got: %v", namespace, serviceName, endpoints.Subsets)
-				return false, nil
-			}
-			epsList, err := cs.DiscoveryV1().EndpointSlices(namespace).List(ctx, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serviceName)})
-			if err != nil {
-				framework.Logf("error fetching '%s/%s' EndpointSlices: %s", namespace, serviceName, err.Error())
-				return false, err
-			}
-			if len(epsList.Items) != 1 {
-				framework.Logf("expected exactly 1 EndpointSlice, got: %d", len(epsList.Items))
-				return false, nil
-			}
-			endpointSlice := epsList.Items[0]
-			if len(endpointSlice.Endpoints) > 0 {
-				framework.Logf("expected EndpointSlice to be empty, got %d endpoints", len(endpointSlice.Endpoints))
-				return false, nil
-			}
-			return true, nil
-		}); epErr != nil {
-			framework.ExpectNoError(epErr)
-		}
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, namespace, serviceName, 0)
+		framework.ExpectNoError(err)
 
 		serviceAddress := net.JoinHostPort(serviceName, strconv.Itoa(port))
 		framework.Logf("waiting up to %v to connect to %v", e2eservice.KubeProxyEndpointLagTimeout, serviceAddress)
@@ -2523,7 +2500,8 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -2591,7 +2569,8 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -2665,7 +2644,8 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {endpointPort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webserver")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -2813,7 +2793,8 @@ var _ = common.SIGDescribe("Services", func() {
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
 		e2epod.SetNodeSelection(&pausePod0.Spec, e2epod.NodeSelection{Name: node0.Name})
@@ -2908,7 +2889,8 @@ var _ = common.SIGDescribe("Services", func() {
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -2983,7 +2965,8 @@ var _ = common.SIGDescribe("Services", func() {
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -3060,7 +3043,8 @@ var _ = common.SIGDescribe("Services", func() {
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -3136,7 +3120,8 @@ var _ = common.SIGDescribe("Services", func() {
 		_, err = cs.CoreV1().Pods(ns).Create(ctx, webserverPod0, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(ctx, f.ClientSet, webserverPod0.Name, f.Namespace.Name, framework.PodStartTimeout))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{webserverPod0.Name: {servicePort}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating 2 pause pods that will try to connect to the webservers")
 		pausePod0 := e2epod.NewAgnhostPod(ns, "pause-pod-0", nil, nil, nil)
@@ -3914,7 +3899,8 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", serviceName, err))
 
 		ginkgo.By("validating endpoints do not exist yet")
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 0)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("creating a pod for the service")
 		names := map[string]bool{}
@@ -3931,13 +3917,15 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 
 		ginkgo.By("validating endpoints exists")
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{name1: {5060}})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 1)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("deleting the pod")
 		e2epod.DeletePodOrFail(ctx, cs, ns, name1)
 		delete(names, name1)
 		ginkgo.By("validating endpoints do not exist anymore")
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 0)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("validating sctp module is still not loaded")
 		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(ctx, f, nodes)
