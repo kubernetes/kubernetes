@@ -44,6 +44,7 @@ import (
 	listersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/backend/heap"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -536,7 +537,7 @@ func queueingHintToLabel(hint framework.QueueingHint, err error) string {
 // Note: we need to associate the failed plugin to `pInfo`, so that the pod can be moved back
 // to activeQ by related cluster event.
 func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framework.QueuedPodInfo) {
-	var s *framework.Status
+	var s *fwk.Status
 	pod := pInfo.Pod
 	startTime := p.clock.Now()
 	defer func() {
@@ -571,7 +572,7 @@ func (p *PriorityQueue) runPreEnqueuePlugins(ctx context.Context, pInfo *framewo
 }
 
 // runPreEnqueuePlugin runs the PreEnqueue plugin and update pInfo's fields accordingly if needed.
-func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Logger, pl framework.PreEnqueuePlugin, pInfo *framework.QueuedPodInfo, shouldRecordMetric bool) *framework.Status {
+func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Logger, pl framework.PreEnqueuePlugin, pInfo *framework.QueuedPodInfo, shouldRecordMetric bool) *fwk.Status {
 	pod := pInfo.Pod
 	startTime := p.clock.Now()
 	s := pl.PreEnqueue(ctx, pod)
@@ -586,7 +587,7 @@ func (p *PriorityQueue) runPreEnqueuePlugin(ctx context.Context, logger klog.Log
 	metrics.UnschedulableReason(pl.Name(), pod.Spec.SchedulerName).Inc()
 	pInfo.GatingPlugin = pl.Name()
 	pInfo.GatingPluginEvents = p.pluginToEventsMap[pInfo.GatingPlugin]
-	if s.Code() == framework.Error {
+	if s.Code() == fwk.Error {
 		logger.Error(s.AsError(), "Unexpected error running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name())
 	} else {
 		logger.V(4).Info("Status after running PreEnqueue plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", s)

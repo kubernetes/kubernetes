@@ -17,6 +17,7 @@ limitations under the License.
 package helper
 
 import (
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -24,7 +25,7 @@ import (
 // scores from [0, max(scores)] to [0, maxPriority]. If reverse is set to true, it
 // reverses the scores by subtracting it from maxPriority.
 // Note: The input scores are always assumed to be non-negative integers.
-func DefaultNormalizeScore(maxPriority int64, reverse bool, scores framework.NodeScoreList) *framework.Status {
+func DefaultNormalizeScore(maxPriority int64, reverse bool, scores framework.NodeScoreList) *fwk.Status {
 	var maxCount int64
 	for i := range scores {
 		if scores[i].Score > maxCount {

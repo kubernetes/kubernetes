@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -380,7 +381,7 @@ func TestPreferredAffinity(t *testing.T) {
 		expectedList                       framework.NodeScoreList
 		name                               string
 		ignorePreferredTermsOfExistingPods bool
-		wantStatus                         *framework.Status
+		wantStatus                         *fwk.Status
 	}{
 		{
 			name: "all nodes are same priority as Affinity is nil",
@@ -390,7 +391,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelAzAz1}},
 			},
-			wantStatus: framework.NewStatus(framework.Skip),
+			wantStatus: fwk.NewStatus(fwk.Skip),
 		},
 		// the node(node1) that have the label {"region": "China"} (match the topology key) and that have existing pods that match the labelSelector get high score
 		// the node(node3) that don't have the label {"region": "whatever the value is"} (mismatch the topology key) but that have existing pods that match the labelSelector get low score
@@ -667,7 +668,7 @@ func TestPreferredAffinity(t *testing.T) {
 		{
 			name:       "invalid Affinity fails PreScore",
 			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAffinityLabels}},
-			wantStatus: framework.NewStatus(framework.Error, `Invalid value: "{{.bad-value.}}"`),
+			wantStatus: fwk.NewStatus(fwk.Error, `Invalid value: "{{.bad-value.}}"`),
 			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgChina}},
@@ -676,7 +677,7 @@ func TestPreferredAffinity(t *testing.T) {
 		{
 			name:       "invalid AntiAffinity fails PreScore",
 			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: invalidAntiAffinityLabels}},
-			wantStatus: framework.NewStatus(framework.Error, `Invalid value: "{{.bad-value.}}"`),
+			wantStatus: fwk.NewStatus(fwk.Error, `Invalid value: "{{.bad-value.}}"`),
 			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "node1", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgChina}},
@@ -754,7 +755,7 @@ func TestPreferredAffinity(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: labelRgIndia}},
 			},
 			expectedList:                       []framework.NodeScore{{Name: "node1", Score: 0}, {Name: "node2", Score: 0}},
-			wantStatus:                         framework.NewStatus(framework.Skip),
+			wantStatus:                         fwk.NewStatus(fwk.Skip),
 			ignorePreferredTermsOfExistingPods: true,
 		},
 		{
@@ -776,7 +777,7 @@ func TestPreferredAffinity(t *testing.T) {
 			pod:        &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS2}},
 			pods:       []*v1.Pod{},
 			nodes:      []*v1.Node{},
-			wantStatus: framework.NewStatus(framework.Skip),
+			wantStatus: fwk.NewStatus(fwk.Skip),
 		},
 	}
 	for _, test := range tests {
@@ -870,7 +871,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		hardPodAffinityWeight int32
 		expectedList          framework.NodeScoreList
 		name                  string
-		wantStatus            *framework.Status
+		wantStatus            *fwk.Status
 	}{
 		{
 			name: "with default weight",
@@ -900,7 +901,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelAzAz1}},
 			},
 			hardPodAffinityWeight: 0,
-			wantStatus:            framework.NewStatus(framework.Skip),
+			wantStatus:            fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "with no matching namespace",
@@ -915,7 +916,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node3", Labels: labelAzAz1}},
 			},
 			hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			wantStatus:            framework.NewStatus(framework.Skip),
+			wantStatus:            fwk.NewStatus(fwk.Skip),
 		},
 		{
 			name: "with matching NamespaceSelector",

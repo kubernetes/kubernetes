@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
@@ -38,14 +39,14 @@ func TestDefaultBinder(t *testing.T) {
 
 	tests := map[string]struct {
 		anotherUID     bool
-		wantStatusCode framework.Code
+		wantStatusCode fwk.Code
 	}{
 		"same UID": {
-			wantStatusCode: framework.Success,
+			wantStatusCode: fwk.Success,
 		},
 		"different UID": {
 			anotherUID:     true,
-			wantStatusCode: framework.Error,
+			wantStatusCode: fwk.Error,
 		},
 	}
 	for name, tc := range tests {
