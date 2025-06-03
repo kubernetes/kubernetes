@@ -889,7 +889,12 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 		if err != nil {
 			// Add logging as requested by the reviewer
 			logger := klog.FromContext(ctx)
-			logger.Error(err, "Failed to scale target after retries", "HPA", klog.KObj(hpa), "scaleTarget", reference)
+			logger.Error(err, "Failed to scale target after retries",
+				"HPA", klog.KObj(hpa),
+				"scaleTarget", reference,
+				"desiredReplicas", desiredReplicas,
+				"currentReplicas", currentReplicas,
+				"error", err.Error())
 
 			// Determine the specific reason and message for AbleToScale
 			ableToScaleReason := "FailedUpdateScale"
