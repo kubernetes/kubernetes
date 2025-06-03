@@ -169,7 +169,9 @@ var _ = common.SIGDescribe("Networking IPerf2", feature.NetworkingPerformance, f
 		_, err = iperf2ClientDaemonSet(ctx, f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err, "deploy iperf2 client daemonset")
 
-		// Make sure the server is ready to go
+		// Make sure the server is ready to go. (We use WaitForEndpointSlices
+		// rather than the simpler WaitForEndpointCount because we want to use
+		// largeClusterTimeout.)
 		framework.Logf("waiting for iperf2 server endpoints")
 		err = e2eendpointslice.WaitForEndpointSlices(ctx, f.ClientSet, f.Namespace.Name, serverServiceName, 2*time.Second, largeClusterTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
 			if len(endpointSlices) == 0 {
