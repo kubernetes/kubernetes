@@ -95,5 +95,7 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Description: "dns-label",
 			Docs:        "This field holds a DNS label value.",
 		}},
+		PayloadsType:     codetags.ValueTypeString,
+		PayloadsRequired: true,
 	}
 }

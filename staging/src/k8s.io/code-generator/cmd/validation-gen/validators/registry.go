@@ -134,6 +134,9 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) && !scopes.Has(ScopeAny) {
 				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
 			}
+			if err := typeCheck(tag, tv.Docs()); err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			}
 			if theseValidations, err := tv.GetValidations(context, tag); err != nil {
 				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
 			} else {

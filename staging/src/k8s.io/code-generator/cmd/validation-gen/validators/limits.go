@@ -84,6 +84,8 @@ func (mltv maxLengthTagValidator) Docs() TagDoc {
 			Description: "<non-negative integer>",
 			Docs:        "This field must be no more than X characters long.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }
 
@@ -139,6 +141,8 @@ func (mitv maxItemsTagValidator) Docs() TagDoc {
 			Description: "<non-negative integer>",
 			Docs:        "This field must be no more than X items long.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }
 
@@ -188,5 +192,7 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }

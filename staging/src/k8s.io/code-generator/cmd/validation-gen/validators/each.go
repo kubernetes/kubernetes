@@ -138,6 +138,8 @@ func (lttv listTypeTagValidator) Docs() TagDoc {
 			Description: "<type>",
 			Docs:        "atomic | map | set",
 		}},
+		PayloadsType:     codetags.ValueTypeString,
+		PayloadsRequired: true,
 	}
 	return doc
 }
@@ -196,6 +198,8 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 			Description: "<field-json-name>",
 			Docs:        "The name of the field.",
 		}},
+		PayloadsType:     codetags.ValueTypeString,
+		PayloadsRequired: true,
 	}
 	return doc
 }
@@ -378,6 +382,8 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each value.",
 		}},
+		PayloadsType:     codetags.ValueTypeTag,
+		PayloadsRequired: true,
 	}
 	return doc
 }
@@ -415,9 +421,6 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		Parent: t,
 		Path:   context.Path.Child("(keys)"),
 	}
-	if tag.ValueTag == nil {
-		return Validations{}, fmt.Errorf("missing validation tag")
-	}
 	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
@@ -454,6 +457,8 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each value.",
 		}},
+		PayloadsType:     codetags.ValueTypeTag,
+		PayloadsRequired: true,
 	}
 	return doc
 }

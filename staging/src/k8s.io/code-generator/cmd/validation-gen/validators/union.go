@@ -129,14 +129,11 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 	if t := NonPointer(NativeType(context.Type)); t != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
-	p, err := toDiscriminatorArgs(tag)
-	if err != nil {
-		return Validations{}, err
-	}
 	if udtv.shared[context.Parent] == nil {
 		udtv.shared[context.Parent] = unions{}
 	}
-	u := udtv.shared[context.Parent].getOrCreate(p.Union)
+	unionArg, _ := tag.NamedArg("union") // optional
+	u := udtv.shared[context.Parent].getOrCreate(unionArg.Value)
 
 	var discriminatorFieldName string
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
@@ -159,6 +156,7 @@ func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 			Name:        "union",
 			Description: "<string>",
 			Docs:        "the name of the union, if more than one exists",
+			Type:        codetags.ArgTypeString,
 		}},
 	}
 }
@@ -188,15 +186,19 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 		return Validations{}, fmt.Errorf("field %q is a union member but has no JSON name", context.Member)
 	}
 
-	p, err := toMemberArgs(context, &tag)
-	if err != nil {
-		return Validations{}, err
-	}
 	if umtv.shared[context.Parent] == nil {
 		umtv.shared[context.Parent] = unions{}
 	}
-	u := umtv.shared[context.Parent].getOrCreate(p.Union)
-	u.fields = append(u.fields, [2]string{fieldName, p.MemberName})
+	unionArg, _ := tag.NamedArg("union") // optional
+	var memberName string
+	if memberNameArg, ok := tag.NamedArg("memberName"); ok { // optional
+		memberName = memberNameArg.Value
+	} else {
+		memberName = context.Member.Name // default
+	}
+
+	u := umtv.shared[context.Parent].getOrCreate(unionArg.Value)
+	u.fields = append(u.fields, [2]string{fieldName, memberName})
 	u.fieldMembers = append(u.fieldMembers, *context.Member)
 
 	// This tag does not actually emit any validations, it just accumulates
@@ -213,64 +215,15 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 			Name:        "union",
 			Description: "<string>",
 			Docs:        "the name of the union, if more than one exists",
+			Type:        codetags.ArgTypeString,
 		}, {
 			Name:        "memberName",
 			Description: "<string>",
 			Docs:        "the discriminator value for this member",
 			Default:     "the field's name",
+			Type:        codetags.ArgTypeString,
 		}},
 	}
-}
-
-func toDiscriminatorArgs(tag codetags.Tag) (discriminatorArgs, error) {
-	var result discriminatorArgs
-	for _, arg := range tag.Args {
-		switch arg.Name {
-		case "union":
-			result.Union = arg.Value
-		default:
-			return discriminatorArgs{}, fmt.Errorf("unknown argument %q", arg.Name)
-		}
-	}
-	return result, nil
-}
-
-// discriminatorArgs defines JSON the parameter value for the
-// +k8s:unionDiscriminator tag.
-type discriminatorArgs struct {
-	// Union sets the name of the union this discriminator belongs to.
-	// This is only needed for go structs that contain more than one union.
-	// Optional.
-	Union string
-}
-
-func toMemberArgs(context Context, tag *codetags.Tag) (*memberArgs, error) {
-	result := &memberArgs{MemberName: context.Member.Name}
-	for _, arg := range tag.Args {
-		switch arg.Name {
-		case "union":
-			result.Union = arg.Value
-		case "memberName":
-			result.MemberName = arg.Value
-		default:
-			return nil, fmt.Errorf("unknown argument %q", arg.Name)
-		}
-	}
-	return result, nil
-}
-
-// memberArgs defines the JSON parameter value for the +k8s:unionMember tag.
-type memberArgs struct {
-	// Union sets the name of the union this member belongs to.
-	// This is only needed for go structs that contain more than one union.
-	// Optional.
-	Union string
-	// MemberName provides a name for a union member. If the union has a
-	// discriminator, the member name must match the value the discriminator
-	// is set to when this member is specified.
-	// Optional.
-	// Defaults to the go field name.
-	MemberName string
 }
 
 // union defines how a union validation will be generated, based
