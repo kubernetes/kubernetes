@@ -60,7 +60,7 @@ func TestRegistrationHandler(t *testing.T) {
 
 	for _, test := range []struct {
 		description       string
-		pluginName        string
+		driverName        string
 		endpoint          string
 		withClient        bool
 		supportedServices []string
@@ -69,27 +69,27 @@ func TestRegistrationHandler(t *testing.T) {
 	}{
 		{
 			description: "no-services-provided",
-			pluginName:  pluginB,
+			driverName:  pluginB,
 			endpoint:    endpointB,
 			shouldError: true,
 		},
 		{
 			description:       "current-service",
-			pluginName:        pluginB,
+			driverName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
 		{
 			description:       "two-services",
-			pluginName:        pluginB,
+			driverName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapbv1alpha4.NodeService, drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
 		},
 		{
 			description:       "old-service",
-			pluginName:        pluginB,
+			driverName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapbv1alpha4.NodeService},
 			chosenService:     drapbv1alpha4.NodeService,
@@ -97,14 +97,14 @@ func TestRegistrationHandler(t *testing.T) {
 		{
 			// Legacy behavior.
 			description:       "version",
-			pluginName:        pluginB,
+			driverName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{"1.0.0"},
 			chosenService:     drapbv1alpha4.NodeService,
 		},
 		{
 			description:       "replace",
-			pluginName:        pluginA,
+			driverName:        pluginA,
 			endpoint:          endpointB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
@@ -112,7 +112,7 @@ func TestRegistrationHandler(t *testing.T) {
 		{
 			description:       "manage-resource-slices",
 			withClient:        true,
-			pluginName:        pluginB,
+			driverName:        pluginB,
 			endpoint:          endpointB,
 			supportedServices: []string{drapb.DRAPluginService},
 			chosenService:     drapb.DRAPluginService,
@@ -152,11 +152,11 @@ func TestRegistrationHandler(t *testing.T) {
 					switch len(expectedSliceFields) {
 					case 1:
 						// Startup cleanup done, now expect cleanup for test plugin.
-						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.pluginName}
+						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": test.driverName}
 					case 2:
 						// Test plugin cleanup done, now expect cleanup for the other plugin.
 						otherPlugin := pluginA
-						if otherPlugin == test.pluginName {
+						if otherPlugin == test.driverName {
 							otherPlugin = pluginB
 						}
 						expectedSliceFields = fields.Set{"spec.nodeName": nodeName, "spec.driver": otherPlugin}
@@ -193,7 +193,7 @@ func TestRegistrationHandler(t *testing.T) {
 				handler.DeRegisterPlugin(pluginA, endpointA)
 			})
 
-			err = handler.ValidatePlugin(test.pluginName, test.endpoint, test.supportedServices)
+			err = handler.ValidatePlugin(test.driverName, test.endpoint, test.supportedServices)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
@@ -202,18 +202,18 @@ func TestRegistrationHandler(t *testing.T) {
 			if err != nil {
 				return
 			}
-			if test.pluginName != pluginA {
-				require.Nil(t, draPlugins.get(test.pluginName), "not registered yet")
+			if test.driverName != pluginA {
+				require.Nil(t, draPlugins.get(test.driverName), "not registered yet")
 			}
 
 			// Add plugin for the first time.
-			err = handler.RegisterPlugin(test.pluginName, test.endpoint, test.supportedServices, nil)
+			err = handler.RegisterPlugin(test.driverName, test.endpoint, test.supportedServices, nil)
 			if test.shouldError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
-			plugin := draPlugins.get(test.pluginName)
+			plugin := draPlugins.get(test.driverName)
 			require.NotNil(t, plugin, "plugin should be registered")
 			t.Cleanup(func() {
 				if client != nil {
@@ -222,10 +222,10 @@ func TestRegistrationHandler(t *testing.T) {
 					assert.NoError(t, err, "recreate slice")
 				}
 
-				tCtx.Logf("Removing plugin %s", test.pluginName)
-				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
+				tCtx.Logf("Removing plugin %s", test.driverName)
+				handler.DeRegisterPlugin(test.driverName, test.endpoint)
 				// Nop.
-				handler.DeRegisterPlugin(test.pluginName, test.endpoint)
+				handler.DeRegisterPlugin(test.driverName, test.endpoint)
 
 				requireNoSlices()
 			})

@@ -29,42 +29,42 @@ import (
 // The null Store is usable.
 type Store struct {
 	sync.RWMutex
-	// plugin name -> Plugin in the order in which they got added
+	// driver-name -> Plugin in the order in which they got added
 	store map[string][]*Plugin
 }
 
-// NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
+// GetDRAPlugin returns a wrapper around those gRPC methods of a DRA
 // driver kubelet plugin which need to be called by kubelet. The wrapper
 // handles gRPC connection management and logging. Connections are reused
-// across different NewDRAPluginClient calls.
+// across different calls.
 //
 // It returns an informative error message including the driver name
 // with an explanation why the driver is not usable.
-func (s *Store) NewDRAPluginClient(driverName string) (*Plugin, error) {
+func (s *Store) GetDRAPlugin(driverName string) (*Plugin, error) {
 	if driverName == "" {
 		return nil, errors.New("DRA driver name is empty")
 	}
-	client := s.get(driverName)
-	if client == nil {
+	plugin := s.get(driverName)
+	if plugin == nil {
 		return nil, fmt.Errorf("DRA driver %s is not registered", driverName)
 	}
-	return client, nil
+	return plugin, nil
 }
 
 // Get lets you retrieve a DRA Plugin by name.
 // This method is protected by a mutex.
-func (s *Store) get(pluginName string) *Plugin {
+func (s *Store) get(driverName string) *Plugin {
 	s.RLock()
 	defer s.RUnlock()
 
-	instances := s.store[pluginName]
-	if len(instances) == 0 {
+	plugins := s.store[driverName]
+	if len(plugins) == 0 {
 		return nil
 	}
 	// Heuristic: pick the most recent one. It's most likely
 	// the newest, except when kubelet got restarted and registered
 	// all running plugins in random order.
-	return instances[len(instances)-1]
+	return plugins[len(plugins)-1]
 }
 
 // Set lets you save a DRA Plugin to the list and give it a specific name.
@@ -76,34 +76,34 @@ func (s *Store) add(p *Plugin) error {
 	if s.store == nil {
 		s.store = make(map[string][]*Plugin)
 	}
-	for _, oldP := range s.store[p.name] {
+	for _, oldP := range s.store[p.driverName] {
 		if oldP.endpoint == p.endpoint {
 			// One plugin instance cannot hijack the endpoint of another instance.
-			return fmt.Errorf("endpoint %s already registered for plugin %s", p.endpoint, p.name)
+			return fmt.Errorf("endpoint %s already registered for plugin %s", p.endpoint, p.driverName)
 		}
 	}
-	s.store[p.name] = append(s.store[p.name], p)
+	s.store[p.driverName] = append(s.store[p.driverName], p)
 	return nil
 }
 
 // remove lets you remove one endpoint for a DRA Plugin.
 // This method is protected by a mutex. It returns the
 // plugin if found and true if that was the last instance
-func (s *Store) remove(pluginName, endpoint string) (*Plugin, bool) {
+func (s *Store) remove(driverName, endpoint string) (*Plugin, bool) {
 	s.Lock()
 	defer s.Unlock()
 
-	instances := s.store[pluginName]
-	i := slices.IndexFunc(instances, func(p *Plugin) bool { return p.endpoint == endpoint })
+	plugins := s.store[driverName]
+	i := slices.IndexFunc(plugins, func(p *Plugin) bool { return p.endpoint == endpoint })
 	if i == -1 {
 		return nil, false
 	}
-	p := instances[i]
-	last := len(instances) == 1
+	p := plugins[i]
+	last := len(plugins) == 1
 	if last {
-		delete(s.store, pluginName)
+		delete(s.store, driverName)
 	} else {
-		s.store[pluginName] = slices.Delete(instances, i, i+1)
+		s.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
 
 	if p.cancel != nil {

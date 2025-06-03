@@ -27,13 +27,13 @@ import (
 
 func TestAddSameName(t *testing.T) {
 	// name will have a random value to avoid conflicts
-	pluginName := fmt.Sprintf("dummy-plugin-%d", rand.IntN(10000))
+	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	firstWasCancelled := false
 	p := &Plugin{
-		name:     pluginName,
-		endpoint: "old",
-		cancel:   func(err error) { firstWasCancelled = true },
+		driverName: driverName,
+		endpoint:   "old",
+		cancel:     func(err error) { firstWasCancelled = true },
 	}
 
 	// ensure the plugin we are using is registered
@@ -47,36 +47,36 @@ func TestAddSameName(t *testing.T) {
 
 	secondWasCancelled := false
 	p2 := &Plugin{
-		name:     pluginName,
-		endpoint: "new",
-		cancel:   func(err error) { secondWasCancelled = true },
+		driverName: driverName,
+		endpoint:   "new",
+		cancel:     func(err error) { secondWasCancelled = true },
 	}
 	require.NoError(t, draPlugins.add(p2))
-	defer draPlugins.remove(p2.name, p2.endpoint)
+	defer draPlugins.remove(p2.driverName, p2.endpoint)
 
 	assert.False(t, firstWasCancelled, "should not cancel context after registering the second instance")
 	assert.False(t, secondWasCancelled, "should not cancel context of a new plugin")
 
 	// Remove old plugin.
-	draPlugins.remove(p.name, p.endpoint)
+	draPlugins.remove(p.driverName, p.endpoint)
 	assert.True(t, firstWasCancelled, "should have canceled context after the explicit removal")
 	assert.False(t, secondWasCancelled, "should not cancel context of a new plugin")
 }
 
 func TestDelete(t *testing.T) {
-	pluginName := fmt.Sprintf("dummy-plugin-%d", rand.IntN(10000))
+	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	wasCancelled := false
 	p := &Plugin{
-		name:   pluginName,
-		cancel: func(err error) { wasCancelled = true },
+		driverName: driverName,
+		cancel:     func(err error) { wasCancelled = true },
 	}
 
 	// ensure the plugin we are using is registered
 	var draPlugins Store
 	draPlugins.add(p)
 
-	draPlugins.remove(p.name, "")
+	draPlugins.remove(p.driverName, "")
 
 	assert.True(t, wasCancelled, "should cancel context after the second call")
 }

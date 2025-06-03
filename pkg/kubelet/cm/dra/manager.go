@@ -221,7 +221,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 		resourceClaim *resourceapi.ResourceClaim
 		podClaim      *v1.PodResourceClaim
 		claimInfo     *ClaimInfo
-		drivers       map[string]*draplugin.Plugin
+		plugins       map[string]*draplugin.Plugin
 	}, len(pod.Spec.ResourceClaims))
 	for i := range pod.Spec.ResourceClaims {
 		podClaim := &pod.Spec.ResourceClaims[i]
@@ -268,17 +268,17 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 			return fmt.Errorf("ResourceClaim %s: %w", resourceClaim.Name, err)
 		}
 		infos[i].claimInfo = claimInfo
-		infos[i].drivers = make(map[string]*draplugin.Plugin, len(claimInfo.DriverState))
+		infos[i].plugins = make(map[string]*draplugin.Plugin, len(claimInfo.DriverState))
 		for driverName := range claimInfo.DriverState {
-			if plugin := infos[i].drivers[driverName]; plugin != nil {
+			if plugin := infos[i].plugins[driverName]; plugin != nil {
 				continue
 			}
-			client, err := m.draPlugins.NewDRAPluginClient(driverName)
+			plugin, err := m.draPlugins.GetDRAPlugin(driverName)
 			if err != nil {
 				// No wrapping, error includes driver name already.
 				return err
 			}
-			infos[i].drivers[driverName] = client
+			infos[i].plugins[driverName] = plugin
 		}
 	}
 
@@ -334,8 +334,8 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 				Name:      claimInfo.ClaimName,
 			}
 			for driverName := range claimInfo.DriverState {
-				client := infos[i].drivers[driverName]
-				batches[client] = append(batches[client], claim)
+				plugin := infos[i].plugins[driverName]
+				batches[plugin] = append(batches[plugin], claim)
 			}
 		}
 
@@ -350,9 +350,9 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 	// Call NodePrepareResources for all claims in each batch.
 	// If there is any error, processing gets aborted.
 	// We could try to continue, but that would make the code more complex.
-	for client, claims := range batches {
+	for plugin, claims := range batches {
 		// Call NodePrepareResources RPC for all resource handles.
-		response, err := client.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
+		response, err := plugin.NodePrepareResources(ctx, &drapb.NodePrepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
 			return fmt.Errorf("NodePrepareResources: %w", err)
@@ -375,7 +375,7 @@ func (m *Manager) prepareResources(ctx context.Context, pod *v1.Pod) error {
 					return fmt.Errorf("internal error: unable to get claim info for ResourceClaim %s", claim.Name)
 				}
 				for _, device := range result.GetDevices() {
-					info.addDevice(client.Name(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CDIDeviceIDs})
+					info.addDevice(plugin.DriverName(), state.Device{PoolName: device.PoolName, DeviceName: device.DeviceName, RequestNames: device.RequestNames, CDIDeviceIDs: device.CDIDeviceIDs})
 				}
 				return nil
 			})
@@ -557,12 +557,12 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 	// We could try to continue, but that would make the code more complex.
 	for driverName, claims := range batches {
 		// Call NodeUnprepareResources RPC for all resource handles.
-		client, err := m.draPlugins.NewDRAPluginClient(driverName)
-		if client == nil {
+		plugin, err := m.draPlugins.GetDRAPlugin(driverName)
+		if plugin == nil {
 			// No wrapping, error includes driver name already.
 			return err
 		}
-		response, err := client.NodeUnprepareResources(ctx, &drapb.NodeUnprepareResourcesRequest{Claims: claims})
+		response, err := plugin.NodeUnprepareResources(ctx, &drapb.NodeUnprepareResourcesRequest{Claims: claims})
 		if err != nil {
 			// General error unrelated to any particular claim.
 			return fmt.Errorf("NodeUnprepareResources: %w", err)

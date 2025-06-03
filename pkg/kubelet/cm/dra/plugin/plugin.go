@@ -35,8 +35,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+// Plugin contains information about one registered plugin of a DRA driver.
+// It implements the kubelet operations for preparing/unpreparing by calling
+// a gRPC interface that is implemented by the plugin.
 type Plugin struct {
-	name          string
+	driverName    string
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
@@ -71,7 +74,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
-		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
+		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.driverName)),
 	)
 	if err != nil {
 		return nil, err
@@ -88,8 +91,8 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	return p.conn, nil
 }
 
-func (p *Plugin) Name() string {
-	return p.name
+func (p *Plugin) DriverName() string {
+	return p.driverName
 }
 
 func (p *Plugin) NodePrepareResources(
@@ -158,11 +161,11 @@ func (p *Plugin) NodeUnprepareResources(
 	return response, err
 }
 
-func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
+func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, conn *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		start := time.Now()
 		err := invoker(ctx, method, req, reply, conn, opts...)
-		metrics.DRAGRPCOperationsDuration.WithLabelValues(pluginName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
+		metrics.DRAGRPCOperationsDuration.WithLabelValues(driverName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
 		return err
 	}
 }

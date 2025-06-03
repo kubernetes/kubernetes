@@ -116,9 +116,9 @@ func TestGRPCConnIsReused(t *testing.T) {
 	wg := sync.WaitGroup{}
 	m := sync.Mutex{}
 
-	pluginName := "dummy-plugin"
+	driverName := "dummy-driver"
 	p := &Plugin{
-		name:              pluginName,
+		driverName:        driverName,
 		backgroundCtx:     tCtx,
 		endpoint:          addr,
 		chosenService:     service,
@@ -145,7 +145,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client, err := draPlugins.NewDRAPluginClient(pluginName)
+			plugin, err := draPlugins.GetDRAPlugin(driverName)
 			if err != nil {
 				t.Error(err)
 				return
@@ -161,12 +161,12 @@ func TestGRPCConnIsReused(t *testing.T) {
 				},
 			}
 
-			_, err = client.NodePrepareResources(tCtx, req)
+			_, err = plugin.NodePrepareResources(tCtx, req)
 			assert.NoError(t, err)
 
-			client.mutex.Lock()
-			conn := client.conn
-			client.mutex.Unlock()
+			plugin.mutex.Lock()
+			conn := plugin.conn
+			plugin.mutex.Unlock()
 
 			m.Lock()
 			defer m.Unlock()
@@ -184,28 +184,28 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 }
 
-func TestNewDRAPluginClient(t *testing.T) {
+func TestGetDRAPlugin(t *testing.T) {
 	for _, test := range []struct {
 		description string
 		setup       func(*Store) error
-		pluginName  string
+		driverName  string
 		shouldError bool
 	}{
 		{
-			description: "plugin name is empty",
+			description: "driver-name is empty",
 			shouldError: true,
 		},
 		{
-			description: "plugin name not found in the list",
-			pluginName:  "plugin-name-not-found-in-the-list",
+			description: "driver-name not found in the list",
+			driverName:  "driver-name-not-found-in-the-list",
 			shouldError: true,
 		},
 		{
 			description: "plugin exists",
 			setup: func(draPlugins *Store) error {
-				return draPlugins.add(&Plugin{name: "dummy-plugin"})
+				return draPlugins.add(&Plugin{driverName: "dummy-driver"})
 			},
-			pluginName: "dummy-plugin",
+			driverName: "dummy-driver",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -213,12 +213,12 @@ func TestNewDRAPluginClient(t *testing.T) {
 			if test.setup != nil {
 				require.NoError(t, test.setup(&draPlugins), "setup plugin")
 			}
-			client, err := draPlugins.NewDRAPluginClient(test.pluginName)
+			plugin, err := draPlugins.GetDRAPlugin(test.driverName)
 			if test.shouldError {
-				assert.Nil(t, client)
+				assert.Nil(t, plugin)
 				assert.Error(t, err)
 			} else {
-				assert.NotNil(t, client)
+				assert.NotNil(t, plugin)
 				assert.NoError(t, err)
 			}
 		})
@@ -270,9 +270,9 @@ func TestGRPCMethods(t *testing.T) {
 			}
 			defer teardown()
 
-			pluginName := "dummy-plugin"
+			driverName := "dummy-driver"
 			p := &Plugin{
-				name:              pluginName,
+				driverName:        driverName,
 				backgroundCtx:     tCtx,
 				endpoint:          addr,
 				chosenService:     test.chosenService,
@@ -292,15 +292,15 @@ func TestGRPCMethods(t *testing.T) {
 
 			var draPlugins Store
 			draPlugins.add(p)
-			client, err := draPlugins.NewDRAPluginClient(pluginName)
+			plugin, err := draPlugins.GetDRAPlugin(driverName)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, err = client.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
+			_, err = plugin.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
 			assertError(t, test.expectError, err)
 
-			_, err = client.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
+			_, err = plugin.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
 			assertError(t, test.expectError, err)
 		})
 	}

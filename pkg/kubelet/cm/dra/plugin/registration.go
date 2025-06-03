@@ -62,7 +62,7 @@ type RegistrationHandler struct {
 	wg    sync.WaitGroup
 	mutex sync.Mutex
 
-	// pendingWipes maps a plugin name to a cancel function for
+	// pendingWipes maps a driver-name to a cancel function for
 	// wiping of that plugin's ResourceSlices. Entries get added
 	// in DeRegisterPlugin and check in RegisterPlugin. If
 	// wiping is pending during RegisterPlugin, it gets canceled.
@@ -184,29 +184,32 @@ func (h *RegistrationHandler) wipeResourceSlices(ctx context.Context, delay time
 
 // RegisterPlugin is called when a plugin can be registered.
 //
+// Plugins of a DRA driver are required to register under the name of
+// the DRA driver.
+//
 // DRA uses the version array in the registration API to enumerate all gRPC
 // services that the plugin provides, using the "<gRPC package name>.<service
 // name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
 // in advance which version to use resp. which optional services the plugin
 // supports.
-func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+func (h *RegistrationHandler) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
 	// Prepare a context with its own logger for the plugin.
 	//
 	// The lifecycle of the plugin's background activities is tied to our
 	// root context, so canceling that will also cancel the plugin.
 	//
-	// The logger injects the plugin name as additional value
+	// The logger injects the driver name and endpoint as additional values
 	// into all log output related to the plugin.
 	ctx := h.backgroundCtx
 	logger := klog.FromContext(ctx)
-	logger = klog.LoggerWithValues(logger, "pluginName", pluginName, "endpoint", endpoint)
+	logger = klog.LoggerWithValues(logger, "driverName", driverName, "endpoint", endpoint)
 	ctx = klog.NewContext(ctx, logger)
 
 	logger.V(3).Info("Register new DRA plugin")
 
-	chosenService, err := h.validateSupportedServices(pluginName, supportedServices)
+	chosenService, err := h.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
-		return fmt.Errorf("version check of plugin %s failed: %w", pluginName, err)
+		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
 
 	var timeout time.Duration
@@ -218,8 +221,8 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	ctx, cancel := context.WithCancelCause(ctx)
 
-	pluginInstance := &Plugin{
-		name:              pluginName,
+	plugin := &Plugin{
+		driverName:        driverName,
 		backgroundCtx:     ctx,
 		cancel:            cancel,
 		conn:              nil,
@@ -228,9 +231,9 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		clientCallTimeout: timeout,
 	}
 
-	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
-	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-	if err := h.draPlugins.add(pluginInstance); err != nil {
+	// Storing endpoint of newly registered DRA Plugin into the map, where the DRA driver name will be the key
+	// under which the manager will be able to get a plugin when it needs to call it.
+	if err := h.draPlugins.add(plugin); err != nil {
 		cancel(err)
 		// No wrapping, the error already contains details.
 		return err
@@ -240,9 +243,9 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	// Only needs to be done once.
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
-	if cancel := h.pendingWipes[pluginName]; cancel != nil {
+	if cancel := h.pendingWipes[driverName]; cancel != nil {
 		(*cancel)(errors.New("new plugin instance registered"))
-		delete(h.pendingWipes, pluginName)
+		delete(h.pendingWipes, driverName)
 	}
 
 	return nil
@@ -252,7 +255,7 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 // NodePrepareResources and NodeUnprepareResources and returns its name
 // (e.g. [drapbv1beta1.DRAPluginService]). An error is returned if the plugin
 // is unusable.
-func (h *RegistrationHandler) validateSupportedServices(pluginName string, supportedServices []string) (string, error) {
+func (h *RegistrationHandler) validateSupportedServices(driverName string, supportedServices []string) (string, error) {
 	if len(supportedServices) == 0 {
 		return "", errors.New("empty list of supported gRPC services (aka supported versions)")
 	}
@@ -281,9 +284,9 @@ func (h *RegistrationHandler) validateSupportedServices(pluginName string, suppo
 
 // DeRegisterPlugin is called when a plugin has removed its socket,
 // signaling it is no longer available.
-func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
-	if p, last := h.draPlugins.remove(pluginName, endpoint); p != nil {
-		// This logger includes endpoint and pluginName.
+func (h *RegistrationHandler) DeRegisterPlugin(driverName, endpoint string) {
+	if p, last := h.draPlugins.remove(driverName, endpoint); p != nil {
+		// This logger includes endpoint and driverName.
 		logger := klog.FromContext(p.backgroundCtx)
 		logger.V(3).Info("Deregister DRA plugin", "lastInstance", last)
 		if !last {
@@ -295,7 +298,7 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 		// the plugin is canceled.
 		logger = klog.FromContext(h.backgroundCtx)
 		logger = klog.LoggerWithName(logger, "driver-cleanup")
-		logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
+		logger = klog.LoggerWithValues(logger, "driverName", driverName)
 		ctx, cancel := context.WithCancelCause(h.backgroundCtx)
 		ctx = klog.NewContext(ctx, logger)
 
@@ -307,10 +310,10 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 		// (see RegisterPlugin).
 		h.mutex.Lock()
 		defer h.mutex.Unlock()
-		if cancel := h.pendingWipes[pluginName]; cancel != nil {
+		if cancel := h.pendingWipes[driverName]; cancel != nil {
 			(*cancel)(errors.New("plugin deregistered a second time"))
 		}
-		h.pendingWipes[pluginName] = &cancel
+		h.pendingWipes[driverName] = &cancel
 
 		h.wg.Add(1)
 		go func() {
@@ -322,11 +325,11 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 				// Cancel our own context, but remove it from the map only if it
 				// is the current entry. Perhaps it already got replaced.
 				cancel(errors.New("wiping done"))
-				if h.pendingWipes[pluginName] == &cancel {
-					delete(h.pendingWipes, pluginName)
+				if h.pendingWipes[driverName] == &cancel {
+					delete(h.pendingWipes, driverName)
 				}
 			}()
-			h.wipeResourceSlices(ctx, h.wipingDelay, pluginName)
+			h.wipeResourceSlices(ctx, h.wipingDelay, driverName)
 		}()
 		return
 	}
@@ -337,10 +340,10 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 
 // ValidatePlugin is called by kubelet's plugin watcher upon detection
 // of a new registration socket opened by DRA plugin.
-func (h *RegistrationHandler) ValidatePlugin(pluginName string, endpoint string, supportedServices []string) error {
-	_, err := h.validateSupportedServices(pluginName, supportedServices)
+func (h *RegistrationHandler) ValidatePlugin(driverName string, endpoint string, supportedServices []string) error {
+	_, err := h.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
-		return fmt.Errorf("invalid versions of plugin %s: %w", pluginName, err)
+		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
 
 	return err
