@@ -22,6 +22,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -33,7 +34,7 @@ func TestNodeUnschedulable(t *testing.T) {
 		name       string
 		pod        *v1.Pod
 		node       *v1.Node
-		wantStatus *framework.Status
+		wantStatus *fwk.Status
 	}{
 		{
 			name: "Does not schedule pod to unschedulable node (node.Spec.Unschedulable==true)",
@@ -43,7 +44,7 @@ func TestNodeUnschedulable(t *testing.T) {
 					Unschedulable: true,
 				},
 			},
-			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonUnschedulable),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonUnschedulable),
 		},
 		{
 			name: "Schedule pod to normal node",

@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -73,7 +74,7 @@ func (m *waitingPodsMap) iterate(callback func(framework.WaitingPod)) {
 type waitingPod struct {
 	pod            *v1.Pod
 	pendingPlugins map[string]*time.Timer
-	s              chan *framework.Status
+	s              chan *fwk.Status
 	mu             sync.RWMutex
 }
 
@@ -87,7 +88,7 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *wa
 		// by using non-blocking send to this channel. This channel has a buffer of size 1
 		// to ensure that non-blocking send will not be ignored - possible situation when
 		// receiving from this channel happens after non-blocking send.
-		s: make(chan *framework.Status, 1),
+		s: make(chan *fwk.Status, 1),
 	}
 
 	wp.pendingPlugins = make(map[string]*time.Timer, len(pluginsMaxWaitTime))
@@ -143,7 +144,7 @@ func (w *waitingPod) Allow(pluginName string) {
 	// The select clause works as a non-blocking send.
 	// If there is no receiver, it's a no-op (default case).
 	select {
-	case w.s <- framework.NewStatus(framework.Success, ""):
+	case w.s <- fwk.NewStatus(fwk.Success, ""):
 	default:
 	}
 }
@@ -159,7 +160,7 @@ func (w *waitingPod) Reject(pluginName, msg string) {
 	// The select clause works as a non-blocking send.
 	// If there is no receiver, it's a no-op (default case).
 	select {
-	case w.s <- framework.NewStatus(framework.Unschedulable, msg).WithPlugin(pluginName):
+	case w.s <- fwk.NewStatus(fwk.Unschedulable, msg).WithPlugin(pluginName):
 	default:
 	}
 }

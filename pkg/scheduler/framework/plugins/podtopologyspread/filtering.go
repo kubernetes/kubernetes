@@ -137,12 +137,12 @@ func (p *criticalPaths) update(tpVal string, num int) {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *PodTopologySpread) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	s, err := pl.calPreFilterState(ctx, pod, nodes)
 	if err != nil {
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	} else if s != nil && len(s.Constraints) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 
 	cycleState.Write(preFilterStateKey, s)
@@ -155,10 +155,10 @@ func (pl *PodTopologySpread) PreFilterExtensions() framework.PreFilterExtensions
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	pl.updateWithPod(s, podInfoToAdd.Pod, podToSchedule, nodeInfo.Node(), 1)
@@ -166,10 +166,10 @@ func (pl *PodTopologySpread) AddPod(ctx context.Context, cycleState fwk.CycleSta
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *PodTopologySpread) RemovePod(ctx context.Context, cycleState fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *fwk.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	pl.updateWithPod(s, podInfoToRemove.Pod, podToSchedule, nodeInfo.Node(), -1)
@@ -308,12 +308,12 @@ func (pl *PodTopologySpread) calPreFilterState(ctx context.Context, pod *v1.Pod,
 }
 
 // Filter invoked at the filter extension point.
-func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
 
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	// However, "empty" preFilterState is legit which tolerates every toSchedule Pod.
@@ -328,7 +328,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleSta
 		tpVal, ok := node.Labels[tpKey]
 		if !ok {
 			logger.V(5).Info("Node doesn't have required topology label for spread constraint", "node", klog.KObj(node), "topologyKey", tpKey)
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
+			return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, ErrReasonNodeLabelNotMatch)
 		}
 
 		// judging criteria:
@@ -348,7 +348,7 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState fwk.CycleSta
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > int(c.MaxSkew) {
 			logger.V(5).Info("Node failed spreadConstraint: matchNum + selfMatchNum - minMatchNum > maxSkew", "node", klog.KObj(node), "topologyKey", tpKey, "matchNum", matchNum, "selfMatchNum", selfMatchNum, "minMatchNum", minMatchNum, "maxSkew", c.MaxSkew)
-			return framework.NewStatus(framework.Unschedulable, ErrReasonConstraintsNotMatch)
+			return fwk.NewStatus(fwk.Unschedulable, ErrReasonConstraintsNotMatch)
 		}
 	}
 

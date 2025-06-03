@@ -40,12 +40,12 @@ func (sr StatelessPreBindExample) Name() string {
 }
 
 // PreBind is the functions invoked by the framework at "prebind" extension point.
-func (sr StatelessPreBindExample) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (sr StatelessPreBindExample) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	if pod == nil {
-		return framework.NewStatus(framework.Error, "pod cannot be nil")
+		return fwk.NewStatus(fwk.Error, "pod cannot be nil")
 	}
 	if pod.Namespace != "foo" {
-		return framework.NewStatus(framework.Unschedulable, "only pods from 'foo' namespace are allowed")
+		return fwk.NewStatus(fwk.Unschedulable, "only pods from 'foo' namespace are allowed")
 	}
 	return nil
 }

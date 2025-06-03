@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -1533,7 +1534,7 @@ func (pl *preEnqueuePlugin) Name() string {
 	return "preEnqueuePlugin"
 }
 
-func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framework.Status {
+func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *fwk.Status {
 	for _, allowed := range pl.allowlists {
 		for label := range p.Labels {
 			if label == allowed {
@@ -1541,7 +1542,7 @@ func (pl *preEnqueuePlugin) PreEnqueue(ctx context.Context, p *v1.Pod) *framewor
 			}
 		}
 	}
-	return framework.NewStatus(framework.UnschedulableAndUnresolvable, "pod name not in allowlists")
+	return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "pod name not in allowlists")
 }
 
 func TestPriorityQueue_moveToActiveQ(t *testing.T) {
