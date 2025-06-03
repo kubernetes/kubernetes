@@ -407,7 +407,11 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 			Parent: nil,
 			Path:   fldPath,
 		}
-		if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
+		extractedTags, err := td.validator.ExtractTags(context, t.CommentLines)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %w", fldPath, err)
+		}
+		if validations, err := td.validator.ExtractValidations(context, extractedTags...); err != nil {
 			return nil, fmt.Errorf("%v: %w", fldPath, err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no type-attached validations", "type", t)
@@ -573,7 +577,12 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			Member: &memb,
 			Path:   childPath,
 		}
-		if validations, err := td.validator.ExtractValidations(context, memb.CommentLines); err != nil {
+
+		Tags, err := td.validator.ExtractTags(context, memb.CommentLines)
+		if err != nil {
+			return fmt.Errorf("field %s: %w", childPath.String(), err)
+		}
+		if validations, err := td.validator.ExtractValidations(context, Tags...); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
