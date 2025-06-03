@@ -1727,6 +1727,22 @@
     MUST have Endpoints and EndpointSlices pointing to each API server instance.
   release: v1.21
   file: test/e2e/network/endpointslice.go
+  - testname: EndpointSlice, multiple IPs, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple endpoint
+    IPs specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have different IPs and different Ports,
+    the service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
+- testname: EndpointSlice, single IP, multiple ports
+  codename: '[sig-network] EndpointSlice should support a Service with multiple ports
+    specified in multiple EndpointSlices [Conformance]'
+  description: Given a selector-less Service with multiple manually-created EndpointSlices
+    (and no Endpoints) where the endpoints have the same IP but different Ports, the
+    service proxy MUST allow connections to both ports.
+  release: v1.34
+  file: test/e2e/network/endpointslice.go
 - testname: EndpointSlice API
   codename: '[sig-network] EndpointSlice should support creating EndpointSlice API
     operations [Conformance]'
