@@ -160,6 +160,7 @@ type objectCache struct {
 	listObject    listObjectFunc
 	watchObject   watchObjectFunc
 	newObject     newObjectFunc
+	isImmutable   isImmutableFunc
 	groupResource schema.GroupResource
 	clock         clock.Clock
 	maxIdleTime   time.Duration
@@ -176,6 +177,7 @@ func NewObjectCache(
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
+	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	clock clock.Clock,
 	maxIdleTime time.Duration,
@@ -189,6 +191,7 @@ func NewObjectCache(
 		listObject:    listObject,
 		watchObject:   watchObject,
 		newObject:     newObject,
+		isImmutable:   isImmutable,
 		groupResource: groupResource,
 		clock:         clock,
 		maxIdleTime:   maxIdleTime,
@@ -327,6 +330,22 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		return nil, apierrors.NewNotFound(c.groupResource, name)
 	}
 	if object, ok := obj.(runtime.Object); ok {
+		// If the returned object is immutable, stop the reflector.
+		//
+		// NOTE: we may potentially not even start the reflector if the object is
+		// already immutable. However, given that:
+		// - we want to also handle the case when object is marked as immutable later
+		// - Secrets and ConfigMaps are periodically fetched by volumemanager anyway
+		// - doing that wouldn't provide visible scalability/performance gain - we
+		//   already have it from here
+		// - doing that would require significant refactoring to reflector
+		// we limit ourselves to just quickly stop the reflector here.
+		if c.isImmutable(object) {
+			item.setImmutable()
+			if item.stop() {
+				klog.V(4).InfoS("Stopped watching for changes - object is immutable", "obj", klog.KRef(namespace, name))
+			}
+		}
 		return object, nil
 	}
 	return nil, fmt.Errorf("unexpected object type: %v", obj)
@@ -365,6 +384,7 @@ func NewWatchBasedManager(
 	listObject listObjectFunc,
 	watchObject watchObjectFunc,
 	newObject newObjectFunc,
+	isImmutable isImmutableFunc,
 	groupResource schema.GroupResource,
 	resyncInterval time.Duration,
 	getReferencedObjects func(*v1.Pod) sets.Set[string]) Manager {
@@ -376,6 +396,6 @@ func NewWatchBasedManager(
 	maxIdleTime := resyncInterval * 5
 
 	// TODO propagate stopCh from the higher level.
-	objectStore := NewObjectCache(listObject, watchObject, newObject, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
+	objectStore := NewObjectCache(listObject, watchObject, newObject, isImmutable, groupResource, clock.RealClock{}, maxIdleTime, wait.NeverStop)
 	return NewCacheBasedManager(objectStore, getReferencedObjects)
 }

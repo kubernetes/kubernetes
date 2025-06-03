@@ -63,12 +63,15 @@ func TestWatchBasedManager(t *testing.T) {
 		return client.CoreV1().Secrets(namespace).Watch(ctx, options)
 	}
 	newObj := func() runtime.Object { return &v1.Secret{} }
+	// We want all watches to be up and running to stress test it.
+	// So don't treat any secret as immutable here.
+	isImmutable := func(_ runtime.Object) bool { return false }
 	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	stopCh := make(chan struct{})
 	t.Cleanup(func() { close(stopCh) })
 
-	store := manager.NewObjectCache(listObj, watchObj, newObj, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
+	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute, stopCh)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
