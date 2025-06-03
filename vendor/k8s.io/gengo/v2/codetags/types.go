@@ -17,21 +17,56 @@ limitations under the License.
 package codetags
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 )
 
-// TypedTag represents a single comment tag with typed args.
-type TypedTag struct {
+// Tag represents a single comment tag with typed args.
+type Tag struct {
 	// Name is the name of the tag with no arguments.
 	Name string
+
 	// Args is a list of optional arguments to the tag.
 	Args []Arg
-	// Value is the value of the tag.
+
+	// Value is the string representation of the tag value.
+	// Provides the tag value when ValueType is ValueTypeString, ValueTypeBool, ValueTypeInt or ValueTypeRaw.
 	Value string
+
+	// ValueTag is another tag parsed from the value of this tag.
+	// Provides the tag value when ValueType is ValueTypeTag.
+	ValueTag *Tag
+
+	// ValueType is the type of the value.
+	ValueType ValueType
 }
 
-func (t TypedTag) String() string {
+// PositionalArg returns the positional argument. If there is no positional
+// argument, it returns false.
+func (t Tag) PositionalArg() (Arg, bool) {
+	if len(t.Args) == 0 || len(t.Args[0].Name) > 0 {
+		return Arg{}, false
+	}
+	return t.Args[0], true
+}
+
+// NamedArg returns the named argument. If o named argument is found, it returns
+// false. Always returns false for empty name; use PositionalArg instead.
+func (t Tag) NamedArg(name string) (Arg, bool) {
+	if len(name) == 0 {
+		return Arg{}, false
+	}
+	for _, arg := range t.Args {
+		if arg.Name == name {
+			return arg, true
+		}
+	}
+	return Arg{}, false
+}
+
+// String returns the canonical string representation of the tag.
+// All strings are represented in double quotes. Spacing is normalized.
+func (t Tag) String() string {
 	buf := strings.Builder{}
 	buf.WriteString(t.Name)
 	if len(t.Args) > 0 {
@@ -44,9 +79,18 @@ func (t TypedTag) String() string {
 		}
 		buf.WriteString(")")
 	}
-	if len(t.Value) > 0 {
-		buf.WriteString("=")
-		buf.WriteString(t.Value)
+	if t.ValueType != ValueTypeNone {
+		if t.ValueType == ValueTypeTag {
+			buf.WriteString("=+")
+			buf.WriteString(t.ValueTag.String())
+		} else {
+			buf.WriteString("=")
+			if t.ValueType == ValueTypeString {
+				buf.WriteString(strconv.Quote(t.Value))
+			} else {
+				buf.WriteString(t.Value)
+			}
+		}
 	}
 	return buf.String()
 }
@@ -55,6 +99,7 @@ func (t TypedTag) String() string {
 type Arg struct {
 	// Name is the name of a named argument. This is zero-valued for positional arguments.
 	Name string
+
 	// Value is the string value of an argument. It has been validated to match the Type.
 	// See the ArgType const godoc for further details on how to parse the value for the
 	// Type.
@@ -64,12 +109,18 @@ type Arg struct {
 	Type ArgType
 }
 
-// String returns the string representation of the argument.
 func (a Arg) String() string {
+	buf := strings.Builder{}
 	if len(a.Name) > 0 {
-		return fmt.Sprintf("%s: %v", a.Name, a.Value)
+		buf.WriteString(a.Name)
+		buf.WriteString(": ")
 	}
-	return fmt.Sprintf("%v", a.Value)
+	if a.Type == ArgTypeString {
+		buf.WriteString(strconv.Quote(a.Value))
+	} else {
+		buf.WriteString(a.Value)
+	}
+	return buf.String()
 }
 
 // ArgType is an argument's type.
@@ -87,4 +138,32 @@ const (
 	// ArgTypeBool identifies bool values. Values of this type must either be the
 	// string "true" or "false".
 	ArgTypeBool ArgType = "bool"
+)
+
+// ValueType is a tag's value type.
+type ValueType string
+
+const (
+	// ValueTypeNone indicates that the tag has no value.
+	ValueTypeNone ValueType = ""
+
+	// ValueTypeString identifies string values.
+	ValueTypeString ValueType = "string"
+
+	// ValueTypeInt identifies int values. Values of this type may be in decimal,
+	// octal, hex or binary string representations. Consider using strconv.ParseInt
+	// to parse, as it supports all these string representations.
+	ValueTypeInt ValueType = "int"
+
+	// ValueTypeBool identifies bool values. Values of this type must either be the
+	// string "true" or "false".
+	ValueTypeBool ValueType = "bool"
+
+	// ValueTypeTag identifies that the value is another tag.
+	ValueTypeTag ValueType = "tag"
+
+	// ValueTypeRaw identifies that the value is raw, untyped content and contains
+	// all text from the tag declaration following the "=" sign, up to the last
+	// non-whitespace character.
+	ValueTypeRaw ValueType = "raw"
 )

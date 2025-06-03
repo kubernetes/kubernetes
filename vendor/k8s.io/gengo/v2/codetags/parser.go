@@ -17,22 +17,25 @@ limitations under the License.
 package codetags
 
 import (
-	"bytes"
 	"fmt"
-	"strconv"
 	"strings"
 	"unicode"
 )
 
-// Parse parses a comment tag into a TypedTag, or returns an error if the tag
+// Parse parses a tag string into a Tag, or returns an error if the tag
 // string fails to parse.
 //
-// A tag consists of a name, optional arguments, and an optional value. For example,
+// ParseOption may be provided to modify the behavior of the parser. The below
+// describes the default behavior.
+//
+// A tag consists of a name, optional arguments, and an optional scalar value or
+// tag value. For example,
 //
 //	"name"
 //	"name=50"
 //	"name("featureX")=50"
 //	"name(limit: 10, path: "/xyz")=text value"
+//	"name(limit: 10, path: "/xyz")=+anotherTag(size: 100)"
 //
 // Arguments are optional and may be either:
 //   - A single positional argument.
@@ -63,30 +66,34 @@ import (
 // typically used first to find and isolate tag strings matching a specific
 // prefix. Those extracted strings can then be parsed using this function.
 //
-// The value part of the tag is optional and follows an equals sign "=".
-// If no equals sign and value are present, the `Value` field of the
-// resulting TypedTag will be an empty string.
+// The value part of the tag is optional and follows an equals sign "=". If a
+// value is present, it must be a string, int, boolean, identifier, or tag.
 //
 // For example,
 //
-//	"name" // no value
-//	"name=value"
-//	"name=values include all the content after the = sign including any special characters (@*#^&...)"
+//	"name" # no value
+//	"name=identifier"
+//	"name="double-quoted value""
+//	"name=`backtick-quoted value`"
+//	"name(100)"
+//	"name(true)"
+//	"name=+anotherTag"
+//	"name=+anotherTag(size: 100)"
 //
-// Comments are treated as part of the value, if a value is present.
+// Trailing comments are ignored unless the RawValues option is enabled, in which
+// case they are treated as part of the value.
 //
 // For example,
 //
-//	"key // This tag has no value, so this comment is ignored"
-//	"key=value // Comments after values are treated as part of the value"
+//	"key=value # This comment is ignored"
 //
 // Formal Grammar:
 //
-// <tag>             ::= <tagName> [ "(" [ <args> ] ")" ] [ "=" <tagValue> ]
-// <args>            ::= <argValue> | <namedArgs>
+// <tag>             ::= <tagName> [ "(" [ <args> ] ")" ] [ ( "=" <value> | "=+" <tag> ) ]
+// <args>            ::= <value> | <namedArgs>
 // <namedArgs>       ::= <argNameAndValue> [ "," <namedArgs> ]*
-// <argNameAndValue> ::= <identifier> ":" <argValue>
-// <argValue>        ::= <identifier> | <string> | <int> | <bool>
+// <argNameAndValue> ::= <identifier> ":" <value>
+// <value>           ::= <identifier> | <string> | <int> | <bool>
 //
 // <tagName>       ::= [a-zA-Z_][a-zA-Z0-9_-.:]*
 // <identifier>    ::= [a-zA-Z_][a-zA-Z0-9_-.]*
@@ -95,17 +102,21 @@ import (
 // <int>           ::= /* Standard Go integer literals (decimal, 0x hex, 0o octal, 0b binary),
 // ...                    with an optional +/- prefix. */
 // <bool>          ::= "true" | "false"
-// <tagValue>      ::= /* All text following the "=" sign to the end of the string. */
-func Parse(tagText string) (TypedTag, error) {
-	tagText = strings.TrimSpace(tagText)
-	return parseTagKey(tagText)
+func Parse(tag string, options ...ParseOption) (Tag, error) {
+	opts := parseOpts{}
+	for _, o := range options {
+		o(&opts)
+	}
+
+	tag = strings.TrimSpace(tag)
+	return parseTag(tag, opts)
 }
 
 // ParseAll calls Parse on each tag in the input slice.
-func ParseAll(tags []string) ([]TypedTag, error) {
-	var out []TypedTag
+func ParseAll(tags []string, options ...ParseOption) ([]Tag, error) {
+	var out []Tag
 	for _, tag := range tags {
-		parsed, err := Parse(tag)
+		parsed, err := Parse(tag, options...)
 		if err != nil {
 			return nil, err
 		}
@@ -114,208 +125,180 @@ func ParseAll(tags []string) ([]TypedTag, error) {
 	return out, nil
 }
 
-const (
-	stBegin           = "stBegin"
-	stTag             = "stTag"
-	stArg             = "stArg"
-	stNumber          = "stNumber"
-	stPrefixedNumber  = "stPrefixedNumber"
-	stQuotedString    = "stQuotedString"
-	stNakedString     = "stNakedString"
-	stEscape          = "stEscape"
-	stEndOfToken      = "stEndOfToken"
-	stMaybeValue      = "stMaybeValue"
-	stValue           = "stValue"
-	stMaybeComment    = "stMaybeComment"
-	stTrailingSlash   = "stTrailingSlash"
-	stTrailingComment = "stTrailingComment"
-)
+type parseOpts struct {
+	rawValues bool
+}
 
-func parseTagKey(input string) (TypedTag, error) {
-	tag := bytes.Buffer{}   // current tag name
-	args := []Arg{}         // all tag arguments
-	value := bytes.Buffer{} // current tag value
+// ParseOption provides a parser option.
+type ParseOption func(*parseOpts)
 
-	cur := Arg{}          // current argument accumulator
-	buf := bytes.Buffer{} // string accumulator
+// RawValues skips parsing of the value part of the tag. If enabled, the Value
+// in the parse response will contain all text following the "=" sign, up to the last
+// non-whitespace character, and ValueType will be set to ValueTypeRaw.
+// Default: disabled
+func RawValues(enabled bool) ParseOption {
+	return func(opts *parseOpts) {
+		opts.rawValues = enabled
+	}
+}
+
+func parseTag(input string, opts parseOpts) (Tag, error) {
+	const (
+		stTag           = "stTag"
+		stMaybeArgs     = "stMaybeArgs"
+		stArg           = "stArg"
+		stArgEndOfToken = "stArgEndOfToken"
+		stMaybeValue    = "stMaybeValue"
+		stValue         = "stValue"
+		stMaybeComment  = "stMaybeComment"
+	)
+	var startTag, endTag *Tag // both ends of the chain when parsing chained tags
+
+	// accumulators
+	var tagName string      // current tag name
+	var value string        // current value
+	var valueType ValueType // current value type
+	cur := Arg{}            // current argument
+	var args []Arg          // current arguments slice
+
+	s := scanner{buf: []rune(input)} // scanner for parsing the tag string
+	var incomplete bool              // tracks if a token is incomplete
 
 	// These are defined outside the loop to make errors easier.
-	var i int
-	var r rune
-	var incomplete bool
-	var quote rune
-
-	saveInt := func() error {
-		s := buf.String()
-		if _, err := strconv.ParseInt(s, 0, 64); err != nil {
-			return fmt.Errorf("invalid number %q", s)
-		} else {
-			cur.Value = s
-			cur.Type = ArgTypeInt
-		}
+	saveArg := func(v string, t ArgType) {
+		cur.Value = v
+		cur.Type = t
 		args = append(args, cur)
 		cur = Arg{}
-		buf.Reset()
+	}
+	saveInt := func(v string) { saveArg(v, ArgTypeInt) }
+	saveString := func(v string) { saveArg(v, ArgTypeString) }
+	saveBoolOrString := func(value string) {
+		if value == "true" || value == "false" {
+			saveArg(value, ArgTypeBool)
+		} else {
+			saveArg(value, ArgTypeString)
+		}
+	}
+	saveName := func(value string) {
+		cur.Name = value
+	}
+	saveTag := func() error {
+		usingNamedArgs := false
+		for i, arg := range args {
+			if (usingNamedArgs && arg.Name == "") || (!usingNamedArgs && arg.Name != "" && i > 0) {
+				return fmt.Errorf("can't mix named and positional arguments")
+			}
+			if arg.Name != "" {
+				usingNamedArgs = true
+			}
+		}
+		if !usingNamedArgs && len(args) > 1 {
+			return fmt.Errorf("multiple arguments must use 'name: value' syntax")
+		}
+		newTag := &Tag{Name: tagName, Args: args}
+		if startTag == nil {
+			startTag = newTag
+			endTag = newTag
+		} else {
+			endTag.ValueTag = newTag
+			endTag.ValueType = ValueTypeTag
+			endTag = newTag
+		}
+		args = nil // Reset to nil instead of empty slice
 		return nil
 	}
-	saveString := func() {
-		s := buf.String()
-		cur.Value = s
-		cur.Type = ArgTypeString
-		args = append(args, cur)
-		cur = Arg{}
-		buf.Reset()
+	saveValue := func() {
+		endTag.Value = value
+		endTag.ValueType = valueType
 	}
-	saveBoolOrString := func() {
-		s := buf.String()
-		if s == "true" || s == "false" {
-			cur.Value = s
-			cur.Type = ArgTypeBool
-		} else {
-			cur.Value = s
-			cur.Type = ArgTypeString
-		}
-		args = append(args, cur)
-		cur = Arg{}
-		buf.Reset()
-	}
-	saveName := func() {
-		cur.Name = buf.String()
-		buf.Reset()
-	}
-
-	runes := []rune(input)
-	st := stBegin
+	var err error
+	st := stTag
 parseLoop:
-	for i, r = range runes {
+	for r := s.peek(); r != EOF; r = s.peek() {
 		switch st {
-		case stBegin:
+		case stTag: // Any leading whitespace is expected to be trimmed before parsing.
 			switch {
-			case unicode.IsSpace(r):
-				continue
 			case isIdentBegin(r):
-				tag.WriteRune(r)
-				st = stTag
+				tagName, err = s.nextIdent(isTagNameInterior)
+				if err != nil {
+					return Tag{}, err
+				}
+				st = stMaybeArgs
 			default:
 				break parseLoop
 			}
-		case stTag:
+		case stMaybeArgs:
 			switch {
-			case isIdentInterior(r) || r == ':':
-				tag.WriteRune(r)
 			case r == '(':
+				s.next() // consume (
 				incomplete = true
 				st = stArg
 			case r == '=':
+				s.next() // consume =
+				if opts.rawValues {
+					// only raw values support empty values following =
+					valueType = ValueTypeRaw
+				} else {
+					incomplete = true
+				}
 				st = stValue
-			case unicode.IsSpace(r):
-				st = stMaybeComment
 			default:
-				break parseLoop
+				st = stMaybeComment
 			}
 		case stArg:
 			switch {
-			case unicode.IsSpace(r):
-				continue
 			case r == ')':
+				s.next() // consume )
 				incomplete = false
 				st = stMaybeValue
-			case r == '0':
-				buf.WriteRune(r)
-				st = stPrefixedNumber
 			case r == '-' || r == '+' || unicode.IsDigit(r):
-				buf.WriteRune(r)
-				st = stNumber
+				number, err := s.nextNumber()
+				if err != nil {
+					return Tag{}, err
+				}
+				saveInt(number)
+				st = stArgEndOfToken
 			case r == '"' || r == '`':
-				quote = r
-				st = stQuotedString
+				str, err := s.nextString()
+				if err != nil {
+					return Tag{}, err
+				}
+				saveString(str)
+				st = stArgEndOfToken
 			case isIdentBegin(r):
-				buf.WriteRune(r)
-				st = stNakedString
+				identifier, err := s.nextIdent(isIdentInterior)
+				if err != nil {
+					return Tag{}, err
+				}
+				r = s.peek() // reset r after nextIdent
+
+				switch {
+				case r == ',' || r == ')': // positional arg
+					if r == ',' {
+						r = s.skipWhitespace() // allow whitespace after ,
+					}
+					saveBoolOrString(identifier)
+					st = stArgEndOfToken
+				case r == ':': // named arg
+					s.next()               // consume :
+					r = s.skipWhitespace() // allow whitespace after :
+					saveName(identifier)
+					st = stArg
+				default:
+					break parseLoop
+				}
 			default:
 				break parseLoop
 			}
-		case stNumber:
-			hexits := "abcdefABCDEF"
+		case stArgEndOfToken:
 			switch {
-			case unicode.IsDigit(r) || strings.Contains(hexits, string(r)):
-				buf.WriteRune(r)
-				continue
 			case r == ',':
-				if err := saveInt(); err != nil {
-					return TypedTag{}, err
-				}
+				s.next()               // consume ,
+				r = s.skipWhitespace() // allow whitespace after ,
 				st = stArg
 			case r == ')':
-				if err := saveInt(); err != nil {
-					return TypedTag{}, err
-				}
-				incomplete = false
-				st = stMaybeValue
-			case unicode.IsSpace(r):
-				if err := saveInt(); err != nil {
-					return TypedTag{}, err
-				}
-				st = stEndOfToken
-			default:
-				break parseLoop
-			}
-		case stPrefixedNumber:
-			switch {
-			case unicode.IsDigit(r):
-				buf.WriteRune(r)
-				st = stNumber
-			case r == 'x' || r == 'o' || r == 'b':
-				buf.WriteRune(r)
-				st = stNumber
-			default:
-				break parseLoop
-			}
-		case stQuotedString:
-			switch {
-			case r == '\\':
-				st = stEscape
-			case r == quote:
-				saveString()
-				st = stEndOfToken
-			default:
-				buf.WriteRune(r)
-			}
-		case stEscape:
-			switch {
-			case r == quote || r == '\\':
-				buf.WriteRune(r)
-				st = stQuotedString
-			default:
-				return TypedTag{}, fmt.Errorf("unhandled escaped character %q", r)
-			}
-		case stNakedString:
-			switch {
-			case isIdentInterior(r):
-				buf.WriteRune(r)
-			case r == ',':
-				saveBoolOrString()
-				st = stArg
-			case r == ')':
-				saveBoolOrString()
-				incomplete = false
-				st = stMaybeValue
-			case unicode.IsSpace(r):
-				saveBoolOrString()
-				st = stEndOfToken
-			case r == ':':
-				saveName()
-				st = stArg
-			default:
-				break parseLoop
-			}
-		case stEndOfToken:
-			switch {
-			case unicode.IsSpace(r):
-				continue
-			case r == ',':
-				st = stArg
-			case r == ')':
+				s.next() // consume )
 				incomplete = false
 				st = stMaybeValue
 			default:
@@ -324,58 +307,91 @@ parseLoop:
 		case stMaybeValue:
 			switch {
 			case r == '=':
+				s.next() // consume =
+				if opts.rawValues {
+					// Empty values are allowed for raw.
+					// Since = might be the last char in the input, we need
+					// to record the valueType as raw immediately.
+					valueType = ValueTypeRaw
+				}
 				st = stValue
-			case unicode.IsSpace(r):
+			default:
+				st = stMaybeComment
+			}
+		case stValue:
+			switch {
+			case opts.rawValues: // When enabled, consume all remaining chars
+				incomplete = false
+				value = s.remainder()
+				break parseLoop
+			case r == '+' && isIdentBegin(s.peekN(1)): // tag value
+				incomplete = false
+				s.next() // consume +
+				if err := saveTag(); err != nil {
+					return Tag{}, err
+				}
+				st = stTag
+			case r == '-' || r == '+' || unicode.IsDigit(r):
+				incomplete = false
+				number, err := s.nextNumber()
+				valueType = ValueTypeInt
+				if err != nil {
+					return Tag{}, err
+				}
+				value = number
+				st = stMaybeComment
+			case r == '"' || r == '`':
+				incomplete = false
+				str, err := s.nextString()
+				if err != nil {
+					return Tag{}, err
+				}
+				value = str
+				valueType = ValueTypeString
+				st = stMaybeComment
+			case isIdentBegin(r):
+				incomplete = false
+				str, err := s.nextIdent(isIdentInterior)
+				if err != nil {
+					return Tag{}, err
+				}
+				value = str
+				if str == "true" || str == "false" {
+					valueType = ValueTypeBool
+				} else {
+					valueType = ValueTypeString
+				}
 				st = stMaybeComment
 			default:
 				break parseLoop
 			}
-		case stValue: // This is a terminal state, it consumes the rest of the input as an opaque value.
-			value.WriteRune(r)
 		case stMaybeComment:
 			switch {
-			case unicode.IsSpace(r):
-				continue
-			case r == '/':
-				incomplete = true
-				st = stTrailingSlash
+			case s.nextIsTrailingComment():
+				s.remainder()
 			default:
 				break parseLoop
 			}
-		case stTrailingSlash:
-			switch {
-			case r == '/':
-				incomplete = false
-				st = stTrailingComment
-			default:
-				break parseLoop
-			}
-		case stTrailingComment:
-			i = len(runes) - 1
-			break parseLoop
 		default:
-			return TypedTag{}, fmt.Errorf("unknown state reached in parser: %s at position %d", st, i)
+			return Tag{}, fmt.Errorf("unexpected internal parser error: unknown state: %s at position %d", st, s.pos)
 		}
 	}
-	if i != len(runes)-1 {
-		return TypedTag{}, fmt.Errorf("unexpected character %q at position %d", r, i)
+	if s.peek() != EOF {
+		return Tag{}, fmt.Errorf("unexpected character %q at position %d", s.next(), s.pos)
 	}
 	if incomplete {
-		return TypedTag{}, fmt.Errorf("unexpected end of input")
+		return Tag{}, fmt.Errorf("unexpected end of input")
 	}
-	usingNamedArgs := false
-	for i, arg := range args {
-		if (usingNamedArgs && arg.Name == "") || (!usingNamedArgs && arg.Name != "" && i > 0) {
-			return TypedTag{}, fmt.Errorf("can't mix named and positional arguments")
-		}
-		if arg.Name != "" {
-			usingNamedArgs = true
-		}
+	if err := saveTag(); err != nil {
+		return Tag{}, err
 	}
-	if !usingNamedArgs && len(args) > 1 {
-		return TypedTag{}, fmt.Errorf("multiple arguments must use 'name: value' syntax")
+	if len(valueType) > 0 {
+		saveValue()
 	}
-	return TypedTag{Name: tag.String(), Args: args, Value: value.String()}, nil
+	if startTag == nil {
+		return Tag{}, fmt.Errorf("unexpected internal parser error: no tags parsed")
+	}
+	return *startTag, nil
 }
 
 func isIdentBegin(r rune) bool {
@@ -384,4 +400,8 @@ func isIdentBegin(r rune) bool {
 
 func isIdentInterior(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '.' || r == '-'
+}
+
+func isTagNameInterior(r rune) bool {
+	return isIdentInterior(r) || r == ':'
 }
