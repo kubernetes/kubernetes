@@ -1354,7 +1354,14 @@ func getContainerAllowedCPUs(pod *v1.Pod, ctnName string, isInit bool) (cpuset.C
 		return cpuset.CPUSet{}, err
 	}
 	framework.Logf("pod %s/%s cnt %s qos=%s path %q", pod.Namespace, pod.Name, ctnName, pod.Status.QOSClass, cgPath)
-	data, err := os.ReadFile(filepath.Join(cgPath, "cpuset.cpus.effective"))
+	// try the cgroupv2 file first
+	filePath := filepath.Join(cgPath, "cpuset.cpus.effective")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		framework.Logf("file %q does not exist, trying cpuset.effective_cpus", filePath)
+		// then fallback to the cgroupv1 file
+		filePath = filepath.Join(cgPath, "cpuset.effective_cpus")
+	}
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
