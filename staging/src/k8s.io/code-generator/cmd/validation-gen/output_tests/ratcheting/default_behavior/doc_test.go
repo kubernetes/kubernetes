@@ -105,19 +105,19 @@ func Test_StructStruct(t *testing.T) {
 		NonDirectComparableStructPtr: &NonDirectComparableStruct{
 			IntPtrField: ptr.To(1),
 		},
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("directComparableStructField"), "", ""),
-		field.Invalid(field.NewPath("nonDirectComparableStructField"), "", ""),
-		field.Invalid(field.NewPath("directComparableStructField").Child("intField"), "", ""),
-		field.Invalid(field.NewPath("nonDirectComparableStructField").Child("intPtrField"), "", ""),
-		field.Invalid(field.NewPath("directComparableStructPtrField"), "", ""),
-		field.Invalid(field.NewPath("nonDirectComparableStructPtrField"), "", ""),
-		field.Invalid(field.NewPath("directComparableStructPtrField").Child("intField"), "", ""),
-		field.Invalid(field.NewPath("nonDirectComparableStructPtrField").Child("intPtrField"), "", ""),
-		field.Invalid(field.NewPath("DirectComparableStruct"), "", ""),
-		field.Invalid(field.NewPath("NonDirectComparableStruct"), "", ""),
-		field.Invalid(field.NewPath("DirectComparableStruct").Child("intField"), "", ""),
-		field.Invalid(field.NewPath("NonDirectComparableStruct").Child("intPtrField"), "", ""),
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"directComparableStructField":                   {"field directComparableStructField", "type DirectComparableStruct"},
+		"directComparableStructField.intField":          {"field intField"},
+		"nonDirectComparableStructField":                {"field nonDirectComparableStructField", "type NonDirectComparableStruct"},
+		"nonDirectComparableStructField.intPtrField":    {"field intPtrField"},
+		"directComparableStructPtrField":                {"field directComparableStructPtrField", "type DirectComparableStruct"},
+		"directComparableStructPtrField.intField":       {"field intField"},
+		"nonDirectComparableStructPtrField":             {"field nonDirectComparableStructPtrField", "type NonDirectComparableStruct"},
+		"nonDirectComparableStructPtrField.intPtrField": {"field intPtrField"},
+		"DirectComparableStruct":                        {"field DirectComparableStruct", "type DirectComparableStruct"},
+		"DirectComparableStruct.intField":               {"field intField"},
+		"NonDirectComparableStruct":                     {"field NonDirectComparableStruct", "type NonDirectComparableStruct"},
+		"NonDirectComparableStruct.intPtrField":         {"field intPtrField"},
 	})
 
 	st.Value(&StructStruct{
@@ -158,17 +158,37 @@ func Test_StructEmbedded(t *testing.T) {
 		NonDirectComparableStruct: NonDirectComparableStruct{
 			IntPtrField: ptr.To(1),
 		},
-	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.Invalid(field.NewPath("directComparableStruct"), "", ""),
-		field.Invalid(field.NewPath("nonDirectComparableStruct"), "", ""),
-		field.Invalid(field.NewPath("directComparableStruct").Child("intField"), "", ""),
-		field.Invalid(field.NewPath("nonDirectComparableStruct").Child("intPtrField"), "", ""),
-		field.Invalid(field.NewPath("nestedDirectComparableStructField"), "", ""),
-		field.Invalid(field.NewPath("nestedDirectComparableStructField").Child("directComparableStructField"), "", ""),
-		field.Invalid(field.NewPath("nestedDirectComparableStructField").Child("directComparableStructField").Child("intField"), "", ""),
-		field.Invalid(field.NewPath("nestedNonDirectComparableStructField"), "", ""),
-		field.Invalid(field.NewPath("nestedNonDirectComparableStructField").Child("nonDirectComparableStructField"), "", ""),
-		field.Invalid(field.NewPath("nestedNonDirectComparableStructField").Child("nonDirectComparableStructField").Child("intPtrField"), "", ""),
+	}).ExpectValidateFalseByPath(map[string][]string{
+		"directComparableStruct": {
+			"field DirectComparableStruct", "type DirectComparableStruct",
+		},
+		"directComparableStruct.intField": {
+			"field intField",
+		},
+		"nonDirectComparableStruct": {
+			"field NonDirectComparableStruct", "type NonDirectComparableStruct",
+		},
+		"nonDirectComparableStruct.intPtrField": {
+			"field intPtrField",
+		},
+		"nestedDirectComparableStructField": {
+			"field NestedDirectComparableStructField", "type NestedDirectComparableStruct",
+		},
+		"nestedDirectComparableStructField.directComparableStructField": {
+			"field directComparableStructField", "type DirectComparableStruct",
+		},
+		"nestedDirectComparableStructField.directComparableStructField.intField": {
+			"field intField",
+		},
+		"nestedNonDirectComparableStructField": {
+			"field NestedNonDirectComparableStructField", "type NestedNonDirectComparableStruct",
+		},
+		"nestedNonDirectComparableStructField.nonDirectComparableStructField": {
+			"field nonDirectComparableStructField", "type NonDirectComparableStruct",
+		},
+		"nestedNonDirectComparableStructField.nonDirectComparableStructField.intPtrField": {
+			"field intPtrField",
+		},
 	})
 
 	st.Value(&StructEmbedded{
