@@ -37,6 +37,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
+	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -333,6 +334,11 @@ func TestConnectionHandling(t *testing.T) {
 				// Slice should get removed.
 				requireNoSlices(tCtx)
 			} else {
+				wipingIsPending := func() bool {
+					return draPlugins.pendingWipes.GetWorkerUnsafe(timedworkers.NewWorkArgs(driverName, "").KeyFromWorkArgs()) != nil
+				}
+				require.Eventuallyf(t, wipingIsPending, time.Minute, time.Second, "wiping should be queued for plugin %s", driverName)
+
 				// Start up gRPC server again.
 				tCtx.Log("Restarting plugin gRPC server")
 				teardown, err = setupFakeGRPCServer(service, endpoint)
@@ -341,10 +347,7 @@ func TestConnectionHandling(t *testing.T) {
 
 				// There shouldn't be any pending wipes for the plugin.
 				require.Eventuallyf(t, func() bool {
-					draPlugins.mutex.Lock()
-					defer draPlugins.mutex.Unlock()
-					_, ok := draPlugins.pendingWipes[driverName]
-					return ok
+					return !wipingIsPending()
 				}, time.Minute, time.Second, "wiping should be stopped for plugin %s", driverName)
 
 				// Slice should still be there
