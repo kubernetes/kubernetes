@@ -535,7 +535,7 @@ func (w *watchCache) list(ctx context.Context, resourceVersion uint64, key strin
 			}
 		}
 		// Legacy exact match
-		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
+		if w.snapshots != nil && opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
 			return w.listExactRV(key, "", resourceVersion)
 		}
 		// Consistent Read - already handled via waitUntilFreshAndBlock
