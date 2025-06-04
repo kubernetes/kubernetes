@@ -20,11 +20,10 @@ package apply
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
-
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // NewKubeconfigPhase returns a new kubeconfig phase.

@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +47,7 @@ import (
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 	kubeconfigtestutil "k8s.io/kubernetes/cmd/kubeadm/test/kubeconfig"

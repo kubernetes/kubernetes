@@ -24,7 +24,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // OpenRCInitSystem defines openrc

@@ -20,7 +20,7 @@ import (
 	"bytes"
 	"text/template"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // ParseTemplate validates and parses passed as argument template

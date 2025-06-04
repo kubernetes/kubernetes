@@ -17,12 +17,11 @@ limitations under the License.
 package fuzzer
 
 import (
-	"sigs.k8s.io/randfill"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/randfill"
 
 	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"

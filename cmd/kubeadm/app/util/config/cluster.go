@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
-
 	authv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -49,6 +47,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
