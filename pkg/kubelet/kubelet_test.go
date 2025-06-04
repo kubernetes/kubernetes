@@ -2427,8 +2427,8 @@ func TestPodResourceAllocationReset(t *testing.T) {
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
 
-	// fakePodWorkers trigger syncPodFn synchronously on update, but entering
-	// kubelet.SyncPod while holding the podResizeMutex can lead to deadlock.
+	// fakePodWorkers triggers syncPodFn synchronously on update. We overwrite it here to
+	// avoid calling kubelet.SyncPod, which performs resize resource allocation.
 	kubelet.podWorkers.(*fakePodWorkers).syncPodFn =
 		func(_ context.Context, _ kubetypes.SyncPodType, _, _ *v1.Pod, _ *kubecontainer.PodStatus) (bool, error) {
 			return false, nil
