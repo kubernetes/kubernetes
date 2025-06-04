@@ -992,7 +992,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	handlers = append(handlers, klet.containerManager.GetAllocateResourcesPodAdmitHandler())
 
-	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
+	criticalPodAdmissionHandler := preemption.NewCriticalPodAdmissionHandler(klet.getAllocatedPods, killPodNow(klet.podWorkers, kubeDeps.Recorder), kubeDeps.Recorder)
 	handlers = append(handlers, lifecycle.NewPredicateAdmitHandler(klet.getNodeAnyWay, criticalPodAdmissionHandler, klet.containerManager.UpdatePluginResources))
 	// apply functional Option's
 	for _, opt := range kubeDeps.Options {
