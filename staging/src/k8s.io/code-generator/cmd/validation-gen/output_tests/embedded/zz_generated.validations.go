@@ -23,6 +23,7 @@ package embedded
 
 import (
 	context "context"
+	fmt "fmt"
 
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
@@ -37,7 +38,11 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
 }
@@ -50,14 +55,14 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
 			errs = append(errs, Validate_T2(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath, &obj.T2, safe.Field(oldObj, func(oldObj *T1) *T2 { return &oldObj.T2 }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("T2") }), &obj.T2, safe.Field(oldObj, func(oldObj *T1) *T2 { return &oldObj.T2 }))...)
 
 	// field T1.T3
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T3) (errs field.ErrorList) {
 			errs = append(errs, Validate_T3(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath, obj.T3, safe.Field(oldObj, func(oldObj *T1) *T3 { return oldObj.T3 }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("T3") }), obj.T3, safe.Field(oldObj, func(oldObj *T1) *T3 { return oldObj.T3 }))...)
 
 	return errs
 }
@@ -66,9 +71,6 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T2.IntField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
-			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T2.IntField")...)
 			return
 		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *T2) *int { return &oldObj.IntField }))...)
@@ -80,9 +82,6 @@ func Validate_T3(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T3.StringField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
-			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T3.StringField")...)
 			return
 		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *T3) *string { return &oldObj.StringField }))...)
@@ -90,9 +89,6 @@ func Validate_T3(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T3.IntField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int) (errs field.ErrorList) {
-			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil // no changes
-			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "T3.IntField")...)
 			return
 		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *T3) *int { return &oldObj.IntField }))...)
