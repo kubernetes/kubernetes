@@ -229,12 +229,6 @@ const (
 	// Deployments and replica sets can now also track terminating pods via .status.terminatingReplicas.
 	DeploymentReplicaSetTerminatingReplicas featuregate.Feature = "DeploymentReplicaSetTerminatingReplicas"
 
-	// owner: @elezar
-	// kep: http://kep.k8s.io/4009
-	//
-	// Add support for CDI Device IDs in the Device Plugin API.
-	DevicePluginCDIDevices featuregate.Feature = "DevicePluginCDIDevices"
-
 	// owner: @aojea
 	//
 	// The apiservers with the MultiCIDRServiceAllocator feature enable, in order to support live migration from the old bitmap ClusterIP
@@ -1147,12 +1141,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DeploymentReplicaSetTerminatingReplicas: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	DevicePluginCDIDevices: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 	},
 
 	DisableAllocatorDualWrite: {

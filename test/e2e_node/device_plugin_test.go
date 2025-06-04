@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -48,7 +47,6 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -282,7 +280,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Expect(v1ResourcesForOurPod.Containers[0].Devices[0].DeviceIds).To(gomega.HaveLen(1))
 		})
 
-		f.It("can make a CDI device accessible in a container", feature.DevicePluginCDIDevices, func(ctx context.Context) {
+		f.It("can make a CDI device accessible in a container", func(ctx context.Context) {
 			// check if CDI_DEVICE env variable is set
 			// and only one correspondent device node /tmp/<CDI_DEVICE> is available inside a container
 			podObj := makeBusyboxPod(SampleDeviceResourceName, "[ $(ls /tmp/CDI-Dev-[1,2] | wc -l) -eq 1 -a -b /tmp/$CDI_DEVICE ]")
@@ -1120,9 +1118,7 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 		}
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.DevicePluginCDIDevices) {
-		dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
-	}
+	dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
 
 	return dp
 }
