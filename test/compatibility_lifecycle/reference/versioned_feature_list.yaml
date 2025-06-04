@@ -579,6 +579,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+- name: InheritReusableCPUsFirst
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: InPlacePodVerticalScaling
   versionedSpecs:
   - default: false
