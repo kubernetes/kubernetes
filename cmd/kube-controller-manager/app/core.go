@@ -530,6 +530,7 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 	resourceQuotaControllerOptions := &resourcequotacontroller.ControllerOptions{
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     controllerContext.InformerFactory.Core().V1().ResourceQuotas(),
+		DeviceClassInformer:       controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
 		ResyncPeriod:              pkgcontroller.StaticResyncPeriodFunc(controllerContext.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
 		InformerFactory:           controllerContext.ObjectOrMetadataInformerFactory,
 		ReplenishmentResyncPeriod: controllerContext.ResyncPeriod,
