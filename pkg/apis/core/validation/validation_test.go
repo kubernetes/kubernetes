@@ -1566,7 +1566,7 @@ func TestValidatePeristentVolumeAttributesClassUpdate(t *testing.T) {
 			newPV:                       testVolumeWithVolumeAttributesClass(ptr.To("")),
 		},
 		"string-to-nil": {
-			isExpectedFailure:           true,
+			isExpectedFailure:           false,
 			enableVolumeAttributesClass: true,
 			oldPV:                       testVolumeWithVolumeAttributesClass(ptr.To("foo")),
 			newPV:                       testVolumeWithVolumeAttributesClass(nil),
@@ -3034,7 +3034,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		"invalid-update-volume-attributes-class": {
 			oldClaim:                    validClaimVolumeAttributesClass1,
-			newClaim:                    validClaimNilVolumeAttributesClass,
+			newClaim:                    validClaimEmptyVolumeAttributesClass,
 			enableVolumeAttributesClass: true,
 			isExpectedFailure:           true,
 		},
@@ -3042,7 +3042,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			oldClaim:                    validClaimVolumeAttributesClass1,
 			newClaim:                    validClaimNilVolumeAttributesClass,
 			enableVolumeAttributesClass: true,
-			isExpectedFailure:           true,
+			isExpectedFailure:           false,
 		},
 		"invalid-update-volume-attributes-class-to-empty": {
 			oldClaim:                    validClaimVolumeAttributesClass1,
