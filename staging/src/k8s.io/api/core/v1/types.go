@@ -7639,6 +7639,8 @@ const (
 	ResourceLimitsEphemeralStorage ResourceName = "limits.ephemeral-storage"
 	// resource.k8s.io devices requested with a certain DeviceClass, number
 	ResourceClaimsPerClass string = ".deviceclass.resource.k8s.io/devices"
+	// resource.k8s.io devices requested with a certain DeviceClass by non-extended-resource claim, number
+	ResourceNonExtendedClaimsPerClass string = ".deviceclass.resource.k8s.io/non-extended-resource-devices"
 )
 
 // The following identify resource prefix for Kubernetes object types

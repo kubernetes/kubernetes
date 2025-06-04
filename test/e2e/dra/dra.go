@@ -1930,6 +1930,47 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		b := drautils.NewBuilder(f, driver)
 		b.UseExtendedResourceName = true
 
+		ginkgo.It("must run a pod with extended resource with resource quota", func(ctx context.Context) {
+			pod := b.Pod()
+			res := v1.ResourceList{}
+			res[v1.ResourceName(b.ExtendedResourceName(0))] = resource.MustParse("1")
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+
+			b.Create(ctx, pod)
+			err := e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod)
+			framework.ExpectNoError(err, "start pod")
+			containerEnv := []string{
+				"container_0_request_0", "true",
+			}
+			drautils.TestContainerEnv(ctx, f, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+
+			claim := b.ExternalClaim()
+			pod2 := b.PodExternal()
+			b.Create(ctx, claim, pod2)
+			b.TestPod(ctx, f, pod2)
+			quota := &v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-quota"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceName("count/resourceclaims.resource.k8s.io"):                                                       resource.MustParse("10"),
+						v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0))):                                        resource.MustParse("10"),
+						v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name)):                       resource.MustParse("10"),
+						v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/non-extended-resource-devices", b.Class(0).Name)): resource.MustParse("10"),
+					},
+				},
+			}
+			b.Create(ctx, quota)
+			framework.ExpectNoError(err)
+			usedResources := v1.ResourceList{}
+			usedResources[v1.ResourceName("count/resourceclaims.resource.k8s.io")] = resource.MustParse("2")
+			usedResources[v1.ResourceName(fmt.Sprintf("requests.%s", b.ExtendedResourceName(0)))] = resource.MustParse("1")
+			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/devices", b.Class(0).Name))] = resource.MustParse("2")
+			usedResources[v1.ResourceName(fmt.Sprintf("%s.deviceclass.resource.k8s.io/non-extended-resource-devices", b.Class(0).Name))] = resource.MustParse("1")
+			err = drautils.WaitForResourceQuota(ctx, f.ClientSet, f.Namespace.Name, quota.Name, usedResources)
+			framework.ExpectNoError(err)
+		})
+
 		ginkgo.It("must run a pod with both implicit and explicit extended resource with one container two resources", func(ctx context.Context) {
 			extendedResourceTest(ctx, b, f, []string{
 				// implicit extended resource name

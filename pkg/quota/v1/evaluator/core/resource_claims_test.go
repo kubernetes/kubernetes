@@ -81,8 +81,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 		"simple": {
 			claim: validClaim,
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("1"),
 			},
 		},
 		"many-requests": {
@@ -94,8 +95,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("5"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("5"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("5"),
 			},
 		},
 		"count": {
@@ -105,8 +107,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("5"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("5"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("5"),
 			},
 		},
 		"all": {
@@ -116,8 +119,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": *resource.NewQuantity(api.AllocationResultsMaxSize, resource.DecimalSI),
 			},
 		},
 		"unknown-count-mode": {
@@ -127,8 +131,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("0"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("0"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("0"),
 			},
 		},
 		"admin": {
@@ -139,15 +144,17 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("1"),
 			},
 		},
 		"prioritized-list": {
 			claim: validClaimWithPrioritizedList,
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("1"),
 			},
 		},
 		"prioritized-list-multiple-subrequests": {
@@ -163,8 +170,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("2"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("2"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("2"),
 			},
 		},
 		"prioritized-list-multiple-subrequests-allocation-mode-all": {
@@ -178,8 +186,9 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("32"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("32"),
 			},
 		},
 		"prioritized-list-multiple-subrequests-different-device-classes": {
@@ -193,9 +202,11 @@ func TestResourceClaimEvaluatorUsage(t *testing.T) {
 				return claim
 			}(),
 			usage: corev1.ResourceList{
-				"count/resourceclaims.resource.k8s.io":    resource.MustParse("1"),
-				"gpu.deviceclass.resource.k8s.io/devices": resource.MustParse("1"),
-				"tpu.deviceclass.resource.k8s.io/devices": resource.MustParse("32"),
+				"count/resourceclaims.resource.k8s.io":                          resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("1"),
+				"gpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("1"),
+				"tpu.deviceclass.resource.k8s.io/devices":                       resource.MustParse("32"),
+				"tpu.deviceclass.resource.k8s.io/non-extended-resource-devices": resource.MustParse("32"),
 			},
 		},
 	}

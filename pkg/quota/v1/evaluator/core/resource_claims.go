@@ -42,6 +42,11 @@ func V1ResourceByDeviceClass(className string) corev1.ResourceName {
 	return corev1.ResourceName(className + corev1.ResourceClaimsPerClass)
 }
 
+// V1ExtendedResourceByDeviceClass returns a quota extended resource name by device class.
+func V1NonExtendedResourceByDeviceClass(className string) corev1.ResourceName {
+	return corev1.ResourceName(className + corev1.ResourceNonExtendedClaimsPerClass)
+}
+
 // NewResourceClaimEvaluator returns an evaluator that can evaluate resource claims
 func NewResourceClaimEvaluator(f quota.ListerForResourceFunc) quota.Evaluator {
 	listFuncByNamespace := generic.ListResourceUsingListerFunc(f, resourceapi.SchemeGroupVersion.WithResource("resourceclaims"))
@@ -96,7 +101,8 @@ func (p *claimEvaluator) MatchingResources(items []corev1.ResourceName) []corev1
 	result := []corev1.ResourceName{}
 	for _, item := range items {
 		if item == ClaimObjectCountName /* object count quota fields */ ||
-			strings.HasSuffix(string(item), corev1.ResourceClaimsPerClass /* by device class */) {
+			strings.HasSuffix(string(item), corev1.ResourceClaimsPerClass /* by device class */) ||
+			strings.HasSuffix(string(item), corev1.ResourceNonExtendedClaimsPerClass /* by device class */) {
 			result = append(result, item)
 		}
 	}
@@ -110,7 +116,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 	if err != nil {
 		return result, err
 	}
-
+	isExtendedResourceClaim := claim.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true"
 	// charge for claim
 	result[ClaimObjectCountName] = *(resource.NewQuantity(1, resource.DecimalSI))
 	for _, request := range claim.Spec.Devices.Requests {
@@ -122,6 +128,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 			maxQuantityByDeviceClassClaim := make(map[corev1.ResourceName]resource.Quantity)
 			for _, subrequest := range request.FirstAvailable {
 				deviceClassClaim := V1ResourceByDeviceClass(subrequest.DeviceClassName)
+				deviceNonExtendedClassClaim := V1NonExtendedResourceByDeviceClass(subrequest.DeviceClassName)
 				var numDevices int64
 				switch subrequest.AllocationMode {
 				case resourceapi.DeviceAllocationModeExactCount:
@@ -138,6 +145,9 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 				q := resource.NewQuantity(numDevices, resource.DecimalSI)
 				if q.Cmp(maxQuantityByDeviceClassClaim[deviceClassClaim]) > 0 {
 					maxQuantityByDeviceClassClaim[deviceClassClaim] = *q
+					if !isExtendedResourceClaim {
+						maxQuantityByDeviceClassClaim[deviceNonExtendedClassClaim] = *q
+					}
 				}
 			}
 			for deviceClassClaim, q := range maxQuantityByDeviceClassClaim {
@@ -148,6 +158,7 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 			continue
 		case request.Exactly != nil:
 			deviceClassClaim := V1ResourceByDeviceClass(request.Exactly.DeviceClassName)
+			deviceNonExtendedClassClaim := V1NonExtendedResourceByDeviceClass(request.Exactly.DeviceClassName)
 			var numDevices int64
 			switch request.Exactly.AllocationMode {
 			case resourceapi.DeviceAllocationModeExactCount:
@@ -163,6 +174,9 @@ func (p *claimEvaluator) Usage(item runtime.Object) (corev1.ResourceList, error)
 			quantity := result[deviceClassClaim]
 			quantity.Add(*(resource.NewQuantity(numDevices, resource.DecimalSI)))
 			result[deviceClassClaim] = quantity
+			if !isExtendedResourceClaim {
+				result[deviceNonExtendedClassClaim] = quantity
+			}
 		default:
 			// Some unknown, future request type. Cannot do quota for it.
 		}
