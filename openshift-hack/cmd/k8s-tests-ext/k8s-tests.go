@@ -2,11 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"reflect"
 	"strconv"
 
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+
 	"k8s.io/kubernetes/openshift-hack/e2e/annotate/generated"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -52,21 +54,35 @@ func main() {
 
 	// Carve up the kube tests into our openshift suites...
 	kubeTestsExtension.AddSuite(e.Suite{
+		Name: "kubernetes/conformance/parallel/minimal",
+		Parents: []string{
+			"openshift/conformance/parallel/minimal",
+		},
+		Qualifiers: []string{withExcludedTestsFilter(`!name.contains('[Serial]') && labels.exists(l, l == "Conformance")`)},
+	})
+
+	kubeTestsExtension.AddSuite(e.Suite{
+		Name: "kubernetes/conformance/serial/minimal",
+		Parents: []string{
+			"openshift/conformance/serial/minimal",
+		},
+		Qualifiers: []string{withExcludedTestsFilter(`name.contains('[Serial]') && labels.exists(l, l == "Conformance")`)},
+	})
+
+	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/parallel",
 		Parents: []string{
 			"openshift/conformance/parallel",
-			"openshift/conformance/parallel/minimal",
 		},
-		Qualifiers: []string{`!labels.exists(l, l == "Serial") && labels.exists(l, l == "Conformance")`},
+		Qualifiers: []string{withExcludedTestsFilter(`!name.contains('[Serial]')`)},
 	})
 
 	kubeTestsExtension.AddSuite(e.Suite{
 		Name: "kubernetes/conformance/serial",
 		Parents: []string{
 			"openshift/conformance/serial",
-			"openshift/conformance/serial/minimal",
 		},
-		Qualifiers: []string{`labels.exists(l, l == "Serial") && labels.exists(l, l == "Conformance")`},
+		Qualifiers: []string{withExcludedTestsFilter(`name.contains('[Serial]')`)},
 	})
 
 	for k, v := range image.GetOriginalImageConfigs() {
@@ -159,4 +175,28 @@ func convertToImage(obj interface{}) extension.Image {
 		}
 	}
 	return image
+}
+
+func withExcludedTestsFilter(baseExpr string) string {
+	excluded := []string{
+		"[Disabled:",
+		"[Disruptive]",
+		"[Skipped]",
+		"[Slow]",
+		"[Flaky]",
+		"[Local]",
+	}
+
+	filter := ""
+	for i, s := range excluded {
+		if i > 0 {
+			filter += " && "
+		}
+		filter += fmt.Sprintf("!name.contains('%s')", s)
+	}
+
+	if baseExpr != "" {
+		return fmt.Sprintf("(%s) && (%s)", baseExpr, filter)
+	}
+	return filter
 }
