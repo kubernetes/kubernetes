@@ -66,7 +66,7 @@ var CmdNetexec = &cobra.Command{
 
 - /: Returns the request's timestamp.
 - /clientip: Returns the request's IP address.
-- /serveraddress: Returns the server address.
+- /serverport: Returns the server port.
 - /header: Returns the request's header value corresponding to the key provided or the entire 
   header marshalled as json, if no form value (key) is provided.
   ("/header?key=X-Forwarded-For" or /header)
@@ -122,7 +122,7 @@ It will also start a UDP server on the indicated UDP port and addresses that res
 - "hostname": Returns the server's hostname
 - "echo <msg>": Returns the given <msg>
 - "clientip": Returns the request's IP address
-- "serveraddress": Returns the server address
+- "serverport": Returns the server port
 
 The UDP server can be disabled by setting --udp-port to -1.
 
@@ -230,7 +230,7 @@ func main(cmd *cobra.Command, args []string) {
 func addRoutes(mux *http.ServeMux, sigTermReceived chan struct{}, exitCh chan shutdownRequest) {
 	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/clientip", clientIPHandler)
-	mux.HandleFunc("/serveraddress", serverAddressHandler)
+	mux.HandleFunc("/serverport", serverPortHandler)
 	mux.HandleFunc("/header", headerHandler)
 	mux.HandleFunc("/dial", dialHandler)
 	mux.HandleFunc("/echo", echoHandler)
@@ -291,9 +291,9 @@ func clientIPHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, r.RemoteAddr)
 }
 
-func serverAddressHandler(w http.ResponseWriter, r *http.Request) {
-	log.Printf("GET /serveraddress")
-	_, _ = fmt.Fprint(w, r.Host)
+func serverPortHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("GET /serverport")
+	_, _ = fmt.Fprint(w, httpPort)
 }
 
 func headerHandler(w http.ResponseWriter, r *http.Request) {
@@ -677,10 +677,10 @@ func startUDPServer(address string, udpPort int) {
 			log.Printf("Sending clientip back to UDP client %s\n", clientAddress)
 			_, err = serverConn.WriteToUDP([]byte(clientAddress.String()), clientAddress)
 			assertNoError(err, fmt.Sprintf("failed to write clientip to UDP client %s", clientAddress))
-		} else if receivedText == "serveraddress" {
-			log.Printf("Sending server address to UDP client %s\n", serverConn.LocalAddr().String())
-			_, err = serverConn.WriteToUDP([]byte(serverConn.LocalAddr().String()), clientAddress)
-			assertNoError(err, fmt.Sprintf("failed to write server address to UDP client %s", clientAddress))
+		} else if receivedText == "serverport" {
+			log.Printf("Sending server port to UDP client %s\n", strconv.Itoa(udpPort))
+			_, err = serverConn.WriteToUDP([]byte(strconv.Itoa(udpPort)), clientAddress)
+			assertNoError(err, fmt.Sprintf("failed to write server port to UDP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
 			log.Printf("Unknown UDP command received from %s: %v\n", clientAddress, receivedText)
 		}
@@ -731,10 +731,10 @@ func startSCTPServer(sctpPort int) {
 			log.Printf("Sending clientip back to SCTP client %s\n", clientAddress)
 			_, err = conn.Write([]byte(clientAddress))
 			assertNoError(err, fmt.Sprintf("failed to write clientip to SCTP client %s", clientAddress))
-		} else if receivedText == "serveraddress" {
-			log.Printf("Sending server address to SCTP client %s\n", conn.LocalAddr().String())
-			_, err = conn.Write([]byte(conn.LocalAddr().String()))
-			assertNoError(err, fmt.Sprintf("failed to write server address to SCTP client %s", clientAddress))
+		} else if receivedText == "serverport" {
+			log.Printf("Sending server port to SCTP client %s\n", strconv.Itoa(sctpPort))
+			_, err = conn.Write([]byte(strconv.Itoa(sctpPort)))
+			assertNoError(err, fmt.Sprintf("failed to write server port to SCTP client %s", clientAddress))
 		} else if len(receivedText) > 0 {
 			log.Printf("Unknown SCTP command received from %s: %v\n", clientAddress, receivedText)
 		}
