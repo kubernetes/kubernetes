@@ -360,8 +360,11 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
 	}
+	usage = 0
+	for _, val := range metrics {
+		usage = usage + val
+	}
 
-	usage = c.sumMetricValues(metrics)
 	usageRatio := float64(usage) / float64(targetUsage)
 	replicaCount, timestamp, err = c.getUsageRatioReplicaCount(currentReplicas, usageRatio, tolerances, namespace, podSelector)
 	return replicaCount, usage, timestamp, err
@@ -379,8 +382,15 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get external metric %s/%s/%+v: %s", namespace, metricName, metricSelector, err)
 	}
-
-	usage = c.sumMetricValuesWithOverflowProtection(metrics)
+	usage = 0
+	for _, val := range metrics {
+		usage = usage + val
+		if usage < 0 {
+			// the only way we would ever get here is because of an Int64 overflow
+			usage = math.MaxInt64
+			break
+		}
+	}
 
 	replicaCount = statusReplicas
 	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
@@ -394,36 +404,13 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 			replicaCount = int32(replicaCountResult)
 		}
 	}
-
-	// Calculate per-pod usage with overflow protection
+	// Handle usage overflow cases
 	if float64(usage) >= float64(math.MaxInt64) {
 		usage = math.MaxInt64
 	} else {
 		usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
 	}
 	return replicaCount, usage, timestamp, nil
-}
-
-// sumMetricValues sums all metric values without overflow protection
-func (c *ReplicaCalculator) sumMetricValues(metrics []int64) int64 {
-	var usage int64
-	for _, val := range metrics {
-		usage += val
-	}
-	return usage
-}
-
-// sumMetricValuesWithOverflowProtection sums all metric values with overflow protection
-func (c *ReplicaCalculator) sumMetricValuesWithOverflowProtection(metrics []int64) int64 {
-	var usage int64
-	for _, val := range metrics {
-		usage += val
-		if usage < 0 {
-			// the only way we would ever get here is because of an Int64 overflow
-			return math.MaxInt64
-		}
-	}
-	return usage
 }
 
 func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1.ResourceName, cpuInitializationPeriod, delayOfInitialReadinessStatus time.Duration) (readyPodCount int, unreadyPods, missingPods, ignoredPods sets.Set[string]) {
