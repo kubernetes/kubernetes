@@ -2207,7 +2207,7 @@ func TestPostFilterPlugins(t *testing.T) {
 					inj:  injectedResult{PostFilterStatus: int(fwk.Success)},
 				},
 			},
-			wantStatus: fwk.AsStatus(fmt.Errorf(injectReason)).WithPlugin("TestPlugin1"),
+			wantStatus: fwk.AsStatus(errors.New(injectReason)).WithPlugin("TestPlugin1"),
 		},
 		{
 			name: "plugin1 failed to make a Pod schedulable, followed by plugin2 which makes the Pod unresolvable",
