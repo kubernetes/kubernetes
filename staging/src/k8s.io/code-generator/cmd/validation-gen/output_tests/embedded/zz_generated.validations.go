@@ -50,14 +50,14 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 		func(fldPath *field.Path, obj, oldObj *T2) (errs field.ErrorList) {
 			errs = append(errs, Validate_T2(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath, &obj.T2, safe.Field(oldObj, func(oldObj *T1) *T2 { return &oldObj.T2 }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("T2") }), &obj.T2, safe.Field(oldObj, func(oldObj *T1) *T2 { return &oldObj.T2 }))...)
 
 	// field T1.T3
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *T3) (errs field.ErrorList) {
 			errs = append(errs, Validate_T3(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath, obj.T3, safe.Field(oldObj, func(oldObj *T1) *T3 { return oldObj.T3 }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("T3") }), obj.T3, safe.Field(oldObj, func(oldObj *T1) *T3 { return oldObj.T3 }))...)
 
 	return errs
 }

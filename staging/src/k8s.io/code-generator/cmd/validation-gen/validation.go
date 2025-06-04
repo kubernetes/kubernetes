@@ -50,7 +50,7 @@ var (
 	fieldPkgSymbols     = mkPkgNames(fieldPkg, "ErrorList", "InternalError", "Path")
 	fmtPkgSymbols       = mkPkgNames("fmt", "Errorf")
 	safePkg             = "k8s.io/apimachinery/pkg/api/safe"
-	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast")
+	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast", "Value")
 	operationPkg        = "k8s.io/apimachinery/pkg/api/operation"
 	operationPkgSymbols = mkPkgNames(operationPkg, "Operation", "MatchesSubresource", "Update")
 	contextPkg          = "context"
@@ -1071,10 +1071,12 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 				}
 				sw.Do("    return\n", targs)
 				sw.Do("  }(", targs)
-				if len(fld.jsonName) == 0 { // embedded (inline) field
-					sw.Do("fldPath, ", targs)
-				} else {
+				if len(fld.jsonName) > 0 {
 					sw.Do("fldPath.Child(\"$.fieldJSON$\"), ", targs)
+				} else {
+					// If there is an embedded field in a root-type, fldPath
+					// will be nil, and we need SOMETHING for the field path.
+					sw.Do("$.safe.Value|raw$(fldPath, func() *$.field.Path|raw$ { return fldPath.Child(\"$.fieldType|raw$\") }), ", targs)
 				}
 				sw.Do("    $.fieldExprPfx$obj.$.fieldName$, ", targs)
 				sw.Do("    $.safe.Field|raw$(oldObj, ", targs)
