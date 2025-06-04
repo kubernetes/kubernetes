@@ -93,7 +93,7 @@ func Validate_AliasMapValueType(ctx context.Context, op operation.Operation, fld
 		return nil // no changes
 	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapValueType")...)
-	errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, Validate_S)...)
+	errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_S)...)
 
 	return errs
 }
@@ -279,7 +279,7 @@ func Validate_StructMap(ctx context.Context, op operation.Operation, fldPath *fi
 				return nil // no changes
 			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field mapValueField")...)
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, Validate_S)...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_S)...)
 			return
 		}(fldPath.Child("mapValueField"), obj.MapValueField, safe.Field(oldObj, func(oldObj *StructMap) map[string]S { return oldObj.MapValueField }))...)
 

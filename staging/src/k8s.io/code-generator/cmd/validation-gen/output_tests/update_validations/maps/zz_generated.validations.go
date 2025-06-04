@@ -76,7 +76,7 @@ func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, Validate_M1)...)
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_M1)...)
 			return
 		}(fldPath.Child("msm1"), obj.MSM1, safe.Field(oldObj, func(oldObj *T1) map[string]M1 { return oldObj.MSM1 }))...)
 
