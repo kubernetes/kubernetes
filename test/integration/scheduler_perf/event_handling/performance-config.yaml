@@ -23,8 +23,6 @@
 # Next, blocker pods are gradually deleted and previously unscheduled pods can be scheduled.
 # Plugins covered: InterPodAffinity, NodePorts, NodeResources, NodeVolumeLimits, PodTopologySpread and VolumeRestrictions.
 - name: EventHandlingPodDelete
-  featureGates:
-    SchedulerQueueingHints: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -147,7 +145,6 @@
 # Plugins covered: InterPodAffinity, NodeResources, NodeUnschedulable, PodTopologySpread, SchedulingGates and TaintToleration.
 - name: EventHandlingPodUpdate
   featureGates:
-    SchedulerQueueingHints: true
     InPlacePodVerticalScaling: true
   workloadTemplate:
   # Collect metrics from all createPods ops that initially create unschedulable pods (type: unsched).
@@ -278,8 +275,6 @@
 # The test case is divided into several stages to make sure that the pods are filtered by a specific plugin.
 # Plugins covered: InterPodAffinity, NodeAffinity, NodeResources, NodeUnschedulable, PodTopologySpread and TaintToleration.
 - name: EventHandlingNodeAdd
-  featureGates:
-    SchedulerQueueingHints: true
   workloadTemplate:
   # Collect metrics from all createPods ops.
   - opcode: startCollectingMetrics
@@ -382,8 +377,6 @@
 # and scheduling pods with matching labels to the intepodaffinity pods.
 # Plugins covered: InterPodAffinity and PodTopologySpread.
 - name: EventHandlingPodAdd
-  featureGates:
-    SchedulerQueueingHints: true
   workloadTemplate:
   # Create two nodes with enough capacity.
   - opcode: createNodes
@@ -456,8 +449,6 @@
 # The test case is divided into several stages to make sure that the pods are filtered by a specific plugin.
 # Plugins covered: InterPodAffinity, NodeAffinity, NodeResources, NodeUnschedulable, PodTopologySpread and TaintToleration.
 - name: EventHandlingNodeUpdate
-  featureGates:
-    SchedulerQueueingHints: true
   workloadTemplate:
   # Collect metrics from all createPods ops.
   - opcode: startCollectingMetrics
