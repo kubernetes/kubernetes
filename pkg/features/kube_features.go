@@ -263,6 +263,13 @@ const (
 	// DisableNodeKubeProxyVersion disable the status.nodeInfo.kubeProxyVersion field of v1.Node
 	DisableNodeKubeProxyVersion featuregate.Feature = "DisableNodeKubeProxyVersion"
 
+	// owner: @janisz
+	//
+	// DockerCredentialUTF8Validation enables UTF-8 validation for base64 encoded auth for Docker config secret.
+	// This temporary feature gate is enabled by default and intended to give a quick escape hatch for a single release
+	// so users can fix their configs or give feedback. This is only available in v1.34 and will be removed in v1.35.
+	DockerCredentialUTF8Validation featuregate.Feature = "DockerCredentialUTF8Validation"
+
 	// owner: @pohly
 	// kep: http://kep.k8s.io/4381
 	//
@@ -1196,6 +1203,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Deprecated},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Deprecated}, // lock to default in 1.34 and remove in v1.37
+	},
+
+	DockerCredentialUTF8Validation: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA},
 	},
 
 	DynamicResourceAllocation: {
