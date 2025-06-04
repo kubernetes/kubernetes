@@ -25321,6 +25321,8 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 	}
 
 	failureCases := map[string]*core.Pod{
+		"static pod with resource claim reference": goodClaimReference,
+		"static pod with resource claim template":  goodClaimTemplate,
 		"pod claim name with prefix": podtest.MakePod("",
 			podtest.SetResourceClaims(core.PodResourceClaim{
 				Name:              "../my-claim",
@@ -25450,7 +25452,14 @@ func TestValidateDynamicResourceAllocation(t *testing.T) {
 		}(),
 	}
 	for k, v := range failureCases {
-		if errs := ValidatePodSpec(&v.Spec, nil, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
+		podMeta := shortPodName
+		if strings.HasPrefix(k, "static pod") {
+			podMeta = podMeta.DeepCopy()
+			podMeta.Annotations = map[string]string{
+				core.MirrorPodAnnotationKey: "True",
+			}
+		}
+		if errs := ValidatePodSpec(&v.Spec, podMeta, field.NewPath("field"), PodValidationOptions{}); len(errs) == 0 {
 			t.Errorf("expected failure for %q", k)
 		}
 	}
