@@ -210,7 +210,7 @@ type TagArgDoc struct {
 	Required bool
 	// Default is the effective value if no value is provided.
 	Default string
-	// Docs is a human-oriented string explaining this payload.
+	// Docs is a human-oriented string explaining this arg.
 	Docs string
 }
 
