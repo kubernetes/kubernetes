@@ -23,6 +23,7 @@ package defaultbehavior
 
 import (
 	context "context"
+	fmt "fmt"
 
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -38,19 +39,39 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	scheme.AddValidationFunc((*StructEmbedded)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_StructEmbedded(ctx, op, nil /* fldPath */, obj.(*StructEmbedded), safe.Cast[*StructEmbedded](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_StructEmbedded(ctx, op, nil /* fldPath */, obj.(*StructEmbedded), safe.Cast[*StructEmbedded](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	scheme.AddValidationFunc((*StructMap)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_StructMap(ctx, op, nil /* fldPath */, obj.(*StructMap), safe.Cast[*StructMap](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_StructMap(ctx, op, nil /* fldPath */, obj.(*StructMap), safe.Cast[*StructMap](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	scheme.AddValidationFunc((*StructPrimitive)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_StructPrimitive(ctx, op, nil /* fldPath */, obj.(*StructPrimitive), safe.Cast[*StructPrimitive](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_StructPrimitive(ctx, op, nil /* fldPath */, obj.(*StructPrimitive), safe.Cast[*StructPrimitive](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	scheme.AddValidationFunc((*StructSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_StructSlice(ctx, op, nil /* fldPath */, obj.(*StructSlice), safe.Cast[*StructSlice](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_StructSlice(ctx, op, nil /* fldPath */, obj.(*StructSlice), safe.Cast[*StructSlice](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	scheme.AddValidationFunc((*StructStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_StructStruct(ctx, op, nil /* fldPath */, obj.(*StructStruct), safe.Cast[*StructStruct](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_StructStruct(ctx, op, nil /* fldPath */, obj.(*StructStruct), safe.Cast[*StructStruct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
 }

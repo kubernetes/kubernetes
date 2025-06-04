@@ -23,6 +23,7 @@ package listset
 
 import (
 	context "context"
+	fmt "fmt"
 
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -38,10 +39,18 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	scheme.AddValidationFunc((*ImmutableStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_ImmutableStruct(ctx, op, nil /* fldPath */, obj.(*ImmutableStruct), safe.Cast[*ImmutableStruct](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ImmutableStruct(ctx, op, nil /* fldPath */, obj.(*ImmutableStruct), safe.Cast[*ImmutableStruct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
 	})
 	return nil
 }
