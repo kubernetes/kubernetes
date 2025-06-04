@@ -445,6 +445,12 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.33"
+- name: DockerCredentialUTF8Validation
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.34"
 - name: DRAAdminAccess
   versionedSpecs:
   - default: false
