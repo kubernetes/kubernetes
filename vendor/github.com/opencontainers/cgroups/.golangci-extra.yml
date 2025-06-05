@@ -1,0 +1,21 @@
+# This is golangci-lint config file which is used to check NEW code in
+# github PRs only (see lint-extra in .github/workflows/validate.yml).
+#
+# For the default linter config, see .golangci.yml. This config should
+# only enable additional linters and/or linter settings not enabled
+# in the default config.
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - godot
+    - revive
+    - staticcheck
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - -QF1008 # https://staticcheck.dev/docs/checks/#QF1008 Omit embedded fields from selector expression.
+  exclusions:
+    generated: strict

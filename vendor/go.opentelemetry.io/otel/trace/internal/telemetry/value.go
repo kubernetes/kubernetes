@@ -316,7 +316,7 @@ func (v Value) String() string {
 	case ValueKindBool:
 		return strconv.FormatBool(v.asBool())
 	case ValueKindBytes:
-		return fmt.Sprint(v.asBytes())
+		return string(v.asBytes())
 	case ValueKindMap:
 		return fmt.Sprint(v.asMap())
 	case ValueKindSlice:
