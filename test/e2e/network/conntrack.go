@@ -19,6 +19,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -657,5 +658,93 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 		framework.Logf("boom-server pod logs: %s", logs)
 		framework.Logf("boom-server OK: did not receive any RST packet")
+	})
+
+	ginkgo.It("should break connection when endpoint is removed for tcp", func(ctx context.Context) {
+		// Create a TCP ClusterIP service
+		var err error
+		var testPort = 12345
+		selectorLabelKey := "service-endpoint-lifecycle"
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in " + ns)
+		tcpService := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: ns,
+			},
+			Spec: v1.ServiceSpec{
+				Type:     v1.ServiceTypeClusterIP,
+				Selector: map[string]string{selectorLabelKey: "1"},
+				Ports: []v1.ServicePort{
+					{
+						Name:       "tcp",
+						Protocol:   v1.ProtocolTCP,
+						Port:       12345,
+						TargetPort: intstr.FromInt32(int32(testPort)),
+					},
+				},
+			},
+		}
+		tcpService, err = fr.ClientSet.CoreV1().Services(ns).Create(ctx, tcpService, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		// Add a backend pod to the service
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil)
+		serverPod1.Spec.Containers[0].Command = []string{"nc"}
+		serverPod1.Spec.Containers[0].Args = []string{"-l", "-v", "-t", "0.0.0.0", strconv.Itoa(testPort)}
+		serverPod1.Labels = map[string]string{selectorLabelKey: "1"}
+		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod1)
+
+		// wait until the endpoints are ready
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend1: {testPort}})
+
+		// create client pod which connects to service
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		// tcp-prober sends "hostname" on the given client every second
+		clientPod.Spec.Containers[0].Image = "aroradaman/tcp-prober"
+		clientPod.Spec.Containers[0].Command = []string{"/app"}
+		clientPod.Spec.Containers[0].Args = []string{tcpService.Spec.ClusterIP, strconv.Itoa(testPort)}
+		clientPod.Spec.Containers[0].Name = podClient
+		// create client with restart policy never to make sure the pod terminates on tcp connection breakdown
+		clientPod.Spec.RestartPolicy = v1.RestartPolicyNever
+		e2epod.NewPodClient(fr).CreateSync(ctx, clientPod)
+
+		// Add another backend pod to the service
+		ginkgo.By("creating a backend pod " + podBackend2 + " for the service " + serviceName)
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil)
+		serverPod2.Spec.Containers[0].Command = []string{"nc"}
+		serverPod2.Spec.Containers[0].Args = []string{"-l", "-v", "-t", "0.0.0.0", strconv.Itoa(testPort)}
+		serverPod2.Labels = map[string]string{selectorLabelKey: "2"}
+		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod2)
+
+		// change service selectors
+		ginkgo.By("changing the service selector")
+		tcpService.Spec.Selector = map[string]string{selectorLabelKey: "2"}
+		tcpService, err = fr.ClientSet.CoreV1().Services(ns).Update(ctx, tcpService, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		// wait until the endpoints are ready
+		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podBackend2: {testPort}})
+
+		// validate/wait for pod to fail
+		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, 5*time.Second, time.Minute, true, func(ctx context.Context) (done bool, err error) {
+			var podExistsInRunningState bool
+			if pods, err := fr.ClientSet.CoreV1().Pods(clientPod.Namespace).List(ctx, metav1.ListOptions{}); err == nil {
+				for _, pod := range pods.Items {
+					if pod.Name == clientPod.Name && pod.Status.Phase == v1.PodRunning {
+						podExistsInRunningState = true
+					}
+				}
+			} else {
+				return false, nil
+			}
+
+			// exit poll if pod doesn't exist in running state.
+			if !podExistsInRunningState {
+				return true, nil
+			}
+			return false, nil
+		}))
 	})
 })
