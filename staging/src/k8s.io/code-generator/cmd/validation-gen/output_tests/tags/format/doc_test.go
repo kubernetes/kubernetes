@@ -53,9 +53,9 @@ func Test(t *testing.T) {
 		DNSLabelTypedefField: "",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
 		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
 		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
 		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),
@@ -72,9 +72,9 @@ func Test(t *testing.T) {
 		DNSLabelTypedefField: "Not a DNS label",
 	}
 	st.Value(invalidStruct).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
-		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=ip-sloppy"),
-		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=ip-sloppy"),
+		field.Invalid(field.NewPath("ipField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipPtrField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
+		field.Invalid(field.NewPath("ipTypedefField"), nil, "").WithOrigin("format=k8s-ip-sloppy"),
 		field.Invalid(field.NewPath("dnsLabelField"), nil, "").WithOrigin("format=dns-label"),
 		field.Invalid(field.NewPath("dnsLabelPtrField"), nil, "").WithOrigin("format=dns-label"),
 		field.Invalid(field.NewPath("dnsLabelTypedefField"), nil, "").WithOrigin("format=dns-label"),

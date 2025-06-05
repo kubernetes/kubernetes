@@ -65,7 +65,7 @@ null
 
 | Description | Docs | Schema |
 |-------------|------|---------|
-| **ip-sloppy** | This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros. | None |
+| **k8s-ip-sloppy** | This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros. | None |
 | **dns-label** | This field holds a DNS label value. | None |
 
 ### k8s:ifOptionDisabled

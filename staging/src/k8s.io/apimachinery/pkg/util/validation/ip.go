@@ -83,7 +83,7 @@ func IsValidIPForLegacyField(fldPath *field.Path, value string, strictValidation
 		return nil
 	}
 	_, allErrors := parseIP(fldPath, value, strictValidation)
-	return allErrors.WithOrigin("format=ip-sloppy")
+	return allErrors.WithOrigin("format=k8s-ip-sloppy")
 }
 
 // IsValidIP tests that the argument is a valid IP address, according to current
