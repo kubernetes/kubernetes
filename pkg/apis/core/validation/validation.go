@@ -7636,7 +7636,7 @@ func ValidateEndpointIP(ipAddress string, fldPath *field.Path) field.ErrorList {
 	if ip.IsLinkLocalMulticast() {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipAddress, "may not be in the link-local multicast range (224.0.0.0/24, ff02::/10)"))
 	}
-	return allErrs.WithOrigin("format=endpoint-ip")
+	return allErrs.WithOrigin("format=k8s-endpoint-ip")
 }
 
 func validateEndpointPort(port *core.EndpointPort, requireName bool, fldPath *field.Path) field.ErrorList {
