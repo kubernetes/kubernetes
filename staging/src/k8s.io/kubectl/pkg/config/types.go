@@ -24,26 +24,26 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 type Preference struct {
 	metav1.TypeMeta
 
-	// overrides allows changing default flag values of commands.
+	// Defaults allow changing default option values of commands.
 	// This is especially useful, when user doesn't want to explicitly
-	// set flags each time.
+	// set options each time.
 	// +optional
-	Overrides []CommandOverride
+	Defaults []CommandDefaults
 
-	// aliases allows defining command aliases for existing kubectl commands, with optional default flag values.
+	// Aliases allow defining command aliases for existing kubectl commands, with optional default option values.
 	// If the alias name collides with a built-in command, built-in command always takes precedence.
-	// Flag overrides defined in the overrides section do NOT apply to aliases for the same command.
-	// kubectl [ALIAS NAME] [USER_FLAGS] [USER_EXPLICIT_ARGS] expands to
+	// Option overrides defined in the defaults section do NOT apply to aliases for the same command.
+	// kubectl [ALIAS NAME] [USER_OPTIONS] [USER_EXPLICIT_ARGS] expands to
 	// kubectl [COMMAND] # built-in command alias points to
 	//         [KUBERC_PREPEND_ARGS]
-	//         [USER_FLAGS]
-	//         [KUBERC_FLAGS] # rest of the flags that are not passed by user in [USER_FLAGS]
+	//         [USER_OPTIONS]
+	//         [KUBERC_OPTIONS] # rest of the options that are not passed by user in [USER_OPTIONS]
 	//         [USER_EXPLICIT_ARGS]
 	//         [KUBERC_APPEND_ARGS]
 	// e.g.
 	// - name: runx
 	//   command: run
-	//   flags:
+	//   options:
 	//   - name: image
 	//     default: nginx
 	//   appendArgs:
@@ -53,7 +53,7 @@ type Preference struct {
 	// this will be expanded to "kubectl run --image=nginx test-pod -- custom-arg1"
 	// - name: getn
 	//   command: get
-	//   flags:
+	//   options:
 	//   - name: output
 	//     default: wide
 	//   prependArgs:
@@ -78,26 +78,28 @@ type AliasOverride struct {
 	// AppendArgs stores the arguments such as resource names, etc.
 	// These arguments are appended to the USER_ARGS.
 	AppendArgs []string
-	// Flag is allocated to store the flag definitions of alias
-	Flags []CommandOverrideFlag
+	// Options is allocated to store the option definitions of alias.
+	// Options only modify the default value of the option and if
+	// user explicitly passes a value, explicit one is used.
+	Options []CommandOptionDefault
 }
 
-// CommandOverride stores the commands and their associated flag's
+// CommandDefaults stores the commands and their associated option's
 // default values.
-type CommandOverride struct {
+type CommandDefaults struct {
 	// Command refers to a command whose flag's default value is changed.
 	Command string
-	// Flags is a list of flags storing different default values.
-	Flags []CommandOverrideFlag
+	// Options is a list of options storing different default values.
+	Options []CommandOptionDefault
 }
 
-// CommandOverrideFlag stores the name and the specified default
-// value of the flag.
-type CommandOverrideFlag struct {
-	// Flag name (long form, without dashes).
-	Name string `json:"name"`
+// CommandOptionDefault stores the name and the specified default
+// value of an option.
+type CommandOptionDefault struct {
+	// Option name (long form, without dashes).
+	Name string
 
 	// In a string format of a default value. It will be parsed
-	// by kubectl to the compatible value of the flag.
-	Default string `json:"default"`
+	// by kubectl to the compatible value of the option.
+	Default string
 }

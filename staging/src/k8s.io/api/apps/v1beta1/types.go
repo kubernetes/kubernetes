@@ -33,6 +33,9 @@ const (
 type ScaleSpec struct {
 	// replicas is the number of observed instances of the scaled object.
 	// +optional
+	// +k8s:optional
+	// +default=0
+	// +k8s:minimum=0
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 
@@ -60,6 +63,7 @@ type ScaleStatus struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.8
 // +k8s:prerelease-lifecycle-gen:removed=1.16
 // +k8s:prerelease-lifecycle-gen:replacement=autoscaling,v1,Scale
+// +k8s:isSubresource=/scale
 
 // Scale represents a scaling request for a resource.
 type Scale struct {

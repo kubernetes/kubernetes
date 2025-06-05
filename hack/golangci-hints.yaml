@@ -246,7 +246,7 @@ linters:
             #   pointerPolicy: SuggestFix # Defaults to `SuggestFix`. We want our required fields to not be pointers.
     depguard:
       rules:
-        main:
+        go-cmp:
           files:
             - $all
             - "!$test"
@@ -254,6 +254,13 @@ linters:
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
+        pkg-errors:
+          files:
+            - $all
+            - "!**/cmd/kubeadm/**"
+          deny:
+            - pkg: "github.com/pkg/errors"
+              desc: "pkg/errors is allowed only in cmd/kubeadm"
     forbidigo:
       analyze-types: true
       forbid:

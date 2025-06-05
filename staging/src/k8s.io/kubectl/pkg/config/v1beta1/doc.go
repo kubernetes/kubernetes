@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourceclaim
+// +k8s:deepcopy-gen=package
+// +k8s:openapi-gen=true
+// +groupName=kubectl.config.k8s.io
+// +k8s:conversion-gen=k8s.io/kubectl/pkg/config
+// +k8s:defaulter-gen=TypeMeta
 
-import (
-	"testing"
-
-	"k8s.io/kubernetes/test/integration/framework"
-)
-
-func TestMain(m *testing.M) {
-	framework.EtcdMain(m.Run)
-}
+package v1beta1 // Package v1beta1 import "k8s.io/kubectl/pkg/config/v1beta1"

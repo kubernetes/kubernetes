@@ -52,7 +52,7 @@ var (
 	safePkg             = "k8s.io/apimachinery/pkg/api/safe"
 	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast")
 	operationPkg        = "k8s.io/apimachinery/pkg/api/operation"
-	operationPkgSymbols = mkPkgNames(operationPkg, "Operation")
+	operationPkgSymbols = mkPkgNames(operationPkg, "Operation", "MatchesSubresource")
 	contextPkg          = "context"
 	contextPkgSymbols   = mkPkgNames(contextPkg, "Context")
 )
@@ -829,13 +829,21 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 			targs["typePfx"] = "*"
 		}
 
-		// TODO: Remove special-casing for `/` and `/scale` resources once ratcheting is introduced.
 		// This uses a typed nil pointer, rather than a real instance because
 		// we need the type information, but not an instance of the type.
 		sw.Do("scheme.AddValidationFunc(", targs)
 		sw.Do("    ($.typePfx$$.rootType|raw$)(nil), ", targs)
 		sw.Do("    func(ctx $.context.Context$, op $.operation.Operation|raw$, obj, oldObj interface{}) $.field.ErrorList|raw$ {\n", targs)
-		sw.Do("  if len(op.Request.Subresources) == 0 {\n", targs)
+
+		sw.Do("switch op.Request.SubresourcePath() {\n", nil)
+		sw.Do("case ", nil)
+		for i, s := range g.toResourceList(rootType) {
+			if i > 0 {
+				sw.Do(", ", nil)
+			}
+			sw.Do("$.$", s)
+		}
+		sw.Do(":\n", nil)
 		sw.Do("    return $.rootType|objectvalidationfn$(", targs)
 		sw.Do("               ctx, ", targs)
 		sw.Do("               op, ", targs)
@@ -846,12 +854,29 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 		sw.Do("  return $.field.ErrorList|raw${", targs)
 		sw.Do("      $.field.InternalError|raw$(", targs)
 		sw.Do("          nil, ", targs)
-		sw.Do("          $.fmt.Errorf|raw$(\"no validation found for %T, subresources: %v\", obj, op.Request.Subresources))", targs)
+		sw.Do("          $.fmt.Errorf|raw$(\"no validation found for %T, subresource: %v\", obj, op.Request.SubresourcePath()))", targs)
 		sw.Do("  }\n", targs)
 		sw.Do("})\n", targs)
 	}
 	sw.Do("return nil\n", nil)
 	sw.Do("}\n\n", nil)
+}
+
+// toResourceList returns a list of resources that are supported by a kind.
+func (g *genValidations) toResourceList(rootType *types.Type) []string {
+	supportedSubresources := supportedSubresourceTags(rootType)
+
+	if subresource, isSubresource := isSubresourceTag(rootType); isSubresource {
+		supportedSubresources.Insert(subresource)
+	} else {
+		supportedSubresources.Insert("/")
+	}
+	supported := supportedSubresources.UnsortedList()
+	slices.Sort(supported)
+	for i, subresource := range supported {
+		supported[i] = strconv.Quote(subresource)
+	}
+	return supported
 }
 
 // emitValidationFunction emits a validation function for the specified type.

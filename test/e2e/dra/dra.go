@@ -339,7 +339,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				f.ClientSet,
 				pod.Namespace,
 				expectedEvent,
-				fmt.Sprintf("old claim with same name %s and different UID %s still exists", klog.KObj(oldClaim), oldClaim.UID),
+				fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", oldClaim.Name, oldClaim.UID),
 				framework.PodStartTimeout*2))
 
 			driver.Fail(unprepareResources, false)
@@ -1685,7 +1685,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			claim.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
 			_, claimTemplate := b.podInline()
 			claimTemplate.Spec.Spec.Devices.Requests[0].Exactly.AdminAccess = ptr.To(true)
-			matchValidationError := gomega.MatchError(gomega.ContainSubstring("admin access to devices requires the `resource.k8s.io/admin-access: true` label on the containing namespace"))
+			matchValidationError := gomega.MatchError(gomega.ContainSubstring("admin access to devices requires the `resource.kubernetes.io/admin-access: true` label on the containing namespace"))
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				// First delete, in case that it succeeded earlier.
 				if err := b.f.ClientSet.ResourceV1beta2().ResourceClaims(b.f.Namespace.Name).Delete(ctx, claim.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
@@ -1706,7 +1706,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 
 			// After labeling the namespace, creation must (eventually...) succeed.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
-				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
 			framework.ExpectNoError(err)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
@@ -1786,7 +1786,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		f.It("DaemonSet with admin access", f.WithFeatureGate(features.DRAAdminAccess), func(ctx context.Context) {
 			// Ensure namespace has the dra admin label.
 			_, err := b.f.ClientSet.CoreV1().Namespaces().Apply(ctx,
-				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.k8s.io/admin-access": "true"}),
+				applyv1.Namespace(b.f.Namespace.Name).WithLabels(map[string]string{"resource.kubernetes.io/admin-access": "true"}),
 				metav1.ApplyOptions{FieldManager: b.f.UniqueName})
 			framework.ExpectNoError(err)
 

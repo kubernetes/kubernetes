@@ -33,14 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	configv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -190,7 +188,7 @@ func (f *fakeCRPlugin) Name() string {
 	return "fakeCRPlugin"
 }
 
-func (f *fakeCRPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, "always fail")
 }
 
@@ -441,7 +439,7 @@ func (*firstFailBindPlugin) Name() string {
 	return "firstFailBindPlugin"
 }
 
-func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodename string) *framework.Status {
+func (p *firstFailBindPlugin) Bind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodename string) *framework.Status {
 	if p.counter == 0 {
 		// fail in the first Bind call.
 		p.counter++
@@ -454,7 +452,6 @@ func (p *firstFailBindPlugin) Bind(ctx context.Context, state *framework.CycleSt
 // TestRequeueByPermitRejection verify Pods failed by permit plugins in the binding cycle are
 // put back to the queue, according to the correct scheduling cycle number.
 func TestRequeueByPermitRejection(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, true)
 	queueingHintCalledCounter := 0
 	fakePermit := &fakePermitPlugin{}
 	registry := frameworkruntime.Registry{
@@ -572,7 +569,7 @@ func (p *fakePermitPlugin) Name() string {
 	return fakePermitPluginName
 }
 
-func (p *fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
+func (p *fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
 	return framework.NewStatus(framework.Wait), wait.ForeverTestTimeout
 }
 

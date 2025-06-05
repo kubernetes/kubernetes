@@ -38,7 +38,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "automatic_reloads_total",
 			Help:           "Total number of automatic reloads of authorization configuration split by status and apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)
@@ -49,7 +49,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "automatic_reload_last_timestamp_seconds",
 			Help:           "Timestamp of the last automatic reload of authorization configuration split by status and apiserver identity.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"status", "apiserver_id_hash"},
 	)

@@ -39,17 +39,18 @@ import (
 // driver kubelet plugin which need to be called by kubelet. The wrapper
 // handles gRPC connection management and logging. Connections are reused
 // across different NewDRAPluginClient calls.
-func NewDRAPluginClient(pluginName string) (*Plugin, error) {
-	if pluginName == "" {
-		return nil, fmt.Errorf("plugin name is empty")
+//
+// It returns an informative error message including the driver name
+// with an explanation why the driver is not usable.
+func NewDRAPluginClient(driverName string) (*Plugin, error) {
+	if driverName == "" {
+		return nil, errors.New("DRA driver name is empty")
 	}
-
-	existingPlugin := draPlugins.get(pluginName)
-	if existingPlugin == nil {
-		return nil, fmt.Errorf("plugin name %s not found in the list of registered DRA plugins", pluginName)
+	client := draPlugins.get(driverName)
+	if client == nil {
+		return nil, fmt.Errorf("DRA driver %s is not registered", driverName)
 	}
-
-	return existingPlugin, nil
+	return client, nil
 }
 
 type Plugin struct {
@@ -103,6 +104,10 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 
 	p.conn = conn
 	return p.conn, nil
+}
+
+func (p *Plugin) Name() string {
+	return p.name
 }
 
 func (p *Plugin) NodePrepareResources(

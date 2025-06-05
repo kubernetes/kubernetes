@@ -163,6 +163,19 @@ func TestNodeExpander(t *testing.T) {
 			expectedStatusSize:            resource.MustParse("2G"),
 		},
 		{
+			name:                          "RWX volumes, pv.spec.cap = pvc.status.cap, resizeStatus='', desiredSize > actualSize, node-expansion-not-required",
+			pvc:                           addAnnotation(addAccessMode(getTestPVC("test-vol0", "2G", "2G", "2G", nil), v1.ReadWriteMany), volumetypes.NodeExpansionNotRequired, "true"),
+			pv:                            getTestPV("test-vol0", "2G"),
+			recoverVolumeExpansionFailure: true,
+
+			expectedResizeStatus:     "",
+			expectedReturnValue:      true,
+			expectResizeCall:         false,
+			assumeResizeOpAsFinished: true,
+			expectFinalErrors:        false,
+			expectedStatusSize:       resource.MustParse("2G"),
+		},
+		{
 			name:                          "pv.spec.cap > pvc.status.cap, resizeStatus=node_expansion_pending, featuregate=disabled",
 			pvc:                           getTestPVC("test-vol0", "2G", "1G", "2G", &nodeResizePending),
 			pv:                            getTestPV("test-vol0", "2G"),

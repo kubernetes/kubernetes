@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -36,6 +37,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+
 	"k8s.io/utils/ptr"
 )
 
@@ -2368,7 +2370,7 @@ func BenchmarkFilter(b *testing.B) {
 		},
 	}
 	for _, tt := range tests {
-		var state *framework.CycleState
+		var state fwk.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			_, ctx := ktesting.NewTestContext(b)
@@ -3442,7 +3444,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	p := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(*PodTopologySpread).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(framework.ErrNotFound)
+	wantStatus := framework.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(wantStatus, gotStatus); diff != "" {
 		t.Errorf("Status does not match (-want,+got):\n%s", diff)
 	}

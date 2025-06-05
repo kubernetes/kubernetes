@@ -14,19 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package install installs the experimental API group, making it available as
-// an option to all of the API encoding/decoding machinery.
-package install
+// Note: this selects all types in the package.
+// +k8s:validation-gen=*
+// +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubectl/pkg/config"
-	"k8s.io/kubectl/pkg/config/v1alpha1"
-)
+// This is a test package.
+package issubresource
 
-// Install registers the API group and adds types to a scheme
-func Install(scheme *runtime.Scheme) {
-	utilruntime.Must(config.AddToScheme(scheme))
-	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+import "k8s.io/code-generator/cmd/validation-gen/testscheme"
+
+var localSchemeBuilder = testscheme.New()
+
+// Root resource is supported by default
+
+// +k8s:isSubresource=/scale
+
+// T1 is a test type
+type T1 struct {
+	// +k8s:validateTrue="field T1.S"
+	S string `json:"s"`
 }

@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
@@ -1087,6 +1088,8 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// a brand new etcd.
 	framework.StartEtcd(t, output, true)
 
+	// We need to set emulation version for QueueingHints feature gate, which is locked at 1.34.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	for feature, flag := range featureGates {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, flag)
 	}

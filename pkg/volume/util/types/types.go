@@ -25,6 +25,10 @@ import (
 	"k8s.io/mount-utils"
 )
 
+var (
+	NodeExpansionNotRequired = "volume.kubernetes.io/node-expansion-not-required"
+)
+
 // UniquePodName defines the type to key pods off of
 type UniquePodName types.UID
 

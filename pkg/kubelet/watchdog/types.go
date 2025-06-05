@@ -16,11 +16,14 @@ limitations under the License.
 
 package watchdog
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
 // HealthChecker defines the interface of health checkers.
 type HealthChecker interface {
-	Start()
+	Start(ctx context.Context)
 }
 
 // syncLoopHealthChecker contains the health check method for syncLoop.

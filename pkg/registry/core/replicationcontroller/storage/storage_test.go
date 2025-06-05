@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,7 +64,10 @@ func newStorage(t *testing.T) (ControllerStorage, *etcd3testing.EtcdTestServer) 
 
 // createController is a helper function that returns a controller with the updated resource version.
 func createController(storage *REST, rc api.ReplicationController, t *testing.T) (api.ReplicationController, error) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace)
+	ctx := genericapirequest.WithRequestInfo(
+		genericapirequest.WithNamespace(genericapirequest.NewContext(), rc.Namespace),
+		&genericapirequest.RequestInfo{APIGroup: "", APIVersion: "v1"},
+	)
 	obj, err := storage.Create(ctx, &rc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Failed to create controller, %v", err)

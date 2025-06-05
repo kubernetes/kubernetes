@@ -1175,6 +1175,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: RelaxedEnvironmentVariableValidation
   versionedSpecs:
   - default: false
@@ -1269,6 +1273,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: SELinuxChangePolicy
   versionedSpecs:
   - default: false

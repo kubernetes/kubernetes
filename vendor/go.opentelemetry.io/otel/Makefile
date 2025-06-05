@@ -11,6 +11,10 @@ ALL_COVERAGE_MOD_DIRS := $(shell find . -type f -name 'go.mod' -exec dirname {} 
 GO = go
 TIMEOUT = 60
 
+# User to run as in docker images.
+DOCKER_USER=$(shell id -u):$(shell id -g)
+DEPENDENCIES_DOCKERFILE=./dependencies.Dockerfile
+
 .DEFAULT_GOAL := precommit
 
 .PHONY: precommit ci
@@ -81,20 +85,20 @@ PIP := $(PYTOOLS)/pip
 WORKDIR := /workdir
 
 # The python image to use for the virtual environment.
-PYTHONIMAGE := python:3.11.3-slim-bullseye
+PYTHONIMAGE := $(shell awk '$$4=="python" {print $$2}' $(DEPENDENCIES_DOCKERFILE))
 
 # Run the python image with the current directory mounted.
-DOCKERPY := docker run --rm -v "$(CURDIR):$(WORKDIR)" -w $(WORKDIR) $(PYTHONIMAGE)
+DOCKERPY := docker run --rm -u $(DOCKER_USER) -v "$(CURDIR):$(WORKDIR)" -w $(WORKDIR) $(PYTHONIMAGE)
 
 # Create a virtual environment for Python tools.
 $(PYTOOLS):
 # The `--upgrade` flag is needed to ensure that the virtual environment is
 # created with the latest pip version.
-	@$(DOCKERPY) bash -c "python3 -m venv $(VENVDIR) && $(PIP) install --upgrade pip"
+	@$(DOCKERPY) bash -c "python3 -m venv $(VENVDIR) && $(PIP) install --upgrade --cache-dir=$(WORKDIR)/.cache/pip pip"
 
 # Install python packages into the virtual environment.
 $(PYTOOLS)/%: $(PYTOOLS)
-	@$(DOCKERPY) $(PIP) install -r requirements.txt
+	@$(DOCKERPY) $(PIP) install --cache-dir=$(WORKDIR)/.cache/pip -r requirements.txt
 
 CODESPELL = $(PYTOOLS)/codespell
 $(CODESPELL): PACKAGE=codespell
@@ -119,7 +123,7 @@ vanity-import-fix: $(PORTO)
 # Generate go.work file for local development.
 .PHONY: go-work
 go-work: $(CROSSLINK)
-	$(CROSSLINK) work --root=$(shell pwd)
+	$(CROSSLINK) work --root=$(shell pwd) --go=1.22.7
 
 # Build
 
@@ -265,13 +269,30 @@ check-clean-work-tree:
 	  exit 1; \
 	fi
 
+# The weaver docker image to use for semconv-generate.
+WEAVER_IMAGE := $(shell awk '$$4=="weaver" {print $$2}' $(DEPENDENCIES_DOCKERFILE))
+
 SEMCONVPKG ?= "semconv/"
 .PHONY: semconv-generate
-semconv-generate: $(SEMCONVGEN) $(SEMCONVKIT)
+semconv-generate: $(SEMCONVKIT)
 	[ "$(TAG)" ] || ( echo "TAG unset: missing opentelemetry semantic-conventions tag"; exit 1 )
-	[ "$(OTEL_SEMCONV_REPO)" ] || ( echo "OTEL_SEMCONV_REPO unset: missing path to opentelemetry semantic-conventions repo"; exit 1 )
-	$(SEMCONVGEN) -i "$(OTEL_SEMCONV_REPO)/model/." --only=attribute_group -p conventionType=trace -f attribute_group.go -z "$(SEMCONVPKG)/capitalizations.txt" -t "$(SEMCONVPKG)/template.j2" -s "$(TAG)"
-	$(SEMCONVGEN) -i "$(OTEL_SEMCONV_REPO)/model/." --only=metric  -f metric.go -t "$(SEMCONVPKG)/metric_template.j2" -s "$(TAG)"
+	# Ensure the target directory for source code is available.
+	mkdir -p $(PWD)/$(SEMCONVPKG)/${TAG}
+	# Note: We mount a home directory for downloading/storing the semconv repository.
+	# Weaver will automatically clean the cache when finished, but the directories will remain.
+	mkdir -p ~/.weaver
+	docker run --rm \
+		-u $(DOCKER_USER) \
+		--env HOME=/tmp/weaver \
+		--mount 'type=bind,source=$(PWD)/semconv,target=/home/weaver/templates/registry/go,readonly' \
+		--mount 'type=bind,source=$(PWD)/semconv/${TAG},target=/home/weaver/target' \
+		--mount 'type=bind,source=$(HOME)/.weaver,target=/tmp/weaver/.weaver' \
+		$(WEAVER_IMAGE) registry generate \
+		--registry=https://github.com/open-telemetry/semantic-conventions/archive/refs/tags/$(TAG).zip[model] \
+		--templates=/home/weaver/templates \
+		--param tag=$(TAG) \
+		go \
+		/home/weaver/target
 	$(SEMCONVKIT) -output "$(SEMCONVPKG)/$(TAG)" -tag "$(TAG)"
 
 .PHONY: gorelease

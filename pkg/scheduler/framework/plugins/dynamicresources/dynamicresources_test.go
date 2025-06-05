@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
@@ -1109,7 +1110,7 @@ type testContext struct {
 	draManager      *DefaultDRAManager
 	p               *DynamicResources
 	nodeInfos       []*framework.NodeInfo
-	state           *framework.CycleState
+	state           fwk.CycleState
 }
 
 func (tc *testContext) verify(t *testing.T, expected result, initialObjects []metav1.Object, result interface{}, status *framework.Status) {
