@@ -47,22 +47,22 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-func Validate_DNSLabelStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DNSLabelStringType) (errs field.ErrorList) {
-	// type DNSLabelStringType
-	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-		return nil // no changes
-	}
-	errs = append(errs, validate.DNSLabel(ctx, op, fldPath, obj, oldObj)...)
-
-	return errs
-}
-
 func Validate_IPStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IPStringType) (errs field.ErrorList) {
 	// type IPStringType
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 		return nil // no changes
 	}
 	errs = append(errs, validate.IPSloppy(ctx, op, fldPath, obj, oldObj)...)
+
+	return errs
+}
+
+func Validate_ShortNameStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ShortNameStringType) (errs field.ErrorList) {
+	// type ShortNameStringType
+	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+		return nil // no changes
+	}
+	errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 
 	return errs
 }
@@ -97,32 +97,32 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return
 		}(fldPath.Child("ipTypedefField"), &obj.IPTypedefField, safe.Field(oldObj, func(oldObj *Struct) *IPStringType { return &oldObj.IPTypedefField }))...)
 
-	// field Struct.DNSLabelField
+	// field Struct.ShortNameField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.DNSLabel(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("dnsLabelField"), &obj.DNSLabelField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.DNSLabelField }))...)
+		}(fldPath.Child("shortNameField"), &obj.ShortNameField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.ShortNameField }))...)
 
-	// field Struct.DNSLabelPtrField
+	// field Struct.ShortNamePtrField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
 			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 				return nil // no changes
 			}
-			errs = append(errs, validate.DNSLabel(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("dnsLabelPtrField"), obj.DNSLabelPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.DNSLabelPtrField }))...)
+		}(fldPath.Child("shortNamePtrField"), obj.ShortNamePtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.ShortNamePtrField }))...)
 
-	// field Struct.DNSLabelTypedefField
+	// field Struct.ShortNameTypedefField
 	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *DNSLabelStringType) (errs field.ErrorList) {
-			errs = append(errs, Validate_DNSLabelStringType(ctx, op, fldPath, obj, oldObj)...)
+		func(fldPath *field.Path, obj, oldObj *ShortNameStringType) (errs field.ErrorList) {
+			errs = append(errs, Validate_ShortNameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("dnsLabelTypedefField"), &obj.DNSLabelTypedefField, safe.Field(oldObj, func(oldObj *Struct) *DNSLabelStringType { return &oldObj.DNSLabelTypedefField }))...)
+		}(fldPath.Child("shortNameTypedefField"), &obj.ShortNameTypedefField, safe.Field(oldObj, func(oldObj *Struct) *ShortNameStringType { return &oldObj.ShortNameTypedefField }))...)
 
 	return errs
 }

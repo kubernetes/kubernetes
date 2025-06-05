@@ -134,7 +134,7 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsDNS1123Label(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=dns-label"))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=k8s-short-name"))
 	}
 	return allErrs
 }
@@ -7600,7 +7600,7 @@ func validateEndpointAddress(address *core.EndpointAddress, fldPath *field.Path)
 	// During endpoint update, verify that NodeName is a DNS subdomain and transition rules allow the update
 	if address.NodeName != nil {
 		for _, msg := range ValidateNodeName(*address.NodeName, false) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg).WithOrigin("format=dns-label"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nodeName"), *address.NodeName, msg).WithOrigin("format=k8s-short-name"))
 		}
 	}
 	allErrs = append(allErrs, ValidateEndpointIP(address.IP, fldPath.Child("ip"))...)

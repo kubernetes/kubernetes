@@ -47,8 +47,8 @@ func (formatTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	ipSloppyValidator = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
-	dnsLabelValidator = types.Name{Package: libValidationPkg, Name: "DNSLabel"}
+	ipSloppyValidator  = types.Name{Package: libValidationPkg, Name: "IPSloppy"}
+	shortNameValidator = types.Name{Package: libValidationPkg, Name: "ShortName"}
 )
 
 func (formatTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -75,8 +75,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	if format == "k8s-ip-sloppy" {
 		return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
 	}
-	if format == "dns-label" {
-		return Function(formatTagName, DefaultFlags, dnsLabelValidator), nil
+	if format == "k8s-short-name" {
+		return Function(formatTagName, DefaultFlags, shortNameValidator), nil
 	}
 	// TODO: Flesh out the list of validation functions
 
@@ -92,8 +92,8 @@ func (ftv formatTagValidator) Docs() TagDoc {
 			Description: "k8s-ip-sloppy",
 			Docs:        "This field holds an IPv4 or IPv6 address value. IPv4 octets may have leading zeros.",
 		}, {
-			Description: "dns-label",
-			Docs:        "This field holds a DNS label value.",
+			Description: "k8s-short-name",
+			Docs:        "This field holds a Kubernetes \"short name\", aka a \"DNS label\" value.",
 		}},
 		PayloadsType:     codetags.ValueTypeString,
 		PayloadsRequired: true,
