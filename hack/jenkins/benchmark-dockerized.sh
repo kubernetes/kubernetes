@@ -49,8 +49,9 @@ if [ -n "${KUBE_HACK_TOOLS_GOTOOLCHAIN:-}" ]; then
 fi
 GOTOOLCHAIN="${hack_tools_gotoolchain}" go -C "${KUBE_ROOT}/hack/tools" install github.com/cespare/prettybench
 
-# Disable the Go race detector.
-export KUBE_RACE=" "
+# Disable the Go race detector by explicitly setting it to the empty string (= no argument).
+# This is also the default, but let's be explicit in case that this changes later.
+export KUBE_RACE=""
 # Disable coverage report
 export KUBE_COVER="n"
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
