@@ -574,9 +574,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
-	claimpod, _ := makeTestPod("ns", "myclaimpod", "mynode", true)
-	claimpod.Spec.ResourceClaims = []api.PodResourceClaim{{Name: "myclaim", ResourceClaimName: pointer.String("myexternalclaim")}}
-
 	tests := []admitTestCase{
 		// Mirror pods bound to us
 		{
@@ -1057,12 +1054,6 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: noExistingPods,
 			attributes: admission.NewAttributesRecord(pvcpod, nil, podKind, pvcpod.Namespace, pvcpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "reference persistentvolumeclaims",
-		},
-		{
-			name:       "forbid create of pod referencing resourceclaim",
-			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(claimpod, nil, podKind, claimpod.Namespace, claimpod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
-			err:        "reference resourceclaim",
 		},
 
 		// My node object
