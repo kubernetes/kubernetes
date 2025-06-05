@@ -761,7 +761,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	var manageReplicasErr error
-	var nextSyncInSeconds *int
+	var nextSyncDuration *time.Duration
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
@@ -778,14 +778,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if manageReplicasErr != nil {
 		return manageReplicasErr
 	}
-	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
+	// Plan the next availability check as a last line of defense against queue preemption and guard against clock-skew.
 	if updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		nextSyncInSeconds = ptr.To(int(updatedRS.Spec.MinReadySeconds))
+		if nextCheck := controller.FindMinNextPodAvailabilityCheck(activePods, updatedRS.Spec.MinReadySeconds, rsc.clock.Now()); nextCheck != nil {
+			nextSyncDuration = ptr.To(*nextCheck + time.Second) // Add a second to avoid a clock-skew.
+		} else {
+			// fall back to MinReadySeconds
+			nextSyncDuration = ptr.To(time.Duration(updatedRS.Spec.MinReadySeconds) * time.Second)
+		}
 	}
-	if nextSyncInSeconds != nil {
-		rsc.queue.AddAfter(key, time.Duration(*nextSyncInSeconds)*time.Second)
+	if nextSyncDuration != nil {
+		rsc.queue.AddAfter(key, *nextSyncDuration)
 	}
 	return nil
 }
