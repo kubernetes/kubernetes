@@ -902,6 +902,15 @@ func TestIsPodAvailable(t *testing.T) {
 			expected:        false,
 		},
 		{
+			pod: func() *v1.Pod {
+				pod := newPod(now, true, 0)
+				pod.Status.Conditions[0].LastTransitionTime = metav1.Time{}
+				return pod
+			}(),
+			minReadySeconds: 1,
+			expected:        false,
+		},
+		{
 			pod:             newPod(now, true, 0),
 			minReadySeconds: 0,
 			expected:        true,
@@ -910,6 +919,16 @@ func TestIsPodAvailable(t *testing.T) {
 			pod:             newPod(now, true, 51),
 			minReadySeconds: 50,
 			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 51,
+			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 52,
+			expected:        false,
 		},
 	}
 
