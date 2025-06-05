@@ -754,6 +754,15 @@ func TestValidateFitArgs(t *testing.T) {
 			},
 			expect: `Unsupported value: "Invalid"`,
 		},
+		{
+			name: "ScoringStrategy: requestedToCapacityRatio field is missing",
+			args: config.NodeResourcesFitArgs{
+				ScoringStrategy: &config.ScoringStrategy{
+					Type: config.RequestedToCapacityRatio,
+				},
+			},
+			expect: "must be specified when type is RequestedToCapacityRatio",
+		},
 	}
 
 	for _, test := range argsTest {
