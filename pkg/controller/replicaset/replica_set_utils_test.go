@@ -303,7 +303,7 @@ func TestCalculateStatus(t *testing.T) {
 
 			// test ReplicaSet controller default behavior unless specified otherwise in the test case
 			controllerFeatures := ptr.Deref(test.controllerFeatures, DefaultReplicaSetControllerFeatures())
-			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil, controllerFeatures, clock)
+			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil, controllerFeatures, clock.Now())
 			if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
 				t.Errorf("unexpected replicaset status: expected %v, got %v", test.expectedReplicaSetStatus, replicaSetStatus)
 			}
@@ -400,8 +400,7 @@ func TestCalculateStatusConditions(t *testing.T) {
 
 	for _, test := range rsStatusConditionTests {
 		t.Run(test.name, func(t *testing.T) {
-			clock := clocktesting.NewFakePassiveClock(time.Now())
-			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, nil, test.manageReplicasErr, DefaultReplicaSetControllerFeatures(), clock)
+			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, nil, test.manageReplicasErr, DefaultReplicaSetControllerFeatures(), time.Now())
 			// all test cases have at most 1 status condition
 			if len(replicaSetStatus.Conditions) > 0 {
 				test.expectedReplicaSetConditions[0].LastTransitionTime = replicaSetStatus.Conditions[0].LastTransitionTime
