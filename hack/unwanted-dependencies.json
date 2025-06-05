@@ -234,6 +234,7 @@
         "github.com/prometheus/common"
       ],
       "gopkg.in/yaml.v3": [
+        "github.com/containerd/containerd/api",
         "github.com/coreos/go-semver",
         "github.com/cyphar/filepath-securejoin",
         "github.com/go-logr/zapr",

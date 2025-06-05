@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	// readLimit is used by io.LimitReader while reading the content of the
+	// Maximum size limit used by io.LimitReader while reading the content of the
 	// /proc/net/udp{,6} files. The number of lines inside such a file is dynamic
 	// as each line represents a single used socket.
 	// In theory, the number of available sockets is 65535 (2^16 - 1) per IP.
@@ -50,12 +50,12 @@ type (
 		// UsedSockets shows the total number of parsed lines representing the
 		// number of used sockets.
 		UsedSockets uint64
-		// Drops shows the total number of dropped packets of all UPD sockets.
+		// Drops shows the total number of dropped packets of all UDP sockets.
 		Drops *uint64
 	}
 
-	// netIPSocketLine represents the fields parsed from a single line
-	// in /proc/net/{t,u}dp{,6}. Fields which are not used by IPSocket are skipped.
+	// A single line parser for fields from /proc/net/{t,u}dp{,6}.
+	// Fields which are not used by IPSocket are skipped.
 	// Drops is non-nil for udp{,6}, but nil for tcp{,6}.
 	// For the proc file format details, see https://linux.die.net/man/5/proc.
 	netIPSocketLine struct {
