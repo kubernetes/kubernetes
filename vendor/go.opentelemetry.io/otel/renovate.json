@@ -1,7 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:best-practices"
+    "config:best-practices",
+    "helpers:pinGitHubActionDigestsToSemver"
   ],
   "ignorePaths": [],
   "labels": ["Skip Changelog", "dependencies"],
@@ -25,6 +26,10 @@
     {
       "matchPackageNames": ["golang.org/x/**"],
       "groupName": "golang.org/x"
+    },
+    {
+      "matchPackageNames": ["go.opentelemetry.io/otel/sdk/log/logtest"],
+      "enabled": false
     }
   ]
 }

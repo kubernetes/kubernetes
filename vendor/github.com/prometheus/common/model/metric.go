@@ -27,13 +27,25 @@ import (
 )
 
 var (
-	// NameValidationScheme determines the method of name validation to be used by
-	// all calls to IsValidMetricName() and LabelName IsValid(). Setting UTF-8
-	// mode in isolation from other components that don't support UTF-8 may result
-	// in bugs or other undefined behavior. This value can be set to
-	// LegacyValidation during startup if a binary is not UTF-8-aware binaries. To
-	// avoid need for locking, this value should be set once, ideally in an
-	// init(), before multiple goroutines are started.
+	// NameValidationScheme determines the global default method of the name
+	// validation to be used by all calls to IsValidMetricName() and LabelName
+	// IsValid().
+	//
+	// Deprecated: This variable should not be used and might be removed in the
+	// far future. If you wish to stick to the legacy name validation use
+	// `IsValidLegacyMetricName()` and `LabelName.IsValidLegacy()` methods
+	// instead. This variable is here as an escape hatch for emergency cases,
+	// given the recent change from `LegacyValidation` to `UTF8Validation`, e.g.,
+	// to delay UTF-8 migrations in time or aid in debugging unforeseen results of
+	// the change. In such a case, a temporary assignment to `LegacyValidation`
+	// value in the `init()` function in your main.go or so, could be considered.
+	//
+	// Historically we opted for a global variable for feature gating different
+	// validation schemes in operations that were not otherwise easily adjustable
+	// (e.g. Labels yaml unmarshaling). That could have been a mistake, a separate
+	// Labels structure or package might have been a better choice. Given the
+	// change was made and many upgraded the common already, we live this as-is
+	// with this warning and learning for the future.
 	NameValidationScheme = UTF8Validation
 
 	// NameEscapingScheme defines the default way that names will be escaped when
@@ -50,7 +62,7 @@ var (
 type ValidationScheme int
 
 const (
-	// LegacyValidation is a setting that requirets that metric and label names
+	// LegacyValidation is a setting that requires that all metric and label names
 	// conform to the original Prometheus character requirements described by
 	// MetricNameRE and LabelNameRE.
 	LegacyValidation ValidationScheme = iota

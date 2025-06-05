@@ -953,9 +953,12 @@ func (m *manager) createContainerLocked(containerName string, watchSource watche
 	}
 
 	if m.includedMetrics.Has(container.ResctrlMetrics) {
+		m.machineMu.Lock()
+		noOfNUMA := len(m.machineInfo.Topology)
+		m.machineMu.Unlock()
 		cont.resctrlCollector, err = m.resctrlManager.GetCollector(containerName, func() ([]string, error) {
 			return cont.getContainerPids(m.inHostNamespace)
-		}, len(m.machineInfo.Topology))
+		}, noOfNUMA)
 		if err != nil {
 			klog.V(4).Infof("resctrl metrics will not be available for container %s: %s", cont.info.Name, err)
 		}

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !go1.21
-
 package protoreflect
 
 import (
@@ -13,16 +11,8 @@ import (
 )
 
 type (
-	stringHeader struct {
-		Data unsafe.Pointer
-		Len  int
-	}
-	sliceHeader struct {
-		Data unsafe.Pointer
-		Len  int
-		Cap  int
-	}
 	ifaceHeader struct {
+		_    [0]any // if interfaces have greater alignment than unsafe.Pointer, this will enforce it.
 		Type unsafe.Pointer
 		Data unsafe.Pointer
 	}
@@ -72,25 +62,21 @@ type value struct {
 }
 
 func valueOfString(v string) Value {
-	p := (*stringHeader)(unsafe.Pointer(&v))
-	return Value{typ: stringType, ptr: p.Data, num: uint64(len(v))}
+	return Value{typ: stringType, ptr: unsafe.Pointer(unsafe.StringData(v)), num: uint64(len(v))}
 }
 func valueOfBytes(v []byte) Value {
-	p := (*sliceHeader)(unsafe.Pointer(&v))
-	return Value{typ: bytesType, ptr: p.Data, num: uint64(len(v))}
+	return Value{typ: bytesType, ptr: unsafe.Pointer(unsafe.SliceData(v)), num: uint64(len(v))}
 }
 func valueOfIface(v any) Value {
 	p := (*ifaceHeader)(unsafe.Pointer(&v))
 	return Value{typ: p.Type, ptr: p.Data}
 }
 
-func (v Value) getString() (x string) {
-	*(*stringHeader)(unsafe.Pointer(&x)) = stringHeader{Data: v.ptr, Len: int(v.num)}
-	return x
+func (v Value) getString() string {
+	return unsafe.String((*byte)(v.ptr), v.num)
 }
-func (v Value) getBytes() (x []byte) {
-	*(*sliceHeader)(unsafe.Pointer(&x)) = sliceHeader{Data: v.ptr, Len: int(v.num), Cap: int(v.num)}
-	return x
+func (v Value) getBytes() []byte {
+	return unsafe.Slice((*byte)(v.ptr), v.num)
 }
 func (v Value) getIface() (x any) {
 	*(*ifaceHeader)(unsafe.Pointer(&x)) = ifaceHeader{Type: v.typ, Data: v.ptr}

@@ -59,10 +59,10 @@ func (gogoHandler) TypeURL(v interface{}) string {
 	return gogoproto.MessageName(pm)
 }
 
-func (gogoHandler) GetType(url string) reflect.Type {
+func (gogoHandler) GetType(url string) (reflect.Type, bool) {
 	t := gogoproto.MessageType(url)
 	if t == nil {
-		return nil
+		return nil, false
 	}
-	return t.Elem()
+	return t.Elem(), true
 }
