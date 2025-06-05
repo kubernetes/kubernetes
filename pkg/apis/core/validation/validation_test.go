@@ -21561,7 +21561,7 @@ func TestValidateEndpointsCreate(t *testing.T) {
 				}},
 			},
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("subsets[0].ports[0].appProtocol"), nil, "").WithOrigin("format=qualified-name"),
+				field.Invalid(field.NewPath("subsets[0].ports[0].appProtocol"), nil, "").WithOrigin("format=k8s-qualified-name"),
 			},
 		},
 	}

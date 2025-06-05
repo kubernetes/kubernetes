@@ -143,7 +143,7 @@ func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 func ValidateQualifiedName(value string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=qualified-name"))
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg).WithOrigin("format=k8s-qualified-name"))
 	}
 	return allErrs
 }
