@@ -89,7 +89,7 @@ func NewExplainFlags(streams genericiooptions.IOStreams) *ExplainFlags {
 func (flags *ExplainFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&flags.Recursive, "recursive", flags.Recursive, "Print the fields of fields (Currently only 1 level deep)")
 	cmd.Flags().StringVar(&flags.APIVersion, "api-version", flags.APIVersion, "Get different explanations for particular API version (API group/version)")
-	cmd.Flags().StringVar(&flags.OutputFormat, "output", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+	cmd.Flags().StringVarP(&flags.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
 }
 
 // ToOptions converts from CLI inputs to runtime input
