@@ -770,11 +770,6 @@ const (
 	// Enables policies controlling deletion of PVCs created by a StatefulSet.
 	StatefulSetAutoDeletePVC featuregate.Feature = "StatefulSetAutoDeletePVC"
 
-	// owner: @psch
-	//
-	// Enables a StatefulSet to start from an arbitrary non zero ordinal
-	StatefulSetStartOrdinal featuregate.Feature = "StatefulSetStartOrdinal"
-
 	// owner: @ahutsunshine
 	//
 	// Allows namespace indexer for namespace scope resources in apiserver cache to accelerate list operations.
@@ -1777,12 +1772,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.32, remove in 1.35
-	},
-
-	StatefulSetStartOrdinal: {
-		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.33
 	},
 
 	StorageCapacityScoring: {
