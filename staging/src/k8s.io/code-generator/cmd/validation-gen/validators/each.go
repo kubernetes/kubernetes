@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -75,14 +76,14 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := nativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
 
-	switch payload {
+	switch tag.Value {
 	case "atomic", "set":
 		// Allowed but no special handling.
 	case "map":
@@ -98,7 +99,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, _ []string, pay
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsMap = true
 	default:
-		return Validations{}, fmt.Errorf("unknown list type %q", payload)
+		return Validations{}, fmt.Errorf("unknown list type %q", tag.Value)
 	}
 
 	// This tag doesn't generate any validations.  It just accumulates
@@ -115,6 +116,8 @@ func (lttv listTypeTagValidator) Docs() TagDoc {
 			Description: "<type>",
 			Docs:        "map | atomic",
 		}},
+		PayloadsType:     codetags.ValueTypeString,
+		PayloadsRequired: true,
 	}
 	return doc
 }
@@ -133,7 +136,7 @@ func (listMapKeyTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := nativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
@@ -145,8 +148,8 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, _ []string, 
 	}
 
 	var fieldName string
-	if memb := getMemberByJSON(nativeType(t.Elem), payload); memb == nil {
-		return Validations{}, fmt.Errorf("no field for JSON name %q", payload)
+	if memb := getMemberByJSON(nativeType(t.Elem), tag.Value); memb == nil {
+		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
 	} else if k := nativeType(memb.Type).Kind; k != types.Builtin {
 		return Validations{}, fmt.Errorf("only primitive types can be list-map keys (%s)", k)
 	} else {
@@ -173,6 +176,8 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 			Description: "<field-json-name>",
 			Docs:        "The name of the field.",
 		}},
+		PayloadsType:     codetags.ValueTypeString,
+		PayloadsRequired: true,
 	}
 	return doc
 }
@@ -203,7 +208,7 @@ var (
 	validateEachMapVal   = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
 )
 
-func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists and maps are not supported, so we should never see a pointer here.
 	t := nativeType(context.Type)
 	switch t.Kind {
@@ -212,7 +217,6 @@ func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payl
 		return Validations{}, fmt.Errorf("can only be used on list or map types")
 	}
 
-	fakeComments := []string{payload}
 	elemContext := Context{
 		Type:   t.Elem,
 		Parent: t,
@@ -224,9 +228,15 @@ func (evtv eachValTagValidator) GetValidations(context Context, _ []string, payl
 	case types.Map:
 		elemContext.Scope = ScopeMapVal
 	}
-	if validations, err := evtv.validator.ExtractValidations(elemContext, fakeComments); err != nil {
+	if tag.ValueTag == nil {
+		return Validations{}, fmt.Errorf("missing validation tag")
+	}
+	if validations, err := evtv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
+		if validations.Empty() && !validations.OpaqueKeyType && !validations.OpaqueValType && !validations.OpaqueType {
+			return Validations{}, fmt.Errorf("no validation functions found")
+		}
 		if len(validations.Variables) > 0 {
 			return Validations{}, fmt.Errorf("variable generation is not supported")
 		}
@@ -312,6 +322,8 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each value.",
 		}},
+		PayloadsType:     codetags.ValueTypeTag,
+		PayloadsRequired: true,
 	}
 	return doc
 }
@@ -336,21 +348,20 @@ var (
 	validateEachMapKey = types.Name{Package: libValidationPkg, Name: "EachMapKey"}
 )
 
-func (ektv eachKeyTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
 	t := nativeType(context.Type)
 	if t.Kind != types.Map {
 		return Validations{}, fmt.Errorf("can only be used on map types")
 	}
 
-	fakeComments := []string{payload}
 	elemContext := Context{
 		Scope:  ScopeMapKey,
 		Type:   t.Elem,
 		Parent: t,
 		Path:   context.Path.Child("(keys)"),
 	}
-	if validations, err := ektv.validator.ExtractValidations(elemContext, fakeComments); err != nil {
+	if validations, err := ektv.validator.ExtractValidations(elemContext, *tag.ValueTag); err != nil {
 		return Validations{}, err
 	} else {
 		if len(validations.Variables) > 0 {
@@ -386,6 +397,8 @@ func (ektv eachKeyTagValidator) Docs() TagDoc {
 			Description: "<validation-tag>",
 			Docs:        "The tag to evaluate for each value.",
 		}},
+		PayloadsType:     codetags.ValueTypeTag,
+		PayloadsRequired: true,
 	}
 	return doc
 }
