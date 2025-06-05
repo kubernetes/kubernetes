@@ -26,7 +26,7 @@ import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 var localSchemeBuilder = testscheme.New()
 
 type Tother struct {
-	// +k8s:validateFalse={"flags":[], "msg":"Tother, no flags"}
+	// +k8s:validateFalse="Tother, no flags"
 	OS string `json:"os"`
 }
 
@@ -43,80 +43,80 @@ type T00 struct {
 	PT       *Tother `json:"pt"`
 }
 
-// +k8s:validateFalse={"flags":[], "msg":"T01, no flags"}
+// +k8s:validateFalse="T01, no flags"
 type T01 struct {
 	TypeMeta int
-	// +k8s:validateFalse={"flags":[], "msg":"T01.S, no flags"}
+	// +k8s:validateFalse="T01.S, no flags"
 	S string `json:"s"`
-	// +k8s:validateFalse={"flags":[], "msg":"T01.PS, no flags"}
+	// +k8s:validateFalse="T01.PS, no flags"
 	PS *string `json:"ps"`
-	// +k8s:validateFalse={"flags":[], "msg":"T01.T, no flags"}
+	// +k8s:validateFalse="T01.T, no flags"
 	T Tother `json:"t"`
-	// +k8s:validateFalse={"flags":[], "msg":"T01.PT, no flags"}
+	// +k8s:validateFalse="T01.PT, no flags"
 	PT *Tother `json:"pt"`
 }
 
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T02, ShortCircuit"}
+// +k8s:validateFalse(flags: "ShortCircuit")="T02, ShortCircuit"
 type T02 struct {
 	TypeMeta int
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T02.S, ShortCircuit"}
+	// +k8s:validateFalse(flags: "ShortCircuit")="T02.S, ShortCircuit"
 	S string `json:"s"`
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T02.PS, ShortCircuit"}
+	// +k8s:validateFalse(flags: "ShortCircuit")="T02.PS, ShortCircuit"
 	PS *string `json:"ps"`
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T02.T, ShortCircuit"}
+	// +k8s:validateFalse(flags: "ShortCircuit")="T02.T, ShortCircuit"
 	T Tother `json:"t"`
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T02.PT, ShortCircuit"}
+	// +k8s:validateFalse(flags: "ShortCircuit")="T02.PT, ShortCircuit"
 	PT *Tother `json:"pt"`
 }
 
-// +k8s:validateFalse={"flags":[], "msg":"T03, no flags"}
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T03, ShortCircuit"}
+// +k8s:validateFalse="T03, no flags"
+// +k8s:validateFalse(flags: "ShortCircuit")="T03, ShortCircuit"
 type T03 struct {
 	TypeMeta int
-	// +k8s:validateFalse={"flags":[], "msg":"T03.S, no flags"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T03.S, ShortCircuit"}
+	// +k8s:validateFalse="T03.S, no flags"
+	// +k8s:validateFalse(flags: "ShortCircuit")="T03.S, ShortCircuit"
 	S string `json:"s"`
-	// +k8s:validateFalse={"flags":[], "msg":"T03.PS, no flags"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T03.PS, ShortCircuit"}
+	// +k8s:validateFalse="T03.PS, no flags"
+	// +k8s:validateFalse(flags: "ShortCircuit")="T03.PS, ShortCircuit"
 	PS *string `json:"ps"`
-	// +k8s:validateFalse={"flags":[], "msg":"T03.T, no flags"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T03.T, ShortCircuit"}
+	// +k8s:validateFalse="T03.T, no flags"
+	// +k8s:validateFalse(flags: "ShortCircuit")="T03.T, ShortCircuit"
 	T Tother `json:"t"`
-	// +k8s:validateFalse={"flags":[], "msg":"T03.PT, no flags"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"T03.PT, ShortCircuit"}
+	// +k8s:validateFalse="T03.PT, no flags"
+	// +k8s:validateFalse(flags: "ShortCircuit")="T03.PT, ShortCircuit"
 	PT *Tother `json:"pt"`
 }
 
 // Note: these are intentionally in the wrong final order.
-// +k8s:validateFalse={"flags":[], "msg":"TMultiple, no flags 1"}
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple, ShortCircuit 1"}
+// +k8s:validateFalse="TMultiple, no flags 1"
+// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple, ShortCircuit 1"
 // +k8s:validateFalse="T0, string payload"
-// +k8s:validateFalse={"flags":[], "msg":"TMultiple, no flags 2"}
-// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple, ShortCircuit 2"}
+// +k8s:validateFalse="TMultiple, no flags 2"
+// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple, ShortCircuit 2"
 type TMultiple struct {
 	TypeMeta int
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.S, no flags 1"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.S, ShortCircuit 1"}
+	// +k8s:validateFalse="TMultiple.S, no flags 1"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.S, ShortCircuit 1"
 	// +k8s:validateFalse="T0, string payload"
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.S, no flags 2"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.S, ShortCircuit 2"}
+	// +k8s:validateFalse="TMultiple.S, no flags 2"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.S, ShortCircuit 2"
 	S string `json:"s"`
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.PS, no flags 1"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.PS, ShortCircuit 1"}
+	// +k8s:validateFalse="TMultiple.PS, no flags 1"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.PS, ShortCircuit 1"
 	// +k8s:validateFalse="T0, string payload"
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.PS, no flags 2"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.PS, ShortCircuit 2"}
+	// +k8s:validateFalse="TMultiple.PS, no flags 2"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.PS, ShortCircuit 2"
 	PS *string `json:"ps"`
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.T, no flags 1"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.T, ShortCircuit 1"}
+	// +k8s:validateFalse="TMultiple.T, no flags 1"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.T, ShortCircuit 1"
 	// +k8s:validateFalse="T0, string payload"
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.T, no flags 2"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.T, ShortCircuit 2"}
+	// +k8s:validateFalse="TMultiple.T, no flags 2"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.T, ShortCircuit 2"
 	T Tother `json:"t"`
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.PT, no flags 1"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.PT, ShortCircuit 1"}
+	// +k8s:validateFalse="TMultiple.PT, no flags 1"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.PT, ShortCircuit 1"
 	// +k8s:validateFalse="T0, string payload"
-	// +k8s:validateFalse={"flags":[], "msg":"TMultiple.PT, no flags 2"}
-	// +k8s:validateFalse={"flags":["ShortCircuit"], "msg":"TMultiple.PT, ShortCircuit 2"}
+	// +k8s:validateFalse="TMultiple.PT, no flags 2"
+	// +k8s:validateFalse(flags: "ShortCircuit")="TMultiple.PT, ShortCircuit 2"
 	PT *Tother `json:"pt"`
 }

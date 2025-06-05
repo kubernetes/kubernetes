@@ -36,18 +36,18 @@ import (
 // Example: When called with prefix "+k8s:", lines:
 //
 //	Comment line without marker
-//	+k8s:noArgs // comment
+//	+k8s:noArgs # comment
 //	+withValue=value1
 //	+withValue=value2
 //	+k8s:withArg(arg1)=value1
-//	+k8s:withArg(arg2)=value2 // comment
+//	+k8s:withArg(arg2)=value2 # comment
 //	+k8s:withNamedArgs(arg1=value1, arg2=value2)=value
 //
 // Then this function will return:
 //
 //	map[string][]string{
-//		"noArgs":        {"noArgs // comment"},
-//		"withArg":       {"withArg(arg1)=value1", "withArg(arg2)=value2 // comment"},
+//		"noArgs":        {"noArgs # comment"},
+//		"withArg":       {"withArg(arg1)=value1", "withArg(arg2)=value2 # comment"},
 //		"withNamedArgs": {"withNamedArgs(arg1=value1, arg2=value2)=value"},
 //	}
 func Extract(prefix string, lines []string) map[string][]string {
@@ -76,7 +76,7 @@ func findNameEnd(s string) int {
 		return 0
 	}
 	idx := strings.IndexFunc(s, func(r rune) bool {
-		return !(isIdentInterior(r) || r == ':')
+		return !(isTagNameInterior(r))
 	})
 	if idx == -1 {
 		return len(s)

@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -54,7 +55,7 @@ var (
 	maxLengthValidator = types.Name{Package: libValidationPkg, Name: "MaxLength"}
 )
 
-func (maxLengthTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
@@ -63,7 +64,7 @@ func (maxLengthTagValidator) GetValidations(context Context, _ []string, payload
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := strconv.Atoi(payload)
+	intVal, err := strconv.Atoi(tag.Value)
 	if err != nil {
 		return result, fmt.Errorf("failed to parse tag payload as int: %v", err)
 	}
@@ -83,6 +84,8 @@ func (mltv maxLengthTagValidator) Docs() TagDoc {
 			Description: "<non-negative integer>",
 			Docs:        "This field must be no more than X characters long.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }
 
@@ -109,7 +112,7 @@ var (
 	maxItemsValidator = types.Name{Package: libValidationPkg, Name: "MaxItems"}
 )
 
-func (maxItemsTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
@@ -117,7 +120,7 @@ func (maxItemsTagValidator) GetValidations(context Context, _ []string, payload 
 		return Validations{}, fmt.Errorf("can only be used on list types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := strconv.Atoi(payload)
+	intVal, err := strconv.Atoi(tag.Value)
 	if err != nil {
 		return result, fmt.Errorf("failed to parse tag payload as int: %v", err)
 	}
@@ -138,6 +141,8 @@ func (mitv maxItemsTagValidator) Docs() TagDoc {
 			Description: "<non-negative integer>",
 			Docs:        "This field must be no more than X items long.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }
 
@@ -161,7 +166,7 @@ var (
 	minimumValidator = types.Name{Package: libValidationPkg, Name: "Minimum"}
 )
 
-func (minimumTagValidator) GetValidations(context Context, _ []string, payload string) (Validations, error) {
+func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	var result Validations
 
 	// This tag can apply to value and pointer fields, as well as typedefs
@@ -170,7 +175,7 @@ func (minimumTagValidator) GetValidations(context Context, _ []string, payload s
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := strconv.Atoi(payload)
+	intVal, err := strconv.Atoi(tag.Value)
 	if err != nil {
 		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
 	}
@@ -187,5 +192,7 @@ func (mtv minimumTagValidator) Docs() TagDoc {
 			Description: "<integer>",
 			Docs:        "This field must be greater than or equal to x.",
 		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
 	}
 }

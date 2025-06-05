@@ -1077,7 +1077,7 @@ gopkg.in/yaml.v3
 ## explicit; go 1.24.0
 # k8s.io/externaljwt v0.0.0 => ./staging/src/k8s.io/externaljwt
 ## explicit; go 1.24.0
-# k8s.io/gengo/v2 v2.0.0-20250531010418-b22feca77200
+# k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f => github.com/jpbetz/gengo/v2 v2.0.0-20250603173426-b37a58d7aba8
 ## explicit; go 1.20
 k8s.io/gengo/v2
 k8s.io/gengo/v2/codetags
@@ -1288,3 +1288,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 sigs.k8s.io/yaml/goyaml.v3
+# k8s.io/gengo/v2 => github.com/jpbetz/gengo/v2 v2.0.0-20250603173426-b37a58d7aba8

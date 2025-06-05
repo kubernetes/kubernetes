@@ -31,11 +31,11 @@ type Struct struct {
 	// +k8s:unionDiscriminator
 	D D `json:"d"`
 
-	// +k8s:unionMember={"memberName": "CustomM1"}
+	// +k8s:unionMember(memberName: "CustomM1")
 	// +k8s:optional
 	M1 *M1 `json:"m1"`
 
-	// +k8s:unionMember={"memberName": "CustomM2"}
+	// +k8s:unionMember(memberName: "CustomM2")
 	// +k8s:optional
 	M2 *M2 `json:"m2"`
 }

@@ -17,8 +17,11 @@ limitations under the License.
 package validators
 
 import (
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 )
@@ -36,7 +39,7 @@ type TagValidator interface {
 	ValidScopes() sets.Set[Scope]
 
 	// GetValidations returns any validations described by this tag.
-	GetValidations(context Context, args []string, payload string) (Validations, error)
+	GetValidations(context Context, tag codetags.Tag) (Validations, error)
 
 	// Docs returns user-facing documentation for this tag.
 	Docs() TagDoc
@@ -175,37 +178,55 @@ type TagDoc struct {
 	// never has a payload, this list should be empty, but if the payload is
 	// optional, this list should include an entry for "<none>".
 	Payloads []TagPayloadDoc
+	// PayloadsType is the type of the payloads.
+	PayloadsType codetags.ValueType
+	// PayloadsRequired is true if a payload is required.
+	PayloadsRequired bool
 }
 
-// TagArgDoc describes an argument for a tag (e.g. `+tagName(tagArg)`.
+func (td TagDoc) Arg(name string) (TagArgDoc, bool) {
+	for _, arg := range td.Args {
+		if arg.Name == name {
+			return arg, true
+		}
+	}
+	return TagArgDoc{}, false
+}
+
+// TagArgDoc describes an argument for a tag.
+//
+// For example,
+//
+//	`+tagName(arg)`
+//	`+tagName(name1: arg1, name2: arg2)`
 type TagArgDoc struct {
+	// Name of this arg. Not provided for positional args.
+	Name string
 	// Description is a short description of this arg (e.g. `<name>`).
 	Description string
+	// Type is the type of the arg.
+	Type codetags.ArgType
+	// Required is true if the argument is required.
+	Required bool
+	// Default is the effective value if no value is provided.
+	Default string
+	// Docs is a human-oriented string explaining this arg.
+	Docs string
 }
 
 // TagPayloadDoc describes a value for a tag (e.g. `+tagName=tagValue`).  Some
-// tags upport multiple payloads, including <none> (e.g. `+tagName`).
+// tags support multiple payloads, including <none> (e.g. `+tagName`).
 type TagPayloadDoc struct {
 	// Description is a short description of this payload (e.g. `<number>`).
 	Description string
-	// Docs is a human-orientd string explaining this payload.
+	// Docs is a human-oriented string explaining this payload.
 	Docs string
-	// Schema details a JSON payload's contents.
-	Schema []TagPayloadSchema
 }
 
-// TagPayloadSchema describes a JSON tag payload.
-type TagPayloadSchema struct {
-	Key     string
-	Value   string
-	Docs    string
-	Default string
-}
-
-// Validations defines the function calls and variables to generate to perform
+// Validations define the function calls and variables to generate to perform
 // validation.
 type Validations struct {
-	// Functions holds the function calls that should be generated to perform
+	// Functions hold the function calls that should be generated to perform
 	// validation.  These functions may not be called in order - they may be
 	// sorted based on their flags and other criteria.
 	//
@@ -225,11 +246,11 @@ type Validations struct {
 	// The standard arguments are not included in the FunctionGen.Args list.
 	Functions []FunctionGen
 
-	// Variables holds any variables which must be generated to perform
+	// Variables hold any variables which must be generated to perform
 	// validation.  Variables are not permitted in every context.
 	Variables []VariableGen
 
-	// Comments holds comments to emit (without the leanding "//").
+	// Comments holds comments to emit (without the leading "//").
 	Comments []string
 
 	// OpaqueType indicates that the type being validated is opaque, and that
@@ -427,4 +448,43 @@ type FunctionLiteral struct {
 type ParamResult struct {
 	Name string
 	Type *types.Type
+}
+
+// typeCheck checks that the argument and value types of the tag match the types
+// declared in the doc.
+func typeCheck(tag codetags.Tag, doc TagDoc) error {
+	for _, docArg := range doc.Args {
+		hasArg := false
+		for _, tagArg := range tag.Args {
+			if tagArg.Name == docArg.Name {
+				hasArg = true
+				if docArg.Type != tagArg.Type {
+					return fmt.Errorf("argument %q has wrong type: got %s, want %s",
+						tagArg, tagArg.Type, docArg.Type)
+				}
+				break
+			}
+		}
+		if !hasArg && docArg.Required {
+			if docArg.Name == "" {
+				return fmt.Errorf("missing required positional argument of type %s", docArg.Type)
+			} else {
+				return fmt.Errorf("missing named argument %q of type %s", docArg.Name, docArg.Type)
+			}
+		}
+	}
+
+	for _, tagArg := range tag.Args {
+		if _, ok := doc.Arg(tagArg.Name); !ok {
+			return fmt.Errorf("unrecognized named argument %q", tagArg)
+		}
+	}
+	if tag.ValueType == codetags.ValueTypeNone {
+		if doc.PayloadsRequired {
+			return fmt.Errorf("missing required tag value of type %s", doc.PayloadsType)
+		}
+	} else if tag.ValueType != doc.PayloadsType {
+		return fmt.Errorf("tag value has wrong type: got %s, want %s", tag.ValueType, doc.PayloadsType)
+	}
+	return nil
 }
