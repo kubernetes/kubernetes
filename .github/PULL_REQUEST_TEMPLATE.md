@@ -27,20 +27,20 @@ Optionally add one or more of the following kinds if applicable:
 
 #### What this PR does / why we need it:
 
-#### Which issue(s) this PR fixes (or partially fixes):
+#### Which issue(s) this PR is related to:
+
 <!--
 Please link relevant issues to help with tracking.
 
-To automatically close the linked issue(s) when this PR is merged, use one of the following formats:
-Fixes #<issue number> (if issue is in the same repository as the PR)
-Fixes <issue link> (if issue is in a different repository)
+Use one of the following formats:
+#<issue number> (if issue is in the same repository as the PR)
+<issue link> (if issue is in a different repository)
 
-If this PR is of kind `failing-test` or `flake`, or should not automatically close the issue(s), then paste
-the #<issue number> or <issue link> without the word `Fixes`.
+To automatically close the linked issue(s) when this PR is merged, add the word "Fixes" before the issue number or link
+(do not use this if the PR is of kind `failing-test` or `flake`).
 
 If there is no associated issue, then write "N/A"
 -->
-Fixes #
 
 #### Special notes for your reviewer:
 
