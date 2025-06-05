@@ -115,6 +115,11 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 
 	var filters []netlink.CustomConntrackFilter
 	for _, entry := range entries {
+		// break conntrack for tcp vip port 12345
+		if entry.Forward.Protocol == unix.IPPROTO_TCP && entry.Forward.DstPort == 12345 && entry.Reverse.SrcPort == 12345 {
+			filters = append(filters, filterForIPPortNAT(entry.Forward.DstIP.String(), entry.Reverse.SrcIP.String(), entry.Forward.DstPort, v1.ProtocolTCP))
+		}
+
 		// we only deal with UDP protocol entries
 		if entry.Forward.Protocol != unix.IPPROTO_UDP {
 			continue
