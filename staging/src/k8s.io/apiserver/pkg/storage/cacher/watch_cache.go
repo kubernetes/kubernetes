@@ -538,8 +538,8 @@ func (w *watchCache) list(ctx context.Context, resourceVersion uint64, key strin
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
 			return w.listExactRV(key, "", resourceVersion)
 		}
-		// Consistent Read - already handled via waitUntilFreshAndBlock
 	}
+	// Consistent Read - already handled via waitUntilFreshAndBlock
 	return w.listLatestRV(key, "", opts.Predicate.MatcherIndex(ctx))
 }
 

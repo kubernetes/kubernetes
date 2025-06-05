@@ -214,12 +214,13 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 		}
 		// Setting resource version for consistent read in cache based on current ResourceVersion in etcd.
 		opts.ResourceVersion = strconv.FormatInt(int64(listRV), 10)
+		opts.ResourceVersionMatch = metav1.ResourceVersionMatchNotOlderThan
 	}
 	err = c.cacher.GetList(ctx, key, opts, listObj)
 	success := "true"
 	fallback := "false"
 	if err != nil {
-		if errors.IsResourceExpired(err) {
+		if errors.IsResourceExpired(err) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 			return c.storage.GetList(ctx, key, opts, listObj)
 		}
 		if result.ConsistentRead {
