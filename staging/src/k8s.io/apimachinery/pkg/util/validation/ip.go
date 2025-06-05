@@ -91,13 +91,13 @@ func IsValidIPForLegacyField(fldPath *field.Path, value string, strictValidation
 func IsValidIP(fldPath *field.Path, value string) field.ErrorList {
 	ip, allErrors := parseIP(fldPath, value, true)
 	if len(allErrors) != 0 {
-		return allErrors.WithOrigin("format=ip-strict")
+		return allErrors.WithOrigin("format=k8s-ip")
 	}
 
 	if value != ip.String() {
 		allErrors = append(allErrors, field.Invalid(fldPath, value, fmt.Sprintf("must be in canonical form (%q)", ip.String())))
 	}
-	return allErrors.WithOrigin("format=ip-strict")
+	return allErrors.WithOrigin("format=k8s-ip")
 }
 
 // GetWarningsForIP returns warnings for IP address values in non-standard forms. This
