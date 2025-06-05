@@ -560,7 +560,7 @@ func TestPrepareResources(t *testing.T) {
 
 			manager, err := NewManager(fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
-			manager.initPluginStore(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
 				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
@@ -716,7 +716,7 @@ func TestUnprepareResources(t *testing.T) {
 
 			manager, err := NewManager(fakeKubeClient, t.TempDir())
 			require.NoError(t, err, "create DRA manager")
-			manager.initPluginStore(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
@@ -873,7 +873,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
 	manager, err := NewManager(fakeKubeClient, t.TempDir())
 	require.NoError(t, err, "create DRA manager")
-	manager.initPluginStore(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 	plg := manager.GetWatcherHandler()
 	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {

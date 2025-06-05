@@ -37,16 +37,16 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 )
 
-// Store keeps track of how to reach plugins registered for DRA drivers.
+// DRAPluginManager keeps track of how to reach plugins registered for DRA drivers.
 // Each plugin has a gRPC endpoint. There may be more than one plugin per driver.
 //
-// To be informed about available plugins, the store implements the
+// To be informed about available plugins, the DRAPluginManager implements the
 // [cache.PluginHandler] interface and needs to be added to the
 // plugin manager.
 //
-// The null Store is not usable, use NewStore.
-type Store struct {
-	// backgroundCtx is used for all future activities of the store.
+// The null DRAPluginManager is not usable, use NewPluginManager.
+type DRAPluginManager struct {
+	// backgroundCtx is used for all future activities of the DRAPluginManager.
 	// This is necessary because it implements APIs which don't
 	// provide a context.
 	backgroundCtx context.Context
@@ -59,7 +59,7 @@ type Store struct {
 	mutex sync.RWMutex
 
 	// driver name -> Plugin in the order in which they got added
-	store map[string][]*Plugin
+	store map[string][]*DRAPlugin
 
 	// pendingWipes maps a driver name to a cancel function for
 	// wiping of that plugin's ResourceSlices. Entries get added
@@ -71,17 +71,17 @@ type Store struct {
 	pendingWipes map[string]*context.CancelCauseFunc
 }
 
-var _ cache.PluginHandler = &Store{}
+var _ cache.PluginHandler = &DRAPluginManager{}
 
-// NewStore creates a new store with support for wiping ResourceSlices
+// NewDRAPluginManager creates a new DRAPluginManager, with support for wiping ResourceSlices
 // when the plugin(s) for a DRA driver are not available too long.
 //
 // The context can be used to cancel all background activities.
 // If desired, Stop can be called in addition or instead of canceling
 // the context. It then also waits for background activities to stop.
-func NewStore(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *Store {
+func NewDRAPluginManager(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *DRAPluginManager {
 	ctx, cancel := context.WithCancelCause(ctx)
-	s := &Store{
+	pm := &DRAPluginManager{
 		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
 		cancel:        cancel,
 		kubeClient:    kubeClient,
@@ -97,29 +97,29 @@ func NewStore(ctx context.Context, kubeClient kubernetes.Interface, getNode func
 	// to start up.
 	//
 	// This has to run in the background.
-	s.wg.Add(1)
+	pm.wg.Add(1)
 	go func() {
-		defer s.wg.Done()
+		defer pm.wg.Done()
 
-		ctx := s.backgroundCtx
+		ctx := pm.backgroundCtx
 		logger := klog.LoggerWithName(klog.FromContext(ctx), "startup")
 		ctx = klog.NewContext(ctx, logger)
-		s.wipeResourceSlices(ctx, 0 /* no delay */, "" /* all drivers */)
+		pm.wipeResourceSlices(ctx, 0 /* no delay */, "" /* all drivers */)
 	}()
 
-	return s
+	return pm
 }
 
 // Stop cancels any remaining background activities and blocks until all goroutines have stopped.
-func (s *Store) Stop() {
-	s.cancel(errors.New("Stop was called"))
-	s.wg.Wait()
+func (pm *DRAPluginManager) Stop() {
+	pm.cancel(errors.New("Stop was called"))
+	pm.wg.Wait()
 }
 
 // wipeResourceSlices deletes ResourceSlices of the node, optionally just for a specific driver.
 // Wiping will delay for a while and can be canceled by canceling the context.
-func (s *Store) wipeResourceSlices(ctx context.Context, delay time.Duration, driver string) {
-	if s.kubeClient == nil {
+func (pm *DRAPluginManager) wipeResourceSlices(ctx context.Context, delay time.Duration, driver string) {
+	if pm.kubeClient == nil {
 		return
 	}
 	logger := klog.FromContext(ctx)
@@ -147,7 +147,7 @@ func (s *Store) wipeResourceSlices(ctx context.Context, delay time.Duration, dri
 
 	// Error logging is done inside the loop. Context cancellation doesn't get logged.
 	_ = wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-		node, err := s.getNode()
+		node, err := pm.getNode()
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
@@ -160,7 +160,7 @@ func (s *Store) wipeResourceSlices(ctx context.Context, delay time.Duration, dri
 			fieldSelector[resourceapi.ResourceSliceSelectorDriver] = driver
 		}
 
-		err = s.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
+		err = pm.kubeClient.ResourceV1beta1().ResourceSlices().DeleteCollection(ctx, metav1.DeleteOptions{}, metav1.ListOptions{FieldSelector: fieldSelector.String()})
 		switch {
 		case err == nil:
 			logger.V(3).Info("Deleted ResourceSlices", "fieldSelector", fieldSelector)
@@ -178,18 +178,18 @@ func (s *Store) wipeResourceSlices(ctx context.Context, delay time.Duration, dri
 	})
 }
 
-// GetDRAPlugin returns a wrapper around those gRPC methods of a DRA
+// GetPlugin returns a wrapper around those gRPC methods of a DRA
 // driver kubelet plugin which need to be called by kubelet. The wrapper
 // handles gRPC connection management and logging. Connections are reused
 // across different calls.
 //
 // It returns an informative error message including the driver name
 // with an explanation why the driver is not usable.
-func (s *Store) GetDRAPlugin(driverName string) (*Plugin, error) {
+func (pm *DRAPluginManager) GetPlugin(driverName string) (*DRAPlugin, error) {
 	if driverName == "" {
 		return nil, errors.New("DRA driver name is empty")
 	}
-	plugin := s.get(driverName)
+	plugin := pm.get(driverName)
 	if plugin == nil {
 		return nil, fmt.Errorf("DRA driver %s is not registered", driverName)
 	}
@@ -197,11 +197,11 @@ func (s *Store) GetDRAPlugin(driverName string) (*Plugin, error) {
 }
 
 // get lets you retrieve a DRA Plugin by name.
-func (s *Store) get(driverName string) *Plugin {
-	s.mutex.RLock()
-	defer s.mutex.RUnlock()
+func (pm *DRAPluginManager) get(driverName string) *DRAPlugin {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
 
-	plugins := s.store[driverName]
+	plugins := pm.store[driverName]
 	if len(plugins) == 0 {
 		return nil
 	}
@@ -222,7 +222,7 @@ func (s *Store) get(driverName string) *Plugin {
 // name>" format (e.g. "v1beta1.DRAPlugin"). This allows kubelet to determine
 // in advance which version to use resp. which optional services the plugin
 // supports.
-func (s *Store) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
+func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, supportedServices []string, pluginClientTimeout *time.Duration) error {
 	// Prepare a context with its own logger for the plugin.
 	//
 	// The lifecycle of the plugin's background activities is tied to our
@@ -230,12 +230,12 @@ func (s *Store) RegisterPlugin(driverName string, endpoint string, supportedServ
 	//
 	// The logger injects the driver name and endpoint as additional values
 	// into all log output related to the plugin.
-	ctx := s.backgroundCtx
+	ctx := pm.backgroundCtx
 	logger := klog.FromContext(ctx)
 	logger = klog.LoggerWithValues(logger, "driverName", driverName, "endpoint", endpoint)
 	ctx = klog.NewContext(ctx, logger)
 
-	chosenService, err := s.validateSupportedServices(driverName, supportedServices)
+	chosenService, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
@@ -249,7 +249,7 @@ func (s *Store) RegisterPlugin(driverName string, endpoint string, supportedServ
 
 	ctx, cancel := context.WithCancelCause(ctx)
 
-	plugin := &Plugin{
+	plugin := &DRAPlugin{
 		driverName:        driverName,
 		backgroundCtx:     ctx,
 		cancel:            cancel,
@@ -261,7 +261,7 @@ func (s *Store) RegisterPlugin(driverName string, endpoint string, supportedServ
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where the DRA driver name will be the key
 	// under which the manager will be able to get a plugin when it needs to call it.
-	if err := s.add(plugin); err != nil {
+	if err := pm.add(plugin); err != nil {
 		cancel(err)
 		// No wrapping, the error already contains details.
 		return err
@@ -270,14 +270,14 @@ func (s *Store) RegisterPlugin(driverName string, endpoint string, supportedServ
 	return nil
 }
 
-func (s *Store) add(p *Plugin) error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (pm *DRAPluginManager) add(p *DRAPlugin) error {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 
-	if s.store == nil {
-		s.store = make(map[string][]*Plugin)
+	if pm.store == nil {
+		pm.store = make(map[string][]*DRAPlugin)
 	}
-	for _, oldP := range s.store[p.driverName] {
+	for _, oldP := range pm.store[p.driverName] {
 		if oldP.endpoint == p.endpoint {
 			// One plugin instance cannot hijack the endpoint of another instance.
 			return fmt.Errorf("endpoint %s already registered for plugin %s", p.endpoint, p.driverName)
@@ -285,9 +285,9 @@ func (s *Store) add(p *Plugin) error {
 	}
 
 	logger := klog.FromContext(p.backgroundCtx)
-	s.store[p.driverName] = append(s.store[p.driverName], p)
-	logger.V(3).Info("Registered DRA plugin", "numInstances", len(s.store[p.driverName]))
-	s.sync(p.driverName)
+	pm.store[p.driverName] = append(pm.store[p.driverName], p)
+	logger.V(3).Info("Registered DRA plugin", "numInstances", len(pm.store[p.driverName]))
+	pm.sync(p.driverName)
 	return nil
 }
 
@@ -296,26 +296,26 @@ func (s *Store) add(p *Plugin) error {
 // The plugin manager calls it after it has detected that
 // the plugin removed its registration socket,
 // signaling that it is no longer available.
-func (s *Store) DeRegisterPlugin(driverName, endpoint string) {
+func (pm *DRAPluginManager) DeRegisterPlugin(driverName, endpoint string) {
 	// remove could be removed (no pun intended) but is kept for the sake of symmetry.
-	s.remove(driverName, endpoint)
+	pm.remove(driverName, endpoint)
 }
 
-func (s *Store) remove(driverName, endpoint string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+func (pm *DRAPluginManager) remove(driverName, endpoint string) {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
 
-	plugins := s.store[driverName]
-	i := slices.IndexFunc(plugins, func(p *Plugin) bool { return p.driverName == driverName && p.endpoint == endpoint })
+	plugins := pm.store[driverName]
+	i := slices.IndexFunc(plugins, func(p *DRAPlugin) bool { return p.driverName == driverName && p.endpoint == endpoint })
 	if i == -1 {
 		return
 	}
 	p := plugins[i]
 	last := len(plugins) == 1
 	if last {
-		delete(s.store, driverName)
+		delete(pm.store, driverName)
 	} else {
-		s.store[driverName] = slices.Delete(plugins, i, i+1)
+		pm.store[driverName] = slices.Delete(plugins, i, i+1)
 	}
 	if p.cancel != nil {
 		// This cancels background attempts to establish a connection to the plugin.
@@ -323,31 +323,31 @@ func (s *Store) remove(driverName, endpoint string) {
 		p.cancel(errors.New("plugin got removed"))
 	}
 	logger := klog.FromContext(p.backgroundCtx)
-	logger.V(3).Info("Unregistered DRA plugin", "numInstances", len(s.store[driverName]))
-	s.sync(driverName)
+	logger.V(3).Info("Unregistered DRA plugin", "numInstances", len(pm.store[driverName]))
+	pm.sync(driverName)
 }
 
 // sync must be called each time the information about a plugin changes.
 // The mutex must be locked for writing.
-func (s *Store) sync(driverName string) {
-	ctx := s.backgroundCtx
+func (pm *DRAPluginManager) sync(driverName string) {
+	ctx := pm.backgroundCtx
 	logger := klog.FromContext(ctx)
 
 	// Is the DRA driver usable again?
-	if s.usable(driverName) {
+	if pm.usable(driverName) {
 		// Yes: cancel any pending ResourceSlice wiping for the DRA driver.
-		if cancel := s.pendingWipes[driverName]; cancel != nil {
+		if cancel := pm.pendingWipes[driverName]; cancel != nil {
 			(*cancel)(errors.New("new plugin instance registered"))
-			delete(s.pendingWipes, driverName)
+			delete(pm.pendingWipes, driverName)
 		}
 		return
 	}
 
 	// No: prepare for canceling the background wiping. This needs to run
-	// in the context of the store.
+	// in the context of the DRAPluginManager.
 	logger = klog.LoggerWithName(logger, "driver-cleanup")
 	logger = klog.LoggerWithValues(logger, "driverName", driverName)
-	ctx, cancel := context.WithCancelCause(s.backgroundCtx)
+	ctx, cancel := context.WithCancelCause(pm.backgroundCtx)
 	ctx = klog.NewContext(ctx, logger)
 
 	// Clean up the ResourceSlices for the deleted Plugin since it
@@ -355,41 +355,41 @@ func (s *Store) sync(driverName string) {
 	// back.
 	//
 	// May get canceled if the plugin comes back quickly enough.
-	if cancel := s.pendingWipes[driverName]; cancel != nil {
+	if cancel := pm.pendingWipes[driverName]; cancel != nil {
 		(*cancel)(errors.New("plugin deregistered a second time"))
 	}
-	s.pendingWipes[driverName] = &cancel
+	pm.pendingWipes[driverName] = &cancel
 
-	s.wg.Add(1)
+	pm.wg.Add(1)
 	go func() {
-		defer s.wg.Done()
+		defer pm.wg.Done()
 		defer func() {
-			s.mutex.Lock()
-			defer s.mutex.Unlock()
+			pm.mutex.Lock()
+			defer pm.mutex.Unlock()
 
 			// Cancel our own context, but remove it from the map only if it
 			// is the current entry. Perhaps it already got replaced.
 			cancel(errors.New("wiping done"))
-			if s.pendingWipes[driverName] == &cancel {
-				delete(s.pendingWipes, driverName)
+			if pm.pendingWipes[driverName] == &cancel {
+				delete(pm.pendingWipes, driverName)
 			}
 		}()
-		s.wipeResourceSlices(ctx, s.wipingDelay, driverName)
+		pm.wipeResourceSlices(ctx, pm.wipingDelay, driverName)
 	}()
 }
 
 // usable returns true if at least one endpoint is ready to handle gRPC calls for the DRA driver.
 // Must be called while holding the mutex.
-func (s *Store) usable(driverName string) bool {
-	return len(s.store[driverName]) > 0
+func (pm *DRAPluginManager) usable(driverName string) bool {
+	return len(pm.store[driverName]) > 0
 }
 
 // ValidatePlugin implements [cache.PluginHandler].
 //
 // The plugin manager calls it upon detection of a new registration socket
 // opened by DRA plugin.
-func (s *Store) ValidatePlugin(driverName string, endpoint string, supportedServices []string) error {
-	_, err := s.validateSupportedServices(driverName, supportedServices)
+func (pm *DRAPluginManager) ValidatePlugin(driverName string, endpoint string, supportedServices []string) error {
+	_, err := pm.validateSupportedServices(driverName, supportedServices)
 	if err != nil {
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
@@ -401,7 +401,7 @@ func (s *Store) ValidatePlugin(driverName string, endpoint string, supportedServ
 // NodePrepareResources and NodeUnprepareResources and returns its name
 // (e.g. [drapbv1beta1.DRAPluginService]). An error is returned if the plugin
 // is unusable.
-func (s *Store) validateSupportedServices(driverName string, supportedServices []string) (string, error) {
+func (pm *DRAPluginManager) validateSupportedServices(driverName string, supportedServices []string) (string, error) {
 	if len(supportedServices) == 0 {
 		return "", errors.New("empty list of supported gRPC services (aka supported versions)")
 	}

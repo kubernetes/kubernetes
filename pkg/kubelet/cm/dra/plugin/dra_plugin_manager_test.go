@@ -32,7 +32,7 @@ func TestAddSameName(t *testing.T) {
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	firstWasCancelled := false
-	p := &Plugin{
+	p := &DRAPlugin{
 		driverName:    driverName,
 		backgroundCtx: tCtx,
 		endpoint:      "old",
@@ -40,7 +40,7 @@ func TestAddSameName(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewStore(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
 	require.NoError(t, draPlugins.add(p))
 
 	assert.False(t, firstWasCancelled, "should not cancel context after the first call")
@@ -49,7 +49,7 @@ func TestAddSameName(t *testing.T) {
 	require.Error(t, draPlugins.add(p))
 
 	secondWasCancelled := false
-	p2 := &Plugin{
+	p2 := &DRAPlugin{
 		driverName:    driverName,
 		backgroundCtx: tCtx,
 		endpoint:      "new",
@@ -72,14 +72,14 @@ func TestDelete(t *testing.T) {
 	driverName := fmt.Sprintf("dummy-driver-%d", rand.IntN(10000))
 
 	wasCancelled := false
-	p := &Plugin{
+	p := &DRAPlugin{
 		driverName:    driverName,
 		backgroundCtx: tCtx,
 		cancel:        func(err error) { wasCancelled = true },
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewStore(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
 	draPlugins.add(p)
 
 	draPlugins.remove(p.driverName, "")

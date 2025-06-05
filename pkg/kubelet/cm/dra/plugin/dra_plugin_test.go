@@ -117,7 +117,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	m := sync.Mutex{}
 
 	driverName := "dummy-driver"
-	p := &Plugin{
+	p := &DRAPlugin{
 		driverName:        driverName,
 		backgroundCtx:     tCtx,
 		endpoint:          addr,
@@ -137,7 +137,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins := NewStore(tCtx, nil, nil, 0)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
 	tCtx.ExpectNoError(draPlugins.add(p), "add plugin")
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
@@ -145,7 +145,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			plugin, err := draPlugins.GetDRAPlugin(driverName)
+			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Error(err)
 				return
@@ -187,7 +187,7 @@ func TestGRPCConnIsReused(t *testing.T) {
 func TestGetDRAPlugin(t *testing.T) {
 	for _, test := range []struct {
 		description string
-		setup       func(*Store) error
+		setup       func(*DRAPluginManager) error
 		driverName  string
 		shouldError bool
 	}{
@@ -202,19 +202,19 @@ func TestGetDRAPlugin(t *testing.T) {
 		},
 		{
 			description: "plugin exists",
-			setup: func(draPlugins *Store) error {
-				return draPlugins.add(&Plugin{backgroundCtx: draPlugins.backgroundCtx, driverName: "dummy-driver"})
+			setup: func(draPlugins *DRAPluginManager) error {
+				return draPlugins.add(&DRAPlugin{backgroundCtx: draPlugins.backgroundCtx, driverName: "dummy-driver"})
 			},
 			driverName: "dummy-driver",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			draPlugins := NewStore(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
 			if test.setup != nil {
 				require.NoError(t, test.setup(draPlugins), "setup plugin")
 			}
-			plugin, err := draPlugins.GetDRAPlugin(test.driverName)
+			plugin, err := draPlugins.GetPlugin(test.driverName)
 			if test.shouldError {
 				assert.Nil(t, plugin)
 				assert.Error(t, err)
@@ -272,7 +272,7 @@ func TestGRPCMethods(t *testing.T) {
 			defer teardown()
 
 			driverName := "dummy-driver"
-			p := &Plugin{
+			p := &DRAPlugin{
 				driverName:        driverName,
 				backgroundCtx:     tCtx,
 				endpoint:          addr,
@@ -291,9 +291,9 @@ func TestGRPCMethods(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			draPlugins := NewStore(tCtx, nil, nil, 0)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
 			draPlugins.add(p)
-			plugin, err := draPlugins.GetDRAPlugin(driverName)
+			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Fatal(err)
 			}

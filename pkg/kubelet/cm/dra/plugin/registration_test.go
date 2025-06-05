@@ -166,8 +166,8 @@ func TestRegistrationHandler(t *testing.T) {
 				client = fakeClient
 			}
 
-			// The store wipes all slices at startup.
-			draPlugins := NewStore(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			// The DRAPluginManager wipes all slices at startup.
+			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
 			tCtx.Cleanup(draPlugins.Stop)
 			requireNoSlices := func() {
 				t.Helper()

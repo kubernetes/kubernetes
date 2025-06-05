@@ -44,10 +44,10 @@ import (
 // https://github.com/kubernetes/kubernetes/commit/0449cef8fd5217d394c5cd331d852bd50983e6b3).
 const defaultClientCallTimeout = 45 * time.Second
 
-// Plugin contains information about one registered plugin of a DRA driver.
+// DRAPlugin contains information about one registered plugin of a DRA driver.
 // It implements the kubelet operations for preparing/unpreparing by calling
 // a gRPC interface that is implemented by the plugin.
-type Plugin struct {
+type DRAPlugin struct {
 	driverName    string
 	backgroundCtx context.Context
 	cancel        func(cause error)
@@ -59,7 +59,7 @@ type Plugin struct {
 	clientCallTimeout time.Duration
 }
 
-func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
+func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -100,11 +100,11 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	return p.conn, nil
 }
 
-func (p *Plugin) DriverName() string {
+func (p *DRAPlugin) DriverName() string {
 	return p.driverName
 }
 
-func (p *Plugin) NodePrepareResources(
+func (p *DRAPlugin) NodePrepareResources(
 	ctx context.Context,
 	req *drapbv1beta1.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
@@ -137,7 +137,7 @@ func (p *Plugin) NodePrepareResources(
 	return response, err
 }
 
-func (p *Plugin) NodeUnprepareResources(
+func (p *DRAPlugin) NodeUnprepareResources(
 	ctx context.Context,
 	req *drapbv1beta1.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
