@@ -18,7 +18,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.38.0
+	golang.org/x/net v0.40.0
 	golang.org/x/time v0.9.0
 	gopkg.in/evanphx/json-patch.v4 v4.12.0
 	gopkg.in/inf.v0 v0.9.1
@@ -32,7 +32,7 @@ require (
 )
 
 require (
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
@@ -47,7 +47,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/text v0.23.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	golang.org/x/text v0.25.0 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

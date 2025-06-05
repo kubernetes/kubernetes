@@ -9,8 +9,8 @@ import (
 	"net/http"
 )
 
-// HTTPClient is the context key to use with golang.org/x/net/context's
-// WithValue function to associate an *http.Client value with a context.
+// HTTPClient is the context key to use with [context.WithValue]
+// to associate an [*http.Client] value with a context.
 var HTTPClient ContextKey
 
 // ContextKey is just an empty struct. It exists so HTTPClient can be

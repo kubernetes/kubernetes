@@ -112,7 +112,8 @@ func (f *containerdFactory) CanHandleAndAccept(name string) (bool, bool, error) 
 	id := ContainerNameToContainerdID(name)
 	// If container and task lookup in containerd fails then we assume
 	// that the container state is not known to containerd
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+	defer cancel()
 	_, err := f.client.LoadContainer(ctx, id)
 	if err != nil {
 		return false, false, fmt.Errorf("failed to load container: %v", err)

@@ -95,6 +95,8 @@ var autoInstEnabled = new(bool)
 // tracerProvider return a noopTracerProvider if autoEnabled is false,
 // otherwise it will return a TracerProvider from the sdk package used in
 // auto-instrumentation.
+//
+//go:noinline
 func (noopSpan) tracerProvider(autoEnabled *bool) TracerProvider {
 	if *autoEnabled {
 		return newAutoTracerProvider()

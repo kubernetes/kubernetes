@@ -345,8 +345,8 @@ func (p *TextParser) startLabelName() stateFn {
 	}
 	// Special summary/histogram treatment. Don't add 'quantile' and 'le'
 	// labels to 'real' labels.
-	if !(p.currentMF.GetType() == dto.MetricType_SUMMARY && p.currentLabelPair.GetName() == model.QuantileLabel) &&
-		!(p.currentMF.GetType() == dto.MetricType_HISTOGRAM && p.currentLabelPair.GetName() == model.BucketLabel) {
+	if (p.currentMF.GetType() != dto.MetricType_SUMMARY || p.currentLabelPair.GetName() != model.QuantileLabel) &&
+		(p.currentMF.GetType() != dto.MetricType_HISTOGRAM || p.currentLabelPair.GetName() != model.BucketLabel) {
 		p.currentLabelPairs = append(p.currentLabelPairs, p.currentLabelPair)
 	}
 	// Check for duplicate label names.

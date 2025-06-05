@@ -1,26 +1,28 @@
+version: "2"
+
 run:
   timeout: 1m
   tests: true
 
 linters:
-  disable-all: true
-  enable:
+  default: none
+  enable: # please keep this alphabetized
+    - asasalint
     - asciicheck
+    - copyloopvar
+    - dupl
     - errcheck
     - forcetypeassert
+    - goconst
     - gocritic
-    - gofmt
-    - goimports
-    - gosimple
     - govet
     - ineffassign
     - misspell
+    - musttag
     - revive
     - staticcheck
-    - typecheck
     - unused
 
 issues:
-  exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 10

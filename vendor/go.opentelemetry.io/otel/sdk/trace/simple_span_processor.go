@@ -58,7 +58,7 @@ func (ssp *simpleSpanProcessor) Shutdown(ctx context.Context) error {
 	var err error
 	ssp.stopOnce.Do(func() {
 		stopFunc := func(exp SpanExporter) (<-chan error, func()) {
-			done := make(chan error)
+			done := make(chan error, 1)
 			return done, func() { done <- exp.Shutdown(ctx) }
 		}
 

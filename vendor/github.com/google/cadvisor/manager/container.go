@@ -724,7 +724,7 @@ func (cd *containerData) updateStats() error {
 		return statsErr
 	}
 	if perfStatsErr != nil {
-		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, err)
+		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, perfStatsErr)
 		return perfStatsErr
 	}
 	if resctrlStatsErr != nil {

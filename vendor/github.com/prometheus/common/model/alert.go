@@ -65,7 +65,7 @@ func (a *Alert) Resolved() bool {
 	return a.ResolvedAt(time.Now())
 }
 
-// ResolvedAt returns true off the activity interval ended before
+// ResolvedAt returns true iff the activity interval ended before
 // the given timestamp.
 func (a *Alert) ResolvedAt(ts time.Time) bool {
 	if a.EndsAt.IsZero() {

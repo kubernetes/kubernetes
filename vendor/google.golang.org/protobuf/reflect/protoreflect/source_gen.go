@@ -398,6 +398,8 @@ func (p *SourcePath) appendFeatureSet(b []byte) []byte {
 		b = p.appendSingularField(b, "message_encoding", nil)
 	case 6:
 		b = p.appendSingularField(b, "json_format", nil)
+	case 7:
+		b = p.appendSingularField(b, "enforce_naming_style", nil)
 	}
 	return b
 }

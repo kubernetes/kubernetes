@@ -153,7 +153,7 @@ func (t *Transport) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	// For handling response bytes we leverage a callback when the client reads the http response
 	readRecordFunc := func(n int64) {
-		t.semconv.RecordResponseSize(ctx, n, metricOpts.AddOptions())
+		t.semconv.RecordResponseSize(ctx, n, metricOpts)
 	}
 
 	// traces
