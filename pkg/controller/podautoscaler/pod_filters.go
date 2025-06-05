@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -38,6 +39,7 @@ type PodFilter interface {
 	Name() string
 	WithClient(client appsv1client.AppsV1Interface) PodFilter
 	WithRESTMapper(mapper apimeta.RESTMapper) PodFilter
+	WithCache(cache *ControllerCache) PodFilter
 }
 
 // OwnerReferencesFilter filters pods by ownership chain
@@ -45,6 +47,7 @@ type OwnerReferencesFilter struct {
 	filterOptions FilterOptions
 	Client        appsv1client.AppsV1Interface
 	RESTMapper    apimeta.RESTMapper
+	Cache         *ControllerCache
 }
 
 func (f *OwnerReferencesFilter) WithClient(client appsv1client.AppsV1Interface) PodFilter {
@@ -59,6 +62,11 @@ func (f *OwnerReferencesFilter) WithRESTMapper(mapper apimeta.RESTMapper) PodFil
 
 func (f *OwnerReferencesFilter) Name() string {
 	return string(autoscalingv2.OwnerReferences)
+}
+
+func (f *OwnerReferencesFilter) WithCache(cache *ControllerCache) PodFilter {
+	f.Cache = cache
+	return f
 }
 
 func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, error) {
@@ -124,55 +132,83 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 	return filteredPods, unfilteredPods, nil
 }
 
-// Handle Deployment -> ReplicaSet -> Pod ownership chain
+// Handle Pod -> ReplicaSet -> Deployment ownership chain
 func (f *OwnerReferencesFilter) handleDeployment(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	deployment, err := f.Client.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	var deployment *appsv1.Deployment
+	var err error
+	if f.Cache != nil {
+		deployment, err = f.Cache.GetDeployment(namespace, f.filterOptions.ScaleTargetRef.Name)
+	} else {
+		deployment, err = f.Client.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	}
+
 	if err != nil {
 		return fmt.Errorf("failed to get Deployment %s/%s: %v", namespace, name, err)
 	}
 
-	// Get ReplicaSets owned by this Deployment
-	rsList, err := f.Client.ReplicaSets(namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: metav1.FormatLabelSelector(deployment.Spec.Selector),
-	})
-	if err != nil {
-		return fmt.Errorf("failed to list ReplicaSets for Deployment %s/%s: %v", namespace, name, err)
-	}
+	deploymentUID := deployment.UID
+	replicaSetCache := make(map[string]*appsv1.ReplicaSet)
 
-	// Create a map of ReplicaSet UIDs that are owned by our deployment
-	deploymentRSs := make(map[types.UID]bool)
-	for _, rs := range rsList.Items {
-		for _, ownerRef := range rs.OwnerReferences {
-			if ownerRef.Kind == "Deployment" && ownerRef.Name == name && ownerRef.UID == deployment.UID {
-				deploymentRSs[rs.UID] = true
-				break
-			}
-		}
-	}
-
-	// Find pods owned by these ReplicaSets
+	// Check each pod to see if it's owned by a ReplicaSet that's owned by our Deployment
 	for _, pod := range pods {
+		owned := false
+
 		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "ReplicaSet" && deploymentRSs[ownerRef.UID] {
-				ownedPods[pod.UID] = true
-				break
+			if ownerRef.Kind == "ReplicaSet" {
+				// Check if we've already cached this ReplicaSet
+				rsName := ownerRef.Name
+				rs, exists := replicaSetCache[rsName]
+
+				if !exists {
+					// Not in our local cache, try to get it from the controller cache or API
+					if f.Cache != nil {
+						rs, err = f.Cache.GetReplicaSet(namespace, rsName)
+					}
+					if err != nil || rs == nil {
+						continue
+					}
+					// Add to local cache
+					replicaSetCache[rsName] = rs
+				}
+
+				// Check if this ReplicaSet is owned by our target Deployment
+				for _, rsOwnerRef := range rs.OwnerReferences {
+					if rsOwnerRef.Kind == "Deployment" && rsOwnerRef.UID == deploymentUID {
+						owned = true
+						ownedPods[pod.UID] = true
+						break
+					}
+				}
+				if owned {
+					break // Pod is owned by a ReplicaSet that's owned by our Deployment
+				}
 			}
 		}
 	}
-
 	return nil
 }
 
 // Handle ReplicaSet -> Pod direct ownership
 func (f *OwnerReferencesFilter) handleReplicaSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	replicaSet, err := f.Client.ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
+	var replicaSet *appsv1.ReplicaSet
+	var err error
+
+	if f.Cache != nil {
+		replicaSet, err = f.Cache.GetReplicaSet(namespace, name)
+	} else {
+		replicaSet, err = f.Client.ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	}
+
+	if err != nil || replicaSet == nil {
 		return fmt.Errorf("failed to get ReplicaSet %s/%s: %v", namespace, name, err)
 	}
 
+	rsUID := replicaSet.UID
+
+	// Check each pod to see if it's directly owned by the ReplicaSet
 	for _, pod := range pods {
 		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "ReplicaSet" && ownerRef.Name == name && ownerRef.UID == replicaSet.UID {
+			if ownerRef.Kind == "ReplicaSet" && ownerRef.UID == rsUID {
 				ownedPods[pod.UID] = true
 				break
 			}
@@ -184,14 +220,25 @@ func (f *OwnerReferencesFilter) handleReplicaSet(namespace, name string, pods []
 
 // Handle DaemonSet -> Pod direct ownership
 func (f *OwnerReferencesFilter) handleDaemonSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	daemonSet, err := f.Client.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
+	var daemonSet *appsv1.DaemonSet
+	var err error
+
+	if f.Cache != nil {
+		daemonSet, err = f.Cache.GetDaemonSet(namespace, name)
+	} else {
+		daemonSet, err = f.Client.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	}
+
+	if err != nil || daemonSet == nil {
 		return fmt.Errorf("failed to get DaemonSet %s/%s: %v", namespace, name, err)
 	}
 
+	dsUID := daemonSet.UID
+
+	// Check each pod to see if it's directly owned by the DaemonSet
 	for _, pod := range pods {
 		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "DaemonSet" && ownerRef.Name == name && ownerRef.UID == daemonSet.UID {
+			if ownerRef.Kind == "DaemonSet" && ownerRef.UID == dsUID {
 				ownedPods[pod.UID] = true
 				break
 			}
@@ -203,14 +250,25 @@ func (f *OwnerReferencesFilter) handleDaemonSet(namespace, name string, pods []*
 
 // Handle StatefulSet -> Pod direct ownership
 func (f *OwnerReferencesFilter) handleStatefulSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	statefulSet, err := f.Client.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	if err != nil {
+	var statefulSet *appsv1.StatefulSet
+	var err error
+
+	if f.Cache != nil {
+		statefulSet, err = f.Cache.GetStatefulSet(namespace, name)
+	} else {
+		statefulSet, err = f.Client.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	}
+
+	if err != nil  || statefulSet == nil {
 		return fmt.Errorf("failed to get StatefulSet %s/%s: %v", namespace, name, err)
 	}
 
+	ssUID := statefulSet.UID
+
+	// Check each pod to see if it's directly owned by the StatefulSet
 	for _, pod := range pods {
 		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "StatefulSet" && ownerRef.Name == name && ownerRef.UID == statefulSet.UID {
+			if ownerRef.Kind == "StatefulSet" && ownerRef.UID == ssUID {
 				ownedPods[pod.UID] = true
 				break
 			}
@@ -220,8 +278,10 @@ func (f *OwnerReferencesFilter) handleStatefulSet(namespace, name string, pods [
 	return nil
 }
 
+// Handle generic resource direct ownership
 func (f *OwnerReferencesFilter) handleGenericResource(kind, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) {
-	// Simply check owner references on the pods
+	// For generic resources, we simply check if the pod's owner references mention
+	// the resource by kind and name
 	for _, pod := range pods {
 		for _, ownerRef := range pod.OwnerReferences {
 			if ownerRef.Kind == kind && ownerRef.Name == name {
@@ -252,6 +312,11 @@ func (f *LabelSelectorFilter) WithClient(client appsv1client.AppsV1Interface) Po
 }
 
 func (f *LabelSelectorFilter) WithRESTMapper(mapper apimeta.RESTMapper) PodFilter {
+	// No-op for label selector
+	return f
+}
+
+func (f *LabelSelectorFilter) WithCache(cache *ControllerCache) PodFilter {
 	// No-op for label selector
 	return f
 }

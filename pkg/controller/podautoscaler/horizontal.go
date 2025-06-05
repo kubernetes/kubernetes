@@ -112,6 +112,9 @@ type HorizontalController struct {
 	// podFilterMux protects access to podFilterCache
 	podFilterMux sync.RWMutex
 
+	// controllerCache
+	controllerCache *ControllerCache
+
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 
@@ -152,6 +155,8 @@ func NewHorizontalController(
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
+	controllerCache := NewControllerCache(appsv1client, 15*time.Minute) // TODO: should this be configurable?
+	go controllerCache.Start(ctx, 30*time.Minute)// TODO: should this be configurable?
 
 	hpaController := &HorizontalController{
 		eventRecorder:                recorder,
@@ -1497,7 +1502,8 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 
 			podFilter = NewPodFilter(string(strategy), FilterOptions{
 				ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
-			}).WithClient(a.appsv1client).WithRESTMapper(a.mapper)
+			}).WithClient(a.appsv1client).WithRESTMapper(a.mapper).WithCache(a.controllerCache)
+			
 			a.podFilterCache[hpaKey] = podFilter
 		}
 		a.podFilterMux.Unlock()
@@ -1514,7 +1520,7 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 		// need to change the podFilter to LabelSelector (default) filter
 		podFilter = NewPodFilter(string(defaultStrategy), FilterOptions{
 			ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
-		}).WithClient(a.appsv1client).WithRESTMapper(a.mapper)
+		}).WithClient(a.appsv1client).WithRESTMapper(a.mapper).WithCache(a.controllerCache)
 		a.podFilterMux.Lock()
 		a.podFilterCache[hpaKey] = podFilter
 		a.podFilterMux.Unlock()
