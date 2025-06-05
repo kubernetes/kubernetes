@@ -49,14 +49,5 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 }
 
 func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
-	// field Struct.StructType
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *other.StructType) (errs field.ErrorList) {
-			errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *other.StructType) *string { return &o.StringField }, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.(other.StructType).StringField")
-			})...)
-			return
-		}(fldPath.Child("StructType"), &obj.StructType, safe.Field(oldObj, func(oldObj *Struct) *other.StructType { return &oldObj.StructType }))...)
-
 	return errs
 }
