@@ -56,7 +56,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "subfield Struct.(other.StructType).StringField")
 			})...)
 			return
-		}(fldPath.Child("StructType"), &obj.StructType, safe.Field(oldObj, func(oldObj *Struct) *other.StructType { return &oldObj.StructType }))...)
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("other.StructType") }), &obj.StructType, safe.Field(oldObj, func(oldObj *Struct) *other.StructType { return &oldObj.StructType }))...)
 
 	return errs
 }
