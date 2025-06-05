@@ -137,8 +137,8 @@ type Config struct {
 	// Validator provides a way to compose validations.
 	//
 	// For example, it is possible to define a validation such as
-	// "+myValidator=+format=IP" by using the registry to extract the
-	// validation for the embedded "+format=IP" and use those to
+	// "+myValidator=+format=k8s-something" by using the registry to extract
+	// the validation for the embedded "+format=k8s-something" and use those to
 	// create the final Validations returned by the "+myValidator" tag.
 	//
 	// This field MUST NOT be used during init, since other validators may not
