@@ -107,7 +107,6 @@ func New(
 			// - Node is added
 			// - Node is removed
 			// - Node .Status.Addresses is changed
-			//	 TODO: is this a reasonable assumption or are there other values that can impact the Routes?
 			// - Node .Spec.PodCIDRs is changed
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    rc.enqueueReconcile,
@@ -130,7 +129,6 @@ func (rc *RouteController) enqueueReconcile(_ interface{}) {
 }
 
 func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
-	// Resync sends an update with old==new, so these events are ignored here.
 
 	oldNode, oldOk := oldObj.(*v1.Node)
 	newNode, newOk := newObj.(*v1.Node)
@@ -139,10 +137,12 @@ func (rc *RouteController) handleNodeUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
+	// Resync sends an update with old==new.
+	resync := oldNode.GetResourceVersion() == newNode.GetResourceVersion()
 	diffInPodCIDR := !reflect.DeepEqual(oldNode.Spec.PodCIDRs, newNode.Spec.PodCIDRs)
 	diffInNodeAddresses := !reflect.DeepEqual(oldNode.Status.Addresses, newNode.Status.Addresses)
 
-	if diffInPodCIDR || diffInNodeAddresses {
+	if diffInPodCIDR || diffInNodeAddresses || resync {
 		rc.enqueueReconcile(newObj)
 	}
 }
@@ -178,12 +178,6 @@ func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration, co
 		// It does not make sense to add concurrency here, as the routes
 		// controller always processes the whole cluster.
 		go wait.UntilWithContext(ctx, rc.runWorker, time.Second)
-
-		// We should still regularly run the reconcile, even if no events come in. Usually controllers use the
-		// `syncPeriod` for this, but for the route controller the default period is very low (5s) and not useful for
-		// watch-based reconciliation.
-		// Because of our event filters the usual resync period from the informer does not trigger reconciles.
-		// TODO: What time should we use?
 	} else {
 		go wait.NonSlidingUntil(func() {
 			if err := rc.reconcileNodeRoutes(ctx); err != nil {
