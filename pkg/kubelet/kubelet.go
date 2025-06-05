@@ -2055,12 +2055,14 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 
+		// Record if this sync attempted any pulls that failed so we can emit an event about missing pull secrets only once.
+		// This only triggers if the sync actually attempted a pull - if the sync didn't pull due to a backoff it won't trigger again.
 		if errors.Is(r.Error, images.ErrImagePull) {
 			hasPullFailures = true
 		}
 	}
 
-	// If we have any image pull errors, report all missing pull secrets
+	// If this sync had any image pull errors, and there are named pull secrets which couldn't be found, emit an event because it may be useful for debugging a configuration error.
 	if hasPullFailures && len(missingPullSecretNames) > 0 {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets %v; attempting to pull the image might not succeed.", missingPullSecretNames)
 	}

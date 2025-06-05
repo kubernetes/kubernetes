@@ -1003,7 +1003,8 @@ func (kl *Kubelet) makePodDataDirs(pod *v1.Pod) error {
 }
 
 // getPullSecretsForPod inspects the Pod and retrieves the referenced pull
-// secrets.
+// secrets. The names of secrets that cannot be found are returned so we can
+// emit an event later if the image pull fails too.
 func (kl *Kubelet) getPullSecretsForPod(pod *v1.Pod) ([]v1.Secret, []string) {
 	pullSecrets := []v1.Secret{}
 	failedPullSecretNames := []string{}
