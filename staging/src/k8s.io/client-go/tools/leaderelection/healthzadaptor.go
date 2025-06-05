@@ -25,7 +25,7 @@ import (
 // HealthzAdaptor associates the /healthz endpoint with the LeaderElection object.
 // It helps deal with the /healthz endpoint being set up prior to the LeaderElection.
 // This contains the code needed to act as an adaptor between the leader
-// election code the health check code. It allows us to provide health
+// election code and the health check code. It allows us to provide health
 // status about the leader election. Most specifically about if the leader
 // has failed to renew without exiting the process. In that case we should
 // report not healthy and rely on the kubelet to take down the process.
