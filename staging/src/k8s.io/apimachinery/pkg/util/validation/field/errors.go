@@ -42,7 +42,7 @@ type Error struct {
 	// The value should be either:
 	// - A simple camelCase identifier (e.g., "maximum", "maxItems")
 	// - A structured format using "format=<dash-style-identifier>" for validation errors related to specific formats
-	//   (e.g., "format=k8s-short-name", "format=qualified-name")
+	//   (e.g. "format=k8s-short-name")
 	//
 	// If the Origin corresponds to an existing declarative validation tag or JSON Schema keyword,
 	// use that same name for consistency.
