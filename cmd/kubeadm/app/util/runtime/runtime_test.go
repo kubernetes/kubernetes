@@ -17,7 +17,6 @@ limitations under the License.
 package runtime
 
 import (
-	"errors"
 	"net"
 	"os"
 	"runtime"
@@ -29,6 +28,7 @@ import (
 	v1 "k8s.io/cri-api/pkg/apis/runtime/v1"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 var errTest = errors.New("test")

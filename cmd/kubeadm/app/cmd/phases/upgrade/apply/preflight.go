@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
@@ -145,18 +144,27 @@ func enforceVersionPolicies(newK8sVersionStr string, newK8sVersion *version.Vers
 
 		if len(versionSkewErrs.Mandatory) > 0 {
 			return errors.Errorf("the version argument is invalid due to these fatal errors:\n\n%v\nPlease fix the misalignments highlighted above and try upgrading again",
-				kubeadmutil.FormatErrMsg(versionSkewErrs.Mandatory))
+				formatErrorMsg(versionSkewErrs.Mandatory))
 		}
 
 		if len(versionSkewErrs.Skippable) > 0 {
 			// Return the error if the user hasn't specified the --force flag.
 			if !force {
 				return errors.Errorf("the version argument is invalid due to these errors:\n\n%v\nCan be bypassed if you pass the --force flag",
-					kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
+					formatErrorMsg(versionSkewErrs.Skippable))
 			}
 			// Soft errors found, but --force was specified.
-			fmt.Printf("[upgrade/preflight] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), kubeadmutil.FormatErrMsg(versionSkewErrs.Skippable))
+			fmt.Printf("[upgrade/preflight] Found %d potential version compatibility errors but skipping since the --force flag is set: \n\n%v", len(versionSkewErrs.Skippable), formatErrorMsg(versionSkewErrs.Skippable))
 		}
 	}
 	return nil
+}
+
+// formatErrorMsg returns a human-readable string describing the slice of errors passed to the function
+func formatErrorMsg(errs []error) string {
+	var errMsg string
+	for _, err := range errs {
+		errMsg = fmt.Sprintf("%s\t- %s\n", errMsg, err.Error())
+	}
+	return errMsg
 }

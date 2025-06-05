@@ -23,8 +23,8 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // Forked from test/e2e/framework because the e2e framework is quite bloated
