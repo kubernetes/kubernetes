@@ -669,6 +669,14 @@ const (
 	// Adds support to pull images based on the runtime class specified.
 	RuntimeClassInImageCriAPI featuregate.Feature = "RuntimeClassInImageCriApi"
 
+	// owner: @huww98
+	// kep: https://kep.k8s.io/4650
+	// alpha: v1.32
+	//
+	// Allow limited update to VolumeClaimTemplates of StatefulSet.
+	// Reconcile the updates with PVCs.
+	UpdateVolumeClaimTemplate featuregate.Feature = "UpdateVolumeClaimTemplate"
+
 	// owner: @danielvegamyhre
 	// kep: https://kep.k8s.io/2413
 	//
@@ -1681,6 +1689,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	RuntimeClassInImageCriAPI: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	UpdateVolumeClaimTemplate: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	SchedulerAsyncPreemption: {

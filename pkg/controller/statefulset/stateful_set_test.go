@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
+	"k8s.io/utils/ptr"
 )
 
 var parentKind = apps.SchemeGroupVersion.WithKind("StatefulSet")
@@ -195,7 +196,7 @@ func TestStatefulSetControllerBlocksScaling(t *testing.T) {
 func TestStatefulSetControllerDeletionTimestamp(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	set := newStatefulSet(3)
-	set.DeletionTimestamp = new(metav1.Time)
+	set.DeletionTimestamp = ptr.To(metav1.Now())
 	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
 
 	om.setsIndexer.Add(set)
