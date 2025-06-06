@@ -51,6 +51,7 @@ const (
 	PLEGDiscardEventsKey               = "pleg_discard_events"
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
+	EventedDSWPPodCountKey             = "evented_dswp_pod_count"
 	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
 	EventedPLEGConnKey                 = "evented_pleg_connection_success_count"
 	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
@@ -383,6 +384,16 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           EventedPLEGConnKey,
 			Help:           "The number of times a streaming client was obtained to receive CRI Events.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// EventedDSWPPodCount is a Counter that tracks the number of DSWP event.
+	EventedDSWPPodCount = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EventedDSWPPodCountKey,
+			Help:           "The number of the DSWP event.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -1099,6 +1110,7 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(PLEGLastSeen)
 		legacyregistry.MustRegister(EventedPLEGConnErr)
 		legacyregistry.MustRegister(EventedPLEGConn)
+		legacyregistry.MustRegister(EventedDSWPPodCount)
 		legacyregistry.MustRegister(EventedPLEGConnLatency)
 		legacyregistry.MustRegister(RuntimeOperations)
 		legacyregistry.MustRegister(RuntimeOperationsDuration)
