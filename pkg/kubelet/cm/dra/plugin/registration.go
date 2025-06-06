@@ -249,17 +249,10 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
-
-	if oldPlugin, replaced := draPlugins.add(pluginInstance); replaced {
-		logger.V(1).Info("DRA plugin already registered, the old plugin was replaced and will be forgotten by the kubelet till the next kubelet restart", "oldEndpoint", oldPlugin.endpoint)
-		// Cancel the *old* plugin's health stream if it existed
-		if oldPlugin != nil {
-			oldCancelFunc := oldPlugin.HealthStreamCancel()
-			if oldCancelFunc != nil {
-				logger.Info("Canceling health stream for replaced plugin instance", "pluginName", pluginName)
-				oldCancelFunc()
-			}
-		}
+	if err := draPlugins.add(pluginInstance); err != nil {
+		cancel(err)
+		// No wrapping, the error already contains details.
+		return err
 	}
 
 	// Now cancel any pending ResourceSlice wiping for this plugin.
@@ -269,8 +262,9 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 	if cancel := h.pendingWipes[pluginName]; cancel != nil {
 		(*cancel)(errors.New("new plugin instance registered"))
 		delete(h.pendingWipes, pluginName)
-
+	}
 	return nil
+
 }
 
 // validateSupportedServices identifies the highest supported gRPC service for
@@ -310,7 +304,23 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 	if p, last := draPlugins.remove(pluginName, endpoint); p != nil {
 		// This logger includes endpoint and pluginName.
 		logger := klog.FromContext(p.backgroundCtx)
-		logger.V(3).Info("Deregister DRA plugin", "endpoint", p.endpoint)
+		logger.V(3).Info("Deregister DRA plugin", "lastInstance", last)
+
+		// Cancel the plugin's health stream if it was active.
+		healthCancel := p.HealthStreamCancel()
+		if healthCancel != nil {
+			logger.V(4).Info("Canceling health stream during deregistration")
+			healthCancel()
+		}
+
+		// Prepare for canceling the background wiping. This needs to run
+		// in the context of the registration handler, the one from
+		// the plugin is canceled.
+		logger = klog.FromContext(h.backgroundCtx)
+		logger = klog.LoggerWithName(logger, "driver-cleanup")
+		logger = klog.LoggerWithValues(logger, "pluginName", pluginName)
+		ctx, cancel := context.WithCancelCause(h.backgroundCtx)
+		ctx = klog.NewContext(ctx, logger)
 
 		// Clean up the ResourceSlices for the deleted Plugin since it
 		// may have died without doing so itself and might never come

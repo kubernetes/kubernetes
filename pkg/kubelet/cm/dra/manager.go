@@ -18,7 +18,9 @@ package dra
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"sync"
 	"time"
@@ -722,73 +724,74 @@ func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream dra
 		}
 	}()
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				logger.Info("Stopping health monitoring", "pluginName", pluginName)
-				return
-			default:
-				resp, err := stream.Recv()
-				if err != nil {
-					logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
-					return
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Stopping health monitoring due to context cancellation", "pluginName", pluginName, "reason", ctx.Err())
+			return ctx.Err()
+		default:
+			resp, err := stream.Recv()
+			if err != nil {
+				logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
+				if errors.Is(err, io.EOF) {
+					logger.Info("Stream ended with EOF", "pluginName", pluginName)
+					return nil
 				}
-				// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
-				devices := make([]state.DeviceHealth, len(resp.GetDevices()))
-				for i, d := range resp.GetDevices() {
-					devices[i] = state.DeviceHealth{
-						PoolName:    d.PoolName,
-						DeviceName:  d.DeviceName,
-						Health:      state.DeviceHealthString(d.Health),
-						LastUpdated: time.Unix(d.LastUpdated, 0),
-					}
+				return err
+			}
+			// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+			devices := make([]state.DeviceHealth, len(resp.GetDevices()))
+			for i, d := range resp.GetDevices() {
+				devices[i] = state.DeviceHealth{
+					PoolName:    d.PoolName,
+					DeviceName:  d.DeviceName,
+					Health:      state.DeviceHealthString(d.Health),
+					LastUpdated: time.Unix(d.LastUpdated, 0),
 				}
+			}
 
-				changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
-				if updateErr != nil {
-					logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
-				}
-				if changed && len(changedDevices) > 0 {
-					logger.V(5).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+			changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+			if updateErr != nil {
+				logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
+			}
+			if changed && len(changedDevices) > 0 {
+				logger.V(5).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
 
-					podsToUpdate := sets.New[string]()
+				podsToUpdate := sets.New[string]()
 
-					m.cache.RLock()
-					for _, dev := range changedDevices {
-						for _, cInfo := range m.cache.claimInfo {
-							if driverState, ok := cInfo.DriverState[pluginName]; ok {
-								for _, allocatedDevice := range driverState.Devices {
-									if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
-										podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
-										break
-									}
+				m.cache.RLock()
+				for _, dev := range changedDevices {
+					for _, cInfo := range m.cache.claimInfo {
+						if driverState, ok := cInfo.DriverState[pluginName]; ok {
+							for _, allocatedDevice := range driverState.Devices {
+								if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
+									podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+									break
 								}
 							}
 						}
 					}
-					m.cache.RUnlock()
-
-					if podsToUpdate.Len() > 0 {
-						podUIDs := podsToUpdate.UnsortedList()
-						logger.V(4).Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
-						select {
-						case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
-						default:
-							logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
-						}
-					} else {
-						logger.V(5).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
-					}
-				} else if changed {
-					logger.V(5).Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
 				}
+				m.cache.RUnlock()
 
+				if podsToUpdate.Len() > 0 {
+					podUIDs := podsToUpdate.UnsortedList()
+					logger.V(4).Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+					select {
+					case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+					default:
+						logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
+					}
+				} else {
+					logger.V(5).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+				}
+			} else if changed {
+				logger.V(5).Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
 			}
-		}
 
-	}()
-	return nil
+		}
+	}
+
 }
 
 // Updates returns the channel that provides resource updates.

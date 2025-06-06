@@ -31,9 +31,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/drahealth/v1alpha1"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
@@ -369,7 +370,7 @@ func TestPlugin_WatchResources(t *testing.T) {
 
 	// Register plugin
 	draPlugins.add(p)
-	defer draPlugins.delete(pluginName)
+	defer draPlugins.remove(p.name, p.endpoint)
 
 	// Test WatchResources
 	stream, err := p.WatchResources(ctx)
@@ -402,7 +403,7 @@ func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.WatchResourcesResp
 
 func (m *mockWatchResourcesClient) CloseSend() error             { return nil }
 func (m *mockWatchResourcesClient) Context() context.Context     { return context.Background() }
-func (m *mockWatchResourcesClient) SendMsg(interface{}) error    { return nil }
-func (m *mockWatchResourcesClient) RecvMsg(interface{}) error    { return nil }
-func (m *mockWatchResourcesClient) Header() (grpc.Header, error) { return nil, nil }
-func (m *mockWatchResourcesClient) Trailer() grpc.Trailer        { return nil }
+func (m *mockWatchResourcesClient) SendMsg(v interface{}) error  { return nil }
+func (m *mockWatchResourcesClient) RecvMsg(v interface{}) error  { return nil }
+func (m *mockWatchResourcesClient) Header() (metadata.MD, error) { return nil, nil }
+func (m *mockWatchResourcesClient) Trailer() metadata.MD         { return nil }

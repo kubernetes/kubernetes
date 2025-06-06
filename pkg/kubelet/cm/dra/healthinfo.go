@@ -78,18 +78,27 @@ func (cache *healthInfoCache) withRLock(f func() error) error {
 	return f()
 }
 
-// saveToCheckpoint saves the cache to the state file.
+// saveToCheckpointInternal does the actual saving without locking.
+// Assumes the caller holds the necessary lock.
+func (cache *healthInfoCache) saveToCheckpointInternal() error {
+	if cache.stateFile == "" {
+		return nil
+	}
+	data, err := json.Marshal(cache.HealthInfo)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(cache.stateFile, data, 0644)
+}
+
+// saveToCheckpoint saves the cache to the state file, acquiring the lock.
 func (cache *healthInfoCache) saveToCheckpoint() error {
 	if cache.stateFile == "" {
 		return nil
 	}
 	cache.Lock()
 	defer cache.Unlock()
-	data, err := json.Marshal(cache.HealthInfo)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(cache.stateFile, data, 0644)
+	return cache.saveToCheckpointInternal()
 }
 
 // getHealthInfo returns the current health info, adjusting for timeouts.
@@ -172,15 +181,16 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 
 		currentDriver.Devices = newDevices
 		(*cache.HealthInfo)[driverName] = currentDriver
+
+		if changed {
+			if err := cache.saveToCheckpointInternal(); err != nil {
+				klog.ErrorS(err, "Failed to save health checkpoint after update")
+			}
+		}
 		return nil
 	})
 	if err != nil {
-		return changedDevices, changed, err
-	}
-	if changed {
-		if err := cache.saveToCheckpoint(); err != nil {
-			return changedDevices, changed, err
-		}
+		return nil, false, err
 	}
 	return changedDevices, changed, nil
 }
@@ -189,6 +199,6 @@ func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []stat
 func (cache *healthInfoCache) clearDriver(driverName string) error {
 	return cache.withLock(func() error {
 		delete(*cache.HealthInfo, driverName)
-		return cache.saveToCheckpoint()
+		return cache.saveToCheckpointInternal()
 	})
 }

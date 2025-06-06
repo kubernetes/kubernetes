@@ -18,7 +18,9 @@ package dra
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -180,10 +182,12 @@ type mockWatchResourcesClient struct {
 func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.WatchResourcesResponse, error) {
 	select {
 	case <-m.Ctx.Done():
+		klog.V(6).Infof("mockWatchClient.Recv: Context done: %v", m.Ctx.Err())
 		return nil, m.Ctx.Err()
 	case item, ok := <-m.RecvChan:
 		if !ok {
-			return nil, fmt.Errorf("recv channel closed")
+			klog.V(6).Info("mockWatchClient.Recv: RecvChan closed, returning io.EOF")
+			return nil, io.EOF
 		}
 		return item.Resp, item.Err
 	}
@@ -346,7 +350,7 @@ func genTestPod() *v1.Pod {
 	}
 }
 
-// getTestClaim generates resource claim object
+// genTestClaim generates resource claim object
 func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClaim {
 	return &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1102,145 +1106,291 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 // is updated correctly, if affected pods are identified, and if update notifications are sent
 // through the manager's update channel. It covers various scenarios including health changes, stream errors, and context cancellation.
 func TestHandleWatchResourcesStream(t *testing.T) {
-	tCtx, cancel := context.WithCancel(ktesting.Init(t))
-	defer cancel()
+	overallTestCtx, overallTestCancel := context.WithCancel(ktesting.Init(t))
+	defer overallTestCancel()
 
-	// Setup Manager with caches
-	manager, err := NewManagerImpl(nil, t.TempDir(), "worker") // KubeClient not needed for this test
-	require.NoError(t, err)
+	// Helper to create and setup a new manager for each sub-test
+	setupNewManagerAndRunStreamTest := func(
+		st *testing.T,
+		testSpecificCtx context.Context,
+		initialClaimInfos ...*ClaimInfo, // Allow passing initial claims for the manager's cache
+	) (
+		managerInstance *ManagerImpl, // Return the manager instance for assertions
+		runTestStreamFunc func(context.Context, chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}) (<-chan resourceupdates.Update, chan struct{}, chan error),
+	) {
+		// Fresh manager for each sub-test
+		manager, err := NewManagerImpl(nil, st.TempDir(), "worker")
+		require.NoError(st, err)
 
-	// Populate claimInfoCache
-	claimInfo := genTestClaimInfo([]string{podUID}, true) // Assume prepared
-	manager.cache.add(claimInfo)
-
-	runStreamTest := func(testCtx context.Context, responses chan struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}) (<-chan resourceupdates.Update, chan struct{}) {
-		mockStream := &mockWatchResourcesClient{
-			RecvChan: responses,
-			Ctx:      testCtx,
+		for _, ci := range initialClaimInfos {
+			manager.cache.add(ci)
 		}
 
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			err := manager.HandleWatchResourcesStream(testCtx, mockStream, driverName)
-			if err != nil && err != context.Canceled && err != context.DeadlineExceeded {
-				t.Errorf("HandleWatchResourcesStream exited with unexpected error: %v", err)
+		managerInstance = manager
+
+		runTestStreamFunc = func(
+			streamCtx context.Context,
+			responses chan struct {
+				Resp *drahealthv1alpha1.WatchResourcesResponse
+				Err  error
+			},
+		) (<-chan resourceupdates.Update, chan struct{}, chan error) {
+			mockStream := &mockWatchResourcesClient{
+				RecvChan: responses,
+				Ctx:      streamCtx,
 			}
-		}()
-		return manager.update, done
+			done := make(chan struct{})
+			errChan := make(chan error, 1)
+			go func() {
+				defer close(done)
+				// Use a logger that includes sub-test name for clarity
+				logger := klog.FromContext(streamCtx).WithName(st.Name())
+				hdlCtx := klog.NewContext(streamCtx, logger)
+
+				err := managerInstance.HandleWatchResourcesStream(hdlCtx, mockStream, driverName)
+				if err != nil {
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) {
+						logger.V(4).Info("HandleWatchResourcesStream (test goroutine) exited as expected", "error", err)
+					} else {
+						// This is an application/stream error, not a standard exit.
+						// The sub-test ("StreamError") will assert this specific error.
+						logger.V(2).Info("HandleWatchResourcesStream (test goroutine) exited with application/stream error", "error", err)
+					}
+				} else {
+					logger.V(4).Info("HandleWatchResourcesStream (test goroutine) exited cleanly (nil error, likely from EOF)")
+				}
+				errChan <- err
+				close(errChan)
+			}()
+			return managerInstance.update, done, errChan
+		}
+		return managerInstance, runTestStreamFunc
 	}
 
 	// --- Test Case 1: Health change for an allocated device ---
-	t.Log("Test Case 1: Health change for allocated device")
-	ctx1, cancel1 := context.WithCancel(tCtx)
-	responses1 := make(chan struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}, 5)
-	updateChan1, done1 := runStreamTest(ctx1, responses1)
-	unhealthyDevice := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy"}
-	responses1 <- struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}{Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDevice}}}
-	select {
-	case update := <-updateChan1:
-		assert.ElementsMatch(t, []string{podUID}, update.PodUIDs, "Test Case 1: Expected pod UID")
-	case <-time.After(2 * time.Second):
-		t.Fatal("Test Case 1: Timeout")
-	}
-	manager.healthInfoMutex.Lock()
-	cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
-	manager.healthInfoMutex.Unlock()
-	assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealth, "Test Case 1: Cache update")
-	cancel1()
-	<-done1
+	t.Run("HealthChangeForAllocatedDevice", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Create a manager with a relevant claim already in its cache.
+		initialClaim := genTestClaimInfo(claimUID, []string{string(podUID)}, true) // podUID, claimUID, etc. are global consts
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, initialClaim)
+
+		t.Log("HealthChangeForAllocatedDevice: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1) // Buffered by 1 for the single message
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		// Send the health update message
+		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Unix()}
+		t.Logf("HealthChangeForAllocatedDevice: Sending health update: %+v", unhealthyDeviceMsg)
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+		}
+
+		t.Log("HealthChangeForAllocatedDevice: Waiting for update on manager channel")
+		select {
+		case upd := <-updateChan:
+			t.Logf("HealthChangeForAllocatedDevice: Received update: %+v", upd)
+			assert.ElementsMatch(t, []string{string(podUID)}, upd.PodUIDs, "Expected pod UID in update")
+		case <-time.After(2 * time.Second):
+			t.Fatal("HealthChangeForAllocatedDevice: Timeout waiting for pod update on manager.update channel")
+		}
+
+		// Check cache state
+		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealth, "Cache update check failed")
+
+		t.Log("HealthChangeForAllocatedDevice: Closing responses channel to signal EOF")
+		close(responses) // Signal EOF
+
+		t.Log("HealthChangeForAllocatedDevice: Waiting on done channel")
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("HealthChangeForAllocatedDevice: done channel closed, stream goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("HealthChangeForAllocatedDevice: Timed out waiting for HandleWatchResourcesStream to finish after EOF signal")
+		}
+		// Expect nil (if HandleWatchResourcesStream returns nil on EOF) or io.EOF
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
 
 	// --- Test Case 2: Health change for a non-allocated device ---
-	t.Log("Test Case 2: Health change for non-allocated device")
-	ctx2, cancel2 := context.WithCancel(tCtx)
-	responses2 := make(chan struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}, 5)
-	updateChan2, done2 := runStreamTest(ctx2, responses2)
-	otherDevice := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: "other-device", Health: "Unhealthy"}
-	responses2 <- struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}{Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{otherDevice}}}
-	select {
-	case update := <-updateChan2:
-		t.Fatalf("Test Case 2: Unexpected update: %+v", update)
-	case <-time.After(200 * time.Millisecond): // OK
-	}
-	manager.healthInfoMutex.Lock()
-	cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
-	manager.healthInfoMutex.Unlock()
-	assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealthOther, "Test Case 2: Cache update other")
-	cancel2()
-	<-done2
+	t.Run("NonAllocatedDeviceChange", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
 
-	// --- Test Case 3: No actual health change ---
-	t.Log("Test Case 3: No actual health change")
-	ctx3, cancel3 := context.WithCancel(tCtx)
-	responses3 := make(chan struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}, 5)
-	updateChan3, done3 := runStreamTest(ctx3, responses3)
-	_, _, _ = manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy"}})
-	responses3 <- struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}{Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDevice}}}
-	select {
-	case update := <-updateChan3:
-		t.Fatalf("Test Case 3: Unexpected update: %+v", update)
-	case <-time.After(200 * time.Millisecond): // OK
-	}
-	cancel3()
-	<-done3
+		// Setup: Manager with no specific claims, or claims that don't use "other-device"
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx)
+		// If needed, add a claim that *doesn't* use "other-device" to ensure cache isn't empty
+		// manager.cache.add(genTestClaimInfo(claimUID, []string{string(podUID)}, true))
+
+		t.Log("NonAllocatedDeviceChange: Test Case Started")
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		otherDeviceMsg := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: "other-device", Health: "Unhealthy", LastUpdated: time.Now().Unix()}
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{otherDeviceMsg}},
+		}
+
+		select {
+		case upd := <-updateChan:
+			t.Fatalf("NonAllocatedDeviceChange: Unexpected update on manager.update channel: %+v", upd)
+			// OK, no update expected on manager.update for this device
+		case <-time.After(200 * time.Millisecond):
+			t.Log("NonAllocatedDeviceChange: Correctly received no update on manager channel.")
+		}
+
+		// Check health cache for the "other-device"
+		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
+		assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealthOther, "Cache update for other-device failed")
+
+		close(responses)
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("NonAllocatedDeviceChange: Stream handler goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("NonAllocatedDeviceChange: Timeout waiting for stream handler to finish after EOF")
+		}
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
+
+	// --- Test Case 3: No actual health state change (idempotency) ---
+	t.Run("NoActualStateChange", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Manager with a claim and the device already marked Unhealthy in health cache
+		initialClaim := genTestClaimInfo(claimUID, []string{string(podUID)}, true)
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, initialClaim)
+
+		// Pre-populate health cache
+		initialHealth := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Add(-5 * time.Millisecond)} // Ensure LastUpdated is slightly in past
+		_, _, err := manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{initialHealth})
+		require.NoError(t, err, "Failed to pre-populate health cache")
+
+		t.Log("NoActualStateChange: Test Case Started")
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		// Send the same "Unhealthy" state again
+		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Unix()}
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+		}
+
+		select {
+		case upd := <-updateChan: // No update should be sent if health status string itself didn't change
+			t.Fatalf("NoActualStateChange: Unexpected update on manager.update channel: %+v", upd)
+		case <-time.After(200 * time.Millisecond):
+			t.Log("NoActualStateChange: Correctly received no update on manager channel.")
+		}
+
+		close(responses)
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("NoActualStateChange: Stream handler goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("NoActualStateChange: Timeout waiting for stream handler to finish after EOF")
+		}
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
 
 	// --- Test Case 4: Stream error ---
-	t.Log("Test Case 4: Stream error")
-	ctx4, cancel4 := context.WithCancel(tCtx)
-	responses4 := make(chan struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}, 5)
-	_, done4 := runStreamTest(ctx4, responses4)
-	streamErr := fmt.Errorf("gRPC stream error")
-	responses4 <- struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}{Err: streamErr}
-	close(responses4)
-	select {
-	case <-done4: // OK
-	case <-time.After(2 * time.Second):
-		t.Fatal("Test Case 4: Timeout")
-	}
-	cancel4()
+	t.Run("StreamError", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
 
-	// --- Test Case 5: Context cancellation (Restart handler for this) ---
-	t.Log("Test Case 5: Context cancellation")
-	ctx5, cancel5 := context.WithCancel(tCtx)
-	responses5 := make(chan struct {
-		Resp *drahealthv1alpha1.WatchResourcesResponse
-		Err  error
-	}, 5)
-	_, done5 := runStreamTest(ctx5, responses5)
-	cancel5()
-	select {
-	case <-done5: // OK
-	case <-time.After(2 * time.Second):
-		t.Fatal("Test Case 5: Timeout")
-	}
+		// Get a new manager and the scoped runStreamTest helper
+		_, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx)
+		t.Log("StreamError: Test Case Started")
 
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1)
+		_, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		expectedStreamErr := errors.New("simulated mock stream error")
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{Err: expectedStreamErr}
+
+		t.Log("StreamError: Waiting on done channel")
+		var actualErr error
+		select {
+		case <-done:
+			// Read the error propagated from the HandleWatchResourcesStream goroutine
+			actualErr = <-streamErrChan
+			t.Logf("StreamError: done channel closed. Stream handler returned: %v", actualErr)
+		case <-time.After(2 * time.Second):
+			t.Fatal("StreamError: Timeout waiting for stream handler to finish after error signal")
+		}
+
+		require.Error(t, actualErr, "HandleWatchResourcesStream should have returned an error")
+		assert.True(t, errors.Is(actualErr, expectedStreamErr), "Expected error '%v', but got '%v'", expectedStreamErr, actualErr)
+
+	})
+
+	// --- Test Case 5: Context cancellation ---
+	t.Run("ContextCanceled", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		// Deliberately do not `defer stCancel()` for this specific test case
+
+		_, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx)
+		t.Log("ContextCanceled: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}) // Unbuffered, will block Recv
+		_, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		t.Log("ContextCanceled: Intentionally canceling context for stream handler after a short delay.")
+		time.Sleep(50 * time.Millisecond) // Give Recv a chance to block
+		stCancel()                        // Manually cancel the context for this sub-test
+
+		t.Log("ContextCanceled: Waiting on done channel")
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("ContextCanceled: done channel closed. Stream handler finished after context cancellation.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("ContextCanceled: Timeout waiting for stream handler to finish after context cancellation")
+		}
+		require.Error(t, finalErr)
+		assert.True(t, errors.Is(finalErr, context.Canceled) || errors.Is(finalErr, context.DeadlineExceeded))
+	})
 }
 
 // TestUpdateAllocatedResourcesStatus checks if the manager correctly updates the
@@ -1252,7 +1402,7 @@ func TestUpdateAllocatedResourcesStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Populate claimInfoCache
-	claimInfo := genTestClaimInfo([]string{podUID}, true) // Assume prepared
+	claimInfo := genTestClaimInfo(claimUID, []string{podUID}, true) // Assume prepared
 	manager.cache.add(claimInfo)
 
 	// Populate healthInfoCache
