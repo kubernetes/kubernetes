@@ -20,7 +20,7 @@ import (
 	"io"
 	"path"
 
-	"k8s.io/gengo/v2"
+	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -73,8 +73,12 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(g.inputPackage)
 	groupName := g.group
-	if override := gengo.ExtractCommentTags("+", p.Comments)["groupName"]; override != nil {
-		groupName = override[0]
+	override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
+	if err != nil {
+		return err
+	}
+	if values, ok := override["groupName"]; ok {
+		groupName = values[0]
 	}
 
 	apiPath := `"` + g.apiPath + `"`
