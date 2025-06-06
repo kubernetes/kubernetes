@@ -521,7 +521,7 @@ func TestPrepareResources(t *testing.T) {
 			description:    "unknown driver",
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
-			expectedErrMsg: "plugin name unknown driver not found",
+			expectedErrMsg: "prepare dynamic resources: DRA driver unknown driver is not registered",
 		},
 		{
 			description:            "should prepare resources, driver returns nil value",
@@ -775,7 +775,7 @@ func TestUnprepareResources(t *testing.T) {
 				},
 				prepared: true,
 			},
-			expectedErrMsg:         "plugin name unknown-driver not found",
+			expectedErrMsg:         "unprepare dynamic resources: DRA driver unknown-driver is not registered",
 			expectedUnprepareCalls: 0,
 		},
 		{

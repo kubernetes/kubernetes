@@ -18,6 +18,7 @@ package plugin
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -150,10 +151,6 @@ func (p *Plugin) HealthClient() drahealthv1alpha1.NodeHealthClient {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 	return p.healthClient
-}
-
-func (p *Plugin) Name() string {
-	return p.name
 }
 
 func (p *Plugin) Name() string {
