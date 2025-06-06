@@ -601,6 +601,13 @@
     MUST now include the new Label.
   release: v1.18
   file: test/e2e/apimachinery/namespace.go
+- testname: Ordered Namespace Deletion
+  codename: '[sig-api-machinery] OrderedNamespaceDeletion namespace deletion should
+    delete pod first [Conformance]'
+  description: Pods must be deleted before other objects when deleting a namespace.
+    See https://kep.k8s.io/5080
+  release: v1.34
+  file: test/e2e/apimachinery/namespace.go
 - testname: ResourceQuota, apply changes to a ResourceQuota status
   codename: '[sig-api-machinery] ResourceQuota should apply changes to a resourcequota
     status [Conformance]'
