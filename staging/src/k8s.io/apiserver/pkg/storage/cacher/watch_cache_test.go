@@ -131,7 +131,10 @@ func newTestWatchCache(capacity int, eventFreshDuration time.Duration, indexers 
 	wc.stopCh = make(chan struct{})
 	pr := progress.NewConditionalProgressRequester(wc.RequestWatchProgress, &immediateTickerFactory{}, nil)
 	go pr.Run(wc.stopCh)
-	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr)
+	getCurrentRV := func(context.Context) (uint64, error) {
+		return wc.resourceVersion, nil
+	}
+	wc.watchCache = newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), eventFreshDuration, schema.GroupResource{Resource: "pods"}, pr, getCurrentRV)
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -466,7 +469,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.Everything})
+	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -481,7 +484,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 
 	// list by label index.
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"label": "value1",
 		}),
@@ -504,7 +507,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 
 	// list with spec.nodeName index.
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -527,7 +530,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 
 	// list with index not exists.
-	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, 5, "prefix/", storage.ListOptions{Predicate: storage.SelectionPredicate{
+	resp, indexUsed, err = store.WaitUntilFreshAndList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "5", Predicate: storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{
 			"not-exist-label": "whatever",
 		}),
@@ -561,7 +564,7 @@ func TestWaitUntilFreshAndListFromCache(t *testing.T) {
 	}()
 
 	// list from future revision. Requires watch cache to request bookmark to get it.
-	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, 3, "prefix/", storage.ListOptions{Predicate: storage.Everything})
+	resp, indexUsed, err := store.WaitUntilFreshAndList(ctx, "prefix/", storage.ListOptions{ResourceVersion: "3", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -641,7 +644,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 				store.Add(makeTestPod("bar", 4))
 			}()
 
-			_, _, err := store.WaitUntilFreshAndList(ctx, 4, "", storage.ListOptions{Predicate: storage.Everything})
+			_, _, err := store.WaitUntilFreshAndList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
 			if !errors.IsTimeout(err) {
 				t.Errorf("expected timeout error but got: %v", err)
 			}
@@ -670,7 +673,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	defer store.Stop()
 
 	{
-		resp, _, err := store.WaitUntilFreshAndList(ctx, 0, "", storage.ListOptions{Predicate: storage.Everything})
+		resp, _, err := store.WaitUntilFreshAndList(ctx, "", storage.ListOptions{ResourceVersion: "", Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -693,7 +696,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		resp, _, err := store.WaitUntilFreshAndList(ctx, 10, "", storage.ListOptions{Predicate: storage.Everything})
+		resp, _, err := store.WaitUntilFreshAndList(ctx, "", storage.ListOptions{ResourceVersion: "10", Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
