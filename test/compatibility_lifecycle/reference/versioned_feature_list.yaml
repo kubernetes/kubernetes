@@ -1633,12 +1633,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.28"
-- name: UserNamespacesPodSecurityStandards
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.29"
 - name: UserNamespacesSupport
   versionedSpecs:
   - default: false

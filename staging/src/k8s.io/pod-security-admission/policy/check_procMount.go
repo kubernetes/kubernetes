@@ -35,9 +35,6 @@ spec.initContainers[*].securityContext.procMount
 
 **Allowed Values:** undefined/null, "Default"
 
-However, if the pod is in a user namespace (`hostUsers: false`), and the
-UserNamespacesPodSecurityStandards feature is enabled, all values are allowed.
-
 */
 
 func init() {
@@ -53,16 +50,16 @@ func CheckProcMount() Check {
 		Level: api.LevelBaseline,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 0),
-				CheckPod:       procMount_1_0,
+				MinimumVersion: api.MajorMinorVersion(1, 34),
+				CheckPod:       procMount_1_34,
 			},
 		},
 	}
 }
 
-func procMount_1_0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	// TODO: When we remove the UserNamespacesPodSecurityStandards feature gate (and GA this relaxation),
-	// create a new policy version.
+func procMount_1_34(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+	// Now that we've removed the UserNamespacesPodSecurityStandards feature gate (and GA this relaxation),
+	// we have created a new policy version (1.1).
 	// Note: pod validation will check for well formed procMount type, so avoid double validation and allow everything
 	// here.
 	if relaxPolicyForUserNamespacePod(podSpec) {

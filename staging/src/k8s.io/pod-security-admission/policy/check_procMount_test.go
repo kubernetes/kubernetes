@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestProcMount(t *testing.T) {
@@ -27,14 +28,12 @@ func TestProcMount(t *testing.T) {
 	unmaskedValue := corev1.UnmaskedProcMount
 	otherValue := corev1.ProcMountType("other")
 
-	hostUsers := false
 	tests := []struct {
-		name           string
-		pod            *corev1.Pod
-		expectReason   string
-		expectDetail   string
-		expectAllowed  bool
-		relaxForUserNS bool
+		name          string
+		pod           *corev1.Pod
+		expectReason  string
+		expectDetail  string
+		expectAllowed bool
 	}{
 		{
 			name: "procMount",
@@ -46,7 +45,7 @@ func TestProcMount(t *testing.T) {
 					{Name: "d", SecurityContext: &corev1.SecurityContext{ProcMount: &unmaskedValue}},
 					{Name: "e", SecurityContext: &corev1.SecurityContext{ProcMount: &otherValue}},
 				},
-				HostUsers: &hostUsers,
+				HostUsers: ptr.To(true),
 			}},
 			expectReason:  `procMount`,
 			expectAllowed: false,
@@ -62,24 +61,17 @@ func TestProcMount(t *testing.T) {
 					{Name: "d", SecurityContext: &corev1.SecurityContext{ProcMount: &unmaskedValue}},
 					{Name: "e", SecurityContext: &corev1.SecurityContext{ProcMount: &otherValue}},
 				},
-				HostUsers: &hostUsers,
+				HostUsers: ptr.To(false),
 			}},
-			expectReason:   "",
-			expectDetail:   "",
-			expectAllowed:  true,
-			relaxForUserNS: true,
+			expectReason:  "",
+			expectDetail:  "",
+			expectAllowed: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.relaxForUserNS {
-				RelaxPolicyForUserNamespacePods(true)
-				t.Cleanup(func() {
-					RelaxPolicyForUserNamespacePods(false)
-				})
-			}
-			result := procMount_1_0(&tc.pod.ObjectMeta, &tc.pod.Spec)
+			result := procMount_1_34(&tc.pod.ObjectMeta, &tc.pod.Spec)
 			if result.Allowed != tc.expectAllowed {
 				t.Fatalf("expected Allowed to be %v was %v", tc.expectAllowed, result.Allowed)
 			}
