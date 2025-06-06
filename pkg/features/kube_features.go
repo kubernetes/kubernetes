@@ -669,14 +669,6 @@ const (
 	// Adds support to pull images based on the runtime class specified.
 	RuntimeClassInImageCriAPI featuregate.Feature = "RuntimeClassInImageCriApi"
 
-	// owner: @danielvegamyhre
-	// kep: https://kep.k8s.io/2413
-	//
-	// Allows mutating spec.completions for Indexed job when done in tandem with
-	// spec.parallelism. Specifically, spec.completions is mutable iff spec.completions
-	// equals to spec.parallelism before and after the update.
-	ElasticIndexedJob featuregate.Feature = "ElasticIndexedJob"
-
 	// owner: @sanposhiho
 	// kep: http://kep.k8s.io/4247
 	//
@@ -1171,11 +1163,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	KubeletCrashLoopBackOffMax: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	ElasticIndexedJob: {
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.31, remove in 1.32
 	},
 
 	EventedPLEG: {

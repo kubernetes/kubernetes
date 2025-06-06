@@ -1591,7 +1591,6 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.ElasticIndexedJob, true)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, test.enableJobSuccessPolicy)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
