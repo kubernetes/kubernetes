@@ -20,10 +20,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 func init() {
-	hostUsers := false
 	fixtureData_1_0 := fixtureGenerator{
 		expectErrorSubstring: "procMount",
 		generatePass: func(p *corev1.Pod) []*corev1.Pod {
@@ -34,7 +34,7 @@ func init() {
 					validProcMountType := corev1.DefaultProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &validProcMountType
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &validProcMountType
-					copy.Spec.HostUsers = &hostUsers
+					copy.Spec.HostUsers = ptr.To(false)
 				}),
 			}
 		},
@@ -46,13 +46,13 @@ func init() {
 				tweak(p, func(copy *corev1.Pod) {
 					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
-					copy.Spec.HostUsers = &hostUsers
+					copy.Spec.HostUsers = ptr.To(false)
 				}),
 				// set proc mount of init container to a forbidden value
 				tweak(p, func(copy *corev1.Pod) {
 					unmaskedProcMountType := corev1.UnmaskedProcMount
 					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
-					copy.Spec.HostUsers = &hostUsers
+					copy.Spec.HostUsers = ptr.To(false)
 				}),
 			}
 		},
@@ -61,5 +61,89 @@ func init() {
 	registerFixtureGenerator(
 		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 0), check: "procMount"},
 		fixtureData_1_0,
+	)
+
+	fixtureData1_35baseline := fixtureGenerator{
+		expectErrorSubstring: "procMount",
+		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+			p = ensureSecurityContext(p)
+			return []*corev1.Pod{
+				// set proc mount of container and init container to a valid value
+				tweak(p, func(copy *corev1.Pod) {
+					validProcMountType := corev1.DefaultProcMount
+					copy.Spec.Containers[0].SecurityContext.ProcMount = &validProcMountType
+					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &validProcMountType
+					copy.Spec.HostUsers = ptr.To(false)
+				}),
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
+					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = ptr.To(false)
+				}),
+			}
+		},
+		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
+		generateFail: func(p *corev1.Pod) []*corev1.Pod {
+			p = ensureSecurityContext(p)
+			return []*corev1.Pod{
+				// set proc mount of container to a forbidden value
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
+					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = ptr.To(true)
+				}),
+				// set proc mount of init container to a forbidden value
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
+					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = ptr.To(true)
+				}),
+			}
+		},
+	}
+
+	registerFixtureGenerator(
+		fixtureKey{level: api.LevelBaseline, version: api.MajorMinorVersion(1, 35), check: "procMount"},
+		fixtureData1_35baseline,
+	)
+
+	fixtureData1_35restricted := fixtureGenerator{
+		expectErrorSubstring: "procMount",
+		generatePass: func(p *corev1.Pod) []*corev1.Pod {
+			p = ensureSecurityContext(p)
+			return []*corev1.Pod{
+				// set proc mount of container and init container to a valid value
+				tweak(p, func(copy *corev1.Pod) {
+					validProcMountType := corev1.DefaultProcMount
+					copy.Spec.Containers[0].SecurityContext.ProcMount = &validProcMountType
+					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &validProcMountType
+					copy.Spec.HostUsers = ptr.To(false)
+				}),
+			}
+		},
+		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
+		generateFail: func(p *corev1.Pod) []*corev1.Pod {
+			p = ensureSecurityContext(p)
+			return []*corev1.Pod{
+				// set proc mount of container to a forbidden value
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
+					copy.Spec.Containers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = ptr.To(false)
+				}),
+				// set proc mount of init container to a forbidden value
+				tweak(p, func(copy *corev1.Pod) {
+					unmaskedProcMountType := corev1.UnmaskedProcMount
+					copy.Spec.InitContainers[0].SecurityContext.ProcMount = &unmaskedProcMountType
+					copy.Spec.HostUsers = ptr.To(false)
+				}),
+			}
+		},
+	}
+
+	registerFixtureGenerator(
+		fixtureKey{level: api.LevelRestricted, version: api.MajorMinorVersion(1, 35), check: "procMount_restricted"},
+		fixtureData1_35restricted,
 	)
 }
