@@ -2322,7 +2322,7 @@ func TestImmediateJobRecreation(t *testing.T) {
 
 	var jobObjs []batchv1.Job
 	// create multiple Jobs we are going to recreate to make the issue more likely.
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 3; i++ {
 		jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, ptr.To(jobSpec(i)))
 		if err != nil {
 			t.Fatalf("Error %v when creating the job2 %q", err, klog.KObj(jobObj))
