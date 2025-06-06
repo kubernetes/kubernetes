@@ -156,6 +156,8 @@ type watchCache struct {
 
 	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
 	snapshots Snapshotter
+
+	getCurrentRV func(context.Context) (uint64, error)
 }
 
 func newWatchCache(
@@ -167,7 +169,9 @@ func newWatchCache(
 	clock clock.WithTicker,
 	eventFreshDuration time.Duration,
 	groupResource schema.GroupResource,
-	progressRequester *progress.ConditionalProgressRequester) *watchCache {
+	progressRequester *progress.ConditionalProgressRequester,
+	getCurrentRV func(context.Context) (uint64, error),
+) *watchCache {
 	wc := &watchCache{
 		capacity:            defaultLowerBoundCapacity,
 		keyFunc:             keyFunc,
@@ -186,6 +190,7 @@ func newWatchCache(
 		versioner:           versioner,
 		groupResource:       groupResource,
 		waitingUntilFresh:   progressRequester,
+		getCurrentRV:        getCurrentRV,
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		wc.snapshots = newStoreSnapshotter()
@@ -494,30 +499,16 @@ func (s sortableStoreElements) Swap(i, j int) {
 	s[i], s[j] = s[j], s[i]
 }
 
-// WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
-// with their ResourceVersion and the name of the index, if any, that was used.
-func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
-	if delegator.ConsistentReadSupported() && w.notFresh(resourceVersion) {
-		w.waitingUntilFresh.Add()
-		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
-		w.waitingUntilFresh.Remove()
-	} else {
-		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
-	}
-
-	defer w.RUnlock()
+// NOTICE: Structure follows the shouldDelegateList function in
+// staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
+func (w *watchCache) WaitUntilFreshAndList(ctx context.Context, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
+	listRV, err := w.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return listResp{}, "", err
 	}
-	return w.list(ctx, resourceVersion, key, opts)
-}
-
-// NOTICE: Structure follows the shouldDelegateList function in
-// staging/src/k8s.io/apiserver/pkg/storage/cacher/delegator.go
-func (w *watchCache) list(ctx context.Context, resourceVersion uint64, key string, opts storage.ListOptions) (resp listResp, index string, err error) {
 	switch opts.ResourceVersionMatch {
 	case metav1.ResourceVersionMatchExact:
-		return w.listExactRV(key, "", resourceVersion)
+		return w.waitAndListExactRV(ctx, key, "", listRV)
 	case metav1.ResourceVersionMatchNotOlderThan:
 	case "":
 		// Continue
@@ -527,23 +518,36 @@ func (w *watchCache) list(ctx context.Context, resourceVersion uint64, key strin
 				return listResp{}, "", errors.NewBadRequest(fmt.Sprintf("invalid continue token: %v", err))
 			}
 			if continueRV > 0 {
-				return w.listExactRV(key, continueKey, uint64(continueRV))
+				return w.waitAndListExactRV(ctx, key, continueKey, uint64(continueRV))
 			} else {
-				// Continue with negative RV is a consistent read - already handled via waitUntilFreshAndBlock.
 				// Don't pass matchValues as they don't support continueKey
-				return w.listLatestRV(key, continueKey, nil)
+				return w.waitAndListConsistent(ctx, key, continueKey, nil)
 			}
 		}
 		// Legacy exact match
 		if opts.Predicate.Limit > 0 && len(opts.ResourceVersion) > 0 && opts.ResourceVersion != "0" {
-			return w.listExactRV(key, "", resourceVersion)
+			return w.waitAndListExactRV(ctx, key, "", listRV)
 		}
-		// Consistent Read - already handled via waitUntilFreshAndBlock
+		if opts.ResourceVersion == "" {
+			return w.waitAndListConsistent(ctx, key, "", opts.Predicate.MatcherIndex(ctx))
+		}
 	}
-	return w.listLatestRV(key, "", opts.Predicate.MatcherIndex(ctx))
+	return w.waitAndListLatestRV(ctx, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
 }
 
-func (w *watchCache) listExactRV(key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
+func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
+	if delegator.ConsistentReadSupported() && w.notFresh(resourceVersion) {
+		w.waitingUntilFresh.Add()
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+		w.waitingUntilFresh.Remove()
+	} else {
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	}
+	defer w.RUnlock()
+	if err != nil {
+		return listResp{}, "", err
+	}
+
 	if w.snapshots == nil {
 		return listResp{}, "", errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
 	}
@@ -556,6 +560,29 @@ func (w *watchCache) listExactRV(key, continueKey string, resourceVersion uint64
 		Items:           items,
 		ResourceVersion: resourceVersion,
 	}, "", nil
+}
+
+func (w *watchCache) waitAndListConsistent(ctx context.Context, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+	resourceVersion, err := w.getCurrentRV(ctx)
+	if err != nil {
+		return listResp{}, "", err
+	}
+	return w.waitAndListLatestRV(ctx, resourceVersion, key, continueKey, matchValues)
+}
+
+func (w *watchCache) waitAndListLatestRV(ctx context.Context, resourceVersion uint64, key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
+	if delegator.ConsistentReadSupported() && w.notFresh(resourceVersion) {
+		w.waitingUntilFresh.Add()
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+		w.waitingUntilFresh.Remove()
+	} else {
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	}
+	defer w.RUnlock()
+	if err != nil {
+		return listResp{}, "", err
+	}
+	return w.listLatestRV(key, continueKey, matchValues)
 }
 
 func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage.MatchValue) (resp listResp, index string, err error) {
