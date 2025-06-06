@@ -540,13 +540,6 @@ const (
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
 
-	// owner: @mimowo
-	// kep: https://kep.k8s.io/3329
-	//
-	// Enables support for appending a dedicated pod condition indicating that
-	// the pod is being deleted due to a disruption.
-	PodDisruptionConditions featuregate.Feature = "PodDisruptionConditions"
-
 	// owner: @danielvegamyhre
 	// kep: https://kep.k8s.io/4017
 	//
@@ -1571,12 +1564,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	PodDeletionCost: {
 		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	PodDisruptionConditions: {
-		{Version: version.MustParse("1.25"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.33
 	},
 
 	PodIndexLabel: {
