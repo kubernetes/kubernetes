@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -85,7 +86,7 @@ var (
 
 func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := NativeType(context.Type)
+	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
@@ -104,13 +105,13 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		// comparable but not what we need.
 		//
 		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-		if IsDirectComparable(NonPointer(NativeType(t.Elem))) {
+		if util.IsDirectComparable(util.NonPointer(util.NativeType(t.Elem))) {
 			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByCompare)}}, nil
 		}
 		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByReflect)}}, nil
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
-		if NativeType(t.Elem).Kind != types.Struct {
+		if util.NativeType(t.Elem).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 		}
 
@@ -160,19 +161,19 @@ func (listMapKeyTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := NativeType(context.Type)
+	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
 	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-	if NativeType(t.Elem).Kind != types.Struct {
+	if util.NativeType(t.Elem).Kind != types.Struct {
 		return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 	}
 
 	var fieldName string
-	if memb := getMemberByJSON(NativeType(t.Elem), tag.Value); memb == nil {
+	if memb := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); memb == nil {
 		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
-	} else if k := NativeType(memb.Type).Kind; k != types.Builtin {
+	} else if k := util.NativeType(memb.Type).Kind; k != types.Builtin {
 		return Validations{}, fmt.Errorf("only primitive types can be list-map keys (%s)", k)
 	} else {
 		fieldName = memb.Name
@@ -234,7 +235,7 @@ var (
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists and maps are not supported, so we should never see a pointer here.
-	t := NativeType(context.Type)
+	t := util.NativeType(context.Type)
 	switch t.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
@@ -315,7 +316,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		// directComparable is used to determine whether we can use the direct
 		// comparison operator "==" or need to use the semantic DeepEqual when
 		// looking up and comparing correlated list elements for validation ratcheting.
-		directComparable := IsDirectComparable(NonPointer(NativeType(t.Elem)))
+		directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(t.Elem)))
 		switch {
 		case listMetadata != nil && listMetadata.declaredAsMap:
 			// Emit the comparison by keys when listType=map
@@ -410,7 +411,7 @@ var (
 
 func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := NativeType(context.Type)
+	t := util.NativeType(context.Type)
 	if t.Kind != types.Map {
 		return Validations{}, fmt.Errorf("can only be used on map types")
 	}

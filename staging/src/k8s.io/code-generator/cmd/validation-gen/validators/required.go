@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -91,7 +92,7 @@ func (rtv requirednessTagValidator) doRequired(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
-	switch NativeType(context.Type).Kind {
+	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
 		return Validations{Functions: []FunctionGen{Function(requiredTagName, ShortCircuit, requiredSliceValidator)}}, nil
 	case types.Map:
@@ -145,7 +146,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	if hasDefault, zeroDefault, err := rtv.hasZeroDefault(context); err != nil {
 		return Validations{}, err
 	} else if hasDefault {
-		if !isNilableType(context.Type) && zeroDefault {
+		if !util.IsNilableType(context.Type) && zeroDefault {
 			return Validations{Comments: []string{"optional value-type fields with zero-value defaults are purely documentation"}}, nil
 		}
 		validations, err := rtv.doRequired(context)
@@ -162,7 +163,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	// originally defined as a value-type or a pointer-type in the API.  This
 	// one does.  Since Go doesn't do partial specialization of templates, we
 	// do manual dispatch here.
-	switch NativeType(context.Type).Kind {
+	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
 		return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalSliceValidator)}}, nil
 	case types.Map:
@@ -183,7 +184,7 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 // hasZeroDefault returns whether the field has a default value and whether
 // that default value is the zero value for the field's type.
 func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
-	t := NonPointer(NativeType(context.Type))
+	t := util.NonPointer(util.NativeType(context.Type))
 	// This validator only applies to fields, so Member must be valid.
 	tagsByName, err := gengo.ExtractFunctionStyleCommentTags("+", []string{defaultTagName}, context.Member.CommentLines)
 	if err != nil {
@@ -262,7 +263,7 @@ func (requirednessTagValidator) doForbidden(context Context) (Validations, error
 	// optional check and short-circuit (but without error).  Why?  For
 	// example, this prevents any further validation from trying to run on a
 	// nil pointer.
-	switch NativeType(context.Type).Kind {
+	switch util.NativeType(context.Type).Kind {
 	case types.Slice:
 		return Validations{
 			Functions: []FunctionGen{

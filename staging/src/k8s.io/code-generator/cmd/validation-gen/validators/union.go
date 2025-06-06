@@ -21,6 +21,7 @@ import (
 	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
@@ -59,7 +60,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 	// inconsistent but unlikely to change. That means we don't REALLY need to
 	// handle it here, but let's be extra careful and extract the most concrete
 	// type possible.
-	if NonPointer(NativeType(context.Type)).Kind != types.Struct {
+	if util.NonPointer(util.NativeType(context.Type)).Kind != types.Struct {
 		return result, nil
 	}
 
@@ -126,7 +127,7 @@ func (unionDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
 func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := NonPointer(NativeType(context.Type)); t != types.String {
+	if t := util.NonPointer(util.NativeType(context.Type)); t != types.String {
 		return Validations{}, fmt.Errorf("can only be used on string types (%s)", rootTypeString(context.Type, t))
 	}
 	if udtv.shared[context.Parent] == nil {
