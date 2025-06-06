@@ -50,6 +50,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2ereplicaset "k8s.io/kubernetes/test/e2e/framework/replicaset"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 type priorityPair struct {
@@ -317,7 +318,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 		var podRes v1.ResourceList
 		// Create 10 pods per node that will eat up all the node's resources.
 		ginkgo.By("Create 10 low-priority pods on each node.")
-		lowPriorityPods := make([]*v1.Pod, 0, 10*len(nodeList.Items))
+		nodeListLen := len(nodeList.Items)
+		lowPriorityPods := make([]*v1.Pod, 0, 10*nodeListLen)
 		// Create pods in the cluster.
 		for i, node := range nodeList.Items {
 			// Update each node to advertise 3 available extended resources
@@ -331,12 +333,6 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 				pausePod := createPausePod(ctx, f, pausePodConfig{
 					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, lowPriorityClassName),
 					PriorityClassName: lowPriorityClassName,
-					// This victim pod will be preempted by the high priority pod.
-					// But, the deletion will be blocked by the finalizer.
-					//
-					// The finalizer is needed to prevent the medium Pods from being scheduled instead of the high Pods,
-					// depending on when the scheduler notices the existence of all the high Pods we create.
-					Finalizers: []string{testFinalizer},
 					Resources: &v1.ResourceRequirements{
 						Requests: podRes,
 						Limits:   podRes,
@@ -354,6 +350,15 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 							},
 						},
 					},
+					// This victim pod will be preempted by the high priority pod.
+					// But, the deletion will be blocked by the preStop hook with
+					// TerminationGracePeriodSeconds set.
+					//
+					// The preStop hook + TerminationGracePeriodSeconds are needed to prevent the medium Pods
+					// from being scheduled instead of the high Pods,
+					// depending on when the scheduler notices the existence of all the high Pods we create.
+					TerminationGracePeriodSeconds: ptr.To[int64](80),
+					PreStopHookSleepSeconds:       ptr.To[int64](79),
 				})
 				lowPriorityPods = append(lowPriorityPods, pausePod)
 				framework.Logf("Created pod: %v", pausePod.Name)
@@ -365,8 +370,8 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod))
 		}
 
-		highPriorityPods := make([]*v1.Pod, 0, 5*len(nodeList.Items))
-		mediumPriorityPods := make([]*v1.Pod, 0, 10*len(nodeList.Items))
+		highPriorityPods := make([]*v1.Pod, 0, 5*nodeListLen)
+		mediumPriorityPods := make([]*v1.Pod, 0, 10*nodeListLen)
 
 		ginkgo.By("Run high/medium priority pods that have same requirements as that of lower priority pod")
 		for i := range nodeList.Items {
@@ -426,10 +431,12 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			}))
 		}
 
-		ginkgo.By("Remove the finalizer from all low priority pods to proceed the preemption.")
+		ginkgo.By("Delete all low priority pods to proceed the preemption faster.")
 		for _, pod := range lowPriorityPods {
-			// Remove the finalizer so that the pod can be deleted by GC
-			e2epod.NewPodClient(f).RemoveFinalizer(ctx, pod.Name, testFinalizer)
+			err := cs.CoreV1().Pods(pod.Namespace).Delete(ctx, pod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To[int64](0)})
+			if err != nil && !apierrors.IsNotFound(err) {
+				framework.Logf("Deleting %v pod failed: %v", pod.Name, err)
+			}
 		}
 
 		ginkgo.By("Wait for high priority pods to be scheduled.")
@@ -437,7 +444,7 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, cs, pod))
 		}
 
-		ginkgo.By("Wait for 5 medium priority pods to be scheduled.")
+		ginkgo.By(fmt.Sprintf("Wait for %v medium priority pods to be scheduled.", 5*nodeListLen))
 		framework.ExpectNoError(wait.PollUntilContextTimeout(ctx, time.Second, framework.PodStartTimeout, false, func(ctx context.Context) (bool, error) {
 			scheduled := 0
 			for _, pod := range mediumPriorityPods {
@@ -450,11 +457,11 @@ var _ = SIGDescribe("SchedulerPreemption", framework.WithSerial(), func() {
 					scheduled++
 				}
 			}
-			if scheduled > 5 {
-				return false, fmt.Errorf("expected 5 medium priority pods to be scheduled, but got %d", scheduled)
+			if scheduled > 5*nodeListLen {
+				return false, fmt.Errorf("expected %v medium priority pods to be scheduled, but got %d", 5*nodeListLen, scheduled)
 			}
 
-			return scheduled == 5, nil
+			return scheduled == 5*nodeListLen, nil
 		}))
 	})
 
