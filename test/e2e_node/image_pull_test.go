@@ -21,6 +21,7 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,7 +29,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -357,7 +357,7 @@ type pulledStruct struct {
 func getDurationsFromPulledEventMsg(msg string) (*pulledStruct, error) {
 	splits := strings.Split(msg, " ")
 	if len(splits) != 13 {
-		return nil, errors.Errorf("pull event message should be spilted to 13: %d", len(splits))
+		return nil, fmt.Errorf("pull event message should be spilted to 13: %d", len(splits))
 	}
 	pulledDuration, err := time.ParseDuration(splits[5])
 	if err != nil {

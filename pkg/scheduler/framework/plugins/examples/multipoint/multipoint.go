@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -43,7 +44,7 @@ type stateData struct {
 	data string
 }
 
-func (s *stateData) Clone() framework.StateData {
+func (s *stateData) Clone() fwk.StateData {
 	copy := &stateData{
 		data: s.data,
 	}
@@ -51,33 +52,33 @@ func (s *stateData) Clone() framework.StateData {
 }
 
 // Reserve is the function invoked by the framework at "reserve" extension point.
-func (mc CommunicatingPlugin) Reserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
 	if pod.Name == "my-test-pod" {
-		state.Write(framework.StateKey(pod.Name), &stateData{data: "never bind"})
+		state.Write(fwk.StateKey(pod.Name), &stateData{data: "never bind"})
 	}
 	return nil
 }
 
 // Unreserve is the function invoked by the framework when any error happens
 // during "reserve" extension point or later.
-func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (mc CommunicatingPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
 	if pod.Name == "my-test-pod" {
 		// The pod is at the end of its lifecycle -- let's clean up the allocated
 		// resources. In this case, our clean up is simply deleting the key written
 		// in the Reserve operation.
-		state.Delete(framework.StateKey(pod.Name))
+		state.Delete(fwk.StateKey(pod.Name))
 	}
 }
 
 // PreBind is the function invoked by the framework at "prebind" extension point.
-func (mc CommunicatingPlugin) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mc CommunicatingPlugin) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}
-	if v, e := state.Read(framework.StateKey(pod.Name)); e == nil {
+	if v, e := state.Read(fwk.StateKey(pod.Name)); e == nil {
 		if value, ok := v.(*stateData); ok && value.data == "never bind" {
 			return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
 		}

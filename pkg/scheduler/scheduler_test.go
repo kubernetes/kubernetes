@@ -45,6 +45,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 
@@ -1150,7 +1151,7 @@ func (t *fakebindPlugin) Name() string {
 	return fakeBind
 }
 
-func (t *fakebindPlugin) Bind(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) *framework.Status {
+func (t *fakebindPlugin) Bind(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
@@ -1159,7 +1160,7 @@ type filterWithoutEnqueueExtensionsPlugin struct{}
 
 func (*filterWithoutEnqueueExtensionsPlugin) Name() string { return filterWithoutEnqueueExtensions }
 
-func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*filterWithoutEnqueueExtensionsPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -1173,7 +1174,7 @@ var fakeNodePluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) 
 
 func (*fakeNodePlugin) Name() string { return fakeNode }
 
-func (*fakeNodePlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*fakeNodePlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -1193,7 +1194,7 @@ var fakePodPluginQueueingFn = func(_ klog.Logger, _ *v1.Pod, _, _ interface{}) (
 
 func (*fakePodPlugin) Name() string { return fakePod }
 
-func (*fakePodPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*fakePodPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -1207,7 +1208,7 @@ type emptyEventPlugin struct{}
 
 func (*emptyEventPlugin) Name() string { return emptyEventExtensions }
 
-func (*emptyEventPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*emptyEventPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -1220,7 +1221,7 @@ type errorEventsToRegisterPlugin struct{}
 
 func (*errorEventsToRegisterPlugin) Name() string { return errorEventsToRegister }
 
-func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*errorEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -1235,7 +1236,7 @@ type emptyEventsToRegisterPlugin struct{}
 
 func (*emptyEventsToRegisterPlugin) Name() string { return emptyEventsToRegister }
 
-func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
+func (*emptyEventsToRegisterPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -1266,7 +1267,7 @@ const (
 	permitTimeout    = 10 * time.Second
 )
 
-func (f fakePermitPlugin) Permit(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
+func (f fakePermitPlugin) Permit(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeName string) (*framework.Status, time.Duration) {
 	defer func() {
 		// Send event with podWaiting reason to broadcast this pod is already waiting in the permit stage.
 		f.eventRecorder.Eventf(p, nil, v1.EventTypeWarning, podWaitingReason, "", "")

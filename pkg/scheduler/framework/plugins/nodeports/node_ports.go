@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -53,7 +54,7 @@ const (
 type preFilterState []*v1.ContainerPort
 
 // Clone the prefilter state.
-func (s preFilterState) Clone() framework.StateData {
+func (s preFilterState) Clone() fwk.StateData {
 	// The state is not impacted by adding/removing existing pods, hence we don't need to make a deep copy.
 	return s
 }
@@ -83,7 +84,7 @@ func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	s := getContainerPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
@@ -98,7 +99,7 @@ func (pl *NodePorts) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func getPreFilterState(cycleState *framework.CycleState) (preFilterState, error) {
+func getPreFilterState(cycleState fwk.CycleState) (preFilterState, error) {
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
@@ -177,7 +178,7 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodePorts) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)

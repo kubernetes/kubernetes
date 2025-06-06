@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -45,6 +44,7 @@ import (
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
 )
 
 // DryRun is responsible for performing verbose dry-run operations with a set of different

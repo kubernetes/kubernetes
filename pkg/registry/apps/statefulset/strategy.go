@@ -128,12 +128,6 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetStartOrdinal) {
-		if oldSS == nil || oldSS.Spec.Ordinals == nil {
-			// Reset Spec.Ordinals to the default value (nil).
-			newSS.Spec.Ordinals = nil
-		}
-	}
 }
 
 // Validate validates a new StatefulSet.

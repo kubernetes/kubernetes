@@ -313,10 +313,6 @@ var (
 	// Tests aiming to verify oom_score functionality
 	OOMScoreAdj = framework.WithFeature(framework.ValidFeatures.Add("OOMScoreAdj"))
 
-	// Owner: sig-api-machinery
-	// Marks tests that enforce ordered namespace deletion.
-	OrderedNamespaceDeletion = framework.WithFeature(framework.ValidFeatures.Add("OrderedNamespaceDeletion"))
-
 	// Owner: sig-node
 	// Verify ProcMount feature.
 	// Used in combination with user namespaces
@@ -450,9 +446,6 @@ var (
 	Swap = framework.WithFeature(framework.ValidFeatures.Add("NodeSwap"))
 
 	PodIndexLabel = framework.WithFeature(framework.ValidFeatures.Add("PodIndexLabel"))
-
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
-	StatefulSetStartOrdinal = framework.WithFeature(framework.ValidFeatures.Add("StatefulSetStartOrdinal"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StatefulUpgrade = framework.WithFeature(framework.ValidFeatures.Add("StatefulUpgrade"))

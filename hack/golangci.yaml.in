@@ -190,7 +190,7 @@ linters:
           {{include "hack/kube-api-linter/kube-api-linter.yaml" | indent 10 | trim}}
     depguard:
       rules:
-        main:
+        go-cmp:
           files:
             - $all
             - "!$test"

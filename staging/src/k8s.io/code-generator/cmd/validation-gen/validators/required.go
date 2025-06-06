@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/v2"
+	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -64,7 +65,7 @@ func (requirednessTagValidator) ValidScopes() sets.Set[Scope] {
 	return requirednessTagValidScopes
 }
 
-func (rtv requirednessTagValidator) GetValidations(context Context, _ []string, _ string) (Validations, error) {
+func (rtv requirednessTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	switch rtv.mode {
 	case requirednessRequired:
 		return rtv.doRequired(context)

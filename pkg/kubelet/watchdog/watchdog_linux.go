@@ -20,6 +20,7 @@ limitations under the License.
 package watchdog
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -122,20 +123,20 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 	return hc, nil
 }
 
-func (hc *healthChecker) Start() {
+func (hc *healthChecker) Start(ctx context.Context) {
 	if hc.interval <= 0 {
 		klog.InfoS("Systemd watchdog is not enabled or the interval is invalid, so health checking will not be started.")
 		return
 	}
 	klog.InfoS("Starting systemd watchdog with interval", "interval", hc.interval)
 
-	go wait.Forever(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := hc.doCheck(); err != nil {
 			klog.ErrorS(err, "Do not notify watchdog this iteration as the kubelet is reportedly not healthy")
 			return
 		}
 
-		err := wait.ExponentialBackoff(hc.retryBackoff, func() (bool, error) {
+		err := wait.ExponentialBackoffWithContext(ctx, hc.retryBackoff, func(_ context.Context) (bool, error) {
 			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
 				klog.V(5).InfoS("Failed to notify systemd watchdog, retrying", "error", err)

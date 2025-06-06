@@ -1181,7 +1181,6 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "node2", Labels: label2}},
 			},
 			expectedList: []framework.NodeScore{{Name: "node1", Score: 18}, {Name: "node5", Score: framework.MaxNodeScore}, {Name: "node2", Score: 36}},
-			runPreScore:  true,
 		},
 	}
 

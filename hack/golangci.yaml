@@ -260,7 +260,7 @@ linters:
             #   pointerPolicy: SuggestFix # Defaults to `SuggestFix`. We want our required fields to not be pointers.
     depguard:
       rules:
-        main:
+        go-cmp:
           files:
             - $all
             - "!$test"

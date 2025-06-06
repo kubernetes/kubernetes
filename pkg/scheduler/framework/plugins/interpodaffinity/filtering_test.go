@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -1005,7 +1006,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	p := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, cache.NewEmptySnapshot(), nil)
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, pod, nodeInfo)
-	wantStatus := framework.AsStatus(framework.ErrNotFound)
+	wantStatus := framework.AsStatus(fwk.ErrNotFound)
 	if diff := cmp.Diff(gotStatus, wantStatus); diff != "" {
 		t.Errorf("Status does not match (-want,+got):\n%s", diff)
 	}
@@ -1242,7 +1243,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
-			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
+			getState := func(pods []*v1.Pod) (*InterPodAffinity, fwk.CycleState, *preFilterState, *cache.Snapshot) {
 				snapshot := cache.NewSnapshot(pods, test.nodes)
 				_, ctx := ktesting.NewTestContext(t)
 				ctx, cancel := context.WithCancel(ctx)

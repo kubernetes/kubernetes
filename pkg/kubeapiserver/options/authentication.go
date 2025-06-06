@@ -567,7 +567,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		switch {
 		case ret.AuthenticationConfig.Anonymous != nil && o.Anonymous.FlagsSet:
 			// Flags and config file are mutually exclusive
-			return kubeauthenticator.Config{}, field.Forbidden(field.NewPath("anonymous"), "--anonynous-auth flag cannot be set when anonymous field is configured in authentication configuration file")
+			return kubeauthenticator.Config{}, field.Forbidden(field.NewPath("anonymous"), "--anonymous-auth flag cannot be set when anonymous field is configured in authentication configuration file")
 		case ret.AuthenticationConfig.Anonymous != nil:
 			// Use the config-file-specified values
 			ret.Anonymous = *ret.AuthenticationConfig.Anonymous

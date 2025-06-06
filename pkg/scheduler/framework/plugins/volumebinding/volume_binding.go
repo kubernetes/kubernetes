@@ -32,6 +32,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -42,13 +43,13 @@ import (
 )
 
 const (
-	stateKey framework.StateKey = Name
+	stateKey fwk.StateKey = Name
 
 	maxUtilization = 100
 )
 
 // the state is initialized in PreFilter phase. because we save the pointer in
-// framework.CycleState, in the later phases we don't need to call Write method
+// fwk.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
 	allBound bool
@@ -63,7 +64,7 @@ type stateData struct {
 	sync.Mutex
 }
 
-func (d *stateData) Clone() framework.StateData {
+func (d *stateData) Clone() fwk.StateData {
 	return d
 }
 
@@ -349,7 +350,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
-func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	logger := klog.FromContext(ctx)
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
@@ -386,7 +387,7 @@ func (pl *VolumeBinding) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func getStateData(cs *framework.CycleState) (*stateData, error) {
+func getStateData(cs fwk.CycleState) (*stateData, error) {
 	state, err := cs.Read(stateKey)
 	if err != nil {
 		return nil, err
@@ -413,7 +414,7 @@ func getStateData(cs *framework.CycleState) (*stateData, error) {
 //
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
-func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
@@ -445,7 +446,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 }
 
 // PreScore invoked at the preScore extension point. It checks whether volumeBinding can skip Score
-func (pl *VolumeBinding) PreScore(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (pl *VolumeBinding) PreScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	if pl.scorer == nil {
 		return framework.NewStatus(framework.Skip)
 	}
@@ -460,7 +461,7 @@ func (pl *VolumeBinding) PreScore(ctx context.Context, cs *framework.CycleState,
 }
 
 // Score invoked at the score extension point.
-func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	if pl.scorer == nil {
 		return 0, nil
 	}
@@ -520,7 +521,7 @@ func (pl *VolumeBinding) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // Reserve reserves volumes of pod and saves binding status in cycle state.
-func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	state, err := getStateData(cs)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -545,7 +546,7 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs *framework.CycleState, 
 //
 // If binding errors, times out or gets undone, then an error will be returned to
 // retry scheduling.
-func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	s, err := getStateData(cs)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -572,7 +573,7 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 
 // Unreserve clears assumed PV and PVC cache.
 // It's idempotent, and does nothing if no cache found for the given pod.
-func (pl *VolumeBinding) Unreserve(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) {
+func (pl *VolumeBinding) Unreserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) {
 	s, err := getStateData(cs)
 	if err != nil {
 		return

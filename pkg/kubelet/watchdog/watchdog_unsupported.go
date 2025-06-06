@@ -19,7 +19,10 @@ limitations under the License.
 
 package watchdog
 
-import "k8s.io/apiserver/pkg/server/healthz"
+import (
+	"context"
+	"k8s.io/apiserver/pkg/server/healthz"
+)
 
 type healthCheckerUnsupported struct{}
 
@@ -36,6 +39,6 @@ func NewHealthChecker(_ syncLoopHealthChecker, _ ...Option) (HealthChecker, erro
 	return &healthCheckerUnsupported{}, nil
 }
 
-func (ow *healthCheckerUnsupported) Start() {
+func (ow *healthCheckerUnsupported) Start(ctx context.Context) {
 	return
 }

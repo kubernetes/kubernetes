@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
@@ -40,7 +41,7 @@ func (pl *FalseFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *FalseFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *FalseFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
 }
 
@@ -58,7 +59,7 @@ func (pl *TrueFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *TrueFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *TrueFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -90,7 +91,7 @@ func (pl *FakeFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *FakeFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *FakeFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	atomic.AddInt32(&pl.NumFilterCalled, 1)
 
 	if returnCode, ok := pl.FailedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
@@ -119,7 +120,7 @@ func (pl *MatchFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *MatchFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *MatchFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	node := nodeInfo.Node()
 	if node == nil {
 		return framework.NewStatus(framework.Error, "node not found")
@@ -148,7 +149,7 @@ func (pl *FakePreFilterPlugin) Name() string {
 }
 
 // PreFilter invoked at the PreFilter extension point.
-func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return pl.Result, pl.Status
 }
 
@@ -179,12 +180,12 @@ func (pl *FakeReservePlugin) Name() string {
 }
 
 // Reserve invoked at the Reserve extension point.
-func (pl *FakeReservePlugin) Reserve(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) *framework.Status {
+func (pl *FakeReservePlugin) Reserve(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *framework.Status {
 	return pl.Status
 }
 
 // Unreserve invoked at the Unreserve extension point.
-func (pl *FakeReservePlugin) Unreserve(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) {
+func (pl *FakeReservePlugin) Unreserve(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) {
 }
 
 // NewFakeReservePlugin initializes a fakeReservePlugin and returns it.
@@ -207,7 +208,7 @@ func (pl *FakePreBindPlugin) Name() string {
 }
 
 // PreBind invoked at the PreBind extension point.
-func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) *framework.Status {
+func (pl *FakePreBindPlugin) PreBind(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) *framework.Status {
 	return pl.Status
 }
 
@@ -232,7 +233,7 @@ func (pl *FakePermitPlugin) Name() string {
 }
 
 // Permit invoked at the Permit extension point.
-func (pl *FakePermitPlugin) Permit(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
+func (pl *FakePermitPlugin) Permit(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ string) (*framework.Status, time.Duration) {
 	return pl.Status, pl.Timeout
 }
 
@@ -258,7 +259,7 @@ func (pl *FakePreScoreAndScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
 	return pl.score, pl.scoreStatus
 }
 
@@ -266,7 +267,7 @@ func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() framework.ScoreExtension
 	return nil
 }
 
-func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
 	return pl.preScoreStatus
 }
 

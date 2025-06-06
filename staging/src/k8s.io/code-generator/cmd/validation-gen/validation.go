@@ -50,7 +50,7 @@ var (
 	fieldPkgSymbols     = mkPkgNames(fieldPkg, "ErrorList", "InternalError", "Path")
 	fmtPkgSymbols       = mkPkgNames("fmt", "Errorf")
 	safePkg             = "k8s.io/apimachinery/pkg/api/safe"
-	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast")
+	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast", "Value")
 	operationPkg        = "k8s.io/apimachinery/pkg/api/operation"
 	operationPkgSymbols = mkPkgNames(operationPkg, "Operation", "MatchesSubresource")
 	contextPkg          = "context"
@@ -407,7 +407,11 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 			Parent: nil,
 			Path:   fldPath,
 		}
-		if validations, err := td.validator.ExtractValidations(context, t.CommentLines); err != nil {
+		extractedTags, err := td.validator.ExtractTags(context, t.CommentLines)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %w", fldPath, err)
+		}
+		if validations, err := td.validator.ExtractValidations(context, extractedTags...); err != nil {
 			return nil, fmt.Errorf("%v: %w", fldPath, err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no type-attached validations", "type", t)
@@ -536,13 +540,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 	// Discover into each field of this struct.
 	for _, memb := range thisNode.valueType.Members {
 		name := memb.Name
-		if len(name) == 0 { // embedded fields
-			if memb.Type.Kind == types.Pointer {
-				name = memb.Type.Elem.Name.Name
-			} else {
-				name = memb.Type.Name.Name
-			}
-		}
+
 		// Only do exported fields.
 		if unicode.IsLower([]rune(name)[0]) {
 			continue
@@ -579,7 +577,12 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			Member: &memb,
 			Path:   childPath,
 		}
-		if validations, err := td.validator.ExtractValidations(context, memb.CommentLines); err != nil {
+
+		Tags, err := td.validator.ExtractTags(context, memb.CommentLines)
+		if err != nil {
+			return fmt.Errorf("field %s: %w", childPath.String(), err)
+		}
+		if validations, err := td.validator.ExtractValidations(context, Tags...); err != nil {
 			return fmt.Errorf("field %s: %w", childPath.String(), err)
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
@@ -1041,10 +1044,6 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 			}
 
 			if buf.Len() > 0 {
-				if len(fld.jsonName) == 0 {
-					continue // TODO: Embedded (inline) types are expected to be unnamed.
-				}
-
 				leafType, typePfx, exprPfx := getLeafTypeAndPrefixes(fld.childType)
 				targs := targs.WithArgs(generator.Args{
 					"fieldName":    fld.name,
@@ -1064,7 +1063,14 @@ func (g *genValidations) emitValidationForChild(c *generator.Context, thisChild 
 					panic(fmt.Sprintf("failed to merge buffer: %v", err))
 				}
 				sw.Do("    return\n", targs)
-				sw.Do("  }(fldPath.Child(\"$.fieldJSON$\"), ", targs)
+				sw.Do("  }(", targs)
+				if len(fld.jsonName) > 0 {
+					sw.Do("fldPath.Child(\"$.fieldJSON$\"), ", targs)
+				} else {
+					// If there is an embedded field in a root-type, fldPath
+					// will be nil, and we need SOMETHING for the field path.
+					sw.Do("$.safe.Value|raw$(fldPath, func() *$.field.Path|raw$ { return fldPath.Child(\"$.fieldType|raw$\") }), ", targs)
+				}
 				sw.Do("    $.fieldExprPfx$obj.$.fieldName$, ", targs)
 				sw.Do("    $.safe.Field|raw$(oldObj, ", targs)
 				sw.Do("        func(oldObj *$.inType|raw$) $.fieldTypePfx$$.fieldType|raw$ {", targs)

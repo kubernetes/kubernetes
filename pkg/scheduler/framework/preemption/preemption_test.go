@@ -42,6 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -72,7 +73,7 @@ type FakePostFilterPlugin struct {
 }
 
 func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
 	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *framework.Status) {
 	return append(victims, nodeInfo.Pods[0].Pod), pl.numViolatingVictim, nil
 }
@@ -109,7 +110,7 @@ func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod)
 type FakePreemptionScorePostFilterPlugin struct{}
 
 func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
-	ctx context.Context, state *framework.CycleState, pod *v1.Pod,
+	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
 	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *framework.Status) {
 	return append(victims, nodeInfo.Pods[0].Pod), 1, nil
 }

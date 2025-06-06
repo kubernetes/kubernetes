@@ -40,8 +40,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/dynamic-resource-allocation/cel"
-	"k8s.io/dynamic-resource-allocation/internal/queue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/buffer"
 	"k8s.io/utils/ptr"
 )
 
@@ -97,7 +97,7 @@ type Tracker struct {
 	// which tries to lock the rwMutex). Writing into such a channel
 	// while not holding the rwMutex doesn't work because in-order delivery
 	// of events would no longer be guaranteed.
-	eventQueue queue.FIFO[func()]
+	eventQueue buffer.Ring[func()]
 }
 
 // Options configure a [Tracker].
@@ -157,6 +157,7 @@ func newTracker(ctx context.Context, opts Options) (finalT *Tracker, finalErr er
 		celCache:              cel.NewCache(10),
 		patchedResourceSlices: cache.NewStore(cache.MetaNamespaceKeyFunc),
 		handleError:           utilruntime.HandleErrorWithContext,
+		eventQueue:            *buffer.NewRing[func()](buffer.RingOptions{InitialSize: 0, NormalSize: 4}),
 	}
 	defer func() {
 		// If we don't return the tracker, stop the partially initialized instance.
@@ -282,7 +283,7 @@ func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) (cache.Res
 	t.eventHandlers = append(t.eventHandlers, handler)
 	allObjs, _ := t.ListPatchedResourceSlices()
 	for _, obj := range allObjs {
-		t.eventQueue.Push(func() {
+		t.eventQueue.WriteOne(func() {
 			handler.OnAdd(obj, true)
 		})
 	}
@@ -298,7 +299,7 @@ func (t *Tracker) AddEventHandler(handler cache.ResourceEventHandler) (cache.Res
 func (t *Tracker) emitEvents() {
 	for {
 		t.rwMutex.Lock()
-		deliver, ok := t.eventQueue.Pop()
+		deliver, ok := t.eventQueue.ReadOne()
 		t.rwMutex.Unlock()
 
 		if !ok {
@@ -323,15 +324,15 @@ func (t *Tracker) pushEvent(oldObj, newObj any) {
 	for _, handler := range t.eventHandlers {
 		handler := handler
 		if oldObj == nil {
-			t.eventQueue.Push(func() {
+			t.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)
 			})
 		} else if newObj == nil {
-			t.eventQueue.Push(func() {
+			t.eventQueue.WriteOne(func() {
 				handler.OnDelete(oldObj)
 			})
 		} else {
-			t.eventQueue.Push(func() {
+			t.eventQueue.WriteOne(func() {
 				handler.OnUpdate(oldObj, newObj)
 			})
 		}

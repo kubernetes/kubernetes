@@ -32,6 +32,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -54,7 +55,7 @@ const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
 	Name = names.VolumeZone
 
-	preFilterStateKey framework.StateKey = "PreFilter" + Name
+	preFilterStateKey fwk.StateKey = "PreFilter" + Name
 
 	// ErrReasonConflict is used for NoVolumeZoneConflict predicate error.
 	ErrReasonConflict = "node(s) had no available volume zone"
@@ -68,7 +69,7 @@ type pvTopology struct {
 }
 
 // the state is initialized in PreFilter phase. because we save the pointer in
-// framework.CycleState, in the later phases we don't need to call Write method
+// fwk.CycleState, in the later phases we don't need to call Write method
 // to update the value
 type stateData struct {
 	// podPVTopologies holds the pv information we need
@@ -76,7 +77,7 @@ type stateData struct {
 	podPVTopologies []pvTopology
 }
 
-func (d *stateData) Clone() framework.StateData {
+func (d *stateData) Clone() fwk.StateData {
 	return d
 }
 
@@ -108,7 +109,7 @@ func (pl *VolumeZone) Name() string {
 //
 // Currently, this is only supported with PersistentVolumeClaims,
 // and only looks for the bound PersistentVolume.
-func (pl *VolumeZone) PreFilter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeZone) PreFilter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	logger := klog.FromContext(ctx)
 	podPVTopologies, status := pl.getPVbyPod(logger, pod)
 	if !status.IsSuccess() {
@@ -187,7 +188,7 @@ func (pl *VolumeZone) PreFilterExtensions() framework.PreFilterExtensions {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeZone) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
 	logger := klog.FromContext(ctx)
 	// If a pod doesn't have any volume attached to it, the predicate will always be true.
 	// Thus we make a fast path for it, to avoid unnecessary computations in this case.
@@ -237,7 +238,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, cs *framework.CycleState, pod 
 	return nil
 }
 
-func getStateData(cs *framework.CycleState) (*stateData, error) {
+func getStateData(cs fwk.CycleState) (*stateData, error) {
 	state, err := cs.Read(preFilterStateKey)
 	if err != nil {
 		return nil, err

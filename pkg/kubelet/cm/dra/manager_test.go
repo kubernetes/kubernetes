@@ -515,7 +515,7 @@ func TestPrepareResources(t *testing.T) {
 			description:    "claim doesn't exist",
 			driverName:     driverName,
 			pod:            genTestPod(),
-			expectedErrMsg: "failed to fetch ResourceClaim ",
+			expectedErrMsg: "fetch ResourceClaim ",
 		},
 		{
 			description:    "unknown driver",
@@ -539,14 +539,14 @@ func TestPrepareResources(t *testing.T) {
 			claim:                genTestClaim(claimName, driverName, deviceName, podUID),
 			resp:                 &drapb.NodePrepareResourcesResponse{Claims: map[string]*drapb.NodePrepareResourceResponse{}},
 			expectedPrepareCalls: 1,
-			expectedErrMsg:       "NodePrepareResources left out 1 claims",
+			expectedErrMsg:       "NodePrepareResources skipped 1 ResourceClaims",
 		},
 		{
 			description:    "pod is not allowed to use resource claim",
 			driverName:     driverName,
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, driverName, deviceName, ""),
-			expectedErrMsg: "is not allowed to use resource claim ",
+			expectedErrMsg: "is not allowed to use ResourceClaim ",
 		},
 		{
 			description: "no container uses the claim",
@@ -612,7 +612,7 @@ func TestPrepareResources(t *testing.T) {
 			claim:                genTestClaim(claimName, driverName, deviceName, podUID),
 			wantTimeout:          true,
 			expectedPrepareCalls: 1,
-			expectedErrMsg:       "NodePrepareResources failed: rpc error: code = DeadlineExceeded",
+			expectedErrMsg:       "NodePrepareResources: rpc error: code = DeadlineExceeded",
 		},
 		{
 			description:            "should prepare resource, claim not in cache",
@@ -660,7 +660,7 @@ func TestPrepareResources(t *testing.T) {
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, driverName, deviceName, podUID),
 			claimInfo:      genTestClaimInfo(anotherClaimUID, []string{podUID}, false),
-			expectedErrMsg: fmt.Sprintf("old claim with same name %s/%s and different UID %s still exists", namespace, claimName, anotherClaimUID),
+			expectedErrMsg: fmt.Sprintf("old ResourceClaim with same name %s and different UID %s still exists", claimName, anotherClaimUID),
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
@@ -792,7 +792,7 @@ func TestUnprepareResources(t *testing.T) {
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			wantTimeout:            true,
 			expectedUnprepareCalls: 1,
-			expectedErrMsg:         "NodeUnprepareResources failed: rpc error: code = DeadlineExceeded",
+			expectedErrMsg:         "NodeUnprepareResources: rpc error: code = DeadlineExceeded",
 		},
 		{
 			description:            "should fail when driver returns empty response",
@@ -801,7 +801,7 @@ func TestUnprepareResources(t *testing.T) {
 			claimInfo:              genTestClaimInfo(claimUID, []string{podUID}, true),
 			resp:                   &drapb.NodeUnprepareResourcesResponse{Claims: map[string]*drapb.NodeUnprepareResourceResponse{}},
 			expectedUnprepareCalls: 1,
-			expectedErrMsg:         "NodeUnprepareResources left out 1 claims",
+			expectedErrMsg:         "NodeUnprepareResources skipped 1 ResourceClaims",
 		},
 		{
 			description:            "should unprepare resource",
@@ -934,7 +934,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 			description:    "should fail when claim info not found",
 			pod:            genTestPod(),
 			claimInfo:      &ClaimInfo{},
-			expectedErrMsg: "unable to get claim info for claim ",
+			expectedErrMsg: "unable to get information for ResourceClaim ",
 		},
 		{
 			description: "should fail when none of the supported fields are set",
@@ -970,7 +970,7 @@ func TestGetContainerClaimInfos(t *testing.T) {
 		{
 			description:    "should fail when claim info is not cached",
 			pod:            genTestPod(),
-			expectedErrMsg: "unable to get claim info for claim ",
+			expectedErrMsg: "unable to get information for ResourceClaim ",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
