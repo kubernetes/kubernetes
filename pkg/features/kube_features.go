@@ -239,6 +239,12 @@ const (
 	//
 	DRAPartitionableDevices featuregate.Feature = "DRAPartitionableDevices"
 
+	// owner: @yliaog
+	// kep: http://kep.k8s.io/5004
+	//
+	// Enables support for providing extended resource requests backed by DRA.
+	DRAExtendedResource featuregate.Feature = "DRAExtendedResource"
+
 	// owner: @mortent
 	// kep: http://kep.k8s.io/4816
 	//
@@ -1134,6 +1140,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	DRADeviceTaints: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
+	DRAExtendedResource: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	DRAPartitionableDevices: {

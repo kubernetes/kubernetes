@@ -451,6 +451,12 @@ message DeviceClassSpec {
   // +optional
   // +listType=atomic
   repeated DeviceClassConfiguration config = 2;
+
+  // ExtendedResourceName is the extended resource name for the devices of this class
+  //
+  // +optional
+  // +featureGate=DRAExtendedResource
+  optional string extendedResourceName = 4;
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
