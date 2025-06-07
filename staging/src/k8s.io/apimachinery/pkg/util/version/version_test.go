@@ -548,3 +548,61 @@ func TestParse(t *testing.T) {
 		}
 	}
 }
+
+func TestVersion_MajorMinorPatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "standard version",
+			input:    "1.33.0",
+			expected: "1.33.0",
+		},
+		{
+			name:     "non-zero patch",
+			input:    "1.33.5",
+			expected: "1.33.5",
+		},
+		{
+			name:     "with prerelease",
+			input:    "1.34.0-alpha.1",
+			expected: "1.34.0",
+		},
+		{
+			name:     "with build metadata",
+			input:    "1.35.2+build.456",
+			expected: "1.35.2",
+		},
+		{
+			name:     "with both prerelease and build",
+			input:    "1.36.1-rc.1+meta",
+			expected: "1.36.1",
+		},
+		{
+			name:     "missing patch component",
+			input:    "1.37", // only major.minor
+			expected: "<nil>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v, err := ParseGeneric(tt.input)
+			if err != nil {
+				t.Fatalf("Failed to parse version: %v", err)
+			}
+			mv := v.MajorMinorPatch()
+			if mv == nil {
+				if tt.expected != "<nil>" {
+					t.Errorf("MajorMinorPatch() = nil; want %q", tt.expected)
+				}
+				return
+			}
+			if got := mv.String(); got != tt.expected {
+				t.Errorf("MajorMinorPatch().String() = %q; want %q", got, tt.expected)
+			}
+		})
+	}
+}
