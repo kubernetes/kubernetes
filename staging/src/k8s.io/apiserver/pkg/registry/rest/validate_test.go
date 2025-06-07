@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
@@ -71,7 +70,7 @@ func TestValidateDeclaratively(t *testing.T) {
 		object      runtime.Object
 		oldObject   runtime.Object
 		subresource string
-		options     sets.Set[string]
+		options     []string
 		expected    field.ErrorList
 	}{
 		{
@@ -108,7 +107,7 @@ func TestValidateDeclaratively(t *testing.T) {
 		},
 		{
 			name:     "update with option",
-			options:  sets.New("option1"),
+			options:  []string{"option1"},
 			object:   valid,
 			expected: field.ErrorList{invalidIfOptionErr},
 		},
@@ -125,7 +124,7 @@ func TestValidateDeclaratively(t *testing.T) {
 
 	scheme.AddValidationFunc(&v1.Pod{}, func(ctx context.Context, op operation.Operation, object, oldObject interface{}) field.ErrorList {
 		results := field.ErrorList{}
-		if op.Options.Has("option1") {
+		if op.HasOption("option1") {
 			results = append(results, invalidIfOptionErr)
 		}
 		if slices.Equal(op.Request.Subresources, []string{"status"}) {
@@ -446,7 +445,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 func TestWithRecover(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 
 	testCases := []struct {
@@ -539,7 +538,7 @@ func TestWithRecover(t *testing.T) {
 func TestWithRecoverUpdate(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 	oldObj := &runtime.Unknown{}
 
@@ -633,7 +632,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 func TestValidateDeclarativelyWithRecovery(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 
 	// Simple test for the ValidateDeclarativelyWithRecovery function
@@ -657,7 +656,7 @@ func TestValidateDeclarativelyWithRecovery(t *testing.T) {
 func TestValidateUpdateDeclarativelyWithRecovery(t *testing.T) {
 	ctx := context.Background()
 	scheme := runtime.NewScheme()
-	options := sets.New[string]()
+	var options []string
 	obj := &runtime.Unknown{}
 	oldObj := &runtime.Unknown{}
 

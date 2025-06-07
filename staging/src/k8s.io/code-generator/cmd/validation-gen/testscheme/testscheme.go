@@ -63,23 +63,23 @@ func (s *Scheme) AddValidationFunc(srcType any, fn func(ctx context.Context, op 
 }
 
 // Validate validates an object using the registered validation function.
-func (s *Scheme) Validate(ctx context.Context, opts sets.Set[string], object any, subresources ...string) field.ErrorList {
+func (s *Scheme) Validate(ctx context.Context, options []string, object any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: opts}, object, nil)
+		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: options}, object, nil)
 	}
 	return nil
 }
 
 // ValidateUpdate validates an update to an object using the registered validation function.
-func (s *Scheme) ValidateUpdate(ctx context.Context, opts sets.Set[string], object, oldObject any, subresources ...string) field.ErrorList {
+func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, oldObject any, subresources ...string) field.ErrorList {
 	if len(s.registrationErrors) > 0 {
 		return s.registrationErrors // short circuit with registration errors if any are present
 	}
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
-		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: opts}, object, oldObject)
+		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: options}, object, oldObject)
 	}
 	return nil
 }
@@ -246,7 +246,7 @@ type ValidationTester struct {
 	*ValidationTestBuilder
 	value        any
 	oldValue     any
-	opts         sets.Set[string]
+	options      []string
 	subresources []string
 }
 
@@ -268,8 +268,8 @@ func (v *ValidationTester) OldValueFuzzed(oldValue any) *ValidationTester {
 }
 
 // Opts sets the ValidationOpts to use.
-func (v *ValidationTester) Opts(opts sets.Set[string]) *ValidationTester {
-	v.opts = opts
+func (v *ValidationTester) Opts(options []string) *ValidationTester {
+	v.options = options
 	return v
 }
 
@@ -537,9 +537,9 @@ func byFullError(err *field.Error) string {
 func (v *ValidationTester) validate() field.ErrorList {
 	var errs field.ErrorList
 	if v.oldValue == nil {
-		errs = v.s.Validate(context.Background(), v.opts, v.value, v.subresources...)
+		errs = v.s.Validate(context.Background(), v.options, v.value, v.subresources...)
 	} else {
-		errs = v.s.ValidateUpdate(context.Background(), v.opts, v.value, v.oldValue, v.subresources...)
+		errs = v.s.ValidateUpdate(context.Background(), v.options, v.value, v.oldValue, v.subresources...)
 	}
 	return errs
 }

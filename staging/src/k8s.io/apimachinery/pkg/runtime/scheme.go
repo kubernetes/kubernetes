@@ -369,7 +369,7 @@ func (s *Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, 
 // Validate validates the provided Object according to the generated declarative validation code.
 // WARNING: This does not validate all objects!  The handwritten validation code in validation.go
 // is not run when this is called.  Only the generated zz_generated.validations.go validation code is run.
-func (s *Scheme) Validate(ctx context.Context, options sets.Set[string], object Object, subresources ...string) field.ErrorList {
+func (s *Scheme) Validate(ctx context.Context, options []string, object Object, subresources ...string) field.ErrorList {
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
 		return fn(ctx, operation.Operation{Type: operation.Create, Request: operation.Request{Subresources: subresources}, Options: options}, object, nil)
 	}
@@ -379,7 +379,7 @@ func (s *Scheme) Validate(ctx context.Context, options sets.Set[string], object 
 // ValidateUpdate validates the provided object and oldObject according to the generated declarative validation code.
 // WARNING: This does not validate all objects!  The handwritten validation code in validation.go
 // is not run when this is called.  Only the generated zz_generated.validations.go validation code is run.
-func (s *Scheme) ValidateUpdate(ctx context.Context, options sets.Set[string], object, oldObject Object, subresources ...string) field.ErrorList {
+func (s *Scheme) ValidateUpdate(ctx context.Context, options []string, object, oldObject Object, subresources ...string) field.ErrorList {
 	if fn, ok := s.validationFuncs[reflect.TypeOf(object)]; ok {
 		return fn(ctx, operation.Operation{Type: operation.Update, Request: operation.Request{Subresources: subresources}, Options: options}, object, oldObject)
 	}
