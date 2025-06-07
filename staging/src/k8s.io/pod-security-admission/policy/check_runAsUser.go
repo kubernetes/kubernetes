@@ -52,14 +52,14 @@ func CheckRunAsUser() Check {
 		Level: api.LevelRestricted,
 		Versions: []VersionedCheck{
 			{
-				MinimumVersion: api.MajorMinorVersion(1, 23),
-				CheckPod:       runAsUser_1_23,
+				MinimumVersion: api.MajorMinorVersion(1, 34),
+				CheckPod:       runAsUser_1_34,
 			},
 		},
 	}
 }
 
-func runAsUser_1_23(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
+func runAsUser_1_34(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	// See KEP-127: https://github.com/kubernetes/enhancements/blob/308ba8d/keps/sig-node/127-user-namespaces/README.md?plain=1#L411-L447
 	if relaxPolicyForUserNamespacePod(podSpec) {
 		return CheckResult{Allowed: true}
