@@ -240,10 +240,11 @@ var _ = SIGDescribe("Secrets", func() {
 	})
 
 	/*
-		Release: v1.30
+		Release: v1.34
 		Testname: Secrets, pod environment from source
-		Description: Create a secret. Create a Pod with Container that declares a environment variable using 'EnvFrom' which references the secret created to extract a key value from the secret.
-		Allows users to use envFrom to set prefix starting with a digit as environment variable names.
+		Description: Create a Pod with environment variable values set using values from Secret.
+		Allows users to use envFrom to set prefixes with various printable ASCII characters excluding '=' as environment variable names.
+		This test verifies that different prefixes including digits, special characters, and letters can be correctly used.
 	*/
 	framework.It("should be consumable as environment variable names when secret keys start with a digit", func(ctx context.Context) {
 		name := "secret-test-" + string(uuid.NewUUID())
@@ -257,7 +258,7 @@ var _ = SIGDescribe("Secrets", func() {
 
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "pod-configmaps-" + string(uuid.NewUUID()),
+				Name: "pod-secret-" + string(uuid.NewUUID()),
 			},
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -267,11 +268,27 @@ var _ = SIGDescribe("Secrets", func() {
 						Command: []string{"sh", "-c", "env"},
 						EnvFrom: []v1.EnvFromSource{
 							{
+								// No prefix
 								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 							{
-								// prefix start with a digit can be consumed as environment variables.
+								// Prefix starting with a digit
 								Prefix:    "1-",
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// Prefix with special characters
+								Prefix:    "$_-",
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// Prefix with uppercase letters
+								Prefix:    "ABC_",
+								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// Prefix with symbols
+								Prefix:    "#@!",
 								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 						},
@@ -282,8 +299,16 @@ var _ = SIGDescribe("Secrets", func() {
 		}
 
 		e2epodoutput.TestContainerOutput(ctx, f, "consume secrets", pod, 0, []string{
+			// Original values without prefix
 			"data-1=value-1", "data-2=value-2", "data-3=value-3",
+			// Values with digit prefix
 			"1-data-1=value-1", "1-data-2=value-2", "1-data-3=value-3",
+			// Values with special character prefix
+			"$_-data-1=value-1", "$_-data-2=value-2", "$_-data-3=value-3",
+			// Values with uppercase letter prefix
+			"ABC_data-1=value-1", "ABC_data-2=value-2", "ABC_data-3=value-3",
+			// Values with symbol prefix
+			"#@!data-1=value-1", "#@!data-2=value-2", "#@!data-3=value-3",
 		})
 	})
 })
