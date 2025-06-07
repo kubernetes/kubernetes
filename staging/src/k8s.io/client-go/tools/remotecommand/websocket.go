@@ -28,12 +28,13 @@ import (
 
 	gwebsocket "github.com/gorilla/websocket"
 
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport/websocket"
-	"k8s.io/klog/v2"
 )
 
 // writeDeadline defines the time that a client-side write to the websocket
@@ -157,7 +158,7 @@ func (e *wsStreamExecutor) StreamWithContext(ctx context.Context, options Stream
 				panicChan <- p
 			}
 		}()
-		creator := newWSStreamCreator(conn)
+		creator := newWSStreamCreator(conn, streamer.streams())
 		go creator.readDemuxLoop(
 			e.upgrader.DataBufferSize(),
 			e.heartbeatPeriod,
@@ -183,16 +184,20 @@ type wsStreamCreator struct {
 	// map of stream id to stream; multiple streams read/write the connection
 	streams   map[byte]*stream
 	streamsMu sync.Mutex
+	streamsWg sync.WaitGroup
 	// setStreamErr holds the error to return to anyone calling setStreams.
 	// this is populated in closeAllStreamReaders
 	setStreamErr error
 }
 
-func newWSStreamCreator(conn *gwebsocket.Conn) *wsStreamCreator {
-	return &wsStreamCreator{
-		conn:    conn,
-		streams: map[byte]*stream{},
+func newWSStreamCreator(conn *gwebsocket.Conn, streams int) *wsStreamCreator {
+	creator := &wsStreamCreator{
+		conn:      conn,
+		streams:   map[byte]*stream{},
+		streamsWg: sync.WaitGroup{},
 	}
+	creator.streamsWg.Add(streams)
+	return creator
 }
 
 func (c *wsStreamCreator) getStream(id byte) *stream {
@@ -208,6 +213,7 @@ func (c *wsStreamCreator) setStream(id byte, s *stream) error {
 		return c.setStreamErr
 	}
 	c.streams[id] = s
+	c.streamsWg.Done()
 	return nil
 }
 
@@ -254,6 +260,10 @@ func (c *wsStreamCreator) readDemuxLoop(bufferSize int, period time.Duration, de
 		return
 	}
 	go h.start()
+
+	// before demuxing streams, waiting for all streams are created and setup properly
+	c.streamsWg.Wait()
+
 	// Buffer size must correspond to the same size allocated
 	// for the read buffer during websocket client creation. A
 	// difference can cause incomplete connection reads.

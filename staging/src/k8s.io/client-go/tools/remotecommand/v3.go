@@ -82,6 +82,18 @@ func (p *streamProtocolV3) handleResizes() {
 	}()
 }
 
+func (p *streamProtocolV3) streams() (count int) {
+	// set up the streams from v2
+	count = p.streamProtocolV2.streams()
+
+	// set up resize stream
+	if p.Tty {
+		count++
+	}
+
+	return
+}
+
 func (p *streamProtocolV3) stream(conn streamCreator) error {
 	if err := p.createStreams(conn); err != nil {
 		return err

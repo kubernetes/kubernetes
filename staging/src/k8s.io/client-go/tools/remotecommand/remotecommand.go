@@ -55,4 +55,5 @@ type streamCreator interface {
 
 type streamProtocolHandler interface {
 	stream(conn streamCreator) error
+	streams() int
 }
