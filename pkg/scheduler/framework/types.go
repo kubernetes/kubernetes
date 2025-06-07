@@ -472,6 +472,13 @@ type PodInfo struct {
 	cachedResource *podResource
 }
 
+func (pi *PodInfo) GetPodCopy() *v1.Pod {
+	if pi.Pod == nil {
+		return nil
+	}
+	return pi.Pod.DeepCopy()
+}
+
 // DeepCopy returns a deep copy of the PodInfo object.
 func (pi *PodInfo) DeepCopy() *PodInfo {
 	return &PodInfo{
