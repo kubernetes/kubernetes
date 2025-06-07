@@ -40,6 +40,7 @@ import (
 	"k8s.io/client-go/transport"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/flowcontrol"
+	basecompatibility "k8s.io/component-base/compatibility"
 	"k8s.io/klog/v2"
 )
 
@@ -162,6 +163,8 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	VersionInfo basecompatibility.EffectiveVersion
 }
 
 var _ fmt.Stringer = new(Config)
@@ -484,7 +487,11 @@ func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Cl
 // Kubernetes API or returns an error if any of the defaults are impossible or invalid.
 func SetKubernetesDefaults(config *Config) error {
 	if len(config.UserAgent) == 0 {
-		config.UserAgent = DefaultKubernetesUserAgent()
+		var v string
+		if config.VersionInfo != nil {
+			v = config.VersionInfo.String()
+		}
+		config.UserAgent = DefaultKubernetesUserAgent(v)
 	}
 	return nil
 }
@@ -500,9 +507,16 @@ func adjustCommit(c string) string {
 	return c
 }
 
-// adjustVersion strips "alpha", "beta", etc. from version in form
-// major.minor.patch-[alpha|beta|etc].
-func adjustVersion(v string) string {
+func adjustVersion(v string, versionOpts ...string) string {
+	var res string
+	if len(versionOpts) != 0 {
+		for _, o := range versionOpts {
+			res += o + "/"
+		}
+
+		return res
+	}
+
 	if len(v) == 0 {
 		return "unknown"
 	}
@@ -527,10 +541,10 @@ func buildUserAgent(command, version, os, arch, commit string) string {
 }
 
 // DefaultKubernetesUserAgent returns a User-Agent string built from static global vars.
-func DefaultKubernetesUserAgent() string {
+func DefaultKubernetesUserAgent(versionOpts ...string) string {
 	return buildUserAgent(
 		adjustCommand(os.Args[0]),
-		adjustVersion(version.Get().GitVersion),
+		adjustVersion(version.Get().GitVersion, versionOpts...),
 		gruntime.GOOS,
 		gruntime.GOARCH,
 		adjustCommit(version.Get().GitCommit))
@@ -624,7 +638,11 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 }
 
 func AddUserAgent(config *Config, userAgent string) *Config {
-	fullUserAgent := DefaultKubernetesUserAgent() + "/" + userAgent
+	var v string
+	if config.VersionInfo != nil {
+		v = config.VersionInfo.String()
+	}
+	fullUserAgent := DefaultKubernetesUserAgent(v) + "/" + userAgent
 	config.UserAgent = fullUserAgent
 	return config
 }
