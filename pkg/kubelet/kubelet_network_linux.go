@@ -37,12 +37,13 @@ const (
 )
 
 func (kl *Kubelet) initNetworkUtil() {
-	iptClients, err := utiliptables.NewDualStack()
-	if err != nil {
-		klog.ErrorS(err, "Failed to initialize iptables")
-	}
-
-	if err != nil || len(iptClients) == 0 {
+	iptClients := utiliptables.NewBestEffort()
+	if len(iptClients) == 0 {
+		// We don't log this as an error because kubelet itself doesn't need any
+		// of this (it sets up these rules for the benefit of *other* components),
+		// and because we *expect* this to fail on hosts where only nftables is
+		// supported (in which case there can't be any other components using
+		// iptables that would need these rules anyway).
 		klog.InfoS("No iptables support on this system; not creating the KUBE-IPTABLES-HINT chain")
 		return
 	}
