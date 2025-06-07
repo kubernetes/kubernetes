@@ -142,7 +142,7 @@ func (t *testRESTStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
 
 func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
-	return newTestGenericStoreRegistry(t, scheme, false)
+	return newTestGenericStoreRegistry(t, scheme, false, true)
 }
 
 func getPodAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
@@ -264,7 +264,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 	}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 
-	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, true)
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, true, true)
 	defer destroyFunc()
 
 	obj, err := registry.Create(ctx, fooPod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -2359,6 +2359,47 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 }
 
+// Test whether objects deleted are correctly delivered
+// to watchers without watch-prev-kv.
+func TestStoreWatchWithoutWatchPrevKv(t *testing.T) {
+	podA := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false, false)
+	defer destroyFunc()
+
+	objCreated, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	podCreated := objCreated.(*example.Pod)
+
+	watcher, err := registry.WatchPredicate(testContext, matchPodName("foo"), podCreated.ResourceVersion, nil)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+	if _, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{}); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	got, open := <-watcher.ResultChan()
+	if !open {
+		t.Errorf("Unexpected channel close")
+	} else {
+		if got.Type != "DELETED" {
+			t.Errorf("Unexpected event type: %s", got.Type)
+		}
+
+		gotObject := got.Object.(*example.Pod)
+		gotObject.ResourceVersion = ""
+		tomb := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"}}
+		if !reflect.DeepEqual(gotObject, tomb) {
+			t.Errorf("Expected: %#v, got: %#v", tomb, gotObject)
+		}
+	}
+}
+
 func TestStoreWatch(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	noNamespaceContext := genericapirequest.NewContext()
@@ -2416,16 +2457,23 @@ func TestStoreWatch(t *testing.T) {
 	}
 }
 
-func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
+func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled, watchPrevKvEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
 
 	newFunc := func() runtime.Object { return &example.Pod{} }
 	newListFunc := func() runtime.Object { return &example.PodList{} }
-
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
+	var reverseKeyFunc func(deleteKey string) (string, string, error)
+	if !watchPrevKvEnabled {
+		reverseKeyFunc = func(deleteKey string) (string, string, error) {
+			tokens := strings.Split(deleteKey, "/")
+			return tokens[len(tokens)-1], tokens[len(tokens)-2], nil
+		}
+	}
+
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, reverseKeyFunc, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -2480,10 +2528,11 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 			return podPrefix
 		},
 		KeyFunc: func(ctx context.Context, id string) (string, error) {
-			if _, ok := genericapirequest.NamespaceFrom(ctx); !ok {
+			if namespace, ok := genericapirequest.NamespaceFrom(ctx); !ok {
 				return "", fmt.Errorf("namespace is required")
+			} else {
+				return path.Join(podPrefix, namespace, id), nil
 			}
-			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*example.Pod).Name, nil },
 		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
@@ -2774,7 +2823,7 @@ func TestDeleteWithCachedObject(t *testing.T) {
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false, true)
 	defer destroyFunc()
 	// cached object does not have any finalizer.
 	registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: podWithNoFinalizer}
@@ -2802,7 +2851,7 @@ func TestPreconditionalUpdateWithCachedObject(t *testing.T) {
 		Spec:       example.PodSpec{NodeName: "machine"},
 	}
 	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
-	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false, true)
 	defer destroyFunc()
 
 	// cached object has old UID

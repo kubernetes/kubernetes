@@ -871,7 +871,7 @@ func TestTooManyRequestsNotReturned(t *testing.T) {
 }
 
 func TestEmptyWatchEventCache(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), nil)
 	defer server.Terminate(t)
 
 	// add a few objects
@@ -3018,7 +3018,7 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 }
 
 func TestWatchStreamSeparation(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix(), nil)
 	t.Cleanup(func() {
 		server.Terminate(t)
 	})
@@ -3231,7 +3231,7 @@ func forceRequestWatchProgressSupport(t *testing.T) {
 		return
 	}
 
-	server, _ := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, _ := newEtcdTestStorage(t, etcd3testing.PathPrefix(), nil)
 	defer server.Terminate(t)
 	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, wait.ForeverTestTimeout, true, func(_ context.Context) (bool, error) {
 		return etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress), nil

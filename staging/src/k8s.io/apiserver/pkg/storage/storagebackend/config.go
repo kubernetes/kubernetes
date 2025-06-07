@@ -64,6 +64,8 @@ type Config struct {
 	Prefix string
 	// Transport holds all connection related info, i.e. equal TransportConfig means equal servers we talk to.
 	Transport TransportConfig
+	// WatchPrevKv indicates watch option prev-kv enabled
+	WatchPrevKv bool
 
 	Codec runtime.Codec
 	// EncodeVersioner is the same groupVersioner used to build the
@@ -123,5 +125,6 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		ReadycheckTimeout:    DefaultReadinessTimeout,
 		LeaseManagerConfig:   etcd3.NewDefaultLeaseManagerConfig(),
 		Transport:            TransportConfig{TracerProvider: noopoteltrace.NewTracerProvider()},
+		WatchPrevKv:          true,
 	}
 }
