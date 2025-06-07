@@ -28,7 +28,9 @@ import (
 	"time"
 
 	authv1 "k8s.io/api/authentication/v1"
+	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -38,7 +40,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/features"
-	v1alpha1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1alpha1"
+	v1testing "k8s.io/kubernetes/pkg/serviceaccount/externaljwt/plugin/testing/v1"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -64,11 +66,11 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	// create and start mock signer.
 	socketPath := utilnettesting.MakeSocketNameForTest(t, fmt.Sprintf("mock-external-jwt-signer-%d.sock", time.Now().Nanosecond()))
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
-	mockSigner := v1alpha1testing.NewMockSigner(t, socketPath)
+	mockSigner := v1testing.NewMockSigner(t, socketPath)
 	defer mockSigner.CleanUp()
 
 	// Start Api server configured with external signer.
-	client, _, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
+	client, clientConfig, tearDownFn := framework.StartTestServer(ctx, t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opt *options.ServerRunOptions) {
 			opt.ServiceAccountSigningEndpoint = socketPath
 			opt.ServiceAccountSigningKeyFile = ""
@@ -105,6 +107,53 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 		t.Fatalf("Error when creating service-account: %v", err)
 	}
 
+	// Define Pod access role in ns-1
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-reader",
+			Namespace: "ns-1",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"get"},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			},
+		},
+	}
+
+	// Define binding for sa-1 to access pod in ns-1
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod-reader-binding",
+			Namespace: "ns-1",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "sa-1",
+				Namespace: "ns-1",
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     "pod-reader",
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	}
+
+	// Create a Role
+	_, err = client.RbacV1().Roles("ns-1").Create(ctx, role, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create role: %v", err)
+	}
+
+	// Create Role binding
+	_, err = client.RbacV1().RoleBindings("ns-1").Create(ctx, roleBinding, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create rolebinding: %v", err)
+	}
+
 	testCases := []struct {
 		desc                      string
 		preTestSignerUpdate       func(t *testing.T)
@@ -133,11 +182,11 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				mockSigner.SigningKey = key1
 				mockSigner.SigningKeyID = "updated-kid-1"
 
-				cpy := make(map[string]v1alpha1testing.KeyT)
+				cpy := make(map[string]v1testing.KeyT)
 				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
-				cpy["updated-kid-1"] = v1alpha1testing.KeyT{
+				cpy["updated-kid-1"] = v1testing.KeyT{
 					Key:                      pubKey1Bytes,
 					ExcludeFromOidcDiscovery: true,
 				}
@@ -176,7 +225,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 				mockSigner.SigningKey = key1
 			},
 			preValidationSignerUpdate: func(_ *testing.T) {
-				mockSigner.SetSupportedKeys(map[string]v1alpha1testing.KeyT{})
+				mockSigner.SetSupportedKeys(map[string]v1testing.KeyT{})
 			},
 			shouldPassAuth: false,
 		},
@@ -187,11 +236,11 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			},
 			preValidationSignerUpdate: func(t *testing.T) {
 				t.Helper()
-				cpy := make(map[string]v1alpha1testing.KeyT)
+				cpy := make(map[string]v1testing.KeyT)
 				for key, value := range mockSigner.GetSupportedKeys() {
 					cpy[key] = value
 				}
-				cpy["kid-1"] = v1alpha1testing.KeyT{Key: pubKey1Bytes}
+				cpy["kid-1"] = v1testing.KeyT{Key: pubKey1Bytes}
 				mockSigner.SetSupportedKeys(cpy)
 				waitForDataTimestamp(t, client, time.Now())
 			},
@@ -245,6 +294,34 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			} else if tokenReviewResult.Status.Authenticated && !tc.shouldPassAuth {
 				t.Fatal("Expected Authentication to fail")
 			}
+
+			// Perform SSAR
+			if tc.shouldPassAuth {
+				config := *clientConfig
+				config.BearerToken = tokenRequest.Status.Token
+
+				newClient, err := kubernetes.NewForConfig(&config)
+				if err != nil {
+					t.Fatalf("While creating a new client using token: %v", err)
+				}
+
+				ssar, err := newClient.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authzv1.SelfSubjectAccessReview{
+					Spec: authzv1.SelfSubjectAccessReviewSpec{
+						ResourceAttributes: &authzv1.ResourceAttributes{
+							Namespace: "ns-1",
+							Verb:      "get",
+							Resource:  "pods",
+						},
+					},
+				}, metav1.CreateOptions{})
+				if err != nil {
+					t.Fatalf("Failed to perform SelfSubjectAccessReview: %v", err)
+				}
+
+				if !ssar.Status.Allowed {
+					t.Fatalf("expected ssar.Status.Allowed to return true")
+				}
+			}
 		})
 	}
 }
@@ -292,7 +369,7 @@ func TestDelayedStartForSigner(t *testing.T) {
 	t.Cleanup(func() { _ = os.Remove(socketPath) })
 	go func() {
 		time.Sleep(20 * time.Second)
-		v1alpha1testing.NewMockSigner(t, socketPath)
+		v1testing.NewMockSigner(t, socketPath)
 	}()
 
 	// Start Api server configured with external signer.

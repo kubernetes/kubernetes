@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,9 @@ limitations under the License.
 // To regenerate api.pb.go run `hack/update-codegen.sh protobindings`
 syntax = "proto3";
 
-package v1alpha1;
+package v1;
 
-option go_package = "k8s.io/externaljwt/apis/v1alpha1";
+option go_package = "k8s.io/externaljwt/apis/v1";
 
 import "google/protobuf/timestamp.proto";
 
