@@ -139,7 +139,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		expectedRequestsMadeByDynamicClient := getExpectedRequestsMadeByClientFor(secretList.GetResourceVersion())
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByDynamicClient))
 	})
-	ginkgo.It("should be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
+	ginkgo.It("should NOT be requested by metadata client's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
 		metaClient, err := metadata.NewForConfig(f.ClientConfig())
@@ -155,16 +155,16 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		wrappedMetaClient, err := metadata.NewForConfig(clientConfig)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Streaming secrets metadata from the server")
+		ginkgo.By("Getting secrets metadata from the server")
 		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying if the secret meta list was properly streamed")
-		streamedMetaSecrets := secretMetaList.Items
-		gomega.Expect(cmp.Equal(expectedMetaSecrets, streamedMetaSecrets)).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
+		actualMetaSecrets := secretMetaList.Items
+		gomega.Expect(cmp.Equal(expectedMetaSecrets, actualMetaSecrets)).To(gomega.BeTrueBecause("data received via list must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestsMadeByMetaClient := getExpectedRequestsMadeByClientFor(secretMetaList.GetResourceVersion())
+		expectedRequestsMadeByMetaClient := []string{expectedListRequestMadeByClient}
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByMetaClient))
 	})
 
@@ -285,6 +285,12 @@ var expectedStreamingRequestMadeByClient = func() string {
 	params.Add("resourceVersionMatch", "NotOlderThan")
 	params.Add("sendInitialEvents", "true")
 	params.Add("watch", "true")
+	return params.Encode()
+}()
+
+var expectedListRequestMadeByClient = func() string {
+	params := url.Values{}
+	params.Add("labelSelector", "watchlist=true")
 	return params.Encode()
 }()
 
