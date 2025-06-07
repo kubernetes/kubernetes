@@ -1383,14 +1383,14 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 		pod            *v1.Pod
 		claims         []*resourceapi.ResourceClaim
 		oldObj, newObj interface{}
-		wantHint       framework.QueueingHint
+		wantHint       fwk.QueueingHint
 		wantErr        bool
 	}{
 		"skip-deletes": {
 			pod:      podWithClaimTemplate,
 			oldObj:   allocatedClaim,
 			newObj:   nil,
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 		"backoff-wrong-new-object": {
 			pod:     podWithClaimTemplate,
@@ -1404,7 +1404,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.OwnerReferences[0].UID += "123"
 				return claim
 			}(),
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 		"skip-unrelated-claim": {
 			pod:    podWithClaimTemplate,
@@ -1415,12 +1415,12 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.UID += "123"
 				return claim
 			}(),
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 		"queue-on-add": {
 			pod:      podWithClaimName,
 			newObj:   pendingClaim,
-			wantHint: framework.Queue,
+			wantHint: fwk.Queue,
 		},
 		"backoff-wrong-old-object": {
 			pod:     podWithClaimName,
@@ -1438,7 +1438,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.Finalizers = append(claim.Finalizers, "foo")
 				return claim
 			}(),
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 		"queue-on-status-change": {
 			pod:    podWithClaimName,
@@ -1449,7 +1449,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.Status.Allocation = &resourceapi.AllocationResult{}
 				return claim
 			}(),
-			wantHint: framework.Queue,
+			wantHint: fwk.Queue,
 		},
 		"claim-deallocate": {
 			pod:    podWithClaimName,
@@ -1460,7 +1460,7 @@ func Test_isSchedulableAfterClaimChange(t *testing.T) {
 				claim.Status.Allocation = nil
 				return claim
 			}(),
-			wantHint: framework.Queue,
+			wantHint: fwk.Queue,
 		},
 	}
 
@@ -1540,7 +1540,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		pod      *v1.Pod
 		claims   []*resourceapi.ResourceClaim
 		obj      interface{}
-		wantHint framework.QueueingHint
+		wantHint fwk.QueueingHint
 		wantErr  bool
 	}{
 		"backoff-wrong-new-object": {
@@ -1552,7 +1552,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			objs:     []apiruntime.Object{pendingClaim},
 			pod:      podWithClaimTemplate,
 			obj:      podWithClaimTemplateInStatus,
-			wantHint: framework.Queue,
+			wantHint: fwk.Queue,
 		},
 		"wrong-pod": {
 			objs: []apiruntime.Object{pendingClaim},
@@ -1563,13 +1563,13 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				return pod
 			}(),
 			obj:      podWithClaimTemplateInStatus,
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 		"missing-claim": {
 			objs:     nil,
 			pod:      podWithClaimTemplate,
 			obj:      podWithClaimTemplateInStatus,
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 		"incomplete": {
 			objs: []apiruntime.Object{pendingClaim},
@@ -1583,7 +1583,7 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 				}}
 				return pod
 			}(),
-			wantHint: framework.QueueSkip,
+			wantHint: fwk.QueueSkip,
 		},
 	}
 

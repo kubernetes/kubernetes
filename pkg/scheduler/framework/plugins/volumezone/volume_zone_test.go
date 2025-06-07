@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -549,13 +550,13 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-pvc",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"pvc-was-added-but-pod-refers-no-pvc": {
@@ -564,7 +565,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"pvc-was-added-and-pod-was-bound-to-different-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_2"),
@@ -572,7 +573,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"pvc-was-added-and-pod-was-bound-to-pvc-but-different-ns": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -580,7 +581,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "ns1"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"pvc-was-added-and-pod-was-bound-to-the-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -588,7 +589,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pvc-was-updated-and-pod-was-bound-to-the-pvc": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -600,7 +601,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pvc-was-updated-but-pod-refers-no-pvc": {
 			pod: st.MakePod().Name("pod_1").Namespace(metav1.NamespaceDefault).Obj(),
@@ -612,7 +613,7 @@ func TestIsSchedulableAfterPersistentVolumeClaimAdded(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 
@@ -638,13 +639,13 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-storageclass",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"sc-doesn't-have-volume-binding-mode": {
@@ -652,7 +653,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 			newObj: &storagev1.StorageClass{
 				ObjectMeta: metav1.ObjectMeta{Name: "SC_1"},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		"new-sc-is-wait-for-first-consumer-mode": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -660,7 +661,7 @@ func TestIsSchedulableAfterStorageClassAdded(t *testing.T) {
 				ObjectMeta:        metav1.ObjectMeta{Name: "SC_1"},
 				VolumeBindingMode: &modeWait,
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 
@@ -684,20 +685,20 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"error-wrong-new-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			newObj:       "not-a-pv",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"error-wrong-old-object": {
 			pod:          createPodWithVolume("pod_1", "PVC_1"),
 			oldObj:       "not-a-pv",
 			newObj:       st.MakePersistentVolume().Name("Vol_1").Obj(),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"new-pv-was-added": {
@@ -708,7 +709,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pv-was-updated-and-changed-topology": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -724,7 +725,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 					Labels: map[string]string{v1.LabelFailureDomainBetaZone: "us-west1-b"},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pv-was-updated-and-added-topology-label": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -741,7 +742,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 						v1.LabelTopologyZone: "zone"},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		"pv-was-updated-but-no-topology-is-changed": {
 			pod: createPodWithVolume("pod_1", "PVC_1"),
@@ -759,7 +760,7 @@ func TestIsSchedulableAfterPersistentVolumeChange(t *testing.T) {
 						v1.LabelTopologyZone: "zone"},
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 	}
 
