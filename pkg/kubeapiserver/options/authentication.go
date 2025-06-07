@@ -321,7 +321,6 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.AuthenticationConfigFile, "authentication-config", o.AuthenticationConfigFile, ""+
 		"File with Authentication Configuration to configure the JWT Token authenticator or the anonymous authenticator. "+
 		"Requires the StructuredAuthenticationConfiguration feature gate. "+
-		"Also requires the feature gate AnonymousAuthConfigurableEndpoints to configure the anonymous authenticator in the config file. "+
 		"This flag is mutually exclusive with the --oidc-* flags if the file configures the JWT Token authenticator. "+
 		"This flag is mutually exclusive with --anonymous-auth if the file configures the Anonymous authenticator.")
 
