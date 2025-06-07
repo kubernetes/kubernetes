@@ -35,26 +35,20 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
-// NewDRAPluginClient returns a wrapper around those gRPC methods of a DRA
-// driver kubelet plugin which need to be called by kubelet. The wrapper
-// handles gRPC connection management and logging. Connections are reused
-// across different NewDRAPluginClient calls.
+// defaultClientCallTimeout is the default amount of time that a DRA driver has
+// to respond to any of the gRPC calls. kubelet uses this value by passing nil
+// to RegisterPlugin. Some tests use a different, usually shorter timeout to
+// speed up testing.
 //
-// It returns an informative error message including the driver name
-// with an explanation why the driver is not usable.
-func NewDRAPluginClient(driverName string) (*Plugin, error) {
-	if driverName == "" {
-		return nil, errors.New("DRA driver name is empty")
-	}
-	client := draPlugins.get(driverName)
-	if client == nil {
-		return nil, fmt.Errorf("DRA driver %s is not registered", driverName)
-	}
-	return client, nil
-}
+// This is half of the kubelet retry period (according to
+// https://github.com/kubernetes/kubernetes/commit/0449cef8fd5217d394c5cd331d852bd50983e6b3).
+const defaultClientCallTimeout = 45 * time.Second
 
-type Plugin struct {
-	name          string
+// DRAPlugin contains information about one registered plugin of a DRA driver.
+// It implements the kubelet operations for preparing/unpreparing by calling
+// a gRPC interface that is implemented by the plugin.
+type DRAPlugin struct {
+	driverName    string
 	backgroundCtx context.Context
 	cancel        func(cause error)
 
@@ -65,7 +59,7 @@ type Plugin struct {
 	clientCallTimeout time.Duration
 }
 
-func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
+func (p *DRAPlugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -89,7 +83,7 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
-		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
+		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.driverName)),
 	)
 	if err != nil {
 		return nil, err
@@ -106,11 +100,11 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	return p.conn, nil
 }
 
-func (p *Plugin) Name() string {
-	return p.name
+func (p *DRAPlugin) DriverName() string {
+	return p.driverName
 }
 
-func (p *Plugin) NodePrepareResources(
+func (p *DRAPlugin) NodePrepareResources(
 	ctx context.Context,
 	req *drapbv1beta1.NodePrepareResourcesRequest,
 	opts ...grpc.CallOption,
@@ -143,7 +137,7 @@ func (p *Plugin) NodePrepareResources(
 	return response, err
 }
 
-func (p *Plugin) NodeUnprepareResources(
+func (p *DRAPlugin) NodeUnprepareResources(
 	ctx context.Context,
 	req *drapbv1beta1.NodeUnprepareResourcesRequest,
 	opts ...grpc.CallOption,
@@ -176,11 +170,11 @@ func (p *Plugin) NodeUnprepareResources(
 	return response, err
 }
 
-func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
+func newMetricsInterceptor(driverName string) grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, conn *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		start := time.Now()
 		err := invoker(ctx, method, req, reply, conn, opts...)
-		metrics.DRAGRPCOperationsDuration.WithLabelValues(pluginName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
+		metrics.DRAGRPCOperationsDuration.WithLabelValues(driverName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
 		return err
 	}
 }
