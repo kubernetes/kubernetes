@@ -351,12 +351,13 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 // terms indicated by the existing pods.
 func satisfyExistingPodsAntiAffinity(state *preFilterState, nodeInfo *framework.NodeInfo) bool {
 	if len(state.existingAntiAffinityCounts) > 0 {
-		// Iterate over topology pairs to get any of the pods being affected by
-		// the scheduled pod anti-affinity terms
-		for topologyKey, topologyValue := range nodeInfo.Node().Labels {
-			tp := topologyPair{key: topologyKey, value: topologyValue}
-			if state.existingAntiAffinityCounts[tp] > 0 {
-				return false
+		// Check if this node matches any anti-affinity topology pairs.
+		nodeLabels := nodeInfo.Node().Labels
+		for tp, count := range state.existingAntiAffinityCounts {
+			if count > 0 {
+				if nodeValue, ok := nodeLabels[tp.key]; ok && nodeValue == tp.value {
+					return false
+				}
 			}
 		}
 	}
