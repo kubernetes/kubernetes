@@ -22,8 +22,6 @@ import (
 	"math/rand"
 	"sort"
 
-	fwk "k8s.io/kube-scheduler/framework"
-
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +33,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -155,11 +154,11 @@ func (pl *DefaultPreemption) PreEnqueue(ctx context.Context, p *v1.Pod) *framewo
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	if pl.fts.EnableAsyncPreemption {
-		return []framework.ClusterEventWithHint{
+		return []fwk.ClusterEventWithHint{
 			// We need to register the event to tell the scheduling queue that the pod could be un-gated after some Pods' deletion.
-			{Event: framework.ClusterEvent{Resource: framework.Pod, ActionType: framework.Delete}, QueueingHintFn: pl.isPodSchedulableAfterPodDeletion},
+			{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isPodSchedulableAfterPodDeletion},
 		}, nil
 	}
 
@@ -175,8 +174,8 @@ func (pl *DefaultPreemption) EventsToRegister(_ context.Context) ([]framework.Cl
 // which failure will be resolved by the preemption.
 // The reason why we return Skip here is that the preemption plugin should not make the decision of when to requeueing Pods,
 // and rather, those plugins should be responsible for that.
-func (pl *DefaultPreemption) isPodSchedulableAfterPodDeletion(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
-	return framework.QueueSkip, nil
+func (pl *DefaultPreemption) isPodSchedulableAfterPodDeletion(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	return fwk.QueueSkip, nil
 }
 
 // calculateNumCandidates returns the number of candidates the FindCandidates

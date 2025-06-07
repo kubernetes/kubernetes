@@ -86,61 +86,61 @@ func (s *preFilterState) Clone() fwk.StateData {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *NodeAffinity) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *NodeAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	// A note about UpdateNodeTaint event:
 	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
 	if pl.enableSchedulingQueueHint {
 		// preCheck is not used when QHint is enabled, and hence we can use UpdateNodeLabel instead of Update.
-		nodeActionType = framework.Add | framework.UpdateNodeLabel
+		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
 	}
 
-	return []framework.ClusterEventWithHint{
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+	return []fwk.ClusterEventWithHint{
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }
 
 // isSchedulableAfterNodeChange is invoked whenever a node changed. It checks whether
 // that change made a previously unschedulable pod schedulable.
-func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalNode, modifiedNode, err := util.As[*v1.Node](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(modifiedNode) {
 		logger.V(4).Info("added or modified node didn't match scheduler-enforced node affinity and this event won't make the Pod schedulable", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	isMatched, err := requiredNodeAffinity.Match(modifiedNode)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 	if !isMatched {
 		logger.V(5).Info("node was created or updated, but the pod's NodeAffinity doesn't match", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 	// Since the node was added and it matches the pod's affinity criteria, we can unblock it.
 	if originalNode == nil {
 		logger.V(5).Info("node was created, and matches with the pod's NodeAffinity", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	// At this point we know the operation is update so we can narrow down the criteria to unmatch -> match changes only
 	// (necessary affinity label was added to the node in this case).
 	wasMatched, err := requiredNodeAffinity.Match(originalNode)
 	if err != nil {
-		return framework.Queue, err
+		return fwk.Queue, err
 	}
 	if wasMatched {
 		logger.V(5).Info("node updated, but the pod's NodeAffinity hasn't changed", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 	logger.V(5).Info("node was updated and the pod's NodeAffinity changed to matched", "pod", klog.KObj(pod), "node", klog.KObj(modifiedNode))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // PreFilter builds and writes cycle state used by Filter.
