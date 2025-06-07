@@ -99,9 +99,11 @@ type RepairIPAddress struct {
 	ipAddressLister networkinglisters.IPAddressLister
 	ipAddressSynced cache.InformerSynced
 
-	svcQueue         workqueue.TypedRateLimitingInterface[string]
-	ipQueue          workqueue.TypedRateLimitingInterface[string]
-	workerLoopPeriod time.Duration
+	svcQueue             workqueue.TypedRateLimitingInterface[string]
+	svcHandlerUnregister func() error
+	ipQueue              workqueue.TypedRateLimitingInterface[string]
+	ipHandlerUnregister  func() error
+	workerLoopPeriod     time.Duration
 
 	broadcaster events.EventBroadcaster
 	recorder    events.EventRecorder
@@ -114,7 +116,7 @@ func NewRepairIPAddress(interval time.Duration,
 	client kubernetes.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	serviceCIDRInformer networkinginformers.ServiceCIDRInformer,
-	ipAddressInformer networkinginformers.IPAddressInformer) *RepairIPAddress {
+	ipAddressInformer networkinginformers.IPAddressInformer) (*RepairIPAddress, error) {
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "ipallocator-repair-controller")
 
@@ -141,7 +143,7 @@ func NewRepairIPAddress(interval time.Duration,
 		clock:            clock.RealClock{},
 	}
 
-	_, _ = serviceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	svcHandler, err := serviceInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -163,8 +165,14 @@ func NewRepairIPAddress(interval time.Duration,
 			}
 		},
 	}, interval)
+	if err != nil {
+		return nil, err
+	}
+	r.svcHandlerUnregister = func() error {
+		return serviceInformer.Informer().RemoveEventHandler(svcHandler)
+	}
 
-	ipAddressInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
+	ipHandler, err := ipAddressInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -186,16 +194,21 @@ func NewRepairIPAddress(interval time.Duration,
 			}
 		},
 	}, interval)
+	if err != nil {
+		return nil, err
+	}
+	r.ipHandlerUnregister = func() error {
+		return ipAddressInformer.Informer().RemoveEventHandler(ipHandler)
+	}
 
-	return r
+	return r, nil
 }
 
 // RunUntil starts the controller until the provided ch is closed.
-func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) {
-	defer r.ipQueue.ShutDown()
-	defer r.svcQueue.ShutDown()
+func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh <-chan struct{}) {
+	defer r.ShutDown()
+
 	r.broadcaster.StartRecordingToSink(stopCh)
-	defer r.broadcaster.Shutdown()
 
 	klog.Info("Starting ipallocator-repair-controller")
 	defer klog.Info("Shutting down ipallocator-repair-controller")
@@ -233,6 +246,14 @@ func (r *RepairIPAddress) RunUntil(onFirstSuccess func(), stopCh chan struct{}) 
 	}
 
 	<-stopCh
+}
+
+func (r *RepairIPAddress) ShutDown() {
+	r.broadcaster.Shutdown()
+	runtime.HandleError(r.svcHandlerUnregister())
+	r.svcQueue.ShutDown()
+	runtime.HandleError(r.ipHandlerUnregister())
+	r.ipQueue.ShutDown()
 }
 
 // runOnce verifies the state of the ClusterIP allocations and returns an error if an unrecoverable problem occurs.

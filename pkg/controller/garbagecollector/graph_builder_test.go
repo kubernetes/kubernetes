@@ -17,8 +17,22 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
+
+	"go.uber.org/goleak"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/metadata"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetAlternateOwnerIdentity(t *testing.T) {
@@ -209,4 +223,136 @@ func TestGetAlternateOwnerIdentity(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGraphBuilderLeak(t *testing.T) {
+	cases := map[string]struct {
+		runner func(ctx context.Context, gb *GraphBuilder)
+	}{
+		"run": {
+			runner: func(ctx context.Context, gb *GraphBuilder) { gb.Run(ctx) },
+		},
+		"shutdown": {
+			runner: func(ctx context.Context, gb *GraphBuilder) { gb.ShutDown() },
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			logger, tCtx := ktesting.NewTestContext(t)
+
+			metadataClient, err := metadata.NewForConfig(&restclient.Config{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rm := &testRESTMapper{
+				meta.MultiRESTMapper{
+					meta.NewDefaultRESTMapper(nil),
+					testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+				},
+			}
+
+			cl := fake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+			informerFactory.Start(tCtx.Done())
+
+			informerFactory.WaitForCacheSync(tCtx.Done())
+
+			alwaysStarted := make(chan struct{})
+			close(alwaysStarted)
+
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+			gb := NewDependencyGraphBuilder(
+				tCtx,
+				metadataClient,
+				rm,
+				map[schema.GroupResource]struct{}{},
+				informerFactory,
+				alwaysStarted,
+			)
+
+			oneResource := map[schema.GroupVersionResource]struct{}{
+				{Version: "v1", Resource: "pods"}: {},
+			}
+
+			if err := gb.syncMonitors(logger, oneResource); err != nil {
+				t.Errorf("unexpected error syncing monitors: with one resource %v", err)
+			}
+
+			ctx, _ := context.WithTimeout(tCtx, 100*time.Millisecond)
+			tc.runner(ctx, gb)
+
+			// The queue metrics need a bit to notice the shutdown.
+			// Not sleeping can lead to erroneous goleak errors.
+			time.Sleep(100 * time.Millisecond)
+		},
+		)
+	}
+}
+
+func TestGraphBuilder_SyncMonitorsLeak(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+
+	metadataClient, err := metadata.NewForConfig(&restclient.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rm := &testRESTMapper{
+		meta.MultiRESTMapper{
+			meta.NewDefaultRESTMapper(nil),
+			testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
+		},
+	}
+
+	cl := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(cl, controller.NoResyncPeriodFunc())
+	informerFactory.Start(tCtx.Done())
+
+	informerFactory.WaitForCacheSync(tCtx.Done())
+
+	alwaysStarted := make(chan struct{})
+	close(alwaysStarted)
+
+	gb := NewDependencyGraphBuilder(
+		tCtx,
+		metadataClient,
+		rm,
+		map[schema.GroupResource]struct{}{},
+		informerFactory,
+		alwaysStarted,
+	)
+	// The graph builder doesn't have to be running - but the resources
+	// from the setup should be freed when the test exits anyhow.
+	defer gb.ShutDown()
+
+	oneResource := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}: {},
+	}
+
+	// add monitor for one resource and store the running goroutines
+	if err := gb.syncMonitors(logger, oneResource); err != nil {
+		t.Errorf("unexpected error syncing monitors: with one resource %v", err)
+	}
+	currentGoroutines := goleak.IgnoreCurrent()
+
+	twoResources := map[schema.GroupVersionResource]struct{}{
+		{Version: "v1", Resource: "pods"}:       {},
+		{Version: "v1", Resource: "configmaps"}: {},
+	}
+
+	// add another monitor, then scale back down. this should stop the
+	// goroutines started from the added monitor.
+	if err := gb.syncMonitors(logger, twoResources); err != nil {
+		t.Errorf("unexpected error syncing monitors: with two resources %v", err)
+	}
+	if err := gb.syncMonitors(logger, oneResource); err != nil {
+		t.Errorf("unexpected error syncing monitors: with one resource %v", err)
+	}
+
+	// verify that the goroutines from the second resource monitor are
+	// shutdown as expected
+	goleak.VerifyNone(t, currentGoroutines)
 }
