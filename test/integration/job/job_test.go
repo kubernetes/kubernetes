@@ -1588,6 +1588,8 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 			if !test.enableJobSuccessPolicy {
 				// TODO: this will be removed in 1.36.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
+			} else if !test.enableJobPodReplacementPolicy {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, test.enableJobPodReplacementPolicy)
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobManagedBy, test.enableJobManagedBy)
@@ -3196,6 +3198,9 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 	for name, tc := range cases {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
+			if !tc.podReplacementPolicyEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobPodReplacementPolicy, tc.podReplacementPolicyEnabled)
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
@@ -3262,6 +3267,7 @@ func TestJobPodReplacementPolicy(t *testing.T) {
 // Enabling will then match the original failed case.
 func TestJobPodReplacementPolicyFeatureToggling(t *testing.T) {
 	t.Cleanup(setDurationDuringTest(&jobcontroller.DefaultJobPodFailureBackOff, fastPodFailureBackoff))
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 	const podCount int32 = 2
 	jobSpec := batchv1.JobSpec{
 		Parallelism:          ptr.To(podCount),
