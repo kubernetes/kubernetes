@@ -397,6 +397,7 @@ func (ms thresholdMetricSelector) isValid(mcc *metricsCollectorConfig) error {
 			return nil
 		}
 	}
+
 	return fmt.Errorf("no matching labels found for metric %v", ms.Name)
 }
 
