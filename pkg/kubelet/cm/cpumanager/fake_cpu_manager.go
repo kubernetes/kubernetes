@@ -90,6 +90,10 @@ func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	return cpuset.CPUSet{}
 }
 
+func (m *fakeManager) RemoveStaleState() {
+	klog.InfoS("RemoveStaleState")
+}
+
 // NewFakeManager creates empty/fake cpu manager
 func NewFakeManager() Manager {
 	return &fakeManager{

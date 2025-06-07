@@ -24,6 +24,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gstruct"
+	"github.com/onsi/gomega/types"
+
+	"google.golang.org/grpc"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,10 +46,6 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/cpuset"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	"github.com/onsi/gomega/gstruct"
-	"github.com/onsi/gomega/types"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -61,11 +64,35 @@ type podDesc struct {
 	resourceName   string
 	resourceAmount int
 	cpuRequest     int // cpuRequest is in millicores
+	memRequest     int // memRequest is in megabytes
+	cpuLimit       int // cpuLimit is in millicores
+	memLimit       int // memLimit is in megabytes
 	initContainers []initContainerDesc
+	mainCntCommand []string
+	restartPolicy  *v1.RestartPolicy
 }
 
-func (desc podDesc) CpuRequestQty() resource.Quantity {
+func (desc podDesc) String() string {
+	return fmt.Sprintf("%s/%s cpu=%v/%v mem=%v/%v %s=%d", desc.podName, desc.cntName, desc.cpuRequest, desc.cpuLimit, desc.memRequest, desc.memLimit, desc.resourceName, desc.resourceAmount)
+}
+
+func (desc podDesc) CPURequestQty() resource.Quantity {
 	qty := resource.NewMilliQuantity(int64(desc.cpuRequest), resource.DecimalSI)
+	return *qty
+}
+
+func (desc podDesc) MemRequestQty() resource.Quantity {
+	qty := resource.NewQuantity(int64(desc.memRequest)*1024*1024, resource.DecimalSI)
+	return *qty
+}
+
+func (desc podDesc) CPULimitQty() resource.Quantity {
+	qty := resource.NewMilliQuantity(int64(desc.cpuLimit), resource.DecimalSI)
+	return *qty
+}
+
+func (desc podDesc) MemLimitQty() resource.Quantity {
+	qty := resource.NewQuantity(int64(desc.memLimit)*1024*1024, resource.DecimalSI)
 	return *qty
 }
 
@@ -78,11 +105,27 @@ func (desc podDesc) CpuRequestExclusive() int {
 	return desc.cpuRequest / 1000
 }
 
-func (desc podDesc) RequiresCPU() bool {
+func (desc podDesc) WantsExclusiveCPUs() bool {
+	if desc.cpuLimit == 0 {
+		return false
+	}
+	if (desc.cpuLimit % 1000) != 0 {
+		// exclusive cpus are request only if the quantity is integral;
+		// hence, explicitly rule out non-integral requests
+		return false
+	}
+	return true
+}
+
+func (desc podDesc) WantsExclusiveMemory() bool {
+	return desc.memLimit > 0
+}
+
+func (desc podDesc) HasCPURequests() bool {
 	return desc.cpuRequest > 0
 }
 
-func (desc podDesc) RequiresDevices() bool {
+func (desc podDesc) HasDevicesRequest() bool {
 	return desc.resourceName != "" && desc.resourceAmount > 0
 }
 
@@ -108,12 +151,62 @@ func (desc initContainerDesc) CPURequestExclusive() int {
 	return desc.cpuRequest / 1000
 }
 
-func (desc initContainerDesc) RequiresCPU() bool {
+func (desc initContainerDesc) HasCPURequests() bool {
 	return desc.cpuRequest > 0
 }
 
-func (desc initContainerDesc) RequiresDevices() bool {
+func (desc initContainerDesc) HasDevicesRequest() bool {
 	return desc.resourceName != "" && desc.resourceAmount > 0
+}
+
+// TODO: replace makePodResourcesTestPod reimplementing in terms of this function
+func makeFullPodResourcesTestPod(desc podDesc) *v1.Pod {
+	cnt := v1.Container{
+		Name:  desc.cntName,
+		Image: busyboxImage,
+		Resources: v1.ResourceRequirements{
+			Requests: v1.ResourceList{},
+			Limits:   v1.ResourceList{},
+		},
+		Command: []string{"sh", "-c", "sleep 1d"},
+	}
+	if desc.cpuLimit > 0 {
+		cnt.Resources.Limits[v1.ResourceCPU] = desc.CPULimitQty()
+	}
+	if desc.cpuRequest > 0 {
+		cnt.Resources.Requests[v1.ResourceCPU] = desc.CPURequestQty()
+	}
+	if desc.memLimit > 0 {
+		cnt.Resources.Limits[v1.ResourceMemory] = desc.MemLimitQty()
+	}
+	if desc.memRequest > 0 {
+		cnt.Resources.Requests[v1.ResourceMemory] = desc.MemRequestQty()
+	}
+	if desc.HasDevicesRequest() {
+		devQty := resource.NewQuantity(int64(desc.resourceAmount), resource.DecimalSI)
+		cnt.Resources.Requests[v1.ResourceName(desc.resourceName)] = *devQty
+		cnt.Resources.Limits[v1.ResourceName(desc.resourceName)] = *devQty
+	}
+	if len(desc.mainCntCommand) > 0 {
+		cnt.Command = desc.mainCntCommand
+	}
+	restartPolicy := v1.RestartPolicyNever
+	if desc.restartPolicy != nil {
+		restartPolicy = *desc.restartPolicy
+	}
+
+	// TODO: support for init containers - currently unneeded
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: desc.podName,
+		},
+		Spec: v1.PodSpec{
+			RestartPolicy: restartPolicy,
+			Containers: []v1.Container{
+				cnt,
+			},
+		},
+	}
 }
 
 func makePodResourcesTestPod(desc podDesc) *v1.Pod {
@@ -126,17 +219,24 @@ func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 		},
 		Command: []string{"sh", "-c", "sleep 1d"},
 	}
-	if desc.RequiresCPU() {
-		cpuRequestQty := desc.CpuRequestQty()
+	if desc.HasCPURequests() {
+		cpuRequestQty := desc.CPURequestQty()
 		cnt.Resources.Requests[v1.ResourceCPU] = cpuRequestQty
 		cnt.Resources.Limits[v1.ResourceCPU] = cpuRequestQty
 		// we don't really care, we only need to be in guaranteed QoS
 		cnt.Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 		cnt.Resources.Limits[v1.ResourceMemory] = resource.MustParse("100Mi")
 	}
-	if desc.RequiresDevices() {
+	if desc.HasDevicesRequest() {
 		cnt.Resources.Requests[v1.ResourceName(desc.resourceName)] = resource.MustParse(fmt.Sprintf("%d", desc.resourceAmount))
 		cnt.Resources.Limits[v1.ResourceName(desc.resourceName)] = resource.MustParse(fmt.Sprintf("%d", desc.resourceAmount))
+	}
+	if len(desc.mainCntCommand) > 0 {
+		cnt.Command = desc.mainCntCommand
+	}
+	restartPolicy := v1.RestartPolicyNever
+	if desc.restartPolicy != nil {
+		restartPolicy = *desc.restartPolicy
 	}
 
 	var initCnts []v1.Container
@@ -154,7 +254,7 @@ func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 		if cntDesc.restartPolicy != nil && *cntDesc.restartPolicy == v1.ContainerRestartPolicyAlways {
 			initCnt.Command = []string{"sh", "-c", "sleep 1d"}
 		}
-		if cntDesc.RequiresCPU() {
+		if cntDesc.HasCPURequests() {
 			cpuRequestQty := cntDesc.CPURequestQty()
 			initCnt.Resources.Requests[v1.ResourceCPU] = cpuRequestQty
 			initCnt.Resources.Limits[v1.ResourceCPU] = cpuRequestQty
@@ -162,7 +262,7 @@ func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 			initCnt.Resources.Requests[v1.ResourceMemory] = resource.MustParse("100Mi")
 			initCnt.Resources.Limits[v1.ResourceMemory] = resource.MustParse("100Mi")
 		}
-		if cntDesc.RequiresDevices() {
+		if cntDesc.HasDevicesRequest() {
 			initCnt.Resources.Requests[v1.ResourceName(cntDesc.resourceName)] = resource.MustParse(fmt.Sprintf("%d", cntDesc.resourceAmount))
 			initCnt.Resources.Limits[v1.ResourceName(cntDesc.resourceName)] = resource.MustParse(fmt.Sprintf("%d", cntDesc.resourceAmount))
 		}
@@ -174,7 +274,7 @@ func makePodResourcesTestPod(desc podDesc) *v1.Pod {
 			Name: desc.podName,
 		},
 		Spec: v1.PodSpec{
-			RestartPolicy:  v1.RestartPolicyNever,
+			RestartPolicy:  restartPolicy,
 			InitContainers: initCnts,
 			Containers: []v1.Container{
 				cnt,
@@ -192,15 +292,26 @@ func logPodResources(podIdx int, pr *kubeletpodresourcesv1.PodResources) {
 	}
 
 	for cntIdx, cnt := range cnts {
+		memStr := logContainerMemoryResources(cnt.Memory)
 		if len(cnt.Devices) == 0 {
-			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v   resources -> none", podIdx, cntIdx, 0, ns, pr.GetName(), cnt.Name, cnt.CpuIds)
+			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v mem -> %s  resources -> none", podIdx, cntIdx, 0, ns, pr.GetName(), cnt.Name, cnt.CpuIds, memStr)
 			continue
 		}
-
 		for devIdx, dev := range cnt.Devices {
-			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v   %s -> %s", podIdx, cntIdx, devIdx, ns, pr.GetName(), cnt.Name, cnt.CpuIds, dev.ResourceName, strings.Join(dev.DeviceIds, ", "))
+			framework.Logf("#%02d/%02d/%02d - %s/%s/%s   cpus -> %v mem -> %s  %s -> %s", podIdx, cntIdx, devIdx, ns, pr.GetName(), cnt.Name, cnt.CpuIds, memStr, dev.ResourceName, strings.Join(dev.DeviceIds, ", "))
 		}
 	}
+}
+
+func logContainerMemoryResources(mems []*kubeletpodresourcesv1.ContainerMemory) string {
+	if len(mems) == 0 {
+		return "none"
+	}
+	blocks := []string{}
+	for _, mem := range mems {
+		blocks = append(blocks, fmt.Sprintf("%s:size=%v@missing", mem.MemoryType, mem.Size_))
+	}
+	return strings.Join(blocks, ", ")
 }
 
 type podResMap map[string]map[string]kubeletpodresourcesv1.ContainerResources
@@ -273,6 +384,7 @@ func findContainerDeviceByName(devs []*kubeletpodresourcesv1.ContainerDevices, r
 }
 
 func matchPodDescWithResources(expected []podDesc, found podResMap) error {
+	framework.Logf("got %d pods expected %d", len(found), len(expected))
 	for _, podReq := range expected {
 		framework.Logf("matching: %#v", podReq)
 
@@ -284,7 +396,7 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 		if !ok {
 			return fmt.Errorf("no container resources for pod %q container %q", podReq.podName, podReq.cntName)
 		}
-		if podReq.RequiresCPU() {
+		if podReq.HasCPURequests() {
 			if exclusiveCpus := podReq.CpuRequestExclusive(); exclusiveCpus != len(cntInfo.CpuIds) {
 				if exclusiveCpus == 0 {
 					return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
@@ -292,7 +404,7 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, exclusiveCpus, cntInfo.CpuIds)
 			}
 		}
-		if podReq.RequiresDevices() {
+		if podReq.HasDevicesRequest() {
 			dev := findContainerDeviceByName(cntInfo.GetDevices(), podReq.resourceName)
 			if dev == nil {
 				return fmt.Errorf("pod %q container %q expected data for resource %q not found", podReq.podName, podReq.cntName, podReq.resourceName)
@@ -337,7 +449,7 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 			if !ok {
 				return fmt.Errorf("no container resources for pod %q container %q", podReq.podName, initCntDesc.cntName)
 			}
-			if initCntDesc.RequiresCPU() {
+			if initCntDesc.HasCPURequests() {
 				if exclusiveCpus := initCntDesc.CPURequestExclusive(); exclusiveCpus != len(cntInfo.CpuIds) {
 					if exclusiveCpus == 0 {
 						return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, initCntDesc.cntName, initCntDesc.cpuRequest, cntInfo.CpuIds)
@@ -345,7 +457,7 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 					return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, initCntDesc.cntName, exclusiveCpus, cntInfo.CpuIds)
 				}
 			}
-			if initCntDesc.RequiresDevices() {
+			if initCntDesc.HasDevicesRequest() {
 				dev := findContainerDeviceByName(cntInfo.GetDevices(), initCntDesc.resourceName)
 				if dev == nil {
 					return fmt.Errorf("pod %q container %q expected data for resource %q not found", podReq.podName, initCntDesc.cntName, initCntDesc.resourceName)
@@ -847,7 +959,27 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 	f := framework.NewDefaultFramework("podresources-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
-	reservedSystemCPUs := cpuset.New(1)
+	var reservedSystemCPUs cpuset.CPUSet
+	var memoryQuantity resource.Quantity
+	var defaultKubeParams *memoryManagerKubeletParams
+
+	ginkgo.BeforeEach(func() {
+		reservedSystemCPUs = cpuset.New(1)
+		memoryQuantity = resource.MustParse("1100Mi")
+		defaultKubeParams = &memoryManagerKubeletParams{
+			systemReservedMemory: []kubeletconfig.MemoryReservation{
+				{
+					NumaNode: 0,
+					Limits: v1.ResourceList{
+						resourceMemory: memoryQuantity,
+					},
+				},
+			},
+			systemReserved: map[string]string{resourceMemory: "500Mi"},
+			kubeReserved:   map[string]string{resourceMemory: "500Mi"},
+			evictionHard:   map[string]string{evictionHardMemory: "100Mi"},
+		}
+	})
 
 	ginkgo.Context("with SRIOV devices in the system", func() {
 		ginkgo.BeforeEach(func() {
@@ -1024,27 +1156,6 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 					podresourcesGetAllocatableResourcesTests(ctx, cli, nil, onlineCPUs, reservedSystemCPUs)
 					podresourcesGetTests(ctx, f, cli, true)
 				})
-				ginkgo.It("should account for resources of pods in terminal phase", func(ctx context.Context) {
-					pd := podDesc{
-						cntName:    "e2e-test-cnt",
-						podName:    "e2e-test-pod",
-						cpuRequest: 1000,
-					}
-					pod := makePodResourcesTestPod(pd)
-					pod.Spec.Containers[0].Command = []string{"sh", "-c", "/bin/true"}
-					pod = e2epod.NewPodClient(f).Create(ctx, pod)
-					defer e2epod.NewPodClient(f).DeleteSync(ctx, pod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-					err := e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
-					framework.ExpectNoError(err)
-					endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
-					framework.ExpectNoError(err)
-					cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
-					framework.ExpectNoError(err)
-					defer conn.Close()
-					// although the pod moved into terminal state, PodResourcesAPI still list its cpus
-					expectPodResources(ctx, 1, cli, []podDesc{pd})
-
-				})
 			})
 		})
 
@@ -1078,6 +1189,270 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 				framework.Logf("Get result: %v, err: %v", getRes, err)
 				gomega.Expect(err).To(gomega.HaveOccurred(), "With feature gate disabled, the call must fail")
 			})
+		})
+	})
+
+	ginkgo.When("checking core resource managers assignments", func() {
+		var podresConn *grpc.ClientConn
+		var podMap map[string]*v1.Pod
+		var cpuAlloc int64
+
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			kubeParams := *defaultKubeParams
+			kubeParams.policy = staticPolicy
+			updateKubeletConfigWithMemoryManagerParams(initialConfig, &kubeParams)
+			initialConfig.CPUManagerPolicy = string(cpumanager.PolicyStatic)
+			initialConfig.CPUManagerReconcilePeriod = metav1.Duration{Duration: 10 * time.Minute} // set it long enough it is practically disabled
+			cpus := reservedSystemCPUs.String()
+			framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
+			initialConfig.ReservedSystemCPUs = cpus
+		})
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			podMap = make(map[string]*v1.Pod)
+		})
+
+		ginkgo.AfterEach(func(ctx context.Context) {
+			if podresConn != nil {
+				framework.ExpectNoError(podresConn.Close())
+			}
+			deletePodsAsync(ctx, f, podMap)
+		})
+
+		ginkgo.JustBeforeEach(func(ctx context.Context) {
+			// this is a very rough check. We just want to rule out system that does NOT have enough resources
+			_, cpuAlloc, _ = getLocalNodeCPUDetails(ctx, f)
+			if cpuAlloc < minCoreCount {
+				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable < %d", minCoreCount)
+			}
+		})
+
+		ginkgo.When("listing pods", func() {
+			ginkgo.It("should report only the running pods regardless of the QoS", func(ctx context.Context) {
+				// TODO: compute automatically
+				if cpuAlloc < 8 {
+					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU %d allocatable < %d", cpuAlloc, 8)
+				}
+
+				restartNever := v1.RestartPolicyNever
+				restartAlways := v1.RestartPolicyAlways
+				descs := []podDesc{
+					{
+						cntName:        "e2e-test-cnt-gu-term-1",
+						podName:        "e2e-test-pod-gu-term-1",
+						cpuLimit:       1000,
+						memLimit:       256,
+						restartPolicy:  &restartNever,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+					},
+					{
+						cntName:        "e2e-test-cnt-gu-term-2",
+						podName:        "e2e-test-pod-gu-term-2",
+						cpuLimit:       200,
+						memLimit:       256,
+						restartPolicy:  &restartNever,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+					},
+					{
+						cntName:       "e2e-test-cnt-gu-run-1",
+						podName:       "e2e-test-pod-gu-run-1",
+						cpuLimit:      200,
+						memLimit:      256,
+						restartPolicy: &restartAlways,
+					},
+					{
+						cntName:       "e2e-test-cnt-gu-run-2",
+						podName:       "e2e-test-pod-gu-run-2",
+						cpuLimit:      1000,
+						memLimit:      256,
+						restartPolicy: &restartAlways,
+					},
+					{
+						cntName:        "e2e-test-cnt-bu-term-1",
+						podName:        "e2e-test-pod-bu-term-1",
+						cpuRequest:     400,
+						memRequest:     256,
+						restartPolicy:  &restartNever,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+					},
+					{
+						cntName:       "e2e-test-cnt-bu-run-1",
+						podName:       "e2e-test-pod-bu-run-1",
+						cpuRequest:    400,
+						memRequest:    256,
+						restartPolicy: &restartAlways,
+					},
+					{
+						cntName:        "e2e-test-cnt-be-term-1",
+						podName:        "e2e-test-pod-be-term-1",
+						restartPolicy:  &restartNever,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+					},
+					{
+						cntName:       "e2e-test-cnt-be-run-1",
+						podName:       "e2e-test-pod-be-run-1",
+						restartPolicy: &restartAlways,
+					},
+				}
+
+				for _, desc := range descs {
+					pod := makeFullPodResourcesTestPod(desc)
+					if desc.restartPolicy == &restartAlways {
+						pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+						podMap[string(pod.UID)] = pod
+					} else {
+						pod = e2epod.NewPodClient(f).Create(ctx, pod)
+						pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
+						podMap[string(pod.UID)] = pod
+						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
+						framework.ExpectNoError(err)
+					}
+				}
+
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
+
+				var cli kubeletpodresourcesv1.PodResourcesListerClient
+				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+
+				gomega.Consistently(func(ctx context.Context) error {
+					resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+					if err != nil {
+						return err
+					}
+					prs := resp.GetPodResources()
+					for idx, pr := range prs {
+						logPodResources(idx, pr)
+					}
+					return checkPodDescMatchesWithPodResourcesList(descs, prs)
+				}).WithContext(ctx).WithTimeout(30 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+			})
+
+			ginkgo.It("should report only the running pods among many", func(ctx context.Context) {
+				// TODO: compute automatically
+				if cpuAlloc < 8 {
+					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU %d allocatable < %d", cpuAlloc, 8)
+				}
+				restartNever := v1.RestartPolicyNever
+				restartAlways := v1.RestartPolicyAlways
+				descs := []podDesc{
+					{
+						cntName:       "e2e-test-cnt-payload-gu-1",
+						podName:       "e2e-test-pod-payload-gu-1",
+						cpuRequest:    1000,
+						restartPolicy: &restartAlways,
+					},
+					{
+						cntName:        "e2e-test-cnt-mixed-cpu-mem",
+						podName:        "e2e-test-pod-mixed-cpu-mem",
+						cpuRequest:     1000,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+						restartPolicy:  &restartNever,
+					},
+					{
+						cntName:       "e2e-test-cnt-payload-gu-2",
+						podName:       "e2e-test-pod-payload-gu-2",
+						cpuRequest:    1000,
+						restartPolicy: &restartAlways,
+					},
+					{
+						cntName:       "e2e-test-cnt-payload-gu-3",
+						podName:       "e2e-test-pod-payload-gu-3",
+						cpuRequest:    1000,
+						restartPolicy: &restartAlways,
+					},
+					{
+						cntName:        "e2e-test-cnt-mixed-mem",
+						podName:        "e2e-test-pod-mixed-mem",
+						cpuRequest:     1000,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+						restartPolicy:  &restartNever,
+					},
+				}
+
+				for _, desc := range descs {
+					pod := makePodResourcesTestPod(desc)
+					if desc.restartPolicy == &restartAlways {
+						pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+						podMap[string(pod.UID)] = pod
+					} else {
+						pod = e2epod.NewPodClient(f).Create(ctx, pod)
+						pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
+						podMap[string(pod.UID)] = pod
+						err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
+						framework.ExpectNoError(err)
+					}
+				}
+
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
+
+				var cli kubeletpodresourcesv1.PodResourcesListerClient
+				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+
+				gomega.Consistently(func(ctx context.Context) error {
+					resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+					if err != nil {
+						return err
+					}
+					prs := resp.GetPodResources()
+					return checkPodDescMatchesWithPodResourcesList(descs, prs)
+				}).WithContext(ctx).WithTimeout(30 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+			})
+
+			ginkgo.DescribeTable("all pods terminated and requiring", func(ctx context.Context, cpuReqMilli, podCount int) {
+				cpuReqTot := int64((cpuReqMilli * podCount) / 1000)
+				ginkgo.By(fmt.Sprintf("needed: %d cores", cpuReqTot))
+				if cpuAlloc < cpuReqTot {
+					e2eskipper.Skipf("Skipping CPU Manager tests since the CPU %d allocatable < %d", cpuAlloc, cpuReqTot)
+				}
+
+				restartNever := v1.RestartPolicyNever
+
+				for idx := range podCount {
+					pd := podDesc{
+						cntName:        fmt.Sprintf("e2e-test-cnt-%d", idx),
+						podName:        fmt.Sprintf("e2e-test-pod-%d", idx),
+						cpuRequest:     cpuReqMilli,
+						mainCntCommand: []string{"sh", "-c", "/bin/true"},
+						restartPolicy:  &restartNever,
+					}
+					pod := makePodResourcesTestPod(pd)
+					pod = e2epod.NewPodClient(f).Create(ctx, pod)
+					pod, err := e2epod.NewPodClient(f).Get(ctx, pod.Name, metav1.GetOptions{})
+					framework.ExpectNoError(err)
+					podMap[string(pod.UID)] = pod
+					err = e2epod.WaitForPodCondition(ctx, f.ClientSet, pod.Namespace, pod.Name, "Pod Succeeded", time.Minute*2, testutils.PodSucceeded)
+					framework.ExpectNoError(err)
+				}
+				endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+				framework.ExpectNoError(err)
+
+				var cli kubeletpodresourcesv1.PodResourcesListerClient
+				cli, podresConn, err = podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+				framework.ExpectNoError(err)
+
+				gomega.Consistently(func(ctx context.Context) error {
+					resp, err := cli.List(ctx, &kubeletpodresourcesv1.ListPodResourcesRequest{})
+					if err != nil {
+						return err
+					}
+					prs := resp.GetPodResources()
+					if len(prs) != podCount {
+						return fmt.Errorf("returned unexpected pods (found=%d expected=%d)", len(prs), podCount)
+					}
+					return checkLackOfPodResourceAssignment(prs)
+				}).WithContext(ctx).WithTimeout(30 * time.Second).WithPolling(2 * time.Second).Should(gomega.Succeed())
+			},
+				ginkgo.Entry("cpu and mem single", context.TODO(), 1000, 1),
+				ginkgo.Entry("cpu and mem multi", context.TODO(), 1000, 3),
+				ginkgo.Entry("mem only single", context.TODO(), 200, 1),
+				ginkgo.Entry("mem only multi", context.TODO(), 200, 3),
+			)
 		})
 	})
 
@@ -1278,6 +1653,88 @@ var _ = SIGDescribe("POD Resources", framework.WithSerial(), feature.PodResource
 		})
 	})
 })
+
+func checkPodDescMatchesWithPodResourcesList(descs []podDesc, prs []*kubeletpodresourcesv1.PodResources) error {
+	running := 0
+	terminated := 0
+	for _, desc := range descs {
+		cntRes := findContainerResourcesByName(prs, desc.podName, desc.cntName)
+		if cntRes == nil {
+			return fmt.Errorf("inconsistent resource assignment: for %s %s", desc.podName, desc.cntName)
+		}
+		if desc.restartPolicy != nil && *desc.restartPolicy != v1.RestartPolicyAlways {
+			terminated += 1
+			if err := checkLackOfContainerResourceAssignment(cntRes); err != nil {
+				return err
+			}
+		} else {
+			running += 1
+			if err := checkPodDescMatchesWithContainerResourceAssignment(desc, cntRes); err != nil {
+				return err
+			}
+		}
+	}
+	if len(prs) != terminated+running {
+		return errors.New("inconsistent return value with desc")
+	}
+	return nil
+}
+
+func findContainerResourcesByName(prs []*kubeletpodresourcesv1.PodResources, podName, cntName string) *kubeletpodresourcesv1.ContainerResources {
+	for _, pr := range prs {
+		if pr.Name == podName {
+			for _, cr := range pr.Containers {
+				if cr.Name == cntName {
+					return cr
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func checkPodDescMatchesWithContainerResourceAssignment(desc podDesc, cr *kubeletpodresourcesv1.ContainerResources) error {
+	if desc.WantsExclusiveCPUs() {
+		if len(cr.CpuIds) == 0 {
+			return fmt.Errorf("%s misses CPUs assignment: %v vs %v", cr.Name, desc.String(), cr)
+		}
+	}
+	if desc.WantsExclusiveMemory() {
+		if len(cr.Memory) == 0 {
+			return fmt.Errorf("%s misses memory assignment: %v vs %v", cr.Name, desc.String(), cr)
+		}
+	}
+	if desc.HasDevicesRequest() {
+		if len(cr.Devices) == 0 {
+			return fmt.Errorf("%s misses devices assignment: %v vs %v", cr.Name, desc.String(), cr)
+		}
+	}
+	return nil
+}
+
+func checkLackOfContainerResourceAssignment(cr *kubeletpodresourcesv1.ContainerResources) error {
+	if len(cr.Devices) > 0 {
+		return fmt.Errorf("%s has devices assignment", cr.Name)
+	}
+	if len(cr.CpuIds) > 0 {
+		return fmt.Errorf("%s has CPUs assignment", cr.Name)
+	}
+	if len(cr.Memory) > 0 {
+		return fmt.Errorf("%s has memory assignment", cr.Name)
+	}
+	return nil
+}
+
+func checkLackOfPodResourceAssignment(prs []*kubeletpodresourcesv1.PodResources) error {
+	for _, pr := range prs {
+		for _, cr := range pr.Containers {
+			if err := checkLackOfContainerResourceAssignment(cr); err != nil {
+				return fmt.Errorf("%s/%s: %w", pr.Namespace, pr.Name, err)
+			}
+		}
+	}
+	return nil
+}
 
 func requireLackOfSRIOVDevices() {
 	if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount > 0 {

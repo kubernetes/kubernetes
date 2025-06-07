@@ -1509,6 +1509,38 @@ func (_c *MockContainerManager_UnprepareDynamicResources_Call) RunAndReturn(run 
 	return _c
 }
 
+// UpdateAllocatedCPUs provides a mock function with no fields
+func (_m *MockContainerManager) UpdateAllocatedCPUs() {
+	_m.Called()
+}
+
+// MockContainerManager_UpdateAllocatedCPUs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAllocatedCPUs'
+type MockContainerManager_UpdateAllocatedCPUs_Call struct {
+	*mock.Call
+}
+
+// UpdateAllocatedCPUs is a helper method to define mock.On call
+func (_e *MockContainerManager_Expecter) UpdateAllocatedCPUs() *MockContainerManager_UpdateAllocatedCPUs_Call {
+	return &MockContainerManager_UpdateAllocatedCPUs_Call{Call: _e.mock.On("UpdateAllocatedCPUs")}
+}
+
+func (_c *MockContainerManager_UpdateAllocatedCPUs_Call) Run(run func()) *MockContainerManager_UpdateAllocatedCPUs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedCPUs_Call) Return() *MockContainerManager_UpdateAllocatedCPUs_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedCPUs_Call) RunAndReturn(run func()) *MockContainerManager_UpdateAllocatedCPUs_Call {
+	_c.Run(run)
+	return _c
+}
+
 // UpdateAllocatedDevices provides a mock function with no fields
 func (_m *MockContainerManager) UpdateAllocatedDevices() {
 	_m.Called()
@@ -1537,6 +1569,38 @@ func (_c *MockContainerManager_UpdateAllocatedDevices_Call) Return() *MockContai
 }
 
 func (_c *MockContainerManager_UpdateAllocatedDevices_Call) RunAndReturn(run func()) *MockContainerManager_UpdateAllocatedDevices_Call {
+	_c.Run(run)
+	return _c
+}
+
+// UpdateAllocatedMemory provides a mock function with no fields
+func (_m *MockContainerManager) UpdateAllocatedMemory() {
+	_m.Called()
+}
+
+// MockContainerManager_UpdateAllocatedMemory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAllocatedMemory'
+type MockContainerManager_UpdateAllocatedMemory_Call struct {
+	*mock.Call
+}
+
+// UpdateAllocatedMemory is a helper method to define mock.On call
+func (_e *MockContainerManager_Expecter) UpdateAllocatedMemory() *MockContainerManager_UpdateAllocatedMemory_Call {
+	return &MockContainerManager_UpdateAllocatedMemory_Call{Call: _e.mock.On("UpdateAllocatedMemory")}
+}
+
+func (_c *MockContainerManager_UpdateAllocatedMemory_Call) Run(run func()) *MockContainerManager_UpdateAllocatedMemory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedMemory_Call) Return() *MockContainerManager_UpdateAllocatedMemory_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockContainerManager_UpdateAllocatedMemory_Call) RunAndReturn(run func()) *MockContainerManager_UpdateAllocatedMemory_Call {
 	_c.Run(run)
 	return _c
 }

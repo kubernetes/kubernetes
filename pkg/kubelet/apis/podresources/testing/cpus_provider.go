@@ -129,6 +129,38 @@ func (_c *MockCPUsProvider_GetCPUs_Call) RunAndReturn(run func(string, string) [
 	return _c
 }
 
+// UpdateAllocatedCPUs provides a mock function with no fields
+func (_m *MockCPUsProvider) UpdateAllocatedCPUs() {
+	_m.Called()
+}
+
+// MockCPUsProvider_UpdateAllocatedCPUs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAllocatedCPUs'
+type MockCPUsProvider_UpdateAllocatedCPUs_Call struct {
+	*mock.Call
+}
+
+// UpdateAllocatedCPUs is a helper method to define mock.On call
+func (_e *MockCPUsProvider_Expecter) UpdateAllocatedCPUs() *MockCPUsProvider_UpdateAllocatedCPUs_Call {
+	return &MockCPUsProvider_UpdateAllocatedCPUs_Call{Call: _e.mock.On("UpdateAllocatedCPUs")}
+}
+
+func (_c *MockCPUsProvider_UpdateAllocatedCPUs_Call) Run(run func()) *MockCPUsProvider_UpdateAllocatedCPUs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockCPUsProvider_UpdateAllocatedCPUs_Call) Return() *MockCPUsProvider_UpdateAllocatedCPUs_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockCPUsProvider_UpdateAllocatedCPUs_Call) RunAndReturn(run func()) *MockCPUsProvider_UpdateAllocatedCPUs_Call {
+	_c.Run(run)
+	return _c
+}
+
 // NewMockCPUsProvider creates a new instance of MockCPUsProvider. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockCPUsProvider(t interface {
