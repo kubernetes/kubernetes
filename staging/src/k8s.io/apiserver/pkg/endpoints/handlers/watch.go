@@ -211,7 +211,6 @@ type WatchServer struct {
 }
 
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
-// or over a websocket connection.
 func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if s.MemoryAllocator != nil {
