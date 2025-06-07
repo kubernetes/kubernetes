@@ -120,7 +120,7 @@ func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageS
 		logManager:             logManager,
 		memoryThrottlingFactor: 0.9,
 		podLogsDirectory:       fakePodLogsDirectory,
-		allocationManager:      allocation.NewInMemoryManager(nil, nil),
+		allocationManager:      allocation.NewInMemoryManager(nil, nil, nil, nil, nil, nil, nil),
 	}
 
 	typedVersion, err := runtimeService.Version(ctx, kubeRuntimeAPIVersion)
