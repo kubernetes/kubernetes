@@ -182,161 +182,161 @@ func parseSNMP6Stats(r io.Reader) (ProcSnmp6, error) {
 			case "Ip6":
 				switch key {
 				case "InReceives":
-					procSnmp6.Ip6.InReceives = &value
+					procSnmp6.InReceives = &value
 				case "InHdrErrors":
-					procSnmp6.Ip6.InHdrErrors = &value
+					procSnmp6.InHdrErrors = &value
 				case "InTooBigErrors":
-					procSnmp6.Ip6.InTooBigErrors = &value
+					procSnmp6.InTooBigErrors = &value
 				case "InNoRoutes":
-					procSnmp6.Ip6.InNoRoutes = &value
+					procSnmp6.InNoRoutes = &value
 				case "InAddrErrors":
-					procSnmp6.Ip6.InAddrErrors = &value
+					procSnmp6.InAddrErrors = &value
 				case "InUnknownProtos":
-					procSnmp6.Ip6.InUnknownProtos = &value
+					procSnmp6.InUnknownProtos = &value
 				case "InTruncatedPkts":
-					procSnmp6.Ip6.InTruncatedPkts = &value
+					procSnmp6.InTruncatedPkts = &value
 				case "InDiscards":
-					procSnmp6.Ip6.InDiscards = &value
+					procSnmp6.InDiscards = &value
 				case "InDelivers":
-					procSnmp6.Ip6.InDelivers = &value
+					procSnmp6.InDelivers = &value
 				case "OutForwDatagrams":
-					procSnmp6.Ip6.OutForwDatagrams = &value
+					procSnmp6.OutForwDatagrams = &value
 				case "OutRequests":
-					procSnmp6.Ip6.OutRequests = &value
+					procSnmp6.OutRequests = &value
 				case "OutDiscards":
-					procSnmp6.Ip6.OutDiscards = &value
+					procSnmp6.OutDiscards = &value
 				case "OutNoRoutes":
-					procSnmp6.Ip6.OutNoRoutes = &value
+					procSnmp6.OutNoRoutes = &value
 				case "ReasmTimeout":
-					procSnmp6.Ip6.ReasmTimeout = &value
+					procSnmp6.ReasmTimeout = &value
 				case "ReasmReqds":
-					procSnmp6.Ip6.ReasmReqds = &value
+					procSnmp6.ReasmReqds = &value
 				case "ReasmOKs":
-					procSnmp6.Ip6.ReasmOKs = &value
+					procSnmp6.ReasmOKs = &value
 				case "ReasmFails":
-					procSnmp6.Ip6.ReasmFails = &value
+					procSnmp6.ReasmFails = &value
 				case "FragOKs":
-					procSnmp6.Ip6.FragOKs = &value
+					procSnmp6.FragOKs = &value
 				case "FragFails":
-					procSnmp6.Ip6.FragFails = &value
+					procSnmp6.FragFails = &value
 				case "FragCreates":
-					procSnmp6.Ip6.FragCreates = &value
+					procSnmp6.FragCreates = &value
 				case "InMcastPkts":
-					procSnmp6.Ip6.InMcastPkts = &value
+					procSnmp6.InMcastPkts = &value
 				case "OutMcastPkts":
-					procSnmp6.Ip6.OutMcastPkts = &value
+					procSnmp6.OutMcastPkts = &value
 				case "InOctets":
-					procSnmp6.Ip6.InOctets = &value
+					procSnmp6.InOctets = &value
 				case "OutOctets":
-					procSnmp6.Ip6.OutOctets = &value
+					procSnmp6.OutOctets = &value
 				case "InMcastOctets":
-					procSnmp6.Ip6.InMcastOctets = &value
+					procSnmp6.InMcastOctets = &value
 				case "OutMcastOctets":
-					procSnmp6.Ip6.OutMcastOctets = &value
+					procSnmp6.OutMcastOctets = &value
 				case "InBcastOctets":
-					procSnmp6.Ip6.InBcastOctets = &value
+					procSnmp6.InBcastOctets = &value
 				case "OutBcastOctets":
-					procSnmp6.Ip6.OutBcastOctets = &value
+					procSnmp6.OutBcastOctets = &value
 				case "InNoECTPkts":
-					procSnmp6.Ip6.InNoECTPkts = &value
+					procSnmp6.InNoECTPkts = &value
 				case "InECT1Pkts":
-					procSnmp6.Ip6.InECT1Pkts = &value
+					procSnmp6.InECT1Pkts = &value
 				case "InECT0Pkts":
-					procSnmp6.Ip6.InECT0Pkts = &value
+					procSnmp6.InECT0Pkts = &value
 				case "InCEPkts":
-					procSnmp6.Ip6.InCEPkts = &value
+					procSnmp6.InCEPkts = &value
 
 				}
 			case "Icmp6":
 				switch key {
 				case "InMsgs":
-					procSnmp6.Icmp6.InMsgs = &value
+					procSnmp6.InMsgs = &value
 				case "InErrors":
 					procSnmp6.Icmp6.InErrors = &value
 				case "OutMsgs":
-					procSnmp6.Icmp6.OutMsgs = &value
+					procSnmp6.OutMsgs = &value
 				case "OutErrors":
-					procSnmp6.Icmp6.OutErrors = &value
+					procSnmp6.OutErrors = &value
 				case "InCsumErrors":
 					procSnmp6.Icmp6.InCsumErrors = &value
 				case "InDestUnreachs":
-					procSnmp6.Icmp6.InDestUnreachs = &value
+					procSnmp6.InDestUnreachs = &value
 				case "InPktTooBigs":
-					procSnmp6.Icmp6.InPktTooBigs = &value
+					procSnmp6.InPktTooBigs = &value
 				case "InTimeExcds":
-					procSnmp6.Icmp6.InTimeExcds = &value
+					procSnmp6.InTimeExcds = &value
 				case "InParmProblems":
-					procSnmp6.Icmp6.InParmProblems = &value
+					procSnmp6.InParmProblems = &value
 				case "InEchos":
-					procSnmp6.Icmp6.InEchos = &value
+					procSnmp6.InEchos = &value
 				case "InEchoReplies":
-					procSnmp6.Icmp6.InEchoReplies = &value
+					procSnmp6.InEchoReplies = &value
 				case "InGroupMembQueries":
-					procSnmp6.Icmp6.InGroupMembQueries = &value
+					procSnmp6.InGroupMembQueries = &value
 				case "InGroupMembResponses":
-					procSnmp6.Icmp6.InGroupMembResponses = &value
+					procSnmp6.InGroupMembResponses = &value
 				case "InGroupMembReductions":
-					procSnmp6.Icmp6.InGroupMembReductions = &value
+					procSnmp6.InGroupMembReductions = &value
 				case "InRouterSolicits":
-					procSnmp6.Icmp6.InRouterSolicits = &value
+					procSnmp6.InRouterSolicits = &value
 				case "InRouterAdvertisements":
-					procSnmp6.Icmp6.InRouterAdvertisements = &value
+					procSnmp6.InRouterAdvertisements = &value
 				case "InNeighborSolicits":
-					procSnmp6.Icmp6.InNeighborSolicits = &value
+					procSnmp6.InNeighborSolicits = &value
 				case "InNeighborAdvertisements":
-					procSnmp6.Icmp6.InNeighborAdvertisements = &value
+					procSnmp6.InNeighborAdvertisements = &value
 				case "InRedirects":
-					procSnmp6.Icmp6.InRedirects = &value
+					procSnmp6.InRedirects = &value
 				case "InMLDv2Reports":
-					procSnmp6.Icmp6.InMLDv2Reports = &value
+					procSnmp6.InMLDv2Reports = &value
 				case "OutDestUnreachs":
-					procSnmp6.Icmp6.OutDestUnreachs = &value
+					procSnmp6.OutDestUnreachs = &value
 				case "OutPktTooBigs":
-					procSnmp6.Icmp6.OutPktTooBigs = &value
+					procSnmp6.OutPktTooBigs = &value
 				case "OutTimeExcds":
-					procSnmp6.Icmp6.OutTimeExcds = &value
+					procSnmp6.OutTimeExcds = &value
 				case "OutParmProblems":
-					procSnmp6.Icmp6.OutParmProblems = &value
+					procSnmp6.OutParmProblems = &value
 				case "OutEchos":
-					procSnmp6.Icmp6.OutEchos = &value
+					procSnmp6.OutEchos = &value
 				case "OutEchoReplies":
-					procSnmp6.Icmp6.OutEchoReplies = &value
+					procSnmp6.OutEchoReplies = &value
 				case "OutGroupMembQueries":
-					procSnmp6.Icmp6.OutGroupMembQueries = &value
+					procSnmp6.OutGroupMembQueries = &value
 				case "OutGroupMembResponses":
-					procSnmp6.Icmp6.OutGroupMembResponses = &value
+					procSnmp6.OutGroupMembResponses = &value
 				case "OutGroupMembReductions":
-					procSnmp6.Icmp6.OutGroupMembReductions = &value
+					procSnmp6.OutGroupMembReductions = &value
 				case "OutRouterSolicits":
-					procSnmp6.Icmp6.OutRouterSolicits = &value
+					procSnmp6.OutRouterSolicits = &value
 				case "OutRouterAdvertisements":
-					procSnmp6.Icmp6.OutRouterAdvertisements = &value
+					procSnmp6.OutRouterAdvertisements = &value
 				case "OutNeighborSolicits":
-					procSnmp6.Icmp6.OutNeighborSolicits = &value
+					procSnmp6.OutNeighborSolicits = &value
 				case "OutNeighborAdvertisements":
-					procSnmp6.Icmp6.OutNeighborAdvertisements = &value
+					procSnmp6.OutNeighborAdvertisements = &value
 				case "OutRedirects":
-					procSnmp6.Icmp6.OutRedirects = &value
+					procSnmp6.OutRedirects = &value
 				case "OutMLDv2Reports":
-					procSnmp6.Icmp6.OutMLDv2Reports = &value
+					procSnmp6.OutMLDv2Reports = &value
 				case "InType1":
-					procSnmp6.Icmp6.InType1 = &value
+					procSnmp6.InType1 = &value
 				case "InType134":
-					procSnmp6.Icmp6.InType134 = &value
+					procSnmp6.InType134 = &value
 				case "InType135":
-					procSnmp6.Icmp6.InType135 = &value
+					procSnmp6.InType135 = &value
 				case "InType136":
-					procSnmp6.Icmp6.InType136 = &value
+					procSnmp6.InType136 = &value
 				case "InType143":
-					procSnmp6.Icmp6.InType143 = &value
+					procSnmp6.InType143 = &value
 				case "OutType133":
-					procSnmp6.Icmp6.OutType133 = &value
+					procSnmp6.OutType133 = &value
 				case "OutType135":
-					procSnmp6.Icmp6.OutType135 = &value
+					procSnmp6.OutType135 = &value
 				case "OutType136":
-					procSnmp6.Icmp6.OutType136 = &value
+					procSnmp6.OutType136 = &value
 				case "OutType143":
-					procSnmp6.Icmp6.OutType143 = &value
+					procSnmp6.OutType143 = &value
 				}
 			case "Udp6":
 				switch key {
@@ -355,7 +355,7 @@ func parseSNMP6Stats(r io.Reader) (ProcSnmp6, error) {
 				case "InCsumErrors":
 					procSnmp6.Udp6.InCsumErrors = &value
 				case "IgnoredMulti":
-					procSnmp6.Udp6.IgnoredMulti = &value
+					procSnmp6.IgnoredMulti = &value
 				}
 			case "UdpLite6":
 				switch key {
