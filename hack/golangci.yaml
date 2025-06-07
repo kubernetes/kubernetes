@@ -269,6 +269,8 @@ linters:
           deny:
             - pkg: "github.com/google/go-cmp/cmp"
               desc: "cmp is allowed only in test files"
+            - pkg: "html/template"
+              desc: "template is allowed only in test files as it disables dead code elimination"
     forbidigo:
       analyze-types: true
       forbid:
