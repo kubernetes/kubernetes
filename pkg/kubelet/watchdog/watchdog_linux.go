@@ -22,6 +22,7 @@ package watchdog
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/coreos/go-systemd/v22/daemon"
@@ -60,14 +61,8 @@ func WithWatchdogClient(watchdog WatchdogClient) Option {
 	}
 }
 
-func WithExtendedCheckers(checkers []healthz.HealthChecker) Option {
-	return func(hc *healthChecker) {
-		hc.checkers = append(hc.checkers, checkers...)
-	}
-}
-
 type healthChecker struct {
-	checkers     []healthz.HealthChecker
+	checkers     atomic.Value
 	retryBackoff wait.Backoff
 	interval     time.Duration
 	watchdog     WatchdogClient
@@ -80,7 +75,7 @@ const minimalNotifyInterval = time.Second
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
-func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+func NewHealthChecker(opts ...Option) (HealthChecker, error) {
 	hc := &healthChecker{
 		watchdog: &DefaultWatchdogClient{},
 	}
@@ -104,23 +99,37 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		return nil, fmt.Errorf("configure watchdog timeout too small: %v", watchdogVal)
 	}
 
-	// The health checks performed by checkers are the same as those for "/healthz".
-	checkers := []healthz.HealthChecker{
-		healthz.PingHealthz,
-		healthz.LogHealthz,
-		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
-	}
 	retryBackoff := wait.Backoff{
 		Duration: time.Second,
 		Factor:   2.0,
 		Jitter:   0.1,
 		Steps:    2,
 	}
-	hc.checkers = append(hc.checkers, checkers...)
 	hc.retryBackoff = retryBackoff
 	hc.interval = watchdogVal / 2
 
 	return hc, nil
+}
+
+func (hc *healthChecker) SetHealthCheckers(syncLoop syncLoopHealthChecker, checkers []healthz.HealthChecker) {
+	// Define the default set of health checkers that should always be present
+	defaultCheckers := []healthz.HealthChecker{
+		healthz.PingHealthz,
+		healthz.LogHealthz,
+		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
+	}
+
+	var combined []healthz.HealthChecker
+	combined = append(combined, defaultCheckers...)
+	combined = append(combined, checkers...)
+	hc.checkers.Store(combined)
+}
+
+func (hc *healthChecker) getHealthCheckers() []healthz.HealthChecker {
+	if v := hc.checkers.Load(); v != nil {
+		return v.([]healthz.HealthChecker)
+	}
+	return []healthz.HealthChecker{}
 }
 
 func (hc *healthChecker) Start(ctx context.Context) {
@@ -156,7 +165,7 @@ func (hc *healthChecker) Start(ctx context.Context) {
 }
 
 func (hc *healthChecker) doCheck() error {
-	for _, hc := range hc.checkers {
+	for _, hc := range hc.getHealthCheckers() {
 		if err := hc.Check(nil); err != nil {
 			return fmt.Errorf("checker %s failed: %w", hc.Name(), err)
 		}
