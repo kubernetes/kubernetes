@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,20 +16,20 @@ limitations under the License.
 
 package v1alpha3
 
-import (
-	"time"
+import "fmt"
 
-	resourceapi "k8s.io/api/resource/v1alpha3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-)
+var _ fmt.Stringer = DeviceTaint{}
 
-func addDefaultingFuncs(scheme *runtime.Scheme) error {
-	return RegisterDefaults(scheme)
-}
-
-func SetDefaults_DeviceTaint(obj *resourceapi.DeviceTaint) {
-	if obj.TimeAdded == nil {
-		obj.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
+// String converts to a string in the format '<key>=<value>:<effect>', '<key>=<value>:', '<key>:<effect>', or '<key>'.
+func (t DeviceTaint) String() string {
+	if len(t.Effect) == 0 {
+		if len(t.Value) == 0 {
+			return fmt.Sprintf("%v", t.Key)
+		}
+		return fmt.Sprintf("%v=%v:", t.Key, t.Value)
 	}
+	if len(t.Value) == 0 {
+		return fmt.Sprintf("%v:%v", t.Key, t.Effect)
+	}
+	return fmt.Sprintf("%v=%v:%v", t.Key, t.Value, t.Effect)
 }

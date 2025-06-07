@@ -52,11 +52,6 @@ API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,CephFS
 API rule violation: names_match,k8s.io/api/core/v1,VolumeSource,StorageOS
 API rule violation: names_match,k8s.io/api/networking/v1,ServiceCIDRSpec,CIDRs
 API rule violation: names_match,k8s.io/api/networking/v1beta1,ServiceCIDRSpec,CIDRs
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,BoolValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,IntValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,StringValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,DeviceAttribute,VersionValue
-API rule violation: names_match,k8s.io/api/resource/v1alpha3,NetworkDeviceData,IPs
 API rule violation: names_match,k8s.io/api/resource/v1beta1,DeviceAttribute,BoolValue
 API rule violation: names_match,k8s.io/api/resource/v1beta1,DeviceAttribute,IntValue
 API rule violation: names_match,k8s.io/api/resource/v1beta1,DeviceAttribute,StringValue

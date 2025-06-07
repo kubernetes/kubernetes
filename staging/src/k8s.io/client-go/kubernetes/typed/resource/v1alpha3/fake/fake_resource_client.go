@@ -28,24 +28,8 @@ type FakeResourceV1alpha3 struct {
 	*testing.Fake
 }
 
-func (c *FakeResourceV1alpha3) DeviceClasses() v1alpha3.DeviceClassInterface {
-	return newFakeDeviceClasses(c)
-}
-
 func (c *FakeResourceV1alpha3) DeviceTaintRules() v1alpha3.DeviceTaintRuleInterface {
 	return newFakeDeviceTaintRules(c)
-}
-
-func (c *FakeResourceV1alpha3) ResourceClaims(namespace string) v1alpha3.ResourceClaimInterface {
-	return newFakeResourceClaims(c, namespace)
-}
-
-func (c *FakeResourceV1alpha3) ResourceClaimTemplates(namespace string) v1alpha3.ResourceClaimTemplateInterface {
-	return newFakeResourceClaimTemplates(c, namespace)
-}
-
-func (c *FakeResourceV1alpha3) ResourceSlices() v1alpha3.ResourceSliceInterface {
-	return newFakeResourceSlices(c)
 }
 
 // RESTClient returns a RESTClient that is used to communicate
