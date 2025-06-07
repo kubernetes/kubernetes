@@ -62,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
 
@@ -116,6 +117,9 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
+
+	// clock can be used by the tests to fake the time.
+	clock clock.PassiveClock
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -153,6 +157,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
 		),
+		clock: clock.RealClock{},
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -709,7 +714,7 @@ func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet, orphanedPods boo
 // invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
-	startTime := time.Now()
+	startTime := rsc.clock.Now()
 	defer func() {
 		logger.V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
 	}()
@@ -756,12 +761,12 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	var manageReplicasErr error
-	var nextSyncInSeconds *int
+	var nextSyncDuration *time.Duration
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr)
+	newStatus := calculateStatus(rsc.clock, rs, activePods, terminatingPods, manageReplicasErr)
 
 	// Always updates status as pods come up or die.
 	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
@@ -773,14 +778,19 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	if manageReplicasErr != nil {
 		return manageReplicasErr
 	}
-	// Resync the ReplicaSet after MinReadySeconds as a last line of defense to guard against clock-skew.
+	// Plan the next availability check as a last line of defense against queue preemption and guard against clock-skew.
 	if updatedRS.Spec.MinReadySeconds > 0 &&
 		updatedRS.Status.ReadyReplicas == *(updatedRS.Spec.Replicas) &&
 		updatedRS.Status.AvailableReplicas != *(updatedRS.Spec.Replicas) {
-		nextSyncInSeconds = ptr.To(int(updatedRS.Spec.MinReadySeconds))
+		if nextCheck := controller.FindMinNextPodAvailabilityCheck(activePods, updatedRS.Spec.MinReadySeconds, rsc.clock.Now()); nextCheck != nil {
+			nextSyncDuration = ptr.To(*nextCheck + time.Second) // Add a second to avoid a clock-skew.
+		} else {
+			// fall back to MinReadySeconds
+			nextSyncDuration = ptr.To(time.Duration(updatedRS.Spec.MinReadySeconds) * time.Second)
+		}
 	}
-	if nextSyncInSeconds != nil {
-		rsc.queue.AddAfter(key, time.Duration(*nextSyncInSeconds)*time.Second)
+	if nextSyncDuration != nil {
+		rsc.queue.AddAfter(key, *nextSyncDuration)
 	}
 	return nil
 }

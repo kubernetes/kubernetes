@@ -881,6 +881,86 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	}
 }
 
+func TestFindMinNextPodAvailabilityCheck(t *testing.T) {
+	now := metav1.Now()
+
+	pod := func(name string, ready bool, beforeSec int) *v1.Pod {
+		p := testutil.NewPod(name, "node0")
+		if ready {
+			p.Status.Conditions[0].LastTransitionTime = metav1.NewTime(now.Add(-1 * time.Duration(beforeSec) * time.Second))
+		} else {
+			p.Status.Conditions[0].Status = v1.ConditionFalse
+		}
+		return p
+	}
+
+	tests := []struct {
+		name            string
+		pods            []*v1.Pod
+		minReadySeconds int32
+		expected        *time.Duration
+	}{
+		{
+			name:            "no pods",
+			pods:            nil,
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name: "unready pods",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", false, 0),
+			},
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name: "ready pods with no minReadySeconds",
+			pods: []*v1.Pod{
+				pod("pod1", true, 0),
+				pod("pod2", true, 0),
+			},
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name: "unready and ready pods should find min next availability check",
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 2),
+				pod("pod3", true, 0),
+				pod("pod4", true, 4),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds: 10,
+			expected:        ptr.To(6 * time.Second),
+		},
+		{
+			name: "unready and available pods do not require min next availability check", // only after pods become ready we can schedule one
+			pods: []*v1.Pod{
+				pod("pod1", false, 0),
+				pod("pod2", true, 15),
+				pod("pod3", true, 11),
+				pod("pod4", true, 10),
+				pod("pod5", false, 0),
+			},
+			minReadySeconds: 10,
+			expected:        nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextAvailable := FindMinNextPodAvailabilityCheck(test.pods, test.minReadySeconds, now.Time)
+
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next min pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
+	}
+}
+
 func TestActiveReplicaSetsFiltering(t *testing.T) {
 
 	rsUuid := uuid.NewUUID()

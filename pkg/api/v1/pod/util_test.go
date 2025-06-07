@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 func TestFindPort(t *testing.T) {
@@ -902,6 +903,15 @@ func TestIsPodAvailable(t *testing.T) {
 			expected:        false,
 		},
 		{
+			pod: func() *v1.Pod {
+				pod := newPod(now, true, 0)
+				pod.Status.Conditions[0].LastTransitionTime = metav1.Time{}
+				return pod
+			}(),
+			minReadySeconds: 1,
+			expected:        false,
+		},
+		{
 			pod:             newPod(now, true, 0),
 			minReadySeconds: 0,
 			expected:        true,
@@ -911,6 +921,16 @@ func TestIsPodAvailable(t *testing.T) {
 			minReadySeconds: 50,
 			expected:        true,
 		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 51,
+			expected:        true,
+		},
+		{
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 52,
+			expected:        false,
+		},
 	}
 
 	for i, test := range tests {
@@ -918,6 +938,66 @@ func TestIsPodAvailable(t *testing.T) {
 		if isAvailable != test.expected {
 			t.Errorf("[tc #%d] expected available pod: %t, got: %t", i, test.expected, isAvailable)
 		}
+	}
+}
+
+func TestNextPodAvailabilityCheck(t *testing.T) {
+	now := metav1.Now()
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		minReadySeconds int32
+		expected        *time.Duration
+	}{
+		{
+			name:            "not ready",
+			pod:             newPod(now, false, 0),
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name:            "no minReadySeconds defined",
+			pod:             newPod(now, true, 0),
+			minReadySeconds: 0,
+			expected:        nil,
+		},
+		{
+			name: "lastTransitionTime is zero",
+			pod: func() *v1.Pod {
+				pod := newPod(now, true, 0)
+				pod.Status.Conditions[0].LastTransitionTime = metav1.Time{}
+				return pod
+			}(),
+			minReadySeconds: 1,
+			expected:        nil,
+		},
+		{
+			name:            "just became ready - available in 1s",
+			pod:             newPod(now, true, 0),
+			minReadySeconds: 1,
+			expected:        ptr.To(time.Second),
+		},
+		{
+			name:            "ready for 20s - available in 10s",
+			pod:             newPod(now, true, 20),
+			minReadySeconds: 30,
+			expected:        ptr.To(10 * time.Second),
+		},
+		{
+			name:            "available",
+			pod:             newPod(now, true, 51),
+			minReadySeconds: 50,
+			expected:        nil,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nextAvailable := NextPodAvailabilityCheck(test.pod, test.minReadySeconds, now.Time)
+			if !ptr.Equal(nextAvailable, test.expected) {
+				t.Errorf("expected next pod availability check: %v, got: %v", test.expected, nextAvailable)
+			}
+		})
 	}
 }
 
