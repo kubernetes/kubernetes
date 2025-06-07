@@ -61,7 +61,8 @@ var _ = SIGDescribe("ResourceMetricsAPI", feature.ResourceMetrics, func() {
 
 			keys := []string{
 				"resource_scrape_error", "node_cpu_usage_seconds_total", "node_memory_working_set_bytes",
-				"pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes",
+				"pod_cpu_usage_seconds_total", "pod_memory_working_set_bytes", "node_swap_usage_bytes",
+				"container_swap_usage_bytes", "pod_swap_usage_bytes",
 			}
 
 			// NOTE: This check should be removed when ListMetricDescriptors is implemented
