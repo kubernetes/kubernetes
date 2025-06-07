@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"k8s.io/klog/v2"
 )
@@ -299,8 +300,11 @@ func decodeDockerConfigFieldAuth(field string) (username, password string, err e
 	if err != nil {
 		return
 	}
-
-	parts := strings.SplitN(string(decoded), ":", 2)
+	decodedStr := string(decoded)
+	if !utf8.ValidString(decodedStr) {
+		return "", "", errors.New("unable to parse auth field, must be valid UTF-8")
+	}
+	parts := strings.SplitN(decodedStr, ":", 2)
 	if len(parts) != 2 {
 		err = fmt.Errorf("unable to parse auth field, must be formatted as base64(username:password)")
 		return
