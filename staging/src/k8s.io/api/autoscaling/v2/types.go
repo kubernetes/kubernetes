@@ -82,7 +82,27 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" protobuf:"bytes,5,opt,name=behavior"`
+
+	// SelectionStrategy determines how pods are selected for metrics collection.
+	// Valid values are "LabelSelector" and "OwnerReferences".
+	// If not set, defaults to "LabelSelector" which is the legacy behavior.
+	// +optional
+	// This is an alpha field and requires enabling ServiceTrafficDistribution feature.
+	// featureGate=HPASelectionStrategy
+	SelectionStrategy *SelectionStrategy `json:"selectionStrategy,omitempty" protobuf:"bytes,6,opt,name=SelectionStrategy"`
 }
+
+// SelectionStrategy defines how pods are selected for metrics collection
+// +enum
+type SelectionStrategy string
+
+const (
+	// LabelSelector selects all pods matching the target's label selector
+	LabelSelector SelectionStrategy = "LabelSelector"
+
+	// OwnerReferences only selects pods owned by the target workload
+	OwnerReferences SelectionStrategy = "OwnerReferences"
+)
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
@@ -428,6 +448,14 @@ type HorizontalPodAutoscalerStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []HorizontalPodAutoscalerCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" listType:"map" protobuf:"bytes,6,rep,name=conditions"`
+
+	// CurrentSelectionStrategy indicates which pod selection strategy
+	// is currently being used.
+	// This is an alpha field and requires enabling the HPASelectionStrategy
+	// feature gate.
+	// +featureGate=HPASelectionStrategy
+	// +optional
+	CurrentSelectionStrategy SelectionStrategy `json:"currentSelectionStrategy,omitempty" protobuf:"bytes,7,opt,name=currentSelectionStrategy"`
 }
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
