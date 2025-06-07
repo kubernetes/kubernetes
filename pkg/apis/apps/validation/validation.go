@@ -63,10 +63,8 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
-		// TODO: Add validation for PodSpec, currently this will check volumes, which we know will
-		// fail. We should really check that the union of the given volumes and volumeClaims match
-		// volume mounts in the containers.
-		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
+		// TODO: Add validation for PodSpec containers volumeMounts if volumeClaimTemplates are defined
+		allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath, opts)...)
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
 		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
 		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"), opts)...)
@@ -158,6 +156,9 @@ func ValidateStatefulSetSpec(spec *apps.StatefulSetSpec, fldPath *field.Path, op
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, ""))
 	} else {
+		if len(spec.VolumeClaimTemplates) > 0 {
+			opts.AllowVolumeNotFoundInVolumeMounts = true
+		}
 		allErrs = append(allErrs, ValidatePodTemplateSpecForStatefulSet(&spec.Template, selector, fldPath.Child("template"), opts)...)
 	}
 
