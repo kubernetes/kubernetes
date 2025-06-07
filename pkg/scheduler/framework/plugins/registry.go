@@ -50,6 +50,8 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableDRAAdminAccess:                         feature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
 		EnableDRADeviceTaints:                        feature.DefaultFeatureGate.Enabled(features.DRADeviceTaints),
 		EnableDynamicResourceAllocation:              feature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation),
+		EnableDRAResourceClaimDeviceStatus:           feature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus),
+		EnableDRADeviceBindingConditions:             feature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions),
 		EnableVolumeAttributesClass:                  feature.DefaultFeatureGate.Enabled(features.VolumeAttributesClass),
 		EnableCSIMigrationPortworx:                   feature.DefaultFeatureGate.Enabled(features.CSIMigrationPortworx),
 		EnableNodeInclusionPolicyInPodTopologySpread: feature.DefaultFeatureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),

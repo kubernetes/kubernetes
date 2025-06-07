@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
@@ -278,6 +279,44 @@ var objWithAdminAccessStatus = &resource.ResourceClaim{
 	},
 }
 
+var objWithDeviseBindingConditions = &resource.ResourceClaim{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "valid-claim",
+		Namespace: "kube-system",
+	},
+	Spec: resource.ResourceClaimSpec{
+		Devices: resource.DeviceClaim{
+			Requests: []resource.DeviceRequest{
+				{
+					Name: "req-0",
+					Exactly: &resource.ExactDeviceRequest{
+						DeviceClassName: "class",
+						AllocationMode:  resource.DeviceAllocationModeAll,
+						AdminAccess:     ptr.To(true),
+					},
+				},
+			},
+		},
+	},
+	Status: resource.ResourceClaimStatus{
+		Allocation: &resource.AllocationResult{
+			Devices: resource.DeviceAllocationResult{
+				Results: []resource.DeviceRequestAllocationResult{
+					{
+						Request:                  "req-0",
+						Driver:                   "dra.example.com",
+						Pool:                     "pool-0",
+						Device:                   "device-0",
+						BindingConditions:        []string{"condition-1", "condition-2"},
+						BindingFailureConditions: []string{"condition-3", "condition-4"},
+						BindingTimeoutSeconds:    ptr.To(int64(10)),
+					},
+				},
+			},
+		},
+	},
+}
+
 var ns1 = &corev1.Namespace{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:   "default",
@@ -321,6 +360,8 @@ func TestStrategyCreate(t *testing.T) {
 		obj                   *resource.ResourceClaim
 		adminAccess           bool
 		prioritizedList       bool
+		bindingConditions     bool
+		deviceStatus          bool
 		expectValidationError string
 		expectObj             *resource.ResourceClaim
 		verify                func(*testing.T, []testclient.Action)
@@ -629,6 +670,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 		newObj                  *resource.ResourceClaim
 		adminAccess             bool
 		deviceStatusFeatureGate bool
+		bindingConditions       bool
 		expectValidationError   string
 		expectObj               *resource.ResourceClaim
 		verify                  func(*testing.T, []testclient.Action)
@@ -896,6 +938,66 @@ func TestStatusStrategyUpdate(t *testing.T) {
 				}
 			},
 		},
+		"keep-fields-binding-conditions": {
+			oldObj:    objWithStatus,
+			newObj:    objWithDeviseBindingConditions,
+			expectObj: objWithDeviseBindingConditions,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       true,
+			deviceStatusFeatureGate: true,
+		},
+		"drop-fields-binding-conditions": {
+			oldObj:    objWithStatus,
+			newObj:    objWithDeviseBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: true,
+		},
+		"drop-fields-binding-conditions-disable-feature-gate": {
+			oldObj:    objWithStatus,
+			newObj:    objWithDeviseBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: false,
+		},
+		"drop-fields-binding-conditions-disable-binding-conditions-feature-gate": {
+			oldObj:    objWithStatus,
+			newObj:    objWithDeviseBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       false,
+			deviceStatusFeatureGate: true,
+		},
+		"drop-fields-binding-conditions-disable-device-status-feature-gate": {
+			oldObj:    objWithStatus,
+			newObj:    objWithDeviseBindingConditions,
+			expectObj: objWithStatus,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 0 {
+					t.Errorf("expected no action to be taken")
+				}
+			},
+			bindingConditions:       true,
+			deviceStatusFeatureGate: false,
+		},
 	}
 
 	for name, tc := range testcases {
@@ -906,6 +1008,9 @@ func TestStatusStrategyUpdate(t *testing.T) {
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAResourceClaimDeviceStatus, tc.deviceStatusFeatureGate)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceBindingConditions, tc.bindingConditions)
+			klog.InfoS("Testing strategy", "adminAccess", tc.adminAccess, "bindingConditions", tc.bindingConditions, "deviceStatus", tc.deviceStatusFeatureGate)
+
 			statusStrategy := NewStatusStrategy(strategy)
 
 			oldObj := tc.oldObj.DeepCopy()
