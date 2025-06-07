@@ -32,6 +32,10 @@ const (
 	// of code conflicts because changes are more likely to be scattered
 	// across the file.
 
+	// owner: @lukasmetzner
+	// Use watch based route controller reconciliation instead of frequent periodic reconciliation.
+	CloudControllerManagerWatchBasedRoutesReconciliation featuregate.Feature = "CloudControllerManagerWatchBasedRoutesReconciliation"
+
 	// owner: @nckturner
 	// kep:  http://kep.k8s.io/2699
 	// Enable webhook in cloud controller manager
@@ -45,6 +49,10 @@ func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.Mutable
 // versionedCloudPublicFeatureGates consists of versioned cloud-specific feature keys.
 // To add a new feature, define a key for it above and add it here.
 var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
+	CloudControllerManagerWatchBasedRoutesReconciliation: {
+		// TODO: Update to 1.34 once the Kubernetes version is changed
+		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
+	},
 	CloudControllerManagerWebhook: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
 	},
