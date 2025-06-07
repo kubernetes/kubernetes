@@ -38,7 +38,7 @@ const (
 	WaitForAllControlPlaneComponents = "WaitForAllControlPlaneComponents"
 	// ControlPlaneKubeletLocalMode is expected to be in alpha in v1.31, beta in v1.33
 	ControlPlaneKubeletLocalMode = "ControlPlaneKubeletLocalMode"
-	// NodeLocalCRISocket is expected to be in alpha in v1.32, beta in v1.33, ga in v1.35
+	// NodeLocalCRISocket is expected to be in alpha in v1.32, beta in v1.34, ga in v1.36
 	NodeLocalCRISocket = "NodeLocalCRISocket"
 )
 
@@ -55,7 +55,7 @@ var InitFeatureGates = FeatureList{
 	},
 	WaitForAllControlPlaneComponents: {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 	ControlPlaneKubeletLocalMode:     {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
-	NodeLocalCRISocket:               {FeatureSpec: featuregate.FeatureSpec{Default: false, PreRelease: featuregate.Alpha}},
+	NodeLocalCRISocket:               {FeatureSpec: featuregate.FeatureSpec{Default: true, PreRelease: featuregate.Beta}},
 }
 
 // Feature represents a feature being gated
