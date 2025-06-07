@@ -85,7 +85,7 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledErr: tt.mockErr,
 			}
 
-			_, err := NewHealthChecker(&mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
+			_, err := NewHealthChecker(WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}

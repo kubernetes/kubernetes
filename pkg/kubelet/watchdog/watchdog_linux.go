@@ -80,7 +80,7 @@ const minimalNotifyInterval = time.Second
 // NewHealthChecker creates a new HealthChecker instance.
 // This function initializes the health checker and configures its behavior based on the status of the systemd watchdog.
 // If the watchdog is not enabled, the function returns an error.
-func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChecker, error) {
+func NewHealthChecker(opts ...Option) (HealthChecker, error) {
 	hc := &healthChecker{
 		watchdog: &DefaultWatchdogClient{},
 	}
@@ -104,23 +104,27 @@ func NewHealthChecker(syncLoop syncLoopHealthChecker, opts ...Option) (HealthChe
 		return nil, fmt.Errorf("configure watchdog timeout too small: %v", watchdogVal)
 	}
 
-	// The health checks performed by checkers are the same as those for "/healthz".
-	checkers := []healthz.HealthChecker{
-		healthz.PingHealthz,
-		healthz.LogHealthz,
-		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
-	}
 	retryBackoff := wait.Backoff{
 		Duration: time.Second,
 		Factor:   2.0,
 		Jitter:   0.1,
 		Steps:    2,
 	}
-	hc.checkers = append(hc.checkers, checkers...)
 	hc.retryBackoff = retryBackoff
 	hc.interval = watchdogVal / 2
 
 	return hc, nil
+}
+
+func (hc *healthChecker) AddHealthCheckers(syncLoop syncLoopHealthChecker, checkers []healthz.HealthChecker) {
+	// The health checks performed by checkers are the same as those for "/healthz".
+	hc.checkers = []healthz.HealthChecker{
+		healthz.PingHealthz,
+		healthz.LogHealthz,
+		healthz.NamedCheck("syncloop", syncLoop.SyncLoopHealthCheck),
+	}
+
+	hc.checkers = append(hc.checkers, checkers...)
 }
 
 func (hc *healthChecker) Start(ctx context.Context) {
