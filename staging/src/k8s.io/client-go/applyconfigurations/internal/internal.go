@@ -1382,6 +1382,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: message
       type:
         scalar: string
+      default: ""
     - name: observedGeneration
       type:
         scalar: numeric
@@ -4556,6 +4557,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.coordination.v1beta1.Lease
   map:
     fields:
@@ -4613,6 +4615,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.coordination.v1beta1.LeaseSpec
   map:
     fields:
@@ -11366,12 +11369,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: namespace
       type:
         scalar: string
     - name: resource
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.networking.v1.ServiceBackendPort
   map:
     fields:
@@ -11643,12 +11648,14 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: name
       type:
         scalar: string
+      default: ""
     - name: namespace
       type:
         scalar: string
     - name: resource
       type:
         scalar: string
+      default: ""
 - name: io.k8s.api.networking.v1beta1.ServiceCIDR
   map:
     fields:
