@@ -275,10 +275,22 @@ func newDualStackInternal(exec utilexec.Interface) (map[v1.IPFamily]Interface, e
 }
 
 // NewDualStack returns a map containing an IPv4 Interface (if IPv4 iptables is supported)
-// and an IPv6 Interface (if IPv6 iptables is supported). If either family is not
-// supported, no Interface will be returned for that family.
+// and an IPv6 Interface (if IPv6 iptables is supported). If only one family is supported,
+// it will return a map with one Interface *and* an error (indicating the problem with the
+// other family). If neither family is supported, it will return an empty map and an
+// error.
 func NewDualStack() (map[v1.IPFamily]Interface, error) {
 	return newDualStackInternal(utilexec.New())
+}
+
+// NewBestEffort returns a map containing an IPv4 Interface (if IPv4 iptables is
+// supported) and an IPv6 Interface (if IPv6 iptables is supported). If iptables is not
+// supported, then it just returns an empty map. This function is intended to make things
+// simple for callers that just want "best-effort" iptables support, where neither partial
+// nor complete lack of iptables support is considered an error.
+func NewBestEffort() map[v1.IPFamily]Interface {
+	ipts, _ := newDualStackInternal(utilexec.New())
+	return ipts
 }
 
 // EnsureChain is part of Interface.
