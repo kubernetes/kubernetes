@@ -3622,6 +3622,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 		map[string]string{},
 		1024,
 		false,
+		nil,
 	)
 	assert.NoError(t, err, "NewMainKubelet should succeed")
 	assert.NotNil(t, testMainKubelet, "testMainKubelet should not be nil")
