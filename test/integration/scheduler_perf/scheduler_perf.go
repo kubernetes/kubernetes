@@ -1778,6 +1778,36 @@ func (e *WorkloadExecutor) runDeletePodsOp(opIndex int, op *deletePodsOp) error 
 	return nil
 }
 
+// waitForPods waits until the specified number of pods in the namespace are scheduled
+func waitForPods(ctx context.Context, client clientset.Interface, namespace string, wantCount int) error {
+	return wait.PollUntilContextTimeout(ctx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+		select {
+		case <-ctx.Done():
+			return true, ctx.Err()
+		default:
+		}
+
+		podList, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+
+		scheduledCount := 0
+		for _, pod := range podList.Items {
+			if len(pod.Spec.NodeName) > 0 {
+				scheduledCount++
+			}
+		}
+
+		if scheduledCount >= wantCount {
+			return true, nil
+		}
+
+		klog.V(4).Infof("namespace: %s, pods scheduled: %d/%d", namespace, scheduledCount, wantCount)
+		return false, nil
+	})
+}
+
 func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	var namespace string
 	if op.Namespace != nil {
@@ -1793,6 +1823,7 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 	}
 
 	var churnFns []func(name string) string
+	var hasPods bool
 
 	for i, path := range op.TemplatePaths {
 		unstructuredObj, gvk, err := getUnstructuredFromFile(path)
@@ -1813,12 +1844,34 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 			dynRes = e.tCtx.Dynamic().Resource(gvr)
 		}
 
+		capturedGVK := *gvk
+		capturedNamespace := namespace
+		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			capturedNamespace = ""
+		}
+
+		// Track if we have Pod templates
+		if capturedGVK.Kind == "Pod" && capturedGVK.Group == "" {
+			hasPods = true
+		}
+
 		churnFns = append(churnFns, func(name string) string {
 			if name != "" {
-				if err := dynRes.Delete(e.tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
-					e.tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
+				shouldDelete := true
+				if capturedGVK.Kind == "Pod" && capturedGVK.Group == "" {
+					pod, err := e.tCtx.Client().CoreV1().Pods(capturedNamespace).Get(e.tCtx, name, metav1.GetOptions{})
+					if err == nil {
+						shouldDelete = len(pod.Spec.NodeName) > 0
+					}
 				}
-				return ""
+
+				if shouldDelete {
+					if err := dynRes.Delete(e.tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
+						e.tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
+					}
+					return ""
+				}
+				return name
 			}
 
 			live, err := dynRes.Create(e.tCtx, unstructuredObj, metav1.CreateOptions{})
@@ -1868,7 +1921,29 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 				retVals[i] = make([]string, op.Number)
 			}
 
-			count := 0
+			// Create all resources first
+			for count := 0; count < op.Number; count++ {
+				select {
+				case <-ticker.C:
+					for i := range churnFns {
+						retVals[i][count] = churnFns[i]("")
+					}
+				case <-e.tCtx.Done():
+					return
+				}
+			}
+
+			// Wait for all pods to be scheduled before starting deletion
+			if hasPods {
+				e.tCtx.Logf("Waiting for all pods to be scheduled before starting deletion phase")
+				if err := waitForPods(e.tCtx, e.tCtx.Client(), namespace, op.Number); err != nil {
+					e.tCtx.Errorf("Failed to wait for pods to be scheduled: %v", err)
+					return
+				}
+			}
+
+			// Continue with recreation cycle
+			count := op.Number
 			for {
 				select {
 				case <-ticker.C:
