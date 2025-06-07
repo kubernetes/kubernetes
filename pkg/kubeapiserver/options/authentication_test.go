@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/pflag"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -50,7 +51,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	"k8s.io/kubernetes/pkg/serviceaccount"
-
 	"k8s.io/utils/pointer"
 )
 
@@ -507,7 +507,6 @@ func TestWithTokenGetterFunction(t *testing.T) {
 }
 
 func TestToAuthenticationConfig_Anonymous(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
 	testCases := []struct {
 		name                     string
 		args                     []string
@@ -782,8 +781,6 @@ jwt:
 }
 
 func TestToAuthenticationConfig_OIDC(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, true)
-
 	testCases := []struct {
 		name         string
 		args         []string
@@ -1051,6 +1048,8 @@ jwt:
 }
 
 func TestValidateOIDCOptions(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+
 	testCases := []struct {
 		name                                  string
 		args                                  []string
