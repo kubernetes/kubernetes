@@ -287,10 +287,6 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
-		case types.Slice:
-			if unalias(elem.Elem) != types.Byte {
-				return nil, fmt.Errorf("field %s (%s): maps of lists are not supported", fldPath.String(), t)
-			}
 		case types.Map:
 			return nil, fmt.Errorf("field %s (%s): maps of maps are not supported", fldPath.String(), t)
 		}
