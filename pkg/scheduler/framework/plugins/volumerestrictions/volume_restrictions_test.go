@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -579,7 +580,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 		oldObj, newObj interface{}
 		existingPods   []*v1.Pod
 		existingPVC    *v1.PersistentVolumeClaim
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"queue-new-object-gcedisk-conflict": {
@@ -587,7 +588,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podGCEDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-gcedisk-no-conflict": {
@@ -595,7 +596,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podGCEDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-new-object-awsdisk-conflict": {
@@ -603,7 +604,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podAWSDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-awsdisk-no-conflict": {
@@ -611,7 +612,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podAWSDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-new-object-rbddisk-conflict": {
@@ -619,7 +620,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podRBDDiskDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-rbddisk-no-conflict": {
@@ -627,7 +628,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podRBDDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-new-object-iscsidisk-conflict": {
@@ -635,7 +636,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podISCSIDiskConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-iscsidisk-no-conflict": {
@@ -643,7 +644,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       podISCSIDiskNoConflicts,
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-has-same-claim": {
@@ -651,7 +652,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       st.MakePod().Name("pod2").PVC("claim-rwop").Obj(),
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-no-same-claim": {
@@ -659,7 +660,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			oldObj:       st.MakePod().Name("pod2").PVC("claim-2-rwop").Obj(),
 			existingPods: []*v1.Pod{},
 			existingPVC:  &v1.PersistentVolumeClaim{},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 	}
@@ -718,42 +719,42 @@ func Test_isSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 		existingPods   []*v1.Pod
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"queue-new-object-pvc-belong-pod": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithTwoPVCs,
 			newObj:       PVC1,
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 		"skip-new-object-unused": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithOnePVC,
 			newObj:       PVC2,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"skip-nil-old-object": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithOnePVC,
 			newObj:       PVC2,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"skip-new-object-not-belong-pod": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithOnePVC,
 			newObj:       PVC2,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"skip-new-object-namespace-not-equal-pod": {
 			existingPods: []*v1.Pod{},
 			pod:          podWithNotEqualNamespace,
 			newObj:       PVC1,
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 	}
