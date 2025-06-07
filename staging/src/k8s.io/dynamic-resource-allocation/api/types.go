@@ -38,11 +38,32 @@ type ResourceSliceSpec struct {
 	Devices                []Device
 	PerDeviceNodeSelection *bool
 	SharedCounters         []CounterSet
+	Mixins                 *ResourceSliceMixins
+}
+
+type ResourceSliceMixins struct {
+	Device                   map[UniqueString]DeviceMixin
+	DeviceCounterConsumption map[UniqueString]DeviceCounterConsumptionMixin
+	CounterSet               map[UniqueString]CounterSetMixin
+}
+
+type DeviceMixin struct {
+	Attributes map[QualifiedName]DeviceAttribute
+	Capacity   map[QualifiedName]DeviceCapacity
+}
+
+type DeviceCounterConsumptionMixin struct {
+	Counters map[string]Counter
+}
+
+type CounterSetMixin struct {
+	Counters map[string]Counter
 }
 
 type CounterSet struct {
-	Name     UniqueString
-	Counters map[string]Counter
+	Name      UniqueString
+	Counters  map[string]Counter
+	MixinRefs []UniqueString
 }
 
 type ResourcePool struct {
@@ -63,11 +84,13 @@ type BasicDevice struct {
 	NodeSelector     *v1.NodeSelector
 	AllNodes         *bool
 	Taints           []resourceapi.DeviceTaint
+	MixinRefs        []UniqueString
 }
 
 type DeviceCounterConsumption struct {
 	CounterSet UniqueString
 	Counters   map[string]Counter
+	MixinRefs  []UniqueString
 }
 
 type QualifiedName string
