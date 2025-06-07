@@ -50,7 +50,7 @@ func (mp *MultipointExample) Name() string {
 // Reserve is the function invoked by the framework at "reserve" extension
 // point. In this trivial example, the Reserve method allocates an array of
 // strings.
-func (mp *MultipointExample) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mp *MultipointExample) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	// Reserve is not called concurrently, and so we don't need to lock.
 	mp.executionPoints = append(mp.executionPoints, "reserve")
 	return nil
@@ -71,13 +71,13 @@ func (mp *MultipointExample) Unreserve(ctx context.Context, state fwk.CycleState
 
 // PreBind is the function invoked by the framework at "prebind" extension
 // point.
-func (mp *MultipointExample) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (mp *MultipointExample) PreBind(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	// PreBind could be called concurrently for different pods.
 	mp.mu.Lock()
 	defer mp.mu.Unlock()
 	mp.executionPoints = append(mp.executionPoints, "pre-bind")
 	if pod == nil {
-		return framework.NewStatus(framework.Error, "pod must not be nil")
+		return fwk.NewStatus(fwk.Error, "pod must not be nil")
 	}
 	return nil
 }
