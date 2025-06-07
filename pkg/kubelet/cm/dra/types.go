@@ -19,6 +19,8 @@ package dra
 import (
 	"context"
 
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -52,6 +54,12 @@ type Manager interface {
 
 	// GetContainerClaimInfos gets Container ClaimInfo objects
 	GetContainerClaimInfos(pod *v1.Pod, container *v1.Container) ([]*ClaimInfo, error)
+
+	// UpdateAllocatedResourcesStatus modifies the status object in-place.
+	UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus)
+
+	// Updates returns a channel that receives notifications about pods whose resource health status might need updating.
+	Updates() <-chan resourceupdates.Update
 }
 
 // ContainerInfo contains information required by the runtime to consume prepared resources.

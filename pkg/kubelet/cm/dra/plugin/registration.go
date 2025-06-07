@@ -67,7 +67,8 @@ type RegistrationHandler struct {
 	//
 	// Must use pointers to functions because the entries have to
 	// be comparable.
-	pendingWipes map[string]*context.CancelCauseFunc
+	pendingWipes  map[string]*context.CancelCauseFunc
+	streamHandler StreamHandler
 }
 
 var _ cache.PluginHandler = &RegistrationHandler{}
@@ -77,20 +78,21 @@ var _ cache.PluginHandler = &RegistrationHandler{}
 // Must only be called once per process because it manages global state.
 // If a kubeClient is provided, then it synchronizes ResourceSlices
 // with the resource information provided by plugins.
-func NewRegistrationHandler(kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
-	// The context and thus logger should come from the caller.
-	return newRegistrationHandler(context.TODO(), kubeClient, getNode, wipingDelay)
+func NewRegistrationHandler(callerCtx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *RegistrationHandler {
+	return newRegistrationHandler(callerCtx, kubeClient, getNode, streamHandler, wipingDelay)
 }
 
-func newRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), wipingDelay time.Duration) *RegistrationHandler {
-	ctx, cancel := context.WithCancelCause(ctx)
+func newRegistrationHandler(parentCtx context.Context, kubeClient kubernetes.Interface, getNode func() (*v1.Node, error), streamHandler StreamHandler, wipingDelay time.Duration) *RegistrationHandler {
+	handlerLogger := klog.LoggerWithName(klog.FromContext(parentCtx), "DRARegistrationHandler")
+	ctx, cancel := context.WithCancelCause(klog.NewContext(parentCtx, handlerLogger))
 	handler := &RegistrationHandler{
-		backgroundCtx: klog.NewContext(ctx, klog.LoggerWithName(klog.FromContext(ctx), "DRA registration handler")),
+		backgroundCtx: ctx,
 		cancel:        cancel,
 		kubeClient:    kubeClient,
 		getNode:       getNode,
 		wipingDelay:   wipingDelay,
 		pendingWipes:  make(map[string]*context.CancelCauseFunc),
+		streamHandler: streamHandler,
 	}
 
 	// When kubelet starts up, no DRA driver has registered yet. None of
@@ -104,9 +106,9 @@ func newRegistrationHandler(ctx context.Context, kubeClient kubernetes.Interface
 	go func() {
 		defer handler.wg.Done()
 
-		logger := klog.LoggerWithName(klog.FromContext(handler.backgroundCtx), "startup")
-		ctx := klog.NewContext(handler.backgroundCtx, logger)
-		handler.wipeResourceSlices(ctx, 0 /* no delay */, "" /* all drivers */)
+		startupLogger := klog.LoggerWithName(klog.FromContext(handler.backgroundCtx), "startup")
+		startupWipeCtx := klog.NewContext(handler.backgroundCtx, startupLogger)
+		handler.wipeResourceSlices(startupWipeCtx, 0 /* no delay */, "" /* all drivers */)
 	}()
 
 	return handler
@@ -226,6 +228,25 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		clientCallTimeout: timeout,
 	}
 
+	// Create a separate context derived from the plugin's context for the stream attempt/lifecycle.
+	streamCtx, streamAttemptCancel := context.WithCancel(ctx)
+	stream, err := pluginInstance.WatchResources(streamCtx)
+	if err != nil {
+		streamAttemptCancel()
+		logger.Error(err, "Failed to start WatchResources stream")
+		// Log and continue without health monitoring.
+		pluginInstance.SetHealthStream(nil, nil)
+
+	} else {
+		// Stream started successfully.
+		logger.Info("Successfully started WatchResources health stream")
+		// Store the stream's specific context and its cancel function
+		pluginInstance.SetHealthStream(streamCtx, streamAttemptCancel)
+
+		// Start handling the stream messages using the draManager
+		go h.streamHandler.HandleWatchResourcesStream(streamCtx, stream, pluginName)
+	}
+
 	// Storing endpoint of newly registered DRA Plugin into the map, where plugin name will be the key
 	// all other DRA components will be able to get the actual socket of DRA plugins by its name.
 	if err := draPlugins.add(pluginInstance); err != nil {
@@ -242,8 +263,8 @@ func (h *RegistrationHandler) RegisterPlugin(pluginName string, endpoint string,
 		(*cancel)(errors.New("new plugin instance registered"))
 		delete(h.pendingWipes, pluginName)
 	}
-
 	return nil
+
 }
 
 // validateSupportedServices identifies the highest supported gRPC service for
@@ -284,8 +305,12 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName, endpoint string) {
 		// This logger includes endpoint and pluginName.
 		logger := klog.FromContext(p.backgroundCtx)
 		logger.V(3).Info("Deregister DRA plugin", "lastInstance", last)
-		if !last {
-			return
+
+		// Cancel the plugin's health stream if it was active.
+		healthCancel := p.HealthStreamCancel()
+		if healthCancel != nil {
+			logger.V(4).Info("Canceling health stream during deregistration")
+			healthCancel()
 		}
 
 		// Prepare for canceling the background wiping. This needs to run

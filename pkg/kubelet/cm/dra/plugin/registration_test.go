@@ -17,6 +17,7 @@ limitations under the License.
 package plugin
 
 import (
+	"context"
 	"sort"
 	"strings"
 	"testing"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	cgotesting "k8s.io/client-go/testing"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -48,6 +50,13 @@ const (
 
 func getFakeNode() (*v1.Node, error) {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}, nil
+}
+
+// mockStreamHandler is a mock implementation of the StreamHandler interface for testing.
+type mockStreamHandler struct{}
+
+func (m *mockStreamHandler) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.NodeHealth_WatchResourcesClient, resourceName string) error {
+	return nil
 }
 
 func TestRegistrationHandler(t *testing.T) {
@@ -167,7 +176,8 @@ func TestRegistrationHandler(t *testing.T) {
 			}
 
 			// The handler wipes all slices at startup.
-			handler := newRegistrationHandler(tCtx, client, getFakeNode, time.Second /* very short wiping delay for testing */)
+			mockSH := &mockStreamHandler{}
+			handler := newRegistrationHandler(tCtx, client, getFakeNode, mockSH, time.Second /* very short wiping delay for testing */)
 			tCtx.Cleanup(handler.Stop)
 			requireNoSlices := func() {
 				t.Helper()

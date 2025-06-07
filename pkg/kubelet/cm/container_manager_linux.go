@@ -1048,10 +1048,52 @@ func (cm *containerManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, stat
 	// For now we only support Device Plugin
 	cm.deviceManager.UpdateAllocatedResourcesStatus(pod, status)
 
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources which is planned for the next iteration of a KEP.
+	// Update DRA resources if the feature is enabled and the manager exists
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) && cm.draManager != nil {
+		cm.draManager.UpdateAllocatedResourcesStatus(pod, status)
+	}
 }
 
 func (cm *containerManagerImpl) Updates() <-chan resourceupdates.Update {
-	// TODO(SergeyKanzhelev, https://kep.k8s.io/4680): add support for DRA resources, for now only use device plugin updates. DRA support is planned for the next iteration of a KEP.
 	return cm.deviceManager.Updates()
+
+	out := make(chan resourceupdates.Update)
+	var wg sync.WaitGroup
+	// May need to be adjusted depending on if we want to expect both to be working immeditaley, maybe version guarded?
+	wg.Add(2)
+
+	proxy := func(c <-chan resourceupdates.Update) {
+		if c == nil {
+			wg.Done()
+			return
+		}
+		for v := range c {
+			out <- v
+		}
+		wg.Done()
+	}
+
+	// Handle channels incase managers are not ready
+	var dmUpdates <-chan resourceupdates.Update
+	if cm.deviceManager != nil {
+		dmUpdates = cm.deviceManager.Updates()
+	}
+
+	var draUpdates <-chan resourceupdates.Update
+	if cm.draManager != nil {
+		draUpdates = cm.draManager.Updates()
+	} else {
+		wg.Done()
+	}
+
+	go proxy(dmUpdates)
+	if draUpdates != nil {
+		go proxy(draUpdates)
+	}
+
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
