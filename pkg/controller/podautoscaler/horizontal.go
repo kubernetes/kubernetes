@@ -48,6 +48,7 @@ import (
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
@@ -867,18 +868,35 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 	}
 
 	if rescale {
-		scale.Spec.Replicas = desiredReplicas
-		_, err = a.scaleNamespacer.Scales(hpa.Namespace).Update(ctx, targetGR, scale, metav1.UpdateOptions{})
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			// 1. GET inside the loop to ensure freshness and get the latest resourceVersion.
+			latestScale, getErr := a.scaleNamespacer.Scales(hpa.Namespace).Get(ctx, targetGR, hpa.Spec.ScaleTargetRef.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return getErr
+			}
+
+			// 2. Optimization: If already scaled, we are done. Avoids a needless write.
+			if latestScale.Spec.Replicas == desiredReplicas {
+				return nil
+			}
+
+			// 3. Apply change and UPDATE.
+			latestScale.Spec.Replicas = desiredReplicas
+			_, updateErr := a.scaleNamespacer.Scales(hpa.Namespace).Update(ctx, targetGR, latestScale, metav1.UpdateOptions{})
+			return updateErr
+		})
+
+		// This is the original, simple error handling.
 		if err != nil {
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
-			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
 			a.setCurrentReplicasAndMetricsInStatus(hpa, currentReplicas, metricStatuses)
-			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
-				utilruntime.HandleError(err)
+			if errStatusUpdate := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); errStatusUpdate != nil {
+				utilruntime.HandleError(errStatusUpdate)
 			}
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
 		}
-		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededRescale", "the HPA controller was able to update the target scale to %d", desiredReplicas)
+
+		// This is the original, simple success handling.
 		a.eventRecorder.Eventf(hpa, v1.EventTypeNormal, "SuccessfulRescale", "New size: %d; reason: %s", desiredReplicas, rescaleReason)
 		a.storeScaleEvent(hpa.Spec.Behavior, key, currentReplicas, desiredReplicas)
 		logger.Info("Successfully rescaled",

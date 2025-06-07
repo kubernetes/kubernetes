@@ -107,6 +107,14 @@ const (
 	numContainersPerPod = 2
 )
 
+func hotCPUCreationTime() metav1.Time {
+	return metav1.Now()
+}
+
+func coolCPUCreationTime() metav1.Time {
+	return metav1.NewTime(time.Now().Add(-2 * time.Hour))
+}
+
 func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 	fakeClient := &fake.Clientset{}
 	fakeClient.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
