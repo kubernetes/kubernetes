@@ -329,7 +329,7 @@ func TestNewDualStack(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fexec := fakeExecForCommands(tc.commands)
-			runners := newDualStackInternal(fexec)
+			runners, _ := newDualStackInternal(fexec)
 
 			if tc.ipv4 && runners[v1.IPv4Protocol] == nil {
 				t.Errorf("Expected ipv4 runner, got nil")

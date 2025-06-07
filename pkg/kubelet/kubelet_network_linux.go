@@ -37,8 +37,12 @@ const (
 )
 
 func (kl *Kubelet) initNetworkUtil() {
-	iptClients := utiliptables.NewDualStack()
-	if len(iptClients) == 0 {
+	iptClients, err := utiliptables.NewDualStack()
+	if err != nil {
+		klog.ErrorS(err, "Failed to initialize iptables")
+	}
+
+	if err != nil || len(iptClients) == 0 {
 		klog.InfoS("No iptables support on this system; not creating the KUBE-IPTABLES-HINT chain")
 		return
 	}

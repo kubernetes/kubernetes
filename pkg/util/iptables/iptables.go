@@ -97,7 +97,7 @@ type Interface interface {
 	HasRandomFully() bool
 
 	// Present checks if the kernel supports the iptable interface
-	Present() bool
+	Present() error
 }
 
 // Protocol defines the ip protocol either ipv4 or ipv6
@@ -244,29 +244,40 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lo
 }
 
 // New returns a new Interface which will exec iptables.
+// Note that this function will return a single iptables Interface *and* an error, if only
+// a single family is supported.
 func New(protocol Protocol) Interface {
 	return newInternal(utilexec.New(), protocol, "", "")
 }
 
-func newDualStackInternal(exec utilexec.Interface) map[v1.IPFamily]Interface {
+func newDualStackInternal(exec utilexec.Interface) (map[v1.IPFamily]Interface, error) {
+	var err error
 	interfaces := map[v1.IPFamily]Interface{}
 
 	iptv4 := newInternal(exec, ProtocolIPv4, "", "")
-	if iptv4.Present() {
+	if presentErr := iptv4.Present(); presentErr != nil {
+		err = presentErr
+	} else {
 		interfaces[v1.IPv4Protocol] = iptv4
 	}
 	iptv6 := newInternal(exec, ProtocolIPv6, "", "")
-	if iptv6.Present() {
+	if presentErr := iptv6.Present(); presentErr != nil {
+		// If we get an error for both IPv4 and IPv6 Present() calls, it's virtually guaranteed that
+		// they're going to be the same error. We ignore the error for IPv6 if IPv4 has already failed.
+		if err == nil {
+			err = presentErr
+		}
+	} else {
 		interfaces[v1.IPv6Protocol] = iptv6
 	}
 
-	return interfaces
+	return interfaces, err
 }
 
 // NewDualStack returns a map containing an IPv4 Interface (if IPv4 iptables is supported)
 // and an IPv6 Interface (if IPv6 iptables is supported). If either family is not
 // supported, no Interface will be returned for that family.
-func NewDualStack() map[v1.IPFamily]Interface {
+func NewDualStack() (map[v1.IPFamily]Interface, error) {
 	return newDualStackInternal(utilexec.New())
 }
 
@@ -650,8 +661,7 @@ func (runner *runner) ChainExists(table Table, chain Chain) (bool, error) {
 
 	out, err := runner.run(opListChain, fullArgs)
 	if err != nil {
-		klog.ErrorS(err, "Failed to list chain", "chain", chain, "table", table, "output", string(out))
-		return false, err
+		return false, fmt.Errorf("error listing chain %q in table %q: %w: %s", chain, table, err, out)
 	}
 	return true, nil
 }
@@ -755,12 +765,11 @@ func (runner *runner) HasRandomFully() bool {
 
 // Present tests if iptable is supported on current kernel by checking the existence
 // of default table and chain
-func (runner *runner) Present() bool {
+func (runner *runner) Present() error {
 	if _, err := runner.ChainExists(TableNAT, ChainPostrouting); err != nil {
-		return false
+		return err
 	}
-
-	return true
+	return nil
 }
 
 var iptablesNotFoundStrings = []string{
