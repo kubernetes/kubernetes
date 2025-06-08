@@ -58,6 +58,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/controller-manager/pkg/healthz"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -130,6 +131,7 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
+	*healthz.ControllerHealthCheckable
 
 	clock clock.PassiveClock
 
@@ -158,6 +160,7 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 	if err := metrics.Register(legacyregistry.Register); err != nil {
 		logger.Error(err, "unable to register metrics")
 	}
+<<<<<<< HEAD
 
 	var consistencyStore consistencyutil.ConsistencyStore
 	var podWriteCallback func(pod *v1.Pod, rs *metav1.OwnerReference)
@@ -205,20 +208,27 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures, consistencyStore consistencyutil.ConsistencyStore) *ReplicaSetController {
 
 	rsc := &ReplicaSetController{
-		GroupVersionKind: gvk,
+		GroupVersionKind: apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		kubeClient:       kubeClient,
-		podControl:       podControl,
+		podControl:       controller.RealPodControl{KubeClient: kubeClient, Recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"})},
 		eventBroadcaster: eventBroadcaster,
 		burstReplicas:    burstReplicas,
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "replicaset_controller"},
 		),
 		clock:              clock.RealClock{},
 		controllerFeatures: controllerFeatures,
 		consistencyStore:   consistencyStore,
 	}
+
+	// Initialize health check with informer sync functions
+	rsc.ControllerHealthCheckable = healthz.NewControllerHealthCheckable(
+		strings.ToLower(rsc.Kind),
+		rsInformer.Informer().HasSynced,
+		podInformer.Informer().HasSynced,
+	)
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
