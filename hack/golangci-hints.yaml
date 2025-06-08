@@ -221,12 +221,14 @@ linters:
             contextual k8s.io/kubernetes/pkg/kubelet/pod/.*
             contextual k8s.io/kubernetes/pkg/kubelet/preemption/.*
             contextual k8s.io/kubernetes/pkg/kubelet/volumemanager/.*
+            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
             
             # As long as contextual logging is alpha or beta, all WithName, WithValues,
             # NewContext calls have to go through klog. Once it is GA, we can lift
             # this restriction. Whether we then do a global search/replace remains
             # to be decided.
             with-helpers .*
+            contextual k8s.io/kubernetes/pkg/kubelet/certificate/.*
       sorted:
         # Installed there by hack/verify-golangci-lint.sh.
         path: _output/local/bin/sorted.so
