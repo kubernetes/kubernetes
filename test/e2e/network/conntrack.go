@@ -719,7 +719,12 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		e2epod.SetNodeSelection(&serverPod.Spec, nodeSelection)
 		e2epod.NewPodClient(fr).CreateSync(ctx, serverPod)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{serverPod.Name: {8080}})
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "udp", Protocol: v1.ProtocolUDP, Target: serverPod.Name, TargetPort: 8080},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		// Check that the first container of server pod keeps receiving traffic
 		// UDP conntrack entries timeout is 30 sec by default
@@ -738,7 +743,12 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Updated Target Port: %v", service.Spec.Ports[0].TargetPort)
 
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{serverPod.Name: {9090}})
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "udp", Protocol: v1.ProtocolUDP, Target: serverPod.Name, TargetPort: 9090},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		// Check that the second container of server pod keeps receiving traffic after clearing up the conntrack entries
 		// UDP conntrack entries timeout is 30 sec by default

@@ -31,7 +31,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	discoveryv1 "k8s.io/api/discovery/v1"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -117,18 +116,6 @@ var (
 		},
 	}
 )
-
-// portsByPodName is a map that maps pod name to container ports.
-type portsByPodName map[string][]int
-
-// portsByPodUID is a map that maps pod name to container ports.
-type portsByPodUID map[types.UID][]int
-
-// fullPortsByPodName is a map that maps pod name to container ports including their protocols.
-type fullPortsByPodName map[string][]v1.ContainerPort
-
-// fullPortsByPodUID is a map that maps pod name to container ports.
-type fullPortsByPodUID map[types.UID][]v1.ContainerPort
 
 // affinityCheckFromPod returns interval, timeout and function pinging the service and
 // returning pinged hosts for pinging the service from execPod.
@@ -853,7 +840,8 @@ var _ = common.SIGDescribe("Services", func() {
 
 		port1 := 100
 		port2 := 101
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 0)
+		framework.ExpectNoError(err)
 
 		names := map[string]bool{}
 		ginkgo.DeferCleanup(func(ctx context.Context) {
@@ -879,26 +867,47 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
+		ginkgo.By("creating pod1 serving port1")
 		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
 		names[podname1] = true
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}})
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname1", Target: podname1, TargetPort: int32(port1)},
+			},
+		)
+		framework.ExpectNoError(err)
 
+		ginkgo.By("creating pod2 serving port2")
 		createPodOrFail(ctx, f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
 		names[podname2] = true
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname1", Target: podname1, TargetPort: int32(port1)},
+				{Name: "portname2", Target: podname2, TargetPort: int32(port2)},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if the Service forwards traffic to pods")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
 		framework.ExpectNoError(err)
 
+		ginkgo.By("deleting pod1 serving port1")
 		e2epod.DeletePodOrFail(ctx, cs, ns, podname1)
 		delete(names, podname1)
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname2: {port2}})
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname2", Target: podname2, TargetPort: int32(port2)},
+			},
+		)
+		framework.ExpectNoError(err)
 
+		ginkgo.By("deleting pod2 serving port2")
 		e2epod.DeletePodOrFail(ctx, cs, ns, podname2)
 		delete(names, podname2)
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 0)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("should be updated after adding or deleting ports ", func(ctx context.Context) {
@@ -918,8 +927,10 @@ var _ = common.SIGDescribe("Services", func() {
 			}
 		})
 		framework.ExpectNoError(err)
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{})
+		err = e2eendpointslice.WaitForEndpointCount(ctx, cs, ns, serviceName, 0)
+		framework.ExpectNoError(err)
 
+		ginkgo.By("Creating a pod to serve port1")
 		podname1 := "pod1"
 		port1 := 100
 		containerPorts1 := []v1.ContainerPort{
@@ -929,7 +940,14 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts1, "netexec", "--http-port", strconv.Itoa(port1))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}})
+
+		ginkgo.By("Waiting for an EndpointSlice pointing to port1")
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname1", Target: podname1, TargetPort: int32(port1)},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if the Service " + serviceName + " forwards traffic to " + podname1)
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
@@ -954,7 +972,7 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Adding a new endpoint to the new port ")
+		ginkgo.By("Creating a pod to serve port2")
 		podname2 := "pod2"
 		port2 := 101
 		containerPorts2 := []v1.ContainerPort{
@@ -964,7 +982,15 @@ var _ = common.SIGDescribe("Services", func() {
 			},
 		}
 		createPodOrFail(ctx, f, ns, podname2, jig.Labels, containerPorts2, "netexec", "--http-port", strconv.Itoa(port2))
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
+
+		ginkgo.By("Waiting for EndpointSlices pointing to both ports")
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname1", Target: podname1, TargetPort: int32(port1)},
+				{Name: "portname2", Target: podname2, TargetPort: int32(port2)},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and " + podname2)
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
@@ -982,8 +1008,15 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err)
 
+		ginkgo.By("Waiting for the EndpointSlices to only point to the port1")
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname1", Target: podname1, TargetPort: int32(port1)},
+			},
+		)
+		framework.ExpectNoError(err)
+
 		ginkgo.By("Checking if the Service forwards traffic to " + podname1 + " and not forwards to " + podname2)
-		validateEndpointsPortsOrFail(ctx, cs, ns, serviceName, portsByPodName{podname1: {port1}})
 		err = jig.CheckServiceReachability(ctx, svc, execPod)
 		framework.ExpectNoError(err)
 	})
@@ -3752,7 +3785,15 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		ginkgo.By("creating pod " + podname1 + " in namespace " + ns)
 		createPodOrFail(ctx, f, ns, podname1, testLabels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
-		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
+
+		ginkgo.By("waiting for EndpointSlices for all ports")
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: svcTCPport.Name, Protocol: v1.ProtocolTCP, Target: podname1, TargetPort: int32(containerPort)},
+				{Name: svcUDPport.Name, Protocol: v1.ProtocolUDP, Target: podname1, TargetPort: int32(containerPort)},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if the Service forwards traffic to the TCP and UDP port")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
@@ -3765,7 +3806,7 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Failf("Failed to connect to Service UDP port: %v", err)
 		}
 
-		ginkgo.By("Checking if the Service forwards traffic to TCP only")
+		ginkgo.By("updating the service to have only a TCP port")
 		service, err = cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
@@ -3776,7 +3817,7 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
 		}
 
-		// test reachability
+		ginkgo.By("Checking if the Service forwards traffic to TCP only")
 		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolTCP, execPod, 30*time.Second)
 		if err != nil {
 			framework.Failf("Failed to connect to Service TCP port: %v", err)
@@ -3788,7 +3829,7 @@ var _ = common.SIGDescribe("Services", func() {
 			return testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 6*time.Second)
 		}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).ShouldNot(gomega.BeNil())
 
-		ginkgo.By("Checking if the Service forwards traffic to UDP only")
+		ginkgo.By("updating the service to have only a UDP port")
 		service, err = cs.CoreV1().Services(ns).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
 			framework.Failf("failed to get Service %q: %v", serviceName, err)
@@ -3799,7 +3840,7 @@ var _ = common.SIGDescribe("Services", func() {
 			framework.Failf("failed to update Service %q: %v", serviceName, err)
 		}
 
-		// test reachability
+		ginkgo.By("Checking if the Service forwards traffic to UDP only")
 		err = testEndpointReachability(ctx, service.Spec.ClusterIP, 80, v1.ProtocolUDP, execPod, 30*time.Second)
 		if err != nil {
 			framework.Failf("Failed to connect to Service UDP port: %v", err)
@@ -3875,7 +3916,13 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 
 		createPodOrFail(ctx, f, ns, podname1, jig.Labels, containerPorts, "netexec", "--http-port", strconv.Itoa(containerPort), "--udp-port", strconv.Itoa(containerPort))
-		validateEndpointsPortsWithProtocolsOrFail(cs, ns, serviceName, fullPortsByPodName{podname1: containerPorts})
+		err = e2eendpointslice.WaitForEndpointPorts(ctx, cs, ns, serviceName,
+			[]e2eendpointslice.PortMapping{
+				{Name: "portname1", Protocol: v1.ProtocolTCP, Target: podname1, TargetPort: int32(containerPort)},
+				{Name: "portname2", Protocol: v1.ProtocolUDP, Target: podname1, TargetPort: int32(containerPort)},
+			},
+		)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if the Service forwards traffic to pods")
 		execPod := e2epod.CreateExecPodOrFail(ctx, cs, ns, "execpod", nil)
@@ -4560,103 +4607,6 @@ func checkServiceReachabilityFromExecPod(ctx context.Context, client clientset.I
 	}
 }
 
-func validatePorts(ep, expectedEndpoints portsByPodUID) error {
-	if len(ep) != len(expectedEndpoints) {
-		// should not happen because we check this condition before
-		return fmt.Errorf("invalid number of endpoints got %v, expected %v", ep, expectedEndpoints)
-	}
-	for podUID := range expectedEndpoints {
-		if _, ok := ep[podUID]; !ok {
-			return fmt.Errorf("endpoint %v not found", podUID)
-		}
-		if len(ep[podUID]) != len(expectedEndpoints[podUID]) {
-			return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
-		}
-		sort.Ints(ep[podUID])
-		sort.Ints(expectedEndpoints[podUID])
-		for index := range ep[podUID] {
-			if ep[podUID][index] != expectedEndpoints[podUID][index] {
-				return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
-			}
-		}
-	}
-	return nil
-}
-
-func translatePodNameToUID(ctx context.Context, c clientset.Interface, ns string, expectedEndpoints portsByPodName) (portsByPodUID, error) {
-	portsByUID := make(portsByPodUID)
-	for name, portList := range expectedEndpoints {
-		pod, err := c.CoreV1().Pods(ns).Get(ctx, name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %w", name, err)
-		}
-		portsByUID[pod.ObjectMeta.UID] = portList
-	}
-	return portsByUID, nil
-}
-
-// validateEndpointsPortsOrFail validates that the given service exists and is served by the given expectedEndpoints.
-func validateEndpointsPortsOrFail(ctx context.Context, c clientset.Interface, namespace, serviceName string, expectedEndpoints portsByPodName) {
-	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
-	expectedPortsByPodUID, err := translatePodNameToUID(ctx, c, namespace, expectedEndpoints)
-	framework.ExpectNoError(err, "failed to translate pod name to UID, ns:%s, expectedEndpoints:%v", namespace, expectedEndpoints)
-
-	var (
-		pollErr error
-		i       = 0
-	)
-	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
-		i++
-
-		ep, err := c.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("Failed go get Endpoints object: %v", err)
-			// Retry the error
-			return false, nil
-		}
-		portsByUID := getContainerPortsByPodUID(ep)
-		if err := validatePorts(portsByUID, expectedPortsByPodUID); err != nil {
-			if i%5 == 0 {
-				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
-			}
-			return false, nil
-		}
-
-		// If EndpointSlice API is enabled, then validate if appropriate EndpointSlice objects
-		// were also create/updated/deleted.
-		if _, err := c.Discovery().ServerResourcesForGroupVersion(discoveryv1.SchemeGroupVersion.String()); err == nil {
-			opts := metav1.ListOptions{
-				LabelSelector: "kubernetes.io/service-name=" + serviceName,
-			}
-			es, err := c.DiscoveryV1().EndpointSlices(namespace).List(ctx, opts)
-			if err != nil {
-				framework.Logf("Failed go list EndpointSlice objects: %v", err)
-				// Retry the error
-				return false, nil
-			}
-			portsByUID = portsByPodUID(e2eendpointslice.GetContainerPortsByPodUID(es.Items))
-			if err := validatePorts(portsByUID, expectedPortsByPodUID); err != nil {
-				if i%5 == 0 {
-					framework.Logf("Unexpected endpoint slices: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
-				}
-				return false, nil
-			}
-		}
-		framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v",
-			serviceName, namespace, expectedEndpoints)
-		return true, nil
-	}); pollErr != nil {
-		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{}); err == nil {
-			for _, pod := range pods.Items {
-				framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-			}
-		} else {
-			framework.Logf("Can't list pod debug info: %v", err)
-		}
-	}
-	framework.ExpectNoError(pollErr, "error waithing for service %s in namespace %s to expose endpoints %v: %v", serviceName, namespace, expectedEndpoints)
-}
-
 func restartApiserver(ctx context.Context, namespace string, cs clientset.Interface) error {
 	return restartComponent(ctx, cs, kubeAPIServerLabelName, metav1.NamespaceSystem, map[string]string{clusterComponentKey: kubeAPIServerLabelName})
 }
@@ -4677,106 +4627,4 @@ func restartComponent(ctx context.Context, cs clientset.Interface, cName, ns str
 
 	_, err = e2epod.PodsCreatedByLabel(ctx, cs, ns, cName, int32(len(pods)), labels.SelectorFromSet(matchLabels))
 	return err
-}
-
-// validateEndpointsPortsWithProtocolsOrFail validates that the given service exists and is served by the given expectedEndpoints.
-func validateEndpointsPortsWithProtocolsOrFail(c clientset.Interface, namespace, serviceName string, expectedEndpoints fullPortsByPodName) {
-	ginkgo.By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to expose endpoints %v", framework.ServiceStartTimeout, serviceName, namespace, expectedEndpoints))
-	expectedPortsByPodUID, err := translatePortsByPodNameToPortsByPodUID(c, namespace, expectedEndpoints)
-	framework.ExpectNoError(err, "failed to translate pod name to UID, ns:%s, expectedEndpoints:%v", namespace, expectedEndpoints)
-
-	var (
-		pollErr error
-		i       = 0
-	)
-	if pollErr = wait.PollImmediate(time.Second, framework.ServiceStartTimeout, func() (bool, error) {
-		i++
-
-		ep, err := c.CoreV1().Endpoints(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
-		if err != nil {
-			framework.Logf("Failed go get Endpoints object: %v", err)
-			// Retry the error
-			return false, nil
-		}
-		portsByUID := getFullContainerPortsByPodUID(ep)
-		if err := validatePortsAndProtocols(portsByUID, expectedPortsByPodUID); err != nil {
-			if i%5 == 0 {
-				framework.Logf("Unexpected endpoints: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
-			}
-			return false, nil
-		}
-
-		// If EndpointSlice API is enabled, then validate if appropriate EndpointSlice objects
-		// were also create/updated/deleted.
-		if _, err := c.Discovery().ServerResourcesForGroupVersion(discoveryv1.SchemeGroupVersion.String()); err == nil {
-			opts := metav1.ListOptions{
-				LabelSelector: "kubernetes.io/service-name=" + serviceName,
-			}
-			es, err := c.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), opts)
-			if err != nil {
-				framework.Logf("Failed go list EndpointSlice objects: %v", err)
-				// Retry the error
-				return false, nil
-			}
-			portsByUID = fullPortsByPodUID(e2eendpointslice.GetFullContainerPortsByPodUID(es.Items))
-			if err := validatePortsAndProtocols(portsByUID, expectedPortsByPodUID); err != nil {
-				if i%5 == 0 {
-					framework.Logf("Unexpected endpoint slices: found %v, expected %v, will retry", portsByUID, expectedEndpoints)
-				}
-				return false, nil
-			}
-		}
-		framework.Logf("successfully validated that service %s in namespace %s exposes endpoints %v",
-			serviceName, namespace, expectedEndpoints)
-		return true, nil
-	}); pollErr != nil {
-		if pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{}); err == nil {
-			for _, pod := range pods.Items {
-				framework.Logf("Pod %s\t%s\t%s\t%s", pod.Namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-			}
-		} else {
-			framework.Logf("Can't list pod debug info: %v", err)
-		}
-	}
-	framework.ExpectNoError(pollErr, "error waithing for service %s in namespace %s to expose endpoints %v: %v", serviceName, namespace, expectedEndpoints)
-}
-
-func translatePortsByPodNameToPortsByPodUID(c clientset.Interface, ns string, expectedEndpoints fullPortsByPodName) (fullPortsByPodUID, error) {
-	portsByUID := make(fullPortsByPodUID)
-	for name, portList := range expectedEndpoints {
-		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("failed to get pod %s, that's pretty weird. validation failed: %w", name, err)
-		}
-		portsByUID[pod.ObjectMeta.UID] = portList
-	}
-	return portsByUID, nil
-}
-
-func validatePortsAndProtocols(ep, expectedEndpoints fullPortsByPodUID) error {
-	if len(ep) != len(expectedEndpoints) {
-		// should not happen because we check this condition before
-		return fmt.Errorf("invalid number of endpoints got %v, expected %v", ep, expectedEndpoints)
-	}
-	for podUID := range expectedEndpoints {
-		if _, ok := ep[podUID]; !ok {
-			return fmt.Errorf("endpoint %v not found", podUID)
-		}
-		if len(ep[podUID]) != len(expectedEndpoints[podUID]) {
-			return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
-		}
-		var match bool
-		for _, epPort := range ep[podUID] {
-			match = false
-			for _, expectedPort := range expectedEndpoints[podUID] {
-				if epPort.ContainerPort == expectedPort.ContainerPort && epPort.Protocol == expectedPort.Protocol {
-					match = true
-				}
-			}
-			if !match {
-				return fmt.Errorf("invalid list of ports for uid %v. Got %v, expected %v", podUID, ep[podUID], expectedEndpoints[podUID])
-			}
-		}
-	}
-	return nil
 }

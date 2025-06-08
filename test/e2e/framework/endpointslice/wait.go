@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -113,6 +114,62 @@ func WaitForEndpointPods(ctx context.Context, cs clientset.Interface, namespace,
 			framework.Logf("Unexpected endpoints on slices, missing: %v, extra: %v", sets.List(expectPodSet.Difference(podSet)), sets.List(podSet.Difference(expectPodSet)))
 			return false, nil
 		}
+		return true, nil
+	})
+}
+
+// PortMapping contains data used by WaitForEndpointPorts
+type PortMapping struct {
+	// Name is the name of the ServicePort / EndpointPort
+	Name string
+	// Protocol is the protocol (defaults to TCP if left empty)
+	Protocol v1.Protocol
+	// Target is the name of the endpoint Pod
+	Target string
+	// TargetPort is the port on Target
+	TargetPort int32
+}
+
+// WaitForEndpointPorts waits (up to ControllerUpdateTimeout) for the named service to
+// have at least one EndpointSlice, with the set of `Endpoints` across all slices having
+// endpoints covering exactly portMappings. (Note that if called on a dual-stack service,
+// it may return before all EndpointSlices have been written, since just the
+// EndpointSlices for a single family will normally target all ports.)
+func WaitForEndpointPorts(ctx context.Context, cs clientset.Interface, namespace, service string, portMappings []PortMapping) error {
+	framework.Logf("Waiting for service %s/%s to have endpoints for ports %v", namespace, service, portMappings)
+
+	for i := range portMappings {
+		if portMappings[i].Protocol == "" {
+			portMappings[i].Protocol = v1.ProtocolTCP
+		}
+	}
+	expectMappings := sets.New(portMappings...)
+
+	return WaitForEndpointSlices(ctx, cs, namespace, service, time.Second, ControllerUpdateTimeout, func(ctx context.Context, endpointSlices []discoveryv1.EndpointSlice) (bool, error) {
+		if len(endpointSlices) == 0 {
+			framework.Logf("Waiting for at least 1 EndpointSlice to exist")
+			return false, nil
+		}
+
+		gotMappings := sets.New[PortMapping]()
+		for _, epSlice := range endpointSlices {
+			for _, endpoint := range epSlice.Endpoints {
+				for _, port := range epSlice.Ports {
+					gotMappings.Insert(PortMapping{
+						Name:       *port.Name,
+						Protocol:   *port.Protocol,
+						Target:     endpoint.TargetRef.Name,
+						TargetPort: *port.Port,
+					})
+				}
+			}
+		}
+
+		if !gotMappings.Equal(expectMappings) {
+			framework.Logf("Unexpected port mappings on slices, missing: %v, extra: %v", expectMappings.Difference(gotMappings).UnsortedList(), gotMappings.Difference(expectMappings).UnsortedList())
+			return false, nil
+		}
+
 		return true, nil
 	})
 }
