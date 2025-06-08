@@ -968,19 +968,13 @@ var _ = common.SIGDescribe("LoadBalancers", feature.LoadBalancer, func() {
 	})
 
 	f.It("should not have connectivity disruption during rolling update with externalTrafficPolicy=Cluster", f.WithSlow(), func(ctx context.Context) {
-		// We start with a low but reasonable threshold to analyze the results.
-		// The goal is to achieve 99% minimum success rate.
-		// TODO: We should do incremental steps toward the goal.
-		minSuccessRate := 0.95
+		minSuccessRate := 0.99
 
 		testRollingUpdateLBConnectivityDisruption(ctx, f, v1.ServiceExternalTrafficPolicyTypeCluster, minSuccessRate)
 	})
 
 	f.It("should not have connectivity disruption during rolling update with externalTrafficPolicy=Local", f.WithSlow(), func(ctx context.Context) {
-		// We start with a low but reasonable threshold to analyze the results.
-		// The goal is to achieve 99% minimum success rate.
-		// TODO: We should do incremental steps toward the goal.
-		minSuccessRate := 0.95
+		minSuccessRate := 0.99
 
 		testRollingUpdateLBConnectivityDisruption(ctx, f, v1.ServiceExternalTrafficPolicyTypeLocal, minSuccessRate)
 	})
@@ -1328,6 +1322,23 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 	e2eservice.TestReachableHTTP(ctx, lbNameOrAddress, svcPort, timeout)
 
 	ginkgo.By("Starting a goroutine to continuously hit the DaemonSet's pods through the service's load balancer")
+	// Create a pool of 100 HTTP clients.
+	// Each client has its own transport, which allows for its own connection pool.
+	// This helps in distributing the load and avoiding ephemeral port exhaustion.
+	// The test limits the number of nodes to 25 so we get a 4:1 ratio per node.
+	// Ref: https://issues.k8s.io/132161
+	const numClients = 100
+	clients := make([]*http.Client, numClients)
+	for i := 0; i < numClients; i++ {
+		clients[i] = &http.Client{
+			Transport: utilnet.SetTransportDefaults(&http.Transport{}),
+			Timeout:   5 * time.Second,
+		}
+	}
+
+	ipPort := net.JoinHostPort(lbNameOrAddress, strconv.Itoa(svcPort))
+	msg := "hello"
+	url := fmt.Sprintf("http://%s/echo?msg=%s", ipPort, msg)
 	var totalRequests uint64 = 0
 	var networkErrors uint64 = 0
 	var httpErrors uint64 = 0
@@ -1337,16 +1348,10 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		defer ginkgo.GinkgoRecover()
 
 		wait.Until(func() {
-			atomic.AddUint64(&totalRequests, 1)
-			client := &http.Client{
-				Transport: utilnet.SetTransportDefaults(&http.Transport{
-					DisableKeepAlives: true,
-				}),
-				Timeout: 5 * time.Second,
-			}
-			ipPort := net.JoinHostPort(lbNameOrAddress, strconv.Itoa(svcPort))
-			msg := "hello"
-			url := fmt.Sprintf("http://%s/echo?msg=%s", ipPort, msg)
+			requestIndex := atomic.AddUint64(&totalRequests, 1)
+			// Select a client from the pool in a round-robin fashion.
+			client := clients[requestIndex%numClients]
+
 			resp, err := client.Get(url)
 			if err != nil {
 				framework.Logf("Got error testing for reachability of %s: %v", url, err)
