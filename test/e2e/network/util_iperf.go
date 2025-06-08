@@ -84,7 +84,7 @@ func NewIPerf(csvLine string) (*IPerfCSVResult, error) {
 	}
 	csvLine = strings.Trim(csvLine, "\n")
 	slice := StrSlice(strings.Split(csvLine, ","))
-	// iperf 2.19+ reports 15 fields, before it was just 9
+	// iperf 2.1.9+ reports 15 fields, before it was just 9
 	if len(slice) != 15 {
 		return nil, fmt.Errorf("incorrect fields in the output: %v (%v out of 15)", slice, len(slice))
 	}
@@ -128,11 +128,11 @@ type IPerf2EnhancedCSVResults struct {
 
 // ParseIPerf2EnhancedResultsFromCSV parses results from iperf2 when given the -e (--enhancedreports)
 // and `--reportstyle C` options.
-// Example output for version < 2.19 (agnhost < 2.53):
+// Example output for version < 2.1.9 (agnhost < 2.53):
 // 20201210141800.884,10.244.2.24,47880,10.96.114.79,6789,3,0.0-1.0,1677852672,13422821376
 // 20201210141801.881,10.244.2.24,47880,10.96.114.79,6789,3,1.0-2.0,1980760064,15846080512
 // 20201210141802.883,10.244.2.24,47880,10.96.114.79,6789,3,2.0-3.0,1886650368,15093202944
-// Example output with version >= 2.19 (agnhost >= 2.53)
+// Example output with version >= 2.1.9 (agnhost >= 2.53)
 // +0000:20240908113035.128,192.168.9.3,58256,192.168.9.4,5001,1,0.0-1.0,5220466748,41763733984,-1,-1,-1,-1,0,0
 // +0000:20240908113036.128,192.168.9.3,58256,192.168.9.4,5001,1,1.0-2.0,5127667712,41021341696,-1,-1,-1,-1,0,0
 // +0000:20240908113037.128,192.168.9.3,58256,192.168.9.4,5001,1,2.0-3.0,5127405568,41019244544,-1,-1,-1,-1,0,0
