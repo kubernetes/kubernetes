@@ -280,16 +280,23 @@ type kubeletServerCertificateDynamicFileManager struct {
 	currentTLSCertificate     atomic.Pointer[tls.Certificate]
 }
 
-// Enqueue implements the functions to be notified when the serving cert content changes.
 func (m *kubeletServerCertificateDynamicFileManager) Enqueue() {
+	// Use context.Background() since this is called by the interface
+	ctx := context.Background()
+	m.enqueueWithContext(ctx)
+}
+
+// Enqueue implements the functions to be notified when the serving cert content changes.
+func (m *kubeletServerCertificateDynamicFileManager) enqueueWithContext(ctx context.Context) {
+	logger := klog.FromContext(ctx)
 	certContent, keyContent := m.dynamicCertificateContent.CurrentCertKeyContent()
 	cert, err := tls.X509KeyPair(certContent, keyContent)
 	if err != nil {
-		klog.ErrorS(err, "invalid certificate and key pair from file", "certFile", m.certFile, "keyFile", m.keyFile)
+		logger.Error(err, "invalid certificate and key pair from file", "certFile", m.certFile, "keyFile", m.keyFile)
 		return
 	}
 	m.currentTLSCertificate.Store(&cert)
-	klog.V(4).InfoS("loaded certificate and key pair in kubelet server certificate manager", "certFile", m.certFile, "keyFile", m.keyFile)
+	logger.V(4).Info("loaded certificate and key pair in kubelet server certificate manager", "certFile", m.certFile, "keyFile", m.keyFile)
 }
 
 // Current returns the last valid certificate key pair loaded from files.
