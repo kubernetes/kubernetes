@@ -24,7 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// DNSLabel verifies that the specified value is a valid DNS label.  It must:
+// ShortName verifies that the specified value is a valid "short name"
+// (sometimes known as a "DNS label".  It must:
 //   - not be empty
 //   - start and end with lower-case alphanumeric characters
 //   - contain only lower-case alphanumeric characters or dashes
@@ -33,13 +34,13 @@ import (
 // All errors returned by this function will be "invalid" type errors. If the
 // caller wants better errors, it must take responsibility for checking things
 // like required/optional and max-length.
-func DNSLabel[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+func ShortName[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
 	if value == nil {
 		return nil
 	}
 	var allErrs field.ErrorList
 	for _, msg := range content.IsDNS1123Label((string)(*value)) {
-		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=dns-label"))
+		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-short-name"))
 	}
 	return allErrs
 }
