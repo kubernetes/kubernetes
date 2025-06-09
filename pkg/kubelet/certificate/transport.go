@@ -56,13 +56,13 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
-	return updateTransport(stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
+func UpdateTransport(ctx context.Context, stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+	return updateTransport(ctx, stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
 // client cert has changed.
-func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+func updateTransport(ctx context.Context, stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
 	if clientConfig.Transport != nil || clientConfig.Dial != nil {
 		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
@@ -70,7 +70,6 @@ func updateTransport(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 
 	if clientCertificateManager != nil {
-		ctx := context.Background()
 		if err := addCertRotation(ctx, stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
 			return nil, err
 		}
