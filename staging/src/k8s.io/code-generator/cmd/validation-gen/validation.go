@@ -407,6 +407,9 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		} else if validations.Empty() {
 			klog.V(6).InfoS("no type-attached validations", "type", t)
 		} else {
+			if util.NonPointer(util.NativeType(t)).Kind == types.Map && util.NonPointer(util.NativeType(t)).Elem.Kind == types.Slice {
+				return nil, fmt.Errorf("field %s: validation for map of slices is not supported", fldPath)
+			}
 			klog.V(5).InfoS("found type-attached validations", "n", validations.Len(), "type", t)
 			thisNode.typeValidations.Add(validations)
 		}
@@ -579,6 +582,9 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			klog.V(6).InfoS("no field-attached validations", "field", childPath)
 		} else {
 			klog.V(5).InfoS("found field-attached validations", "n", validations.Len(), "field", childPath)
+			if util.NonPointer(util.NativeType(childType)).Kind == types.Map && util.NonPointer(util.NativeType(childType)).Elem.Kind == types.Slice {
+				return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
+			}
 			child.fieldValidations.Add(validations)
 			if len(validations.Variables) > 0 {
 				return fmt.Errorf("%v: variable generation is not supported for field validations", childPath)
