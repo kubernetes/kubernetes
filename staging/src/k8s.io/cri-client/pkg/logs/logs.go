@@ -330,7 +330,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 	var parse parseFunc
 	var stop bool
 	isNewLine := true
-	found := true
+	continueToRead := true
 	writer := newLogWriter(stdout, stderr, opts)
 	msg := &logMessage{}
 	baseName := filepath.Base(path)
@@ -347,7 +347,7 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 			}
 			if opts.follow {
 				// The container is not running, we got to the end of the log.
-				if !found {
+				if !continueToRead {
 					return nil
 				}
 				// Reset seek so that if this is an incomplete line,
@@ -369,13 +369,13 @@ func ReadLogs(ctx context.Context, logger *klog.Logger, path, containerID string
 					// the event.
 					continue
 				}
-				var recreated bool
+				var fromStart bool
 				// Wait until the next log change.
-				found, recreated, err = waiter.wait(ctx)
+				continueToRead, fromStart, err = waiter.wait(ctx)
 				if err != nil {
 					return err
 				}
-				if recreated {
+				if fromStart {
 					newF, err := openFileShareDelete(path)
 					if err != nil {
 						if os.IsNotExist(err) {
@@ -482,8 +482,9 @@ func newWaitLog(logger *klog.Logger, id string, logName string, w *fsnotify.Watc
 	}
 }
 
-// wait for the next log write. It returns two booleans and an error. The first boolean
-// indicates whether a new log is found; the second boolean if the log file was recreated;
+// wait for the next log write. It returns two booleans and an error.
+// The first boolean indicates whether to continue reading logs;
+// The second boolean indicates whether the log should be read from the start;
 // the error is error happens during waiting new logs.
 func (wl *waitLog) wait(ctx context.Context) (bool, bool, error) {
 	if time.Since(wl.lastCheck) > waitDuration {
@@ -496,7 +497,7 @@ func (wl *waitLog) wait(ctx context.Context) (bool, bool, error) {
 
 	if wl.recreated {
 		wl.recreated = false
-		// Reopen the log file now.
+		// Reopen the log file now. Read from start.
 		return true, true, nil
 	}
 

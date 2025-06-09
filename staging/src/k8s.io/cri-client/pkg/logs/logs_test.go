@@ -234,12 +234,16 @@ func TestReadRotatedLog(t *testing.T) {
 	defer cancel()
 	// Start to follow the container's log.
 	fileName := file.Name()
+	readLogsStarted := make(chan struct{})
+	readLogsEnd := make(chan struct{})
 	go func(ctx context.Context) {
 		podLogOptions := v1.PodLogOptions{
 			Follow: true,
 		}
 		opts := NewLogOptions(&podLogOptions, time.Now())
+		close(readLogsStarted)
 		_ = ReadLogs(ctx, nil, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		close(readLogsEnd)
 	}(ctx)
 
 	// log in stdout
@@ -250,10 +254,10 @@ func TestReadRotatedLog(t *testing.T) {
 	dir := filepath.Dir(file.Name())
 	baseName := filepath.Base(file.Name())
 
-	// Write 10 lines to log file.
 	// Let ReadLogs start.
-	time.Sleep(50 * time.Millisecond)
+	<-readLogsStarted
 
+	// Write 10 lines to log file.
 	for line := 0; line < 10; line++ {
 		// Write the first three lines to log file
 		now := time.Now().Format(RFC3339NanoLenient)
@@ -289,12 +293,11 @@ func TestReadRotatedLog(t *testing.T) {
 	err = file.Close()
 	assert.NoErrorf(t, err, "could not close file.")
 
-	// waitLog.wait may wait 1 second
-	time.Sleep(1500 * time.Millisecond)
 	// Make the function ReadLogs end.
 	fakeRuntimeService.Lock()
 	fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
 	fakeRuntimeService.Unlock()
+	<-readLogsEnd
 
 	assert.Equal(t, expectedStdout, stdoutBuf.String())
 	assert.Equal(t, expectedStderr, stderrBuf.String())
