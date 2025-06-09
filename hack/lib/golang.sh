@@ -524,6 +524,18 @@ kube::golang::internal::verify_go_version() {
   if [ "${GOTOOLCHAIN:-auto}" != 'auto' ]; then
     # no-op, just respect GOTOOLCHAIN
     :
+  elif [ "${GO_VERSION:-}" == 'devel' ]; then
+    # get the latest master version of Go, build and use that version
+    export GOTOOLCHAIN='local'
+    if [[ ! -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" && ! -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
+      GOROOT_BOOTSTRAP="${GOROOT_BOOTSTRAP:-/usr/local/go}" "${KUBE_ROOT}/third_party/gimme/gimme" "master" >/dev/null 2>&1
+    fi
+
+    if [[ -f "${KUBE_ROOT}/.gimme/envs/gomaster.env" ]]; then
+      source "${KUBE_ROOT}/.gimme/envs/gomaster.env"
+    elif [[ -f "${HOME}/.gimme/envs/gomaster.env" ]]; then
+      source "${HOME}/.gimme/envs/gomaster.env"
+    fi
   elif [ -n "${FORCE_HOST_GO:-}" ]; then
     # ensure existing host version is used, like before GOTOOLCHAIN existed
     export GOTOOLCHAIN='local'
