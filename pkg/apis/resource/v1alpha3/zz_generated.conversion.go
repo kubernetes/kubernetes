@@ -874,6 +874,7 @@ func Convert_resource_DeviceConfiguration_To_v1alpha3_DeviceConfiguration(in *re
 func autoConvert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *resourcev1alpha3.DeviceConstraint, out *resource.DeviceConstraint, s conversion.Scope) error {
 	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	out.MatchAttribute = (*resource.FullyQualifiedName)(unsafe.Pointer(in.MatchAttribute))
+	out.MatchExpression = in.MatchExpression
 	return nil
 }
 
@@ -885,6 +886,7 @@ func Convert_v1alpha3_DeviceConstraint_To_resource_DeviceConstraint(in *resource
 func autoConvert_resource_DeviceConstraint_To_v1alpha3_DeviceConstraint(in *resource.DeviceConstraint, out *resourcev1alpha3.DeviceConstraint, s conversion.Scope) error {
 	out.Requests = *(*[]string)(unsafe.Pointer(&in.Requests))
 	out.MatchAttribute = (*resourcev1alpha3.FullyQualifiedName)(unsafe.Pointer(in.MatchAttribute))
+	out.MatchExpression = in.MatchExpression
 	return nil
 }
 

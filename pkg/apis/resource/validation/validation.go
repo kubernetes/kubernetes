@@ -312,11 +312,20 @@ func validateDeviceConstraint(constraint resource.DeviceConstraint, fldPath *fie
 			return validateRequestNameRef(name, fldPath, requestNames)
 		},
 		stringKey, fldPath.Child("requests"))...)
-	if constraint.MatchAttribute == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("matchAttribute"), ""))
-	} else {
+
+	if constraint.MatchAttribute == nil && constraint.MatchExpression == "" {
+		allErrs = append(allErrs, field.Required(fldPath, "must specify either matchAttribute or MatchExpression"))
+	}
+	if constraint.MatchAttribute != nil && constraint.MatchExpression != "" {
+		allErrs = append(allErrs, field.Invalid(fldPath, constraint, "cannot specify both matchAttribute and MatchExpression"))
+	}
+	// Validate MatchAttribute if present
+	if constraint.MatchAttribute != nil {
 		allErrs = append(allErrs, validateFullyQualifiedName(*constraint.MatchAttribute, fldPath.Child("matchAttribute"))...)
 	}
+
+	//TODO add validation for Expression
+
 	return allErrs
 }
 

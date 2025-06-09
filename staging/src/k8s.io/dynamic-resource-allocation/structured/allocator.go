@@ -241,9 +241,11 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 		// false, adding more devices will not cause it to return true. This
 		// allows the search to stop early once a constraint returns false.
 		constraints := make([]constraint, len(claim.Spec.Devices.Constraints))
+		alloc.logger.V(6).Info("Checking constraints", "total constraints", len(claim.Spec.Devices.Constraints))
 		for i, constraint := range claim.Spec.Devices.Constraints {
 			switch {
 			case constraint.MatchAttribute != nil:
+				alloc.logger.V(6).Info("Evaluating match attrib constraint")
 				matchAttribute := draapi.FullyQualifiedName(*constraint.MatchAttribute)
 				logger := alloc.logger
 				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
@@ -254,6 +256,22 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node) (finalResult []
 					logger:        logger,
 					requestNames:  sets.New(constraint.Requests...),
 					attributeName: matchAttribute,
+				}
+				constraints[i] = m
+			case constraint.MatchExpression != "":
+				logger := alloc.logger
+				alloc.logger.V(6).Info("Evaluating match expr constraint")
+				if loggerV := alloc.logger.V(6); loggerV.Enabled() {
+					logger = klog.LoggerWithName(logger, "matchExpressionConstraint")
+					//logger = klog.LoggerWithValues(logger, "matchExpression", constraint.MatchExpression)
+				}
+				m := &matchExpressionConstraint{
+					logger:       logger,
+					requestNames: sets.New(constraint.Requests...),
+					expression:   constraint.MatchExpression,
+					devices:      make([]*draapi.BasicDevice, 0),
+					celCache:     alloc.celCache,
+					numDevices:   minDevicesPerClaim,
 				}
 				constraints[i] = m
 			default:
@@ -671,6 +689,114 @@ func (m *matchAttributeConstraint) matches(requestName, subRequestName string) b
 	}
 }
 
+// comment start
+// matchExpressionConstraint evaluates the selected set of devices against the given cel expression.
+// The evaluation needs to be done once all devices have been added to the set.
+//
+// We need to track which devices are part of the set and we need to know how many devices are expected to be in the set.
+type matchExpressionConstraint struct {
+	logger       klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
+	requestNames sets.Set[string]
+	expression   string
+	celCache     *cel.Cache
+
+	devices    []*draapi.BasicDevice
+	numDevices int
+}
+
+func (m *matchExpressionConstraint) add(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) bool {
+	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+		m.logger.V(7).Info("Constraint does not apply to request", "request", requestName)
+		return true
+	}
+
+	// Add device to array
+	m.logger.V(7).Info("Appending device", "device", deviceID)
+	m.devices = append(m.devices, device)
+
+	// Only evaluate when we have all devices
+	m.logger.V(7).Info("devices added so far ", "current", len(m.devices), "expected", m.numDevices)
+	if m.numDevices > len(m.devices) {
+		m.logger.V(7).Info("Collecting devices", "current", len(m.devices), "expected", m.numDevices)
+		return true
+	}
+
+	//m.logger.V(7).Info("Checking all devices ", m.devices)
+	// Convert devices to format expected by CEL
+	var deviceList []cel.Device
+	for _, dev := range m.devices {
+		var converted resourceapi.BasicDevice
+		if err := draapi.Convert_api_BasicDevice_To_v1beta1_BasicDevice(dev, &converted, nil); err != nil {
+			m.logger.Error(err, "Failed to convert device for CEL evaluation")
+			return false
+		}
+		deviceList = append(deviceList, cel.Device{
+			Driver:     deviceID.Driver.String(),
+			Attributes: converted.Attributes,
+			Capacity:   converted.Capacity,
+		})
+	}
+
+	m.logger.V(7).Info("Compiling expression %s", m.expression)
+	// Get compiled expression from cache
+	expr := m.celCache.GetOrCompile(m.expression)
+	if expr.Error != nil {
+		m.logger.Error(expr.Error, "Failed to compile expression")
+		return false
+	}
+
+	// Evaluate expression
+	m.logger.V(7).Info("Evaluating expression %s", m.expression)
+	matches, details, err := expr.DevicesMatch(context.Background(), deviceList)
+	if err != nil {
+		m.logger.Error(err, "Expression evaluation failed")
+		return false
+	}
+
+	if !matches {
+		m.logger.V(7).Info("Devices don't satisfy expression",
+			"actualCost", ptr.Deref(details.ActualCost(), 0))
+		//remove the last device we added. For others, there will be a remove call
+		m.devices = m.devices[:len(m.devices)-1]
+		return false
+	}
+
+	m.logger.V(7).Info("All devices satisfy expression")
+	return true
+}
+
+func (m *matchExpressionConstraint) remove(requestName, subRequestName string, device *draapi.BasicDevice, deviceID DeviceID) {
+
+	if m.requestNames.Len() > 0 && !m.matches(requestName, subRequestName) {
+		return
+	}
+
+	// Reset everything - we'll need to collect and evaluate all devices again
+	//m.devices = nil
+	// Find and remove only the specific device from the slice
+	for i := 0; i < len(m.devices); i++ {
+		if m.devices[i] == device { // Compare the actual device pointers
+			// Remove this specific device by shifting remaining elements
+			copy(m.devices[i:], m.devices[i+1:])
+			// Shrink slice by one
+			m.devices = m.devices[:len(m.devices)-1]
+			break
+		}
+	}
+
+	m.logger.V(7).Info("Reset constraint state for re-evaluation")
+}
+
+func (m *matchExpressionConstraint) matches(requestName, subRequestName string) bool {
+	if subRequestName == "" {
+		return m.requestNames.Has(requestName)
+	} else {
+		fullSubRequestName := fmt.Sprintf("%s/%s", requestName, subRequestName)
+		return m.requestNames.Has(requestName) || m.requestNames.Has(fullSubRequestName)
+	}
+}
+
+// comment end
 func lookupAttribute(device *draapi.BasicDevice, deviceID DeviceID, attributeName draapi.FullyQualifiedName) *draapi.DeviceAttribute {
 	// Fully-qualified match?
 	if attr, ok := device.Attributes[draapi.QualifiedName(attributeName)]; ok {

@@ -45,6 +45,7 @@ import (
 
 const (
 	deviceVar     = "device"
+	devicesVar    = "devices"
 	driverVar     = "driver"
 	attributesVar = "attributes"
 	capacityVar   = "capacity"
@@ -273,6 +274,66 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 	return resultBool, details, nil
 }
 
+// DevicesMatch evaluates the CEL expression against a list of devices to check if they satisfy
+// a collective constraint (like being contiguous)
+func (c CompilationResult) DevicesMatch(ctx context.Context, devices []Device) (bool, *cel.EvalDetails, error) {
+	// Create a list of device maps for CEL evaluation
+	devicesList := make([]any, 0, len(devices))
+	for _, device := range devices {
+		// Build attributes map for each device similar to DeviceMatches
+		attributes := make(map[string]any)
+		for name, attr := range device.Attributes {
+			value, err := getAttributeValue(attr)
+			if err != nil {
+				return false, nil, fmt.Errorf("attribute %s: %w", name, err)
+			}
+			domain, id := parseQualifiedName(name, device.Driver)
+			if attributes[domain] == nil {
+				attributes[domain] = make(map[string]any)
+			}
+			attributes[domain].(map[string]any)[id] = value
+		}
+
+		// Build capacity map for each device
+		capacity := make(map[string]any)
+		for name, cap := range device.Capacity {
+			domain, id := parseQualifiedName(name, device.Driver)
+			if capacity[domain] == nil {
+				capacity[domain] = make(map[string]apiservercel.Quantity)
+			}
+			capacity[domain].(map[string]apiservercel.Quantity)[id] = apiservercel.Quantity{Quantity: &cap.Value}
+		}
+
+		// Create device map structure
+		deviceMap := map[string]any{
+			driverVar:     device.Driver,
+			attributesVar: newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), attributes, c.emptyMapVal),
+			capacityVar:   newStringInterfaceMapWithDefault(c.Environment.CELTypeAdapter(), capacity, c.emptyMapVal),
+		}
+		devicesList = append(devicesList, deviceMap)
+	}
+
+	// Set up variables for CEL evaluation
+	variables := map[string]any{
+		"devices": devicesList,
+	}
+
+	// Evaluate the expression
+	result, details, err := c.Program.ContextEval(ctx, variables)
+	if err != nil {
+		return false, details, err
+	}
+	resultAny, err := result.ConvertToNative(boolType)
+	if err != nil {
+		return false, details, fmt.Errorf("CEL result of type %s could not be converted to bool: %w", result.Type().TypeName(), err)
+	}
+	resultBool, ok := resultAny.(bool)
+	if !ok {
+		return false, details, fmt.Errorf("CEL native result value should have been a bool, got instead: %T", resultAny)
+	}
+	return resultBool, details, nil
+}
+
 func newCompiler() *compiler {
 	envset := environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion(), true /* strictCost */)
 	field := func(name string, declType *apiservercel.DeclType, required bool) *apiservercel.DeclField {
@@ -297,6 +358,7 @@ func newCompiler() *compiler {
 			IntroducedVersion: version.MajorMinor(1, 31),
 			EnvOptions: []cel.EnvOption{
 				cel.Variable(deviceVar, deviceType.CelType()),
+				cel.Variable(devicesVar, cel.ListType(deviceType.CelType())),
 
 				// https://pkg.go.dev/github.com/google/cel-go/ext#Bindings
 				//
@@ -397,6 +459,7 @@ func (s *sizeEstimator) EstimateSize(element checker.AstNode) *checker.SizeEstim
 	switch path[0] {
 	case deviceVar:
 		currentNode = s.compiler.deviceType
+	//TODO devices var
 	default:
 		// Unknown root, shouldn't happen.
 		return nil
