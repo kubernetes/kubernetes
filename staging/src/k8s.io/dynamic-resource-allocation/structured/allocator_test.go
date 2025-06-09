@@ -613,8 +613,9 @@ func TestAllocator(t *testing.T) {
 		slices           []*resourceapi.ResourceSlice
 		node             *v1.Node
 
-		expectResults []any
-		expectError   types.GomegaMatcher // can be used to check for no error or match specific error types
+		expectResults            []any
+		expectError              types.GomegaMatcher // can be used to check for no error or match specific error
+		expectAllocationAttempts map[string]int64
 	}{
 
 		"empty": {},
@@ -3491,6 +3492,12 @@ func TestAllocator(t *testing.T) {
 					multipleDeviceAllocationResults(req1SubReq1, driverA, pool1, resourceapi.AllocationResultsMaxSize/2, resourceapi.AllocationResultsMaxSize/2),
 				)...,
 			)},
+			expectAllocationAttempts: map[string]int64{
+				// We expect one allocation attempt for each of the two subrequests in the first request,
+				// and then attempts for both subrequests for the second request to be attempted for each
+				// of them. Only the last will succeed.
+				claim0: 6,
+			},
 		},
 		"prioritized-list-max-allocation-allocation-mode-all": {
 			features: Features{
@@ -3522,6 +3529,11 @@ func TestAllocator(t *testing.T) {
 				deviceAllocationResult(req1, driverB, pool2, "device-0", false),
 				deviceAllocationResult(req1, driverB, pool2, "device-1", false),
 			)},
+			expectAllocationAttempts: map[string]int64{
+				// We expect one allocation attempt for each of the subrequests in the first request
+				// and the second request will be attempted for both of them.
+				claim0: 4,
+			},
 		},
 	}
 
@@ -3557,6 +3569,11 @@ func TestAllocator(t *testing.T) {
 			g.Expect(allocatedDevices).To(gomega.HaveExactElements(tc.allocatedDevices))
 			g.Expect(slices).To(gomega.ConsistOf(tc.slices))
 			g.Expect(classLister.objs).To(gomega.ConsistOf(tc.classes))
+
+			if tc.expectAllocationAttempts != nil {
+				stats := allocator.GetStats()
+				g.Expect(stats.AllocationAttemptsByClaim).To(gomega.Equal(tc.expectAllocationAttempts))
+			}
 		})
 	}
 }
