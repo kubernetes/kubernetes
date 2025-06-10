@@ -55,7 +55,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, obj.D, obj.M1, obj.M2)...)
+	errs = append(errs, validate.DiscriminatedUnion[*Struct](ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) any { return obj.D }, func(obj *Struct) any { return obj.M1 }, func(obj *Struct) any { return obj.M2 })...)
 
 	// field Struct.TypeMeta has no validation
 	// field Struct.D has no validation
