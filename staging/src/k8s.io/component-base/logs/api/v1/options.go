@@ -23,11 +23,11 @@ import (
 	"io"
 	"math"
 	"os"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	"github.com/spf13/pflag"
 
 	"k8s.io/klog/v2"
@@ -240,8 +240,8 @@ func apply(c *LoggingConfiguration, options *LoggingOptions, featureGate feature
 		case ReapplyHandlingError:
 			return errors.New("logging configuration was already applied earlier, changing it is not allowed")
 		case ReapplyHandlingIgnoreUnchanged:
-			if diff := cmp.Diff(oldP, p); diff != "" {
-				return fmt.Errorf("the logging configuration should not be changed after setting it once (- old setting, + new setting):\n%s", diff)
+			if !reflect.DeepEqual(oldP, p) {
+				return fmt.Errorf("the logging configuration should not be changed after setting it once (- old setting, + new setting):\n-: %#v\n+: %#v\n", oldP, p)
 			}
 			return nil
 		default:
