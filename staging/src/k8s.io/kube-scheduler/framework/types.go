@@ -30,7 +30,7 @@ type ActionType int64
 
 // Constants for ActionTypes.
 // CAUTION for contributors: When you add a new ActionType, you must update the following:
-// - The list of basic, podOnly, and nodeOnly.
+// - The list of basicActionTypes, podActionTypes, and nodeActionTypes at k/k/pkg/scheduler/framework/types.go
 // - String() method.
 const (
 	Add ActionType = 1 << iota
@@ -115,7 +115,7 @@ type EventResource string
 
 // Constants for GVKs.
 //
-// CAUTION for contributors: When you add a new EventResource, you must register a new one to allResources.
+// CAUTION for contributors: When you add a new EventResource, you must register a new one to allResources at k/k/pkg/scheduler/framework/types.go
 //
 // Note:
 // - UpdatePodXYZ or UpdateNodeXYZ: triggered by updating particular parts of a Pod or a Node, e.g. updatePodLabel.
