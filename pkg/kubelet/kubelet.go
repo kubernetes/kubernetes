@@ -321,6 +321,7 @@ type Dependencies struct {
 	RemoteImageService        internalapi.ImageManagerService
 	PodStartupLatencyTracker  util.PodStartupLatencyTracker
 	NodeStartupLatencyTracker util.NodeStartupLatencyTracker
+	HealthChecker             watchdog.HealthChecker
 	// remove it after cadvisor.UsingLegacyCadvisorStats dropped.
 	useLegacyCadvisorStats bool
 }
@@ -437,7 +438,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	nodeLabels map[string]string,
 	nodeStatusMaxImages int32,
 	seccompDefault bool,
-	healthChecker watchdog.HealthChecker,
 ) (*Kubelet, error) {
 	ctx := context.Background()
 	logger := klog.TODO()
@@ -640,7 +640,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		nodeStatusMaxImages:            nodeStatusMaxImages,
 		tracer:                         tracer,
 		nodeStartupLatencyTracker:      kubeDeps.NodeStartupLatencyTracker,
-		healthChecker:                  healthChecker,
+		healthChecker:                  kubeDeps.HealthChecker,
 		flagz:                          kubeDeps.Flagz,
 	}
 
