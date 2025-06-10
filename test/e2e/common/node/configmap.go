@@ -244,12 +244,13 @@ var _ = SIGDescribe("ConfigMap", func() {
 	})
 
 	/*
-		Release: v1.30
-		Testname: ConfigMap, from environment field
-		Description: Create a Pod with an environment variable value set using a value from ConfigMap.
-		Allows users to use envFrom to set prefix starting with a digit as environment variable names.
+		Release: v1.34
+		Testname: ConfigMap, from environment field with various prefixes
+		Description: Create a Pod with environment variable values set using values from ConfigMap.
+		Allows users to use envFrom to set prefixes with various printable ASCII characters excluding '=' as environment variable names.
+		This test verifies that different prefixes including digits, special characters, and letters can be correctly used.
 	*/
-	framework.It("should be consumable as environment variable names when configmap keys start with a digit", func(ctx context.Context) {
+	framework.It("should be consumable as environment variable names with various prefixes", func(ctx context.Context) {
 		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		ginkgo.By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
@@ -270,11 +271,27 @@ var _ = SIGDescribe("ConfigMap", func() {
 						Command: []string{"sh", "-c", "env"},
 						EnvFrom: []v1.EnvFromSource{
 							{
+								// No prefix
 								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 							{
-								// prefix start with a digit can be consumed as environment variables.
+								// Prefix starting with a digit
 								Prefix:       "1-",
+								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// Prefix with special characters
+								Prefix:       "$_-",
+								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// Prefix with uppercase letters
+								Prefix:       "ABC_",
+								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
+							},
+							{
+								// Prefix with symbols
+								Prefix:       "#@!",
 								ConfigMapRef: &v1.ConfigMapEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 						},
@@ -285,8 +302,16 @@ var _ = SIGDescribe("ConfigMap", func() {
 		}
 
 		e2epodoutput.TestContainerOutput(ctx, f, "consume configMaps", pod, 0, []string{
+			// Original values without prefix
 			"data-1=value-1", "data-2=value-2", "data-3=value-3",
+			// Values with digit prefix
 			"1-data-1=value-1", "1-data-2=value-2", "1-data-3=value-3",
+			// Values with special character prefix
+			"$_-data-1=value-1", "$_-data-2=value-2", "$_-data-3=value-3",
+			// Values with uppercase letter prefix
+			"ABC_data-1=value-1", "ABC_data-2=value-2", "ABC_data-3=value-3",
+			// Values with symbol prefix
+			"#@!data-1=value-1", "#@!data-2=value-2", "#@!data-3=value-3",
 		})
 	})
 })
