@@ -617,7 +617,7 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Count(key string) (int64, error) {
+func (s *store) Count(ctx context.Context, key string) (int64, error) {
 	preparedKey, err := s.prepareKey(key)
 	if err != nil {
 		return 0, err
@@ -631,7 +631,7 @@ func (s *store) Count(key string) (int64, error) {
 	}
 
 	startTime := time.Now()
-	count, err := s.client.Kubernetes.Count(context.Background(), preparedKey, kubernetes.CountOptions{})
+	count, err := s.client.Kubernetes.Count(ctx, preparedKey, kubernetes.CountOptions{})
 	metrics.RecordEtcdRequest("listWithCount", s.groupResource, err, startTime)
 	if err != nil {
 		return 0, err

@@ -244,7 +244,7 @@ type Interface interface {
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
-	Count(key string) (int64, error)
+	Count(ctx context.Context, key string) (int64, error)
 
 	// ReadinessCheck checks if the storage is ready for accepting requests.
 	ReadinessCheck() error

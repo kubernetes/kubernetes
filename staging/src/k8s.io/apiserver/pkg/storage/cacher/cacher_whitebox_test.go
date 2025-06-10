@@ -189,7 +189,7 @@ func (d *dummyStorage) GetList(ctx context.Context, resPrefix string, opts stora
 func (d *dummyStorage) GuaranteedUpdate(_ context.Context, _ string, _ runtime.Object, _ bool, _ *storage.Preconditions, _ storage.UpdateFunc, _ runtime.Object) error {
 	return fmt.Errorf("unimplemented")
 }
-func (d *dummyStorage) Count(_ string) (int64, error) {
+func (d *dummyStorage) Count(_ context.Context, _ string) (int64, error) {
 	return 0, fmt.Errorf("unimplemented")
 }
 func (d *dummyStorage) ReadinessCheck() error {

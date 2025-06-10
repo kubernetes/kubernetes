@@ -107,8 +107,8 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 	return s.Storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, cachedExistingObject)
 }
 
-func (s *DryRunnableStorage) Count(key string) (int64, error) {
-	return s.Storage.Count(key)
+func (s *DryRunnableStorage) Count(ctx context.Context, key string) (int64, error) {
+	return s.Storage.Count(ctx, key)
 }
 
 func (s *DryRunnableStorage) copyInto(in, out runtime.Object) error {
