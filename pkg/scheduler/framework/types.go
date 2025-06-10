@@ -43,7 +43,7 @@ import (
 var generation int64
 
 var (
-	// basicActionTypes is a list of basicActionTypes ActionTypes.
+	// basicActionTypes is a list of basic ActionTypes.
 	basicActionTypes = []fwk.ActionType{fwk.Add, fwk.Delete, fwk.Update}
 	// podActionTypes is a list of ActionTypes that are only applicable for Pod events.
 	podActionTypes = []fwk.ActionType{fwk.UpdatePodLabel, fwk.UpdatePodScaleDown, fwk.UpdatePodToleration, fwk.UpdatePodSchedulingGatesEliminated, fwk.UpdatePodGeneratedResourceClaim}
@@ -96,27 +96,26 @@ func AllClusterEventLabels() []string {
 	return labels
 }
 
-// IsWildCard returns true if ClusterEvent follows WildCard semantics
+// ClusterEventIsWildCard returns true if the given ClusterEvent follows WildCard semantics
 func ClusterEventIsWildCard(ce fwk.ClusterEvent) bool {
 	return ce.Resource == fwk.WildCard && ce.ActionType == fwk.All
 }
 
-// Match returns true if ClusterEvent is matched with the coming event.
-// "match" means the coming event is the same or more specific than the ce.
-// i.e., when ce.ActionType is Update, it return true if a coming event is UpdateNodeLabel
+// MatchClusterEvents returns true if ce is matched with incomingEvent.
+// "match" means that incomingEvent is the same or more specific than the ce.
+// e.g. when ce.ActionType is Update and incomingEvent.ActionType is UpdateNodeLabel, it will return true
 // because UpdateNodeLabel is more specific than Update.
-// On the other hand, when ce.ActionType is UpdateNodeLabel, it doesn't return true if a coming event is Update.
-// This is based on the fact that the scheduler interprets the coming cluster event as specific event if possible;
-// meaning, if a coming event is Node/Update, it means that Node's update is not something
-// that can be interpreted as any of Node's specific Update events.
+// On the other hand, when ce.ActionType is UpdateNodeLabel and incomingEvent.ActionType is Update, it returns false.
+// This is based on the fact that the scheduler interprets the incoming cluster event as specific event as possible;
+// meaning, if incomingEvent is Node/Update, it means that Node's update is not something that can be interpreted
+// as any of Node's specific Update events.
 //
-// If the ce.Resource is "*", there's no requirement for the coming event' Resource.
-// Contrarily, if the coming event's Resource is "*", the ce.Resource should only be "*".
-// (which should never happen in the current implementation of the scheduling queue.)
+// If the ce.Resource is "*", there's no requirement for incomingEvent.Resource.
+// Contrarily, if incomingEvent.Resource is "*", the only accepted ce.Resource is "*" (which should never
+// happen in the current implementation of the scheduling queue).
 //
-// Note: we have a special case here when the coming event is a wildcard event,
-// it will force all Pods to move to activeQ/backoffQ,
-// but we take it as an unmatched event unless the ce is also a wildcard one.
+// Note: we have a special case here when incomingEvent is a wildcard event, it will force all Pods to move
+// to activeQ/backoffQ, but we take it as an unmatched event unless ce is also a wildcard event.
 func MatchClusterEvents(ce, incomingEvent fwk.ClusterEvent) bool {
 	return ClusterEventIsWildCard(ce) ||
 		matchEventResources(ce.Resource, incomingEvent.Resource) && ce.ActionType&incomingEvent.ActionType != 0 && incomingEvent.ActionType <= ce.ActionType
@@ -128,8 +127,8 @@ func matchEventResources(r, resource fwk.EventResource) bool {
 	return r == fwk.WildCard ||
 		// Exact match
 		r == resource ||
-		// Pod matches assignedPod and unscheduledPod.
-		// (assignedPod and unscheduledPod aren't exposed and hence only used for incoming events and never used in EventsToRegister)
+		// Pod matches assignedPod and unschedulablePod.
+		// (assignedPod and unschedulablePod aren't exposed and hence only used for incoming events and never used in EventsToRegister)
 		r == fwk.Pod && (resource == assignedPod || resource == unschedulablePod)
 }
 
