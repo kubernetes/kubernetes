@@ -1435,7 +1435,7 @@ func makeCgroupPathForContainer(pod *v1.Pod, ctnName string, isInit bool) (strin
 
 func containerCgroupPathPrefixFromDriver(runtimeName string) string {
 	if runtimeName == "cri-o" {
-		return "cri-o"
+		return "crio"
 	}
 	return "cri-containerd"
 }
