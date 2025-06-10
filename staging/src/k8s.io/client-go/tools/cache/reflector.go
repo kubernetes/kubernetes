@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -141,6 +142,9 @@ type Reflector struct {
 	//
 	// TODO(#115478): Consider making reflector.UseWatchList a private field. Since we implemented "api streaming" on the etcd storage layer it should work.
 	UseWatchList *bool
+	// WaitForReflectorToCatchUpLatestResourceVersion indicates whether the reflector should wait until it catches up
+	// with the latest resourceVersion obtained from the store.
+	WaitForReflectorToCatchUpLatestResourceVersion bool
 }
 
 func (r *Reflector) Name() string {
@@ -539,8 +543,8 @@ func (r *Reflector) watch(ctx context.Context, w watch.Interface, resyncerrc cha
 			}
 		}
 
-		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription, r.setLastSyncResourceVersion,
-			r.clock, resyncerrc)
+		err = handleWatch(ctx, start, w, r.store, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+			r.setLastSyncResourceVersion, nil, r.getLatestResourceVersion, r.clock, resyncerrc)
 		// handleWatch always stops the watcher. So we don't need to here.
 		// Just set it to nil to trigger a retry on the next loop.
 		w = nil
@@ -758,9 +762,20 @@ func (r *Reflector) watchList(ctx context.Context) (watch.Interface, error) {
 			}
 			return nil, err
 		}
-		watchListBookmarkReceived, err := handleListWatch(ctx, start, w, temporaryStore, r.expectedType, r.expectedGVK, r.name, r.typeDescription,
+		watchListBookmarkReceived, err := handleListWatch(
+			ctx,
+			start,
+			w,
+			temporaryStore,
+			r.expectedType,
+			r.expectedGVK,
+			r.name,
+			r.typeDescription,
 			func(rv string) { resourceVersion = rv },
-			r.clock, make(chan error))
+			&r.WaitForReflectorToCatchUpLatestResourceVersion,
+			r.getLatestResourceVersion,
+			r.clock, make(chan error),
+		)
 		if err != nil {
 			w.Stop() // stop and retry with clean state
 			if errors.Is(err, errorStopRequested) {
@@ -803,6 +818,31 @@ func (r *Reflector) syncWith(items []runtime.Object, resourceVersion string) err
 	return r.store.Replace(found, resourceVersion)
 }
 
+// refer to the GetCurrentResourceVersion method in the staging/src/k8s.io/apiserver/pkg/storage/etcd3/store.go
+func (r *Reflector) getLatestResourceVersion(ctx context.Context) (int, error) {
+	object, err := r.listerWatcher.ListWithContext(ctx, metav1.ListOptions{
+		Limit: 1, // just in case we actually hit something
+	})
+	if err != nil {
+		return 0, err
+	}
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		return 0, err
+	}
+	if accessor == nil {
+		return 0, fmt.Errorf("unable to extract a list accessor from %T", accessor)
+	}
+	latestResourceVersion, err := strconv.Atoi(accessor.GetResourceVersion())
+	if err != nil {
+		return 0, err
+	}
+	if latestResourceVersion == 0 {
+		return 0, fmt.Errorf("the current resource version must be greater than 0")
+	}
+	return latestResourceVersion, nil
+}
+
 // handleListWatch consumes events from w, updates the Store, and records the
 // last seen ResourceVersion, to allow continuing from that ResourceVersion on
 // retry. If successful, the watcher will be left open after receiving the
@@ -817,12 +857,16 @@ func handleListWatch(
 	name string,
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
+	waitForReflectorToCatchUpLatestResourceVersion *bool,
+	getLatestResourceVersion func(ctx context.Context) (int, error),
 	clock clock.Clock,
 	errCh chan error,
 ) (bool, error) {
 	exitOnWatchListBookmarkReceived := true
-	return handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+	return handleAnyWatch(
+		ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
+		setLastSyncResourceVersion, waitForReflectorToCatchUpLatestResourceVersion,
+		getLatestResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
 }
 
 // handleListWatch consumes events from w, updates the Store, and records the
@@ -838,12 +882,15 @@ func handleWatch(
 	name string,
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
+	waitForReflectorToCatchUpLatestResourceVersion *bool,
+	getLatestResourceVersion func(ctx context.Context) (int, error),
 	clock clock.Clock,
 	errCh chan error,
 ) error {
 	exitOnWatchListBookmarkReceived := false
 	_, err := handleAnyWatch(ctx, start, w, store, expectedType, expectedGVK, name, expectedTypeName,
-		setLastSyncResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
+		setLastSyncResourceVersion, waitForReflectorToCatchUpLatestResourceVersion,
+		getLatestResourceVersion, exitOnWatchListBookmarkReceived, clock, errCh)
 	return err
 }
 
@@ -866,6 +913,8 @@ func handleAnyWatch(
 	name string,
 	expectedTypeName string,
 	setLastSyncResourceVersion func(string),
+	waitForReflectorToCatchUpLatestResourceVersion *bool,
+	getLatestResourceVersion func(ctx context.Context) (int, error),
 	exitOnWatchListBookmarkReceived bool,
 	clock clock.Clock,
 	errCh chan error,
@@ -881,6 +930,15 @@ func handleAnyWatch(
 			w.Stop()
 		}
 	}()
+
+	var latestResourceVersion int
+	var err error
+	if waitForReflectorToCatchUpLatestResourceVersion != nil && *waitForReflectorToCatchUpLatestResourceVersion {
+		latestResourceVersion, err = getLatestResourceVersion(ctx)
+		if err != nil {
+			return false, err
+		}
+	}
 
 loop:
 	for {
@@ -946,6 +1004,18 @@ loop:
 				rvu.UpdateResourceVersion(resourceVersion)
 			}
 			eventCount++
+			if waitForReflectorToCatchUpLatestResourceVersion != nil && *waitForReflectorToCatchUpLatestResourceVersion {
+				lastSyncResourceVersion, err := strconv.Atoi(resourceVersion)
+				if err != nil {
+					return false, fmt.Errorf("unable to convert resourceVersion %q to int: %w", resourceVersion, err)
+				}
+
+				// reflector is not caught up with the latest resource version yet
+				if latestResourceVersion > lastSyncResourceVersion {
+					continue
+				}
+				waitForReflectorToCatchUpLatestResourceVersion = ptr.To(false)
+			}
 			if exitOnWatchListBookmarkReceived && watchListBookmarkReceived {
 				stopWatcher = false
 				watchDuration := clock.Since(start)
