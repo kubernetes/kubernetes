@@ -82,18 +82,56 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 			//       The correct package would be the output package but is not known here. This does not show up in generated code.
 			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
 			supportVarName := PrivateVar{Name: "UnionMembershipFor" + context.Type.Name.Name + unionName, Package: "local"}
+			ptrType := types.PointerTo(context.Type)
+			ptrTypeName := types.Name{
+				Package: context.Type.Name.Package,
+				Name:    "*" + context.Type.Name.Name,
+			}
+
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
 					Function(unionMemberTagName, DefaultFlags, newDiscriminatedUnionMembership,
 						append([]any{*u.discriminator}, u.fields...)...))
 				result.Variables = append(result.Variables, supportVar)
-				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator,
-					append([]any{supportVarName, u.discriminatorMember}, u.fieldMembers...)...)
+
+				var extractorArgs []any
+				extractorArgs = append(extractorArgs, supportVarName)
+
+				discriminatorExtractor := FunctionLiteral{
+					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+					Results:    []ParamResult{{Type: types.Any}},
+					Body:       fmt.Sprintf("return obj.%s", u.discriminatorMember.(types.Member).Name),
+				}
+				extractorArgs = append(extractorArgs, discriminatorExtractor)
+
+				for _, member := range u.fieldMembers {
+					extractor := FunctionLiteral{
+						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+						Results:    []ParamResult{{Type: types.Any}},
+						Body:       fmt.Sprintf("return obj.%s", member.(types.Member).Name),
+					}
+					extractorArgs = append(extractorArgs, extractor)
+				}
+
+				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extractorArgs...).WithTypeArgs(ptrTypeName)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, u.fields...))
 				result.Variables = append(result.Variables, supportVar)
-				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, append([]any{supportVarName}, u.fieldMembers...)...)
+
+				var extractorArgs []any
+				extractorArgs = append(extractorArgs, supportVarName)
+
+				for _, member := range u.fieldMembers {
+					extractor := FunctionLiteral{
+						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+						Results:    []ParamResult{{Type: types.Any}},
+						Body:       fmt.Sprintf("return obj.%s", member.(types.Member).Name),
+					}
+					extractorArgs = append(extractorArgs, extractor)
+				}
+
+				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extractorArgs...).WithTypeArgs(ptrTypeName)
 				result.Functions = append(result.Functions, fn)
 			}
 		}
