@@ -140,7 +140,7 @@ func (s *ValidationTestBuilder) ValidateFixtures() {
 		}
 		s.ValueFuzzed(v)
 		vt := &ValidationTester{ValidationTestBuilder: s, value: v}
-		byPath := vt.ValidateFalseArgsByPath()
+		byPath := vt.validateFalseArgsByPath()
 		got[t.String()] = byPath
 	}
 
@@ -311,27 +311,6 @@ func (v *ValidationTester) ExpectValid() *ValidationTester {
 	return v
 }
 
-// ExpectValidAt validates the value and calls t.Errorf for any validation errors at the given path.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectValidAt(fldPath *field.Path) *ValidationTester {
-	v.T.Helper()
-
-	v.T.Run(fmt.Sprintf("%T.%v", v.value, fldPath), func(t *testing.T) {
-		t.Helper()
-
-		var got field.ErrorList
-		for _, e := range v.validate() {
-			if e.Field == fldPath.String() {
-				got = append(got, e)
-			}
-		}
-		if len(got) > 0 {
-			t.Errorf("want no errors at %v, got: %v", fldPath, got)
-		}
-	})
-	return v
-}
-
 // ExpectInvalid validates the value and calls t.Errorf if want does not match the actual errors.
 // Returns ValidationTester to support call chaining.
 func (v *ValidationTester) ExpectInvalid(want ...*field.Error) *ValidationTester {
@@ -340,40 +319,26 @@ func (v *ValidationTester) ExpectInvalid(want ...*field.Error) *ValidationTester
 	return v.expectInvalid(byFullError, want...)
 }
 
-// ExpectValidateFalse validates the value and calls t.Errorf if the actual errors do not
-// match the given validateFalseArgs.  For example, if the value to validate has a
-// single `+validateFalse="type T1"` tag, ExpectValidateFalse("type T1") will pass.
-// Returns ValidationTester to support call chaining.
-func (v *ValidationTester) ExpectValidateFalse(validateFalseArgs ...string) *ValidationTester {
-	v.T.Helper()
-
-	var want []*field.Error
-	for _, s := range validateFalseArgs {
-		want = append(want, field.Invalid(nil, "", fmt.Sprintf("forced failure: %s", s)))
-	}
-	return v.expectInvalid(byDetail, want...)
-}
-
-func (v *ValidationTester) ExpectValidateFalseByPath(validateFalseArgsByPath map[string][]string) *ValidationTester {
+func (v *ValidationTester) ExpectValidateFalseByPath(expectedByPath map[string][]string) *ValidationTester {
 	v.T.Helper()
 
 	v.T.Run(fmt.Sprintf("%T", v.value), func(t *testing.T) {
 		t.Helper()
 
-		byPath := v.ValidateFalseArgsByPath()
+		actualByPath := v.validateFalseArgsByPath()
 		// ensure args are sorted
-		for _, args := range validateFalseArgsByPath {
+		for _, args := range expectedByPath {
 			sort.Strings(args)
 		}
-		if !cmp.Equal(validateFalseArgsByPath, byPath) {
-			t.Errorf("validateFalse args, grouped by field path, differed from expected:\n%s\n", cmp.Diff(validateFalseArgsByPath, byPath, cmpopts.SortMaps(stdcmp.Less[string])))
+		if !cmp.Equal(expectedByPath, actualByPath) {
+			t.Errorf("validateFalse args, grouped by field path, differed from expected:\n%s\n", cmp.Diff(expectedByPath, actualByPath, cmpopts.SortMaps(stdcmp.Less[string])))
 		}
 
 	})
 	return v
 }
 
-func (v *ValidationTester) ValidateFalseArgsByPath() map[string][]string {
+func (v *ValidationTester) validateFalseArgsByPath() map[string][]string {
 	byPath := map[string][]string{}
 	errs := v.validate()
 	for _, e := range errs {
