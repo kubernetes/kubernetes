@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/pflag"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -64,6 +65,7 @@ func TestAuthenticationValidate(t *testing.T) {
 		testAuthenticationConfigFile      string
 		expectErr                         string
 		enabledFeatures, disabledFeatures []featuregate.Feature
+		emulationVersion                  *version.Version
 	}{
 		{
 			name: "test when OIDC and ServiceAccounts are nil",
@@ -250,6 +252,9 @@ func TestAuthenticationValidate(t *testing.T) {
 				Allow:    true,
 				FlagsSet: true,
 			},
+			// This allows us to disable the AnonymousAuthConfigurableEndpoints
+			// feature-gate, otherwise this feature-gate cannot be disabled.
+			emulationVersion: version.MustParse("1.33"),
 		},
 	}
 
@@ -261,6 +266,12 @@ func TestAuthenticationValidate(t *testing.T) {
 			options.ServiceAccounts = testcase.testSA
 			options.WebHook = testcase.testWebHook
 			options.AuthenticationConfigFile = testcase.testAuthenticationConfigFile
+
+			// SetFeatureGateEmulationVersionDuringTest needs to be called
+			// before any calls to SetFeatureGateDuringTest to work reliably.
+			if testcase.emulationVersion != nil {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			for _, f := range testcase.enabledFeatures {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, f, true)
 			}
@@ -747,7 +758,11 @@ jwt:
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if !testcase.enableAnonymousEndpoints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnonymousAuthConfigurableEndpoints, testcase.enableAnonymousEndpoints)
+
 			opts := NewBuiltInAuthenticationOptions().WithAnonymous()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
 			opts.AddFlags(pf)
