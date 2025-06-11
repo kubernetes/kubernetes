@@ -87,7 +87,8 @@ func bootstrap(cfg config.ServerConfig) (b *bootstrappedServer, err error) {
 		if err = fileutil.IsDirWriteable(cfg.WALDir()); err != nil {
 			return nil, fmt.Errorf("cannot write to WAL directory: %w", err)
 		}
-		bwal = bootstrapWALFromSnapshot(cfg, backend.snapshot)
+		cfg.Logger.Info("Bootstrapping WAL from snapshot")
+		bwal = bootstrapWALFromSnapshot(cfg, backend.snapshot, backend.ci)
 	}
 
 	cfg.Logger.Info("bootstrapping cluster")
@@ -556,7 +557,7 @@ func (b *bootstrappedRaft) newRaftNode(ss *snap.Snapshotter, wal *wal.WAL, cl *m
 	)
 }
 
-func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot) *bootstrappedWAL {
+func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot, ci cindex.ConsistentIndexer) *bootstrappedWAL {
 	wal, st, ents, snap, meta := openWALFromSnapshot(cfg, snapshot)
 	bwal := &bootstrappedWAL{
 		lg:       cfg.Logger,
@@ -569,6 +570,19 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 	}
 
 	if cfg.ForceNewCluster {
+		consistentIndex := ci.ConsistentIndex()
+		oldCommitIndex := bwal.st.Commit
+		// If only `HardState.Commit` increases, HardState won't be persisted
+		// to disk, even though the committed entries might have already been
+		// applied. This can result in consistent_index > CommitIndex.
+		//
+		// When restarting etcd with `--force-new-cluster`, all uncommitted
+		// entries are dropped. To avoid losing entries that were actually
+		// committed, we reset Commit to max(HardState.Commit, consistent_index).
+		//
+		// See: https://github.com/etcd-io/raft/pull/300 for more details.
+		bwal.st.Commit = max(oldCommitIndex, consistentIndex)
+
 		// discard the previously uncommitted entries
 		bwal.ents = bwal.CommitedEntries()
 		entries := bwal.NewConfigChangeEntries()
@@ -578,6 +592,7 @@ func bootstrapWALFromSnapshot(cfg config.ServerConfig, snapshot *raftpb.Snapshot
 			"forcing restart member",
 			zap.String("cluster-id", meta.clusterID.String()),
 			zap.String("local-member-id", meta.nodeID.String()),
+			zap.Uint64("wal-commit-index", oldCommitIndex),
 			zap.Uint64("commit-index", bwal.st.Commit),
 		)
 	} else {
