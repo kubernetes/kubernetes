@@ -1161,7 +1161,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "envFrom": {
-            "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+            "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
             "items": {
               "allOf": [
                 {
@@ -1973,7 +1973,7 @@
             "description": "The ConfigMap to select from"
           },
           "prefix": {
-            "description": "Optional text to prepend to the name of each environment variable. Must be a C_IDENTIFIER.",
+            "description": "Optional text to prepend to the name of each environment variable. May consist of any printable ASCII characters except '='.",
             "type": "string"
           },
           "secretRef": {
@@ -1992,7 +1992,7 @@
         "properties": {
           "name": {
             "default": "",
-            "description": "Name of the environment variable. Must be a C_IDENTIFIER.",
+            "description": "Name of the environment variable. May consist of any printable ASCII characters except '='.",
             "type": "string"
           },
           "value": {
@@ -2091,7 +2091,7 @@
             "x-kubernetes-patch-strategy": "merge"
           },
           "envFrom": {
-            "description": "List of sources to populate environment variables in the container. The keys defined within a source must be a C_IDENTIFIER. All invalid keys will be reported as an event when the container is starting. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
+            "description": "List of sources to populate environment variables in the container. The keys defined within a source may consist of any printable ASCII characters except '='. When a key exists in multiple sources, the value associated with the last source will take precedence. Values defined by an Env with a duplicate key will take precedence. Cannot be updated.",
             "items": {
               "allOf": [
                 {

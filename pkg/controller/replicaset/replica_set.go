@@ -118,6 +118,21 @@ type ReplicaSetController struct {
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 	*healthz.ControllerHealthCheckable
+
+	// Controller specific features; see ReplicaSetControllerFeatures for details.
+	controllerFeatures ReplicaSetControllerFeatures
+}
+
+// ReplicaSetControllerFeatures that can be set in accordance with the controller type (GVK).
+// These do not have to correspond to FeatureGates, or their stability, nor do they have to undergo graduation.
+type ReplicaSetControllerFeatures struct {
+	EnableStatusTerminatingReplicas bool
+}
+
+func DefaultReplicaSetControllerFeatures() ReplicaSetControllerFeatures {
+	return ReplicaSetControllerFeatures{
+		EnableStatusTerminatingReplicas: true,
+	}
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
@@ -127,6 +142,24 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 	if err := metrics.Register(legacyregistry.Register); err != nil {
 		logger.Error(err, "unable to register metrics")
 	}
+	return NewBaseController(logger, rsInformer, podInformer, kubeClient, burstReplicas,
+		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
+		"replicaset_controller",
+		"replicaset",
+		controller.RealPodControl{
+			KubeClient: kubeClient,
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
+		},
+		eventBroadcaster,
+		DefaultReplicaSetControllerFeatures(),
+	)
+}
+
+// NewBaseController is the implementation of NewReplicaSetController with additional injected
+// parameters so that it can also serve as the implementation of NewReplicationController.
+func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface, eventBroadcaster record.EventBroadcaster, controllerFeatures ReplicaSetControllerFeatures) *ReplicaSetController {
+
 	rsc := &ReplicaSetController{
 		GroupVersionKind: apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		kubeClient:       kubeClient,
@@ -138,6 +171,7 @@ func NewReplicaSetController(ctx context.Context, rsInformer appsinformers.Repli
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "replicaset_controller"},
 		),
+		controllerFeatures: controllerFeatures,
 	}
 
 	// Initialize health check with informer sync functions
@@ -742,7 +776,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 	}
 
 	var terminatingPods []*v1.Pod
-	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DeploymentReplicaSetTerminatingReplicas) && rsc.controllerFeatures.EnableStatusTerminatingReplicas {
 		allTerminatingPods := controller.FilterTerminatingPods(allRSPods)
 		terminatingPods = controller.FilterClaimedPods(rs, selector, allTerminatingPods)
 	}
@@ -753,10 +787,10 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr)
+	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr, rsc.controllerFeatures)
 
 	// Always updates status as pods come up or die.
-	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus)
+	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus, rsc.controllerFeatures)
 	if err != nil {
 		// Multiple things could lead to this update failing. Requeuing the replica set ensures
 		// Returning an error causes a requeue without forcing a hotloop

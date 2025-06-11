@@ -238,6 +238,11 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeProxyDaemonSetMigration = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
 
+	// Owner: sig-network
+	// Marks tests that require the kernel to have support for the nfacct subsystem.
+	// (Some distros don't include this in the kernel.)
+	KubeProxyNFAcct = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyNFAcct"))
+
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LabelSelector = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
 
@@ -363,10 +368,6 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	RecoverVolumeExpansionFailure = framework.WithFeature(framework.ValidFeatures.Add("RecoverVolumeExpansionFailure"))
-
-	// RelaxedEnvironmentVariableValidation used when we verify whether the pod can consume all printable ASCII characters as environment variable names,
-	// and whether the pod can consume configmap/secret that key starts with a number.
-	RelaxedEnvironmentVariableValidation = framework.WithFeature(framework.ValidFeatures.Add("RelaxedEnvironmentVariableValidation"))
 
 	// Owner: sig-network
 	// Marks tests of KEP-4427 that require the `RelaxedDNSSearchValidation` feature gate

@@ -32,7 +32,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"k8s.io/apimachinery/pkg/util/wait"
-	externaljwtv1alpha1 "k8s.io/externaljwt/apis/v1alpha1"
+	externaljwtv1 "k8s.io/externaljwt/apis/v1"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
@@ -48,7 +48,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 		wantVerificationKeys  *VerificationKeys
 		refreshHintSec        int
 		dataTimeStamp         *timestamppb.Timestamp
-		supportedKeysOverride []*externaljwtv1alpha1.Key
+		supportedKeysOverride []*externaljwtv1.Key
 	}{
 		{
 			desc: "single key in signer",
@@ -157,7 +157,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 					excludeFromOidc: true,
 				},
 			},
-			supportedKeysOverride: []*externaljwtv1alpha1.Key{
+			supportedKeysOverride: []*externaljwtv1.Key{
 				{
 					KeyId: "kid",
 					Key:   nil,
@@ -186,7 +186,7 @@ func TestExternalPublicKeyGetter(t *testing.T) {
 			}
 			backend.DataTimeStamp = tc.dataTimeStamp
 			backend.SupportedKeysOverride = tc.supportedKeysOverride
-			externaljwtv1alpha1.RegisterExternalJWTSignerServer(grpcServer, backend)
+			externaljwtv1.RegisterExternalJWTSignerServer(grpcServer, backend)
 
 			defer grpcServer.Stop()
 			go func() {
@@ -268,7 +268,7 @@ func TestInitialFill(t *testing.T) {
 		refreshHintSeconds: 10,
 		DataTimeStamp:      timestamppb.New(time.Time{}),
 	}
-	externaljwtv1alpha1.RegisterExternalJWTSignerServer(grpcServer, backend)
+	externaljwtv1.RegisterExternalJWTSignerServer(grpcServer, backend)
 
 	defer grpcServer.Stop()
 	go func() {
@@ -333,7 +333,7 @@ func TestReflectChanges(t *testing.T) {
 		refreshHintSeconds: 10,
 		DataTimeStamp:      timestamppb.New(time.Time{}),
 	}
-	externaljwtv1alpha1.RegisterExternalJWTSignerServer(grpcServer, backend)
+	externaljwtv1.RegisterExternalJWTSignerServer(grpcServer, backend)
 
 	defer grpcServer.Stop()
 	go func() {

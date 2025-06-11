@@ -895,7 +895,10 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	numReplicas := int32(10)
 	newStatus := apps.ReplicaSetStatus{Replicas: numReplicas}
 	logger, _ := ktesting.NewTestContext(t)
-	updateReplicaSetStatus(logger, fakeRSClient, rs, newStatus)
+	_, err := updateReplicaSetStatus(logger, fakeRSClient, rs, newStatus, DefaultReplicaSetControllerFeatures())
+	if err == nil {
+		t.Errorf("Expected update err")
+	}
 	updates, gets := 0, 0
 	for _, a := range fakeClient.Actions() {
 		if a.GetResource().Resource != "replicasets" {
