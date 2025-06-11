@@ -522,9 +522,17 @@ func (c *RaftCluster) PromoteMember(id types.ID, shouldApplyV3 ShouldApplyV3) {
 	defer c.Unlock()
 
 	if c.v2store != nil {
-		m := *(c.members[id])
-		m.RaftAttributes.IsLearner = false
-		mustUpdateMemberInStore(c.lg, c.v2store, &m)
+		if _, ok := c.members[id]; ok {
+			m := *(c.members[id])
+			m.RaftAttributes.IsLearner = false
+			mustUpdateMemberInStore(c.lg, c.v2store, &m)
+		} else {
+			c.lg.Info("Skipped promoting non-existent member in v2store",
+				zap.String("cluster-id", c.cid.String()),
+				zap.String("local-member-id", c.localID.String()),
+				zap.String("promoted-member-id", id.String()),
+			)
+		}
 	}
 
 	if id == c.localID {
@@ -550,15 +558,23 @@ func (c *RaftCluster) PromoteMember(id types.ID, shouldApplyV3 ShouldApplyV3) {
 			// promotion request had been applied to v3store, but not saved
 			// to v2snapshot yet when in 3.5. Once upgrading to 3.6, the
 			// patch here ensure the issue can be automatically fixed.
-			if m.IsLearner {
+			if m == nil {
+				c.lg.Info(
+					"Skipped forcibly promoting non-existent member in v3store",
+					zap.String("cluster-id", c.cid.String()),
+					zap.String("local-member-id", c.localID.String()),
+					zap.String("promoted-member-id", id.String()),
+				)
+			} else if m.IsLearner {
 				m.RaftAttributes.IsLearner = false
-				c.lg.Info("Forcibly apply member promotion request", zap.String("member", fmt.Sprintf("%+v", *m)))
+				c.lg.Info("Forcibly apply member promotion request in v3store", zap.String("member", fmt.Sprintf("%+v", *m)))
 				c.be.MustHackySaveMemberToBackend(m)
 			} else {
 				c.lg.Info(
-					"ignore already promoted member",
+					"ignore already promoted member in v3store",
 					zap.String("cluster-id", c.cid.String()),
 					zap.String("local-member-id", c.localID.String()),
+					zap.String("promoted-member-id", id.String()),
 				)
 			}
 		}
@@ -567,6 +583,7 @@ func (c *RaftCluster) PromoteMember(id types.ID, shouldApplyV3 ShouldApplyV3) {
 			"ignore already promoted member due to backend being nil",
 			zap.String("cluster-id", c.cid.String()),
 			zap.String("local-member-id", c.localID.String()),
+			zap.String("promoted-member-id", id.String()),
 		)
 	}
 }
@@ -602,9 +619,19 @@ func (c *RaftCluster) UpdateRaftAttributes(id types.ID, raftAttr RaftAttributes,
 	defer c.Unlock()
 
 	if c.v2store != nil {
-		m := *(c.members[id])
-		m.RaftAttributes = raftAttr
-		mustUpdateMemberInStore(c.lg, c.v2store, &m)
+		if _, ok := c.members[id]; ok {
+			m := *(c.members[id])
+			m.RaftAttributes = raftAttr
+			mustUpdateMemberInStore(c.lg, c.v2store, &m)
+		} else {
+			c.lg.Info("Skipped updating non-existent member in v2store",
+				zap.String("cluster-id", c.cid.String()),
+				zap.String("local-member-id", c.localID.String()),
+				zap.String("updated-remote-peer-id", id.String()),
+				zap.Strings("updated-remote-peer-urls", raftAttr.PeerURLs),
+				zap.Bool("updated-remote-peer-is-learner", raftAttr.IsLearner),
+			)
+		}
 	}
 	if c.be != nil && shouldApplyV3 {
 		c.members[id].RaftAttributes = raftAttr

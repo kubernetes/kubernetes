@@ -147,11 +147,11 @@ github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/zeebo/errs v1.4.0/go.mod h1:sgbWHsvVuTPHcqJJGQ1WhI5KbWlHYz+2+2C/LSEtCw4=
 go.etcd.io/bbolt v1.4.0/go.mod h1:AsD+OCi/qPN1giOX1aiLAha3o1U8rAz65bvN4j0sRuk=
-go.etcd.io/etcd/api/v3 v3.6.0/go.mod h1:Wt5yZqEmxgTNJGHob7mTVBJDZNXiHPtXTcPab37iFOw=
-go.etcd.io/etcd/client/pkg/v3 v3.6.0/go.mod h1:Jv5SFWMnGvIBn8o3OaBq/PnT0jjsX8iNokAUessNjoA=
-go.etcd.io/etcd/client/v3 v3.6.0/go.mod h1:Jzk/Knqe06pkOZPHXsQ0+vNDvMQrgIqJ0W8DwPdMJMg=
-go.etcd.io/etcd/pkg/v3 v3.6.0/go.mod h1:pFym9TwvGyAp9VHK/0LoJ1n2D+sX4ukzP15ZqN5gYO8=
-go.etcd.io/etcd/server/v3 v3.6.0/go.mod h1:y8PLrWY4upkE79xxRCkbWmCmGUmTeAG0RmzfzDhHO/E=
+go.etcd.io/etcd/api/v3 v3.6.1/go.mod h1:lnfuqoGsXMlZdTJlact3IB56o3bWp1DIlXPIGKRArto=
+go.etcd.io/etcd/client/pkg/v3 v3.6.1/go.mod h1:aTkCp+6ixcVTZmrJGa7/Mc5nMNs59PEgBbq+HCmWyMc=
+go.etcd.io/etcd/client/v3 v3.6.1/go.mod h1:fCbPUdjWNLfx1A6ATo9syUmFVxqHH9bCnPLBZmnLmMY=
+go.etcd.io/etcd/pkg/v3 v3.6.1/go.mod h1:nS0ahQoZZ9qXjQAtYGDt80IEHKl9YOF7mv6J0lQmBoQ=
+go.etcd.io/etcd/server/v3 v3.6.1/go.mod h1:nCqJGTP9c2WlZluJB59j3bqxZEI/GYBfQxno0MguVjE=
 go.etcd.io/raft/v3 v3.6.0/go.mod h1:nLvLevg6+xrVtHUmVaTcTz603gQPHfh7kUAwV6YpfGo=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=
 go.opentelemetry.io/auto/sdk v1.1.0/go.mod h1:3wSPjt5PWp2RhlCcmmOial7AvC4DQqZb7a7wCow3W8A=
