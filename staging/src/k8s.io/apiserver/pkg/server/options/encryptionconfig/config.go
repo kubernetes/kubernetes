@@ -907,9 +907,8 @@ func (u unionTransformers) TransformToStorage(ctx context.Context, data []byte, 
 
 // computeEncryptionConfigHash returns the expected hash for an encryption config file that has been loaded as bytes.
 // We use a hash instead of the raw file contents when tracking changes to avoid holding any encryption keys in memory outside of their associated transformers.
-// This hash must be used in-memory and not externalized to the process because it has no cross-release stability guarantees.
 func computeEncryptionConfigHash(data []byte) string {
-	return fmt.Sprintf("k8s:enc:unstable:1:%x", sha256.Sum256(data))
+	return fmt.Sprintf("sha256:%x", sha256.Sum256(data))
 }
 
 var _ storagevalue.ResourceTransformers = &DynamicTransformers{}

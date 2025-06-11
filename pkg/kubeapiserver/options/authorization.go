@@ -118,7 +118,7 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		}
 
 		// load/validate kube-apiserver authz config with no opinion about required modes
-		_, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
+		_, _, err := authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
 		if err != nil {
 			return append(allErrors, err)
 		}
@@ -219,6 +219,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 
 	var authorizationConfiguration *authzconfig.AuthorizationConfiguration
 	var err error
+	var authorizationConfigData string
 
 	// if --authorization-config is set, check if
 	// 	- the feature flag is set
@@ -236,7 +237,7 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 			return nil, fmt.Errorf("--%s can not be specified when --%s or --authorization-webhook-* flags are defined", authorizationConfigFlag, authorizationModeFlag)
 		}
 		// load/validate kube-apiserver authz config with no opinion about required modes
-		authorizationConfiguration, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
+		authorizationConfiguration, authorizationConfigData, err = authorizer.LoadAndValidateFile(o.AuthorizationConfigurationFile, authorizationcel.NewDefaultCompiler(), nil)
 		if err != nil {
 			return nil, err
 		}
@@ -252,8 +253,9 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		VersionedInformerFactory: versionedInformerFactory,
 		WebhookRetryBackoff:      o.WebhookRetryBackoff,
 
-		ReloadFile:                 o.AuthorizationConfigurationFile,
-		AuthorizationConfiguration: authorizationConfiguration,
+		ReloadFile:                            o.AuthorizationConfigurationFile,
+		AuthorizationConfiguration:            authorizationConfiguration,
+		InitialAuthorizationConfigurationData: authorizationConfigData,
 	}, nil
 }
 

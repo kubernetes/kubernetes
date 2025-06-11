@@ -27,6 +27,7 @@ import (
 const (
 	testAPIServerID     = "testAPIServerID"
 	testAPIServerIDHash = "sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37"
+	testConfigDataHash  = "sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3"
 )
 
 func TestRecordEncryptionConfigAutomaticReloadFailure(t *testing.T) {
@@ -53,16 +54,19 @@ func TestRecordEncryptionConfigAutomaticReloadSuccess(t *testing.T) {
 	# HELP apiserver_encryption_config_controller_automatic_reloads_total [ALPHA] Total number of reload successes and failures of encryption configuration split by apiserver identity.
     # TYPE apiserver_encryption_config_controller_automatic_reloads_total counter
     apiserver_encryption_config_controller_automatic_reloads_total {apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",status="success"} 1
+	# HELP apiserver_encryption_config_controller_last_config_info [ALPHA] Information about the last applied encryption configuration with hash as label, split by apiserver identity.
+	# TYPE apiserver_encryption_config_controller_last_config_info gauge
+	apiserver_encryption_config_controller_last_config_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:6bc9f4aa2e5587afbb96074e1809550cbc4de3cc3a35717dac8ff2800a147fd3"} 1
 	`
 	metricNames := []string{
-		namespace + "_" + subsystem + "_automatic_reload_success_total",
 		namespace + "_" + subsystem + "_automatic_reloads_total",
+		namespace + "_" + subsystem + "_last_config_info",
 	}
 
-	encryptionConfigAutomaticReloadsTotal.Reset()
+	ResetMetricsForTest()
 	RegisterMetrics()
 
-	RecordEncryptionConfigAutomaticReloadSuccess(testAPIServerID)
+	RecordEncryptionConfigAutomaticReloadSuccess(testAPIServerID, testConfigDataHash)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expectedValue), metricNames...); err != nil {
 		t.Fatal(err)
 	}
@@ -106,5 +110,43 @@ func TestEncryptionConfigAutomaticReloadLastTimestampSeconds(t *testing.T) {
 		if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tc.expectedValue), metricNames...); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestRecordEncryptionConfigAutomaticReloadSuccess_StaleMetricCleanup(t *testing.T) {
+	ResetMetricsForTest()
+	RegisterMetrics()
+
+	// Record first config
+	firstConfigHash := "sha256:firsthash"
+	RecordEncryptionConfigAutomaticReloadSuccess(testAPIServerID, firstConfigHash)
+
+	// Verify first config metric exists
+	firstExpected := `
+	# HELP apiserver_encryption_config_controller_last_config_info [ALPHA] Information about the last applied encryption configuration with hash as label, split by apiserver identity.
+	# TYPE apiserver_encryption_config_controller_last_config_info gauge
+	apiserver_encryption_config_controller_last_config_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:firsthash"} 1
+	`
+	metricNames := []string{
+		namespace + "_" + subsystem + "_last_config_info",
+	}
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(firstExpected), metricNames...); err != nil {
+		t.Fatal(err)
+	}
+
+	// Record second config - should clean up first config's metric
+	secondConfigHash := "sha256:secondhash"
+	RecordEncryptionConfigAutomaticReloadSuccess(testAPIServerID, secondConfigHash)
+
+	// Verify only second config metric exists
+	secondExpected := `
+	# HELP apiserver_encryption_config_controller_last_config_info [ALPHA] Information about the last applied encryption configuration with hash as label, split by apiserver identity.
+	# TYPE apiserver_encryption_config_controller_last_config_info gauge
+	apiserver_encryption_config_controller_last_config_info{apiserver_id_hash="sha256:14f9d63e669337ac6bfda2e2162915ee6a6067743eddd4e5c374b572f951ff37",hash="sha256:secondhash"} 1
+	`
+
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(secondExpected), metricNames...); err != nil {
+		t.Fatal(err)
 	}
 }
