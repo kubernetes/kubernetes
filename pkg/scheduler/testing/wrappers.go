@@ -511,6 +511,20 @@ func (p *PodWrapper) ContainerPort(ports []v1.ContainerPort) *PodWrapper {
 	return p
 }
 
+// InitContainerPort creates an initContainer with ports valued `ports`,
+// and injects into the inner pod.
+func (p *PodWrapper) InitContainerPort(sidecar bool, ports []v1.ContainerPort) *PodWrapper {
+	c := MakeContainer().
+		Name("init-container").
+		Image("pause").
+		ContainerPort(ports)
+	if sidecar {
+		c.RestartPolicy(v1.ContainerRestartPolicyAlways)
+	}
+	p.Spec.InitContainers = append(p.Spec.InitContainers, c.Obj())
+	return p
+}
+
 // PVC creates a Volume with a PVC and injects into the inner pod.
 func (p *PodWrapper) PVC(name string) *PodWrapper {
 	p.Spec.Volumes = append(p.Spec.Volumes, v1.Volume{
