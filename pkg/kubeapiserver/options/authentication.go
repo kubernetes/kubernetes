@@ -788,7 +788,7 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(
 
 				trackedAuthenticationConfigData = authConfigData
 				klog.InfoS("reloaded authentication config")
-				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID)
+				authenticationconfigmetrics.RecordAuthenticationConfigAutomaticReloadSuccess(apiServerID, authConfigData)
 			},
 			func(err error) { klog.ErrorS(err, "watching authentication config file") },
 		)
