@@ -22,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
+
+	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
@@ -58,12 +60,12 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 	args := tag.Args
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	t := nonPointer(nativeType(context.Type))
+	t := util.NonPointer(util.NativeType(context.Type))
 	if t.Kind != types.Struct {
 		return Validations{}, fmt.Errorf("can only be used on struct types")
 	}
 	subname := args[0].Value
-	submemb := getMemberByJSON(t, subname)
+	submemb := util.GetMemberByJSON(t, subname)
 	if submemb == nil {
 		return Validations{}, fmt.Errorf("no field for json name %q", subname)
 	}
@@ -83,12 +85,12 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 
 		for _, vfn := range validations.Functions {
 			nilableStructType := context.Type
-			if !isNilableType(nilableStructType) {
+			if !util.IsNilableType(nilableStructType) {
 				nilableStructType = types.PointerTo(nilableStructType)
 			}
 			nilableFieldType := submemb.Type
 			fieldExprPrefix := ""
-			if !isNilableType(nilableFieldType) {
+			if !util.IsNilableType(nilableFieldType) {
 				nilableFieldType = types.PointerTo(nilableFieldType)
 				fieldExprPrefix = "&"
 			}

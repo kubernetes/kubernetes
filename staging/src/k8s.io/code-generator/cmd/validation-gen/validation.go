@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -219,14 +220,6 @@ func (td *typeDiscoverer) DiscoverType(t *types.Type) error {
 	return nil
 }
 
-// unalias returns the unaliased type.
-func unalias(t *types.Type) *types.Type {
-	for t.Kind == types.Alias {
-		t = t.Underlying
-	}
-	return t
-}
-
 // discoverType walks the given type recursively and returns a typeNode
 // representing it. This does not distinguish between discovering a type
 // definition and discovering a field of a struct.  The first time it
@@ -255,7 +248,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 			return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
 		}
 	case types.Pointer:
-		pointee := unalias(t.Elem)
+		pointee := util.NativeType(t.Elem)
 		switch pointee.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): pointers to pointers are not supported", fldPath.String(), t)
@@ -267,23 +260,23 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	case types.Array:
 		return nil, fmt.Errorf("field %s (%s): fixed-size arrays are not supported", fldPath.String(), t)
 	case types.Slice:
-		elem := unalias(t.Elem)
+		elem := util.NativeType(t.Elem)
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): lists of pointers are not supported", fldPath.String(), t)
 		case types.Slice:
-			if unalias(elem.Elem) != types.Byte {
+			if util.NativeType(elem.Elem) != types.Byte {
 				return nil, fmt.Errorf("field %s (%s): lists of lists are not supported", fldPath.String(), t)
 			}
 		case types.Map:
 			return nil, fmt.Errorf("field %s (%s): lists of maps are not supported", fldPath.String(), t)
 		}
 	case types.Map:
-		key := unalias(t.Key)
+		key := util.NativeType(t.Key)
 		if key != types.String {
 			return nil, fmt.Errorf("field %s (%s): maps with non-string keys are not supported", fldPath.String(), t)
 		}
-		elem := unalias(t.Elem)
+		elem := util.NativeType(t.Elem)
 		switch elem.Kind {
 		case types.Pointer:
 			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
@@ -416,7 +409,7 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 			// system, while preventing validation on them since that functionality is not yet
 			// implemented. Once validation support for map-of-slices is added, this check should
 			// be removed.
-			if unalias(t).Kind == types.Map && unalias(t).Elem.Kind == types.Slice {
+			if util.NativeType(t).Kind == types.Map && util.NativeType(t).Elem.Kind == types.Slice {
 				return nil, fmt.Errorf("field %s: validation for map of slices is not supported", fldPath)
 			}
 			klog.V(5).InfoS("found type-attached validations", "n", validations.Len(), "type", t)
@@ -595,7 +588,7 @@ func (td *typeDiscoverer) discoverStruct(thisNode *typeNode, fldPath *field.Path
 			// system, while preventing validation on them since that functionality is not yet
 			// implemented. Once validation support for map-of-slices is added, this check should
 			// be removed.
-			if unalias(childType).Kind == types.Map && unalias(childType).Elem.Kind == types.Slice {
+			if util.NativeType(childType).Kind == types.Map && util.NativeType(childType).Elem.Kind == types.Slice {
 				return fmt.Errorf("field %s: validation for map of slices is not supported", childPath)
 			}
 			child.fieldValidations.Add(validations)
@@ -838,7 +831,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 			"safe":      mkSymbolArgs(c, safePkgSymbols),
 			"context":   mkSymbolArgs(c, contextPkgSymbols),
 		}
-		if !isNilableType(rootType) {
+		if !util.IsNilableType(rootType) {
 			targs["typePfx"] = "*"
 		}
 
@@ -905,7 +898,7 @@ func (g *genValidations) emitValidationFunction(c *generator.Context, t *types.T
 		"context":    mkSymbolArgs(c, contextPkgSymbols),
 		"objTypePfx": "*",
 	}
-	if isNilableType(t) {
+	if util.IsNilableType(t) {
 		targs["objTypePfx"] = ""
 	}
 
@@ -1334,7 +1327,7 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 				"objType":    v.ObjType,
 				"objTypePfx": "*",
 			}
-			if isNilableType(v.ObjType) {
+			if util.IsNilableType(v.ObjType) {
 				targs["objTypePfx"] = ""
 			}
 
@@ -1431,16 +1424,6 @@ func toGolangSourceDataLiteral(sw *generator.SnippetWriter, c *generator.Context
 	}
 }
 
-// isNilableType returns true if the argument type can be compared to nil.
-func isNilableType(t *types.Type) bool {
-	t = unalias(t)
-	switch t.Kind {
-	case types.Pointer, types.Map, types.Slice, types.Interface: // Note: Arrays are not nilable
-		return true
-	}
-	return false
-}
-
 // getLeafTypeAndPrefixes returns the "leaf value type" for a given type, as
 // well as type and expression prefix strings for the input type.  The type
 // prefix can be prepended to the given type's name to produce the nilable form
@@ -1466,7 +1449,7 @@ func getLeafTypeAndPrefixes(inType *types.Type) (*types.Type, string, string) {
 		nPtrs++
 		leafType = leafType.Elem
 	}
-	if !isNilableType(leafType) {
+	if !util.IsNilableType(leafType) {
 		typePfx = "*"
 		if nPtrs == 0 {
 			exprPfx = "&"
