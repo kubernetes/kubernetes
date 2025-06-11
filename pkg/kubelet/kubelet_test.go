@@ -1108,7 +1108,7 @@ func TestHandlePluginResources(t *testing.T) {
 				if newQuantity.Value() < 0 {
 					return fmt.Errorf("Allocation failed")
 				}
-				newAllocatableResource.ScalarResources[resource] = newQuantity.Value()
+				newAllocatableResource.GetScalarResources()[resource] = newQuantity.Value()
 			}
 		}
 		node.Allocatable = newAllocatableResource

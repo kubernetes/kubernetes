@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -74,7 +75,7 @@ type cacheImpl struct {
 	headNode *nodeInfoListItem
 	nodeTree *nodeTree
 	// A map from image name to its ImageStateSummary.
-	imageStates map[string]*framework.ImageStateSummary
+	imageStates map[string]*fwk.ImageStateSummary
 }
 
 type podState struct {
@@ -97,7 +98,7 @@ func newCache(ctx context.Context, ttl, period time.Duration) *cacheImpl {
 		nodeTree:    newNodeTree(logger, nil),
 		assumedPods: sets.New[string](),
 		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*framework.ImageStateSummary),
+		imageStates: make(map[string]*fwk.ImageStateSummary),
 	}
 }
 
@@ -169,7 +170,7 @@ func (cache *cacheImpl) Dump() *Dump {
 
 	nodes := make(map[string]*framework.NodeInfo, len(cache.nodes))
 	for k, v := range cache.nodes {
-		nodes[k] = v.info.Snapshot()
+		nodes[k] = v.info.SnapshotConcrete()
 	}
 
 	return &Dump{
@@ -181,7 +182,7 @@ func (cache *cacheImpl) Dump() *Dump {
 // UpdateSnapshot takes a snapshot of cached NodeInfo map. This is called at
 // beginning of every scheduling cycle.
 // The snapshot only includes Nodes that are not deleted at the time this function is called.
-// nodeInfo.Node() is guaranteed to be not nil for all the nodes in the snapshot.
+// nodeInfo.GetNode() is guaranteed to be not nil for all the nodes in the snapshot.
 // This function tracks generation number of NodeInfo and updates only the
 // entries of an existing snapshot that have changed after the snapshot was taken.
 func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapshot) error {
@@ -213,29 +214,29 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
 		}
-		if np := node.info.Node(); np != nil {
+		if np := node.info.GetNode(); np != nil {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
 			if !ok {
 				updateAllLists = true
 				existing = &framework.NodeInfo{}
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
 			}
-			clone := node.info.Snapshot()
+			clone := node.info.SnapshotConcrete()
 			// We track nodes that have pods with affinity, here we check if this node changed its
 			// status from having pods with affinity to NOT having pods with affinity or the other
 			// way around.
-			if (len(existing.PodsWithAffinity) > 0) != (len(clone.PodsWithAffinity) > 0) {
+			if (len(existing.GetPodsWithAffinity()) > 0) != (len(clone.PodsWithAffinity) > 0) {
 				updateNodesHavePodsWithAffinity = true
 			}
-			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
+			if (len(existing.GetPodsWithRequiredAntiAffinity()) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
 			if !updateUsedPVCSet {
-				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
+				if len(existing.GetPVCRefCounts()) != len(clone.PVCRefCounts) {
 					updateUsedPVCSet = true
 				} else {
 					for pvcKey := range clone.PVCRefCounts {
-						if _, found := existing.PVCRefCounts[pvcKey]; !found {
+						if _, found := existing.GetPVCRefCounts()[pvcKey]; !found {
 							updateUsedPVCSet = true
 							break
 						}
@@ -244,7 +245,16 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
 			// is used in the NodeInfoList, which we may not update.
-			*existing = *clone
+			// This operation on pointers is the reason why cacheImpl operates on framework.NodeInfo (concrete implementation)
+			// and not on interface fwk.NodeInfo.
+			if existingPtr, ok := existing.(*framework.NodeInfo); ok {
+				*existingPtr = *clone
+				nodeSnapshot.nodeInfoMap[np.Name] = existingPtr
+			} else {
+				errMsg := fmt.Sprintf("nodeInfoMap does not hold *framework.NodeInfo object. Cannot update the reference. Got object %s", existing)
+				logger.Error(nil, errMsg)
+				return errors.New(errMsg)
+			}
 		}
 	}
 	// Update the snapshot generation with the latest NodeInfo generation.
@@ -281,12 +291,12 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 }
 
 func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot *Snapshot, updateAll bool) {
-	snapshot.havePodsWithAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
-	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.havePodsWithAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
+	snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	snapshot.usedPVCSet = sets.New[string]()
 	if updateAll {
 		// Take a snapshot of the nodes order in the tree
-		snapshot.nodeInfoList = make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+		snapshot.nodeInfoList = make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 		nodesList, err := cache.nodeTree.list()
 		if err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Error occurred while retrieving the list of names of the nodes from node tree")
@@ -294,13 +304,13 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 		for _, nodeName := range nodesList {
 			if nodeInfo := snapshot.nodeInfoMap[nodeName]; nodeInfo != nil {
 				snapshot.nodeInfoList = append(snapshot.nodeInfoList, nodeInfo)
-				if len(nodeInfo.PodsWithAffinity) > 0 {
+				if len(nodeInfo.GetPodsWithAffinity()) > 0 {
 					snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 				}
-				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+				if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
 					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
-				for key := range nodeInfo.PVCRefCounts {
+				for key := range nodeInfo.GetPVCRefCounts() {
 					snapshot.usedPVCSet.Insert(key)
 				}
 			} else {
@@ -309,13 +319,13 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 		}
 	} else {
 		for _, nodeInfo := range snapshot.nodeInfoList {
-			if len(nodeInfo.PodsWithAffinity) > 0 {
+			if len(nodeInfo.GetPodsWithAffinity()) > 0 {
 				snapshot.havePodsWithAffinityNodeInfoList = append(snapshot.havePodsWithAffinityNodeInfoList, nodeInfo)
 			}
-			if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
+			if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
 				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 			}
-			for key := range nodeInfo.PVCRefCounts {
+			for key := range nodeInfo.GetPVCRefCounts() {
 				snapshot.usedPVCSet.Insert(key)
 			}
 		}
@@ -329,7 +339,7 @@ func (cache *cacheImpl) removeDeletedNodesFromSnapshot(snapshot *Snapshot) {
 		if toDelete <= 0 {
 			break
 		}
-		if n, ok := cache.nodes[name]; !ok || n.info.Node() == nil {
+		if n, ok := cache.nodes[name]; !ok || n.info.GetNode() == nil {
 			delete(snapshot.nodeInfoMap, name)
 			toDelete--
 		}
@@ -471,7 +481,7 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod) error {
 		if err := n.info.RemovePod(logger, pod); err != nil {
 			return err
 		}
-		if len(n.info.Pods) == 0 && n.info.Node() == nil {
+		if len(n.info.Pods) == 0 && n.info.GetNode() == nil {
 			cache.removeNodeInfoFromList(logger, pod.Spec.NodeName)
 		} else {
 			cache.moveNodeInfoToHead(logger, pod.Spec.NodeName)
@@ -608,14 +618,14 @@ func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.No
 		n = newNodeInfoListItem(framework.NewNodeInfo())
 		cache.nodes[node.Name] = n
 	} else {
-		cache.removeNodeImageStates(n.info.Node())
+		cache.removeNodeImageStates(n.info.GetNode())
 	}
 	cache.moveNodeInfoToHead(logger, node.Name)
 
 	cache.nodeTree.addNode(logger, node)
 	cache.addNodeImageStates(node, n.info)
 	n.info.SetNode(node)
-	return n.info.Snapshot()
+	return n.info.SnapshotConcrete()
 }
 
 func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo {
@@ -627,14 +637,14 @@ func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node
 		cache.nodes[newNode.Name] = n
 		cache.nodeTree.addNode(logger, newNode)
 	} else {
-		cache.removeNodeImageStates(n.info.Node())
+		cache.removeNodeImageStates(n.info.GetNode())
 	}
 	cache.moveNodeInfoToHead(logger, newNode.Name)
 
 	cache.nodeTree.updateNode(logger, oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	n.info.SetNode(newNode)
-	return n.info.Snapshot()
+	return n.info.SnapshotConcrete()
 }
 
 // RemoveNode removes a node from the cache's tree.
@@ -671,14 +681,14 @@ func (cache *cacheImpl) RemoveNode(logger klog.Logger, node *v1.Node) error {
 // addNodeImageStates adds states of the images on given node to the given nodeInfo and update the imageStates in
 // scheduler cache. This function assumes the lock to scheduler cache has been acquired.
 func (cache *cacheImpl) addNodeImageStates(node *v1.Node, nodeInfo *framework.NodeInfo) {
-	newSum := make(map[string]*framework.ImageStateSummary)
+	newSum := make(map[string]*fwk.ImageStateSummary)
 
 	for _, image := range node.Status.Images {
 		for _, name := range image.Names {
 			// update the entry in imageStates
 			state, ok := cache.imageStates[name]
 			if !ok {
-				state = &framework.ImageStateSummary{
+				state = &fwk.ImageStateSummary{
 					Size:  image.SizeBytes,
 					Nodes: sets.New(node.Name),
 				}

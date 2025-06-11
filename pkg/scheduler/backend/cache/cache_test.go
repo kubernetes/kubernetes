@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -87,8 +88,8 @@ func (b *hostPortInfoBuilder) add(protocol, ip string, port int32) *hostPortInfo
 	return b
 }
 
-func (b *hostPortInfoBuilder) build() framework.HostPortInfo {
-	res := make(framework.HostPortInfo)
+func (b *hostPortInfoBuilder) build() fwk.HostPortInfo {
+	res := make(fwk.HostPortInfo)
 	for _, param := range b.inputs {
 		res.Add(param.ip, param.protocol, param.port)
 	}
@@ -98,8 +99,8 @@ func (b *hostPortInfoBuilder) build() framework.HostPortInfo {
 func newNodeInfo(requestedResource *framework.Resource,
 	nonzeroRequest *framework.Resource,
 	pods []*v1.Pod,
-	usedPorts framework.HostPortInfo,
-	imageStates map[string]*framework.ImageStateSummary,
+	usedPorts fwk.HostPortInfo,
+	imageStates map[string]*fwk.ImageStateSummary,
 ) *framework.NodeInfo {
 	nodeInfo := framework.NewNodeInfo(pods...)
 	nodeInfo.Requested = requestedResource
@@ -142,7 +143,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}, {
 		name: "node requested resource are equal to the sum of the assumed pods requested resource, node contains host ports defined by pods",
@@ -158,7 +159,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[1], testPods[2]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}, { // test non-zero request
 		name: "assumed pod without resource request",
@@ -174,7 +175,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[3]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}, {
 		name: "assumed one pod with extended resource",
@@ -191,7 +192,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[4]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}, {
 		name: "assumed two pods with extended resources",
@@ -208,7 +209,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[4], testPods[5]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}, {
 		name: "assumed pod with random invalid extended resource key",
@@ -224,7 +225,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[6]},
 			newHostPortInfoBuilder().build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	},
 	}
@@ -321,7 +322,7 @@ func TestExpirePod(t *testing.T) {
 				// Order gets altered when removing pods.
 				[]*v1.Pod{testPods[2], testPods[1]},
 				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-				make(map[string]*framework.ImageStateSummary),
+				make(map[string]*fwk.ImageStateSummary),
 			),
 			ttl: defaultTTL,
 		},
@@ -342,7 +343,7 @@ func TestExpirePod(t *testing.T) {
 				},
 				[]*v1.Pod{testPods[0]},
 				newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-				make(map[string]*framework.ImageStateSummary),
+				make(map[string]*fwk.ImageStateSummary),
 			),
 			ttl: time.Duration(0),
 		},
@@ -407,7 +408,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}
 
@@ -520,7 +521,7 @@ func TestAddPodAlwaysUpdatesPodInfoInNodeInfo(t *testing.T) {
 				},
 				[]*v1.Pod{p2},
 				newHostPortInfoBuilder().add("TCP", "0.0.0.0", 80).build(),
-				make(map[string]*framework.ImageStateSummary),
+				make(map[string]*fwk.ImageStateSummary),
 			),
 		},
 	}
@@ -576,7 +577,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 				},
 				[]*v1.Pod{updatedPod.DeepCopy()},
 				newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
-				make(map[string]*framework.ImageStateSummary),
+				make(map[string]*fwk.ImageStateSummary),
 			),
 		},
 	}
@@ -629,7 +630,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 			},
 			[]*v1.Pod{basePod},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}
 
@@ -683,7 +684,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		), newNodeInfo(
 			&framework.Resource{
 				MilliCPU: 100,
@@ -695,7 +696,7 @@ func TestUpdatePod(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		)},
 	}
 
@@ -827,7 +828,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		), newNodeInfo(
 			&framework.Resource{
 				MilliCPU: 100,
@@ -839,7 +840,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			},
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-			make(map[string]*framework.ImageStateSummary),
+			make(map[string]*fwk.ImageStateSummary),
 		)},
 	}
 
@@ -901,8 +902,8 @@ func TestEphemeralStorageResource(t *testing.T) {
 				Memory:   schedutil.DefaultMemoryRequest,
 			},
 			[]*v1.Pod{podE},
-			framework.HostPortInfo{},
-			make(map[string]*framework.ImageStateSummary),
+			fwk.HostPortInfo{},
+			make(map[string]*fwk.ImageStateSummary),
 		),
 	}
 	logger, ctx := ktesting.NewTestContext(t)
@@ -947,7 +948,7 @@ func TestRemovePod(t *testing.T) {
 		},
 		[]*v1.Pod{pod},
 		newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
-		make(map[string]*framework.ImageStateSummary),
+		make(map[string]*fwk.ImageStateSummary),
 	)
 	tests := map[string]struct {
 		assume bool
@@ -1050,7 +1051,7 @@ func TestForgetPod(t *testing.T) {
 }
 
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
-func buildNodeInfo(node *v1.Node, pods []*v1.Pod, imageStates map[string]*framework.ImageStateSummary) *framework.NodeInfo {
+func buildNodeInfo(node *v1.Node, pods []*v1.Pod, imageStates map[string]*fwk.ImageStateSummary) *framework.NodeInfo {
 	expected := framework.NewNodeInfo()
 	expected.SetNode(node)
 	expected.Allocatable = framework.NewResource(node.Status.Allocatable)
@@ -1069,13 +1070,13 @@ func buildNodeInfo(node *v1.Node, pods []*v1.Pod, imageStates map[string]*framew
 }
 
 // buildImageStates creates ImageStateSummary of image from nodes that will be added in cache.
-func buildImageStates(nodes []*v1.Node) map[string]*framework.ImageStateSummary {
-	imageStates := make(map[string]*framework.ImageStateSummary)
+func buildImageStates(nodes []*v1.Node) map[string]*fwk.ImageStateSummary {
+	imageStates := make(map[string]*fwk.ImageStateSummary)
 	for _, item := range nodes {
 		for _, image := range item.Status.Images {
 			for _, name := range image.Names {
 				if state, ok := imageStates[name]; !ok {
-					state = &framework.ImageStateSummary{
+					state = &fwk.ImageStateSummary{
 						Size:  image.SizeBytes,
 						Nodes: sets.New[string](item.Name),
 					}
@@ -1234,7 +1235,7 @@ func TestNodeOperators(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			nodes := map[string]*framework.NodeInfo{}
+			nodes := map[string]fwk.NodeInfo{}
 			for nodeItem := cache.headNode; nodeItem != nil; nodeItem = nodeItem.next {
 				nodes[nodeItem.info.Node().Name] = nodeItem.info
 			}
@@ -1273,7 +1274,7 @@ func TestNodeOperators(t *testing.T) {
 			if !found || len(cachedNodes.nodeInfoMap) != len(tc.nodes) {
 				t.Errorf("failed to dump cached nodes:\n got: %v \nexpected: %v", cachedNodes.nodeInfoMap, tc.nodes)
 			}
-			expected.Generation = newNode.Generation
+			expected.Generation = newNode.GetGeneration()
 			if diff := cmp.Diff(expected.Snapshot(), newNode, nodeInfoCmpOpts...); diff != "" {
 				t.Errorf("Failed to clone node (-want,+got):\n%s", diff)
 			}
@@ -1284,7 +1285,7 @@ func TestNodeOperators(t *testing.T) {
 
 			// Step 3: update node attribute successfully.
 			node.Status.Allocatable[v1.ResourceMemory] = mem50m
-			expected.Allocatable.Memory = mem50m.Value()
+			expected.Allocatable.SetMemory(mem50m.Value())
 
 			cache.UpdateNode(logger, nil, node)
 			got, found = cache.nodes[node.Name]
@@ -1773,18 +1774,19 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 		if want.Node() == nil {
 			want = nil
 		}
-		if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], nodeInfoCmpOpts...); diff != "" {
-			return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
+		if want != nil || snapshot.nodeInfoMap[name] != nil {
+			if diff := cmp.Diff(want, snapshot.nodeInfoMap[name], nodeInfoCmpOpts...); diff != "" {
+				return fmt.Errorf("Unexpected node info for node (-want, +got):\n%s", diff)
+			}
 		}
 	}
-
 	// Compare the lists.
 	if len(snapshot.nodeInfoList) != cache.nodeTree.numNodes {
 		return fmt.Errorf("unexpected number of nodes in NodeInfoList. Expected: %v, got: %v", cache.nodeTree.numNodes, len(snapshot.nodeInfoList))
 	}
 
-	expectedNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
-	expectedHavePodsWithAffinityNodeInfoList := make([]*framework.NodeInfo, 0, cache.nodeTree.numNodes)
+	expectedNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
+	expectedHavePodsWithAffinityNodeInfoList := make([]fwk.NodeInfo, 0, cache.nodeTree.numNodes)
 	expectedUsedPVCSet := sets.New[string]()
 	nodesList, err := cache.nodeTree.list()
 	if err != nil {
@@ -1793,10 +1795,10 @@ func compareCacheWithNodeInfoSnapshot(t *testing.T, cache *cacheImpl, snapshot *
 	for _, nodeName := range nodesList {
 		if n := snapshot.nodeInfoMap[nodeName]; n != nil {
 			expectedNodeInfoList = append(expectedNodeInfoList, n)
-			if len(n.PodsWithAffinity) > 0 {
+			if len(n.GetPodsWithAffinity()) > 0 {
 				expectedHavePodsWithAffinityNodeInfoList = append(expectedHavePodsWithAffinityNodeInfoList, n)
 			}
-			for key := range n.PVCRefCounts {
+			for key := range n.GetPVCRefCounts() {
 				expectedUsedPVCSet.Insert(key)
 			}
 		} else {
@@ -1966,7 +1968,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 			}
 			nodeNames := make([]string, len(snapshot.nodeInfoList))
 			for i, nodeInfo := range snapshot.nodeInfoList {
-				nodeNames[i] = nodeInfo.Node().Name
+				nodeNames[i] = nodeInfo.GetNode().Name
 			}
 			if diff := cmp.Diff(test.expected, nodeNames); diff != "" {
 				t.Errorf("Unexpected nodeInfoList (-want, +got):\n%s", diff)
@@ -2036,11 +2038,11 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 
 // checkImageStateSummary collect ImageStateSummary of image traverse nodes,
 // the collected ImageStateSummary should be equal
-func checkImageStateSummary(nodes map[string]*framework.NodeInfo, imageNames ...string) bool {
+func checkImageStateSummary(nodes map[string]fwk.NodeInfo, imageNames ...string) bool {
 	for _, imageName := range imageNames {
-		var imageState *framework.ImageStateSummary
+		var imageState *fwk.ImageStateSummary
 		for _, node := range nodes {
-			state, ok := node.ImageStates[imageName]
+			state, ok := node.GetImageStates()[imageName]
 			if !ok {
 				continue
 			}
