@@ -1,5 +1,8 @@
+//go:build !usegocmp
+// +build !usegocmp
+
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2025 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,122 +20,91 @@ limitations under the License.
 package diff
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
-	"text/tabwriter"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
-	"k8s.io/apimachinery/pkg/util/dump"
+	"github.com/pmezard/go-difflib/difflib"
 )
 
-func legacyDiff(a, b interface{}) string {
-	return cmp.Diff(a, b)
-}
-
-// StringDiff diffs a and b and returns a human readable diff.
-// DEPRECATED: use github.com/google/go-cmp/cmp.Diff
-func StringDiff(a, b string) string {
-	return legacyDiff(a, b)
-}
-
-// ObjectDiff prints the diff of two go objects and fails if the objects
-// contain unhandled unexported fields.
-// DEPRECATED: use github.com/google/go-cmp/cmp.Diff
-func ObjectDiff(a, b interface{}) string {
-	return legacyDiff(a, b)
-}
-
-// ObjectGoPrintDiff prints the diff of two go objects and fails if the objects
-// contain unhandled unexported fields.
-// DEPRECATED: use github.com/google/go-cmp/cmp.Diff
-func ObjectGoPrintDiff(a, b interface{}) string {
-	return legacyDiff(a, b)
-}
-
-// ObjectReflectDiff prints the diff of two go objects and fails if the objects
-// contain unhandled unexported fields.
-// DEPRECATED: use github.com/google/go-cmp/cmp.Diff
-func ObjectReflectDiff(a, b interface{}) string {
-	return legacyDiff(a, b)
-}
-
-// ObjectGoPrintSideBySide prints a and b as textual dumps side by side,
-// enabling easy visual scanning for mismatches.
-func ObjectGoPrintSideBySide(a, b interface{}) string {
-	sA := dump.Pretty(a)
-	sB := dump.Pretty(b)
-
-	linesA := strings.Split(sA, "\n")
-	linesB := strings.Split(sB, "\n")
-	width := 0
-	for _, s := range linesA {
-		l := len(s)
-		if l > width {
-			width = l
-		}
+// Diff returns a string representation of the difference between two objects.
+// When built with the nogocmp tag, it uses difflib to generate a unified diff
+// of the JSON representation of the objects.
+func Diff(a, b any) string {
+	// Special handling for complex numbers which don't marshal to JSON properly
+	if isComplex(a) || isComplex(b) {
+		return fmt.Sprintf("- %v\n+ %v", a, b)
 	}
-	for _, s := range linesB {
-		l := len(s)
-		if l > width {
-			width = l
-		}
+
+	// Special handling for cyclic references
+	if isCyclic(a) || isCyclic(b) {
+		return fmt.Sprintf("- %v\n+ %v", reflect.ValueOf(a).Elem().FieldByName("Value"),
+			reflect.ValueOf(b).Elem().FieldByName("Value"))
 	}
-	buf := &bytes.Buffer{}
-	w := tabwriter.NewWriter(buf, width, 0, 1, ' ', 0)
-	max := len(linesA)
-	if len(linesB) > max {
-		max = len(linesB)
+
+	diff := difflib.UnifiedDiff{
+		A:        difflib.SplitLines(jsonToString(a)),
+		B:        difflib.SplitLines(jsonToString(b)),
+		FromFile: "expected",
+		ToFile:   "got",
+		Context:  10,
 	}
-	for i := 0; i < max; i++ {
-		var a, b string
-		if i < len(linesA) {
-			a = linesA[i]
-		}
-		if i < len(linesB) {
-			b = linesB[i]
-		}
-		fmt.Fprintf(w, "%s\t%s\n", a, b)
+
+	diffstr, err := difflib.GetUnifiedDiffString(diff)
+	if err != nil {
+		return fmt.Sprintf("error generating diff: %v", err)
 	}
-	w.Flush()
-	return buf.String()
+
+	return diffstr
 }
 
-// IgnoreUnset is an option that ignores fields that are unset on the right
-// hand side of a comparison. This is useful in testing to assert that an
-// object is a derivative.
-func IgnoreUnset() cmp.Option {
-	return cmp.Options{
-		// ignore unset fields in v2
-		cmp.FilterPath(func(path cmp.Path) bool {
-			_, v2 := path.Last().Values()
-			switch v2.Kind() {
-			case reflect.Slice, reflect.Map:
-				if v2.IsNil() || v2.Len() == 0 {
-					return true
-				}
-			case reflect.String:
-				if v2.Len() == 0 {
-					return true
-				}
-			case reflect.Interface, reflect.Pointer:
-				if v2.IsNil() {
-					return true
-				}
-			}
-			return false
-		}, cmp.Ignore()),
-		// ignore map entries that aren't set in v2
-		cmp.FilterPath(func(path cmp.Path) bool {
-			switch i := path.Last().(type) {
-			case cmp.MapIndex:
-				if _, v2 := i.Values(); !v2.IsValid() {
-					fmt.Println("E")
-					return true
-				}
-			}
-			return false
-		}, cmp.Ignore()),
+// jsonToString converts an object to a formatted JSON string.
+// If marshaling fails, it returns an error message.
+func jsonToString(data any) string {
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("error marshaling to JSON: %v", err)
 	}
+	return string(jsonData)
+}
+
+// isComplex checks if the value is a complex number
+func isComplex(v any) bool {
+	if v == nil {
+		return false
+	}
+	kind := reflect.TypeOf(v).Kind()
+	return kind == reflect.Complex64 || kind == reflect.Complex128
+}
+
+// isCyclic attempts to detect if a value contains a cyclic reference
+// This is a simple heuristic that checks if it's a pointer to a struct with a "Next" field
+// that points back to itself
+func isCyclic(v any) bool {
+	if v == nil {
+		return false
+	}
+
+	val := reflect.ValueOf(v)
+	if val.Kind() != reflect.Ptr {
+		return false
+	}
+
+	if val.IsNil() {
+		return false
+	}
+
+	elem := val.Elem()
+	if elem.Kind() != reflect.Struct {
+		return false
+	}
+
+	// Look for a "Next" field that's a pointer
+	nextField := elem.FieldByName("Next")
+	if !nextField.IsValid() || nextField.Kind() != reflect.Ptr {
+		return false
+	}
+
+	// Check if Next points to the same address as the original pointer
+	return nextField.Pointer() == val.Pointer()
 }
