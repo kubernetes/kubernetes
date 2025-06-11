@@ -1118,7 +1118,7 @@ func TestVolumeBinding(t *testing.T) {
 
 			t.Logf("Verify: Score")
 			for i, nodeInfo := range nodeInfos {
-				nodeName := nodeInfo.Node().Name
+				nodeName := nodeInfo.GetNode().Name
 				score, status := p.Score(ctx, state, item.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("Score expects success status, got: %v", status)

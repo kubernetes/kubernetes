@@ -251,7 +251,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			}
 			var gotList framework.NodeScoreList
 			for _, nodeInfo := range nodeInfos {
-				nodeName := nodeInfo.Node().Name
+				nodeName := nodeInfo.GetNode().Name
 				score, status := p.(framework.ScorePlugin).Score(ctx, state, test.pod, nodeInfo)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)

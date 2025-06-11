@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	fwk "k8s.io/kube-scheduler/framework"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -1036,17 +1037,17 @@ func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(podUID, contName, re
 // the allocated capacity. This allows pods that have already been scheduled on
 // the node to pass GeneralPredicates admission checking even upon device plugin failure.
 func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulerframework.NodeInfo) {
-	var newAllocatableResource *schedulerframework.Resource
+	var newAllocatableResource fwk.Resource
 	allocatableResource := node.Allocatable
-	if allocatableResource.ScalarResources == nil {
-		allocatableResource.ScalarResources = make(map[v1.ResourceName]int64)
+	if allocatableResource.GetScalarResources() == nil {
+		allocatableResource.SetScalarResources(make(map[v1.ResourceName]int64))
 	}
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	for resource, devices := range m.allocatedDevices {
 		needed := devices.Len()
-		quant, ok := allocatableResource.ScalarResources[v1.ResourceName(resource)]
+		quant, ok := allocatableResource.GetScalarResources()[v1.ResourceName(resource)]
 		if ok && int(quant) >= needed {
 			continue
 		}
@@ -1055,7 +1056,7 @@ func (m *ManagerImpl) sanitizeNodeAllocatable(node *schedulerframework.NodeInfo)
 		if newAllocatableResource == nil {
 			newAllocatableResource = allocatableResource.Clone()
 		}
-		newAllocatableResource.ScalarResources[v1.ResourceName(resource)] = int64(needed)
+		newAllocatableResource.SetScalar(v1.ResourceName(resource), int64(needed))
 	}
 	if newAllocatableResource != nil {
 		node.Allocatable = newAllocatableResource

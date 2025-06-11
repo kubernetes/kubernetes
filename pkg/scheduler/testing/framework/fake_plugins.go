@@ -41,8 +41,13 @@ func (pl *FalseFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
+<<<<<<< HEAD
 func (pl *FalseFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Unschedulable, ErrReasonFake)
+=======
+func (pl *FalseFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Unschedulable, ErrReasonFake)
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 }
 
 // NewFalseFilterPlugin initializes a FalseFilterPlugin and returns it.
@@ -59,7 +64,11 @@ func (pl *TrueFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
+<<<<<<< HEAD
 func (pl *TrueFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+=======
+func (pl *TrueFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	return nil
 }
 
@@ -91,11 +100,19 @@ func (pl *FakeFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
+<<<<<<< HEAD
 func (pl *FakeFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	atomic.AddInt32(&pl.NumFilterCalled, 1)
 
 	if returnCode, ok := pl.FailedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
 		return fwk.NewStatus(returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+=======
+func (pl *FakeFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
+	atomic.AddInt32(&pl.NumFilterCalled, 1)
+
+	if returnCode, ok := pl.FailedNodeReturnCodeMap[nodeInfo.GetNode().Name]; ok {
+		return framework.NewStatus(returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	}
 
 	return nil
@@ -120,8 +137,13 @@ func (pl *MatchFilterPlugin) Name() string {
 }
 
 // Filter invoked at the filter extension point.
+<<<<<<< HEAD
 func (pl *MatchFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
+=======
+func (pl *MatchFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
+	node := nodeInfo.GetNode()
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	if node == nil {
 		return fwk.NewStatus(fwk.Error, "node not found")
 	}
@@ -149,7 +171,11 @@ func (pl *FakePreFilterPlugin) Name() string {
 }
 
 // PreFilter invoked at the PreFilter extension point.
+<<<<<<< HEAD
 func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+=======
+func (pl *FakePreFilterPlugin) PreFilter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	return pl.Result, pl.Status
 }
 
@@ -264,7 +290,11 @@ func (pl *FakePreScoreAndScorePlugin) Name() string {
 	return pl.name
 }
 
+<<<<<<< HEAD
 func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+=======
+func (pl *FakePreScoreAndScorePlugin) Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *framework.Status) {
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	return pl.score, pl.scoreStatus
 }
 
@@ -272,7 +302,11 @@ func (pl *FakePreScoreAndScorePlugin) ScoreExtensions() framework.ScoreExtension
 	return nil
 }
 
+<<<<<<< HEAD
 func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+=======
+func (pl *FakePreScoreAndScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *framework.Status {
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	return pl.preScoreStatus
 }
 
