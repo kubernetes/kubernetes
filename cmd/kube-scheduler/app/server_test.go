@@ -515,7 +515,7 @@ func newFoo(_ context.Context, _ runtime.Object, _ framework.Handle) (framework.
 	return &foo{}, nil
 }
 
-func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (*foo) PreFilter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ []fwk.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
 	return nil, nil
 }
 
@@ -523,6 +523,6 @@ func (*foo) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 
-func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (*foo) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
 	return nil
 }

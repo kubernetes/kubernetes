@@ -55,13 +55,13 @@ func (pl *fooPlugin) Name() string {
 	return "foo"
 }
 
-func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	taints := nodeInfo.Node().Spec.Taints
+func (pl *fooPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *framework.Status {
+	taints := nodeInfo.GetNode().Spec.Taints
 	if len(taints) == 0 {
 		return nil
 	}
 
-	if corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.Node().Spec.Taints[0]) {
+	if corev1.TolerationsTolerateTaint(pod.Spec.Tolerations, &nodeInfo.GetNode().Spec.Taints[0]) {
 		return nil
 	}
 	return framework.NewStatus(framework.Unschedulable)

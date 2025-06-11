@@ -58,7 +58,7 @@ type NodeToStatusReader interface {
 	Get(nodeName string) *Status
 	// NodesForStatusCode returns a list of NodeInfos for the nodes that have a given status code.
 	// It returns the NodeInfos for all matching nodes denoted by AbsentNodesStatus as well.
-	NodesForStatusCode(nodeLister NodeInfoLister, code Code) ([]*NodeInfo, error)
+	NodesForStatusCode(nodeLister NodeInfoLister, code Code) ([]fwk.NodeInfo, error)
 }
 
 // NodeToStatusMap is an alias for NodeToStatusReader to keep partial backwards compatibility.
@@ -133,8 +133,8 @@ func (m *NodeToStatus) ForEachExplicitNode(fn func(nodeName string, status *Stat
 // and filtered using NodeToStatus.Get.
 // If the absentNodesStatus doesn't match the code, nodeToStatus map is used to create a list of nodes
 // and nodeLister.Get is used to obtain NodeInfo for each.
-func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code Code) ([]*NodeInfo, error) {
-	var resultNodes []*NodeInfo
+func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code Code) ([]fwk.NodeInfo, error) {
+	var resultNodes []fwk.NodeInfo
 
 	if m.AbsentNodesStatus().Code() == code {
 		allNodes, err := nodeLister.List()
@@ -147,7 +147,7 @@ func (m *NodeToStatus) NodesForStatusCode(nodeLister NodeInfoLister, code Code) 
 		}
 		// Need to find all the nodes that are absent or have a matching code using the allNodes.
 		for _, node := range allNodes {
-			nodeName := node.Node().Name
+			nodeName := node.GetNode().Name
 			if status := m.Get(nodeName); status.Code() == code {
 				resultNodes = append(resultNodes, node)
 			}
@@ -457,7 +457,7 @@ type PreEnqueuePlugin interface {
 }
 
 // LessFunc is the function to sort pod info
-type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
+type LessFunc func(podInfo1, podInfo2 fwk.QueuedPodInfo) bool
 
 // QueueSortPlugin is an interface that must be implemented by "QueueSort" plugins.
 // These plugins are used to sort pods in the scheduling queue. Only one queue sort
@@ -465,7 +465,7 @@ type LessFunc func(podInfo1, podInfo2 *QueuedPodInfo) bool
 type QueueSortPlugin interface {
 	Plugin
 	// Less are used to sort pods in the scheduling queue.
-	Less(*QueuedPodInfo, *QueuedPodInfo) bool
+	Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool
 }
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
@@ -507,10 +507,10 @@ type EnqueueExtensions interface {
 type PreFilterExtensions interface {
 	// AddPod is called by the framework while trying to evaluate the impact
 	// of adding podToAdd to the node while scheduling podToSchedule.
-	AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
+	AddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *Status
 	// RemovePod is called by the framework while trying to evaluate the impact
 	// of removing podToRemove from the node while scheduling podToSchedule.
-	RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
+	RemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *Status
 }
 
 // PreFilterPlugin is an interface that must be implemented by "PreFilter" plugins.
@@ -526,7 +526,7 @@ type PreFilterPlugin interface {
 	//
 	// When it returns Skip status, returned PreFilterResult and other fields in status are just ignored,
 	// and coupled Filter plugin/PreFilterExtensions() will be skipped in this scheduling cycle.
-	PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []*NodeInfo) (*PreFilterResult, *Status)
+	PreFilter(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodes []fwk.NodeInfo) (*PreFilterResult, *Status)
 	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
@@ -559,7 +559,7 @@ type FilterPlugin interface {
 	// For example, during preemption, we may pass a copy of the original
 	// nodeInfo object that has some pods removed from it to evaluate the
 	// possibility of preempting them to schedule the target pod.
-	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *NodeInfo) *Status
+	Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *Status
 }
 
 // PostFilterPlugin is an interface for "PostFilter" plugins. These plugins are called
@@ -597,7 +597,7 @@ type PreScorePlugin interface {
 	// the pod will be rejected
 	// When it returns Skip status, other fields in status are just ignored,
 	// and coupled Score plugin will be skipped in this scheduling cycle.
-	PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*NodeInfo) *Status
+	PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *Status
 }
 
 // ScoreExtensions is an interface for Score extended functionality.
@@ -615,7 +615,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo *NodeInfo) (int64, *Status)
+	Score(ctx context.Context, state fwk.CycleState, p *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions
@@ -834,7 +834,7 @@ type Handle interface {
 	SharedDRAManager() SharedDRAManager
 
 	// RunFilterPluginsWithNominatedPods runs the set of configured filter plugins for nominated pod on the given node.
-	RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info *NodeInfo) *Status
+	RunFilterPluginsWithNominatedPods(ctx context.Context, state fwk.CycleState, pod *v1.Pod, info fwk.NodeInfo) *Status
 
 	// Extenders returns registered scheduler extenders.
 	Extenders() []Extender
@@ -920,13 +920,13 @@ type PodActivator interface {
 type PodNominator interface {
 	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
-	AddNominatedPod(logger klog.Logger, pod *PodInfo, nominatingInfo *NominatingInfo)
+	AddNominatedPod(logger klog.Logger, pod fwk.PodInfo, nominatingInfo *NominatingInfo)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
 	DeleteNominatedPodIfExists(pod *v1.Pod)
 	// UpdateNominatedPod updates the <oldPod> with <newPod>.
-	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo *PodInfo)
+	UpdateNominatedPod(logger klog.Logger, oldPod *v1.Pod, newPodInfo fwk.PodInfo)
 	// NominatedPodsForNode returns nominatedPods on the given node.
-	NominatedPodsForNode(nodeName string) []*PodInfo
+	NominatedPodsForNode(nodeName string) []fwk.PodInfo
 }
 
 // PluginsRunner abstracts operations to run some plugins.
@@ -935,12 +935,12 @@ type PodNominator interface {
 type PluginsRunner interface {
 	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
 	// of these plugins returns any status other than "Success", the given pod is rejected.
-	RunPreScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []*NodeInfo) *Status
+	RunPreScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) *Status
 	// RunScorePlugins runs the set of configured scoring plugins.
 	// It returns a list that stores scores from each plugin and total score for each Node.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	RunScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []*NodeInfo) ([]NodePluginScores, *Status)
+	RunScorePlugins(context.Context, fwk.CycleState, *v1.Pod, []fwk.NodeInfo) ([]NodePluginScores, *Status)
 	// RunFilterPlugins runs the set of configured Filter plugins for pod on
 	// the given node. Note that for the node being evaluated, the passed nodeInfo
 	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
@@ -948,13 +948,13 @@ type PluginsRunner interface {
 	// preemption, we may pass a copy of the original nodeInfo object that has some pods
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
-	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, *NodeInfo) *Status
+	RunFilterPlugins(context.Context, fwk.CycleState, *v1.Pod, fwk.NodeInfo) *Status
 	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionAddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
+	RunPreFilterExtensionAddPod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToAdd fwk.PodInfo, nodeInfo fwk.NodeInfo) *Status
 	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
 	// PreFilter plugins. It returns directly if any of the plugins return any
 	// status other than Success.
-	RunPreFilterExtensionRemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
+	RunPreFilterExtensionRemovePod(ctx context.Context, state fwk.CycleState, podToSchedule *v1.Pod, podInfoToRemove fwk.PodInfo, nodeInfo fwk.NodeInfo) *Status
 }

@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
+	fwk "k8s.io/kube-scheduler/framework"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -148,8 +149,8 @@ func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *s
 }
 
 // BuildNodeInfos build NodeInfo slice from a v1.Node slice
-func BuildNodeInfos(nodes []*v1.Node) []*framework.NodeInfo {
-	res := make([]*framework.NodeInfo, len(nodes))
+func BuildNodeInfos(nodes []*v1.Node) []fwk.NodeInfo {
+	res := make([]fwk.NodeInfo, len(nodes))
 	for i := 0; i < len(nodes); i++ {
 		res[i] = framework.NewNodeInfo()
 		res[i].SetNode(nodes[i])
