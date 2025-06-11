@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/dynamic-resource-allocation/structured"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -38,19 +39,19 @@ var _ framework.SharedDRAManager = &sharedDRAManagerContract{}
 
 type nodeInfoListerContract struct{}
 
-func (c *nodeInfoListerContract) List() ([]*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) List() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
-func (c *nodeInfoListerContract) HavePodsWithAffinityList() ([]*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) HavePodsWithAffinityList() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
-func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) HavePodsWithRequiredAntiAffinityList() ([]fwk.NodeInfo, error) {
 	return nil, nil
 }
 
-func (c *nodeInfoListerContract) Get(_ string) (*framework.NodeInfo, error) {
+func (c *nodeInfoListerContract) Get(_ string) (fwk.NodeInfo, error) {
 	return nil, nil
 }
 

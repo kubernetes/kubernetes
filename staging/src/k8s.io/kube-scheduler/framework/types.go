@@ -18,8 +18,11 @@ package framework
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"k8s.io/klog/v2"
 )
@@ -237,4 +240,299 @@ func (ce ClusterEvent) Label() string {
 	}
 
 	return fmt.Sprintf("%v%v", ce.Resource, ce.ActionType)
+}
+
+// NodeInfo is node level aggregated information.
+type NodeInfo interface {
+	// Node returns overall information about this node.
+	Node() *v1.Node
+	// GetPods returns Pods running on the node.
+	GetPods() []PodInfo
+	// GetPodsWithAffinity returns the subset of pods with affinity.
+	GetPodsWithAffinity() []PodInfo
+	// GetPodsWithRequiredAntiAffinity returns the subset of pods with required anti-affinity.
+	GetPodsWithRequiredAntiAffinity() []PodInfo
+	// GetUsedPorts returns the ports allocated on the node.
+	GetUsedPorts() HostPortInfo
+	// GetRequested returns total requested resources of all pods on this node. This includes assumed
+	// pods, which scheduler has sent for binding, but may not be scheduled yet.
+	GetRequested() Resource
+	// GetNonZeroRequested return total requested resources of all pods on this node with a minimum value
+	// applied to each container's CPU and memory requests. This does not reflect
+	// the actual resource requests for this node, but is used to avoid scheduling
+	// many zero-request pods onto one node.
+	GetNonZeroRequested() Resource
+	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
+	// as int64, to avoid conversions and accessing map.
+	GetAllocatable() Resource
+	// GetImageStates returns the entry of an image if and only if this image is on the node. The entry can be used for
+	// checking an image's existence and advanced usage (e.g., image locality scheduling policy) based on the image
+	// state information.
+	GetImageStates() map[string]*ImageStateSummary
+	// GetPVCRefCounts returns a mapping of PVC names to the number of pods on the node using it.
+	// Keys are in the format "namespace/name".
+	GetPVCRefCounts() map[string]int
+	// Whenever NodeInfo changes, generation is bumped.
+	// This is used to avoid cloning it if the object didn't change.
+	GetGeneration() int64
+	// Snapshot returns a copy of this node, Except that ImageStates is copied without the Nodes field.
+	Snapshot() NodeInfo
+	// String returns representation of human readable format of this NodeInfo.
+	String() string
+
+	// AddPodInfo adds pod information to this NodeInfo.
+	// Consider using this instead of AddPod if a PodInfo is already computed.
+	AddPodInfo(podInfo PodInfo)
+	// RemovePod subtracts pod information from this NodeInfo.
+	RemovePod(logger klog.Logger, pod *v1.Pod) error
+	// SetNode sets the overall node information.
+	SetNode(node *v1.Node)
+}
+
+// QueuedPodInfo is a Pod wrapper with additional information related to
+// the pod's status in the scheduling queue, such as the timestamp when
+// it's added to the queue.
+type QueuedPodInfo interface {
+	// GetPodInfo returns the PodInfo object wrapped by this QueuedPodInfo instance.
+	GetPodInfo() PodInfo
+	// GetTimestamp returns the time pod added to the scheduling queue.
+	GetTimestamp() time.Time
+	// GetAttempts returns the number of all schedule attempts before successfully scheduled.
+	// It's used to record the # attempts metric.
+	GetAttempts() int
+	// GetBackoffExpiration returns the time when the Pod will complete its backoff.
+	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
+	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
+	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
+	GetBackoffExpiration() time.Time
+	// GetUnschedulableCount returns the total number of the scheduling attempts that this Pod gets unschedulable.
+	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
+	// this count won't be incremented.
+	// It's used to calculate the backoff time this Pod is obliged to get before retrying.
+	GetUnschedulableCount() int
+	// GetConsecutiveErrorsCount returns the number of the error status that this Pod gets sequentially.
+	// This count is reset when the Pod gets another status than Error.
+	//
+	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the Pod and hence need a backoff retry mechanism
+	// because that might push more burden to the kube-apiserver.
+	// But, we don't want to calculate the backoff time in the same way as the normal unschedulable reason
+	// since the purpose is different; the backoff for a unschedulable status etc is for the punishment of wasting the scheduling cycles,
+	// whereas the backoff for the error status is for the protection of the kube-apiserver.
+	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
+	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
+	GetConsecutiveErrorsCount() int
+	// GetInitialAttemptTimestamp returns the time when the pod is added to the queue for the first time. The pod may be added
+	// back to the queue multiple times before it's successfully scheduled.
+	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
+	// latency for a pod.
+	GetInitialAttemptTimestamp() *time.Time
+	// GetUnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
+	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
+	// If Pods are rejected at other extension points,
+	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
+	// and retried soon after a backoff period.
+	// That is because such failures could be solved regardless of incoming cluster events (registered in EventsToRegister).
+	GetUnschedulablePlugins() sets.Set[string]
+	// GetPendingPlugins records the plugin names that the Pod failed with Pending status.
+	GetPendingPlugins() sets.Set[string]
+	// GetGatingPlugin records the plugin name that gated the Pod at PreEnqueue.
+	GetGatingPlugin() string
+	// GetGatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
+	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
+	GetGatingPluginEvents() []ClusterEvent
+}
+
+// PodInfo is a wrapper to a Pod with additional pre-computed information to
+// accelerate processing. This information is typically immutable (e.g., pre-processed
+// inter-pod affinity selectors).
+type PodInfo interface {
+	// GetPod returns the wrapped Pod
+	GetPod() *v1.Pod
+	// GetRequiredAffinityTerms returns the precomputed affinity terms.
+	GetRequiredAffinityTerms() []AffinityTerm
+	// GetRequiredAffinitRequiredAntiAffinityTermsyTerms returns the precomputed anti-affinity terms.
+	GetRequiredAntiAffinityTerms() []AffinityTerm
+	// GetPreferredAffinityTerms returns the precomputed affinity terms with weights.
+	GetPreferredAffinityTerms() []WeightedAffinityTerm
+	// GetPreferredAntiAffinityTerms returns the precomputed anti-affinity terms with weights.
+	GetPreferredAntiAffinityTerms() []WeightedAffinityTerm
+	// CalculateResource is only intended to be used by NodeInfo.
+	CalculateResource() PodResource
+}
+
+// PodResource contains the result of CalculateResource and is intended to be used only internally.
+type PodResource struct {
+	Resource Resource
+	Non0CPU  int64
+	Non0Mem  int64
+}
+
+// AffinityTerm is a processed version of v1.PodAffinityTerm.
+type AffinityTerm struct {
+	Namespaces        sets.Set[string]
+	Selector          labels.Selector
+	TopologyKey       string
+	NamespaceSelector labels.Selector
+}
+
+// Matches returns true if the pod matches the label selector and namespaces or namespace selector.
+func (at *AffinityTerm) Matches(pod *v1.Pod, nsLabels labels.Set) bool {
+	if at.Namespaces.Has(pod.Namespace) || at.NamespaceSelector.Matches(nsLabels) {
+		return at.Selector.Matches(labels.Set(pod.Labels))
+	}
+	return false
+}
+
+// WeightedAffinityTerm is a "processed" representation of v1.WeightedAffinityTerm.
+type WeightedAffinityTerm struct {
+	AffinityTerm
+	Weight int32
+}
+
+// Resource is a collection of compute resources.
+type Resource interface {
+	GetMilliCPU() int64
+	GetMemory() int64
+	GetEphemeralStorage() int64
+	// We return AllowedPodNumber (which is Node.Status.Allocatable.Pods().Value())
+	// explicitly as int, to avoid conversions and improve performance.
+	GetAllowedPodNumber() int
+	// ScalarResources returns a map for resource names to their scalar values
+	GetScalarResources() map[v1.ResourceName]int64
+	// SetMaxResource compares with ResourceList and takes max value for each Resource.
+	SetMaxResource(rl v1.ResourceList)
+}
+
+// ImageStateSummary provides summarized information about the state of an image.
+type ImageStateSummary struct {
+	// Size of the image
+	Size int64
+	// Used to track how many nodes have this image, it is computed from the Nodes field below
+	// during the execution of Snapshot.
+	NumNodes int
+	// A set of node names for nodes having this image present. This field is used for
+	// keeping track of the nodes during update/add/remove events.
+	Nodes sets.Set[string]
+}
+
+// Snapshot returns a copy without Nodes field of ImageStateSummary
+func (iss *ImageStateSummary) Snapshot() *ImageStateSummary {
+	return &ImageStateSummary{
+		Size:     iss.Size,
+		NumNodes: iss.Nodes.Len(),
+	}
+}
+
+// DefaultBindAllHostIP defines the default ip address used to bind to all host.
+const DefaultBindAllHostIP = "0.0.0.0"
+
+// ProtocolPort represents a protocol port pair, e.g. tcp:80.
+type ProtocolPort struct {
+	Protocol string
+	Port     int32
+}
+
+// NewProtocolPort creates a ProtocolPort instance.
+func NewProtocolPort(protocol string, port int32) *ProtocolPort {
+	pp := &ProtocolPort{
+		Protocol: protocol,
+		Port:     port,
+	}
+
+	if len(pp.Protocol) == 0 {
+		pp.Protocol = string(v1.ProtocolTCP)
+	}
+
+	return pp
+}
+
+// HostPortInfo stores mapping from ip to a set of ProtocolPort
+type HostPortInfo map[string]map[ProtocolPort]struct{}
+
+// Add adds (ip, protocol, port) to HostPortInfo
+func (h HostPortInfo) Add(ip, protocol string, port int32) {
+	if port <= 0 {
+		return
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+	if _, ok := h[ip]; !ok {
+		h[ip] = map[ProtocolPort]struct{}{
+			*pp: {},
+		}
+		return
+	}
+
+	h[ip][*pp] = struct{}{}
+}
+
+// Remove removes (ip, protocol, port) from HostPortInfo
+func (h HostPortInfo) Remove(ip, protocol string, port int32) {
+	if port <= 0 {
+		return
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+	if m, ok := h[ip]; ok {
+		delete(m, *pp)
+		if len(h[ip]) == 0 {
+			delete(h, ip)
+		}
+	}
+}
+
+// Len returns the total number of (ip, protocol, port) tuple in HostPortInfo
+func (h HostPortInfo) Len() int {
+	length := 0
+	for _, m := range h {
+		length += len(m)
+	}
+	return length
+}
+
+// CheckConflict checks if the input (ip, protocol, port) conflicts with the existing
+// ones in HostPortInfo.
+func (h HostPortInfo) CheckConflict(ip, protocol string, port int32) bool {
+	if port <= 0 {
+		return false
+	}
+
+	h.sanitize(&ip, &protocol)
+
+	pp := NewProtocolPort(protocol, port)
+
+	// If ip is 0.0.0.0 check all IP's (protocol, port) pair
+	if ip == DefaultBindAllHostIP {
+		for _, m := range h {
+			if _, ok := m[*pp]; ok {
+				return true
+			}
+		}
+		return false
+	}
+
+	// If ip isn't 0.0.0.0, only check IP and 0.0.0.0's (protocol, port) pair
+	for _, key := range []string{DefaultBindAllHostIP, ip} {
+		if m, ok := h[key]; ok {
+			if _, ok2 := m[*pp]; ok2 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// sanitize the parameters
+func (h HostPortInfo) sanitize(ip, protocol *string) {
+	if len(*ip) == 0 {
+		*ip = DefaultBindAllHostIP
+	}
+	if len(*protocol) == 0 {
+		*protocol = string(v1.ProtocolTCP)
+	}
 }

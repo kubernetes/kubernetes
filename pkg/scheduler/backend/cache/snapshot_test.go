@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -37,7 +38,7 @@ func TestGetNodeImageStates(t *testing.T) {
 	tests := []struct {
 		node              *v1.Node
 		imageExistenceMap map[string]sets.Set[string]
-		expected          map[string]*framework.ImageStateSummary
+		expected          map[string]*fwk.ImageStateSummary
 	}{
 		{
 			node: &v1.Node{
@@ -63,7 +64,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				"gcr.io/10:v1":  sets.New("node-0", "node-1"),
 				"gcr.io/200:v1": sets.New("node-0"),
 			},
-			expected: map[string]*framework.ImageStateSummary{
+			expected: map[string]*fwk.ImageStateSummary{
 				"gcr.io/10:v1": {
 					Size:     int64(10 * mb),
 					NumNodes: 2,
@@ -83,7 +84,7 @@ func TestGetNodeImageStates(t *testing.T) {
 				"gcr.io/10:v1":  sets.New("node-1"),
 				"gcr.io/200:v1": sets.New[string](),
 			},
-			expected: map[string]*framework.ImageStateSummary{},
+			expected: map[string]*fwk.ImageStateSummary{},
 		},
 	}
 
@@ -270,8 +271,8 @@ func TestNewSnapshot(t *testing.T) {
 			},
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
-					Pods: []*framework.PodInfo{
-						{Pod: podWithPort},
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{Pod: podWithPort},
 					},
 				},
 			},
@@ -287,18 +288,18 @@ func TestNewSnapshot(t *testing.T) {
 			},
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
-					Pods: []*framework.PodInfo{
-						{Pod: podsWithPVCs[0]},
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{Pod: podsWithPVCs[0]},
 					},
 				},
 				{
-					Pods: []*framework.PodInfo{
-						{Pod: podsWithPVCs[1]},
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{Pod: podsWithPVCs[1]},
 					},
 				},
 				{
-					Pods: []*framework.PodInfo{
-						{Pod: podsWithPVCs[2]},
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{Pod: podsWithPVCs[2]},
 					},
 				},
 			},
@@ -318,18 +319,18 @@ func TestNewSnapshot(t *testing.T) {
 			},
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
-					Pods: []*framework.PodInfo{},
+					Pods: []fwk.PodInfo{},
 				},
 				{
-					Pods: []*framework.PodInfo{
-						{Pod: podWithAnnotations},
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{Pod: podWithAnnotations},
 					},
 				},
 				{
-					Pods: []*framework.PodInfo{
-						{
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{
 							Pod: podsWithAffitiny[0],
-							RequiredAffinityTerms: []framework.AffinityTerm{
+							RequiredAffinityTerms: []fwk.AffinityTerm{
 								{
 									Namespaces:        sets.New("ns"),
 									Selector:          labels.SelectorFromSet(map[string]string{"baz": "qux"}),
@@ -356,10 +357,10 @@ func TestNewSnapshot(t *testing.T) {
 			},
 			expectedNodesInfos: []*framework.NodeInfo{
 				{
-					Pods: []*framework.PodInfo{
-						{
+					Pods: []fwk.PodInfo{
+						&framework.PodInfo{
 							Pod: podsWithAffitiny[1],
-							RequiredAffinityTerms: []framework.AffinityTerm{
+							RequiredAffinityTerms: []fwk.AffinityTerm{
 								{
 									Namespaces:        sets.New("ns"),
 									Selector:          labels.SelectorFromSet(map[string]string{"key": "value"}),
@@ -368,9 +369,9 @@ func TestNewSnapshot(t *testing.T) {
 								},
 							},
 						},
-						{
+						&framework.PodInfo{
 							Pod: podWithAntiAffitiny,
-							RequiredAntiAffinityTerms: []framework.AffinityTerm{
+							RequiredAntiAffinityTerms: []fwk.AffinityTerm{
 								{
 									Namespaces:        sets.New("ns"),
 									Selector:          labels.SelectorFromSet(map[string]string{"another": "label"}),
@@ -382,7 +383,7 @@ func TestNewSnapshot(t *testing.T) {
 					},
 				},
 				{
-					Pods: []*framework.PodInfo{},
+					Pods: []fwk.PodInfo{},
 				},
 			},
 			expectedNumNodes:             2,
@@ -408,7 +409,7 @@ func TestNewSnapshot(t *testing.T) {
 					t.Error("node infos should not be nil")
 				}
 				for j := range test.expectedNodesInfos[i].Pods {
-					if diff := cmp.Diff(test.expectedNodesInfos[i].Pods[j], info.Pods[j], cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
+					if diff := cmp.Diff(test.expectedNodesInfos[i].Pods[j], info.GetPods()[j], cmpopts.IgnoreUnexported(framework.PodInfo{})); diff != "" {
 						t.Errorf("Unexpected PodInfo (-want +got):\n%s", diff)
 					}
 				}

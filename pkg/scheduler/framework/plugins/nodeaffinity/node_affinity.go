@@ -144,7 +144,7 @@ func (pl *NodeAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1
 }
 
 // PreFilter builds and writes cycle state used by Filter.
-func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (pl *NodeAffinity) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	affinity := pod.Spec.Affinity
 	noNodeAffinity := (affinity == nil ||
 		affinity.NodeAffinity == nil ||
@@ -203,7 +203,7 @@ func (pl *NodeAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 
 // Filter checks if the Node matches the Pod .spec.affinity.nodeAffinity and
 // the plugin's added affinity.
-func (pl *NodeAffinity) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (pl *NodeAffinity) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	node := nodeInfo.Node()
 
 	if pl.addedNodeSelector != nil && !pl.addedNodeSelector.Match(node) {
@@ -238,7 +238,7 @@ func (s *preScoreState) Clone() fwk.StateData {
 }
 
 // PreScore builds and writes cycle state used by Score and NormalizeScore.
-func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	preferredNodeAffinity, err := getPodPreferredNodeAffinity(pod)
 	if err != nil {
 		return fwk.AsStatus(err)
@@ -257,7 +257,7 @@ func (pl *NodeAffinity) PreScore(ctx context.Context, cycleState fwk.CycleState,
 // Score returns the sum of the weights of the terms that match the Node.
 // Terms came from the Pod .spec.affinity.nodeAffinity and from the plugin's
 // default affinity.
-func (pl *NodeAffinity) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *NodeAffinity) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	node := nodeInfo.Node()
 
 	var count int64

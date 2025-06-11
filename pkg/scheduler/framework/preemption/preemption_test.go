@@ -74,8 +74,8 @@ type FakePostFilterPlugin struct {
 
 func (pl *FakePostFilterPlugin) SelectVictimsOnNode(
 	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.Pods[0].Pod), pl.numViolatingVictim, nil
+	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	return append(victims, nodeInfo.GetPods()[0].GetPod()), pl.numViolatingVictim, nil
 }
 
 func (pl *FakePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -111,8 +111,8 @@ type FakePreemptionScorePostFilterPlugin struct{}
 
 func (pl *FakePreemptionScorePostFilterPlugin) SelectVictimsOnNode(
 	ctx context.Context, state fwk.CycleState, pod *v1.Pod,
-	nodeInfo *framework.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
-	return append(victims, nodeInfo.Pods[0].Pod), 1, nil
+	nodeInfo fwk.NodeInfo, pdbs []*policy.PodDisruptionBudget) (victims []*v1.Pod, numViolatingVictim int, status *fwk.Status) {
+	return append(victims, nodeInfo.GetPods()[0].GetPod()), 1, nil
 }
 
 func (pl *FakePreemptionScorePostFilterPlugin) GetOffsetAndNumCandidates(nodes int32) (int32, int32) {
@@ -812,7 +812,7 @@ type fakePodNominator struct {
 	requestStopper chan struct{}
 }
 
-func (f *fakePodNominator) NominatedPodsForNode(nodeName string) []*framework.PodInfo {
+func (f *fakePodNominator) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
 	<-f.requestStopper
 	return nil
 }
@@ -881,13 +881,13 @@ func (f *fakeExtender) IsInterested(pod *v1.Pod) bool {
 	return pod != nil
 }
 
-func (f *fakeExtender) Filter(_ *v1.Pod, _ []*framework.NodeInfo) ([]*framework.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+func (f *fakeExtender) Filter(_ *v1.Pod, _ []fwk.NodeInfo) ([]fwk.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
 	return nil, nil, nil, nil
 }
 
 func (f *fakeExtender) Prioritize(
 	_ *v1.Pod,
-	_ []*framework.NodeInfo,
+	_ []fwk.NodeInfo,
 ) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }

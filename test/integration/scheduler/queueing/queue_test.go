@@ -188,7 +188,7 @@ func (f *fakeCRPlugin) Name() string {
 	return "fakeCRPlugin"
 }
 
-func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ *framework.NodeInfo) *fwk.Status {
+func (f *fakeCRPlugin) Filter(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Unschedulable, "always fail")
 }
 

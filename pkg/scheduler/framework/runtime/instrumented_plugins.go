@@ -33,7 +33,7 @@ type instrumentedFilterPlugin struct {
 
 var _ framework.FilterPlugin = &instrumentedFilterPlugin{}
 
-func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
+func (p *instrumentedFilterPlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
 	p.metric.Inc()
 	return p.FilterPlugin.Filter(ctx, state, pod, nodeInfo)
 }
@@ -46,7 +46,7 @@ type instrumentedPreFilterPlugin struct {
 
 var _ framework.PreFilterPlugin = &instrumentedPreFilterPlugin{}
 
-func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
+func (p *instrumentedPreFilterPlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	result, status := p.PreFilterPlugin.PreFilter(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()
@@ -62,7 +62,7 @@ type instrumentedPreScorePlugin struct {
 
 var _ framework.PreScorePlugin = &instrumentedPreScorePlugin{}
 
-func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
+func (p *instrumentedPreScorePlugin) PreScore(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) *fwk.Status {
 	status := p.PreScorePlugin.PreScore(ctx, state, pod, nodes)
 	if !status.IsSkip() {
 		p.metric.Inc()
@@ -78,7 +78,7 @@ type instrumentedScorePlugin struct {
 
 var _ framework.ScorePlugin = &instrumentedScorePlugin{}
 
-func (p *instrumentedScorePlugin) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (p *instrumentedScorePlugin) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	p.metric.Inc()
 	return p.ScorePlugin.Score(ctx, state, pod, nodeInfo)
 }
