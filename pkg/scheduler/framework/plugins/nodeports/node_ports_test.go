@@ -154,7 +154,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:                "non-sidecar initContainer using hostPort",
-			wantPreFilterStatus: framework.NewStatus(framework.Skip),
+			wantPreFilterStatus: fwk.NewStatus(fwk.Skip),
 		},
 		{
 			pod: st.MakePod().
@@ -168,7 +168,7 @@ func TestNodePorts(t *testing.T) {
 			nodeInfo: framework.NewNodeInfo(
 				newPod("m1", "TCP/0.0.0.0/8001")),
 			name:             "TCP hostPort conflict from sidecar initContainer",
-			wantFilterStatus: framework.NewStatus(framework.Unschedulable, ErrReason),
+			wantFilterStatus: fwk.NewStatus(fwk.Unschedulable, ErrReason),
 		},
 	}
 
