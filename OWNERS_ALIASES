@@ -215,9 +215,11 @@ aliases:
     - seans3
     - soltysh
   sig-testing-reviewers:
+    - aojea
     - bentheelder
     - cblecker
     - dims
+    - pohly
   # emeritus:
   # - spiffxp
   sig-node-approvers:
