@@ -83,10 +83,6 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
 			supportVarName := PrivateVar{Name: "UnionMembershipFor" + context.Type.Name.Name + unionName, Package: "local"}
 			ptrType := types.PointerTo(context.Type)
-			ptrTypeName := types.Name{
-				Package: context.Type.Name.Package,
-				Name:    "*" + context.Type.Name.Name,
-			}
 
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
@@ -113,7 +109,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 					extractorArgs = append(extractorArgs, extractor)
 				}
 
-				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extractorArgs...).WithTypeArgs(ptrTypeName)
+				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extractorArgs...)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, u.fields...))
@@ -131,7 +127,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 					extractorArgs = append(extractorArgs, extractor)
 				}
 
-				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extractorArgs...).WithTypeArgs(ptrTypeName)
+				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extractorArgs...)
 				result.Functions = append(result.Functions, fn)
 			}
 		}

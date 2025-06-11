@@ -54,7 +54,7 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
 		return nil // no changes
 	}
-	errs = append(errs, validate.DiscriminatedUnion[*Struct](ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) any { return obj.D })...)
+	errs = append(errs, validate.DiscriminatedUnion(ctx, op, fldPath, obj, oldObj, unionMembershipForStruct, func(obj *Struct) any { return obj.D })...)
 
 	// field Struct.TypeMeta has no validation
 	// field Struct.D has no validation
