@@ -1015,6 +1015,12 @@ items:
     - /readyz/*
     verbs:
     - get
+  - apiGroups:
+    - ""
+    resources:
+    - nodes/metrics
+    verbs:
+    - get
   - nonResourceURLs:
     - /flagz
     verbs:
