@@ -33,10 +33,14 @@ import (
 )
 
 // FitPredicate is a function type which is used in fake extender.
+<<<<<<< HEAD
 type FitPredicate func(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status
+=======
+type FitPredicate func(pod *v1.Pod, node fwk.NodeInfo) *framework.Status
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 
 // PriorityFunc is a function type which is used in fake extender.
-type PriorityFunc func(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error)
+type PriorityFunc func(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error)
 
 // PriorityConfig is used in fake extender to perform Prioritize function.
 type PriorityConfig struct {
@@ -45,6 +49,7 @@ type PriorityConfig struct {
 }
 
 // ErrorPredicateExtender implements FitPredicate function to always return error status.
+<<<<<<< HEAD
 func ErrorPredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Error, "some error")
 }
@@ -57,55 +62,85 @@ func FalsePredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 // TruePredicateExtender implements FitPredicate function to always return success status.
 func TruePredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Success)
+=======
+func ErrorPredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Error, "some error")
+}
+
+// FalsePredicateExtender implements FitPredicate function to always return unschedulable status.
+func FalsePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.GetNode().Name))
+}
+
+// TruePredicateExtender implements FitPredicate function to always return success status.
+func TruePredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
+	return framework.NewStatus(framework.Success)
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 }
 
 // Node1PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node1"; otherwise return false.
+<<<<<<< HEAD
 func Node1PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 	if node.Node().Name == "node1" {
 		return fwk.NewStatus(fwk.Success)
 	}
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
+=======
+func Node1PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
+	if node.GetNode().Name == "node1" {
+		return framework.NewStatus(framework.Success)
+	}
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.GetNode().Name))
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 }
 
 // Node2PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node2"; otherwise return false.
+<<<<<<< HEAD
 func Node2PredicateExtender(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
 	if node.Node().Name == "node2" {
 		return fwk.NewStatus(fwk.Success)
 	}
 	return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Node().Name))
+=======
+func Node2PredicateExtender(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
+	if node.GetNode().Name == "node2" {
+		return framework.NewStatus(framework.Success)
+	}
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.GetNode().Name))
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 }
 
 // ErrorPrioritizerExtender implements PriorityFunc function to always return error.
-func ErrorPrioritizerExtender(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error) {
+func ErrorPrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error) {
 	return &framework.NodeScoreList{}, fmt.Errorf("some error")
 }
 
 // Node1PrioritizerExtender implements PriorityFunc function to give score 10
 // if the given node's name is "node1"; otherwise score 1.
-func Node1PrioritizerExtender(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error) {
+func Node1PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error) {
 	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
-		if node.Node().Name == "node1" {
+		if node.GetNode().Name == "node1" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.GetNode().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
 
 // Node2PrioritizerExtender implements PriorityFunc function to give score 10
 // if the given node's name is "node2"; otherwise score 1.
-func Node2PrioritizerExtender(pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.NodeScoreList, error) {
+func Node2PrioritizerExtender(pod *v1.Pod, nodes []fwk.NodeInfo) (*framework.NodeScoreList, error) {
 	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
-		if node.Node().Name == "node2" {
+		if node.GetNode().Name == "node2" {
 			score = 10
 		}
-		result = append(result, framework.NodeScore{Name: node.Node().Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.GetNode().Name, Score: int64(score)})
 	}
 	return &result, nil
 }
@@ -125,9 +160,9 @@ func (pl *node2PrioritizerPlugin) Name() string {
 }
 
 // Score return score 100 if the given nodeName is "node2"; otherwise return score 10.
-func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
+func (pl *node2PrioritizerPlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {
 	score := 10
-	if nodeInfo.Node().Name == "node2" {
+	if nodeInfo.GetNode().Name == "node2" {
 		score = 100
 	}
 	return int64(score), nil
@@ -147,7 +182,7 @@ type FakeExtender struct {
 	Prioritizers     []PriorityConfig
 	Weight           int64
 	NodeCacheCapable bool
-	FilteredNodes    []*framework.NodeInfo
+	FilteredNodes    []fwk.NodeInfo
 	UnInterested     bool
 	Ignorable        bool
 	Binder           func() error
@@ -222,7 +257,7 @@ func (f *FakeExtender) ProcessPreemption(
 // 1. More victim pods (if any) amended by preemption phase of extender.
 // 2. Number of violating victim (used to calculate PDB).
 // 3. Fits or not after preemption phase on extender's side.
-func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1.Pod, node *framework.NodeInfo) ([]*v1.Pod, int, bool, error) {
+func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1.Pod, node fwk.NodeInfo) ([]*v1.Pod, int, bool, error) {
 	// If a extender support preemption but have no cached node info, let's run filter to make sure
 	// default scheduler's decision still stand with given pod and node.
 	if !f.NodeCacheCapable {
@@ -238,7 +273,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
 	// and get cached node info by given node name.
-	nodeInfoCopy := f.CachedNodeNameToInfo[node.Node().Name].Snapshot()
+	nodeInfoCopy := f.CachedNodeNameToInfo[node.GetNode().Name].Snapshot()
 
 	var potentialVictims []*v1.Pod
 
@@ -251,10 +286,10 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
 	podPriority := corev1helpers.PodPriority(pod)
-	for _, p := range nodeInfoCopy.Pods {
-		if corev1helpers.PodPriority(p.Pod) < podPriority {
-			potentialVictims = append(potentialVictims, p.Pod)
-			if err := removePod(p.Pod); err != nil {
+	for _, p := range nodeInfoCopy.GetPods() {
+		if corev1helpers.PodPriority(p.GetPod()) < podPriority {
+			potentialVictims = append(potentialVictims, p.GetPod())
+			if err := removePod(p.GetPod()); err != nil {
 				return nil, 0, false, err
 			}
 		}
@@ -302,7 +337,11 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(logger klog.Logger, pod *v1
 
 // runPredicate run predicates of extender one by one for given pod and node.
 // Returns: fits or not.
+<<<<<<< HEAD
 func (f *FakeExtender) runPredicate(pod *v1.Pod, node *framework.NodeInfo) *fwk.Status {
+=======
+func (f *FakeExtender) runPredicate(pod *v1.Pod, node fwk.NodeInfo) *framework.Status {
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 	for _, predicate := range f.Predicates {
 		status := predicate(pod, node)
 		if !status.IsSuccess() {
@@ -313,18 +352,25 @@ func (f *FakeExtender) runPredicate(pod *v1.Pod, node *framework.NodeInfo) *fwk.
 }
 
 // Filter implements the extender Filter function.
-func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*framework.NodeInfo) ([]*framework.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
-	var filtered []*framework.NodeInfo
+func (f *FakeExtender) Filter(pod *v1.Pod, nodes []fwk.NodeInfo) ([]fwk.NodeInfo, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
+	var filtered []fwk.NodeInfo
 	failedNodesMap := extenderv1.FailedNodesMap{}
 	failedAndUnresolvableMap := extenderv1.FailedNodesMap{}
 	for _, node := range nodes {
 		status := f.runPredicate(pod, node)
 		if status.IsSuccess() {
 			filtered = append(filtered, node)
+<<<<<<< HEAD
 		} else if status.Code() == fwk.Unschedulable {
 			failedNodesMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.Node().Name)
 		} else if status.Code() == fwk.UnschedulableAndUnresolvable {
 			failedAndUnresolvableMap[node.Node().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Node().Name)
+=======
+		} else if status.Code() == framework.Unschedulable {
+			failedNodesMap[node.GetNode().Name] = fmt.Sprintf("FakeExtender: node %q failed", node.GetNode().Name)
+		} else if status.Code() == framework.UnschedulableAndUnresolvable {
+			failedAndUnresolvableMap[node.GetNode().Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.GetNode().Name)
+>>>>>>> 740a8099d07 (Moving Scheduler interfaces to staging: Move PodInfo and NodeInfo interfaces (together with related types) to staging repo, leaving internal implementation in kubernetes/kubernetes/pkg/scheduler)
 		} else {
 			return nil, nil, nil, status.AsError()
 		}
@@ -338,7 +384,7 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*framework.NodeInfo) ([]*fram
 }
 
 // Prioritize implements the extender Prioritize function.
-func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*framework.NodeInfo) (*extenderv1.HostPriorityList, int64, error) {
+func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []fwk.NodeInfo) (*extenderv1.HostPriorityList, int64, error) {
 	result := extenderv1.HostPriorityList{}
 	combinedScores := map[string]int64{}
 	for _, prioritizer := range f.Prioritizers {
@@ -368,7 +414,7 @@ func (f *FakeExtender) Bind(binding *v1.Binding) error {
 	}
 	if len(f.FilteredNodes) != 0 {
 		for _, node := range f.FilteredNodes {
-			if node.Node().Name == binding.Target.Name {
+			if node.GetNode().Name == binding.Target.Name {
 				f.FilteredNodes = nil
 				return nil
 			}
