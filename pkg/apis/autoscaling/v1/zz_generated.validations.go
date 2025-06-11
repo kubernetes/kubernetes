@@ -68,6 +68,9 @@ func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *fi
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *int32) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil // no changes
+			}
 			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
 		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *autoscalingv1.ScaleSpec) *int32 { return &oldObj.Replicas }))...)
