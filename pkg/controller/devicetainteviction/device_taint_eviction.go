@@ -27,14 +27,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard // Discouraged for production use (https://github.com/kubernetes/kubernetes/issues/104821) but has no good alternative for logging.
-
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -546,7 +545,7 @@ func (tc *Controller) handleClaimChange(oldClaim, newClaim *resourceapi.Resource
 	name := newNamespacedName(claim)
 	if tc.eventLogger != nil {
 		// This is intentionally very verbose for debugging.
-		tc.eventLogger.Info("ResourceClaim changed", "claimObject", name, "oldClaim", klog.Format(oldClaim), "newClaim", klog.Format(newClaim), "diff", cmp.Diff(oldClaim, newClaim))
+		tc.eventLogger.Info("ResourceClaim changed", "claimObject", name, "oldClaim", klog.Format(oldClaim), "newClaim", klog.Format(newClaim), "diff", diff.Diff(oldClaim, newClaim))
 	}
 
 	// Deleted?
@@ -686,7 +685,7 @@ func (tc *Controller) handleSliceChange(oldSlice, newSlice *resourceapi.Resource
 	}
 	if tc.eventLogger != nil {
 		// This is intentionally very verbose for debugging.
-		tc.eventLogger.Info("ResourceSlice changed", "pool", poolID, "oldSlice", klog.Format(oldSlice), "newSlice", klog.Format(newSlice), "diff", cmp.Diff(oldSlice, newSlice))
+		tc.eventLogger.Info("ResourceSlice changed", "pool", poolID, "oldSlice", klog.Format(oldSlice), "newSlice", klog.Format(newSlice), "diff", diff.Diff(oldSlice, newSlice))
 	}
 
 	// Determine old and new device taints. Only devices
@@ -784,7 +783,7 @@ func (tc *Controller) handlePodChange(oldPod, newPod *v1.Pod) {
 	}
 	if tc.eventLogger != nil {
 		// This is intentionally very verbose for debugging.
-		tc.eventLogger.Info("Pod changed", "pod", klog.KObj(pod), "oldPod", klog.Format(oldPod), "newPod", klog.Format(newPod), "diff", cmp.Diff(oldPod, newPod))
+		tc.eventLogger.Info("Pod changed", "pod", klog.KObj(pod), "oldPod", klog.Format(oldPod), "newPod", klog.Format(newPod), "diff", diff.Diff(oldPod, newPod))
 	}
 	if newPod == nil {
 		// Nothing left to do for it. No need to emit an event here, it's gone.

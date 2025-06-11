@@ -823,7 +823,7 @@ _____________________________________________________________________
 			actual := rt.buf.String()
 			if actual != rt.expected {
 
-				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.StringDiff(actual, rt.expected))
+				t.Errorf("failed PrintUpgradePlan:\n\nexpected:\n%s\n\nactual:\n%s\n\ndiff:\n%s", rt.expected, actual, diff.Diff(actual, rt.expected))
 			}
 		})
 	}
