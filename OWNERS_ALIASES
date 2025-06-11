@@ -217,8 +217,9 @@ aliases:
   sig-testing-reviewers:
     - bentheelder
     - cblecker
-    - spiffxp
     - dims
+  # emeritus:
+  # - spiffxp
   sig-node-approvers:
     - Random-Liu
     - dchen1107
@@ -553,5 +554,6 @@ aliases:
   conformance-behavior-approvers:
     - smarterclayton
     - johnbelamaric
-    - spiffxp
     - dims
+  # emeritus:
+  # - spiffpx
