@@ -8,9 +8,9 @@ reviewers:
   - johnbelamaric
 approvers:
   - cheftako
-  - spiffxp
   - johnbelamaric
 emeritus_approvers:
+  - spiffxp
 labels:
   - area/conformance
   - sig/architecture

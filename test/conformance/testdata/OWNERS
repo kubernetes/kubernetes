@@ -5,7 +5,6 @@ options:
   no_parent_owners: true
 reviewers:
   - smarterclayton
-  - spiffxp
   - dims
   - johnbelamaric
 approvers:
