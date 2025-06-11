@@ -64,7 +64,7 @@ func EachSliceVal[T any](ctx context.Context, op operation.Operation, fldPath *f
 
 // lookup returns a pointer to the first element in the list that matches the
 // target, according to the provided comparison function, or else nil.
-func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
+func lookup[T any](list []T, target T, cmp CompareFunc[T]) *T {
 	for i := range list {
 		if cmp(list[i], target) {
 			return &list[i]
@@ -118,34 +118,17 @@ func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, f
 	return errs
 }
 
-// UniqueByCompare verifies that each element of newSlice is unique.  This
-// function can only be used on types that are directly comparable. For
-// non-comparable types, use UniqueByReflect.
-//
-// Caution: structs with pointer fields satisfy comparable, but this function
-// will only compare pointer values.  It does not compare the pointed-to
-// values.
-func UniqueByCompare[T comparable](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
-	return unique(fldPath, newSlice, DirectEqual)
-}
-
-// UniqueByReflect verifies that each element of newSlice is unique. Unlike
-// UniqueByCompare, this function can be used with types that are not directly
-// comparable, at the cost of performance.
-func UniqueByReflect[T any](_ context.Context, op operation.Operation, fldPath *field.Path, newSlice, _ []T) field.ErrorList {
-	return unique(fldPath, newSlice, SemanticDeepEqual)
-}
-
-// unique compares every element of the slice with every other element and
-// returns errors for non-unique items.
-func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.ErrorList {
+// Unique verifies that each element of newSlice is unique, according to the
+// cmp function. It compares every element of the slice with every other
+// element and returns errors for non-unique items.
+func Unique[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, newSlice, _ []T, cmp CompareFunc[T]) field.ErrorList {
 	var dups []int
-	for i, val := range slice {
-		for j := i + 1; j < len(slice); j++ {
-			other := slice[j]
+	for i, val := range newSlice {
+		for j := i + 1; j < len(newSlice); j++ {
+			other := newSlice[j]
 			if cmp(val, other) {
 				if dups == nil {
-					dups = make([]int, 0, len(slice))
+					dups = make([]int, 0, len(newSlice))
 				}
 				if lookup(dups, j, func(a, b int) bool { return a == b }) == nil {
 					dups = append(dups, j)
@@ -157,7 +140,13 @@ func unique[T any](fldPath *field.Path, slice []T, cmp func(T, T) bool) field.Er
 	var errs field.ErrorList
 	sort.Ints(dups)
 	for _, i := range dups {
-		errs = append(errs, field.Duplicate(fldPath.Index(i), slice[i]))
+		var val any = newSlice[i]
+		// TODO: we don't want the whole item to be logged in the error, just
+		// the key(s). Unfortunately, the way errors are rendered, it comes out
+		// as something like "map[string]any{...}" which is not very nice. Once
+		// that is fixed, we can consider adding a way for this function to
+		// specify that just the keys should be renderted in the error.
+		errs = append(errs, field.Duplicate(fldPath.Index(i), val))
 	}
 	return errs
 }

@@ -46,6 +46,7 @@ func init() {
 	shared := map[string]*listMetadata{} // keyed by the fieldpath
 	RegisterTagValidator(listTypeTagValidator{byFieldPath: shared})
 	RegisterTagValidator(listMapKeyTagValidator{byFieldPath: shared})
+	RegisterFieldValidator(listFieldValidator{byFieldPath: shared})
 
 	globalEachVal = &eachValTagValidator{byFieldPath: shared, validator: nil}
 	RegisterTagValidator(globalEachVal)
@@ -60,9 +61,38 @@ var listTagsValidScopes = sets.New(ScopeAny)
 // listMetadata collects information about a single list with map or set semantics.
 type listMetadata struct {
 	// These will be checked for correctness elsewhere.
-	declaredAsMap bool
 	declaredAsSet bool
-	keyFields     []string
+	declaredAsMap bool
+	keyFields     []string // iff declaredAsMap
+	keyNames      []string // iff declaredAsMap
+}
+
+// makeListMapMatchFunc generates a function that compares two list-map
+// elements by their list-map key fields.
+func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
+	if !lm.declaredAsMap {
+		panic("makeListMapMatchFunc called on a non-map list")
+	}
+	if len(lm.keyFields) == 0 {
+		panic("makeListMapMatchFunc called on a list-map with no key fields")
+	}
+
+	cmpFn := FunctionLiteral{
+		Parameters: []ParamResult{{"a", t}, {"b", t}},
+		Results:    []ParamResult{{"", types.Bool}},
+	}
+	buf := strings.Builder{}
+	buf.WriteString("return ")
+	// Note: this does not handle pointer fields, which are not
+	// supposed to be used as listMap keys.
+	for i, fld := range lm.keyFields {
+		if i > 0 {
+			buf.WriteString(" && ")
+		}
+		buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
+	}
+	cmpFn.Body = buf.String()
+	return cmpFn
 }
 
 type listTypeTagValidator struct {
@@ -80,8 +110,7 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 }
 
 var (
-	validateUniqueByCompare = types.Name{Package: libValidationPkg, Name: "UniqueByCompare"}
-	validateUniqueByReflect = types.Name{Package: libValidationPkg, Name: "UniqueByReflect"}
+	validateUnique = types.Name{Package: libValidationPkg, Name: "Unique"}
 )
 
 func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
@@ -106,9 +135,17 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		//
 		// NOTE: lists of pointers are not supported, so we should never see a pointer here.
 		if util.IsDirectComparable(util.NonPointer(util.NativeType(t.Elem))) {
-			return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByCompare)}}, nil
+			return Validations{
+				Functions: []FunctionGen{
+					Function(listTypeTagName, DefaultFlags, validateUnique, Identifier(validateDirectEqual)),
+				},
+			}, nil
 		}
-		return Validations{Functions: []FunctionGen{Function(listTypeTagName, DefaultFlags, validateUniqueByReflect)}}, nil
+		return Validations{
+			Functions: []FunctionGen{
+				Function(listTypeTagName, DefaultFlags, validateUnique, Identifier(validateSemanticDeepEqual)),
+			},
+		}, nil
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
 		if util.NativeType(t.Elem).Kind != types.Struct {
@@ -121,6 +158,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		}
 		lm := lttv.byFieldPath[context.Path.String()]
 		lm.declaredAsMap = true
+		// NOTE: we validate uniqueness of the keys in the listFieldValidator.
 	default:
 		return Validations{}, fmt.Errorf("unknown list type %q", tag.Value)
 	}
@@ -184,6 +222,7 @@ func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags
 	}
 	lm := lmktv.byFieldPath[context.Path.String()]
 	lm.keyFields = append(lm.keyFields, fieldName)
+	lm.keyNames = append(lm.keyNames, tag.Value)
 
 	// This tag doesn't generate any validations.  It just accumulates
 	// information for other tags to use.
@@ -205,6 +244,58 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	return doc
 }
 
+type listFieldValidator struct {
+	byFieldPath map[string]*listMetadata
+}
+
+func (listFieldValidator) Init(_ Config) {}
+
+func (listFieldValidator) Name() string {
+	return "listFieldValidator"
+}
+
+func (lfv listFieldValidator) GetValidations(context Context) (Validations, error) {
+	lm := lfv.byFieldPath[context.Path.String()]
+	if lm == nil {
+		// TODO(thockin): enable this once the whole codebase is converted or
+		// if we only run against fields which are opted-in.
+		//if context.Type.Kind == types.Slice || context.Type.Kind == types.Array {
+		//	return Validations{}, fmt.Errorf("found list field without a listType")
+		//}
+		return Validations{}, nil
+	}
+
+	// Check some fundamental constraints on list types' tags.
+	if lm.declaredAsSet && lm.declaredAsMap {
+		return Validations{}, fmt.Errorf("listType cannot be both set and map")
+	}
+	if lm.declaredAsMap && len(lm.keyFields) == 0 {
+		return Validations{}, fmt.Errorf("found listType=map without listMapKey")
+	}
+	if len(lm.keyFields) > 0 && !lm.declaredAsMap {
+		return Validations{}, fmt.Errorf("found listMapKey without listType=map")
+	}
+	// Check for missing listType (after the other checks so the more specific errors take priority)
+	if !lm.declaredAsSet && !lm.declaredAsMap {
+		return Validations{}, fmt.Errorf("found list metadata without a listType")
+	}
+
+	result := Validations{}
+
+	if lm.declaredAsMap {
+		// TODO: There are some fields which are declared as maps which do not
+		// enforce uniqueness in manual validation. Those either need to not be
+		// maps or we need to allow types to opt-out from this validation.  SSA
+		// is also not able to handle these well.
+		t := util.NativeType(context.Type)
+		cmpArg := lm.makeListMapMatchFunc(t.Elem)
+		f := Function("listFieldValidator", DefaultFlags, validateUnique, cmpArg)
+		result.Functions = append(result.Functions, f)
+	}
+
+	return result, nil
+}
+
 type eachValTagValidator struct {
 	byFieldPath map[string]*listMetadata
 	validator   Validator
@@ -222,8 +313,8 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-// LateTagValidator indicatesa that validator has to run after the listType and
-// listMapKey tags.
+// LateTagValidator indicates that this validator has to run AFTER the listType
+// and listMapKey tags.
 func (eachValTagValidator) LateTagValidator() {}
 
 var (
@@ -289,23 +380,9 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	result := Validations{}
 	result.OpaqueValType = validations.OpaqueType
 
-	var listMetadata *listMetadata
-	if lm, found := evtv.byFieldPath[fldPath.String()]; found {
-		if lm.declaredAsSet && lm.declaredAsMap {
-			return Validations{}, fmt.Errorf("listType cannot be both set and map")
-		}
-		if lm.declaredAsMap && len(lm.keyFields) == 0 {
-			return Validations{}, fmt.Errorf("found listType=map without listMapKey")
-		}
-		if len(lm.keyFields) > 0 && !lm.declaredAsMap {
-			return Validations{}, fmt.Errorf("found listMapKey without listType=map")
-		}
-		// Check for missing listType (after the other checks so the more specific errors take priority)
-		if !lm.declaredAsSet && !lm.declaredAsMap {
-			return Validations{}, fmt.Errorf("found list metadata without a listType")
-		}
-		listMetadata = lm
-	}
+	// This type is a "late" validator, so it runs after all the keys are
+	// registered.  See LateTagValidator() above.
+	listMetadata := evtv.byFieldPath[fldPath.String()]
 
 	for _, vfn := range validations.Functions {
 		// matchArg is the function that is used to lookup the correlated element in the old list.
@@ -320,22 +397,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 		switch {
 		case listMetadata != nil && listMetadata.declaredAsMap:
 			// Emit the comparison by keys when listType=map
-			matchFn := FunctionLiteral{
-				Parameters: []ParamResult{{"a", t.Elem}, {"b", t.Elem}},
-				Results:    []ParamResult{{"", types.Bool}},
-			}
-			buf := strings.Builder{}
-			buf.WriteString("return ")
-			// Note: this does not handle pointer fields, which are not
-			// supposed to be used as listMap keys.
-			for i, fld := range listMetadata.keyFields {
-				if i > 0 {
-					buf.WriteString(" && ")
-				}
-				buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
-			}
-			matchFn.Body = buf.String()
-			matchArg = matchFn
+			matchArg = listMetadata.makeListMapMatchFunc(t.Elem)
 			if directComparable {
 				equivArg = Identifier(validateDirectEqual)
 			} else {

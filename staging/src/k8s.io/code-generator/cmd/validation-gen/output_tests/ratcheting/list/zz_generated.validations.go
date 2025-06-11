@@ -120,6 +120,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a DirectComparableStructWithKey, b DirectComparableStructWithKey) bool { return a.Key == b.Key }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DirectComparableStructWithKey) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceStructWithKey[*]")
 			})...)
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a DirectComparableStructWithKey, b DirectComparableStructWithKey) bool { return a.Key == b.Key })...)
 			return
 		}(fldPath.Child("sliceStructWithKey"), obj.SliceStructWithKey, safe.Field(oldObj, func(oldObj *StructSlice) []DirectComparableStructWithKey { return oldObj.SliceStructWithKey }))...)
 
@@ -132,6 +133,7 @@ func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStructWithKey) field.ErrorList {
 				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SliceNonComparableStructWithKey[*]")
 			})...)
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key })...)
 			return
 		}(fldPath.Child("sliceNonComparableStructWithKey"), obj.SliceNonComparableStructWithKey, safe.Field(oldObj, func(oldObj *StructSlice) []NonComparableStructWithKey { return oldObj.SliceNonComparableStructWithKey }))...)
 

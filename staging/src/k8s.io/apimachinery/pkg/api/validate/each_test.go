@@ -425,40 +425,45 @@ func testEachMapKeyRatcheting[K ~string, V any](t *testing.T, name string, old, 
 	})
 }
 
-func TestUniqueByCompare(t *testing.T) {
-	testUniqueByCompare(t, "int_nil", []int(nil), 0)
-	testUniqueByCompare(t, "int_empty", []int{}, 0)
-	testUniqueByCompare(t, "int_uniq", []int{1, 2, 3}, 0)
-	testUniqueByCompare(t, "int_dup", []int{1, 2, 3, 2, 1}, 2)
+func TestUniqueComparableValues(t *testing.T) {
+	testUnique(t, "int_nil", []int(nil), 0)
+	testUnique(t, "int_empty", []int{}, 0)
+	testUnique(t, "int_uniq", []int{1, 2, 3}, 0)
+	testUnique(t, "int_dup", []int{1, 2, 3, 2, 1}, 2)
 
-	testUniqueByCompare(t, "string_nil", []string(nil), 0)
-	testUniqueByCompare(t, "string_empty", []string{}, 0)
-	testUniqueByCompare(t, "string_uniq", []string{"a", "b", "c"}, 0)
-	testUniqueByCompare(t, "string_dup", []string{"a", "a", "c", "b", "a"}, 2)
+	testUnique(t, "string_nil", []string(nil), 0)
+	testUnique(t, "string_empty", []string{}, 0)
+	testUnique(t, "string_uniq", []string{"a", "b", "c"}, 0)
+	testUnique(t, "string_dup", []string{"a", "a", "c", "b", "a"}, 2)
 
 	type isComparable struct {
 		I int
 		S string
 	}
 
-	testUniqueByCompare(t, "struct_nil", []isComparable(nil), 0)
-	testUniqueByCompare(t, "struct_empty", []isComparable{}, 0)
-	testUniqueByCompare(t, "struct_uniq", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}}, 0)
-	testUniqueByCompare(t, "struct_dup", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}, {2, "b"}, {1, "a"}}, 2)
+	testUnique(t, "struct_nil", []isComparable(nil), 0)
+	testUnique(t, "struct_empty", []isComparable{}, 0)
+	testUnique(t, "struct_uniq", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}}, 0)
+	testUnique(t, "struct_dup", []isComparable{{1, "a"}, {2, "b"}, {3, "c"}, {2, "b"}, {1, "a"}}, 2)
 }
 
-func testUniqueByCompare[T comparable](t *testing.T, name string, input []T, wantErrs int) {
+func testUnique[T comparable](t *testing.T, name string, input []T, wantErrs int) {
 	t.Helper()
-	var zero T
-	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
-		errs := UniqueByCompare(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil)
+	t.Run(fmt.Sprintf("%s(direct)", name), func(t *testing.T) {
+		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, DirectEqual)
+		if len(errs) != wantErrs {
+			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
+		}
+	})
+	t.Run(fmt.Sprintf("%s(reflect)", name), func(t *testing.T) {
+		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
 	})
 }
 
-func TestUniqueByReflect(t *testing.T) {
+func TestUniqueNonComparableValues(t *testing.T) {
 	type nonComparable struct {
 		I int
 		S []string
@@ -479,7 +484,7 @@ func testUniqueByReflect[T any](t *testing.T, name string, input []T, wantErrs i
 	t.Helper()
 	var zero T
 	t.Run(fmt.Sprintf("%s(%T)", name, zero), func(t *testing.T) {
-		errs := UniqueByReflect(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil)
+		errs := Unique(context.Background(), operation.Operation{}, field.NewPath("test"), input, nil, SemanticDeepEqual)
 		if len(errs) != wantErrs {
 			t.Errorf("expected %d errors, got %d: %s", wantErrs, len(errs), fmtErrs(errs))
 		}
