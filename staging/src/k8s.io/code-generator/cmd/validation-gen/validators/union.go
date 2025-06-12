@@ -87,7 +87,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
 					Function(unionMemberTagName, DefaultFlags, newDiscriminatedUnionMembership,
-						append([]any{*u.discriminator}, u.fields...)...))
+						append([]any{*u.discriminator}, toSliceAny(u.fields)...)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				var extractorArgs []any
@@ -96,7 +96,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 				discriminatorExtractor := FunctionLiteral{
 					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 					Results:    []ParamResult{{Type: types.Any}},
-					Body:       fmt.Sprintf("return obj.%s", u.discriminatorMember.(types.Member).Name),
+					Body:       fmt.Sprintf("return obj.%s", u.discriminatorMember.Name),
 				}
 				extractorArgs = append(extractorArgs, discriminatorExtractor)
 
@@ -104,7 +104,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 					extractor := FunctionLiteral{
 						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 						Results:    []ParamResult{{Type: types.Any}},
-						Body:       fmt.Sprintf("return obj.%s", member.(types.Member).Name),
+						Body:       fmt.Sprintf("return obj.%s", member.Name),
 					}
 					extractorArgs = append(extractorArgs, extractor)
 				}
@@ -112,7 +112,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extractorArgs...)
 				result.Functions = append(result.Functions, fn)
 			} else {
-				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, u.fields...))
+				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, toSliceAny(u.fields)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				var extractorArgs []any
@@ -122,7 +122,7 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 					extractor := FunctionLiteral{
 						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
 						Results:    []ParamResult{{Type: types.Any}},
-						Body:       fmt.Sprintf("return obj.%s", member.(types.Member).Name),
+						Body:       fmt.Sprintf("return obj.%s", member.Name),
 					}
 					extractorArgs = append(extractorArgs, extractor)
 				}
@@ -134,6 +134,14 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 	}
 
 	return result, nil
+}
+
+func toSliceAny[T any](t []T) []any {
+	result := make([]any, len(t))
+	for i, v := range t {
+		result[i] = v
+	}
+	return result
 }
 
 const (
@@ -174,7 +182,7 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
 		discriminatorFieldName = jsonAnnotation.Name
 		u.discriminator = &discriminatorFieldName
-		u.discriminatorMember = *context.Member
+		u.discriminatorMember = context.Member
 	}
 
 	// This tag does not actually emit any validations, it just accumulates
@@ -234,7 +242,7 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 
 	u := umtv.shared[context.Parent].getOrCreate(unionArg.Value)
 	u.fields = append(u.fields, [2]string{fieldName, memberName})
-	u.fieldMembers = append(u.fieldMembers, *context.Member)
+	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	// This tag does not actually emit any validations, it just accumulates
 	// information. The validation is done by the unionTypeValidator.
@@ -265,18 +273,18 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 // on +k8s:unionMember and +k8s:unionDiscriminator tags found in a go struct.
 type union struct {
 	// fields provides field information about all the members of the union.
-	// Each slice element is a [2]string to provide a fieldName and memberName pair, where
-	// [0] identifies the field name and [1] identifies the union member Name.
-	// fields is index aligned with fieldMembers.
+	// Each item provides a fieldName and memberName pair, where [0] identifies
+	// the field name and [1] identifies the union member Name. fields is index
+	// aligned with fieldMembers.
 	// If member name is not set, it defaults to the go struct field name.
-	fields []any
-	// fieldMembers is a list of types.Member for all the members of the union.
-	fieldMembers []any
+	fields [][2]string
+	// fieldMembers describes all the members of the union.
+	fieldMembers []*types.Member
 
 	// discriminator is the name of the discriminator field
 	discriminator *string
-	// discriminatorMember is the types.Member of the discriminator field.
-	discriminatorMember any
+	// discriminatorMember describes the discriminator field.
+	discriminatorMember *types.Member
 }
 
 // unions represents all the unions for a go struct.
