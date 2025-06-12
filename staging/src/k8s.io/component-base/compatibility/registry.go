@@ -386,11 +386,30 @@ func (r *componentGlobalsRegistry) Validate() []error {
 	defer r.mutex.Unlock()
 	for _, globals := range r.componentGlobals {
 		errs = append(errs, globals.effectiveVersion.Validate()...)
+		var features map[featuregate.Feature]featuregate.FeatureSpec
 		if globals.featureGate != nil {
 			errs = append(errs, globals.featureGate.Validate()...)
+			features = globals.featureGate.GetAll()
+		}
+		binaryVersion := globals.effectiveVersion.BinaryVersion()
+		emulatedVersion := globals.effectiveVersion.EmulationVersion()
+		if binaryVersion.GreaterThan(emulatedVersion) {
+			if enabled := enabledAlphaFeatures(features, globals); len(enabled) != 0 {
+				klog.Warningf("component has alpha features enabled in emulated version, this is unsupported: features=%v", enabled)
+			}
 		}
 	}
 	return errs
+}
+
+func enabledAlphaFeatures(features map[featuregate.Feature]featuregate.FeatureSpec, globals *ComponentGlobals) []string {
+	var enabled []string
+	for feat, featSpec := range features {
+		if featSpec.PreRelease == featuregate.Alpha && globals.featureGate.Enabled(feat) {
+			enabled = append(enabled, string(feat))
+		}
+	}
+	return enabled
 }
 
 func (r *componentGlobalsRegistry) SetEmulationVersionMapping(fromComponent, toComponent string, f VersionMapping) error {
