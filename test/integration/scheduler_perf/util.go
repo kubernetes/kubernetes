@@ -32,6 +32,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapialpha "k8s.io/api/resource/v1alpha3"
 	resourceapi "k8s.io/api/resource/v1beta1"
+	resourceapiv1beta2 "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -91,6 +92,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
+		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapiv1beta2.SchemeGroupVersion))
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapialpha.SchemeGroupVersion))
 	}
 	customFlags := []string{

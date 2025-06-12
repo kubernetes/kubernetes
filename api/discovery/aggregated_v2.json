@@ -1978,26 +1978,6 @@
           "freshness": "Current",
           "resources": [
             {
-              "resource": "deviceclasses",
-              "responseKind": {
-                "group": "",
-                "kind": "DeviceClass",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "deviceclass",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
               "resource": "devicetaintrules",
               "responseKind": {
                 "group": "",
@@ -2006,81 +1986,6 @@
               },
               "scope": "Cluster",
               "singularResource": "devicetaintrule",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceclaims",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClaim",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "resourceclaim",
-              "subresources": [
-                {
-                  "responseKind": {
-                    "group": "",
-                    "kind": "ResourceClaim",
-                    "version": ""
-                  },
-                  "subresource": "status",
-                  "verbs": [
-                    "get",
-                    "patch",
-                    "update"
-                  ]
-                }
-              ],
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceclaimtemplates",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceClaimTemplate",
-                "version": ""
-              },
-              "scope": "Namespaced",
-              "singularResource": "resourceclaimtemplate",
-              "verbs": [
-                "create",
-                "delete",
-                "deletecollection",
-                "get",
-                "list",
-                "patch",
-                "update",
-                "watch"
-              ]
-            },
-            {
-              "resource": "resourceslices",
-              "responseKind": {
-                "group": "",
-                "kind": "ResourceSlice",
-                "version": ""
-              },
-              "scope": "Cluster",
-              "singularResource": "resourceslice",
               "verbs": [
                 "create",
                 "delete",
