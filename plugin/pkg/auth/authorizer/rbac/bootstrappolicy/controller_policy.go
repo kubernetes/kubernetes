@@ -251,7 +251,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "update").Groups("*").Resources("*/scale").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			// StrictPodSelection requies access to pod level Resources (Deployment, StatefulSet, etc.)
-			rbacv1helpers.NewRule("get", "list", "watch").Groups(appsGroup).Resources("*").RuleOrDie(),
+			rbacv1helpers.NewRule("get", "list", "watch").Groups("*").Resources("*").RuleOrDie(),
 
 			// allow listing resource, custom, and external metrics
 			rbacv1helpers.NewRule("list", "watch").Groups(resMetricsGroup).Resources("pods").RuleOrDie(),

@@ -184,7 +184,7 @@ func init() {
 	scaleUpLimitFactor = 8
 }
 
-func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
+func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient, *dynamicfake.FakeDynamicClient) {
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
@@ -663,7 +663,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		return true, metrics, nil
 	})
 
-	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient
+	fakeDynamicClient := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
+
+	return fakeClient, fakeMetricsClient, fakeCMClient, fakeEMClient, fakeScaleClient, fakeDynamicClient
 }
 
 func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization *int32) {
@@ -729,7 +731,7 @@ func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *m
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
-	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient := tc.prepareTestClient(t)
+	testClient, testMetricsClient, testCMClient, testEMClient, testScaleClient, testDynamicClient := tc.prepareTestClient(t)
 	if tc.testClient != nil {
 		testClient = tc.testClient
 	}
@@ -781,7 +783,6 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	hpaController := NewHorizontalController(
 		tCtx,
 		eventClient.CoreV1(),
-		testClient.AppsV1(),
 		testScaleClient,
 		testClient.AutoscalingV2(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),
@@ -793,6 +794,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
+		testDynamicClient,
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {

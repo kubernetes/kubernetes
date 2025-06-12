@@ -24,9 +24,12 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/client-go/dynamic"
+
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
@@ -131,7 +134,7 @@ type HorizontalController struct {
 	// Storage of HPAs and their selectors.
 	hpaSelectors    *selectors.BiMultimap
 	hpaSelectorsMux sync.Mutex
-	appsv1client    appsv1client.AppsV1Interface
+	dynamicClient   *dynamic.DynamicClient
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -150,13 +153,14 @@ func NewHorizontalController(
 	tolerance float64,
 	cpuInitializationPeriod,
 	delayOfInitialReadinessStatus time.Duration,
+	dynamicClient *dynamic.DynamicClient,
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
-	controllerCache := NewControllerCache(appsv1client, 15*time.Minute) // TODO: should this be configurable?
-	go controllerCache.Start(ctx, 30*time.Minute)// TODO: should this be configurable?
+	controllerCache := NewControllerCache(dynamicClient, mapper, 15*time.Minute) // TODO: should this be configurable?
+	go controllerCache.Start(ctx, 30*time.Minute)                                // TODO: should this be configurable?
 
 	hpaController := &HorizontalController{
 		eventRecorder:                recorder,
@@ -181,7 +185,8 @@ func NewHorizontalController(
 		hpaSelectors:        selectors.NewBiMultimap(),
 		podFilterCache:      make(map[selectors.Key]PodFilter),
 		podFilterMux:        sync.RWMutex{},
-		appsv1client:        appsv1client,
+		dynamicClient:       dynamicClient,
+		controllerCache: controllerCache,
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -1504,8 +1509,8 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 
 			podFilter = NewPodFilter(string(strategy), FilterOptions{
 				ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
-			}).WithClient(a.appsv1client).WithRESTMapper(a.mapper).WithCache(a.controllerCache)
-			
+			}).WithDynamicClient(a.dynamicClient).WithRESTMapper(a.mapper).WithCache(a.controllerCache)
+
 			a.podFilterCache[hpaKey] = podFilter
 		}
 		a.podFilterMux.Unlock()
@@ -1522,7 +1527,7 @@ func (a *HorizontalController) podFilterForHpa(hpa *autoscalingv2.HorizontalPodA
 		// need to change the podFilter to LabelSelector (default) filter
 		podFilter = NewPodFilter(string(defaultStrategy), FilterOptions{
 			ScaleTargetRef: &hpa.Spec.ScaleTargetRef,
-		}).WithClient(a.appsv1client).WithRESTMapper(a.mapper).WithCache(a.controllerCache)
+		}).WithDynamicClient(a.dynamicClient).WithRESTMapper(a.mapper).WithCache(a.controllerCache)
 		a.podFilterMux.Lock()
 		a.podFilterCache[hpaKey] = podFilter
 		a.podFilterMux.Unlock()

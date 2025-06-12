@@ -6,38 +6,38 @@ import (
 	"sync"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
 // ControllerCacheEntry stores a cached controller resource
+
+// ControllerCacheEntry stores a cached controller resource
 type ControllerCacheEntry struct {
-	Resource    interface{}
+	Resource    *unstructured.Unstructured
 	Error       error
 	LastFetched time.Time
 }
 
 // ControllerCache provides caching for controller resources
 type ControllerCache struct {
-	mutex        sync.RWMutex
-	deployments  map[string]*ControllerCacheEntry
-	replicaSets  map[string]*ControllerCacheEntry
-	statefulSets map[string]*ControllerCacheEntry
-	daemonSets   map[string]*ControllerCacheEntry
-	client       appsv1client.AppsV1Interface
-	cacheTTL     time.Duration
+	mutex         sync.RWMutex
+	resources     map[string]*ControllerCacheEntry
+	dynamicClient dynamic.Interface
+	restMapper    apimeta.RESTMapper
+	cacheTTL      time.Duration
 }
 
 // NewControllerCache creates a new controller cache
-func NewControllerCache(client appsv1client.AppsV1Interface, cacheTTL time.Duration) *ControllerCache {
+func NewControllerCache(dynamicClient dynamic.Interface, restMapper apimeta.RESTMapper, cacheTTL time.Duration) *ControllerCache {
 	return &ControllerCache{
-		deployments:  make(map[string]*ControllerCacheEntry),
-		replicaSets:  make(map[string]*ControllerCacheEntry),
-		statefulSets: make(map[string]*ControllerCacheEntry),
-		daemonSets:   make(map[string]*ControllerCacheEntry),
-		client:       client,
-		cacheTTL:     cacheTTL,
+		resources:     make(map[string]*ControllerCacheEntry),
+		dynamicClient: dynamicClient,
+		restMapper:    restMapper,
+		cacheTTL:      cacheTTL,
 	}
 }
 
@@ -64,43 +64,57 @@ func (c *ControllerCache) cleanup() {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	for key, entry := range c.deployments {
+	for key, entry := range c.resources {
 		if entry.LastFetched.Before(expiredTime) {
-			delete(c.deployments, key)
-		}
-	}
-
-	for key, entry := range c.replicaSets {
-		if entry.LastFetched.Before(expiredTime) {
-			delete(c.replicaSets, key)
-		}
-	}
-
-	for key, entry := range c.statefulSets {
-		if entry.LastFetched.Before(expiredTime) {
-			delete(c.statefulSets, key)
-		}
-	}
-
-	for key, entry := range c.daemonSets {
-		if entry.LastFetched.Before(expiredTime) {
-			delete(c.daemonSets, key)
+			delete(c.resources, key)
 		}
 	}
 }
 
-// makeKey creates a cache key from namespace and name
-func makeKey(namespace, name string) string {
-	return fmt.Sprintf("%s/%s", namespace, name)
+// makeResourceKey creates a cache key from GVR, namespace and name
+func (c *ControllerCache) makeResourceKey(gvr schema.GroupVersionResource, namespace, name string) string {
+	return fmt.Sprintf("%s/%s/%s/%s", gvr.String(), namespace, name, "")
 }
 
-// GetDeployment gets a deployment from cache or API server
-func (c *ControllerCache) GetDeployment(namespace, name string) (*appsv1.Deployment, error) {
-	key := makeKey(namespace, name)
+// GetResource gets a resource from cache or API server using owner reference
+func (c *ControllerCache) GetResource(namespace string, ownerRef metav1.OwnerReference) (*unstructured.Unstructured, error) {
+	gv, err := schema.ParseGroupVersion(ownerRef.APIVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse group version %s: %v", ownerRef.APIVersion, err)
+	}
+
+	// Get GVR for the owner
+	gvk := schema.GroupVersionKind{
+		Group:   gv.Group,
+		Version: gv.Version,
+		Kind:    ownerRef.Kind,
+	}
+
+	// Try to get the proper GVR using REST mapper
+	var gvr schema.GroupVersionResource
+	if c.restMapper != nil {
+		mapping, err := c.restMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err == nil {
+			gvr = mapping.Resource
+		} else {
+			// Fallback to guessing
+			gvr, _ = apimeta.UnsafeGuessKindToResource(gvk)
+		}
+	} else {
+		// Fallback to guessing
+		gvr, _ = apimeta.UnsafeGuessKindToResource(gvk)
+	}
+
+	return c.getResourceByGVR(gvr, namespace, ownerRef.Name)
+}
+
+// getResourceByGVR gets a resource by GVR from cache or API server
+func (c *ControllerCache) getResourceByGVR(gvr schema.GroupVersionResource, namespace, name string) (*unstructured.Unstructured, error) {
+	key := c.makeResourceKey(gvr, namespace, name)
 
 	// Check cache first
 	c.mutex.RLock()
-	entry, found := c.deployments[key]
+	entry, found := c.resources[key]
 	c.mutex.RUnlock()
 
 	now := time.Now()
@@ -108,116 +122,23 @@ func (c *ControllerCache) GetDeployment(namespace, name string) (*appsv1.Deploym
 		if entry.Error != nil {
 			return nil, entry.Error
 		}
-		return entry.Resource.(*appsv1.Deployment), nil
+		// in cache we can return it
+		return entry.Resource, nil
 	}
 
 	// Not in cache or too old, fetch from API
-	deployment, err := c.client.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	var resource *unstructured.Unstructured
+	var err error
+	resource, err = c.dynamicClient.Resource(gvr).Namespace(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 
 	// Update cache
 	c.mutex.Lock()
-	c.deployments[key] = &ControllerCacheEntry{
-		Resource:    deployment,
+	c.resources[key] = &ControllerCacheEntry{
+		Resource:    resource,
 		Error:       err,
 		LastFetched: now,
 	}
 	c.mutex.Unlock()
 
-	return deployment, err
-}
-
-// GetReplicaSet gets a replica set from cache or API server
-func (c *ControllerCache) GetReplicaSet(namespace, name string) (*appsv1.ReplicaSet, error) {
-	key := makeKey(namespace, name)
-
-	// Check cache first
-	c.mutex.RLock()
-	entry, found := c.replicaSets[key]
-	c.mutex.RUnlock()
-
-	now := time.Now()
-	if found && now.Sub(entry.LastFetched) < c.cacheTTL {
-		if entry.Error != nil {
-			return nil, entry.Error
-		}
-		return entry.Resource.(*appsv1.ReplicaSet), nil
-	}
-
-	// Not in cache or too old, fetch from API
-	replicaSet, err := c.client.ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-
-	// Update cache
-	c.mutex.Lock()
-	c.replicaSets[key] = &ControllerCacheEntry{
-		Resource:    replicaSet,
-		Error:       err,
-		LastFetched: now,
-	}
-	c.mutex.Unlock()
-
-	return replicaSet, err
-}
-
-// GetStatefulSet gets a stateful set from cache or API server
-func (c *ControllerCache) GetStatefulSet(namespace, name string) (*appsv1.StatefulSet, error) {
-	key := makeKey(namespace, name)
-
-	// Check cache first
-	c.mutex.RLock()
-	entry, found := c.statefulSets[key]
-	c.mutex.RUnlock()
-
-	now := time.Now()
-	if found && now.Sub(entry.LastFetched) < c.cacheTTL {
-		if entry.Error != nil {
-			return nil, entry.Error
-		}
-		return entry.Resource.(*appsv1.StatefulSet), nil
-	}
-
-	// Not in cache or too old, fetch from API
-	statefulSet, err := c.client.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-
-	// Update cache
-	c.mutex.Lock()
-	c.statefulSets[key] = &ControllerCacheEntry{
-		Resource:    statefulSet,
-		Error:       err,
-		LastFetched: now,
-	}
-	c.mutex.Unlock()
-
-	return statefulSet, err
-}
-
-// GetDaemonSet gets a daemon set from cache or API server
-func (c *ControllerCache) GetDaemonSet(namespace, name string) (*appsv1.DaemonSet, error) {
-	key := makeKey(namespace, name)
-
-	// Check cache first
-	c.mutex.RLock()
-	entry, found := c.daemonSets[key]
-	c.mutex.RUnlock()
-
-	now := time.Now()
-	if found && now.Sub(entry.LastFetched) < c.cacheTTL {
-		if entry.Error != nil {
-			return nil, entry.Error
-		}
-		return entry.Resource.(*appsv1.DaemonSet), nil
-	}
-
-	// Not in cache or too old, fetch from API
-	daemonSet, err := c.client.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-
-	// Update cache
-	c.mutex.Lock()
-	c.daemonSets[key] = &ControllerCacheEntry{
-		Resource:    daemonSet,
-		Error:       err,
-		LastFetched: now,
-	}
-	c.mutex.Unlock()
-
-	return daemonSet, err
+	return resource, err
 }

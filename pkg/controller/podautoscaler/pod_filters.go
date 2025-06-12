@@ -1,15 +1,16 @@
 package podautoscaler
 
 import (
-	"context"
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/api/core/v1"
+
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 )
 
@@ -37,9 +38,9 @@ type PodFilter interface {
 	Filter(pods []*v1.Pod) (filtered []*v1.Pod, unfiltered []*v1.Pod, err error)
 	// Name returns the name of the filter strategy for logging purposes
 	Name() string
-	WithClient(client appsv1client.AppsV1Interface) PodFilter
 	WithRESTMapper(mapper apimeta.RESTMapper) PodFilter
 	WithCache(cache *ControllerCache) PodFilter
+	WithDynamicClient(client *dynamic.DynamicClient) PodFilter
 }
 
 // OwnerReferencesFilter filters pods by ownership chain
@@ -48,6 +49,7 @@ type OwnerReferencesFilter struct {
 	Client        appsv1client.AppsV1Interface
 	RESTMapper    apimeta.RESTMapper
 	Cache         *ControllerCache
+	dynamicClient *dynamic.DynamicClient
 }
 
 func (f *OwnerReferencesFilter) WithClient(client appsv1client.AppsV1Interface) PodFilter {
@@ -69,13 +71,14 @@ func (f *OwnerReferencesFilter) WithCache(cache *ControllerCache) PodFilter {
 	return f
 }
 
-func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, error) {
-	if f.Client == nil {
-		return nil, nil, fmt.Errorf("apps/v1 client is required for OwnerReferencesFilter")
-	}
+func (f *OwnerReferencesFilter) WithDynamicClient(client *dynamic.DynamicClient) PodFilter {
+	f.dynamicClient = client
+	return f
+}
 
-	if f.RESTMapper == nil {
-		return nil, nil, fmt.Errorf("RESTMapper is required for OwnerReferencesFilter")
+func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, error) {
+	if f.Cache == nil {
+		return nil, nil, fmt.Errorf("cache is required for OwnerReferencesFilter") // TODO: how to handle this?
 	}
 
 	if f.filterOptions.ScaleTargetRef == nil {
@@ -90,41 +93,25 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 	filteredPods := make([]*v1.Pod, 0, len(pods))
 	unfilteredPods := make([]*v1.Pod, 0, len(pods))
 
-	targetKind := f.filterOptions.ScaleTargetRef.Kind
-	targetName := f.filterOptions.ScaleTargetRef.Name
-	// targetAPIVersion := f.filterOptions.ScaleTargetRef.APIVersion
 	namespace := pods[0].Namespace
+	targetRef := f.filterOptions.ScaleTargetRef
 
-	// Map to track pods owned by the target
-	ownedPods := make(map[types.UID]bool)
-
-	// Handle different resource types with specific ownership patterns
-	// TODO(omerap12): combine functions
-	switch targetKind {
-	case "Deployment":
-		if err := f.handleDeployment(namespace, targetName, pods, ownedPods); err != nil {
-			return nil, nil, err
-		}
-	case "StatefulSet":
-		if err := f.handleStatefulSet(namespace, targetName, pods, ownedPods); err != nil {
-			return nil, nil, err
-		}
-	case "ReplicaSet":
-		if err := f.handleReplicaSet(namespace, targetName, pods, ownedPods); err != nil {
-			return nil, nil, err
-		}
-	case "DaemonSet":
-		if err := f.handleDaemonSet(namespace, targetName, pods, ownedPods); err != nil {
-			return nil, nil, err
-		}
-	default:
-		f.handleGenericResource(targetKind, targetName, pods, ownedPods)
-	}
-
+	// Check ownership for each pod
 	for _, pod := range pods {
-		if ownedPods[pod.UID] {
+		isOwned, err := f.isPodOwnedByTarget(pod, *targetRef, namespace)
+		if err != nil {
+			// On error, assume pod is not owned
+			// TODO: is this how to handle this?
+			fmt.Println("Error ", err.Error())
+			unfilteredPods = append(unfilteredPods, pod)
+			continue
+		}
+
+		if isOwned {
+			fmt.Println("Pod is ownded by targetRef", pod.Name)
 			filteredPods = append(filteredPods, pod)
 		} else {
+			fmt.Println("Pod is not ownded by targetRef", pod.Name)
 			unfilteredPods = append(unfilteredPods, pod)
 		}
 	}
@@ -132,164 +119,83 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 	return filteredPods, unfilteredPods, nil
 }
 
-// Handle Pod -> ReplicaSet -> Deployment ownership chain
-func (f *OwnerReferencesFilter) handleDeployment(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	var deployment *appsv1.Deployment
+// isPodOwnedByTarget checks if a pod is owned by the target reference by traversing the ownership chain
+func (f *OwnerReferencesFilter) isPodOwnedByTarget(pod *v1.Pod, targetRef autoscalingv2.CrossVersionObjectReference, namespace string) (bool, error) {
+	const maxOwnershipChainLength = 10 // TODO: should we make this configurable?
+
+	current := &unstructured.Unstructured{}
+	current.SetName(pod.Name)
+	current.SetNamespace(pod.Namespace)
+	current.SetUID(pod.UID)
+	current.SetOwnerReferences(pod.OwnerReferences)
+
+	// Check each owner reference to see if any directly matches our target
+	var nextOwner *unstructured.Unstructured
+
 	var err error
-	if f.Cache != nil {
-		deployment, err = f.Cache.GetDeployment(namespace, f.filterOptions.ScaleTargetRef.Name)
-	} else {
-		deployment, err = f.Client.Deployments(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+
+	for depth := 0; depth < maxOwnershipChainLength; depth++ {
+		// Check if current object is our target
+		if f.isTargetMatch(current, targetRef) {
+			return true, nil
+		}
+
+		ownerRefs := current.GetOwnerReferences()
+		if len(ownerRefs) == 0 {
+			// No more owners to check
+			return false, nil
+		}
+
+		for _, ownerRef := range ownerRefs {
+			// Check if this owner directly matches our target
+			if f.isOwnerRefMatch(ownerRef, targetRef) {
+				return true, nil
+			}
+
+			// If not a direct match, we need to fetch the owner and continue traversal
+			if nextOwner == nil {
+				nextOwner, err = f.Cache.GetResource(namespace, ownerRef)
+				if err != nil {
+					fmt.Println(err.Error())
+					continue // TODO: what should we do here?
+				}
+			}
+		}
+
+		if nextOwner == nil {
+			// No valid owners found that we could fetch
+			return false, nil
+		}
+
+		// Continue with the owner
+		current = nextOwner
 	}
 
+	return false, fmt.Errorf("maximum ownership chain depth (%d) exceeded", maxOwnershipChainLength)
+}
+
+// isTargetMatch checks if the current object matches the target reference
+func (f *OwnerReferencesFilter) isTargetMatch(obj *unstructured.Unstructured, targetRef autoscalingv2.CrossVersionObjectReference) bool {
+	if obj.GetName() != targetRef.Name {
+		return false
+	}
+
+	// Get the object's GVK
+	gvk := obj.GroupVersionKind()
+
+	// Parse target's API version
+	targetGV, err := schema.ParseGroupVersion(targetRef.APIVersion)
 	if err != nil {
-		return fmt.Errorf("failed to get Deployment %s/%s: %v", namespace, name, err)
+		return false
 	}
 
-	deploymentUID := deployment.UID
-	replicaSetCache := make(map[string]*appsv1.ReplicaSet)
-
-	// Check each pod to see if it's owned by a ReplicaSet that's owned by our Deployment
-	for _, pod := range pods {
-		owned := false
-
-		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "ReplicaSet" {
-				// Check if we've already cached this ReplicaSet
-				rsName := ownerRef.Name
-				rs, exists := replicaSetCache[rsName]
-
-				if !exists {
-					// Not in our local cache, try to get it from the controller cache or API
-					if f.Cache != nil {
-						rs, err = f.Cache.GetReplicaSet(namespace, rsName)
-					}
-					if err != nil || rs == nil {
-						continue
-					}
-					// Add to local cache
-					replicaSetCache[rsName] = rs
-				}
-
-				// Check if this ReplicaSet is owned by our target Deployment
-				for _, rsOwnerRef := range rs.OwnerReferences {
-					if rsOwnerRef.Kind == "Deployment" && rsOwnerRef.UID == deploymentUID {
-						owned = true
-						ownedPods[pod.UID] = true
-						break
-					}
-				}
-				if owned {
-					break // Pod is owned by a ReplicaSet that's owned by our Deployment
-				}
-			}
-		}
-	}
-	return nil
+	// Compare Kind and API Version
+	return gvk.Kind == targetRef.Kind && gvk.Group == targetGV.Group && gvk.Version == targetGV.Version
 }
 
-// Handle ReplicaSet -> Pod direct ownership
-func (f *OwnerReferencesFilter) handleReplicaSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	var replicaSet *appsv1.ReplicaSet
-	var err error
-
-	if f.Cache != nil {
-		replicaSet, err = f.Cache.GetReplicaSet(namespace, name)
-	} else {
-		replicaSet, err = f.Client.ReplicaSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	}
-
-	if err != nil || replicaSet == nil {
-		return fmt.Errorf("failed to get ReplicaSet %s/%s: %v", namespace, name, err)
-	}
-
-	rsUID := replicaSet.UID
-
-	// Check each pod to see if it's directly owned by the ReplicaSet
-	for _, pod := range pods {
-		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "ReplicaSet" && ownerRef.UID == rsUID {
-				ownedPods[pod.UID] = true
-				break
-			}
-		}
-	}
-
-	return nil
-}
-
-// Handle DaemonSet -> Pod direct ownership
-func (f *OwnerReferencesFilter) handleDaemonSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	var daemonSet *appsv1.DaemonSet
-	var err error
-
-	if f.Cache != nil {
-		daemonSet, err = f.Cache.GetDaemonSet(namespace, name)
-	} else {
-		daemonSet, err = f.Client.DaemonSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	}
-
-	if err != nil || daemonSet == nil {
-		return fmt.Errorf("failed to get DaemonSet %s/%s: %v", namespace, name, err)
-	}
-
-	dsUID := daemonSet.UID
-
-	// Check each pod to see if it's directly owned by the DaemonSet
-	for _, pod := range pods {
-		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "DaemonSet" && ownerRef.UID == dsUID {
-				ownedPods[pod.UID] = true
-				break
-			}
-		}
-	}
-
-	return nil
-}
-
-// Handle StatefulSet -> Pod direct ownership
-func (f *OwnerReferencesFilter) handleStatefulSet(namespace, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) error {
-	var statefulSet *appsv1.StatefulSet
-	var err error
-
-	if f.Cache != nil {
-		statefulSet, err = f.Cache.GetStatefulSet(namespace, name)
-	} else {
-		statefulSet, err = f.Client.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
-	}
-
-	if err != nil  || statefulSet == nil {
-		return fmt.Errorf("failed to get StatefulSet %s/%s: %v", namespace, name, err)
-	}
-
-	ssUID := statefulSet.UID
-
-	// Check each pod to see if it's directly owned by the StatefulSet
-	for _, pod := range pods {
-		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == "StatefulSet" && ownerRef.UID == ssUID {
-				ownedPods[pod.UID] = true
-				break
-			}
-		}
-	}
-
-	return nil
-}
-
-// Handle generic resource direct ownership
-func (f *OwnerReferencesFilter) handleGenericResource(kind, name string, pods []*v1.Pod, ownedPods map[types.UID]bool) {
-	// For generic resources, we simply check if the pod's owner references mention
-	// the resource by kind and name
-	for _, pod := range pods {
-		for _, ownerRef := range pod.OwnerReferences {
-			if ownerRef.Kind == kind && ownerRef.Name == name {
-				ownedPods[pod.UID] = true
-				break
-			}
-		}
-	}
+// isOwnerRefMatch checks if an owner reference matches the target reference
+func (f *OwnerReferencesFilter) isOwnerRefMatch(ownerRef metav1.OwnerReference, targetRef autoscalingv2.CrossVersionObjectReference) bool {
+	return ownerRef.Kind == targetRef.Kind && ownerRef.Name == targetRef.Name && ownerRef.APIVersion == targetRef.APIVersion
 }
 
 // LabelSelectorFilter uses the default label selector strategy
@@ -306,7 +212,7 @@ func (f *LabelSelectorFilter) Name() string {
 	return string(autoscalingv2.LabelSelector)
 }
 
-func (f *LabelSelectorFilter) WithClient(client appsv1client.AppsV1Interface) PodFilter {
+func (f *LabelSelectorFilter) WithDynamicClient(client *dynamic.DynamicClient) PodFilter {
 	// No-op for label selector
 	return f
 }
