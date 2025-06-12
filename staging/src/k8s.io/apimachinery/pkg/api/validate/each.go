@@ -78,6 +78,7 @@ func lookup[T any](list []T, target T, cmp func(T, T) bool) *T {
 // For update operations, it implements validation ratcheting by skipping validation
 // when the old value exists and the equiv function confirms the values are equivalent.
 // The value-type of the map is assumed to not be nilable.
+// If equiv is nil, value-based ratcheting is disabled and all values will be validated.
 func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]V,
 	equiv CompareFunc[V], validator ValidateFunc[*V]) field.ErrorList {
 	var errs field.ErrorList
@@ -97,7 +98,7 @@ func EachMapVal[K ~string, V any](ctx context.Context, op operation.Operation, f
 }
 
 // EachMapKey validates each element of newMap with the specified
-// validation function.  The oldMap argument is not used.
+// validation function.
 func EachMapKey[K ~string, T any](ctx context.Context, op operation.Operation, fldPath *field.Path, newMap, oldMap map[K]T,
 	validator ValidateFunc[*K]) field.ErrorList {
 	var errs field.ErrorList

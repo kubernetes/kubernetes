@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/utils/ptr"
 )
 
 type TestStruct struct {
@@ -51,6 +52,11 @@ type NonComparableStructWithKey struct {
 	Key string
 	I   int
 	S   []string
+}
+
+type NonComparableStructWithPtr struct {
+	I int
+	P *int
 }
 
 func TestEachSliceVal(t *testing.T) {
@@ -301,6 +307,45 @@ func TestEachMapValRatcheting(t *testing.T) {
 		},
 		SemanticDeepEqual,
 		1,
+	)
+	testEachMapValRatcheting(t, "struct with pointer field, same value different pointer",
+		map[string]NonComparableStructWithPtr{
+			"one": {I: 11, P: ptr.To(1)},
+			"two": {I: 12, P: ptr.To(2)},
+		},
+		map[string]NonComparableStructWithPtr{
+			"one": {I: 11, P: ptr.To(1)},
+			"two": {I: 12, P: ptr.To(2)},
+		},
+		SemanticDeepEqual,
+		0,
+	)
+	testEachMapValRatcheting(t, "nil map to empty map",
+		nil,
+		map[string]int{},
+		DirectEqual,
+		0,
+	)
+
+	testEachMapValRatcheting(t, "nil map to non-empty map",
+		nil,
+		map[string]int{"one": 1},
+		DirectEqual,
+		1, // Expect validation for new entry
+	)
+
+	testEachMapValRatcheting(t, "empty map to nil map",
+		map[string]int{},
+		nil,
+		DirectEqual,
+		0,
+	)
+
+	testEachMapValRatcheting(t, "non-empty map to nil map",
+		map[string]int{"one": 1},
+		nil,
+		DirectEqual,
+		0,
 	)
 }
 
