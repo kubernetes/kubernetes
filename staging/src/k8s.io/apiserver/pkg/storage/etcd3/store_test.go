@@ -24,7 +24,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync/atomic"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -249,7 +248,7 @@ func TestTransformationFailure(t *testing.T) {
 
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
-	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false)
+	storagetesting.RunTestList(ctx, t, store, increaseRV(client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
 }
 
 func TestConsistentList(t *testing.T) {
@@ -257,7 +256,7 @@ func TestConsistentList(t *testing.T) {
 	storagetesting.RunTestConsistentList(ctx, t, store, increaseRV(client.Client), false, true, false)
 }
 
-func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *clientRecorder) storagetesting.CallsValidation {
+func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, recorder *storagetesting.KVRecorder) storagetesting.CallsValidation {
 	return func(t *testing.T, pageSize, estimatedProcessedObjects uint64) {
 		if reads := transformer.GetReadsAndReset(); reads != estimatedProcessedObjects {
 			t.Errorf("unexpected reads: %d, expected: %d", reads, estimatedProcessedObjects)
@@ -288,23 +287,23 @@ func checkStorageCallsInvariants(transformer *storagetesting.PrefixTransformer, 
 }
 
 func TestListContinuation(t *testing.T) {
-	ctx, store, client := testSetup(t, withRecorder())
+	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
 	storagetesting.RunTestListContinuation(ctx, t, store, validation)
 }
 
 func TestListPaginationRareObject(t *testing.T) {
-	ctx, store, client := testSetup(t, withRecorder())
+	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
 	storagetesting.RunTestListPaginationRareObject(ctx, t, store, validation)
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
-	ctx, store, client := testSetup(t, withRecorder())
+	ctx, store, client := testSetup(t)
 	validation := checkStorageCallsInvariants(
-		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*clientRecorder))
+		store.transformer.(*storagetesting.PrefixTransformer), client.KV.(*storagetesting.KVRecorder))
 	storagetesting.RunTestListContinuationWithFilter(ctx, t, store, validation)
 }
 
@@ -521,20 +520,6 @@ func newTestTransformer() value.Transformer {
 	return storagetesting.NewPrefixTransformer([]byte(defaultTestPrefix), false)
 }
 
-type clientRecorder struct {
-	reads uint64
-	clientv3.KV
-}
-
-func (r *clientRecorder) Get(ctx context.Context, key string, opts ...clientv3.OpOption) (*clientv3.GetResponse, error) {
-	atomic.AddUint64(&r.reads, 1)
-	return r.KV.Get(ctx, key, opts...)
-}
-
-func (r *clientRecorder) GetReadsAndReset() uint64 {
-	return atomic.SwapUint64(&r.reads, 0)
-}
-
 type setupOptions struct {
 	client         func(testing.TB) *kubernetes.Client
 	codec          runtime.Codec
@@ -545,8 +530,6 @@ type setupOptions struct {
 	groupResource  schema.GroupResource
 	transformer    value.Transformer
 	leaseConfig    LeaseManagerConfig
-
-	recorderEnabled bool
 }
 
 type setupOption func(*setupOptions)
@@ -568,12 +551,6 @@ func withPrefix(prefix string) setupOption {
 func withLeaseConfig(leaseConfig LeaseManagerConfig) setupOption {
 	return func(options *setupOptions) {
 		options.leaseConfig = leaseConfig
-	}
-}
-
-func withRecorder() setupOption {
-	return func(options *setupOptions) {
-		options.recorderEnabled = true
 	}
 }
 
@@ -600,9 +577,6 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		opt(&setupOpts)
 	}
 	client := setupOpts.client(t)
-	if setupOpts.recorderEnabled {
-		client.KV = &clientRecorder{KV: client.KV}
-	}
 	versioner := storage.APIObjectVersioner{}
 	store := newStore(
 		client,

@@ -186,7 +186,7 @@ func TestLists(t *testing.T) {
 					t.Parallel()
 					ctx, cacher, server, terminate := testSetupWithEtcdServer(t)
 					t.Cleanup(terminate)
-					storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), true)
+					storagetesting.RunTestList(ctx, t, cacher, increaseRV(server.V3Client.Client), true, server.V3Client.Kubernetes.(*storagetesting.KubernetesRecorder))
 				})
 
 				t.Run("ConsistentList", func(t *testing.T) {
