@@ -138,3 +138,23 @@ func BenchmarkLister_Match_100k_100(b *testing.B) {
 func BenchmarkLister_Match_1M_100(b *testing.B) {
 	benchmarkLister(b, 1000000, 100, map[string]string{"match": "true"})
 }
+
+func benchmarkNothingLister(b *testing.B, numObjects int, numMatching int, labelSelector *metav1.LabelSelector) {
+	store := mustCreateStore(numObjects, numMatching, nil)
+	selector, err := metav1.LabelSelectorAsSelector(labelSelector)
+	if err != nil {
+		b.Fatalf("LabelSelectorAsSelector returned an error: %v", err)
+	}
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		err := ListAll(store, selector, func(m interface{}) {
+		})
+		if err != nil {
+			b.Fatalf("ListAll returned an error: %v", err)
+		}
+	}
+}
+
+func BenchmarkLister_Match_1M_0(b *testing.B) {
+	benchmarkNothingLister(b, 1000000, 0, nil)
+}
