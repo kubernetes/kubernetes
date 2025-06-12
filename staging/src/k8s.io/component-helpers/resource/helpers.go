@@ -53,6 +53,8 @@ type PodResourcesOptions struct {
 	// from the calculation. If pod-level resources are not set in PodSpec,
 	// pod-level resources will always be skipped.
 	SkipPodLevelResources bool
+	// SkipContainerLevelResources
+	SkipContainerLevelResources bool
 }
 
 var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
@@ -120,7 +122,11 @@ func IsPodLevelRequestsSet(pod *v1.Pod) bool {
 // those pod-level values are used in calculating Pod Requests.
 // The computation is part of the API and must be reviewed as an API change.
 func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
-	reqs := AggregateContainerRequests(pod, opts)
+	reqs := v1.ResourceList{}
+	if !opts.SkipContainerLevelResources {
+		reqs = AggregateContainerRequests(pod, opts)
+	}
+
 	if !opts.SkipPodLevelResources && IsPodLevelRequestsSet(pod) {
 		for resourceName, quantity := range pod.Spec.Resources.Requests {
 			if IsSupportedPodLevelResource(resourceName) {
