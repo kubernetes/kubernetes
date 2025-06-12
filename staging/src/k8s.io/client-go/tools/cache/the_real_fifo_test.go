@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"runtime"
 	"testing"
@@ -52,7 +53,7 @@ func testRealFIFOPop(f *RealFIFO) testFifoObject {
 	if val == nil {
 		return testFifoObject{name: closedFIFOName}
 	}
-	return val.(Deltas).Newest().Object.(testFifoObject)
+	return val.([]Deltas)[0].Newest().Object.(testFifoObject)
 }
 
 func emptyKnownObjects() KeyListerGetter {
@@ -248,8 +249,8 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 func collapseDeltas(ins []interface{}) Deltas {
 	ret := Deltas{}
 	for _, curr := range ins {
-		for _, delta := range curr.(Deltas) {
-			ret = append(ret, delta)
+		for _, deltas := range curr.([]Deltas) {
+			ret = append(ret, deltas...)
 		}
 	}
 	return ret
@@ -408,7 +409,7 @@ func TestRealFIFO_transformer(t *testing.T) {
 		if err != nil {
 			t.Fatalf("got nothing on try %v?", i)
 		}
-		a := obj.(Deltas)[0]
+		a := obj.([]Deltas)[0][0]
 		e := expected1[i]
 		if !reflect.DeepEqual(e, a) {
 			t.Errorf("%d Expected %+v, got %+v", i, e, a)
@@ -593,7 +594,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -622,7 +623,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -653,7 +654,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -685,7 +686,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for i, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("%d Expected %#v, got %#v", i, e, a)
 		}
@@ -707,7 +708,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -738,7 +739,7 @@ func TestRealFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -764,7 +765,7 @@ func TestRealFIFO_UpdateResyncRace(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(f).([]Deltas)[0]
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -794,8 +795,8 @@ func TestRealFIFO_HasSyncedCorrectOnDeletion(t *testing.T) {
 		if f.HasSynced() {
 			t.Errorf("Expected HasSynced to be false")
 		}
-		cur, initial := pop2[Deltas](f)
-		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
+		cur, initial := pop2[[]Deltas](f)
+		if e, a := expected, cur[0]; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
 		if initial != true {
@@ -972,5 +973,122 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 		case <-time.After(500 * time.Millisecond):
 			t.Fatalf("timed out waiting for Pop to return after Close")
 		}
+	}
+}
+
+func TestRealFIFO_PopMultipleDeltaInBatch(t *testing.T) {
+	obj1 := mkFifoObj("foo1", 5)
+	obj2 := mkFifoObj("foo2", 5)
+	obj3 := mkFifoObj("foo3", 5)
+	testCases := []struct {
+		name            string
+		incomingItems   []testFifoObject
+		actions         []func(f *RealFIFO)
+		batchSize       int
+		expectedBatches [][]Deltas
+	}{
+		{
+			name: "update 1 item should have separate batch",
+			incomingItems: []testFifoObject{
+				obj1,
+			},
+			actions: []func(f *RealFIFO){
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+				func(f *RealFIFO) { _ = f.Update(obj1) },
+			},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}},
+				{{{Updated, obj1}}},
+				{{{Updated, obj1}}},
+			},
+		},
+		{
+			name: "pop 3 unique items should work",
+			incomingItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}, {{Replaced, obj3}}},
+			},
+		},
+		{
+			name: "pop 3 items with 2 unique should have 2 batch",
+			incomingItems: []testFifoObject{
+				obj1, obj2, obj1,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 3,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}},
+				{{{Replaced, obj1}}},
+			},
+		},
+		{
+			name: "pop 3 items with 2 batch size should have 2 batch",
+			incomingItems: []testFifoObject{
+				obj1, obj2, obj3,
+			},
+			actions:   []func(f *RealFIFO){},
+			batchSize: 2,
+			expectedBatches: [][]Deltas{
+				{{{Replaced, obj1}}, {{Replaced, obj2}}},
+				{{{Replaced, obj3}}},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := NewRealFIFOWithBatch(
+				testFifoObjectKeyFunc,
+				literalListerGetter(func() []testFifoObject {
+					return tc.incomingItems
+				}),
+				nil,
+				tc.batchSize)
+
+			initialItems := make([]interface{}, len(tc.incomingItems))
+			for i, item := range tc.incomingItems {
+				initialItems[i] = item
+			}
+			_ = f.Replace(initialItems, "")
+			for _, action := range tc.actions {
+				action(f)
+			}
+
+			const maxAttempts = 10
+			receivedItems := make([]interface{}, 0)
+
+			for i := 0; i < maxAttempts; i++ {
+				timer := time.NewTimer(time.Millisecond * 50)
+				received := make(chan interface{})
+				go func() {
+					_, _ = f.Pop(func(obj interface{}, isInInitialList bool) error {
+						received <- obj
+						return nil
+					})
+				}()
+				select {
+				case <-timer.C:
+					close(received)
+					break
+				case item := <-received:
+					receivedItems = append(receivedItems, item)
+					close(received)
+				}
+			}
+
+			runtime.Gosched()
+			f.Close()
+
+			idx := 0
+			for _, batch := range receivedItems {
+				assert.Equal(t, tc.expectedBatches[idx], batch)
+				idx++
+			}
+		})
 	}
 }
