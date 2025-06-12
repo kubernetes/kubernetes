@@ -684,7 +684,10 @@ var _ = SIGDescribe("Lifecycle Sleep Hook", func() {
 			podWithHook := getPodWithHook(name, imageutils.GetE2EImage(imageutils.BusyBox), lifecycle)
 			podWithHook.Spec.TerminationGracePeriodSeconds = ptr.To[int64](gracePeriod)
 			podWithHook.Spec.Containers[0].Command = []string{"/bin/sh"}
-			podWithHook.Spec.Containers[0].Args = []string{"-c", "exit 0"}
+			// If we exit the container as soon as it's created,
+			// finishAt - startedAt can be negative due to some internal race
+			// so we need to keep it running for a while
+			podWithHook.Spec.Containers[0].Args = []string{"-c", "sleep 3"}
 			podWithHook.Spec.RestartPolicy = v1.RestartPolicyNever
 			ginkgo.By("create the pod with lifecycle hook using sleep action")
 			p := podClient.Create(ctx, podWithHook)
