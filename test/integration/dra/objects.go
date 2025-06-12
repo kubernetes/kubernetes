@@ -58,7 +58,7 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 			// the most expensive option is to have a single counter per CounterSet.
 			SharedCounters: func() []resourceapi.CounterSet {
 				var counterSets []resourceapi.CounterSet
-				for i := 0; i < resourceapi.ResourceSliceMaxSharedCounters; i++ {
+				for i := 0; i < resourceapi.ResourceSliceMaxCountersPerResourceSlice; i++ {
 					counterSets = append(counterSets, resourceapi.CounterSet{
 						Name: maxDNSLabel(i),
 						Counters: map[string]resourceapi.Counter{
@@ -78,7 +78,7 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 						// Use attributes rather than capacity since it is more expensive.
 						Attributes: func() map[resourceapi.QualifiedName]resourceapi.DeviceAttribute {
 							attributes := make(map[resourceapi.QualifiedName]resourceapi.DeviceAttribute)
-							for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice; i++ {
+							for i := 0; i < resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDeviceAfterMixins; i++ {
 								attributes[maxResourceQualifiedName(i)] = resourceapi.DeviceAttribute{
 									StringValue: ptr.To(maxDNSLabel(i)),
 								}
@@ -87,7 +87,7 @@ func NewMaxResourceSlice() *resourceapi.ResourceSlice {
 						}(),
 						ConsumesCounters: func() []resourceapi.DeviceCounterConsumption {
 							var consumesCounters []resourceapi.DeviceCounterConsumption
-							for i := 0; i < resourceapi.ResourceSliceMaxDeviceCountersPerSlice/resourceapi.ResourceSliceMaxDevices; i++ {
+							for i := 0; i < resourceapi.ResourceSliceMaxConsumedCountersPerResourceSlice/resourceapi.ResourceSliceMaxDevices; i++ {
 								consumesCounters = append(consumesCounters, resourceapi.DeviceCounterConsumption{
 									CounterSet: maxDNSLabel(i),
 									Counters: map[string]resourceapi.Counter{
