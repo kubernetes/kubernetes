@@ -70,18 +70,19 @@ type EndpointSliceHandler interface {
 
 // EndpointSliceConfig tracks a set of endpoints configurations.
 type EndpointSliceConfig struct {
-	listerSynced  cache.InformerSynced
-	eventHandlers []EndpointSliceHandler
-	logger        klog.Logger
+	listerSynced      cache.InformerSynced
+	eventHandlers     []EndpointSliceHandler
+	handlerUnregister func() error
+	logger            klog.Logger
 }
 
 // NewEndpointSliceConfig creates a new EndpointSliceConfig.
-func NewEndpointSliceConfig(ctx context.Context, endpointSliceInformer discoveryv1informers.EndpointSliceInformer, resyncPeriod time.Duration) *EndpointSliceConfig {
+func NewEndpointSliceConfig(ctx context.Context, endpointSliceInformer discoveryv1informers.EndpointSliceInformer, resyncPeriod time.Duration) (*EndpointSliceConfig, error) {
 	result := &EndpointSliceConfig{
 		logger: klog.FromContext(ctx),
 	}
 
-	handlerRegistration, _ := endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
+	handler, err := endpointSliceInformer.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    result.handleAddEndpointSlice,
 			UpdateFunc: result.handleUpdateEndpointSlice,
@@ -89,10 +90,16 @@ func NewEndpointSliceConfig(ctx context.Context, endpointSliceInformer discovery
 		},
 		resyncPeriod,
 	)
+	if err != nil {
+		return nil, err
+	}
+	result.handlerUnregister = func() error {
+		return endpointSliceInformer.Informer().RemoveEventHandler(handler)
+	}
 
-	result.listerSynced = handlerRegistration.HasSynced
+	result.listerSynced = handler.HasSynced
 
-	return result
+	return result, nil
 }
 
 // RegisterEventHandler registers a handler which is called on every endpoint slice change.
@@ -102,6 +109,8 @@ func (c *EndpointSliceConfig) RegisterEventHandler(handler EndpointSliceHandler)
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *EndpointSliceConfig) Run(stopCh <-chan struct{}) {
+	defer c.ShutDown()
+
 	c.logger.Info("Starting endpoint slice config controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint slice config", stopCh, c.listerSynced) {
@@ -112,6 +121,12 @@ func (c *EndpointSliceConfig) Run(stopCh <-chan struct{}) {
 		c.logger.V(3).Info("Calling handler.OnEndpointSlicesSynced()")
 		h.OnEndpointSlicesSynced()
 	}
+
+	<-stopCh
+}
+
+func (c *EndpointSliceConfig) ShutDown() {
+	utilruntime.HandleError(c.handlerUnregister())
 }
 
 func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {

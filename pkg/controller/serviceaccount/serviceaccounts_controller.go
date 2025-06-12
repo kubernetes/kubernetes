@@ -75,6 +75,9 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		DeleteFunc: e.serviceAccountDeleted,
 	}, options.ServiceAccountResync)
 	e.saLister = saInformer.Lister()
+	e.saHandlerUnregister = func() error {
+		return saInformer.Informer().RemoveEventHandler(saHandler)
+	}
 	e.saListerSynced = saHandler.HasSynced
 
 	nsHandler, _ := nsInformer.Informer().AddEventHandlerWithResyncPeriod(cache.ResourceEventHandlerFuncs{
@@ -82,6 +85,9 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		UpdateFunc: e.namespaceUpdated,
 	}, options.NamespaceResync)
 	e.nsLister = nsInformer.Lister()
+	e.nsHandlerUnregister = func() error {
+		return nsInformer.Informer().RemoveEventHandler(nsHandler)
+	}
 	e.nsListerSynced = nsHandler.HasSynced
 
 	e.syncHandler = e.syncNamespace
@@ -97,11 +103,13 @@ type ServiceAccountsController struct {
 	// To allow injection for testing.
 	syncHandler func(ctx context.Context, key string) error
 
-	saLister       corelisters.ServiceAccountLister
-	saListerSynced cache.InformerSynced
+	saLister            corelisters.ServiceAccountLister
+	saHandlerUnregister func() error
+	saListerSynced      cache.InformerSynced
 
-	nsLister       corelisters.NamespaceLister
-	nsListerSynced cache.InformerSynced
+	nsLister            corelisters.NamespaceLister
+	nsHandlerUnregister func() error
+	nsListerSynced      cache.InformerSynced
 
 	queue workqueue.TypedRateLimitingInterface[string]
 }
@@ -109,7 +117,7 @@ type ServiceAccountsController struct {
 // Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
 func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer c.queue.ShutDown()
+	defer c.ShutDown()
 
 	klog.FromContext(ctx).Info("Starting service account controller")
 	defer klog.FromContext(ctx).Info("Shutting down service account controller")
@@ -123,6 +131,12 @@ func (c *ServiceAccountsController) Run(ctx context.Context, workers int) {
 	}
 
 	<-ctx.Done()
+}
+
+func (c *ServiceAccountsController) ShutDown() {
+	c.queue.ShutDown()
+	c.saHandlerUnregister()
+	c.nsHandlerUnregister()
 }
 
 // serviceAccountDeleted reacts to a ServiceAccount deletion by recreating a default ServiceAccount in the namespace if needed
