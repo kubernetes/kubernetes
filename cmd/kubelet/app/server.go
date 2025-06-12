@@ -979,7 +979,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, tp 
 		// we set exitAfter to five minutes because we use this client configuration to request new certs - if we are unable
 		// to request new certs, we will be unable to continue normal operation. Exiting the process allows a wrapper
 		// or the bootstrapping credentials to potentially lay down new initial config.
-		closeAllConns, err := kubeletcertificate.UpdateTransport(wait.NeverStop, transportConfig, clientCertificateManager, 5*time.Minute)
+		closeAllConns, err := kubeletcertificate.UpdateTransport(ctx, wait.NeverStop, transportConfig, clientCertificateManager, 5*time.Minute)
 		if err != nil {
 			return nil, nil, err
 		}
