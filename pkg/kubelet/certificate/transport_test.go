@@ -193,7 +193,7 @@ func TestRotateShutsDownConnections(t *testing.T) {
 
 	// Check for a new cert every 10 milliseconds
 	tCtx := ktesting.Init(t)
-	if _, err := updateTransport(tCtx, stop, 10*time.Millisecond, c, m, 0); err != nil {
+	if _, err := updateTransport(tCtx, 10*time.Millisecond, c, m, 0); err != nil {
 		t.Fatal(err)
 	}
 

@@ -56,13 +56,13 @@ import (
 //
 // stopCh should be used to indicate when the transport is unused and doesn't need
 // to continue checking the manager.
-func UpdateTransport(ctx context.Context, stopCh <-chan struct{}, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
-	return updateTransport(ctx, stopCh, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
+func UpdateTransport(ctx context.Context, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+	return updateTransport(ctx, 10*time.Second, clientConfig, clientCertificateManager, exitAfter)
 }
 
 // updateTransport is an internal method that exposes how often this method checks that the
 // client cert has changed.
-func updateTransport(ctx context.Context, stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
+func updateTransport(ctx context.Context, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration) (func(), error) {
 	if clientConfig.Transport != nil || clientConfig.Dial != nil {
 		return nil, fmt.Errorf("there is already a transport or dialer configured")
 	}
@@ -70,7 +70,7 @@ func updateTransport(ctx context.Context, stopCh <-chan struct{}, period time.Du
 	d := connrotation.NewDialer((&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext)
 
 	if clientCertificateManager != nil {
-		if err := addCertRotation(ctx, stopCh, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
+		if err := addCertRotation(ctx, period, clientConfig, clientCertificateManager, exitAfter, d); err != nil {
 			return nil, err
 		}
 	} else {
@@ -80,7 +80,7 @@ func updateTransport(ctx context.Context, stopCh <-chan struct{}, period time.Du
 	return d.CloseAll, nil
 }
 
-func addCertRotation(ctx context.Context, stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
+func addCertRotation(ctx context.Context, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
 		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
@@ -155,14 +155,14 @@ func addCertRotation(ctx context.Context, stopCh <-chan struct{}, period time.Du
 	}
 
 	// start long-term check
-	go wait.Until(checkNewCertificateAndRotate, period, stopCh)
+	go wait.Until(checkNewCertificateAndRotate, period, ctx.Done())
 
 	if !hasCert.Load() {
 		// start a faster check until we get the initial certificate
 		go wait.PollUntil(time.Second, func() (bool, error) {
 			checkNewCertificateAndRotate()
 			return hasCert.Load(), nil
-		}, stopCh)
+		}, ctx.Done())
 	}
 
 	clientConfig.Transport = utilnet.SetTransportDefaults(&http.Transport{

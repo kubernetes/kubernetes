@@ -278,12 +278,11 @@ type kubeletServerCertificateDynamicFileManager struct {
 	keyFile                   string
 	dynamicCertificateContent *dynamiccertificates.DynamicCertKeyPairContent
 	currentTLSCertificate     atomic.Pointer[tls.Certificate]
-	ctx                       context.Context
 }
 
 // Enqueue implements the functions to be notified when the serving cert content changes.
 func (m *kubeletServerCertificateDynamicFileManager) Enqueue() {
-	logger := klog.FromContext(m.ctx)
+	logger := klog.FromContext(context.TODO())
 	certContent, keyContent := m.dynamicCertificateContent.CurrentCertKeyContent()
 	cert, err := tls.X509KeyPair(certContent, keyContent)
 	if err != nil {
@@ -301,8 +300,9 @@ func (m *kubeletServerCertificateDynamicFileManager) Current() *tls.Certificate 
 
 // Start starts watching the certificate and key files
 func (m *kubeletServerCertificateDynamicFileManager) Start() {
-	m.ctx, m.cancelFn = context.WithCancel(context.Background())
-	go m.dynamicCertificateContent.Run(m.ctx, 1)
+	var ctx context.Context
+	ctx, m.cancelFn = context.WithCancel(context.Background())
+	go m.dynamicCertificateContent.Run(ctx, 1)
 }
 
 // Stop stops watching the certificate and key files
