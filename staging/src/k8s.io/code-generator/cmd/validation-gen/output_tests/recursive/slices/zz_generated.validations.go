@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -90,6 +91,9 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T2.ST1
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []T1) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_T1)...)
 			return
 		}(fldPath.Child("st1"), obj.ST1, safe.Field(oldObj, func(oldObj *T2) []T1 { return oldObj.ST1 }))...)
@@ -99,6 +103,9 @@ func Validate_T2(ctx context.Context, op operation.Operation, fldPath *field.Pat
 
 func Validate_T3(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T3) (errs field.ErrorList) {
 	// type T3
+	if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+		return nil // no changes
+	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T3")...)
 
 	// field T3.T4
@@ -115,6 +122,9 @@ func Validate_T4(ctx context.Context, op operation.Operation, fldPath *field.Pat
 	// field T4.ST3
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj []T3) (errs field.ErrorList) {
+			if op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil // no changes
+			}
 			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, Validate_T3)...)
 			return
 		}(fldPath.Child("st3"), obj.ST3, safe.Field(oldObj, func(oldObj *T4) []T3 { return oldObj.ST3 }))...)

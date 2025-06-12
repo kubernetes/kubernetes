@@ -23,6 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
+
+	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
@@ -58,7 +60,7 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 
 	// This tag can apply to value and pointer fields, as well as typedefs
 	// (which should never be pointers). We need to check the concrete type.
-	if t := nonPointer(nativeType(context.Type)); !types.IsInteger(t) {
+	if t := util.NonPointer(util.NativeType(context.Type)); !types.IsInteger(t) {
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
