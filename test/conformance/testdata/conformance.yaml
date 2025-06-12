@@ -2066,6 +2066,16 @@
     watch event.
   release: v1.19
   file: test/e2e/network/service.go
+- testname: ConfigMap, from environment field with various prefixes
+  codename: '[sig-node] ConfigMap should be consumable as environment variable names
+    with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    ConfigMap. Allows users to use envFrom to set prefixes with various printable
+    ASCII characters excluding '=' as environment variable names. This test verifies
+    that different prefixes including digits, special characters, and letters can
+    be correctly used.
+  release: v1.34
+  file: test/e2e/common/node/configmap.go
 - testname: ConfigMap, from environment field
   codename: '[sig-node] ConfigMap should be consumable via environment variable [NodeConformance]
     [Conformance]'
@@ -2638,6 +2648,16 @@
     patch, delete, and deletecollection.'
   release: v1.20
   file: test/e2e/common/node/runtimeclass.go
+- testname: Secrets, pod environment from source
+  codename: '[sig-node] Secrets should be consumable as environment variable names
+    variable names with various prefixes [Conformance]'
+  description: Create a Pod with environment variable values set using values from
+    Secret. Allows users to use envFrom to set prefixes with various printable ASCII
+    characters excluding '=' as environment variable names. This test verifies that
+    different prefixes including digits, special characters, and letters can be correctly
+    used.
+  release: v1.34
+  file: test/e2e/common/node/secrets.go
 - testname: Secrets, pod environment field
   codename: '[sig-node] Secrets should be consumable from pods in env vars [NodeConformance]
     [Conformance]'
