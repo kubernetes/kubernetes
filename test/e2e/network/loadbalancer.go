@@ -1331,12 +1331,13 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 	var totalRequests uint64 = 0
 	var networkErrors uint64 = 0
 	var httpErrors uint64 = 0
-	done := make(chan struct{})
-	defer close(done)
+
+	pollCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go func() {
 		defer ginkgo.GinkgoRecover()
 
-		wait.Until(func() {
+		_ = wait.PollUntilContextCancel(pollCtx, time.Second/100, true, func(ctx context.Context) (bool, error) {
 			atomic.AddUint64(&totalRequests, 1)
 			client := &http.Client{
 				Transport: utilnet.SetTransportDefaults(&http.Transport{
@@ -1351,26 +1352,27 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 			if err != nil {
 				framework.Logf("Got error testing for reachability of %s: %v", url, err)
 				atomic.AddUint64(&networkErrors, 1)
-				return
+				return false, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != http.StatusOK {
 				framework.Logf("Got bad status code: %d", resp.StatusCode)
 				atomic.AddUint64(&httpErrors, 1)
-				return
+				return false, nil
 			}
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				framework.Logf("Got error reading HTTP body: %v", err)
 				atomic.AddUint64(&httpErrors, 1)
-				return
+				return false, nil
 			}
 			if string(body) != msg {
 				framework.Logf("The response body does not contain expected string %s", string(body))
 				atomic.AddUint64(&httpErrors, 1)
-				return
+				return false, nil
 			}
-		}, time.Duration(0), done)
+			return false, nil
+		})
 	}()
 
 	ginkgo.By("Triggering DaemonSet rolling update several times")
