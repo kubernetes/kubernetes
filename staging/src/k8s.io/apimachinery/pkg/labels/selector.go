@@ -115,6 +115,16 @@ func Nothing() Selector {
 	return sharedNothingSelector
 }
 
+// MatchesNothing only returns true when the selector is labels.Nothing(),
+// which internally returns a sharedNothingSelector and returns false in all other cases.
+// This implementation may change over time to recognize more selectors that match nothing.
+//
+// Note: The current implementation does not check for selector conflict scenarios (e.g., a=a,a!=a).
+// Support for detecting such cases can be added in the future.
+func MatchesNothing(selector Selector) bool {
+	return selector == sharedNothingSelector
+}
+
 // NewSelector returns a nil selector
 func NewSelector() Selector {
 	return internalSelector(nil)
