@@ -67,6 +67,12 @@ const (
 	//  The feature is disabled in Beta by default because
 	//  it will only be turned on for selected control plane component(s).
 	WatchListClient Feature = "WatchListClient"
+
+	// owner: @yue9944882
+	// alpha: v1.34
+	//
+	// Allow InOrderInformer to process incoming events in batches to expedite the process rate.
+	InOrderInformersBatchProcess Feature = "InOrderInformersBatchProcess"
 )
 
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
@@ -75,9 +81,10 @@ const (
 // After registering with the binary, the features are, by default, controllable using environment variables.
 // For more details, please see envVarFeatureGates implementation.
 var defaultKubernetesFeatureGates = map[Feature]FeatureSpec{
-	ClientsAllowCBOR:        {Default: false, PreRelease: Alpha},
-	ClientsPreferCBOR:       {Default: false, PreRelease: Alpha},
-	InOrderInformers:        {Default: true, PreRelease: Beta},
-	InformerResourceVersion: {Default: false, PreRelease: Alpha},
-	WatchListClient:         {Default: false, PreRelease: Beta},
+	ClientsAllowCBOR:             {Default: false, PreRelease: Alpha},
+	ClientsPreferCBOR:            {Default: false, PreRelease: Alpha},
+	InOrderInformers:             {Default: true, PreRelease: Beta},
+	InformerResourceVersion:      {Default: false, PreRelease: Alpha},
+	WatchListClient:              {Default: false, PreRelease: Beta},
+	InOrderInformersBatchProcess: {Default: false, PreRelease: Alpha},
 }
