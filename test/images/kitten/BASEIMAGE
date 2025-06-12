@@ -1,7 +1,8 @@
-linux/amd64=REGISTRY/agnhost:2.33-linux-amd64
-linux/arm=REGISTRY/agnhost:2.33-linux-arm
-linux/arm64=REGISTRY/agnhost:2.33-linux-arm64
-linux/ppc64le=REGISTRY/agnhost:2.33-linux-ppc64le
-linux/s390x=REGISTRY/agnhost:2.33-linux-s390x
-windows/amd64/1809=REGISTRY/agnhost:2.33-windows-amd64-1809
-windows/amd64/ltsc2022=REGISTRY/agnhost:2.33-windows-amd64-ltsc2022
+linux/amd64=REGISTRY/agnhost:AGNHOST-VERSION-linux-amd64
+linux/arm=REGISTRY/agnhost:AGNHOST-VERSION-linux-arm
+linux/arm64=REGISTRY/agnhost:AGNHOST-VERSION-linux-arm64
+linux/ppc64le=REGISTRY/agnhost:AGNHOST-VERSION-linux-ppc64le
+linux/s390x=REGISTRY/agnhost:AGNHOST-VERSION-linux-s390x
+windows/amd64/1809=REGISTRY/agnhost:AGNHOST-VERSION-windows-amd64-1809
+windows/amd64/ltsc2022=REGISTRY/agnhost:AGNHOST-VERSION-windows-amd64-ltsc2022
+windows/amd64/ltsc2025=REGISTRY/agnhost:AGNHOST-VERSION-windows-amd64-ltsc2025

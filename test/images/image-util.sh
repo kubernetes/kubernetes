@@ -43,8 +43,12 @@ windows_os_versions=(1809 ltsc2022 ltsc2025)
 declare -A WINDOWS_OS_VERSIONS_MAP
 
 # Get the version of busybox from the VERSION file.
-# This is used to replace the @BUSYBOX-VERSION@ placeholder in the BASEIMAGE file.
+# This is used to replace the BUSYBOX-VERSION placeholder in the BASEIMAGE file.
 BUSYBOX_VERSION=$(<"${KUBE_ROOT}/test/images/busybox/VERSION")
+
+# Get the version of agnhost from the VERSION file.
+# This is used to replace the AGNHOST-VERSION placeholder in the BASEIMAGE file.
+AGNHOST_VERSION=$(<"${KUBE_ROOT}/test/images/agnhost/VERSION")
 
 initWindowsOsVersions() {
   for os_version in "${windows_os_versions[@]}"; do
@@ -60,7 +64,10 @@ initWindowsOsVersions
 # Returns list of all supported architectures from BASEIMAGE file
 listOsArchs() {
   local image=${1}
-  sed "s/BUSYBOX-VERSION/${BUSYBOX_VERSION}/g" "${image}/BASEIMAGE" | cut -d "=" -f 1
+  sed \
+  -e "s/BUSYBOX-VERSION/${BUSYBOX_VERSION}/g" \
+  -e "s/AGNHOST-VERSION/${AGNHOST_VERSION}/g" \
+  "${image}/BASEIMAGE" | cut -d "=" -f 1
 }
 
 splitOsArch() {
@@ -88,7 +95,10 @@ splitOsArch() {
 # Returns baseimage need to used in Dockerfile for any given architecture
 getBaseImage() {
   os_arch=$1
-  sed "s/BUSYBOX-VERSION/${BUSYBOX_VERSION}/g" BASEIMAGE | grep "${os_arch}=" | cut -d= -f2
+  sed \
+  -e "s/BUSYBOX-VERSION/${BUSYBOX_VERSION}/g" \
+  -e "s/AGNHOST-VERSION/${AGNHOST_VERSION}/g" \
+  BASEIMAGE | grep "${os_arch}=" | cut -d= -f2
 }
 
 # This function will build test image for all the architectures
