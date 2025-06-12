@@ -43,6 +43,11 @@ spec:
           int: 2
           string: stringValue
           version: versionValue
+      bindingConditions:
+      - bindingConditionsValue
+      bindingFailureConditions:
+      - bindingFailureConditionsValue
+      bindingTimeoutSeconds: 11
       capacity:
         capacityKey:
           value: "0"
@@ -69,6 +74,7 @@ spec:
         key: keyValue
         timeAdded: "2004-01-01T01:01:01Z"
         value: valueValue
+      usageRestrictedToNode: true
     name: nameValue
   driver: driverValue
   nodeName: nodeNameValue

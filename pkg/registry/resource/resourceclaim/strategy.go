@@ -30,8 +30,9 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/kubernetes/typed/core/v1"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/dynamic-resource-allocation/structured"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
@@ -214,6 +215,7 @@ func dropDisabledFields(newClaim, oldClaim *resource.ResourceClaim) {
 	dropDisabledDRAPrioritizedListFields(newClaim, oldClaim)
 	dropDisabledDRAAdminAccessFields(newClaim, oldClaim)
 	dropDisabledDRAResourceClaimDeviceStatusFields(newClaim, oldClaim)
+	dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim)
 }
 
 func dropDisabledDRAPrioritizedListFields(newClaim, oldClaim *resource.ResourceClaim) {
@@ -345,3 +347,40 @@ func dropDeallocatedStatusDevices(newClaim, oldClaim *resource.ResourceClaim) {
 }
 
 // TODO: add tests after partitionable devices is merged (code conflict!)
+
+// dropDisabledDRADeviceBindingConditionsFields removes fields which are covered by a feature gate.
+func dropDisabledDRADeviceBindingConditionsFields(newClaim, oldClaim *resource.ResourceClaim) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) && utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimDeviceStatus) ||
+		draBindingConditionsFeatureInUse(oldClaim) {
+		return
+	}
+
+	klog.Info("drop disabled DRADeviceBindingConditions fields")
+	if newClaim.Status.Allocation != nil {
+		newClaim.Status.Allocation.AllocationTimestamp = nil
+	}
+	for i := range newClaim.Status.Devices {
+		newClaim.Status.Allocation.Devices.Results[i].BindingConditions = nil
+		newClaim.Status.Allocation.Devices.Results[i].BindingFailureConditions = nil
+		newClaim.Status.Allocation.Devices.Results[i].BindingTimeoutSeconds = nil
+	}
+}
+
+func draBindingConditionsFeatureInUse(claim *resource.ResourceClaim) bool {
+	if claim == nil || claim.Status.Allocation == nil {
+		return false
+	}
+
+	if claim.Status.Allocation.AllocationTimestamp != nil {
+		return true
+	}
+
+	for _, result := range claim.Status.Allocation.Devices.Results {
+		if result.BindingConditions != nil || result.BindingFailureConditions != nil ||
+			result.BindingTimeoutSeconds != nil {
+			return true
+		}
+	}
+
+	return false
+}
