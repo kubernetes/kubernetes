@@ -1226,14 +1226,14 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				sw.Do("  if ", nil)
 				firstCondition := true
 				if len(v.Conditions.OptionEnabled) > 0 {
-					sw.Do("op.Options.Has($.$)", strconv.Quote(v.Conditions.OptionEnabled))
+					sw.Do("op.HasOption($.$)", strconv.Quote(v.Conditions.OptionEnabled))
 					firstCondition = false
 				}
 				if len(v.Conditions.OptionDisabled) > 0 {
 					if !firstCondition {
 						sw.Do(" && ", nil)
 					}
-					sw.Do("!op.Options.Has($.$)", strconv.Quote(v.Conditions.OptionDisabled))
+					sw.Do("!op.HasOption($.$)", strconv.Quote(v.Conditions.OptionDisabled))
 				}
 				sw.Do(" {\n", nil)
 				sw.Do("    return ", nil)
