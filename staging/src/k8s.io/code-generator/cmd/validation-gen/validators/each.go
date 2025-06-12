@@ -77,7 +77,7 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 		panic("makeListMapMatchFunc called on a list-map with no key fields")
 	}
 
-	cmpFn := FunctionLiteral{
+	matchFn := FunctionLiteral{
 		Parameters: []ParamResult{{"a", t}, {"b", t}},
 		Results:    []ParamResult{{"", types.Bool}},
 	}
@@ -91,8 +91,8 @@ func (lm *listMetadata) makeListMapMatchFunc(t *types.Type) FunctionLiteral {
 		}
 		buf.WriteString(fmt.Sprintf("a.%s == b.%s", fld, fld))
 	}
-	cmpFn.Body = buf.String()
-	return cmpFn
+	matchFn.Body = buf.String()
+	return matchFn
 }
 
 type listTypeTagValidator struct {
@@ -288,8 +288,8 @@ func (lfv listFieldValidator) GetValidations(context Context) (Validations, erro
 		// maps or we need to allow types to opt-out from this validation.  SSA
 		// is also not able to handle these well.
 		t := util.NativeType(context.Type)
-		cmpArg := lm.makeListMapMatchFunc(t.Elem)
-		f := Function("listFieldValidator", DefaultFlags, validateUnique, cmpArg)
+		matchArg := lm.makeListMapMatchFunc(t.Elem)
+		f := Function("listFieldValidator", DefaultFlags, validateUnique, matchArg)
 		result.Functions = append(result.Functions, f)
 	}
 
