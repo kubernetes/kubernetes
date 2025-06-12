@@ -524,7 +524,7 @@ func (o *DeleteOptions) PrintObj(info *resource.Info) {
 }
 
 func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
-	fmt.Fprintf(o.Out, i18n.T("You are about to delete the following %d resource(s):\n"), len(infos))
+	fmt.Fprintf(o.Out, i18n.T("You are about to delete the following %d resource(s):\n"), len(infos)) //nolint:errcheck
 	for _, info := range infos {
 		groupKind := info.Mapping.GroupVersionKind
 		kindString := fmt.Sprintf("%s.%s", strings.ToLower(groupKind.Kind), groupKind.Group)
@@ -532,11 +532,11 @@ func (o *DeleteOptions) confirmation(infos []*resource.Info) bool {
 			kindString = strings.ToLower(groupKind.Kind)
 		}
 
-		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name)
+		fmt.Fprintf(o.Out, "%s/%s\n", kindString, info.Name) //nolint:errcheck
 	}
-	fmt.Fprint(o.Out, i18n.T("Do you want to continue?")+" (y/n): ")
+	fmt.Fprint(o.Out, i18n.T("Do you want to continue?")+" (y/N): ") //nolint:errcheck
 	var input string
-	_, err := fmt.Fscan(o.In, &input)
+	_, err := fmt.Fscanln(o.In, &input)
 	if err != nil {
 		return false
 	}
