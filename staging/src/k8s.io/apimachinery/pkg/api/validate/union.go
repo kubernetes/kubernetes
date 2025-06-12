@@ -26,6 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// ExtractorFn extracts a member field from a parent object.
+type ExtractorFn[T, V any] func(obj T) V
+
 // Union verifies that exactly one member of a union is specified.
 //
 // UnionMembership must define all the members of the union.
@@ -34,35 +37,38 @@ import (
 //
 //	var abcUnionMembership := schema.NewUnionMembership("a", "b", "c")
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, Union(ctx, op, fldPath, in, abcUnionMembership, in.A, in.B, in.C)...)
+//		errs = append(errs, Union(ctx, op, fldPath, in, oldIn, abcUnionMembership,
+//			func(in *ABC) any { return in.A },
+//			func(in *ABC) any { return in.B },
+//			func(in *ABC) any { return in.C },
+//		)...)
 //		return errs
 //	}
-func Union(_ context.Context, op operation.Operation, fldPath *field.Path, _, _ any, union *UnionMembership, fieldValues ...any) field.ErrorList {
-	if len(union.members) != len(fieldValues) {
+func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, extractorFns ...ExtractorFn[T, any]) field.ErrorList {
+	if len(union.members) != len(extractorFns) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
-				fmt.Errorf("number of field values (%d) does not match number of union members (%d)",
-					len(fieldValues), len(union.members))),
+				fmt.Errorf("number of field extractors (%d) does not match number of union members (%d)",
+					len(extractorFns), len(union.members))),
 		}
 	}
-	var specifiedMember *string
-	for i, fieldValue := range fieldValues {
+	var specifiedFields []string
+	for i, extractor := range extractorFns {
+		fieldValue := extractor(obj)
 		rv := reflect.ValueOf(fieldValue)
 		if rv.IsValid() && !rv.IsZero() {
-			m := union.members[i]
-			if specifiedMember != nil && *specifiedMember != m.discriminatorValue {
-				return field.ErrorList{
-					field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(union.specifiedFields(fieldValues), ", ")),
-						fmt.Sprintf("must specify exactly one of: %s", strings.Join(union.allFields(), ", "))),
-				}
-			}
-			name := m.discriminatorValue
-			specifiedMember = &name
+			specifiedFields = append(specifiedFields, union.members[i].fieldName)
 		}
 	}
-	if specifiedMember == nil {
+	if len(specifiedFields) > 1 {
+		return field.ErrorList{
+			field.Invalid(fldPath, fmt.Sprintf("{%s}", strings.Join(specifiedFields, ", ")),
+				fmt.Sprintf("must specify exactly one of: %s", strings.Join(union.allFields(), ", "))),
+		}
+	}
+	if len(specifiedFields) == 0 {
 		return field.ErrorList{field.Invalid(fldPath, "",
-			fmt.Sprintf("must specify exactly one of: %s",
+			fmt.Sprintf("must specify one of: %s",
 				strings.Join(union.allFields(), ", ")))}
 	}
 	return nil
@@ -76,24 +82,32 @@ func Union(_ context.Context, op operation.Operation, fldPath *field.Path, _, _ 
 //
 //	var abcUnionMembership := schema.NewDiscriminatedUnionMembership("type", "a", "b", "c")
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, abcUnionMembership, in.Type, in.A, in.B, in.C)...)
+//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, abcUnionMembership,
+//			func(in *ABC) string { return in.Type },
+//			func(in *ABC) any { return in.A },
+//			func(in *ABC) any { return in.B },
+//			func(in *ABC) any { return in.C },
+//		)...)
 //		return errs
 //	}
 //
 // It is not an error for the discriminatorValue to be unknown.  That must be
 // validated on its own.
-func DiscriminatedUnion[T ~string](_ context.Context, op operation.Operation, fldPath *field.Path, _, _ any, union *UnionMembership, discriminatorValue T, fieldValues ...any) (errs field.ErrorList) {
-	discriminatorStrValue := string(discriminatorValue)
-	if len(union.members) != len(fieldValues) {
+func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T, D], extractorFns ...ExtractorFn[T, any]) (errs field.ErrorList) {
+	if len(union.members) != len(extractorFns) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
-				fmt.Errorf("number of field values (%d) does not match number of union members (%d)",
-					len(fieldValues), len(union.members))),
+				fmt.Errorf("number of field extractors (%d) does not match number of union members (%d)",
+					len(extractorFns), len(union.members))),
 		}
 	}
-	for i, fieldValue := range fieldValues {
+
+	discriminatorValue := discriminatorExtractor(obj)
+
+	for i, extractor := range extractorFns {
 		member := union.members[i]
-		isDiscriminatedMember := discriminatorStrValue == member.discriminatorValue
+		isDiscriminatedMember := string(discriminatorValue) == member.discriminatorValue
+		fieldValue := extractor(obj)
 		rv := reflect.ValueOf(fieldValue)
 		isSpecified := rv.IsValid() && !rv.IsZero()
 		if isSpecified && !isDiscriminatedMember {
@@ -136,19 +150,6 @@ func NewDiscriminatedUnionMembership(discriminatorFieldName string, members ...[
 		u.members = append(u.members, member{fieldName: fieldName[0], discriminatorValue: fieldName[1]})
 	}
 	return u
-}
-
-// specifiedFields returns a string listing all the field names of the specified fieldValues for use in error reporting.
-func (u UnionMembership) specifiedFields(fieldValues []any) []string {
-	var membersSpecified []string
-	for i, fieldValue := range fieldValues {
-		rv := reflect.ValueOf(fieldValue)
-		if rv.IsValid() && !rv.IsZero() {
-			f := u.members[i]
-			membersSpecified = append(membersSpecified, f.fieldName)
-		}
-	}
-	return membersSpecified
 }
 
 // allFields returns a string listing all the field names of the member of a union for use in error reporting.

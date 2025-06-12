@@ -26,7 +26,7 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{}).ExpectInvalid(
-		field.Invalid(nil, "", "must specify exactly one of: `m1`, `m2`"),
+		field.Invalid(nil, "", "must specify one of: `m1`, `m2`"),
 	)
 
 	st.Value(&Struct{M1: &M1{}}).ExpectValid()

@@ -74,13 +74,19 @@ func TestUnion(t *testing.T) {
 			name:        "invalid no member set",
 			fields:      [][2]string{{"a", "A"}, {"b", "B"}, {"c", "C"}, {"d", "D"}},
 			fieldValues: []any{nil, nil, nil, nil},
-			expected:    field.ErrorList{field.Invalid(nil, "", "must specify exactly one of: `a`, `b`, `c`, `d`")},
+			expected:    field.ErrorList{field.Invalid(nil, "", "must specify one of: `a`, `b`, `c`, `d`")},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Union(context.Background(), operation.Operation{Type: operation.Update}, nil, nil, nil, NewUnionMembership(tc.fields...), tc.fieldValues...)
+			extractors := make([]ExtractorFn[*testMember, any], len(tc.fieldValues))
+			for i, val := range tc.fieldValues {
+				val := val
+				extractors[i] = func(_ *testMember) any { return val }
+			}
+
+			got := Union(context.Background(), operation.Operation{Type: operation.Update}, nil, &testMember{}, nil, NewUnionMembership(tc.fields...), extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got, tc.expected)
 			}
@@ -119,7 +125,15 @@ func TestDiscriminatedUnion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := DiscriminatedUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, nil, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), tc.discriminatorValue, tc.fieldValues...)
+			discriminatorExtractor := func(_ *testMember) string { return tc.discriminatorValue }
+
+			extractors := make([]ExtractorFn[*testMember, any], len(tc.fieldValues))
+			for i, val := range tc.fieldValues {
+				val := val
+				extractors[i] = func(_ *testMember) any { return val }
+			}
+
+			got := DiscriminatedUnion(context.Background(), operation.Operation{Type: operation.Update}, nil, &testMember{}, nil, NewDiscriminatedUnionMembership(tc.discriminatorField, tc.fields...), discriminatorExtractor, extractors...)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got %v want %v", got.ToAggregate(), tc.expected.ToAggregate())
 			}

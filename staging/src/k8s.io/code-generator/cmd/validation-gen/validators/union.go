@@ -82,24 +82,66 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 			//       The correct package would be the output package but is not known here. This does not show up in generated code.
 			// TODO: Append a consistent hash suffix to avoid generated name conflicts?
 			supportVarName := PrivateVar{Name: "UnionMembershipFor" + context.Type.Name.Name + unionName, Package: "local"}
+			ptrType := types.PointerTo(context.Type)
+
 			if u.discriminator != nil {
 				supportVar := Variable(supportVarName,
 					Function(unionMemberTagName, DefaultFlags, newDiscriminatedUnionMembership,
-						append([]any{*u.discriminator}, u.fields...)...))
+						append([]any{*u.discriminator}, toSliceAny(u.fields)...)...))
 				result.Variables = append(result.Variables, supportVar)
-				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator,
-					append([]any{supportVarName, u.discriminatorMember}, u.fieldMembers...)...)
+
+				var extractorArgs []any
+				extractorArgs = append(extractorArgs, supportVarName)
+
+				discriminatorExtractor := FunctionLiteral{
+					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+					Results:    []ParamResult{{Type: types.String}},
+					Body:       fmt.Sprintf("return string(obj.%s)", u.discriminatorMember.Name), // Cast to string
+				}
+				extractorArgs = append(extractorArgs, discriminatorExtractor)
+
+				for _, member := range u.fieldMembers {
+					extractor := FunctionLiteral{
+						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+						Results:    []ParamResult{{Type: types.Any}},
+						Body:       fmt.Sprintf("return obj.%s", member.Name),
+					}
+					extractorArgs = append(extractorArgs, extractor)
+				}
+
+				fn := Function(unionMemberTagName, DefaultFlags, discriminatedUnionValidator, extractorArgs...)
 				result.Functions = append(result.Functions, fn)
 			} else {
-				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, u.fields...))
+				supportVar := Variable(supportVarName, Function(unionMemberTagName, DefaultFlags, newUnionMembership, toSliceAny(u.fields)...))
 				result.Variables = append(result.Variables, supportVar)
-				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, append([]any{supportVarName}, u.fieldMembers...)...)
+
+				var extractorArgs []any
+				extractorArgs = append(extractorArgs, supportVarName)
+
+				for _, member := range u.fieldMembers {
+					extractor := FunctionLiteral{
+						Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
+						Results:    []ParamResult{{Type: types.Any}},
+						Body:       fmt.Sprintf("return obj.%s", member.Name),
+					}
+					extractorArgs = append(extractorArgs, extractor)
+				}
+
+				fn := Function(unionMemberTagName, DefaultFlags, unionValidator, extractorArgs...)
 				result.Functions = append(result.Functions, fn)
 			}
 		}
 	}
 
 	return result, nil
+}
+
+func toSliceAny[T any](t []T) []any {
+	result := make([]any, len(t))
+	for i, v := range t {
+		result[i] = v
+	}
+	return result
 }
 
 const (
@@ -140,7 +182,7 @@ func (udtv unionDiscriminatorTagValidator) GetValidations(context Context, tag c
 	if jsonAnnotation, ok := tags.LookupJSON(*context.Member); ok {
 		discriminatorFieldName = jsonAnnotation.Name
 		u.discriminator = &discriminatorFieldName
-		u.discriminatorMember = *context.Member
+		u.discriminatorMember = context.Member
 	}
 
 	// This tag does not actually emit any validations, it just accumulates
@@ -200,7 +242,7 @@ func (umtv unionMemberTagValidator) GetValidations(context Context, tag codetags
 
 	u := umtv.shared[context.Parent].getOrCreate(unionArg.Value)
 	u.fields = append(u.fields, [2]string{fieldName, memberName})
-	u.fieldMembers = append(u.fieldMembers, *context.Member)
+	u.fieldMembers = append(u.fieldMembers, context.Member)
 
 	// This tag does not actually emit any validations, it just accumulates
 	// information. The validation is done by the unionTypeValidator.
@@ -231,18 +273,18 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 // on +k8s:unionMember and +k8s:unionDiscriminator tags found in a go struct.
 type union struct {
 	// fields provides field information about all the members of the union.
-	// Each slice element is a [2]string to provide a fieldName and memberName pair, where
-	// [0] identifies the field name and [1] identifies the union member Name.
-	// fields is index aligned with fieldMembers.
+	// Each item provides a fieldName and memberName pair, where [0] identifies
+	// the field name and [1] identifies the union member Name. fields is index
+	// aligned with fieldMembers.
 	// If member name is not set, it defaults to the go struct field name.
-	fields []any
-	// fieldMembers is a list of types.Member for all the members of the union.
-	fieldMembers []any
+	fields [][2]string
+	// fieldMembers describes all the members of the union.
+	fieldMembers []*types.Member
 
 	// discriminator is the name of the discriminator field
 	discriminator *string
-	// discriminatorMember is the types.Member of the discriminator field.
-	discriminatorMember any
+	// discriminatorMember describes the discriminator field.
+	discriminatorMember *types.Member
 }
 
 // unions represents all the unions for a go struct.
