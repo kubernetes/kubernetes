@@ -2185,7 +2185,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
-	f.It("sequential update with pods replacing each other", framework.WithSlow(), func(ctx context.Context) {
+	f.It("sequential update with pods replacing each other", f.WithLabel("KubeletMinVersion:1.33"), framework.WithSlow(), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
 		// Same driver name, same socket path.
