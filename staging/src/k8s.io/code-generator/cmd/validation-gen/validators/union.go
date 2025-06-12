@@ -95,8 +95,8 @@ func (utv unionTypeValidator) GetValidations(context Context) (Validations, erro
 
 				discriminatorExtractor := FunctionLiteral{
 					Parameters: []ParamResult{{Name: "obj", Type: ptrType}},
-					Results:    []ParamResult{{Type: types.Any}},
-					Body:       fmt.Sprintf("return obj.%s", u.discriminatorMember.Name),
+					Results:    []ParamResult{{Type: types.String}},
+					Body:       fmt.Sprintf("return string(obj.%s)", u.discriminatorMember.Name), // Cast to string
 				}
 				extractorArgs = append(extractorArgs, discriminatorExtractor)
 

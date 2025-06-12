@@ -27,7 +27,7 @@ import (
 )
 
 // ExtractorFn extracts a member field from a parent object.
-type ExtractorFn[T any] func(obj T) any
+type ExtractorFn[T, V any] func(obj T) V
 
 // Union verifies that exactly one member of a union is specified.
 //
@@ -44,7 +44,7 @@ type ExtractorFn[T any] func(obj T) any
 //		)...)
 //		return errs
 //	}
-func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, extractorFns ...ExtractorFn[T]) field.ErrorList {
+func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, extractorFns ...ExtractorFn[T, any]) field.ErrorList {
 	if len(union.members) != len(extractorFns) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
@@ -82,7 +82,8 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 //
 //	var abcUnionMembership := schema.NewDiscriminatedUnionMembership("type", "a", "b", "c")
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, abcUnionMembership, in.Type,
+//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, abcUnionMembership,
+//			func(in *ABC) string { return in.Type },
 //			func(in *ABC) any { return in.A },
 //			func(in *ABC) any { return in.B },
 //			func(in *ABC) any { return in.C },
@@ -92,7 +93,7 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 //
 // It is not an error for the discriminatorValue to be unknown.  That must be
 // validated on its own.
-func DiscriminatedUnion[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T], extractorFns ...ExtractorFn[T]) (errs field.ErrorList) {
+func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj T, union *UnionMembership, discriminatorExtractor ExtractorFn[T, D], extractorFns ...ExtractorFn[T, any]) (errs field.ErrorList) {
 	if len(union.members) != len(extractorFns) {
 		return field.ErrorList{
 			field.InternalError(fldPath,
@@ -102,18 +103,10 @@ func DiscriminatedUnion[T any](_ context.Context, op operation.Operation, fldPat
 	}
 
 	discriminatorValue := discriminatorExtractor(obj)
-	// Reflect to get string value through aliases, necessary for == comparison.
-	discriminatorStrValue := ""
-	if discriminatorValue != nil {
-		val := reflect.ValueOf(discriminatorValue)
-		if val.Kind() == reflect.String {
-			discriminatorStrValue = val.String()
-		}
-	}
 
 	for i, extractor := range extractorFns {
 		member := union.members[i]
-		isDiscriminatedMember := discriminatorStrValue == member.discriminatorValue
+		isDiscriminatedMember := string(discriminatorValue) == member.discriminatorValue
 		fieldValue := extractor(obj)
 		rv := reflect.ValueOf(fieldValue)
 		isSpecified := rv.IsValid() && !rv.IsZero()
