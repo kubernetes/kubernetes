@@ -26,6 +26,25 @@ import (
 	utiltrace "k8s.io/utils/trace"
 )
 
+// RealFIFOOptions is the configuration parameters for RealFIFO.
+type RealFIFOOptions struct {
+	// KeyFunction is used to figure out what key an object should have. (It's
+	// exposed in the returned RealFIFO's keyOf() method, with additional
+	// handling around deleted objects and queue state).
+	// Optional, the default is MetaNamespaceKeyFunc.
+	KeyFunction KeyFunc
+
+	// KnownObjects is expected to return a list of keys that the consumer of
+	// this queue "knows about". It is used to decide which items are missing
+	// when Replace() is called; 'Deleted' deltas are produced for the missing items.
+	// KnownObjects is required.
+	KnownObjects KeyListerGetter
+
+	// If set, will be called for objects before enqueueing them. Please
+	// see the comment on TransformFunc for details.
+	Transformer TransformFunc
+}
+
 // RealFIFO is a Queue in which every notification from the Reflector is passed
 // in order to the Queue via Pop.
 // This means that it
@@ -398,16 +417,31 @@ func (f *RealFIFO) Transformer() TransformFunc {
 // NewRealFIFO returns a Store which can be used to queue up items to
 // process.
 func NewRealFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter, transformer TransformFunc) *RealFIFO {
-	if knownObjects == nil {
+	return NewRealFIFOWithOptions(RealFIFOOptions{
+		KeyFunction:  keyFunc,
+		KnownObjects: knownObjects,
+		Transformer:  transformer,
+	})
+}
+
+// NewRealFIFOWithOptions returns a Queue which can be used to process changes to
+// items. See also the comment on RealFIFO.
+func NewRealFIFOWithOptions(opts RealFIFOOptions) *RealFIFO {
+	if opts.KeyFunction == nil {
+		opts.KeyFunction = MetaNamespaceKeyFunc
+	}
+
+	if opts.KnownObjects == nil {
 		panic("coding error: knownObjects must be provided")
 	}
 
 	f := &RealFIFO{
 		items:        make([]Delta, 0, 10),
-		keyFunc:      keyFunc,
-		knownObjects: knownObjects,
-		transformer:  transformer,
+		keyFunc:      opts.KeyFunction,
+		knownObjects: opts.KnownObjects,
+		transformer:  opts.Transformer,
 	}
+
 	f.cond.L = &f.lock
 	return f
 }
