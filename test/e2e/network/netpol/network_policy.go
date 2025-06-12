@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1240,6 +1241,65 @@ var _ = common.SIGDescribe("Netpol", func() {
 			reachability.ExpectPeer(&Peer{Namespace: nsX, Pod: "a"}, &Peer{Namespace: nsY}, false)
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
+
+		f.It("should enforce default-deny ingress policy against LoadBalancer traffic with ExternalTrafficPolicy: Local", feature.NetworkPolicy, feature.LoadBalancer, func(ctx context.Context) {
+			// Create pods and namespaces to utilize netpol helper functions
+			k8s := initializeResources(ctx, f, []v1.Protocol{v1.ProtocolTCP}, []int32{80})
+
+			// Make and apply deny-all-ingress policy in namespace x
+			nsX, _, _ := getK8sNamespaces(k8s)
+			policy := GenNetworkPolicyWithNameAndPodSelector(
+				"deny-ingress",
+				metav1.LabelSelector{},
+				SetSpecIngressRules(),
+			)
+			CreatePolicy(ctx, k8s, policy, nsX)
+
+			// Create a “Local” LoadBalancer Service in namespace x with one netexec pod
+			cs := f.ClientSet
+			timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(ctx, cs)
+			jig := e2eservice.NewTestJig(cs, nsX, "deny-lb")
+			svc, err := jig.CreateOnlyLocalLoadBalancerService(ctx, timeout, true, nil)
+			framework.ExpectNoError(err)
+
+			// Grab subnetPrefix to detect SNAT'd requests
+			subnetPrefix, err := common.GetSubnetPrefix(ctx, cs)
+			framework.ExpectNoError(err)
+
+			// FIXME: figure out the actual expected semantics for
+			// "ExternalTrafficPolicy: Local" + "IPMode: Proxy".
+			// https://issues.k8s.io/123714    ing := &svc.Status.LoadBalancer.Ingress[0]
+			ingress := &svc.Status.LoadBalancer.Ingress[0]
+			if ingress.IP == "" || (ingress.IPMode != nil && *ingress.IPMode == v1.LoadBalancerIPModeProxy) {
+				e2eskipper.Skipf("LoadBalancer uses 'Proxy' IPMode")
+			}
+
+			ingressIP := e2eservice.GetIngressPoint(ingress)
+			svcPort := int(svc.Spec.Ports[0].Port)
+
+			// Attempt HTTP request from the e2e “host” to LB_IP:svcPort
+			clientIPPort, err = GetHTTPContent(ingressIP, svcPort, e2eservice.KubeProxyLagTimeout, "/")
+
+			if err == nil {
+				host, _, splitErr := net.SplitHostPort(clientIPPort)
+				if splitErr != nil {
+					framework.Failf("unexpected clientIPPort format: %q", clientIPPort)
+				}
+
+				ip := utilnet.ParseIPSloppy(host)
+				if ip == nil {
+					framework.Failf("invalid client IP format: %q", host)
+				}
+
+				if subnetPrefix.Contains(ip) {
+					e2eskipper.Skipf("LoadBalancer request was SNAT'd")
+				}
+
+				framework.Failf("LoadBalancer traffic reached pod with preserved source IP %s, but default-deny NetworkPolicy should have blocked it", ip.String())
+			}
+
+		})
+
 	})
 })
 
