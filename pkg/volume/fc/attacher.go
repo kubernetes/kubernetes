@@ -57,7 +57,7 @@ func (plugin *fcPlugin) NewDeviceMounter() (volume.DeviceMounter, error) {
 }
 
 func (plugin *fcPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	mounter := plugin.host.GetMounter()
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
@@ -97,7 +97,7 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 }
 
 func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, mountArgs volume.DeviceMounterArgs) error {
-	mounter := attacher.host.GetMounter(fcPluginName)
+	mounter := attacher.host.GetMounter()
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -123,7 +123,7 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
 	}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}
+		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec()}
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
@@ -146,7 +146,7 @@ var _ volume.DeviceUnmounter = &fcDetacher{}
 
 func (plugin *fcPlugin) NewDetacher() (volume.Detacher, error) {
 	return &fcDetacher{
-		mounter: plugin.host.GetMounter(plugin.GetPluginName()),
+		mounter: plugin.host.GetMounter(),
 		manager: &fcUtil{},
 		host:    plugin.host,
 	}, nil
@@ -247,7 +247,7 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 		fsType:       fc.FSType,
 		volumeMode:   volumeMode,
 		readOnly:     readOnly,
-		mounter:      volumeutil.NewSafeFormatAndMountFromHost(fcPluginName, host),
+		mounter:      volumeutil.NewSafeFormatAndMountFromHost(host),
 		deviceUtil:   volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 		mountOptions: volumeutil.MountOptionFromSpec(spec),
 	}, nil
@@ -260,6 +260,6 @@ func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost) *fcD
 		},
 		mounter:    mounter,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
-		exec:       host.GetExec(fcPluginName),
+		exec:       host.GetExec(),
 	}
 }

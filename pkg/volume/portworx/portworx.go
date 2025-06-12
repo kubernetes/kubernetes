@@ -116,7 +116,7 @@ func (plugin *portworxVolumePlugin) GetAccessModes() []v1.PersistentVolumeAccess
 }
 
 func (plugin *portworxVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.UID, plugin.util, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newMounterInternal(spec, pod.UID, plugin.util, plugin.host.GetMounter())
 }
 
 func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager portworxManager, mounter mount.Interface) (volume.Mounter, error) {
@@ -140,11 +140,11 @@ func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host)}, nil
+		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.host)}, nil
 }
 
 func (plugin *portworxVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
-	return plugin.newUnmounterInternal(volName, podUID, plugin.util, plugin.host.GetMounter(plugin.GetPluginName()))
+	return plugin.newUnmounterInternal(volName, podUID, plugin.util, plugin.host.GetMounter())
 }
 
 func (plugin *portworxVolumePlugin) newUnmounterInternal(volName string, podUID types.UID, manager portworxManager,

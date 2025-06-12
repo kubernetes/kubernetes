@@ -407,11 +407,11 @@ func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Sp
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by expand controller's VolumeHost implementation")
 }
 
-func (expc *expandController) GetMounter(pluginName string) mount.Interface {
+func (expc *expandController) GetMounter() mount.Interface {
 	return nil
 }
 
-func (expc *expandController) GetExec(pluginName string) utilexec.Interface {
+func (expc *expandController) GetExec() utilexec.Interface {
 	return utilexec.New()
 }
 

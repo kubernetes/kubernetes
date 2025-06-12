@@ -73,7 +73,7 @@ func (ctrl *PersistentVolumeController) NewWrapperUnmounter(volName string, spec
 	return nil, fmt.Errorf("PersistentVolumeController.NewWrapperMounter is not implemented")
 }
 
-func (ctrl *PersistentVolumeController) GetMounter(pluginName string) mount.Interface {
+func (ctrl *PersistentVolumeController) GetMounter() mount.Interface {
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(typ
 	}
 }
 
-func (adc *PersistentVolumeController) GetExec(pluginName string) utilexec.Interface {
+func (adc *PersistentVolumeController) GetExec() utilexec.Interface {
 	return utilexec.New()
 }
 

@@ -335,10 +335,8 @@ func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 
 // NewSafeFormatAndMountFromHost creates a new SafeFormatAndMount with Mounter
 // and Exec taken from given VolumeHost.
-func NewSafeFormatAndMountFromHost(pluginName string, host volume.VolumeHost) *mount.SafeFormatAndMount {
-	mounter := host.GetMounter(pluginName)
-	exec := host.GetExec(pluginName)
-	return &mount.SafeFormatAndMount{Interface: mounter, Exec: exec}
+func NewSafeFormatAndMountFromHost(host volume.VolumeHost) *mount.SafeFormatAndMount {
+	return &mount.SafeFormatAndMount{Interface: host.GetMounter(), Exec: host.GetExec()}
 }
 
 // GetVolumeMode retrieves VolumeMode from pv.

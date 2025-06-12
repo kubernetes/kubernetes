@@ -136,7 +136,7 @@ func (f *fakeVolumeHost) GetKubeClient() clientset.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
+func (f *fakeVolumeHost) GetMounter() mount.Interface {
 	return f.mounter
 }
 
@@ -198,7 +198,7 @@ func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secre
 	}
 }
 
-func (f *fakeVolumeHost) GetExec(pluginName string) exec.Interface {
+func (f *fakeVolumeHost) GetExec() exec.Interface {
 	return f.exec
 }
 

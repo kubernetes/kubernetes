@@ -1181,7 +1181,7 @@ func TestUnmounterTeardown(t *testing.T) {
 	}
 
 	// do a fake local mount
-	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
+	diskMounter := util.NewSafeFormatAndMountFromHost(plug.host)
 	device := "/fake/device"
 	if goruntime.GOOS == "windows" {
 		// We need disk numbers on Windows.
@@ -1238,7 +1238,7 @@ func TestUnmounterTeardownNoClientError(t *testing.T) {
 	}
 
 	// do a fake local mount
-	diskMounter := util.NewSafeFormatAndMountFromHost(plug.GetPluginName(), plug.host)
+	diskMounter := util.NewSafeFormatAndMountFromHost(plug.host)
 	device := "/fake/device"
 	if goruntime.GOOS == "windows" {
 		// We need disk numbers on Windows.

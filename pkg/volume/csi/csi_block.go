@@ -498,7 +498,7 @@ func (m *csiBlockMapper) cleanupOrphanDeviceFiles() error {
 	// Remove everything under xxx/plugins/kubernetes.io/csi/volumeDevices/<volume name>.
 	// At this point it contains only "data/vol_data.json" and empty "dev/".
 	volumeDir := getVolumePluginDir(m.specName, m.plugin.host)
-	mounter := m.plugin.host.GetMounter(m.plugin.GetPluginName())
+	mounter := m.plugin.host.GetMounter()
 	if err := removeall.RemoveAllOneFilesystem(mounter, volumeDir); err != nil {
 		return err
 	}

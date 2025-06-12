@@ -544,7 +544,7 @@ func TestConstructVolumeSpec(t *testing.T) {
 			plug := &localVolumePlugin{
 				host: volumetest.NewFakeKubeletVolumeHost(t, tmpDir, nil, nil),
 			}
-			mounter := plug.host.GetMounter(plug.GetPluginName())
+			mounter := plug.host.GetMounter()
 			fakeMountPoints := []mount.MountPoint{}
 			for _, mp := range tt.mountPoints {
 				fakeMountPoint := mp

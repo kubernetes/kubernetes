@@ -132,7 +132,7 @@ func (plugin *localVolumePlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (vol
 			pod:             pod,
 			podUID:          pod.UID,
 			volName:         spec.Name(),
-			mounter:         plugin.host.GetMounter(plugin.GetPluginName()),
+			mounter:         plugin.host.GetMounter(),
 			hostUtil:        kvh.GetHostUtil(),
 			plugin:          plugin,
 			globalPath:      globalLocalPath,
@@ -149,7 +149,7 @@ func (plugin *localVolumePlugin) NewUnmounter(volName string, podUID types.UID) 
 		localVolume: &localVolume{
 			podUID:  podUID,
 			volName: volName,
-			mounter: plugin.host.GetMounter(plugin.GetPluginName()),
+			mounter: plugin.host.GetMounter(),
 			plugin:  plugin,
 		},
 	}, nil
@@ -201,7 +201,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 	// For filesystem volume with block source, we should resolve to its device
 	// path if global mount path exists.
 	var path string
-	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	mounter := plugin.host.GetMounter()
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
 		return volume.ReconstructedVolume{}, err
@@ -311,7 +311,7 @@ func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error
 	}
 	return &deviceMounter{
 		plugin:   plugin,
-		mounter:  util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mounter:  util.NewSafeFormatAndMountFromHost(plugin.host),
 		hostUtil: kvh.GetHostUtil(),
 	}, nil
 }
@@ -405,7 +405,7 @@ func (plugin *localVolumePlugin) NodeExpand(resizeOptions volume.NodeResizeOptio
 
 	switch fileType {
 	case hostutil.FileTypeBlockDev:
-		_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), localDevicePath, resizeOptions.DeviceMountPath)
+		_, err = util.GenericResizeFS(plugin.host, localDevicePath, resizeOptions.DeviceMountPath)
 		if err != nil {
 			return false, err
 		}
@@ -451,12 +451,12 @@ func (dm *deviceMounter) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 func (plugin *localVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
 	return &deviceMounter{
 		plugin:  plugin,
-		mounter: util.NewSafeFormatAndMountFromHost(plugin.GetPluginName(), plugin.host),
+		mounter: util.NewSafeFormatAndMountFromHost(plugin.host),
 	}, nil
 }
 
 func (plugin *localVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
-	mounter := plugin.host.GetMounter(plugin.GetPluginName())
+	mounter := plugin.host.GetMounter()
 	return mounter.GetMountRefs(deviceMountPath)
 }
 

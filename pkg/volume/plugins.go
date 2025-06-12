@@ -386,7 +386,7 @@ type VolumeHost interface {
 	NewWrapperUnmounter(volName string, spec Spec, podUID types.UID) (Unmounter, error)
 
 	// Get mounter interface.
-	GetMounter(pluginName string) mount.Interface
+	GetMounter() mount.Interface
 
 	// Returns the hostname of the host kubelet is running on
 	GetHostName() string
@@ -408,7 +408,7 @@ type VolumeHost interface {
 	DeleteServiceAccountTokenFunc() func(podUID types.UID)
 
 	// Returns an interface that should be used to execute any utilities in volume plugins
-	GetExec(pluginName string) exec.Interface
+	GetExec() exec.Interface
 
 	// Returns the labels on the node
 	GetNodeLabels() (map[string]string, error)

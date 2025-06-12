@@ -806,7 +806,7 @@ func (adc *attachDetachController) NewWrapperUnmounter(volName string, spec volu
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by Attach/Detach controller's VolumeHost implementation")
 }
 
-func (adc *attachDetachController) GetMounter(pluginName string) mount.Interface {
+func (adc *attachDetachController) GetMounter() mount.Interface {
 	return nil
 }
 
@@ -851,7 +851,7 @@ func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UI
 	}
 }
 
-func (adc *attachDetachController) GetExec(pluginName string) utilexec.Interface {
+func (adc *attachDetachController) GetExec() utilexec.Interface {
 	return utilexec.New()
 }
 

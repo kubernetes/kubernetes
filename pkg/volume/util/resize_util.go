@@ -456,7 +456,7 @@ func mergeStorageAllocatedResources(pvc *v1.PersistentVolumeClaim, size resource
 }
 
 // GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
-func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
-	resizer := mount.NewResizeFs(host.GetExec(pluginName))
+func GenericResizeFS(host volume.VolumeHost, devicePath, deviceMountPath string) (bool, error) {
+	resizer := mount.NewResizeFs(host.GetExec())
 	return resizer.Resize(devicePath, deviceMountPath)
 }

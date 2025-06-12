@@ -73,7 +73,7 @@ func (c *Controller) NewWrapperUnmounter(volName string, spec volume.Spec, podUI
 	return nil, fmt.Errorf("NewWrapperUnmounter not supported by SELinux controller VolumeHost implementation")
 }
 
-func (c *Controller) GetMounter(pluginName string) mount.Interface {
+func (c *Controller) GetMounter() mount.Interface {
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (c *Controller) DeleteServiceAccountTokenFunc() func(types.UID) {
 	}
 }
 
-func (c *Controller) GetExec(pluginName string) utilexec.Interface {
+func (c *Controller) GetExec() utilexec.Interface {
 	return utilexec.New()
 }
 
