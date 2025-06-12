@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	scalefake "k8s.io/client-go/scale/fake"
@@ -794,7 +795,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		defaultTestingTolerance,
 		defaultTestingCPUInitializationPeriod,
 		defaultTestingDelayOfInitialReadinessStatus,
-		testDynamicClient,
+		nil, // TODO 
 	)
 	hpaController.hpaListerSynced = alwaysReady
 	if tc.recommendations != nil {
@@ -5135,7 +5136,7 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelInternal,
 		},
 	}
-	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
+	_, _, _, testEMClient, _, _ := tc.prepareTestClient(t)
 	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
 	})

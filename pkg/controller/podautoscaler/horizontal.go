@@ -44,7 +44,6 @@ import (
 	autoscalinginformers "k8s.io/client-go/informers/autoscaling/v2"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	appsv1client "k8s.io/client-go/kubernetes/typed/apps/v1"
 	autoscalingclient "k8s.io/client-go/kubernetes/typed/autoscaling/v2"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v2"
@@ -141,7 +140,6 @@ type HorizontalController struct {
 func NewHorizontalController(
 	ctx context.Context,
 	evtNamespacer v1core.EventsGetter,
-	appsv1client appsv1client.AppsV1Interface,
 	scaleNamespacer scaleclient.ScalesGetter,
 	hpaNamespacer autoscalingclient.HorizontalPodAutoscalersGetter,
 	mapper apimeta.RESTMapper,
@@ -186,7 +184,7 @@ func NewHorizontalController(
 		podFilterCache:      make(map[selectors.Key]PodFilter),
 		podFilterMux:        sync.RWMutex{},
 		dynamicClient:       dynamicClient,
-		controllerCache: controllerCache,
+		controllerCache:     controllerCache,
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
