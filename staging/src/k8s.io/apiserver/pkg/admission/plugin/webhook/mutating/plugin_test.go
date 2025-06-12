@@ -26,14 +26,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	clocktesting "k8s.io/utils/clock/testing"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
+	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-base/metrics/testutil"
+	clocktesting "k8s.io/utils/clock/testing"
 )
 
 // BenchmarkAdmit tests the performance cost of invoking a mutating webhook
@@ -156,6 +158,9 @@ func TestAdmit(t *testing.T) {
 				attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
 			}
 
+			if len(tt.ExpectRejectionMetrics) > 0 {
+				admissionmetrics.Metrics.WebhookRejectionGathererForTest().Reset()
+			}
 			err = wh.Admit(context.TODO(), attr, objectInterfaces)
 			if tt.ExpectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.ExpectAllow, err)
@@ -176,6 +181,15 @@ func TestAdmit(t *testing.T) {
 			} else if isStatusErr {
 				if statusErr.ErrStatus.Code != tt.ExpectStatusCode {
 					t.Errorf("expected status code %d, got %d", tt.ExpectStatusCode, statusErr.ErrStatus.Code)
+				}
+			}
+			if len(tt.ExpectRejectionMetrics) > 0 {
+				expectedMetrics := `
+# HELP apiserver_admission_webhook_rejection_count [ALPHA] Admission webhook rejection count, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.
+# TYPE apiserver_admission_webhook_rejection_count counter
+` + tt.ExpectRejectionMetrics + "\n"
+				if err := testutil.CollectAndCompare(admissionmetrics.Metrics.WebhookRejectionGathererForTest(), strings.NewReader(expectedMetrics), "apiserver_admission_webhook_rejection_count"); err != nil {
+					t.Errorf("unexpected collecting result:\n%s", err)
 				}
 			}
 			fakeAttr, ok := attr.(*webhooktesting.FakeAttributes)

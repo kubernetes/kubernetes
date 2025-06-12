@@ -225,6 +225,7 @@ type ValidatingTest struct {
 	ErrorContains          string
 	ExpectAnnotations      map[string]string
 	ExpectStatusCode       int32
+	ExpectRejectionMetrics string
 	ExpectReinvokeWebhooks map[string]bool
 }
 
@@ -242,6 +243,7 @@ type MutatingTest struct {
 	ErrorContains          string
 	ExpectAnnotations      map[string]string
 	ExpectStatusCode       int32
+	ExpectRejectionMetrics string
 	ExpectReinvokeWebhooks map[string]bool
 }
 
@@ -289,7 +291,8 @@ func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string
 			t.ExpectAnnotations[newKey] = value
 			delete(t.ExpectAnnotations, key)
 		}
-		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.SkipBenchmark, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
+		expectedMetrics := strings.ReplaceAll(t.ExpectRejectionMetrics, `type="validating"`, `type="admit"`)
+		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.SkipBenchmark, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, expectedMetrics, t.ExpectReinvokeWebhooks}
 	}
 	return r
 }
@@ -517,8 +520,9 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectStatusCode: http.StatusInternalServerError,
-			ErrorContains:    "could not get REST client",
+			ExpectStatusCode:       http.StatusInternalServerError,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="invalidClientConfig",operation="UPDATE",rejection_code="500",type="validating"} 1`,
+			ErrorContains:          "could not get REST client",
 		},
 		{
 			Name: "match & non-status error",
@@ -530,8 +534,9 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectStatusCode: http.StatusInternalServerError,
-			ErrorContains:    "transport connection broken",
+			ExpectStatusCode:       http.StatusInternalServerError,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="nonStatusError",operation="UPDATE",rejection_code="503",type="validating"} 1`,
+			ErrorContains:          "failed to call webhook",
 		},
 		{
 			Name: "match & allow (url)",
@@ -968,8 +973,9 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectStatusCode: http.StatusInternalServerError,
-			ErrorContains:    "could not get REST client",
+			ExpectStatusCode:       http.StatusInternalServerError,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="invalidClientConfig",operation="UPDATE",rejection_code="500",type="admit"} 1`,
+			ErrorContains:          "could not get REST client",
 			ExpectAnnotations: map[string]string{
 				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "invalidClientConfig", false),
 			},
@@ -984,8 +990,9 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectStatusCode: http.StatusInternalServerError,
-			ErrorContains:    "transport connection broken",
+			ExpectStatusCode:       http.StatusInternalServerError,
+			ExpectRejectionMetrics: `apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error",name="nonStatusError",operation="UPDATE",rejection_code="503",type="admit"} 1`,
+			ErrorContains:          "failed to call webhook",
 			ExpectAnnotations: map[string]string{
 				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "nonStatusError", false),
 			},
