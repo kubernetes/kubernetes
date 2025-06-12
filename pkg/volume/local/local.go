@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
 )
@@ -309,9 +310,13 @@ func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error
 	if !ok {
 		return nil, fmt.Errorf("plugin volume host does not implement KubeletVolumeHost interface")
 	}
+	return plugin.newDeviceMounterInternal(kvh, plugin.host.GetMounter(), utilexec.New())
+}
+
+func (plugin *localVolumePlugin) newDeviceMounterInternal(kvh volume.KubeletVolumeHost, mounter mount.Interface, exec utilexec.Interface) (volume.DeviceMounter, error) {
 	return &deviceMounter{
 		plugin:   plugin,
-		mounter:  util.NewSafeFormatAndMountFromHost(plugin.host),
+		mounter:  mount.NewSafeFormatAndMount(mounter, exec),
 		hostUtil: kvh.GetHostUtil(),
 	}, nil
 }
@@ -449,9 +454,13 @@ func (dm *deviceMounter) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *localVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter, error) {
+	return plugin.newDeviceUnmounterInternal(plugin.host.GetMounter(), utilexec.New())
+}
+
+func (plugin *localVolumePlugin) newDeviceUnmounterInternal(mounter mount.Interface, exec utilexec.Interface) (volume.DeviceUnmounter, error) {
 	return &deviceMounter{
 		plugin:  plugin,
-		mounter: util.NewSafeFormatAndMountFromHost(plugin.host),
+		mounter: mount.NewSafeFormatAndMount(mounter, exec),
 	}, nil
 }
 

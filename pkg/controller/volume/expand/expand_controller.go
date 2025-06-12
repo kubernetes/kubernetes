@@ -25,7 +25,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -409,10 +408,6 @@ func (expc *expandController) NewWrapperUnmounter(volName string, spec volume.Sp
 
 func (expc *expandController) GetMounter() mount.Interface {
 	return nil
-}
-
-func (expc *expandController) GetExec() utilexec.Interface {
-	return utilexec.New()
 }
 
 func (expc *expandController) GetHostName() string {

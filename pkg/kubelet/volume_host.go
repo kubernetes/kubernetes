@@ -302,7 +302,3 @@ func (kvh *kubeletVolumeHost) GetNodeName() types.NodeName {
 func (kvh *kubeletVolumeHost) GetEventRecorder() record.EventRecorder {
 	return kvh.kubelet.recorder
 }
-
-func (kvh *kubeletVolumeHost) GetExec() utilexec.Interface {
-	return kvh.exec
-}

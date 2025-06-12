@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -116,10 +115,6 @@ func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(typ
 		//nolint:logcheck
 		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
-}
-
-func (adc *PersistentVolumeController) GetExec() utilexec.Interface {
-	return utilexec.New()
 }
 
 func (ctrl *PersistentVolumeController) GetNodeLabels() (map[string]string, error) {

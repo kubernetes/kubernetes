@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 	utilstrings "k8s.io/utils/strings"
 
 	volumeclient "github.com/libopenstorage/openstorage/api/client/volume"
@@ -140,7 +141,7 @@ func (plugin *portworxVolumePlugin) newMounterInternal(spec *volume.Spec, podUID
 		},
 		fsType:      fsType,
 		readOnly:    readOnly,
-		diskMounter: util.NewSafeFormatAndMountFromHost(plugin.host)}, nil
+		diskMounter: mount.NewSafeFormatAndMount(plugin.host.GetMounter(), exec.New())}, nil
 }
 
 func (plugin *portworxVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {

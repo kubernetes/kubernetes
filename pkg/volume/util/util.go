@@ -333,12 +333,6 @@ func SplitUniqueName(uniqueName v1.UniqueVolumeName) (string, string, error) {
 	return pluginName, components[2], nil
 }
 
-// NewSafeFormatAndMountFromHost creates a new SafeFormatAndMount with Mounter
-// and Exec taken from given VolumeHost.
-func NewSafeFormatAndMountFromHost(host volume.VolumeHost) *mount.SafeFormatAndMount {
-	return &mount.SafeFormatAndMount{Interface: host.GetMounter(), Exec: host.GetExec()}
-}
-
 // GetVolumeMode retrieves VolumeMode from pv.
 // If the volume doesn't have PersistentVolume, it's an inline volume,
 // should return volumeMode as filesystem to keep existing behavior.

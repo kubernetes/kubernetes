@@ -46,8 +46,9 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
-	"k8s.io/kubernetes/pkg/volume/util"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/mount-utils"
+	testingexec "k8s.io/utils/exec/testing"
 )
 
 var (
@@ -1181,7 +1182,7 @@ func TestUnmounterTeardown(t *testing.T) {
 	}
 
 	// do a fake local mount
-	diskMounter := util.NewSafeFormatAndMountFromHost(plug.host)
+	diskMounter := mount.NewSafeFormatAndMount(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	device := "/fake/device"
 	if goruntime.GOOS == "windows" {
 		// We need disk numbers on Windows.
@@ -1238,7 +1239,7 @@ func TestUnmounterTeardownNoClientError(t *testing.T) {
 	}
 
 	// do a fake local mount
-	diskMounter := util.NewSafeFormatAndMountFromHost(plug.host)
+	diskMounter := mount.NewSafeFormatAndMount(plug.host.GetMounter(), &testingexec.FakeExec{DisableScripts: true})
 	device := "/fake/device"
 	if goruntime.GOOS == "windows" {
 		// We need disk numbers on Windows.

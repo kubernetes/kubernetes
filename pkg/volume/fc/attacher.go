@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
 type fcAttacher struct {
@@ -123,7 +124,7 @@ func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, de
 		options = volumeutil.AddSELinuxMountOption(options, mountArgs.SELinuxLabel)
 	}
 	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec()}
+		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: exec.New()}
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
@@ -178,7 +179,7 @@ func (detacher *fcDetacher) UnmountDevice(deviceMountPath string) error {
 		return nil
 	}
 
-	unMounter := volumeSpecToUnmounter(detacher.mounter, detacher.host)
+	unMounter := volumeSpecToUnmounter(detacher.mounter)
 	// The device is unmounted now. If UnmountDevice was retried, GetDeviceNameFromMount
 	// won't find any mount and won't return DetachDisk below.
 	// Therefore implement our own retry mechanism here.
@@ -247,19 +248,19 @@ func volumeSpecToMounter(spec *volume.Spec, host volume.VolumeHost) (*fcDiskMoun
 		fsType:       fc.FSType,
 		volumeMode:   volumeMode,
 		readOnly:     readOnly,
-		mounter:      volumeutil.NewSafeFormatAndMountFromHost(host),
+		mounter:      mount.NewSafeFormatAndMount(host.GetMounter(), exec.New()),
 		deviceUtil:   volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
 		mountOptions: volumeutil.MountOptionFromSpec(spec),
 	}, nil
 }
 
-func volumeSpecToUnmounter(mounter mount.Interface, host volume.VolumeHost) *fcDiskUnmounter {
+func volumeSpecToUnmounter(mounter mount.Interface) *fcDiskUnmounter {
 	return &fcDiskUnmounter{
 		fcDisk: &fcDisk{
 			io: &osIOHandler{},
 		},
 		mounter:    mounter,
 		deviceUtil: volumeutil.NewDeviceHandler(volumeutil.NewIOHandler()),
-		exec:       host.GetExec(),
+		exec:       exec.New(),
 	}
 }
