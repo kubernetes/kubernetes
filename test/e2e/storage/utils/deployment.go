@@ -161,6 +161,9 @@ func PatchCSIDeployment(f *e2eframework.Framework, o PatchCSIOptions, object int
 		if o.SELinuxMount != nil {
 			object.Spec.SELinuxMount = o.SELinuxMount
 		}
+		if o.NodeAllocatableUpdatePeriodSeconds != nil {
+			object.Spec.NodeAllocatableUpdatePeriodSeconds = o.NodeAllocatableUpdatePeriodSeconds
+		}
 	}
 
 	return nil
@@ -224,6 +227,9 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	SELinuxMount *bool
+	// If not nil, the value to use for the CSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds
+	// field *if* the driver deploys a CSIDriver object. Ignored otherwise.
+	NodeAllocatableUpdatePeriodSeconds *int64
 	// If not nil, the values will be used for setting feature arguments to
 	// specific sidecar.
 	// Feature is a map - where key is sidecar name such as:
