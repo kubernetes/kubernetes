@@ -68,7 +68,7 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 	}
 	if len(specifiedFields) == 0 {
 		return field.ErrorList{field.Invalid(fldPath, "",
-			fmt.Sprintf("must specify exactly one of: %s",
+			fmt.Sprintf("must specify one of: %s",
 				strings.Join(union.allFields(), ", ")))}
 	}
 	return nil
