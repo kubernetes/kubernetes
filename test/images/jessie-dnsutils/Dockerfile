@@ -21,8 +21,8 @@ CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 # as they do not exist anymore in the debian repositories for jessie. So we do not recommend using this
 # image for any production use and limit use of this image to just test scenarios.
 
-COPY fixup-apt-list.sh /
-RUN ["/fixup-apt-list.sh"]
+# COPY fixup-apt-list.sh /
+# RUN ["/fixup-apt-list.sh"]
 
 RUN apt-get -q update && \
     apt-get install -y --force-yes dnsutils && \
