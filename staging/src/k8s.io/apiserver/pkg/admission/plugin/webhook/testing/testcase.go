@@ -508,6 +508,32 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 			ExpectAllow:      false,
 		},
 		{
+			Name: "match & invalid client config",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "invalidClientConfig",
+				ClientConfig:            registrationv1.WebhookClientConfig{},
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "could not get REST client",
+		},
+		{
+			Name: "match & non-status error",
+			Webhooks: []registrationv1.ValidatingWebhook{{
+				Name:                    "nonStatusError",
+				ClientConfig:            ccfgSVC("nonStatusError"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "transport connection broken",
+		},
+		{
 			Name: "match & allow (url)",
 			Webhooks: []registrationv1.ValidatingWebhook{{
 				Name:                    "allow.example.com",
@@ -930,6 +956,38 @@ func NewMutatingTestCases(url *url.URL, configurationName string) []MutatingTest
 			ExpectAnnotations: map[string]string{
 				"failed-open.mutation.webhook.admission.k8s.io/round_0_index_0": "invalidPatch",
 				"mutation.webhook.admission.k8s.io/round_0_index_0":             mutationAnnotationValue(configurationName, "invalidPatch", false),
+			},
+		},
+		{
+			Name: "match & invalid client config",
+			Webhooks: []registrationv1.MutatingWebhook{{
+				Name:                    "invalidClientConfig",
+				ClientConfig:            registrationv1.WebhookClientConfig{},
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "could not get REST client",
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "invalidClientConfig", false),
+			},
+		},
+		{
+			Name: "match & non-status error",
+			Webhooks: []registrationv1.MutatingWebhook{{
+				Name:                    "nonStatusError",
+				ClientConfig:            ccfgSVC("nonStatusError"),
+				Rules:                   matchEverythingRules,
+				NamespaceSelector:       &metav1.LabelSelector{},
+				ObjectSelector:          &metav1.LabelSelector{},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			}},
+			ExpectStatusCode: http.StatusInternalServerError,
+			ErrorContains:    "transport connection broken",
+			ExpectAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue(configurationName, "nonStatusError", false),
 			},
 		},
 		{
