@@ -24,6 +24,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // GetResourceRequestQuantity finds and returns the request quantity for a specific resource.
@@ -39,16 +42,23 @@ func GetResourceRequestQuantity(pod *v1.Pod, resourceName v1.ResourceName) resou
 		requestQuantity = resource.Quantity{Format: resource.DecimalSI}
 	}
 
-	for _, container := range pod.Spec.Containers {
-		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
+	// Supported pod level resources will be used instead of container level ones when available
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources) && resourcehelper.IsPodLevelResourcesSet(pod) && resourcehelper.IsSupportedPodLevelResource(resourceName) {
+		if rQuantity, ok := pod.Spec.Resources.Requests[resourceName]; ok {
 			requestQuantity.Add(rQuantity)
 		}
-	}
+	} else {
+		for _, container := range pod.Spec.Containers {
+			if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
+				requestQuantity.Add(rQuantity)
+			}
+		}
 
-	for _, container := range pod.Spec.InitContainers {
-		if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
-			if requestQuantity.Cmp(rQuantity) < 0 {
-				requestQuantity = rQuantity.DeepCopy()
+		for _, container := range pod.Spec.InitContainers {
+			if rQuantity, ok := container.Resources.Requests[resourceName]; ok {
+				if requestQuantity.Cmp(rQuantity) < 0 {
+					requestQuantity = rQuantity.DeepCopy()
+				}
 			}
 		}
 	}
