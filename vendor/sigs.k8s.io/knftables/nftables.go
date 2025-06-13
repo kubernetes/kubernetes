@@ -41,7 +41,7 @@ type Interface interface {
 	Check(ctx context.Context, tx *Transaction) error
 
 	// List returns a list of the names of the objects of objectType ("chain", "set",
-	// or "map") in the table. If there are no such objects, this will return an empty
+	// "map" or "counter") in the table. If there are no such objects, this will return an empty
 	// list and no error.
 	List(ctx context.Context, objectType string) ([]string, error)
 
@@ -58,6 +58,9 @@ type Interface interface {
 	// be "set" or "map".) If the set/map exists but contains no elements, this will
 	// return an empty list and no error.
 	ListElements(ctx context.Context, objectType, name string) ([]*Element, error)
+
+	// ListCounters returns a list of the counters.
+	ListCounters(ctx context.Context) ([]*Counter, error)
 }
 
 type nftContext struct {
@@ -85,6 +88,10 @@ type realNFTables struct {
 func newInternal(family Family, table string, execer execer) (Interface, error) {
 	var err error
 
+	if (family == "") != (table == "") {
+		return nil, fmt.Errorf("family and table must either both be specified or both be empty")
+	}
+
 	nft := &realNFTables{
 		nftContext: nftContext{
 			family: family,
@@ -108,16 +115,30 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 		return nil, fmt.Errorf("nft version must be v1.0.1 or later (got %s)", strings.TrimSpace(out))
 	}
 
+	testFamily := family
+	if testFamily == "" {
+		testFamily = InetFamily
+	}
+	testTable := table
+	if testTable == "" {
+		testTable = "test"
+	}
+
 	// Check that (a) nft works, (b) we have permission, (c) the kernel is new enough
 	// to support object comments.
 	tx := nft.NewTransaction()
 	tx.Add(&Table{
+		Family:  testFamily,
+		Name:    testTable,
 		Comment: PtrTo("test"),
 	})
 	if err := nft.Check(context.TODO(), tx); err != nil {
 		// Try again, checking just that (a) nft works, (b) we have permission.
 		tx := nft.NewTransaction()
-		tx.Add(&Table{})
+		tx.Add(&Table{
+			Family: testFamily,
+			Name:   testTable,
+		})
 		if err := nft.Check(context.TODO(), tx); err != nil {
 			return nil, fmt.Errorf("could not run nftables command: %w", err)
 		}
@@ -128,8 +149,13 @@ func newInternal(family Family, table string, execer execer) (Interface, error) 
 	return nft, nil
 }
 
-// New creates a new nftables.Interface for interacting with the given table. If nftables
-// is not available/usable on the current host, it will return an error.
+// New creates a new nftables.Interface. If nftables is not available/usable on the
+// current host, it will return an error.
+//
+// Normally, family and table will specify the family and table to use for all operations
+// on the returned Interface. However, if you leave them empty (`""`), then the Interface
+// will have no associated family/table and (a) you must explicitly fill in those fields
+// in any objects you use in a Transaction, (b) you can't use any of the List* methods.
 func New(family Family, table string) (Interface, error) {
 	return newInternal(family, table, realExec{})
 }
@@ -511,4 +537,40 @@ func parseElementValue(json interface{}) ([]string, error) {
 	}
 
 	return nil, fmt.Errorf("could not parse element value %q", json)
+}
+
+// ListCounters is part of Interface
+func (nft *realNFTables) ListCounters(ctx context.Context) ([]*Counter, error) {
+	cmd := exec.CommandContext(ctx, nft.path, "--json", "list", "counters", "table", string(nft.family), nft.table)
+	out, err := nft.exec.Run(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run nft: %w", err)
+	}
+
+	objects, err := getJSONObjects(out, "counter")
+	if err != nil {
+		return nil, err
+	}
+
+	objectToCounter := func(object map[string]interface{}) *Counter {
+		counter := &Counter{
+			Name:    object["name"].(string),
+			Packets: PtrTo(uint64(object["packets"].(float64))),
+			Bytes:   PtrTo(uint64(object["bytes"].(float64))),
+		}
+		if handle, ok := jsonVal[string](object, "comment"); ok {
+			counter.Comment = PtrTo(handle)
+		}
+		if handle, ok := jsonVal[float64](object, "handle"); ok {
+			counter.Handle = PtrTo(int(handle))
+		}
+
+		return counter
+	}
+
+	counters := make([]*Counter, 0, len(objects))
+	for _, object := range objects {
+		counters = append(counters, objectToCounter(object))
+	}
+	return counters, nil
 }

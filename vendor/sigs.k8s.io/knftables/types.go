@@ -33,7 +33,7 @@ const (
 // implement this interface.
 type Object interface {
 	// validate validates an object for an operation
-	validate(verb verb) error
+	validate(verb verb, ctx *nftContext) error
 
 	// writeOperation writes out an "nft" operation involving the object. It assumes
 	// that the object has been validated.
@@ -43,7 +43,7 @@ type Object interface {
 	// command. line is the part of the line after "nft add <type> <family> <tablename>"
 	// (so for most types it starts with the object name).
 	// If error is returned, Object's fields may be partially filled, therefore Object should not be used.
-	parse(line string) error
+	parse(family Family, table, line string) error
 }
 
 // Family is an nftables family
@@ -71,12 +71,32 @@ const (
 	NetDevFamily Family = "netdev"
 )
 
+// TableFlag represents a table flag
+type TableFlag string
+
+const (
+	// DormantFlag indicates that a table is not currently evaluated. (Its base chains
+	// are unregistered.)
+	DormantFlag TableFlag = "dormant"
+)
+
 // Table represents an nftables table.
 type Table struct {
+	// Family is the nftables family of the table. You do not normally need to fill
+	// this in because it will be filled in for you automatically from the Interface.
+	Family Family
+
+	// Name is the name of the table. You do not normally need to fill this in
+	// because it will be filled in for you automatically from the Interface.
+	Name string
+
 	// Comment is an optional comment for the table. (Requires kernel >= 5.10 and
 	// nft >= 0.9.7; otherwise this field will be silently ignored. Requires
 	// nft >= 1.0.8 to include comments in List() results.)
 	Comment *string
+
+	// Flags are the table flags
+	Flags []TableFlag
 
 	// Handle is an identifier that can be used to uniquely identify an object when
 	// deleting it. When adding a new object, this must be nil.
@@ -185,9 +205,31 @@ const (
 	SNATPriority BaseChainPriority = "srcnat"
 )
 
+// BaseChainPolicy sets what happens to packets not explicitly accepted or refused by a
+// base chain.
+type BaseChainPolicy string
+
+const (
+	// AcceptPolicy, which is the default, accepts any unmatched packets (though,
+	// as with any other nftables chain, a later chain can drop or reject it).
+	AcceptPolicy BaseChainPolicy = "accept"
+
+	// DropPolicy drops any unmatched packets.
+	DropPolicy BaseChainPolicy = "drop"
+)
+
 // Chain represents an nftables chain; either a "base chain" (if Type, Hook, and Priority
 // are specified), or a "regular chain" (if they are not).
 type Chain struct {
+	// Family is the nftables family of the chain's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the chain's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the chain.
 	Name string
 
@@ -200,6 +242,10 @@ type Chain struct {
 	// Priority is the chain priority; this must be set for a base chain and unset for
 	// a regular chain. You can call ParsePriority() to convert this to a number.
 	Priority *BaseChainPriority
+
+	// Policy is the policy for packets not explicitly accepted or refused by a base
+	// chain.
+	Policy *BaseChainPolicy
 
 	// Device is the network interface that the chain is attached to; this must be set
 	// for a base chain connected to the "ingress" or "egress" hooks, and unset for
@@ -218,6 +264,15 @@ type Chain struct {
 
 // Rule represents a rule in a chain
 type Rule struct {
+	// Family is the nftables family of the rule's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the rule's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Chain is the name of the chain that contains this rule
 	Chain string
 
@@ -277,6 +332,15 @@ const (
 
 // Set represents the definition of an nftables set (but not its elements)
 type Set struct {
+	// Family is the nftables family of the set's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the set's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the set.
 	Name string
 
@@ -322,6 +386,15 @@ type Set struct {
 
 // Map represents the definition of an nftables map (but not its elements)
 type Map struct {
+	// Family is the nftables family of the map's table. You do not normally need to
+	// fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the map's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Name is the name of the map.
 	Name string
 
@@ -363,6 +436,15 @@ type Map struct {
 
 // Element represents a set or map element
 type Element struct {
+	// Family is the nftables family of the element's table. You do not normally need
+	// to fill this in because it will be filled in for you automatically from the
+	// Interface.
+	Family Family
+
+	// Table is the name of the element's table. You do not normally need to fill this
+	// in because it will be filled in for you automatically from the Interface.
+	Table string
+
 	// Set is the name of the set that contains this element (or the empty string if
 	// this is a map element.)
 	Set string
@@ -381,4 +463,70 @@ type Element struct {
 
 	// Comment is an optional comment for the element
 	Comment *string
+}
+
+type FlowtableIngressPriority string
+
+const (
+	// FilterIngressPriority is the priority for the filter value in the Ingress hook
+	// that stands for 0.
+	FilterIngressPriority FlowtableIngressPriority = "filter"
+)
+
+// Flowtable represents an nftables flowtable.
+// https://wiki.nftables.org/wiki-nftables/index.php/Flowtables
+type Flowtable struct {
+	// Family is the nftables family of the flowtable's table. You do not normally
+	// need to fill this in because it will be filled in for you automatically from
+	// the Interface.
+	Family Family
+
+	// Table is the name of the flowtable's table. You do not normally need to fill
+	// this in because it will be filled in for you automatically from the Interface.
+	Table string
+
+	// Name is the name of the flowtable.
+	Name string
+
+	// The Priority can be a signed integer or FlowtableIngressPriority which stands for 0.
+	// Addition and subtraction can be used to set relative priority, e.g. filter + 5 equals to 5.
+	Priority *FlowtableIngressPriority
+
+	// The Devices are specified as iifname(s) of the input interface(s) of the traffic
+	// that should be offloaded.
+	Devices []string
+
+	// Handle is an identifier that can be used to uniquely identify an object when
+	// deleting it. When adding a new object, this must be nil
+	Handle *int
+}
+
+// Counter represents named counter
+type Counter struct {
+	// Family is the nftables family of the counter's table. You do not normally
+	// need to fill this in because it will be filled in for you automatically from
+	// the Interface.
+	Family Family
+
+	// Table is the name of the counter's table. You do not normally need to fill
+	// this in because it will be filled in for you automatically from the Interface.
+	Table string
+
+	// Name is the name of the named counter
+	Name string
+
+	// Comment is an optional comment for the counter
+	Comment *string
+
+	// Packets represents numbers of packets tracked by the counter.
+	// This will be filled in by ListCounters() but can be nil when creating new counter.
+	Packets *uint64
+
+	// Bytes represents numbers of bytes tracked by the counter.
+	// This will be filled in by ListCounters() but can be nil when creating new counter.
+	Bytes *uint64
+
+	// Handle is an identifier that can be used to uniquely identify an object when
+	// deleting it. When adding a new object, this must be nil
+	Handle *int
 }

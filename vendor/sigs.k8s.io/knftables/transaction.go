@@ -45,6 +45,7 @@ const (
 	replaceVerb verb = "replace"
 	deleteVerb  verb = "delete"
 	flushVerb   verb = "flush"
+	resetVerb   verb = "reset"
 )
 
 // populateCommandBuf populates the transaction as series of nft commands to the given bytes.Buffer.
@@ -83,7 +84,7 @@ func (tx *Transaction) operation(verb verb, obj Object) {
 	if tx.err != nil {
 		return
 	}
-	if tx.err = obj.validate(verb); tx.err != nil {
+	if tx.err = obj.validate(verb, tx.nftContext); tx.err != nil {
 		return
 	}
 
@@ -138,4 +139,11 @@ func (tx *Transaction) Flush(obj Object) {
 // transaction is Run.
 func (tx *Transaction) Delete(obj Object) {
 	tx.operation(deleteVerb, obj)
+}
+
+// Reset adds a "nft reset" operation to tx, resetting obj (which must be a Counter).
+// The Reset() call always succeeds, but if obj does not exist then an error will be
+// returned when the transaction is Run.
+func (tx *Transaction) Reset(obj Object) {
+	tx.operation(resetVerb, obj)
 }
