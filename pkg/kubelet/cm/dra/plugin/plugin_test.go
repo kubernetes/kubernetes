@@ -25,9 +25,14 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"k8s.io/klog/v2"
 
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -325,3 +330,80 @@ func assertError(t *testing.T, expectError string, err error) {
 		t.Errorf("Expected error %q, got: %v", expectError, err)
 	}
 }
+
+func TestPlugin_WatchResources(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	ctx := klog.NewContext(tCtx, klog.NewKlogr())
+
+	// Mock gRPC stream
+	mockStream := &mockWatchResourcesClient{
+		recvFunc: func() (*drahealthv1alpha1.WatchResourcesResponse, error) {
+			return &drahealthv1alpha1.WatchResourcesResponse{
+				Devices: []*drahealthv1alpha1.DeviceHealth{
+					{
+						ResourceName: "test-driver/pool1/device1",
+						PoolName:     "pool1",
+						DeviceName:   "device1",
+						Health:       "Healthy",
+						LastUpdated:  time.Now().Unix(),
+					},
+				},
+			}, nil
+		},
+	}
+	mockClient := &mockNodeHealthClient{
+		watchFunc: func(ctx context.Context, in *drahealthv1alpha1.WatchResourcesRequest, opts ...grpc.CallOption) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
+			return mockStream, nil
+		},
+	}
+
+	// Create Plugin instance
+	pluginName := "test-driver"
+	p := &Plugin{
+		name:              pluginName,
+		backgroundCtx:     ctx,
+		endpoint:          "unix:///tmp/test.sock",
+		chosenService:     drapbv1beta1.DRAPluginService, // Any valid service for registration
+		healthClient:      mockClient,
+		clientCallTimeout: 5 * time.Second,
+	}
+
+	// Register plugin
+	draPlugins.add(p)
+	defer draPlugins.remove(p.name, p.endpoint)
+
+	// Test WatchResources
+	stream, err := p.WatchResources(ctx)
+	assert.NoError(t, err)
+	assert.NotNil(t, stream)
+
+	resp, err := stream.Recv()
+	assert.NoError(t, err)
+	assert.Len(t, resp.Devices, 1)
+	assert.Equal(t, "test-driver/pool1/device1", resp.Devices[0].ResourceName)
+	assert.Equal(t, "Healthy", resp.Devices[0].Health)
+}
+
+// Mock implementations for WatchResources
+type mockNodeHealthClient struct {
+	watchFunc func(ctx context.Context, in *drahealthv1alpha1.WatchResourcesRequest, opts ...grpc.CallOption) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error)
+}
+
+func (m *mockNodeHealthClient) WatchResources(ctx context.Context, in *drahealthv1alpha1.WatchResourcesRequest, opts ...grpc.CallOption) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
+	return m.watchFunc(ctx, in, opts...)
+}
+
+type mockWatchResourcesClient struct {
+	recvFunc func() (*drahealthv1alpha1.WatchResourcesResponse, error)
+}
+
+func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.WatchResourcesResponse, error) {
+	return m.recvFunc()
+}
+
+func (m *mockWatchResourcesClient) CloseSend() error             { return nil }
+func (m *mockWatchResourcesClient) Context() context.Context     { return context.Background() }
+func (m *mockWatchResourcesClient) SendMsg(v interface{}) error  { return nil }
+func (m *mockWatchResourcesClient) RecvMsg(v interface{}) error  { return nil }
+func (m *mockWatchResourcesClient) Header() (metadata.MD, error) { return nil, nil }
+func (m *mockWatchResourcesClient) Trailer() metadata.MD         { return nil }

@@ -18,7 +18,9 @@ package dra
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -28,8 +30,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1beta1"
@@ -39,11 +43,34 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
+
+/*
+const (
+
+	driverName      = "test-driver"
+	driverClassName = "test"
+	className       = "test-class"
+	namespace       = "test-ns"
+	podName         = "test-pod"
+	containerName   = "test-container"
+	claimName       = "test-claim"
+	requestName     = "req1"
+	poolName        = "pool-a"
+	deviceName      = "dev-0"
+	podUID          = types.UID("test-pod-uid")
+	claimUID        = types.UID("test-claim-uid")
+
+	cdiID = driverName + "/" + driverClassName + "=claim-" + string(claimUID)
+
+)
+*/
 
 const (
 	driverClassName = "test"
@@ -53,12 +80,16 @@ const (
 
 type fakeDRADriverGRPCServer struct {
 	drapb.UnimplementedDRAPluginServer
+	drahealthv1alpha1.UnimplementedNodeHealthServer
 	driverName                 string
 	timeout                    *time.Duration
 	prepareResourceCalls       atomic.Uint32
 	unprepareResourceCalls     atomic.Uint32
+	watchResourcesCalls        atomic.Uint32
 	prepareResourcesResponse   *drapb.NodePrepareResourcesResponse
 	unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse
+	watchResourcesResponses    chan *drahealthv1alpha1.WatchResourcesResponse
+	watchResourcesError        error
 }
 
 func (s *fakeDRADriverGRPCServer) NodePrepareResources(ctx context.Context, req *drapb.NodePrepareResourcesRequest) (*drapb.NodePrepareResourcesResponse, error) {
@@ -108,6 +139,74 @@ func (s *fakeDRADriverGRPCServer) NodeUnprepareResources(ctx context.Context, re
 	return s.unprepareResourcesResponse, nil
 }
 
+func (s *fakeDRADriverGRPCServer) WatchResources(req *drahealthv1alpha1.WatchResourcesRequest, stream drahealthv1alpha1.NodeHealth_WatchResourcesServer) error {
+	s.watchResourcesCalls.Add(1)
+	logger := klog.FromContext(stream.Context())
+	logger.V(4).Info("Fake Server: WatchResources stream started")
+
+	if s.watchResourcesError != nil {
+		logger.Error(s.watchResourcesError, "Fake Server: Returning predefined stream error")
+		return s.watchResourcesError
+	}
+
+	// Use the stream argument to send messages
+	for {
+		select {
+		case <-stream.Context().Done():
+			logger.Info("Fake Server: WatchResources stream context canceled")
+			return stream.Context().Err()
+		case resp, ok := <-s.watchResourcesResponses:
+			if !ok {
+				logger.Info("Fake Server: WatchResources response channel closed")
+				return nil
+			}
+			logger.V(5).Info("Fake Server: Sending health response", "response", resp)
+			// Use the stream argument to send
+			if err := stream.Send(resp); err != nil {
+				logger.Error(err, "Fake Server: Error sending response on stream")
+				return err
+			}
+		}
+	}
+}
+
+type mockWatchResourcesClient struct {
+	mock.Mock
+	RecvChan chan struct {
+		Resp *drahealthv1alpha1.WatchResourcesResponse
+		Err  error
+	}
+	Ctx context.Context
+}
+
+func (m *mockWatchResourcesClient) Recv() (*drahealthv1alpha1.WatchResourcesResponse, error) {
+	select {
+	case <-m.Ctx.Done():
+		klog.V(6).Infof("mockWatchClient.Recv: Context done: %v", m.Ctx.Err())
+		return nil, m.Ctx.Err()
+	case item, ok := <-m.RecvChan:
+		if !ok {
+			klog.V(6).Info("mockWatchClient.Recv: RecvChan closed, returning io.EOF")
+			return nil, io.EOF
+		}
+		return item.Resp, item.Err
+	}
+}
+
+func (m *mockWatchResourcesClient) Context() context.Context {
+	return m.Ctx
+}
+
+func (m *mockWatchResourcesClient) Header() (metadata.MD, error) { return nil, nil }
+func (m *mockWatchResourcesClient) Trailer() metadata.MD         { return nil }
+func (m *mockWatchResourcesClient) CloseSend() error             { return nil }
+func (m *mockWatchResourcesClient) RecvMsg(v interface{}) error {
+	return fmt.Errorf("RecvMsg not implemented")
+}
+func (m *mockWatchResourcesClient) SendMsg(v interface{}) error {
+	return fmt.Errorf("SendMsg not implemented")
+}
+
 type tearDown func()
 
 type fakeDRAServerInfo struct {
@@ -119,7 +218,7 @@ type fakeDRAServerInfo struct {
 	teardownFn tearDown
 }
 
-func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse) (fakeDRAServerInfo, error) {
+func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, pluginClientTimeout *time.Duration, prepareResourcesResponse *drapb.NodePrepareResourcesResponse, unprepareResourcesResponse *drapb.NodeUnprepareResourcesResponse, watchResourcesError error) (fakeDRAServerInfo, error) {
 	socketDir, err := os.MkdirTemp("", "dra")
 	if err != nil {
 		return fakeDRAServerInfo{
@@ -155,24 +254,32 @@ func setupFakeDRADriverGRPCServer(ctx context.Context, shouldTimeout bool, plugi
 		driverName:                 driverName,
 		prepareResourcesResponse:   prepareResourcesResponse,
 		unprepareResourcesResponse: unprepareResourcesResponse,
+		watchResourcesResponses:    make(chan *drahealthv1alpha1.WatchResourcesResponse, 10),
+		watchResourcesError:        watchResourcesError,
 	}
 	if shouldTimeout {
 		timeout := *pluginClientTimeout * 2
 		fakeDRADriverGRPCServer.timeout = &timeout
 	}
 
+	drahealthv1alpha1.RegisterNodeHealthServer(s, fakeDRADriverGRPCServer)
 	drapb.RegisterDRAPluginServer(s, fakeDRADriverGRPCServer)
 
-	go func(ctx context.Context) {
+	go func() {
 		go func() {
-			if err := s.Serve(l); err != nil {
-				logger := klog.FromContext(ctx)
+			logger := klog.FromContext(ctx)
+			logger.V(4).Info("Starting fake gRPC server", "address", socketName)
+			if err := s.Serve(l); err != nil && err != grpc.ErrServerStopped {
 				logger.Error(err, "failed to serve gRPC")
 			}
+			logger.V(4).Info("Fake gRPC server stopped serving", "address", socketName)
 		}()
 		<-stopCh
+		logger := klog.FromContext(ctx)
+		logger.V(4).Info("Stopping fake gRPC server", "address", socketName)
 		s.GracefulStop()
-	}(ctx)
+		logger.V(4).Info("Fake gRPC server stopped", "address", socketName)
+	}()
 
 	return fakeDRAServerInfo{
 		server:     fakeDRADriverGRPCServer,
@@ -243,7 +350,7 @@ func genTestPod() *v1.Pod {
 	}
 }
 
-// getTestClaim generates resource claim object
+// genTestClaim generates resource claim object
 func genTestClaim(name, driver, device, podUID string) *resourceapi.ResourceClaim {
 	return &resourceapi.ResourceClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -413,8 +520,8 @@ func TestPrepareResources(t *testing.T) {
 		{
 			description:    "unknown driver",
 			pod:            genTestPod(),
-			claim:          genTestClaim(claimName, "unknown.driver", deviceName, podUID),
-			expectedErrMsg: "DRA driver unknown.driver is not registered",
+			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
+			expectedErrMsg: "prepare dynamic resources: DRA driver unknown driver is not registered",
 		},
 		{
 			description:            "should prepare resources, driver returns nil value",
@@ -559,21 +666,19 @@ func TestPrepareResources(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-			if err != nil {
-				t.Fatalf("failed to newClaimInfoCache, err:%v", err)
-			}
+			require.NoError(t, err, "failed to newClaimInfoCache")
 
 			manager := &ManagerImpl{
 				kubeClient: fakeKubeClient,
 				cache:      cache,
+				update:     make(chan resourceupdates.Update, 1),
 			}
 
 			if test.claim != nil {
-				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
-					t.Fatalf("failed to create ResourceClaim %s: %+v", test.claim.Name, err)
-				}
+				_, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{})
+				require.NoError(t, err)
 				defer func() {
-					require.NoError(t, fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{}))
+					_ = fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Delete(tCtx, test.claim.Name, metav1.DeleteOptions{})
 				}()
 			}
 
@@ -583,13 +688,13 @@ func TestPrepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil)
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, test.resp, nil, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+			plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager, time.Second /* very short wiping delay for testing */)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
@@ -618,19 +723,16 @@ func TestPrepareResources(t *testing.T) {
 			}
 
 			// check the cache contains the expected claim info
-			claimName, _, err := resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
-			if err != nil {
-				t.Fatal(err)
-			}
-			claimInfo, ok := manager.cache.get(*claimName, test.pod.Namespace)
-			if !ok {
-				t.Fatalf("claimInfo not found in cache for claim %s", *claimName)
-			}
-			if len(claimInfo.PodUIDs) != 1 || !claimInfo.PodUIDs.Has(string(test.pod.UID)) {
-				t.Fatalf("podUIDs mismatch: expected [%s], got %v", test.pod.UID, claimInfo.PodUIDs)
-			}
-
-			assert.Equal(t, test.expectedClaimInfoState, claimInfo.ClaimInfoState)
+			podClaimName, _, err := resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
+			require.NoError(t, err)
+			claimInfoResult, ok := manager.cache.get(*podClaimName, test.pod.Namespace)
+			require.True(t, ok, "claimInfo not found in cache")
+			require.True(t, claimInfoResult.PodUIDs.Has(string(test.pod.UID)), "podUIDs mismatch")
+			assert.Equal(t, test.expectedClaimInfoState.ClaimUID, claimInfoResult.ClaimInfoState.ClaimUID)
+			assert.Equal(t, test.expectedClaimInfoState.ClaimName, claimInfoResult.ClaimInfoState.ClaimName)
+			assert.Equal(t, test.expectedClaimInfoState.Namespace, claimInfoResult.ClaimInfoState.Namespace)
+			assert.Equal(t, test.expectedClaimInfoState.DriverState, claimInfoResult.ClaimInfoState.DriverState)
+			assert.True(t, claimInfoResult.prepared, "ClaimInfo should be marked as prepared")
 		})
 	}
 }
@@ -651,11 +753,30 @@ func TestUnprepareResources(t *testing.T) {
 		expectedErrMsg         string
 	}{
 		{
-			description:    "unknown driver",
-			pod:            genTestPod(),
-			claim:          genTestClaim(claimName, "unknown driver", deviceName, podUID),
-			claimInfo:      genTestClaimInfo(claimUID, []string{podUID}, true),
-			expectedErrMsg: "DRA driver test-driver is not registered",
+			description: "unknown driver",
+			driverName:  driverName,
+			pod:         genTestPod(),
+			claimInfo: &ClaimInfo{
+				ClaimInfoState: state.ClaimInfoState{
+					ClaimUID:  claimUID,
+					ClaimName: claimName,
+					Namespace: namespace,
+					PodUIDs:   sets.New[string](string(podUID)),
+					DriverState: map[string]state.DriverState{
+						"unknown-driver": {
+							Devices: []state.Device{{
+								PoolName:     poolName,
+								DeviceName:   deviceName,
+								RequestNames: []string{requestName},
+								CDIDeviceIDs: []string{"random-cdi-id"},
+							}},
+						},
+					},
+				},
+				prepared: true,
+			},
+			expectedErrMsg:         "unprepare dynamic resources: DRA driver unknown-driver is not registered",
+			expectedUnprepareCalls: 0,
 		},
 		{
 			description:         "resource claim referenced by other pod(s)",
@@ -710,8 +831,12 @@ func TestUnprepareResources(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
 			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-			if err != nil {
-				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
+			require.NoError(t, err, "failed to create a new instance of the claimInfoCache")
+
+			manager := &ManagerImpl{
+				kubeClient: fakeKubeClient,
+				cache:      cache,
+				update:     make(chan resourceupdates.Update, 1),
 			}
 
 			var pluginClientTimeout *time.Duration
@@ -720,22 +845,15 @@ func TestUnprepareResources(t *testing.T) {
 				pluginClientTimeout = &timeout
 			}
 
-			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp)
-			if err != nil {
-				t.Fatal(err)
-			}
+			draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, test.wantTimeout, pluginClientTimeout, nil, test.resp, nil)
+			require.NoError(t, err)
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+			plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager, time.Second /* very short wiping delay for testing */)
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
 			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
-
-			manager := &ManagerImpl{
-				kubeClient: fakeKubeClient,
-				cache:      cache,
-			}
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -756,17 +874,18 @@ func TestUnprepareResources(t *testing.T) {
 			require.NoError(t, err)
 
 			if test.wantResourceSkipped {
+				if test.claimInfo != nil && len(test.claimInfo.PodUIDs) > 1 {
+					cachedClaim, exists := manager.cache.get(test.claimInfo.ClaimName, test.claimInfo.Namespace)
+					require.True(t, exists, "ClaimInfo should still exist if skipped")
+					assert.False(t, cachedClaim.PodUIDs.Has(string(test.pod.UID)), "Pod UID should be removed from skipped claim")
+				}
 				return // resource skipped so no need to continue
 			}
 
-			// Check that the cache has been updated correctly
-			claimName, _, err := resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
-			if err != nil {
-				t.Fatal(err)
-			}
-			if manager.cache.contains(*claimName, test.pod.Namespace) {
-				t.Fatalf("claimInfo still found in cache after calling UnprepareResources")
-			}
+			// Check cache was cleared only on successful unprepare
+			podClaimName, _, err := resourceclaim.Name(test.pod, &test.pod.Spec.ResourceClaims[0])
+			require.NoError(t, err)
+			assert.False(t, manager.cache.contains(*podClaimName, test.pod.Namespace), "claimInfo should not be found after successful unprepare")
 		})
 	}
 }
@@ -888,34 +1007,33 @@ func TestGetContainerClaimInfos(t *testing.T) {
 // to detect possible data races
 func TestParallelPrepareUnprepareResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
+	const numGoroutines = 30
 
 	// Setup and register fake DRA driver
-	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	draServerInfo, err := setupFakeDRADriverGRPCServer(tCtx, false, nil, nil, nil, nil)
+	require.NoError(t, err)
 	defer draServerInfo.teardownFn()
 
-	plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+	// Create ClaimInfo cache
+	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
+	require.NoError(t, err, "failed to newClaimInfoCache")
+
+	// Create fake Kube client and DRA manager FIRST
+	fakeKubeClient := fake.NewSimpleClientset()
+	manager := &ManagerImpl{
+		kubeClient: fakeKubeClient,
+		cache:      cache,
+		update:     make(chan resourceupdates.Update, numGoroutines), // Larger buffer maybe needed
+	}
+
+	plg := plugin.NewRegistrationHandler(tCtx, fakeKubeClient, getFakeNode, manager, time.Second /* very short wiping delay for testing */)
 	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
 	defer plg.DeRegisterPlugin(driverName, draServerInfo.socketName)
 
-	// Create ClaimInfo cache
-	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-	if err != nil {
-		t.Errorf("failed to newClaimInfoCache, err: %+v", err)
-		return
-	}
-
-	// Create fake Kube client and DRA manager
-	fakeKubeClient := fake.NewSimpleClientset()
-	manager := &ManagerImpl{kubeClient: fakeKubeClient, cache: cache}
-
 	// Call PrepareResources in parallel
 	var wgSync, wgStart sync.WaitGroup // groups to sync goroutines
-	numGoroutines := 30
 	wgSync.Add(numGoroutines)
 	wgStart.Add(1)
 	for i := 0; i < numGoroutines; i++ {
@@ -944,6 +1062,7 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 					},
 					Containers: []v1.Container{
 						{
+							Name: fmt.Sprintf("container-%d", goRoutineNum),
 							Resources: v1.ResourceRequirements{
 								Claims: []v1.ResourceClaim{
 									{
@@ -962,13 +1081,17 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 				return
 			}
 
+			defer func() {
+				_ = fakeKubeClient.ResourceV1beta1().ResourceClaims(pod.Namespace).Delete(tCtx, claim.Name, metav1.DeleteOptions{})
+			}()
+
 			if err = manager.PrepareResources(tCtx, pod); err != nil {
-				t.Errorf("pod: %s: PrepareResources failed: %+v", pod.Name, err)
+				t.Errorf("GoRoutine %d: pod: %s: PrepareResources failed: %+v", goRoutineNum, pod.Name, err)
 				return
 			}
 
 			if err = manager.UnprepareResources(tCtx, pod); err != nil {
-				t.Errorf("pod: %s: UnprepareResources failed: %+v", pod.Name, err)
+				t.Errorf("GoRoutine %d: pod: %s: UnprepareResources failed: %+v", goRoutineNum, pod.Name, err)
 				return
 			}
 
@@ -976,4 +1099,342 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	}
 	wgStart.Done() // Start executing goroutines
 	wgSync.Wait()  // Wait for all goroutines to finish
+}
+
+// TestHandleWatchResourcesStream verifies the manager's ability to process health updates
+// received from a DRA plugin's WatchResources stream. It checks if the internal health cache
+// is updated correctly, if affected pods are identified, and if update notifications are sent
+// through the manager's update channel. It covers various scenarios including health changes, stream errors, and context cancellation.
+func TestHandleWatchResourcesStream(t *testing.T) {
+	overallTestCtx, overallTestCancel := context.WithCancel(ktesting.Init(t))
+	defer overallTestCancel()
+
+	// Helper to create and setup a new manager for each sub-test
+	setupNewManagerAndRunStreamTest := func(
+		st *testing.T,
+		testSpecificCtx context.Context,
+		initialClaimInfos ...*ClaimInfo, // Allow passing initial claims for the manager's cache
+	) (
+		managerInstance *ManagerImpl, // Return the manager instance for assertions
+		runTestStreamFunc func(context.Context, chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}) (<-chan resourceupdates.Update, chan struct{}, chan error),
+	) {
+		// Fresh manager for each sub-test
+		manager, err := NewManagerImpl(nil, st.TempDir(), "worker")
+		require.NoError(st, err)
+
+		for _, ci := range initialClaimInfos {
+			manager.cache.add(ci)
+		}
+
+		managerInstance = manager
+
+		runTestStreamFunc = func(
+			streamCtx context.Context,
+			responses chan struct {
+				Resp *drahealthv1alpha1.WatchResourcesResponse
+				Err  error
+			},
+		) (<-chan resourceupdates.Update, chan struct{}, chan error) {
+			mockStream := &mockWatchResourcesClient{
+				RecvChan: responses,
+				Ctx:      streamCtx,
+			}
+			done := make(chan struct{})
+			errChan := make(chan error, 1)
+			go func() {
+				defer close(done)
+				// Use a logger that includes sub-test name for clarity
+				logger := klog.FromContext(streamCtx).WithName(st.Name())
+				hdlCtx := klog.NewContext(streamCtx, logger)
+
+				err := managerInstance.HandleWatchResourcesStream(hdlCtx, mockStream, driverName)
+				if err != nil {
+					if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) {
+						logger.V(4).Info("HandleWatchResourcesStream (test goroutine) exited as expected", "error", err)
+					} else {
+						// This is an application/stream error, not a standard exit.
+						// The sub-test ("StreamError") will assert this specific error.
+						logger.V(2).Info("HandleWatchResourcesStream (test goroutine) exited with application/stream error", "error", err)
+					}
+				} else {
+					logger.V(4).Info("HandleWatchResourcesStream (test goroutine) exited cleanly (nil error, likely from EOF)")
+				}
+				errChan <- err
+				close(errChan)
+			}()
+			return managerInstance.update, done, errChan
+		}
+		return managerInstance, runTestStreamFunc
+	}
+
+	// --- Test Case 1: Health change for an allocated device ---
+	t.Run("HealthChangeForAllocatedDevice", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Create a manager with a relevant claim already in its cache.
+		initialClaim := genTestClaimInfo(claimUID, []string{string(podUID)}, true) // podUID, claimUID, etc. are global consts
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, initialClaim)
+
+		t.Log("HealthChangeForAllocatedDevice: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1) // Buffered by 1 for the single message
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		// Send the health update message
+		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Unix()}
+		t.Logf("HealthChangeForAllocatedDevice: Sending health update: %+v", unhealthyDeviceMsg)
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+		}
+
+		t.Log("HealthChangeForAllocatedDevice: Waiting for update on manager channel")
+		select {
+		case upd := <-updateChan:
+			t.Logf("HealthChangeForAllocatedDevice: Received update: %+v", upd)
+			assert.ElementsMatch(t, []string{string(podUID)}, upd.PodUIDs, "Expected pod UID in update")
+		case <-time.After(2 * time.Second):
+			t.Fatal("HealthChangeForAllocatedDevice: Timeout waiting for pod update on manager.update channel")
+		}
+
+		// Check cache state
+		cachedHealth := manager.healthInfoCache.getHealthInfo(driverName, poolName, deviceName)
+		assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealth, "Cache update check failed")
+
+		t.Log("HealthChangeForAllocatedDevice: Closing responses channel to signal EOF")
+		close(responses) // Signal EOF
+
+		t.Log("HealthChangeForAllocatedDevice: Waiting on done channel")
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("HealthChangeForAllocatedDevice: done channel closed, stream goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("HealthChangeForAllocatedDevice: Timed out waiting for HandleWatchResourcesStream to finish after EOF signal")
+		}
+		// Expect nil (if HandleWatchResourcesStream returns nil on EOF) or io.EOF
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
+
+	// --- Test Case 2: Health change for a non-allocated device ---
+	t.Run("NonAllocatedDeviceChange", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Manager with no specific claims, or claims that don't use "other-device"
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx)
+		// If needed, add a claim that *doesn't* use "other-device" to ensure cache isn't empty
+		// manager.cache.add(genTestClaimInfo(claimUID, []string{string(podUID)}, true))
+
+		t.Log("NonAllocatedDeviceChange: Test Case Started")
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		otherDeviceMsg := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: "other-device", Health: "Unhealthy", LastUpdated: time.Now().Unix()}
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{otherDeviceMsg}},
+		}
+
+		select {
+		case upd := <-updateChan:
+			t.Fatalf("NonAllocatedDeviceChange: Unexpected update on manager.update channel: %+v", upd)
+			// OK, no update expected on manager.update for this device
+		case <-time.After(200 * time.Millisecond):
+			t.Log("NonAllocatedDeviceChange: Correctly received no update on manager channel.")
+		}
+
+		// Check health cache for the "other-device"
+		cachedHealthOther := manager.healthInfoCache.getHealthInfo(driverName, poolName, "other-device")
+		assert.Equal(t, state.DeviceHealthString("Unhealthy"), cachedHealthOther, "Cache update for other-device failed")
+
+		close(responses)
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("NonAllocatedDeviceChange: Stream handler goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("NonAllocatedDeviceChange: Timeout waiting for stream handler to finish after EOF")
+		}
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
+
+	// --- Test Case 3: No actual health state change (idempotency) ---
+	t.Run("NoActualStateChange", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Setup: Manager with a claim and the device already marked Unhealthy in health cache
+		initialClaim := genTestClaimInfo(claimUID, []string{string(podUID)}, true)
+		manager, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx, initialClaim)
+
+		// Pre-populate health cache
+		initialHealth := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Add(-5 * time.Millisecond)} // Ensure LastUpdated is slightly in past
+		_, _, err := manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{initialHealth})
+		require.NoError(t, err, "Failed to pre-populate health cache")
+
+		t.Log("NoActualStateChange: Test Case Started")
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1)
+		updateChan, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		// Send the same "Unhealthy" state again
+		unhealthyDeviceMsg := &drahealthv1alpha1.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Unhealthy", LastUpdated: time.Now().Unix()}
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{
+			Resp: &drahealthv1alpha1.WatchResourcesResponse{Devices: []*drahealthv1alpha1.DeviceHealth{unhealthyDeviceMsg}},
+		}
+
+		select {
+		case upd := <-updateChan: // No update should be sent if health status string itself didn't change
+			t.Fatalf("NoActualStateChange: Unexpected update on manager.update channel: %+v", upd)
+		case <-time.After(200 * time.Millisecond):
+			t.Log("NoActualStateChange: Correctly received no update on manager channel.")
+		}
+
+		close(responses)
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("NoActualStateChange: Stream handler goroutine finished.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("NoActualStateChange: Timeout waiting for stream handler to finish after EOF")
+		}
+		assert.True(t, finalErr == nil || errors.Is(finalErr, io.EOF), "Expected nil or io.EOF, got %v", finalErr)
+	})
+
+	// --- Test Case 4: Stream error ---
+	t.Run("StreamError", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		defer stCancel()
+
+		// Get a new manager and the scoped runStreamTest helper
+		_, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx)
+		t.Log("StreamError: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}, 1)
+		_, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		expectedStreamErr := errors.New("simulated mock stream error")
+		responses <- struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}{Err: expectedStreamErr}
+
+		t.Log("StreamError: Waiting on done channel")
+		var actualErr error
+		select {
+		case <-done:
+			// Read the error propagated from the HandleWatchResourcesStream goroutine
+			actualErr = <-streamErrChan
+			t.Logf("StreamError: done channel closed. Stream handler returned: %v", actualErr)
+		case <-time.After(2 * time.Second):
+			t.Fatal("StreamError: Timeout waiting for stream handler to finish after error signal")
+		}
+
+		require.Error(t, actualErr, "HandleWatchResourcesStream should have returned an error")
+		assert.True(t, errors.Is(actualErr, expectedStreamErr), "Expected error '%v', but got '%v'", expectedStreamErr, actualErr)
+
+	})
+
+	// --- Test Case 5: Context cancellation ---
+	t.Run("ContextCanceled", func(t *testing.T) {
+		stCtx, stCancel := context.WithCancel(overallTestCtx)
+		// Deliberately do not `defer stCancel()` for this specific test case
+
+		_, runStreamTest := setupNewManagerAndRunStreamTest(t, stCtx)
+		t.Log("ContextCanceled: Test Case Started")
+
+		responses := make(chan struct {
+			Resp *drahealthv1alpha1.WatchResourcesResponse
+			Err  error
+		}) // Unbuffered, will block Recv
+		_, done, streamErrChan := runStreamTest(stCtx, responses)
+
+		t.Log("ContextCanceled: Intentionally canceling context for stream handler after a short delay.")
+		time.Sleep(50 * time.Millisecond) // Give Recv a chance to block
+		stCancel()                        // Manually cancel the context for this sub-test
+
+		t.Log("ContextCanceled: Waiting on done channel")
+		var finalErr error
+		select {
+		case <-done:
+			finalErr = <-streamErrChan
+			t.Log("ContextCanceled: done channel closed. Stream handler finished after context cancellation.")
+		case <-time.After(1 * time.Second):
+			t.Fatal("ContextCanceled: Timeout waiting for stream handler to finish after context cancellation")
+		}
+		require.Error(t, finalErr)
+		assert.True(t, errors.Is(finalErr, context.Canceled) || errors.Is(finalErr, context.DeadlineExceeded))
+	})
+}
+
+// TestUpdateAllocatedResourcesStatus checks if the manager correctly updates the
+// PodStatus with the health information of allocated DRA resources. It populates
+// the caches with known claim and health data, then calls the function and verifies the resulting PodStatus.
+func TestUpdateAllocatedResourcesStatus(t *testing.T) {
+	// Setup Manager with caches
+	manager, err := NewManagerImpl(nil, t.TempDir(), "worker")
+	require.NoError(t, err)
+
+	// Populate claimInfoCache
+	claimInfo := genTestClaimInfo(claimUID, []string{podUID}, true) // Assume prepared
+	manager.cache.add(claimInfo)
+
+	// Populate healthInfoCache
+	healthyDevice := state.DeviceHealth{PoolName: poolName, DeviceName: deviceName, Health: "Healthy", LastUpdated: time.Now()}
+	_, _, err = manager.healthInfoCache.updateHealthInfo(driverName, []state.DeviceHealth{healthyDevice})
+	require.NoError(t, err)
+
+	// Create Pod and Status objects
+	pod := genTestPod()
+	require.True(t, len(pod.Spec.Containers) > 0, "genTestPod should create at least one container")
+	// Ensure the container has a name for matching
+	pod.Spec.Containers[0].Name = containerName
+	podStatus := &v1.PodStatus{
+		ContainerStatuses: []v1.ContainerStatus{
+			{Name: containerName}, // Match container name if specified, otherwise use index 0
+		},
+	}
+
+	// Call the function under test
+	manager.UpdateAllocatedResourcesStatus(pod, podStatus)
+
+	// Assertions
+	require.Len(t, podStatus.ContainerStatuses, 1)
+	contStatus := podStatus.ContainerStatuses[0]
+	require.NotNil(t, contStatus.AllocatedResourcesStatus)
+	require.Len(t, contStatus.AllocatedResourcesStatus, 1, "Should have status for one resource claim")
+
+	resourceStatus := contStatus.AllocatedResourcesStatus[0]
+	assert.Equal(t, v1.ResourceName(claimName), resourceStatus.Name, "ResourceStatus Name mismatch")
+	// Check the Resources slice
+	require.Len(t, resourceStatus.Resources, 1, "Should have health info for one device")
+	resourceHealth := resourceStatus.Resources[0]
+	assert.Equal(t, v1.ResourceID(cdiID), resourceHealth.ResourceID, "ResourceHealth ResourceID mismatch")
+	assert.Equal(t, v1.ResourceHealthStatusHealthy, resourceHealth.Health, "ResourceHealth Health status mismatch")
 }

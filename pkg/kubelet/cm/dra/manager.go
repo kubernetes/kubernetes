@@ -18,8 +18,11 @@ package dra
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -31,9 +34,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	dra "k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/resourceupdates"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -73,6 +78,17 @@ type ManagerImpl struct {
 
 	// getNode is a function that returns the node object using the kubelet's node lister.
 	getNode GetNodeFunc
+
+	// healthInfoCache contains cached health info
+	healthInfoCache *healthInfoCache
+
+	// lastHealthUpdate is the last time the health info cache was updated.
+	lastHealthUpdate time.Time
+
+	// healthInfoMutex protects the healthInfoCache and lastHealthUpdate.
+	healthInfoMutex sync.Mutex
+
+	update chan resourceupdates.Update
 }
 
 // NewManagerImpl creates a new manager.
@@ -90,22 +106,32 @@ func NewManagerImpl(kubeClient clientset.Interface, stateFileDirectory string, n
 		return nil, fmt.Errorf("create ResourceClaim cache: %w", err)
 	}
 
+	healthInfoCache, err := newHealthInfoCache(stateFileDirectory + "/" + "dra_health_state")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create healthInfo cache: %w", err)
+	}
+
 	// TODO: for now the reconcile period is not configurable.
 	// We should consider making it configurable in the future.
 	reconcilePeriod := defaultReconcilePeriod
 
 	manager := &ManagerImpl{
-		cache:           claimInfoCache,
-		kubeClient:      kubeClient,
-		reconcilePeriod: reconcilePeriod,
-		activePods:      nil,
-		sourcesReady:    nil,
+		cache:            claimInfoCache,
+		kubeClient:       kubeClient,
+		reconcilePeriod:  reconcilePeriod,
+		activePods:       nil,
+		sourcesReady:     nil,
+		healthInfoCache:  healthInfoCache,
+		lastHealthUpdate: time.Time{},
+		healthInfoMutex:  sync.Mutex{},
+		update:           make(chan resourceupdates.Update, 100),
 	}
 
 	return manager, nil
 }
 
 func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
+	rootCtx := context.Background()
 	// The time that DRA drivers have to come back after being unregistered
 	// before the kubelet removes their ResourceSlices.
 	//
@@ -119,14 +145,18 @@ func (m *ManagerImpl) GetWatcherHandler() cache.PluginHandler {
 	// If a DRA driver wants to be sure that slices don't get wiped,
 	// it should use rolling updates.
 	wipingDelay := 30 * time.Second
-	return cache.PluginHandler(dra.NewRegistrationHandler(m.kubeClient, m.getNode, wipingDelay))
+	return cache.PluginHandler(dra.NewRegistrationHandler(rootCtx, m.kubeClient, m.getNode, m, wipingDelay))
 }
 
 // Start starts the reconcile loop of the manager.
 func (m *ManagerImpl) Start(ctx context.Context, activePods ActivePodsFunc, getNode GetNodeFunc, sourcesReady config.SourcesReady) error {
+	logger := klog.FromContext(ctx)
 	m.activePods = activePods
 	m.getNode = getNode
 	m.sourcesReady = sourcesReady
+
+	logger.Info("Starting DRA manager")
+
 	go wait.UntilWithContext(ctx, func(ctx context.Context) { m.reconcileLoop(ctx) }, m.reconcilePeriod)
 	return nil
 }
@@ -645,4 +675,206 @@ func (m *ManagerImpl) GetContainerClaimInfos(pod *v1.Pod, container *v1.Containe
 		}
 	}
 	return claimInfos, nil
+}
+
+// UpdateAllocatedResourcesStatus updates the health status of allocated DRA resources in the pod's container statuses.
+func (m *ManagerImpl) UpdateAllocatedResourcesStatus(pod *v1.Pod, status *v1.PodStatus) {
+	logger := klog.FromContext(context.Background())
+	for _, container := range pod.Spec.Containers {
+		// Get all the DRA claim details associated with this specific container.
+		claimInfos, err := m.GetContainerClaimInfos(pod, &container)
+		if err != nil {
+			logger.Error(err, "Failed to get claim infos for container", "pod", klog.KObj(pod), "container", container.Name)
+			continue
+		}
+
+		// Find the corresponding container status
+		for i, containerStatus := range status.ContainerStatuses {
+			if containerStatus.Name != container.Name {
+				continue
+			}
+
+			// Ensure the slice exists. Use a map for efficient updates by resource name.
+			resourceStatusMap := make(map[v1.ResourceName]*v1.ResourceStatus)
+			if status.ContainerStatuses[i].AllocatedResourcesStatus != nil {
+				for idx := range status.ContainerStatuses[i].AllocatedResourcesStatus {
+					// Store pointers to modify in place
+					resourceStatusMap[status.ContainerStatuses[i].AllocatedResourcesStatus[idx].Name] = &status.ContainerStatuses[i].AllocatedResourcesStatus[idx]
+				}
+			} else {
+				status.ContainerStatuses[i].AllocatedResourcesStatus = []v1.ResourceStatus{}
+			}
+
+			// Loop through each claim associated with the container
+			for _, claimInfo := range claimInfos {
+				resourceName := v1.ResourceName(claimInfo.ClaimName)
+
+				// Get or create the ResourceStatus entry for this claim
+				resStatus, ok := resourceStatusMap[resourceName]
+
+				if !ok {
+					// Create a new entry and add it to the map and the slice
+					newStatus := v1.ResourceStatus{
+						Name:      resourceName,
+						Resources: []v1.ResourceHealth{}, // Initialize the slice
+					}
+					status.ContainerStatuses[i].AllocatedResourcesStatus = append(status.ContainerStatuses[i].AllocatedResourcesStatus, newStatus)
+					// Get pointer to the newly added element *after* appending
+					resStatus = &status.ContainerStatuses[i].AllocatedResourcesStatus[len(status.ContainerStatuses[i].AllocatedResourcesStatus)-1]
+					resourceStatusMap[resourceName] = resStatus
+				}
+
+				// Clear previous health entries for this resource before adding current ones
+				// Ensures we only report current health for allocated devices.
+				resStatus.Resources = []v1.ResourceHealth{}
+
+				// Iterate through the map holding the state specific to each driver
+				for driverName, driverState := range claimInfo.DriverState {
+					// Iterate through each specific device allocated by this driver
+					for _, device := range driverState.Devices {
+						m.healthInfoMutex.Lock()
+						healthStr := m.healthInfoCache.getHealthInfo(driverName, device.PoolName, device.DeviceName)
+						m.healthInfoMutex.Unlock()
+
+						// Convert internal health string to API type
+						var health v1.ResourceHealthStatus
+						switch healthStr {
+						case "Healthy":
+							health = v1.ResourceHealthStatusHealthy
+						case "Unhealthy":
+							health = v1.ResourceHealthStatusUnhealthy
+						default: // Catches "Unknown" or any other case
+							health = v1.ResourceHealthStatusUnknown
+						}
+
+						// Create the ResourceHealth entry
+						resourceHealth := v1.ResourceHealth{
+							Health: health,
+						}
+
+						// Use first CDI device ID as ResourceID, with fallback
+						if len(device.CDIDeviceIDs) > 0 {
+							resourceHealth.ResourceID = v1.ResourceID(device.CDIDeviceIDs[0])
+						} else {
+							// Fallback ID if no CDI ID is present
+							resourceHealth.ResourceID = v1.ResourceID(fmt.Sprintf("%s/%s/%s", driverName, device.PoolName, device.DeviceName))
+						}
+
+						// Append the health status for this specific device/resource ID
+						resStatus.Resources = append(resStatus.Resources, resourceHealth)
+					}
+				}
+			}
+			// Rebuild the slice from the map values to ensure correctness
+			finalStatuses := make([]v1.ResourceStatus, 0, len(resourceStatusMap))
+			for _, rs := range resourceStatusMap {
+				// Only add if it actually has resource health entries populated
+				if len(rs.Resources) > 0 {
+					finalStatuses = append(finalStatuses, *rs)
+				}
+			}
+			status.ContainerStatuses[i].AllocatedResourcesStatus = finalStatuses
+		}
+	}
+}
+
+// watchResources starts a health monitoring stream for a DRA plugin.
+func (m *ManagerImpl) watchResources(ctx context.Context, pluginName string, p *dra.Plugin) error {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Starting to watch resources for plugin", "pluginName", pluginName)
+
+	stream, err := p.WatchResources(ctx)
+	if err != nil {
+		logger.Error(err, "Failed to establish WatchResources stream", "pluginName", pluginName)
+		return err
+	}
+	return m.HandleWatchResourcesStream(ctx, stream, pluginName)
+}
+
+// HandleWatchResourcesStream processes health updates from the DRA plugin.
+func (m *ManagerImpl) HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.NodeHealth_WatchResourcesClient, pluginName string) error {
+	logger := klog.FromContext(ctx)
+
+	defer func() {
+		logger.Info("Clearing health cache for driver upon stream exit", "pluginName", pluginName)
+		// Use a separate context for clearDriver if needed, though background should be fine.
+		if err := m.healthInfoCache.clearDriver(pluginName); err != nil {
+			logger.Error(err, "Failed to clear health info cache for driver", "pluginName", pluginName)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("Stopping health monitoring due to context cancellation", "pluginName", pluginName, "reason", ctx.Err())
+			return ctx.Err()
+		default:
+			resp, err := stream.Recv()
+			if err != nil {
+				logger.Error(err, "Error receiving from WatchResources stream", "pluginName", pluginName)
+				if errors.Is(err, io.EOF) {
+					logger.Info("Stream ended with EOF", "pluginName", pluginName)
+					return nil
+				}
+				return err
+			}
+			// Convert drahealthv1alpha1.DeviceHealth to state.DeviceHealth
+			devices := make([]state.DeviceHealth, len(resp.GetDevices()))
+			for i, d := range resp.GetDevices() {
+				devices[i] = state.DeviceHealth{
+					PoolName:    d.PoolName,
+					DeviceName:  d.DeviceName,
+					Health:      state.DeviceHealthString(d.Health),
+					LastUpdated: time.Unix(d.LastUpdated, 0),
+				}
+			}
+
+			changedDevices, changed, updateErr := m.healthInfoCache.updateHealthInfo(pluginName, devices)
+			if updateErr != nil {
+				logger.Error(updateErr, "Failed to update health info cache", "pluginName", pluginName)
+			}
+			if changed && len(changedDevices) > 0 {
+				logger.V(5).Info("Health info changed, checking affected pods", "pluginName", pluginName, "changedDevicesCount", len(changedDevices))
+
+				podsToUpdate := sets.New[string]()
+
+				m.cache.RLock()
+				for _, dev := range changedDevices {
+					for _, cInfo := range m.cache.claimInfo {
+						if driverState, ok := cInfo.DriverState[pluginName]; ok {
+							for _, allocatedDevice := range driverState.Devices {
+								if allocatedDevice.PoolName == dev.PoolName && allocatedDevice.DeviceName == dev.DeviceName {
+									podsToUpdate.Insert(cInfo.PodUIDs.UnsortedList()...)
+									break
+								}
+							}
+						}
+					}
+				}
+				m.cache.RUnlock()
+
+				if podsToUpdate.Len() > 0 {
+					podUIDs := podsToUpdate.UnsortedList()
+					logger.V(4).Info("Sending health update notification for pods", "pluginName", pluginName, "pods", podUIDs)
+					select {
+					case m.update <- resourceupdates.Update{PodUIDs: podUIDs}:
+					default:
+						logger.Error(nil, "DRA health update channel is full, discarding pod update notification", "pluginName", pluginName, "pods", podUIDs)
+					}
+				} else {
+					logger.V(5).Info("Health info changed, but no active pods found using the affected devices", "pluginName", pluginName)
+				}
+			} else if changed {
+				logger.V(5).Info("Health info updated, but no specific device changes detected", "pluginName", pluginName)
+			}
+
+		}
+	}
+
+}
+
+// Updates returns the channel that provides resource updates.
+func (m *ManagerImpl) Updates() <-chan resourceupdates.Update {
+	// Return the internal channel that HandleWatchResourcesStream writes to.
+	return m.update
 }

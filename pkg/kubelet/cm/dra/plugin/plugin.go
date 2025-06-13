@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"k8s.io/klog/v2"
+	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -63,14 +64,31 @@ type Plugin struct {
 	endpoint          string
 	chosenService     string // e.g. drapbv1beta1.DRAPluginService
 	clientCallTimeout time.Duration
+
+	healthClient       drahealthv1alpha1.NodeHealthClient
+	healthStreamCtx    context.Context
+	healthStreamCancel context.CancelFunc
 }
 
 func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	if p.conn != nil {
+	// If connection exists and is ready, return it.
+	if p.conn != nil && p.conn.GetState() != connectivity.Shutdown {
+		// Initialize health client if connection exists but client is nil
+		// This allows lazy init if connection was established before health was added.
+		if p.healthClient == nil {
+			p.healthClient = drahealthv1alpha1.NewNodeHealthClient(p.conn)
+			klog.FromContext(p.backgroundCtx).V(4).Info("Initialized NodeHealthClient lazily")
+		}
 		return p.conn, nil
+	}
+
+	if p.conn != nil {
+		p.conn.Close()
+		p.conn = nil
+		p.healthClient = nil
 	}
 
 	ctx := p.backgroundCtx
@@ -90,20 +108,49 @@ func (p *Plugin) getOrCreateGRPCConn() (*grpc.ClientConn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
 		grpc.WithChainUnaryInterceptor(newMetricsInterceptor(p.name)),
+		grpc.WithBlock(),
 	)
 	if err != nil {
-		return nil, err
+		// Error could be context deadline exceeded or connection refused etc.
+		logger.Error(err, "Failed to dial gRPC connection")
+		return nil, fmt.Errorf("failed to dial %s: %w", p.endpoint, err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	if ok := conn.WaitForStateChange(ctx, connectivity.Connecting); !ok {
-		return nil, errors.New("timed out waiting for gRPC connection to be ready")
-	}
-
+	logger.V(4).Info("Successfully established gRPC connection", "endpoint", p.endpoint)
 	p.conn = conn
+	// Initialize clients now that connection is established.
+	p.healthClient = drahealthv1alpha1.NewNodeHealthClient(p.conn)
+
 	return p.conn, nil
+}
+
+// SetHealthStream stores the context and cancel function for the active health stream.
+func (p *Plugin) SetHealthStream(ctx context.Context, cancel context.CancelFunc) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	p.healthStreamCtx = ctx
+	p.healthStreamCancel = cancel
+}
+
+// HealthStreamCancel returns the cancel function for the current health stream, if any.
+func (p *Plugin) HealthStreamCancel() context.CancelFunc {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return p.healthStreamCancel
+}
+
+// HealthClient returns the NodeHealthClient, ensuring it's initialized.
+// Returns nil if connection cannot be established.
+func (p *Plugin) HealthClient() drahealthv1alpha1.NodeHealthClient {
+	// Ensure connection and client are initialized
+	_, err := p.getOrCreateGRPCConn()
+	if err != nil {
+		klog.FromContext(p.backgroundCtx).Error(err, "Failed to get gRPC connection for health client")
+		return nil
+	}
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+	return p.healthClient
 }
 
 func (p *Plugin) Name() string {
@@ -183,4 +230,21 @@ func newMetricsInterceptor(pluginName string) grpc.UnaryClientInterceptor {
 		metrics.DRAGRPCOperationsDuration.WithLabelValues(pluginName, method, status.Code(err).String()).Observe(time.Since(start).Seconds())
 		return err
 	}
+}
+
+// WatchResources establishes a stream to receive health updates from the DRA plugin.
+func (p *Plugin) WatchResources(ctx context.Context) (drahealthv1alpha1.NodeHealth_WatchResourcesClient, error) {
+	if p.healthClient == nil {
+		return nil, fmt.Errorf("health client not initialized for plugin %s", p.name)
+	}
+	logger := klog.FromContext(ctx).V(4).WithValues("pluginName", p.name)
+	logger.Info("Starting WatchResources stream")
+	stream, err := p.healthClient.WatchResources(ctx, &drahealthv1alpha1.WatchResourcesRequest{})
+	if err != nil {
+		logger.Error(err, "WatchResources RPC call failed")
+		return nil, err
+	}
+
+	logger.V(4).Info("WatchResources stream initiated successfully")
+	return stream, nil
 }
