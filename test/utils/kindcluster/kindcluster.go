@@ -24,6 +24,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -119,6 +120,40 @@ func (c *Cluster) LoadConfig(tCtx ktesting.TContext) *restclient.Config {
 
 }
 
+// UpdateAll replaces all system components with the ones provided via
+// the kube-apiserver|kube-controller-manager|kube-proxy|kube-scheduler.tar
+// release images in the given directory.
+//
+// This corresponds conceptually to https://gist.github.com/aojea/2c94034f8e86d08842e5916231eb3fe1.
+func (c *Cluster) UpdateAll(tCtx ktesting.TContext, dockerTag, releaseImagesDir string, kubeletBinary string) {
+	controlPlaneComponents := []string{"kube-apiserver", "kube-controller-manager", "kube-scheduler"}
+	nodes := regexp.MustCompile(`[[:space:]]+`).Split(runKind(tCtx, "get", "nodes", "--name", c.name), -1)
+	workerNodes := make([]string, 0, len(nodes)-1)
+	controlPlaneNodes := make([]string, 0, 1)
+	for _, node := range nodes {
+		if strings.Contains(node, "worker") {
+			workerNodes = append(workerNodes, node)
+		} else if node != "" {
+			controlPlaneNodes = append(controlPlaneNodes, node)
+		}
+	}
+
+	for _, node := range controlPlaneNodes {
+		for _, component := range controlPlaneComponents {
+			runKind(tCtx, "load", "image-archive", path.Join(releaseImagesDir, component+".tar"), "--name", c.name, "--nodes", node)
+			runCmd(tCtx, "docker", "exec", node, "sed", "-i", "-r", fmt.Sprintf(`s|^(.*image\:.*)\:.*$|\1-amd64\:%s|`, dockerTag), "/etc/kubernetes/manifests/"+component+".yaml")
+		}
+	}
+
+	// TODO: wait for restart
+
+	for _, node := range workerNodes {
+		runCmd(tCtx, "docker", "cp", kubeletBinary, node+":/usr/bin/kubelet")
+		// systemctl restart checks that the service comes up.
+		runCmd(tCtx, "docker", "exec", node, "systemctl", "restart", "kubelet")
+	}
+}
+
 // BuildImage ensures that there is a kind node image for the given version
 // of Kubernetes. It can build from a directory with Kubernetes source code
 // or download URL like https://dl.k8s.io/ci/v1.33.1-19+f900f017250646/kubernetes-server-linux-amd64.tar.gz.
@@ -132,17 +167,42 @@ func BuildImage(tCtx ktesting.TContext, version, imageSource string) string {
 	return imageName
 }
 
-func runKind(tCtx ktesting.TContext, args ...string) {
+// ServerDownloadURL returns the full URL from which kind can create a node image
+// for the given major/minor version of Kubernetes.
+//
+// This considers only proper releases.
+func ServerDownloadURL(tCtx ktesting.TContext, major, minor uint) string {
+	url := fmt.Sprintf("https://dl.k8s.io/release/stable-%d.%d.txt", major, minor)
+	get, err := http.NewRequestWithContext(tCtx, http.MethodGet, url, nil)
+	tCtx.ExpectNoError(err, "construct GET for %s", url)
+	resp, err := http.DefaultClient.Do(get)
+	tCtx.ExpectNoError(err, "get %s", url)
+	if resp.StatusCode != 200 {
+		tCtx.Fatalf("get %s: %d - %s", url, resp.StatusCode, resp.Status)
+	}
+	if resp.Body == nil {
+		tCtx.Fatalf("empty response for %s", url)
+	}
+	defer resp.Body.Close()
+	version, err := io.ReadAll(resp.Body)
+	tCtx.ExpectNoError(err, "read response body for %s", url)
+	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-linux-amd64.tar.gz", string(version))
+}
+
+func runKind(tCtx ktesting.TContext, args ...string) string {
 	tCtx.Helper()
-	// In practice, parameters contain no spaces, so no quoting is needed and
-	// we can simply concatenate with spaces as separator.
-	tCtx.Logf("Running command: kind %s", strings.Join(args, " "))
-	cmd := exec.CommandContext(tCtx, "kind", args...)
+	return runCmd(tCtx, "kind", args...)
+}
+
+func runCmd(tCtx ktesting.TContext, name string, args ...string) string {
+	tCtx.Helper()
+	tCtx.Logf("Running command: %s %s", name, strings.Join(args, " "))
+	cmd := exec.CommandContext(tCtx, name, args...)
 	var output strings.Builder
 	reader, writer := io.Pipe()
 	cmd.Stdout = writer
 	cmd.Stderr = writer
-	tCtx.ExpectNoError(cmd.Start(), "start kind command")
+	tCtx.ExpectNoError(cmd.Start(), "start %s command", name)
 	scanner := bufio.NewScanner(reader)
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -151,13 +211,15 @@ func runKind(tCtx ktesting.TContext, args ...string) {
 		for scanner.Scan() {
 			line := scanner.Text()
 			line = strings.TrimSuffix(line, "\n")
-			tCtx.Logf("kind: %s", line)
+			tCtx.Logf("%s: %s", name, line)
 			output.WriteString(line)
 			output.WriteByte('\n')
 		}
 	}()
-	tCtx.ExpectNoError(cmd.Wait(), fmt.Sprintf("kind command failed, output:\n%s", output.String()))
+	tCtx.ExpectNoError(cmd.Wait(), fmt.Sprintf("%s command failed, output:\n%s", name, output.String()))
 	writer.Close()
 	wg.Wait()
-	tCtx.ExpectNoError(scanner.Err(), "read kind command output")
+	tCtx.ExpectNoError(scanner.Err(), "read %s command output", name)
+
+	return output.String()
 }

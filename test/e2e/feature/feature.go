@@ -217,6 +217,8 @@ var (
 	// The kind command must be in the PATH.
 	// It must support bringing up a cluster with a node image built from
 	// the current Kubernetes version on the host in which the test run.
+	// The repo root must point to the Kubernetes source code.
+	// make and docker must be available.
 	KindCommand = framework.WithFeature(framework.ValidFeatures.Add("KindCommand"))
 
 	// Owner: sig-network
