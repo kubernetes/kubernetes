@@ -176,6 +176,11 @@ const (
 	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
 	RetryGenerateName featuregate.Feature = "RetryGenerateName"
 
+	// owner: @serathius
+	//
+	// Enables APF to use size of objects for estimating request cost.
+	SizeBasedListCostEstimate featuregate.Feature = "SizeBasedListCostEstimate"
+
 	// owner: @cici37
 	//
 	// StrictCostEnforcementForVAP is used to apply strict CEL cost validation for ValidatingAdmissionPolicy.
@@ -360,6 +365,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	SeparateCacheWatchRPC: {
 		{Version: version.MustParse("1.28"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
+	},
+
+	SizeBasedListCostEstimate: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
 	},
 
 	StorageVersionAPI: {

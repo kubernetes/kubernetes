@@ -1277,6 +1277,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Deprecated},
 	},
 
+	genericfeatures.SizeBasedListCostEstimate: {
+		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	genericfeatures.StorageVersionAPI: {
 		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
 	},
