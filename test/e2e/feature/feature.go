@@ -208,8 +208,16 @@ var (
 	// Marks tests that require a cluster with dual-stack pod and service networks.
 	IPv6DualStack = framework.WithFeature(framework.ValidFeatures.Add("IPv6DualStack"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-testing
+	// Marks tests which need to run in a kind cluster.
 	Kind = framework.WithFeature(framework.ValidFeatures.Add("Kind"))
+
+	// Owner: sig-testing
+	//
+	// The kind command must be in the PATH.
+	// It must support bringing up a cluster with a node image built from
+	// the current Kubernetes version on the host in which the test run.
+	KindCommand = framework.WithFeature(framework.ValidFeatures.Add("KindCommand"))
 
 	// Owner: sig-network
 	// Marks tests that require kube-dns-autoscaler
@@ -237,6 +245,14 @@ var (
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	KubeProxyDaemonSetMigration = framework.WithFeature(framework.ValidFeatures.Add("KubeProxyDaemonSetMigration"))
+
+	// Owner: sig-testing
+	//
+	// Marks tests which can only run if the E2E suite gets invoked with
+	// -kube-root-by-version "1.32=<absolute path to a Kubernetes v1.32.x source tree>".
+	//
+	// The Kubernetes binaries must have been built with "make" there.
+	KubeRootV132 = framework.WithFeature(framework.ValidFeatures.Add("KubeRootV132"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	LabelSelector = framework.WithFeature(framework.ValidFeatures.Add("LabelSelector"))
