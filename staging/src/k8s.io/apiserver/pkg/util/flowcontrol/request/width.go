@@ -23,6 +23,7 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/klog/v2"
@@ -56,9 +57,9 @@ func (we *WorkEstimate) MaxSeats() int {
 	return int(we.FinalSeats)
 }
 
-// objectCountGetterFunc represents a function that gets the total
+// statsGetterFunc represents a function that gets the total
 // number of objects for a given resource.
-type objectCountGetterFunc func(string) (int64, error)
+type statsGetterFunc func(string) (storage.Stats, error)
 
 // watchCountGetterFunc represents a function that gets the total
 // number of watchers potentially interested in a given request.
@@ -71,7 +72,7 @@ type maxSeatsFunc func(priorityLevelName string) uint64
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
+func NewWorkEstimator(objectCountFn statsGetterFunc, watchCountFn watchCountGetterFunc, config *WorkEstimatorConfig, maxSeatsFn maxSeatsFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
 		minimumSeats:          config.MinimumSeats,
 		maximumSeatsLimit:     config.MaximumSeatsLimit,

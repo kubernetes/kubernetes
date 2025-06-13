@@ -24,6 +24,7 @@ import (
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
@@ -547,8 +548,8 @@ func TestWorkEstimator(t *testing.T) {
 			if len(counts) == 0 {
 				counts = map[string]int64{}
 			}
-			countsFn := func(key string) (int64, error) {
-				return counts[key], test.countErr
+			countsFn := func(key string) (storage.Stats, error) {
+				return storage.Stats{ObjectCount: counts[key]}, test.countErr
 			}
 			watchCountsFn := func(_ *apirequest.RequestInfo) int {
 				return test.watchCount

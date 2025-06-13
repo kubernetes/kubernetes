@@ -1429,6 +1429,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: SizeBasedListCostEstimate
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: SizeMemoryBackedVolumes
   versionedSpecs:
   - default: false
