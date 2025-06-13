@@ -51,7 +51,7 @@ const (
 	ErrReason = "node(s) didn't have free ports for the requested pod ports"
 )
 
-type preFilterState []*v1.ContainerPort
+type preFilterState []v1.ContainerPort
 
 // Clone the prefilter state.
 func (s preFilterState) Clone() fwk.StateData {
@@ -64,28 +64,9 @@ func (pl *NodePorts) Name() string {
 	return Name
 }
 
-// getContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
-// will be in the result; but it does not resolve port conflict.
-func getContainerPorts(pods ...*v1.Pod) []*v1.ContainerPort {
-	ports := []*v1.ContainerPort{}
-	for _, pod := range pods {
-		for j := range pod.Spec.Containers {
-			container := &pod.Spec.Containers[j]
-			for k := range container.Ports {
-				// Only return ports with a host port specified.
-				if container.Ports[k].HostPort <= 0 {
-					continue
-				}
-				ports = append(ports, &container.Ports[k])
-			}
-		}
-	}
-	return ports
-}
-
 // PreFilter invoked at the prefilter extension point.
 func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
-	s := getContainerPorts(pod)
+	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
 		return nil, framework.NewStatus(framework.Skip)
@@ -149,24 +130,19 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 		return framework.QueueSkip, nil
 	}
 
-	// Get the used host ports of the deleted pod.
-	usedPorts := make(framework.HostPortInfo)
-	for _, container := range deletedPod.Spec.Containers {
-		for _, podPort := range container.Ports {
-			if podPort.HostPort > 0 {
-				usedPorts.Add(podPort.HostIP, string(podPort.Protocol), podPort.HostPort)
-			}
-		}
-	}
-
 	// If the deleted pod doesn't use any host ports, it doesn't make the target pod schedulable.
-	if len(usedPorts) == 0 {
+	ports := util.GetHostPorts(deletedPod)
+	if len(ports) == 0 {
 		return framework.QueueSkip, nil
 	}
 
 	// Construct a fake NodeInfo that only has the deleted Pod.
 	// If we can schedule `pod` to this fake node, it means that `pod` and the deleted pod don't have any common port(s).
 	// So, deleting that pod couldn't make `pod` schedulable.
+	usedPorts := make(framework.HostPortInfo, len(ports))
+	for _, p := range ports {
+		usedPorts.Add(p.HostIP, string(p.Protocol), p.HostPort)
+	}
 	nodeInfo := framework.NodeInfo{UsedPorts: usedPorts}
 	if Fits(pod, &nodeInfo) {
 		logger.V(4).Info("the deleted pod and the target pod don't have any common port(s), returning QueueSkip as deleting this Pod won't make the Pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
@@ -194,10 +170,10 @@ func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod 
 
 // Fits checks if the pod fits the node.
 func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) bool {
-	return fitsPorts(getContainerPorts(pod), nodeInfo)
+	return fitsPorts(util.GetHostPorts(pod), nodeInfo)
 }
 
-func fitsPorts(wantPorts []*v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
+func fitsPorts(wantPorts []v1.ContainerPort, nodeInfo *framework.NodeInfo) bool {
 	// try to see whether existingPorts and wantPorts will conflict or not
 	existingPorts := nodeInfo.UsedPorts
 	for _, cp := range wantPorts {

@@ -49,6 +49,9 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 
 func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// type T1
+	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+		return nil // no changes
+	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T1")...)
 
 	// field T1.TypeMeta has no validation

@@ -56,6 +56,9 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 
 func Validate_E1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *E1) (errs field.ErrorList) {
 	// type E1
+	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+		return nil // no changes
+	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type E1")...)
 
 	return errs
@@ -63,11 +66,17 @@ func Validate_E1(ctx context.Context, op operation.Operation, fldPath *field.Pat
 
 func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// type T1
+	if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+		return nil // no changes
+	}
 	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T1")...)
 
 	// field T1.S
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil // no changes
+			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.S")...)
 			return
 		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *T1) *string { return &oldObj.S }))...)

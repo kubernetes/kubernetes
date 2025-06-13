@@ -52,6 +52,7 @@ func TestCalculateStatus(t *testing.T) {
 		replicaset                                    *apps.ReplicaSet
 		activePods                                    []*v1.Pod
 		terminatingPods                               []*v1.Pod
+		controllerFeatures                            *ReplicaSetControllerFeatures
 		expectedReplicaSetStatus                      apps.ReplicaSetStatus
 	}{
 		{
@@ -61,6 +62,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -77,6 +79,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", notFullyLabelledRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -95,6 +98,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 2,
@@ -111,6 +115,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
@@ -129,6 +134,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod2", notFullyLabelledRS, v1.PodRunning, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 0,
@@ -146,6 +152,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             2,
 				FullyLabeledReplicas: 1,
@@ -162,6 +169,7 @@ func TestCalculateStatus(t *testing.T) {
 				newPod("pod1", fullyLabelledRS, v1.PodPending, nil, true),
 			},
 			nil,
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
@@ -177,6 +185,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				newPod("pod1", longMinReadySecondsRS, v1.PodRunning, nil, true),
 			},
+			nil,
 			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
@@ -196,6 +205,7 @@ func TestCalculateStatus(t *testing.T) {
 			[]*v1.Pod{
 				asTerminating(newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true)),
 			},
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
@@ -215,6 +225,7 @@ func TestCalculateStatus(t *testing.T) {
 				asTerminating(newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true)),
 				asTerminating(newPod("pod3", fullyLabelledRS, v1.PodRunning, nil, true)),
 			},
+			nil,
 			apps.ReplicaSetStatus{
 				Replicas:             1,
 				FullyLabeledReplicas: 1,
@@ -223,13 +234,37 @@ func TestCalculateStatus(t *testing.T) {
 				TerminatingReplicas:  ptr.To[int32](2),
 			},
 		},
+		{
+			"1 fully labelled pods and 2 terminating with DeploymentReplicaSetTerminatingReplicas (ReplicationController)",
+			true,
+			fullyLabelledRS,
+			[]*v1.Pod{
+				newPod("pod1", fullyLabelledRS, v1.PodRunning, nil, true),
+			},
+			[]*v1.Pod{
+				asTerminating(newPod("pod2", fullyLabelledRS, v1.PodRunning, nil, true)),
+				asTerminating(newPod("pod3", fullyLabelledRS, v1.PodRunning, nil, true)),
+			},
+			&ReplicaSetControllerFeatures{
+				EnableStatusTerminatingReplicas: false,
+			},
+			apps.ReplicaSetStatus{
+				Replicas:             1,
+				FullyLabeledReplicas: 1,
+				ReadyReplicas:        1,
+				AvailableReplicas:    1,
+				TerminatingReplicas:  nil,
+			},
+		},
 	}
 
 	for _, test := range rsStatusTests {
 		t.Run(test.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DeploymentReplicaSetTerminatingReplicas, test.enableDeploymentReplicaSetTerminatingReplicas)
 
-			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil)
+			// test ReplicaSet controller default behavior unless specified otherwise in the test case
+			controllerFeatures := ptr.Deref(test.controllerFeatures, DefaultReplicaSetControllerFeatures())
+			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, test.terminatingPods, nil, controllerFeatures)
 			if !reflect.DeepEqual(replicaSetStatus, test.expectedReplicaSetStatus) {
 				t.Errorf("unexpected replicaset status: expected %v, got %v", test.expectedReplicaSetStatus, replicaSetStatus)
 			}
@@ -326,7 +361,7 @@ func TestCalculateStatusConditions(t *testing.T) {
 
 	for _, test := range rsStatusConditionTests {
 		t.Run(test.name, func(t *testing.T) {
-			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, nil, test.manageReplicasErr)
+			replicaSetStatus := calculateStatus(test.replicaset, test.activePods, nil, test.manageReplicasErr, DefaultReplicaSetControllerFeatures())
 			// all test cases have at most 1 status condition
 			if len(replicaSetStatus.Conditions) > 0 {
 				test.expectedReplicaSetConditions[0].LastTransitionTime = replicaSetStatus.Conditions[0].LastTransitionTime

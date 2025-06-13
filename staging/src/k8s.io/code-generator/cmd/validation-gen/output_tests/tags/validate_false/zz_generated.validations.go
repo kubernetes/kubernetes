@@ -53,6 +53,9 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 	// field Struct.StringField
 	errs = append(errs,
 		func(fldPath *field.Path, obj, oldObj *string) (errs field.ErrorList) {
+			if op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil // no changes
+			}
 			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StringField")...)
 			return
 		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }))...)

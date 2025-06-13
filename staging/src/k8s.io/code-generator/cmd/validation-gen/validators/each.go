@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
+
+	"k8s.io/code-generator/cmd/validation-gen/util"
 )
 
 const (
@@ -78,7 +80,7 @@ func (listTypeTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := nativeType(context.Type)
+	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
@@ -88,7 +90,7 @@ func (lttv listTypeTagValidator) GetValidations(context Context, tag codetags.Ta
 		// Allowed but no special handling.
 	case "map":
 		// NOTE: maps of pointers are not supported, so we should never see a pointer here.
-		if nativeType(t.Elem).Kind != types.Struct {
+		if util.NativeType(t.Elem).Kind != types.Struct {
 			return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 		}
 
@@ -138,19 +140,19 @@ func (listMapKeyTagValidator) ValidScopes() sets.Set[Scope] {
 
 func (lmktv listMapKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := nativeType(context.Type)
+	t := util.NativeType(context.Type)
 	if t.Kind != types.Slice && t.Kind != types.Array {
 		return Validations{}, fmt.Errorf("can only be used on list types")
 	}
 	// NOTE: lists of pointers are not supported, so we should never see a pointer here.
-	if nativeType(t.Elem).Kind != types.Struct {
+	if util.NativeType(t.Elem).Kind != types.Struct {
 		return Validations{}, fmt.Errorf("only lists of structs can be list-maps")
 	}
 
 	var fieldName string
-	if memb := getMemberByJSON(nativeType(t.Elem), tag.Value); memb == nil {
+	if memb := util.GetMemberByJSON(util.NativeType(t.Elem), tag.Value); memb == nil {
 		return Validations{}, fmt.Errorf("no field for JSON name %q", tag.Value)
-	} else if k := nativeType(memb.Type).Kind; k != types.Builtin {
+	} else if k := util.NativeType(memb.Type).Kind; k != types.Builtin {
 		return Validations{}, fmt.Errorf("only primitive types can be list-map keys (%s)", k)
 	} else {
 		fieldName = memb.Name
@@ -210,7 +212,7 @@ var (
 
 func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists and maps are not supported, so we should never see a pointer here.
-	t := nativeType(context.Type)
+	t := util.NativeType(context.Type)
 	switch t.Kind {
 	case types.Slice, types.Array, types.Map:
 	default:
@@ -350,7 +352,7 @@ var (
 
 func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
 	// NOTE: pointers to lists are not supported, so we should never see a pointer here.
-	t := nativeType(context.Type)
+	t := util.NativeType(context.Type)
 	if t.Kind != types.Map {
 		return Validations{}, fmt.Errorf("can only be used on map types")
 	}

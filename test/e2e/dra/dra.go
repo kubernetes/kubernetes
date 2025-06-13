@@ -272,7 +272,9 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			testContainerEnv(ctx, f, pod, pod.Spec.Containers[1].Name, true, container1Env...)
 		})
 
-		ginkgo.It("blocks new pod after force-delete", func(ctx context.Context) {
+		// https://github.com/kubernetes/kubernetes/issues/131513 was fixed in master for 1.34 and not backported,
+		// so this test only passes for kubelet >= 1.34.
+		f.It("blocks new pod after force-delete", f.WithLabel("KubeletMinVersion:1.34"), func(ctx context.Context) {
 			// The problem with a force-deleted pod is that kubelet
 			// is not necessarily done yet with tearing down the
 			// pod at the time when the pod and its claim are
@@ -2096,7 +2098,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
-	ginkgo.It("rolling update", func(ctx context.Context) {
+	// Seamless upgrade support was added in Kubernetes 1.33.
+	f.It("rolling update", f.WithLabel("KubeletMinVersion:1.33"), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
 		oldDriver := NewDriverInstance(f)
@@ -2138,7 +2141,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 		framework.ExpectNoError(e2epod.WaitForPodNotFoundInNamespace(ctx, f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodDelete))
 	})
 
-	ginkgo.It("failed update", func(ctx context.Context) {
+	// Seamless upgrade support was added in Kubernetes 1.33.
+	f.It("failed update", f.WithLabel("KubeletMinVersion:1.33"), func(ctx context.Context) {
 		nodes := NewNodesNow(ctx, f, 1, 1)
 
 		oldDriver := NewDriverInstance(f)

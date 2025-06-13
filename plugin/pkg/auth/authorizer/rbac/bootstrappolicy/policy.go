@@ -283,6 +283,9 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			"/livez", "/readyz", "/healthz",
 			"/livez/*", "/readyz/*", "/healthz/*",
 		).RuleOrDie(),
+
+		// Needed for kubelet metrics
+		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes/metrics").RuleOrDie(),
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {

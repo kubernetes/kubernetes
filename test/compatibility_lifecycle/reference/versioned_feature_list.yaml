@@ -77,6 +77,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: AnyVolumeDataSource
   versionedSpecs:
   - default: false
@@ -495,6 +499,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: GitRepoVolumeDriver
   versionedSpecs:
   - default: true
@@ -981,6 +989,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: PodAndContainerStatsFromCRI
   versionedSpecs:
   - default: false
@@ -1091,6 +1103,10 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.33"
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.34"
 - name: ProcMountType
   versionedSpecs:
   - default: false
@@ -1165,6 +1181,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.32"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: ReloadKubeletServerCertificateFile
   versionedSpecs:
   - default: true
@@ -1307,6 +1327,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.29"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: ServiceAccountNodeAudienceRestriction
   versionedSpecs:
   - default: false
@@ -1515,6 +1539,10 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
+  - default: true
+    lockToDefault: true
+    preRelease: GA
+    version: "1.34"
 - name: StructuredAuthorizationConfiguration
   versionedSpecs:
   - default: false
