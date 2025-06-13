@@ -77,6 +77,7 @@ type watcher struct {
 	versioner           storage.Versioner
 	transformer         value.Transformer
 	getCurrentStorageRV func(context.Context) (uint64, error)
+	sizer               *sizeCache
 }
 
 // watchChan implements watch.Interface.
@@ -91,6 +92,7 @@ type watchChan struct {
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
 	resultChan        chan watch.Event
+	sizer             *sizeCache
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -134,6 +136,7 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		internalPred:      pred,
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
+		sizer:             w.sizer,
 	}
 	if pred.Empty() {
 		// The filter doesn't filter out any object.
@@ -402,6 +405,14 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}, initialEventsEnd
 		}
 
 		for _, e := range wres.Events {
+			if wc.sizer != nil {
+				switch e.Type {
+				case clientv3.EventTypePut:
+					wc.sizer.AddOrUpdate(string(e.Kv.Key), e.Kv.ModRevision, int64(len(e.Kv.Value)))
+				case clientv3.EventTypeDelete:
+					wc.sizer.Delete(string(e.Kv.Key), e.Kv.ModRevision)
+				}
+			}
 			metrics.RecordEtcdEvent(wc.watcher.groupResource)
 			parsedEvent, err := parseEvent(e)
 			if err != nil {

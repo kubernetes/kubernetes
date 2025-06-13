@@ -274,8 +274,8 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
-func (c *CacheDelegator) Count(ctx context.Context, pathPrefix string) (int64, error) {
-	return c.storage.Count(ctx, pathPrefix)
+func (c *CacheDelegator) Stats(ctx context.Context) (storage.Stats, error) {
+	return c.storage.Stats(ctx)
 }
 
 func (c *CacheDelegator) ReadinessCheck() error {
