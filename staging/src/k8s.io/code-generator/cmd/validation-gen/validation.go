@@ -237,56 +237,10 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 		}
 	}
 
-	// Catch some edge cases that we don't want to handle (yet?).  This happens
+	// Catch some cases that we don't want to handle (yet?).  This happens
 	// as early as possible to make all the other code simpler.
-	switch t.Kind {
-	case types.Builtin, types.Struct:
-		// Allowed
-	case types.Interface:
-		// We can't do much with interfaces, but they pop up in some places
-		// like RawExtension.
-	case types.Alias:
-		if t.Underlying.Kind == types.Pointer {
-			return nil, fmt.Errorf("field %s (%s): typedefs to pointers are not supported", fldPath.String(), t)
-		}
-	case types.Pointer:
-		pointee := util.NativeType(t.Elem)
-		switch pointee.Kind {
-		case types.Pointer:
-			return nil, fmt.Errorf("field %s (%s): pointers to pointers are not supported", fldPath.String(), t)
-		case types.Slice, types.Array:
-			return nil, fmt.Errorf("field %s (%s): pointers to lists are not supported", fldPath.String(), t)
-		case types.Map:
-			return nil, fmt.Errorf("field %s (%s): pointers to maps are not supported", fldPath.String(), t)
-		}
-	case types.Array:
-		return nil, fmt.Errorf("field %s (%s): fixed-size arrays are not supported", fldPath.String(), t)
-	case types.Slice:
-		elem := util.NativeType(t.Elem)
-		switch elem.Kind {
-		case types.Pointer:
-			return nil, fmt.Errorf("field %s (%s): lists of pointers are not supported", fldPath.String(), t)
-		case types.Slice:
-			if util.NativeType(elem.Elem) != types.Byte {
-				return nil, fmt.Errorf("field %s (%s): lists of lists are not supported", fldPath.String(), t)
-			}
-		case types.Map:
-			return nil, fmt.Errorf("field %s (%s): lists of maps are not supported", fldPath.String(), t)
-		}
-	case types.Map:
-		key := util.NativeType(t.Key)
-		if key != types.String {
-			return nil, fmt.Errorf("field %s (%s): maps with non-string keys are not supported", fldPath.String(), t)
-		}
-		elem := util.NativeType(t.Elem)
-		switch elem.Kind {
-		case types.Pointer:
-			return nil, fmt.Errorf("field %s (%s): maps of pointers are not supported", fldPath.String(), t)
-		case types.Map:
-			return nil, fmt.Errorf("field %s (%s): maps of maps are not supported", fldPath.String(), t)
-		}
-	default:
-		return nil, fmt.Errorf("field %s (%v, kind %v) is not supported", fldPath.String(), t, t.Kind)
+	if err := td.verifySupportedType(t); err != nil {
+		return nil, fmt.Errorf("field %s (%s): %w", fldPath.String(), t, err)
 	}
 
 	// Discovery applies to values, not pointers.
@@ -523,6 +477,61 @@ func (td *typeDiscoverer) discoverType(t *types.Type, fldPath *field.Path) (*typ
 	}
 
 	return thisNode, nil
+}
+
+// verifySupportedType checks whether the given type is supported.
+func (td *typeDiscoverer) verifySupportedType(t *types.Type) error {
+	switch t.Kind {
+	case types.Builtin, types.Struct:
+		// Allowed
+	case types.Interface:
+		// We can't do much with interfaces, but they pop up in some places
+		// like RawExtension.
+	case types.Alias:
+		if t.Underlying.Kind == types.Pointer {
+			return fmt.Errorf("typedefs to pointers are not supported")
+		}
+	case types.Pointer:
+		pointee := util.NativeType(t.Elem)
+		switch pointee.Kind {
+		case types.Pointer:
+			return fmt.Errorf("pointers to pointers are not supported")
+		case types.Slice, types.Array:
+			return fmt.Errorf("pointers to lists are not supported")
+		case types.Map:
+			return fmt.Errorf("pointers to maps are not supported")
+		}
+	case types.Array:
+		return fmt.Errorf("fixed-size arrays are not supported")
+	case types.Slice:
+		elem := util.NativeType(t.Elem)
+		switch elem.Kind {
+		case types.Pointer:
+			return fmt.Errorf("lists of pointers are not supported")
+		case types.Slice:
+			if util.NativeType(elem.Elem) != types.Byte {
+				return fmt.Errorf("lists of lists are not supported")
+			}
+		case types.Map:
+			return fmt.Errorf("lists of maps are not supported")
+		}
+	case types.Map:
+		key := util.NativeType(t.Key)
+		if key != types.String {
+			return fmt.Errorf("maps with non-string keys are not supported")
+		}
+		elem := util.NativeType(t.Elem)
+		switch elem.Kind {
+		case types.Pointer:
+			return fmt.Errorf("maps of pointers are not supported")
+		case types.Map:
+			return fmt.Errorf("maps of maps are not supported")
+		}
+	default:
+		return fmt.Errorf("kind %v is not supported", t.Kind)
+	}
+
+	return nil
 }
 
 // discoverStruct walks a struct type recursively.
