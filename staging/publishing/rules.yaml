@@ -7,13 +7,13 @@ rules:
       dirs:
       - staging/src/k8s.io/apimachinery
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     source:
       branch: release-1.30
       dirs:
       - staging/src/k8s.io/apimachinery
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     source:
       branch: release-1.31
       dirs:
@@ -24,7 +24,7 @@ rules:
       dirs:
       - staging/src/k8s.io/apimachinery
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     source:
       branch: release-1.33
       dirs:
@@ -41,7 +41,7 @@ rules:
       dirs:
       - staging/src/k8s.io/api
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -50,7 +50,7 @@ rules:
       dirs:
       - staging/src/k8s.io/api
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -67,7 +67,7 @@ rules:
       dirs:
       - staging/src/k8s.io/api
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -93,7 +93,7 @@ rules:
       go build -mod=mod ./...
       go test -mod=mod ./...
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -108,7 +108,7 @@ rules:
       go build -mod=mod ./...
       go test -mod=mod ./...
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -137,7 +137,7 @@ rules:
       go build -mod=mod ./...
       go test -mod=mod ./...
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -163,7 +163,7 @@ rules:
       dirs:
       - staging/src/k8s.io/code-generator
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -172,7 +172,7 @@ rules:
       dirs:
       - staging/src/k8s.io/code-generator
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -189,7 +189,7 @@ rules:
       dirs:
       - staging/src/k8s.io/code-generator
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -212,7 +212,7 @@ rules:
       dirs:
       - staging/src/k8s.io/component-base
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -225,7 +225,7 @@ rules:
       dirs:
       - staging/src/k8s.io/component-base
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -250,7 +250,7 @@ rules:
       dirs:
       - staging/src/k8s.io/component-base
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -278,7 +278,7 @@ rules:
       dirs:
       - staging/src/k8s.io/component-helpers
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -291,7 +291,7 @@ rules:
       dirs:
       - staging/src/k8s.io/component-helpers
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -316,7 +316,7 @@ rules:
       dirs:
       - staging/src/k8s.io/component-helpers
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -340,7 +340,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kms
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -349,7 +349,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kms
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -366,7 +366,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kms
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -394,7 +394,7 @@ rules:
       dirs:
       - staging/src/k8s.io/apiserver
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -411,7 +411,7 @@ rules:
       dirs:
       - staging/src/k8s.io/apiserver
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -444,7 +444,7 @@ rules:
       dirs:
       - staging/src/k8s.io/apiserver
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -484,7 +484,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-aggregator
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -505,7 +505,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-aggregator
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -546,7 +546,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-aggregator
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -594,7 +594,7 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -620,7 +620,7 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -671,7 +671,7 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -718,7 +718,7 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -738,7 +738,7 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -777,7 +777,7 @@ rules:
       # assumes GO111MODULE=on
       go build -mod=mod .
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -821,7 +821,7 @@ rules:
     required-packages:
     - k8s.io/code-generator
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -844,7 +844,7 @@ rules:
     required-packages:
     - k8s.io/code-generator
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -889,7 +889,7 @@ rules:
     required-packages:
     - k8s.io/code-generator
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -928,7 +928,7 @@ rules:
       dirs:
       - staging/src/k8s.io/metrics
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -943,7 +943,7 @@ rules:
       dirs:
       - staging/src/k8s.io/metrics
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -972,7 +972,7 @@ rules:
       dirs:
       - staging/src/k8s.io/metrics
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -1002,7 +1002,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cli-runtime
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -1015,7 +1015,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cli-runtime
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -1040,7 +1040,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cli-runtime
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -1070,7 +1070,7 @@ rules:
       dirs:
       - staging/src/k8s.io/sample-cli-plugin
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -1085,7 +1085,7 @@ rules:
       dirs:
       - staging/src/k8s.io/sample-cli-plugin
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -1114,7 +1114,7 @@ rules:
       dirs:
       - staging/src/k8s.io/sample-cli-plugin
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -1145,7 +1145,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-proxy
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -1160,7 +1160,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-proxy
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -1189,7 +1189,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-proxy
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -1212,13 +1212,13 @@ rules:
       dirs:
       - staging/src/k8s.io/cri-api
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     source:
       branch: release-1.30
       dirs:
       - staging/src/k8s.io/cri-api
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     source:
       branch: release-1.31
       dirs:
@@ -1229,7 +1229,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cri-api
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     source:
       branch: release-1.33
       dirs:
@@ -1254,7 +1254,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cri-client
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -1287,7 +1287,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cri-client
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -1327,7 +1327,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kubelet
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -1348,7 +1348,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kubelet
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -1389,7 +1389,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kubelet
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -1427,7 +1427,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-scheduler
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -1442,7 +1442,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-scheduler
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -1471,7 +1471,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-scheduler
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -1507,7 +1507,7 @@ rules:
       dirs:
       - staging/src/k8s.io/controller-manager
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -1526,7 +1526,7 @@ rules:
       dirs:
       - staging/src/k8s.io/controller-manager
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -1563,7 +1563,7 @@ rules:
       dirs:
       - staging/src/k8s.io/controller-manager
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -1607,7 +1607,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cloud-provider
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -1630,7 +1630,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cloud-provider
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -1675,7 +1675,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cloud-provider
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -1725,7 +1725,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-controller-manager
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -1750,7 +1750,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-controller-manager
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -1799,7 +1799,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kube-controller-manager
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -1837,7 +1837,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cluster-bootstrap
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -1848,7 +1848,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cluster-bootstrap
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -1869,7 +1869,7 @@ rules:
       dirs:
       - staging/src/k8s.io/cluster-bootstrap
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -1893,7 +1893,7 @@ rules:
       dirs:
       - staging/src/k8s.io/csi-translation-lib
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -1904,7 +1904,7 @@ rules:
       dirs:
       - staging/src/k8s.io/csi-translation-lib
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -1925,7 +1925,7 @@ rules:
       dirs:
       - staging/src/k8s.io/csi-translation-lib
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -1944,13 +1944,13 @@ rules:
       dirs:
       - staging/src/k8s.io/mount-utils
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     source:
       branch: release-1.30
       dirs:
       - staging/src/k8s.io/mount-utils
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     source:
       branch: release-1.31
       dirs:
@@ -1961,7 +1961,7 @@ rules:
       dirs:
       - staging/src/k8s.io/mount-utils
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     source:
       branch: release-1.33
       dirs:
@@ -1970,7 +1970,7 @@ rules:
 - destination: legacy-cloud-providers
   branches:
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -2020,7 +2020,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kubectl
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -2043,7 +2043,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kubectl
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -2088,7 +2088,7 @@ rules:
       dirs:
       - staging/src/k8s.io/kubectl
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -2132,7 +2132,7 @@ rules:
       dirs:
       - staging/src/k8s.io/pod-security-admission
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -2151,7 +2151,7 @@ rules:
       dirs:
       - staging/src/k8s.io/pod-security-admission
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -2188,7 +2188,7 @@ rules:
       dirs:
       - staging/src/k8s.io/pod-security-admission
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -2234,7 +2234,7 @@ rules:
       dirs:
       - staging/src/k8s.io/dynamic-resource-allocation
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.30
@@ -2257,7 +2257,7 @@ rules:
       dirs:
       - staging/src/k8s.io/dynamic-resource-allocation
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: apimachinery
       branch: release-1.31
@@ -2306,7 +2306,7 @@ rules:
       dirs:
       - staging/src/k8s.io/dynamic-resource-allocation
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: apimachinery
       branch: release-1.33
@@ -2347,7 +2347,7 @@ rules:
       dirs:
       - staging/src/k8s.io/endpointslice
   - name: release-1.30
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.30
@@ -2362,7 +2362,7 @@ rules:
       dirs:
       - staging/src/k8s.io/endpointslice
   - name: release-1.31
-    go: 1.23.9
+    go: 1.23.10
     dependencies:
     - repository: api
       branch: release-1.31
@@ -2391,7 +2391,7 @@ rules:
       dirs:
       - staging/src/k8s.io/endpointslice
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     dependencies:
     - repository: api
       branch: release-1.33
@@ -2418,7 +2418,7 @@ rules:
       dirs:
       - staging/src/k8s.io/externaljwt
   - name: release-1.33
-    go: 1.24.3
+    go: 1.24.4
     source:
       branch: release-1.33
       dirs:
