@@ -1,0 +1,5 @@
+rules:
+  # This test is a Ginkgo suite and, in contrast to other integration tests, can use the E2E framework.
+  - selectorRegexp: k8s[.]io/kubernetes/test/e2e
+    allowedPrefixes:
+      - ""
