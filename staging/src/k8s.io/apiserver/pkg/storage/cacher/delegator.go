@@ -265,8 +265,15 @@ func (c *CacheDelegator) GuaranteedUpdate(ctx context.Context, key string, desti
 	return c.storage.GuaranteedUpdate(ctx, key, destination, ignoreNotFound, preconditions, tryUpdate, nil)
 }
 
-func (c *CacheDelegator) Count(ctx context.Context, pathPrefix string) (int64, error) {
-	return c.storage.Count(ctx, pathPrefix)
+func (c *CacheDelegator) Stats(ctx context.Context) (storage.Stats, error) {
+	if !delegator.ConsistentReadSupported() || !utilfeature.DefaultFeatureGate.Enabled(features.BtreeWatchCache) || !utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		return c.storage.Stats(ctx)
+	}
+	resourceVersion, err := c.storage.GetCurrentResourceVersion(ctx)
+	if err != nil {
+		return storage.Stats{}, err
+	}
+	return c.cacher.Stats(ctx, resourceVersion)
 }
 
 func (c *CacheDelegator) ReadinessCheck() error {

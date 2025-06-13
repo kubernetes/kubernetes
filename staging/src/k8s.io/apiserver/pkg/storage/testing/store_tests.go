@@ -3103,42 +3103,64 @@ func RunTestTransformationFailure(ctx context.Context, t *testing.T, store Inter
 	}
 }
 
-func RunTestCount(ctx context.Context, t *testing.T, store storage.Interface) {
-	resourceA := "/foo.bar.io/abc"
+func RunTestStats(ctx context.Context, t *testing.T, store storage.Interface, sizeEnabled bool) {
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 0, ObjectSize: 0})
 
-	// resourceA is intentionally a prefix of resourceB to ensure that the count
-	// for resourceA does not include any objects from resourceB.
-	resourceB := fmt.Sprintf("%sdef", resourceA)
-
-	resourceACountExpected := 5
-	for i := 1; i <= resourceACountExpected; i++ {
-		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
-
-		key := fmt.Sprintf("%s/%d", resourceA, i)
-		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
-			t.Fatalf("Create failed: %v", err)
-		}
+	foo := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
+	fooKey := computePodKey(foo)
+	if err := store.Create(ctx, fooKey, foo, nil, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
 	}
+	var fooSize int64 = 106
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 1, ObjectSize: fooSize})
 
-	resourceBCount := 4
-	for i := 1; i <= resourceBCount; i++ {
-		obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("foo-%d", i)}}
-
-		key := fmt.Sprintf("%s/%d", resourceB, i)
-		if err := store.Create(ctx, key, obj, nil, 0); err != nil {
-			t.Fatalf("Create failed: %v", err)
-		}
+	bar := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "bar"}}
+	barKey := computePodKey(bar)
+	if err := store.Create(ctx, barKey, bar, nil, 0); err != nil {
+		t.Fatalf("Create failed: %v", err)
 	}
+	var barSize int64 = 106
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 2, ObjectSize: fooSize + barSize})
 
-	resourceACountGot, err := store.Count(t.Context(), resourceA)
+	if err := store.GuaranteedUpdate(ctx, barKey, bar, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			pod.Labels = map[string]string{"foo": "bar"}
+			return pod, nil
+		}), nil); err != nil {
+		t.Errorf("Update failed: %v", err)
+	}
+	barSize = 129
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 2, ObjectSize: fooSize + barSize})
+
+	if err := store.Delete(ctx, fooKey, foo, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
+		t.Errorf("Delete failed: %v", err)
+	}
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 1, ObjectSize: barSize})
+
+	if err := store.Delete(ctx, fooKey, foo, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err == nil {
+		t.Errorf("Delete expected to fail")
+	}
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 1, ObjectSize: barSize})
+
+	if err := store.Delete(ctx, barKey, bar, nil, storage.ValidateAllObjectFunc, nil, storage.DeleteOptions{}); err != nil {
+		t.Errorf("Delete failed: %v", err)
+	}
+	assertStats(t, store, sizeEnabled, storage.Stats{ObjectCount: 0, ObjectSize: 0})
+}
+
+func assertStats(t *testing.T, store storage.Interface, sizeEnabled bool, expectStats storage.Stats) {
+	t.Helper()
+	stats, err := store.Stats(t.Context())
 	if err != nil {
-		t.Fatalf("store.Count failed: %v", err)
+		t.Fatalf("store.Stats failed: %v", err)
 	}
 
-	// count for resourceA should not include the objects for resourceB
-	// even though resourceA is a prefix of resourceB.
-	if int64(resourceACountExpected) != resourceACountGot {
-		t.Fatalf("store.Count for resource %s: expected %d but got %d", resourceA, resourceACountExpected, resourceACountGot)
+	if !sizeEnabled {
+		expectStats.ObjectSize = 0
+	}
+	if expectStats != stats {
+		t.Errorf("store.Stats: expected %+v but got %+v", expectStats, stats)
 	}
 }
 

@@ -26,7 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -36,6 +38,7 @@ type listerWatcher struct {
 	resourcePrefix  string
 	newListFunc     func() runtime.Object
 	contextMetadata metadata.MD
+	withObjectSize  bool
 }
 
 // NewListerWatcher returns a storage.Interface backed ListerWatcher.
@@ -45,6 +48,7 @@ func NewListerWatcher(storage storage.Interface, resourcePrefix string, newListF
 		resourcePrefix:  resourcePrefix,
 		newListFunc:     newListFunc,
 		contextMetadata: contextMetadata,
+		withObjectSize:  utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate),
 	}
 }
 
@@ -62,6 +66,7 @@ func (lw *listerWatcher) List(options metav1.ListOptions) (runtime.Object, error
 		ResourceVersionMatch: options.ResourceVersionMatch,
 		Predicate:            pred,
 		Recursive:            true,
+		WithObjectSize:       lw.withObjectSize,
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {
@@ -80,6 +85,7 @@ func (lw *listerWatcher) Watch(options metav1.ListOptions) (watch.Interface, err
 		Predicate:       storage.Everything,
 		Recursive:       true,
 		ProgressNotify:  true,
+		WithObjectSize:  lw.withObjectSize,
 	}
 	ctx := context.Background()
 	if lw.contextMetadata != nil {

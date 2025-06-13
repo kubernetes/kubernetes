@@ -743,6 +743,11 @@ const (
 	// pod's lifecycle and will not block pod termination.
 	SidecarContainers featuregate.Feature = "SidecarContainers"
 
+	// owner: @serathius
+	//
+	// Enables APF to use size of objects for estimating request cost.
+	SizeBasedListCostEstimate featuregate.Feature = "SizeBasedListCostEstimate"
+
 	// owner: @derekwaynecarr
 	//
 	// Enables kubelet support to size memory backed volumes
@@ -1737,6 +1742,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.33"), Default: true, LockToDefault: true, PreRelease: featuregate.GA}, // GA in 1.33 remove in 1.36
+	},
+
+	SizeBasedListCostEstimate: {
+		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Beta},
 	},
 
 	SizeMemoryBackedVolumes: {

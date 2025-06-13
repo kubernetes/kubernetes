@@ -44,10 +44,14 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 )
 
@@ -344,9 +348,15 @@ func TestListResourceVersionMatch(t *testing.T) {
 	storagetesting.RunTestListResourceVersionMatch(ctx, t, &storeWithPrefixTransformer{store})
 }
 
-func TestCount(t *testing.T) {
-	ctx, store, _ := testSetup(t)
-	storagetesting.RunTestCount(ctx, t, store)
+func TestStats(t *testing.T) {
+	for _, sizeBasedListCostEstimate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("SizeBasedListCostEstimate=%v", sizeBasedListCostEstimate), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedListCostEstimate)
+			// Match transformer with cacher tests.
+			ctx, store, _ := testSetup(t, withTransformer(identity.NewEncryptCheckTransformer()))
+			storagetesting.RunTestStats(ctx, t, store, sizeBasedListCostEstimate)
+		})
+	}
 }
 
 // =======================================================================
@@ -577,6 +587,12 @@ func withRecorder() setupOption {
 	}
 }
 
+func withTransformer(transformer value.Transformer) setupOption {
+	return func(options *setupOptions) {
+		options.transformer = transformer
+	}
+}
+
 func withDefaults(options *setupOptions) {
 	options.client = func(t testing.TB) *kubernetes.Client {
 		return testserver.RunEtcd(t, nil)
@@ -692,8 +708,6 @@ func TestInvalidKeys(t *testing.T) {
 	expectInvalidKey("Get", store.Get(ctx, invalidKey, storage.GetOptions{}, nil))
 	expectInvalidKey("GetList", store.GetList(ctx, invalidKey, storage.ListOptions{}, nil))
 	expectInvalidKey("GuaranteedUpdate", store.GuaranteedUpdate(ctx, invalidKey, nil, true, nil, nil, nil))
-	_, countErr := store.Count(t.Context(), invalidKey)
-	expectInvalidKey("Count", countErr)
 }
 
 func BenchmarkStore_GetList(b *testing.B) {

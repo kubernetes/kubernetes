@@ -22,28 +22,33 @@ import (
 	"sync"
 
 	"github.com/google/btree"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/tools/cache"
 )
 
-// newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the two 2 data structures:
+// newThreadedBtreeStoreIndexer returns a storage for cacher by adding locking over the three data structures:
 // * btree based storage for efficient LIST operation on prefix
 // * map based indexer for retrieving values by index.
+// * map based stats storage for cheaply getting total size of objects.
 // This separation is used to allow independent snapshotting those two storages in the future.
 // Intention is to utilize btree for its cheap snapshots that don't require locking if don't mutate data.
 func newThreadedBtreeStoreIndexer(indexers cache.Indexers, degree int) *threadedStoreIndexer {
 	return &threadedStoreIndexer{
 		store:   newBtreeStore(degree),
 		indexer: newIndexer(indexers),
+		stats:   newStatsStore(),
 	}
 }
 
 type threadedStoreIndexer struct {
 	lock    sync.RWMutex
 	store   btreeStore
+	stats   statsStore
 	indexer indexer
 }
 
 var _ orderedLister = (*threadedStoreIndexer)(nil)
+var _ statser = (*threadedStoreIndexer)(nil)
 
 func (si *threadedStoreIndexer) Count(prefix, continueKey string) (count int) {
 	si.lock.RLock()
@@ -75,6 +80,7 @@ func (si *threadedStoreIndexer) addOrUpdate(obj interface{}) error {
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
+	si.stats.AddOrUpdate(newElem.Key, newElem.Size)
 	oldElem := si.store.addOrUpdateElem(newElem)
 	return si.indexer.updateElem(newElem.Key, oldElem, newElem)
 }
@@ -86,6 +92,7 @@ func (si *threadedStoreIndexer) Delete(obj interface{}) error {
 	}
 	si.lock.Lock()
 	defer si.lock.Unlock()
+	si.stats.Delete(storeElem.Key)
 	oldObj, existed := si.store.deleteElem(storeElem)
 	if !existed {
 		return nil
@@ -117,6 +124,12 @@ func (si *threadedStoreIndexer) Get(obj interface{}) (item interface{}, exists b
 	return si.store.Get(obj)
 }
 
+func (si *threadedStoreIndexer) Stats() storage.Stats {
+	si.lock.RLock()
+	defer si.lock.RUnlock()
+	return si.stats.Stats()
+}
+
 func (si *threadedStoreIndexer) GetByKey(key string) (item interface{}, exists bool, err error) {
 	si.lock.RLock()
 	defer si.lock.RUnlock()
@@ -126,7 +139,11 @@ func (si *threadedStoreIndexer) GetByKey(key string) (item interface{}, exists b
 func (si *threadedStoreIndexer) Replace(objs []interface{}, resourceVersion string) error {
 	si.lock.Lock()
 	defer si.lock.Unlock()
-	err := si.store.Replace(objs, resourceVersion)
+	err := si.stats.Replace(objs)
+	if err != nil {
+		return err
+	}
+	err = si.store.Replace(objs, resourceVersion)
 	if err != nil {
 		return err
 	}
@@ -502,4 +519,49 @@ func (s *storeSnapshotter) Len() int {
 	defer s.mux.RUnlock()
 
 	return s.snapshots.Len()
+}
+
+func newStatsStore() statsStore {
+	ss := statsStore{}
+	ss.reset()
+	return ss
+}
+
+type statsStore struct {
+	totalSize int64
+	keySize   map[string]int64
+}
+
+func (ss *statsStore) reset() {
+	ss.totalSize = 0
+	ss.keySize = map[string]int64{}
+}
+
+func (ss *statsStore) AddOrUpdate(key string, size int64) {
+	ss.totalSize += size - ss.keySize[key]
+	ss.keySize[key] = size
+}
+
+func (ss *statsStore) Delete(key string) {
+	ss.totalSize -= ss.keySize[key]
+	delete(ss.keySize, key)
+}
+
+func (ss *statsStore) Replace(objs []interface{}) error {
+	ss.reset()
+	for _, obj := range objs {
+		elem, ok := obj.(*storeElement)
+		if !ok {
+			return fmt.Errorf("obj not a storeElement: %#v", obj)
+		}
+		ss.AddOrUpdate(elem.Key, elem.Size)
+	}
+	return nil
+}
+
+func (ss *statsStore) Stats() storage.Stats {
+	return storage.Stats{
+		ObjectCount: int64(len(ss.keySize)),
+		ObjectSize:  ss.totalSize,
+	}
 }
