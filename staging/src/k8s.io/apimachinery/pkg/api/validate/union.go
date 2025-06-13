@@ -35,9 +35,9 @@ type ExtractorFn[T, V any] func(obj T) V
 //
 // For example:
 //
-//	var abcUnionMembership := schema.NewUnionMembership("a", "b", "c")
+//	var UnionMembershipForABC := validate.NewUnionMembership([2]string{"a", "A"}, [2]string{"b", "B"}, [2]string{"c", "C"})
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, Union(ctx, op, fldPath, in, oldIn, abcUnionMembership,
+//		errs = append(errs, Union(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
 //			func(in *ABC) any { return in.A },
 //			func(in *ABC) any { return in.B },
 //			func(in *ABC) any { return in.C },
@@ -80,10 +80,10 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 //
 // For example:
 //
-//	var abcUnionMembership := schema.NewDiscriminatedUnionMembership("type", "a", "b", "c")
+//	var UnionMembershipForABC := validate.NewDiscriminatedUnionMembership("type", [2]string{"a", "A"}, [2]string{"b" "B"}, [2]string{"c", "C"})
 //	func ValidateABC(ctx context.Context, op operation.Operation, fldPath, *field.Path, in *ABC) (errs fields.ErrorList) {
-//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, abcUnionMembership,
-//			func(in *ABC) string { return in.Type },
+//		errs = append(errs, DiscriminatedUnion(ctx, op, fldPath, in, oldIn, UnionMembershipForABC,
+//			func(in *ABC) string { return string(in.Type) },
 //			func(in *ABC) any { return in.A },
 //			func(in *ABC) any { return in.B },
 //			func(in *ABC) any { return in.C },
