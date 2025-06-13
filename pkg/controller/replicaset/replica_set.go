@@ -223,9 +223,10 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 		consistencyStore:   consistencyStore,
 	}
 
-	// Initialize health check with informer sync functions
+	// Each controller instance registers its own health check with its informers.
+	// The health check name is unique per controller type (GVK).
 	rsc.ControllerHealthCheckable = healthz.NewControllerHealthCheckable(
-		strings.ToLower(rsc.Kind),
+		strings.ToLower(gvk.Kind),
 		rsInformer.Informer().HasSynced,
 		podInformer.Informer().HasSynced,
 	)
