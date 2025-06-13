@@ -131,8 +131,8 @@ type containerManagerImpl struct {
 	memoryManager memorymanager.Manager
 	// Interface for Topology resource co-ordination
 	topologyManager topologymanager.Manager
-	// Interface for Dynamic Resource Allocation management.
-	draManager dra.Manager
+	// Implementation of Dynamic Resource Allocation (DRA).
+	draManager *dra.Manager
 	// kubeClient is the interface to the Kubernetes API server. May be nil if the kubelet is running in standalone mode.
 	kubeClient clientset.Interface
 }
@@ -310,7 +310,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// Initialize DRA manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DynamicResourceAllocation) {
 		klog.InfoS("Creating Dynamic Resource Allocation (DRA) manager")
-		cm.draManager, err = dra.NewManagerImpl(kubeClient, nodeConfig.KubeletRootDir, nodeConfig.NodeName)
+		cm.draManager, err = dra.NewManager(kubeClient, nodeConfig.KubeletRootDir)
 		if err != nil {
 			return nil, err
 		}

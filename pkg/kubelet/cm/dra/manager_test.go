@@ -40,7 +40,6 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/klog/v2"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
-	"k8s.io/kubernetes/pkg/kubelet/cm/dra/plugin"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -199,7 +198,7 @@ func TestNewManagerImpl(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, test.stateFileDirectory, "worker")
+			manager, err := NewManager(kubeClient, test.stateFileDirectory)
 			if test.wantErr {
 				assert.Error(t, err)
 				return
@@ -363,7 +362,7 @@ func TestGetResources(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			manager, err := NewManagerImpl(kubeClient, t.TempDir(), "worker")
+			manager, err := NewManager(kubeClient, t.TempDir())
 			require.NoError(t, err)
 
 			if test.claimInfo != nil {
@@ -558,15 +557,10 @@ func TestPrepareResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-			if err != nil {
-				t.Fatalf("failed to newClaimInfoCache, err:%v", err)
-			}
 
-			manager := &ManagerImpl{
-				kubeClient: fakeKubeClient,
-				cache:      cache,
-			}
+			manager, err := NewManager(fakeKubeClient, t.TempDir())
+			require.NoError(t, err, "create DRA manager")
+			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
 
 			if test.claim != nil {
 				if _, err := fakeKubeClient.ResourceV1beta1().ResourceClaims(test.pod.Namespace).Create(tCtx, test.claim, metav1.CreateOptions{}); err != nil {
@@ -588,12 +582,10 @@ func TestPrepareResources(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer draServerInfo.teardownFn()
-
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
 			}
-			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -709,10 +701,6 @@ func TestUnprepareResources(t *testing.T) {
 	} {
 		t.Run(test.description, func(t *testing.T) {
 			tCtx := ktesting.Init(t)
-			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-			if err != nil {
-				t.Fatalf("failed to create a new instance of the claimInfoCache, err: %v", err)
-			}
 
 			var pluginClientTimeout *time.Duration
 			if test.wantTimeout {
@@ -726,15 +714,13 @@ func TestUnprepareResources(t *testing.T) {
 			}
 			defer draServerInfo.teardownFn()
 
-			plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+			manager, err := NewManager(fakeKubeClient, t.TempDir())
+			require.NoError(t, err, "create DRA manager")
+			manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+
+			plg := manager.GetWatcherHandler()
 			if err := plg.RegisterPlugin(test.driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, pluginClientTimeout); err != nil {
 				t.Fatalf("failed to register plugin %s, err: %v", test.driverName, err)
-			}
-			defer plg.DeRegisterPlugin(test.driverName, draServerInfo.socketName) // for sake of next tests
-
-			manager := &ManagerImpl{
-				kubeClient: fakeKubeClient,
-				cache:      cache,
 			}
 
 			if test.claimInfo != nil {
@@ -773,16 +759,8 @@ func TestUnprepareResources(t *testing.T) {
 
 func TestPodMightNeedToUnprepareResources(t *testing.T) {
 	fakeKubeClient := fake.NewSimpleClientset()
-
-	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-	if err != nil {
-		t.Fatalf("failed to newClaimInfoCache, err:%v", err)
-	}
-
-	manager := &ManagerImpl{
-		kubeClient: fakeKubeClient,
-		cache:      cache,
-	}
+	manager, err := NewManager(fakeKubeClient, t.TempDir())
+	require.NoError(t, err, "create DRA manager")
 
 	claimInfo := &ClaimInfo{
 		ClaimInfoState: state.ClaimInfoState{PodUIDs: sets.New(podUID), ClaimName: claimName, Namespace: namespace},
@@ -855,13 +833,8 @@ func TestGetContainerClaimInfos(t *testing.T) {
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-			if err != nil {
-				t.Fatalf("error occur:%v", err)
-			}
-			manager := &ManagerImpl{
-				cache: cache,
-			}
+			manager, err := NewManager(nil, t.TempDir())
+			require.NoError(t, err, "create DRA manager")
 
 			if test.claimInfo != nil {
 				manager.cache.add(test.claimInfo)
@@ -896,22 +869,16 @@ func TestParallelPrepareUnprepareResources(t *testing.T) {
 	}
 	defer draServerInfo.teardownFn()
 
-	plg := plugin.NewRegistrationHandler(nil, getFakeNode, time.Second /* very short wiping delay for testing */)
+	// Create fake Kube client and DRA manager
+	fakeKubeClient := fake.NewSimpleClientset()
+	manager, err := NewManager(fakeKubeClient, t.TempDir())
+	require.NoError(t, err, "create DRA manager")
+	manager.initDRAPluginManager(tCtx, getFakeNode, time.Second /* very short wiping delay for testing */)
+
+	plg := manager.GetWatcherHandler()
 	if err := plg.RegisterPlugin(driverName, draServerInfo.socketName, []string{drapb.DRAPluginService}, nil); err != nil {
 		t.Fatalf("failed to register plugin %s, err: %v", driverName, err)
 	}
-	defer plg.DeRegisterPlugin(driverName, draServerInfo.socketName)
-
-	// Create ClaimInfo cache
-	cache, err := newClaimInfoCache(t.TempDir(), draManagerStateFileName)
-	if err != nil {
-		t.Errorf("failed to newClaimInfoCache, err: %+v", err)
-		return
-	}
-
-	// Create fake Kube client and DRA manager
-	fakeKubeClient := fake.NewSimpleClientset()
-	manager := &ManagerImpl{kubeClient: fakeKubeClient, cache: cache}
 
 	// Call PrepareResources in parallel
 	var wgSync, wgStart sync.WaitGroup // groups to sync goroutines

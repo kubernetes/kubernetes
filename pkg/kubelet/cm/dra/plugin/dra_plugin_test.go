@@ -27,7 +27,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
 	drapbv1alpha4 "k8s.io/kubelet/pkg/apis/dra/v1alpha4"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -114,9 +116,9 @@ func TestGRPCConnIsReused(t *testing.T) {
 	wg := sync.WaitGroup{}
 	m := sync.Mutex{}
 
-	pluginName := "dummy-plugin"
-	p := &Plugin{
-		name:              pluginName,
+	driverName := "dummy-driver"
+	p := &DRAPlugin{
+		driverName:        driverName,
 		backgroundCtx:     tCtx,
 		endpoint:          addr,
 		chosenService:     service,
@@ -135,15 +137,15 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 
 	// ensure the plugin we are using is registered
-	draPlugins.add(p)
-	defer draPlugins.remove(pluginName, addr)
+	draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+	tCtx.ExpectNoError(draPlugins.add(p), "add plugin")
 
 	// we call `NodePrepareResource` 2 times and check whether a new connection is created or the same is reused
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			client, err := NewDRAPluginClient(pluginName)
+			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Error(err)
 				return
@@ -159,12 +161,12 @@ func TestGRPCConnIsReused(t *testing.T) {
 				},
 			}
 
-			_, err = client.NodePrepareResources(tCtx, req)
+			_, err = plugin.NodePrepareResources(tCtx, req)
 			assert.NoError(t, err)
 
-			client.mutex.Lock()
-			conn := client.conn
-			client.mutex.Unlock()
+			plugin.mutex.Lock()
+			conn := plugin.conn
+			plugin.mutex.Unlock()
 
 			m.Lock()
 			defer m.Unlock()
@@ -182,50 +184,42 @@ func TestGRPCConnIsReused(t *testing.T) {
 	}
 }
 
-func TestNewDRAPluginClient(t *testing.T) {
+func TestGetDRAPlugin(t *testing.T) {
 	for _, test := range []struct {
 		description string
-		setup       func(string) tearDown
-		pluginName  string
+		setup       func(*DRAPluginManager) error
+		driverName  string
 		shouldError bool
 	}{
 		{
-			description: "plugin name is empty",
-			setup: func(_ string) tearDown {
-				return func() {}
-			},
-			pluginName:  "",
+			description: "driver-name is empty",
 			shouldError: true,
 		},
 		{
-			description: "plugin name not found in the list",
-			setup: func(_ string) tearDown {
-				return func() {}
-			},
-			pluginName:  "plugin-name-not-found-in-the-list",
+			description: "driver-name not found in the list",
+			driverName:  "driver-name-not-found-in-the-list",
 			shouldError: true,
 		},
 		{
 			description: "plugin exists",
-			setup: func(name string) tearDown {
-				draPlugins.add(&Plugin{name: name})
-				return func() {
-					draPlugins.remove(name, "")
-				}
+			setup: func(draPlugins *DRAPluginManager) error {
+				return draPlugins.add(&DRAPlugin{backgroundCtx: draPlugins.backgroundCtx, driverName: "dummy-driver"})
 			},
-			pluginName: "dummy-plugin",
+			driverName: "dummy-driver",
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			teardown := test.setup(test.pluginName)
-			defer teardown()
-
-			client, err := NewDRAPluginClient(test.pluginName)
+			tCtx := ktesting.Init(t)
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
+			if test.setup != nil {
+				require.NoError(t, test.setup(draPlugins), "setup plugin")
+			}
+			plugin, err := draPlugins.GetPlugin(test.driverName)
 			if test.shouldError {
-				assert.Nil(t, client)
+				assert.Nil(t, plugin)
 				assert.Error(t, err)
 			} else {
-				assert.NotNil(t, client)
+				assert.NotNil(t, plugin)
 				assert.NoError(t, err)
 			}
 		})
@@ -277,9 +271,9 @@ func TestGRPCMethods(t *testing.T) {
 			}
 			defer teardown()
 
-			pluginName := "dummy-plugin"
-			p := &Plugin{
-				name:              pluginName,
+			driverName := "dummy-driver"
+			p := &DRAPlugin{
+				driverName:        driverName,
 				backgroundCtx:     tCtx,
 				endpoint:          addr,
 				chosenService:     test.chosenService,
@@ -297,18 +291,17 @@ func TestGRPCMethods(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			draPlugins := NewDRAPluginManager(tCtx, nil, nil, 0)
 			draPlugins.add(p)
-			defer draPlugins.remove(pluginName, addr)
-
-			client, err := NewDRAPluginClient(pluginName)
+			plugin, err := draPlugins.GetPlugin(driverName)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, err = client.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
+			_, err = plugin.NodePrepareResources(tCtx, &drapbv1beta1.NodePrepareResourcesRequest{})
 			assertError(t, test.expectError, err)
 
-			_, err = client.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
+			_, err = plugin.NodeUnprepareResources(tCtx, &drapbv1beta1.NodeUnprepareResourcesRequest{})
 			assertError(t, test.expectError, err)
 		})
 	}
