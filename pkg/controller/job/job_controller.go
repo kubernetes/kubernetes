@@ -521,6 +521,11 @@ func (jm *Controller) deleteJob(logger klog.Logger, obj interface{}) {
 		}
 	}
 	jm.cleanupPodFinalizers(jobObj)
+	key := cache.MetaObjectToName(jobObj).String()
+	err := jm.podBackoffStore.removeBackoffRecord(key)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("error removing backoff record %w", err))
+	}
 }
 
 // enqueueSyncJobImmediately tells the Job controller to invoke syncJob
