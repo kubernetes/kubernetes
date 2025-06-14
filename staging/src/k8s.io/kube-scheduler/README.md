@@ -1,3 +1,7 @@
+> ⚠️ **This is a staging repository for Kubernetes**.  
+> Contributions, including issues and pull requests, should be made to the main Kubernetes repository: [https://github.com/kubernetes/kubernetes](https://github.com/kubernetes/kubernetes).  
+> This repository is not for direct contributions.
+
 # kube-scheduler
 
 Implements [KEP 115 - Moving ComponentConfig API types to staging repos](https://git.k8s.io/enhancements/keps/sig-cluster-lifecycle/wgs/115-componentconfig#kube-scheduler-changes)
