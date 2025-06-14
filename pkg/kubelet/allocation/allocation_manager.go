@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -96,6 +98,9 @@ type Manager interface {
 	// - Non-resizable resources: only CPU & memory are resizable
 	// - Non-running containers: they will be sized correctly when (re)started
 	IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool
+
+	// GetPodResizeInfo to cache containers and pod resources CPU and memory resources once resizing is completed
+	GetPodResizeInfo(allocatedPod *v1.Pod) string
 }
 
 type manager struct {
@@ -107,9 +112,11 @@ type manager struct {
 	statusManager    status.Manager
 
 	allocationMutex sync.Mutex
+
+	recorder record.EventRecorder
 }
 
-func NewManager(checkpointDirectory string, containerManager cm.ContainerManager, statusManager status.Manager) Manager {
+func NewManager(checkpointDirectory string, containerManager cm.ContainerManager, statusManager status.Manager, recorder record.EventRecorder) Manager {
 	return &manager{
 		allocated: newStateImpl(checkpointDirectory, allocatedPodsStateFile),
 		actuated:  newStateImpl(checkpointDirectory, actuatedPodsStateFile),
@@ -117,6 +124,8 @@ func NewManager(checkpointDirectory string, containerManager cm.ContainerManager
 		containerManager: containerManager,
 		statusManager:    statusManager,
 		admitHandlers:    lifecycle.PodAdmitHandlers{},
+
+		recorder: recorder,
 	}
 }
 
@@ -284,6 +293,52 @@ func (m *manager) GetActuatedResources(podUID types.UID, containerName string) (
 	return m.actuated.GetContainerResources(podUID, containerName)
 }
 
+type ContainerAllocation struct {
+	Name      string
+	Resources v1.ResourceRequirements
+}
+
+type PodResourceSummary struct {
+	//TODO: Resources v1.ResourceRequirements, add pod-level resources here once resizing pod-level resources is supported
+	InitContainers []ContainerAllocation `json:"initContainers,omitempty"`
+	Containers     []ContainerAllocation `json:"containers,omitempty"`
+}
+
+// GetPodResizeInfo to cache containers and pod resources CPU and memory resources once resizing is completed
+func (m *manager) GetPodResizeInfo(allocatedPod *v1.Pod) string {
+	resizedInfo := &PodResourceSummary{
+		InitContainers: make([]ContainerAllocation, 0),
+		Containers:     make([]ContainerAllocation, 0),
+	}
+
+	podutil.VisitContainers(&allocatedPod.Spec, podutil.InitContainers|podutil.Containers,
+		func(allocatedContainer *v1.Container, containerType podutil.ContainerType) bool {
+			if !isResizableContainer(allocatedContainer, containerType) {
+				// If the container is not resizeable container, it doesn't need to be saved to resize completed event annotations
+				return true
+			}
+
+			actuatedResources, _ := m.GetActuatedResources(allocatedPod.UID, allocatedContainer.Name)
+
+			allocation := ContainerAllocation{
+				Name:      allocatedContainer.Name,
+				Resources: actuatedResources,
+			}
+
+			switch containerType {
+			case podutil.InitContainers:
+				resizedInfo.InitContainers = append(resizedInfo.InitContainers, allocation)
+			default:
+				resizedInfo.Containers = append(resizedInfo.Containers, allocation)
+			}
+			return true
+		})
+
+	podResizeMsgDetailsJSON, _ := json.Marshal(resizedInfo)
+	podResizeMsgDetails := fmt.Sprintf("Pod resize completed, %s", string(podResizeMsgDetailsJSON))
+	return podResizeMsgDetails
+}
+
 func (m *manager) HandlePodResourcesResize(
 	runtime kubecontainer.Runtime,
 	allocatedPods []*v1.Pod,
@@ -299,8 +354,18 @@ func (m *manager) HandlePodResourcesResize(
 			// If a resize is in progress, make sure the cache has the correct state in case the Kubelet restarted.
 			m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", false)
 		} else {
+			// podResizeConditionsOriginalLen is used to save original resize condition
+			podResizeConditionsOriginalLen := len(m.statusManager.GetPodResizeConditions(pod.UID))
+
 			// (Allocated == Actual) => clear the resize in-progress status.
 			m.statusManager.ClearPodResizeInProgressCondition(pod.UID)
+
+			// If pod resize completed, print pod resize complete event
+			if (podResizeConditionsOriginalLen != 0) && (len(m.statusManager.GetPodResizeConditions(pod.UID)) == 0) {
+				// PodResizeCompletedMsg includes pod all resizeable container resources
+				PodResizeCompletedMsg := m.GetPodResizeInfo(allocatedPod)
+				m.recorder.Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, PodResizeCompletedMsg)
+			}
 		}
 	}()
 
