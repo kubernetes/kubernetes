@@ -20,11 +20,14 @@ import (
 	"context"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestConfigurationChannels(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := ktesting.Init(t)
+	ctx = ktesting.WithCancel(ctx)
+	defer ctx.Cancel("TestConfigurationChannels completed")
 
 	mux := newMux(nil)
 	channelOne := mux.ChannelWithContext(ctx, "one")
@@ -43,7 +46,7 @@ type MergeMock struct {
 	t      *testing.T
 }
 
-func (m MergeMock) Merge(source string, update interface{}) error {
+func (m MergeMock) Merge(ctx context.Context, source string, update interface{}) error {
 	if m.source != source {
 		m.t.Errorf("Expected %s, Got %s", m.source, source)
 	}
@@ -54,8 +57,9 @@ func (m MergeMock) Merge(source string, update interface{}) error {
 }
 
 func TestMergeInvoked(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := ktesting.Init(t)
+	ctx = ktesting.WithCancel(ctx)
+	defer ctx.Cancel("TestMergeInvoked completed")
 
 	merger := MergeMock{"one", "test", t}
 	mux := newMux(&merger)
@@ -63,18 +67,19 @@ func TestMergeInvoked(t *testing.T) {
 }
 
 // mergeFunc implements the Merger interface
-type mergeFunc func(source string, update interface{}) error
+type mergeFunc func(ctx context.Context, source string, update interface{}) error
 
-func (f mergeFunc) Merge(source string, update interface{}) error {
-	return f(source, update)
+func (f mergeFunc) Merge(ctx context.Context, source string, update interface{}) error {
+	return f(ctx, source, update)
 }
 
 func TestSimultaneousMerge(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := ktesting.Init(t)
+	ctx = ktesting.WithCancel(ctx)
+	defer ctx.Cancel("TestSimultaneousMerge completed")
 
 	ch := make(chan bool, 2)
-	mux := newMux(mergeFunc(func(source string, update interface{}) error {
+	mux := newMux(mergeFunc(func(ctx context.Context, source string, update interface{}) error {
 		switch source {
 		case "one":
 			if update.(string) != "test" {
