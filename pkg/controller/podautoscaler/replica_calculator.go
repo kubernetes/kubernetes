@@ -104,7 +104,6 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 	filteredPods, unfilteredPods, err := podFilter.Filter(podList)
 	if err != nil {
 		// Fall back to default behavior: use all pods
-		fmt.Println("line 107", err.Error())
 		filteredPods = podList
 		unfilteredPods = []*v1.Pod{} // empty slice since we're not filtering out any pods
 	}
@@ -231,7 +230,6 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 	filteredPods, unfilteredPods, err := podFilter.Filter(podList)
 	if err != nil {
 		// Fall back to default behavior: use all pods
-		fmt.Println("line 234", err.Error())
 		filteredPods = podList
 		unfilteredPods = []*v1.Pod{} // empty slice since we're not filtering out any pods
 	}

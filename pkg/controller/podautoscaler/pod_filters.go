@@ -102,16 +102,13 @@ func (f *OwnerReferencesFilter) Filter(pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod, er
 		if err != nil {
 			// On error, assume pod is not owned
 			// TODO: is this how to handle this?
-			fmt.Println("Error ", err.Error())
 			unfilteredPods = append(unfilteredPods, pod)
 			continue
 		}
 
 		if isOwned {
-			fmt.Println("Pod is ownded by targetRef", pod.Name)
 			filteredPods = append(filteredPods, pod)
 		} else {
-			fmt.Println("Pod is not ownded by targetRef", pod.Name)
 			unfilteredPods = append(unfilteredPods, pod)
 		}
 	}
@@ -156,7 +153,6 @@ func (f *OwnerReferencesFilter) isPodOwnedByTarget(pod *v1.Pod, targetRef autosc
 			if nextOwner == nil {
 				nextOwner, err = f.Cache.GetResource(namespace, ownerRef)
 				if err != nil {
-					fmt.Println(err.Error())
 					continue // TODO: what should we do here?
 				}
 			}
