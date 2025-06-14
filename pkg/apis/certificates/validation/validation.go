@@ -22,9 +22,9 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilcert "k8s.io/client-go/util/cert"
@@ -304,7 +304,7 @@ func validateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.Certif
 			case len(newConditions) > len(oldConditions):
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not add a condition of type %q", t)))
 			case !apiequality.Semantic.DeepEqual(oldConditions, newConditions):
-				conditionDiff := cmp.Diff(oldConditions, newConditions)
+				conditionDiff := diff.Diff(oldConditions, newConditions)
 				validationErrorList = append(validationErrorList, field.Forbidden(field.NewPath("status", "conditions"), fmt.Sprintf("updates may not modify a condition of type %q\n%v", t, conditionDiff)))
 			}
 		}

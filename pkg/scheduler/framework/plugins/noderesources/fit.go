@@ -21,10 +21,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
@@ -314,7 +313,7 @@ func (f *Fit) isSchedulableAfterPodEvent(logger klog.Logger, pod *v1.Pod, oldObj
 	if !f.isSchedulableAfterPodScaleDown(pod, originalPod, modifiedPod) {
 		if loggerV := logger.V(10); loggerV.Enabled() {
 			// Log more information.
-			loggerV.Info("pod got scaled down, but the modification isn't related to the resource requests of the target pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod), "diff", cmp.Diff(originalPod, modifiedPod))
+			loggerV.Info("pod got scaled down, but the modification isn't related to the resource requests of the target pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod), "diff", diff.Diff(originalPod, modifiedPod))
 		} else {
 			logger.V(5).Info("pod got scaled down, but the modification isn't related to the resource requests of the target pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 		}
