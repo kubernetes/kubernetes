@@ -108,7 +108,7 @@ func (plugin *emptyDirPlugin) SupportsSELinuxContextMount(spec *volume.Spec) (bo
 }
 
 func (plugin *emptyDirPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(plugin.GetPluginName()), &realMountDetector{plugin.host.GetMounter(plugin.GetPluginName())})
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec *volume.Spec, pod *v1.Pod) *resource.Quantity {
@@ -172,7 +172,7 @@ func (plugin *emptyDirPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod,
 
 func (plugin *emptyDirPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(plugin.GetPluginName()), &realMountDetector{plugin.host.GetMounter(plugin.GetPluginName())})
+	return plugin.newUnmounterInternal(volName, podUID, plugin.host.GetMounter(), &realMountDetector{plugin.host.GetMounter()})
 }
 
 func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Unmounter, error) {

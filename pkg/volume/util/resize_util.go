@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
 var (
@@ -456,7 +457,7 @@ func mergeStorageAllocatedResources(pvc *v1.PersistentVolumeClaim, size resource
 }
 
 // GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
-func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
-	resizer := mount.NewResizeFs(host.GetExec(pluginName))
+func GenericResizeFS(host volume.VolumeHost, devicePath, deviceMountPath string) (bool, error) {
+	resizer := mount.NewResizeFs(exec.New())
 	return resizer.Resize(devicePath, deviceMountPath)
 }
