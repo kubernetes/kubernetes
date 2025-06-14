@@ -60,7 +60,7 @@ const (
 	// StaticEstimatedCRDCostLimit represents the largest-allowed total cost for the x-kubernetes-validations rules of a CRD.
 	StaticEstimatedCRDCostLimit = 100000000
 
-	MaxSelectableFields = 8
+	MaxSelectableFields = 16
 )
 
 var supportedValidationReason = sets.NewString(
