@@ -109,11 +109,13 @@ func (i *objectCacheItem) stopIfIdle(now time.Time, maxIdleTime time.Duration) b
 func (i *objectCacheItem) restartReflectorIfNeeded() {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	if i.immutable || !i.stopped {
+	if !i.stopped {
 		return
 	}
 	i.stopCh = make(chan struct{})
 	i.stopped = false
+	// Wait for the reflector to catch up to the latest resourceVersion when restarting
+	i.reflector.WaitForReflectorToCatchUpLatestResourceVersion = true
 	go i.startReflector()
 }
 
