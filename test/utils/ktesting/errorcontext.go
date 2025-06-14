@@ -69,6 +69,13 @@ type errorContext struct {
 	failed bool
 }
 
+func (eCtx *errorContext) Value(key any) any {
+	if key == suppressUnexpectedErrorLoggingKey {
+		return true
+	}
+	return eCtx.TContext.Value(key)
+}
+
 func (eCtx *errorContext) finalize(err *error) {
 	eCtx.mutex.Lock()
 	defer eCtx.mutex.Unlock()

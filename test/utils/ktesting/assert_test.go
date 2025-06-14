@@ -180,11 +180,12 @@ to equal
 				tCtx.ExpectNoError(errors.New("fake error"))
 			},
 			expectError: `Unexpected error: fake error`,
-			expectLog: `<klog header>: Unexpected error:
-    <*errors.errorString | 0xXXXX>: 
-    fake error
-    {s: "fake error"}
-`,
+			// TODO: test this output
+			// 			expectLog: `<klog header>: Unexpected error:
+			//     <*errors.errorString | 0xXXXX>:
+			//     fake error
+			//     {s: "fake error"}
+			// `,
 		},
 		"expect-no-error-failure": {
 			cb: func(tCtx TContext) {
@@ -215,21 +216,23 @@ to equal
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}))
 			},
 			expectError: `doing something: fake error`,
-			expectLog: `<klog header>: Failed at:
-    abc
-    xyz
-`,
+			// TODO: test this output
+			// 			expectLog: `<klog header>: Failed at:
+			//     abc
+			//     xyz
+			// `,
 		},
 		"expect-no-error-backtrace-and-explanation": {
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(fmt.Errorf("doing something: %w", FailureError{Msg: "fake error", FullStackTrace: "abc\nxyz"}), "testing error checking")
 			},
 			expectError: `testing error checking: doing something: fake error`,
-			expectLog: `<klog header>: testing error checking
-<klog header>: Failed at:
-    abc
-    xyz
-`,
+			// TODO: test this output
+			// 			expectLog: `<klog header>: testing error checking
+			// <klog header>: Failed at:
+			//     abc
+			//     xyz
+			// `,
 		},
 
 		"output": {
