@@ -1323,6 +1323,12 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(4).InfoS("Skipped terminating status check for all endpoints", "svcClusterIP", svcInfo.ClusterIP(), "ingressLBCount", len(svcInfo.loadBalancerIngressIPs))
 		}
 
+		epsMap := proxier.endpointsMap[svcName]
+		klog.V(4).InfoS("TEST: Endpoints map for service", "svcName", svcName, "endpointsCount", len(epsMap))
+		for svcName := range proxier.endpointsMap {
+			klog.V(4).InfoS("TEST: Available services in endpointmap", "svcName", svcName, "endpointsCount", len(proxier.endpointsMap[svcName]))
+		}
+
 		for _, epInfo := range proxier.endpointsMap[svcName] {
 			ep, ok := epInfo.(*endpointInfo)
 			if !ok {
