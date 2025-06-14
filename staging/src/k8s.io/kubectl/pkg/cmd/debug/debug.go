@@ -76,7 +76,7 @@ var (
 		* Node: Create a new pod that runs in the node's host namespaces and can access
 		        the node's filesystem.
 
-		Note: When a non-root user is configured for the entire target Pod, some capabilities granted 
+		Note: When a non-root user is configured for the entire target Pod, some capabilities granted
 		by debug profile may not work.
 `))
 
@@ -727,6 +727,9 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) (*corev1.Pod, err
 	p := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pn,
+			Labels: map[string]string{
+				"app.kubernetes.io/managed-by": "kubectl-debug",
+			},
 		},
 		Spec: corev1.PodSpec{
 			Containers: []corev1.Container{
