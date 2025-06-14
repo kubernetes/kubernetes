@@ -49,6 +49,13 @@ func (m *kubeGenericRuntimeManager) generateContainerResources(pod *v1.Pod, cont
 	}
 }
 
+// generateContainerResourcesForUpdate generates platform specific (windows) container resources config for runtime
+// with setting special values to parameters that will be updated to max.
+func (m *kubeGenericRuntimeManager) generateContainerResourcesForUpdate(pod *v1.Pod, container *v1.Container) *runtimeapi.ContainerResources {
+	// TODO: Set values for updating resources to max.
+	return m.generateContainerResources(pod, container)
+}
+
 // generateUpdatePodSandboxResourcesRequest generates platform specific podsandox resources config for runtime
 func (m *kubeGenericRuntimeManager) generateUpdatePodSandboxResourcesRequest(sandboxID string, pod *v1.Pod, podResources *cm.ResourceConfig) *runtimeapi.UpdatePodSandboxResourcesRequest {
 	return nil
