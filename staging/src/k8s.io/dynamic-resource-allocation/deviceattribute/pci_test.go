@@ -17,8 +17,8 @@ import (
 func TestStandardPCIDeviceAttributes(t *testing.T) {
 	pcieRootAttrName := resourceapi.QualifiedName(resourceapi.StandardDeviceAttributePCIeRoot)
 
-	address := &utils.PCIAddress{Domain: 0, Bus: 1, Device: 2, Function: 3}
-	root := &utils.PCIRoot{Domain: 0, Bus: 1}
+	address := utils.MustNewPCIAddress(0x0, 0x1, 0x2, 0x3)
+	root := utils.MustNewPCIRoot(0x0, 0x1)
 	standardAttributes := map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
 		pcieRootAttrName: {
 			StringValue: ptr.To("pci" + root.String()),

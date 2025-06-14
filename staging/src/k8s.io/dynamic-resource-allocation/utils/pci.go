@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -9,17 +10,45 @@ import (
 	"strings"
 )
 
+const (
+	// PCI address consists of:
+	// - domain:  16 bits, it can be represented in 4-digit hexadecimal number
+	// - bus:      8 bits, it can be represented in 2-digit hexadecimal number
+	// - device:   5 bits, it can be represented in 2-digit hexadecimal number
+	// - function: 3 bits, it can be represented in 1-digit hexadecimal number
+	//
+	// ref: "Chapter 12. PCI Drivers - PCI Addressing"
+	//      Linux Device Drivers, 3rd Edition by Jonathan Corbet, Alessandro Rubini, Greg Kroah-Hartman
+	//      https://www.oreilly.com/library/view/linux-device-drivers/0596005903/ch12.html
+	PCIDomainBits   = uint16(16)
+	PCIDomainMax    = uint16(math.MaxUint16)
+	PCIBusBits      = uint16(8)
+	PCIBusMax       = uint16((1 << PCIBusBits) - 1)
+	PCIDeviceBits   = uint16(5)
+	PCIDeviceMax    = uint16((1 << PCIDeviceBits) - 1)
+	PCIFunctionBits = uint16(3)
+	PCIFunctionMax  = uint16((1 << PCIFunctionBits) - 1)
+)
+
 var (
 	// bdfRegexp matches PCI address in BDF notation.
 	// The format is <domain>:<bus>:<device>.<function>
 	// where:
-	// - domain: 4-digit hexadecimal number representing the PCI domain
-	// - bus: 2-digit hexadecimal number representing the PCI bus
-	// - device: 2-digit hexadecimal number representing the PCI device
-	// - function: 1-digit hexadecimal number representing the PCI function
+	// - domain: 4-digit hexadecimal number representing the PCI domain (16 bits)
+	// - bus: 2-digit hexadecimal number representing the PCI bus (8 bits)
+	// - device: 2-digit hexadecimal number representing the PCI device (5 bits)
+	// - function: 1-digit hexadecimal number representing the PCI function (3 bits)
+	//
 	// Example: "0000:0e:1f.0" represents domain 0, bus 14, device 31, function 0.
+	//
 	// ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
 	bdfRegexp = regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2}):([0-9a-f]{2})\.([0-9a-f]{1})$`)
+
+	// pciRootRegexp matches PCI root address in the format "pci<domain>:<bus>".
+	// The format is:
+	// - domain: 4-digit hexadecimal number representing the PCI domain (32 bits)
+	// - bus: 2-digit hexadecimal number representing the PCI bus (8 bits)
+	pciRootRegexp = regexp.MustCompile(`^([0-9a-f]{4}):([0-9a-f]{2})$`)
 )
 
 // PCIRoot represents a PCI root address in the combination of Domain and Bus.
@@ -28,34 +57,84 @@ var (
 //
 // ref: https://docs.kernel.org/PCI/sysfs-pci.html
 type PCIRoot struct {
-	Domain uint32
-	Bus    uint32
+	domain uint16
+	bus    uint16
 }
 
+func NewPCIRoot(domain, bus uint16) (*PCIRoot, error) {
+	// no validation for domain, as it uses full 16 bits
+
+	if bus > PCIBusMax {
+		return nil, fmt.Errorf("invalid PCI bus number: %02x, must be in range 0-%d (%dbits)", bus, PCIBusMax, PCIBusBits)
+	}
+	return &PCIRoot{
+		domain: domain,
+		bus:    bus,
+	}, nil
+}
+
+func MustNewPCIRoot(domain, bus uint16) *PCIRoot {
+	root, err := NewPCIRoot(domain, bus)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create PCIRoot: %v", err))
+	}
+	return root
+}
+
+// String returns the string representation of the PCIRoot in the format "domain:bus".
 func (p *PCIRoot) String() string {
-	return fmt.Sprintf("%04x:%02x", p.Domain, p.Bus)
+	return fmt.Sprintf("%04x:%02x", p.domain, p.bus)
 }
 
 // The PCIAddress holds PCI address components in BDF notation.
 // <domain>:<bus>:<device>.<function>
 // where:
-// - domain: 4-digit hexadecimal number representing the PCI domain
-// - bus: 2-digit hexadecimal number representing the PCI bus
-// - device: 2-digit hexadecimal number representing the PCI device
-// - function: 1-digit hexadecimal number representing the PCI function
+// - domain: 4-digit hexadecimal number representing the PCI domain (16 bits)
+// - bus: 2-digit hexadecimal number representing the PCI bus (8 bits)
+// - device: 2-digit hexadecimal number representing the PCI device (5 bits)
+// - function: 1-digit hexadecimal number representing the PCI function (3 bits)
 //
 // Example: "0000:0e:1f.0" represents domain 0, bus 14, device 31, function 0.
 //
-// ref: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
+// ref:
+// - BDF Notation: https://wiki.xenproject.org/wiki/Bus:Device.Function_(BDF)_Notation
+// - PCI Addressing: https://docs.kernel.org/PCI/sysfs-pci.html
 type PCIAddress struct {
-	Domain   uint32
-	Bus      uint32
-	Device   uint32
-	Function uint32
+	domain   uint16
+	bus      uint16
+	device   uint16
+	function uint16
+}
+
+func NewPCIAddress(domain, bus, device, function uint16) (*PCIAddress, error) {
+	// no validation for domain, as it uses full 16 bits
+	if bus > PCIBusMax {
+		return nil, fmt.Errorf("invalid PCI bus number: %02x, must be in range 0-%d (%dbits)", bus, PCIBusMax, PCIBusBits)
+	}
+	if device > PCIDeviceMax {
+		return nil, fmt.Errorf("invalid PCI device number: %02x, must be in range 0-%d (%dbits)", device, PCIDeviceMax, PCIDeviceBits)
+	}
+	if function > PCIFunctionMax {
+		return nil, fmt.Errorf("invalid PCI function number: %01x, must be in range 0-%d (%dbits)", function, PCIFunctionMax, PCIFunctionBits)
+	}
+	return &PCIAddress{
+		domain:   domain,
+		bus:      bus,
+		device:   device,
+		function: function,
+	}, nil
+}
+
+func MustNewPCIAddress(domain, bus, device, function uint16) *PCIAddress {
+	addr, err := NewPCIAddress(domain, bus, device, function)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create PCIAddress: %v", err))
+	}
+	return addr
 }
 
 func (p *PCIAddress) String() string {
-	return fmt.Sprintf("%04x:%02x:%02x.%01x", p.Domain, p.Bus, p.Device, p.Function)
+	return fmt.Sprintf("%04x:%02x:%02x.%01x", p.domain, p.bus, p.device, p.function)
 }
 
 // ResolvePCIRoot resolves the PCI root for the PCIAddress.
@@ -75,7 +154,7 @@ func (p *PCIAddress) ResolvePCIRoot(sysfs Sysfs) (*PCIRoot, error) {
 	}
 
 	pciRootPart := strings.Split(strings.TrimPrefix(sysDevicesPath, sysfs.Devices("")+"/"), "/")[0]
-	pciRoot, err := parsePCIRoot(
+	pciRoot, err := ParsePCIRoot(
 		pciRootPart[3:], // skip "pci" prefix
 	)
 	if err != nil {
@@ -120,38 +199,36 @@ func (p *PCIAddress) resolveSysDevicesPath(sysfs Sysfs) (string, error) {
 	return targetAbs, nil
 }
 
-// parsePCIRoot parses a PCIRoot from a string in the format "domain:bus".
+// ParsePCIRoot parses a PCIRoot from a string in the format "domain:bus".
 // The format is:
 // - domain: 4-digit hexadecimal number representing the PCI domain
 // - bus: 2-digit hexadecimal number representing the PCI bus
 // Example: "0000:01" represents domain 0, bus 1.
-func parsePCIRoot(str string) (*PCIRoot, error) {
-	parts := strings.Split(str, ":")
-	if len(parts) != 2 {
+func ParsePCIRoot(str string) (*PCIRoot, error) {
+	match := pciRootRegexp.FindStringSubmatch(str)
+
+	if len(match) == 0 {
 		return nil, fmt.Errorf("invalid PCIRoot format: %s", str)
 	}
 
-	parsePart := func(name, part string) (uint32, error) {
-		value, err := parseHexToUint32(part)
+	parsePart := func(name, part string) (uint16, error) {
+		value, err := parseHexTouint16(part)
 		if err != nil {
 			return 0, fmt.Errorf("invalid value %s in PCIRoot %s: %w", name, str, err)
 		}
-		return uint32(value), nil
+		return uint16(value), nil
 	}
 
-	var domain, bus uint32
+	var domain, bus uint16
 	var err error
-	if domain, err = parsePart("domain", parts[0]); err != nil {
+	if domain, err = parsePart("domain", match[1]); err != nil {
 		return nil, err
 	}
-	if bus, err = parsePart("bus", parts[1]); err != nil {
+	if bus, err = parsePart("bus", match[2]); err != nil {
 		return nil, err
 	}
 
-	return &PCIRoot{
-		Domain: domain,
-		Bus:    bus,
-	}, nil
+	return NewPCIRoot(domain, bus)
 }
 
 // ParsePCIAddress parses a PCI address in BDF notation.
@@ -173,15 +250,15 @@ func ParsePCIAddress(bdfString string) (*PCIAddress, error) {
 		return nil, fmt.Errorf("invalid PCI address format: %s", bdfString)
 	}
 
-	parsePart := func(name, part string) (uint32, error) {
-		value, err := parseHexToUint32(part)
+	parsePart := func(name, part string) (uint16, error) {
+		value, err := parseHexTouint16(part)
 		if err != nil {
 			return 0, fmt.Errorf("invalid value %s in PCI address %s: %w", name, bdfString, err)
 		}
-		return uint32(value), nil
+		return uint16(value), nil
 	}
 
-	var domain, bus, device, function uint32
+	var domain, bus, device, function uint16
 	var err error
 	if domain, err = parsePart("domain", match[1]); err != nil {
 		return nil, err
@@ -196,18 +273,13 @@ func ParsePCIAddress(bdfString string) (*PCIAddress, error) {
 		return nil, err
 	}
 
-	return &PCIAddress{
-		Domain:   uint32(domain),
-		Bus:      uint32(bus),
-		Device:   uint32(device),
-		Function: uint32(function),
-	}, nil
+	return NewPCIAddress(domain, bus, device, function)
 }
 
-func parseHexToUint32(s string) (uint32, error) {
+func parseHexTouint16(s string) (uint16, error) {
 	value, err := strconv.ParseUint(s, 16, 32)
 	if err != nil {
 		return 0, err
 	}
-	return uint32(value), nil
+	return uint16(value), nil
 }

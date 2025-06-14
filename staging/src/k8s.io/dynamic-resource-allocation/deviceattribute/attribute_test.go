@@ -24,19 +24,12 @@ func TestAddStandardDeviceAttributes(t *testing.T) {
 	})
 
 	testSysFs := utils.NewSysfsWithRoot(testSysfsDir)
-	// "0123:45:67.8"
-	testPCIAddress := utils.PCIAddress{
-		Domain:   0x0123,
-		Bus:      0x45,
-		Device:   0x67,
-		Function: 0x8,
-	}
-	// "0123:45"
-	testPCIRoot := utils.PCIRoot{
-		Domain: 0x1234,
-		Bus:    0x56,
-	}
-	// /sys/bus/pci/devices/0123:45:67.8 --> /sys/devices/pci1234:56/0123:45:67.8
+	// "0123:45:1e.7"
+	testPCIAddress := utils.MustNewPCIAddress(0x0123, 0x45, 0x1e, 0x7)
+	// "1234:56"
+	testPCIRoot := utils.MustNewPCIRoot(0x1234, 0x56)
+
+	// /sys/bus/pci/devices/0123:45:1e.7 --> /sys/devices/pci1234:56/0123:45:1e.7
 	testPCIDevicePath := testSysFs.Devices("pci" + testPCIRoot.String() + "/" + testPCIAddress.String())
 	dratesting.TouchFile(t, testPCIDevicePath)
 	testPCIBusPath := testSysFs.Bus("pci/devices/" + testPCIAddress.String())
@@ -49,7 +42,7 @@ func TestAddStandardDeviceAttributes(t *testing.T) {
 		"pci attrs": {
 			opts: []StandardDeviceAttributesOption{
 				WithStandardPCIDeviceAttributesOpts(
-					WithPCIDeviceAddress(&testPCIAddress),
+					WithPCIDeviceAddress(testPCIAddress),
 					withSysfs(testSysFs), // Use the mock sysfs
 				),
 			},
