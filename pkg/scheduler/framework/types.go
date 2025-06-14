@@ -35,6 +35,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	resourcehelper "k8s.io/component-helpers/resource"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -586,7 +587,7 @@ const (
 	NoNodeAvailableMsg = "0/%v nodes are available"
 )
 
-func (d *Diagnosis) AddPluginStatus(sts *Status) {
+func (d *Diagnosis) AddPluginStatus(sts *fwk.Status) {
 	if sts.Plugin() == "" {
 		return
 	}
@@ -596,7 +597,7 @@ func (d *Diagnosis) AddPluginStatus(sts *Status) {
 		}
 		d.UnschedulablePlugins.Insert(sts.Plugin())
 	}
-	if sts.Code() == Pending {
+	if sts.Code() == fwk.Pending {
 		if d.PendingPlugins == nil {
 			d.PendingPlugins = sets.New[string]()
 		}
@@ -623,7 +624,7 @@ func (f *FitError) Error() string {
 		// So, we shouldn't add the message from NodeToStatusMap when the PreFilter failed.
 		// Otherwise, we will have duplicated reasons in the error message.
 		reasons := make(map[string]int)
-		f.Diagnosis.NodeToStatus.ForEachExplicitNode(func(_ string, status *Status) {
+		f.Diagnosis.NodeToStatus.ForEachExplicitNode(func(_ string, status *fwk.Status) {
 			for _, reason := range status.Reasons() {
 				reasons[reason]++
 			}
