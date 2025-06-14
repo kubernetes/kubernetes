@@ -176,6 +176,7 @@ to equal
 			expectNoFail: true,
 		},
 		"expect-no-error-normal-error": {
+
 			cb: func(tCtx TContext) {
 				tCtx.ExpectNoError(errors.New("fake error"))
 			},
@@ -185,6 +186,13 @@ to equal
     fake error
     {s: "fake error"}
 `,
+		},
+		"expect-no-error-normal-error-no-logging": {
+			suppressUnexpectedErrorLogging: true,
+			cb: func(tCtx TContext) {
+				tCtx.ExpectNoError(errors.New("fake error"))
+			},
+			expectError: `Unexpected error: fake error`,
 		},
 		"expect-no-error-failure": {
 			cb: func(tCtx TContext) {

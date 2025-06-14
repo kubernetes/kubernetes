@@ -62,18 +62,27 @@ func expect(tCtx TContext, actual interface{}, extra ...interface{}) gomega.Asse
 	return gomega.NewWithT(tCtx).Expect(actual, extra...)
 }
 
+// suppressUnexpectedErrorLoggingKeyType is the type for a key which, if set to true in a context,
+// suppresses logging of an unexpected error. The context returned by WithError uses this because
+// the caller catches all failures in an error and then decides about logging.
+type suppressUnexpectedErrorLoggingKeyType struct{}
+
+var suppressUnexpectedErrorLoggingKey suppressUnexpectedErrorLoggingKeyType
+
 func expectNoError(tCtx TContext, err error, explain ...interface{}) {
 	if err == nil {
 		return
 	}
 
 	tCtx.Helper()
+	value, ok := tCtx.Value(suppressUnexpectedErrorLoggingKey).(bool)
+	suppressLogging := ok && value
 
 	description := buildDescription(explain...)
 
 	if errors.Is(err, ErrFailure) {
 		var failure FailureError
-		if errors.As(err, &failure) {
+		if !suppressLogging && errors.As(err, &failure) {
 			if backtrace := failure.Backtrace(); backtrace != "" {
 				if description != "" {
 					tCtx.Log(description)
@@ -90,7 +99,9 @@ func expectNoError(tCtx TContext, err error, explain ...interface{}) {
 	if description == "" {
 		description = "Unexpected error"
 	}
-	tCtx.Logf("%s:\n%s", description, format.Object(err, 1))
+	if !suppressLogging {
+		tCtx.Logf("%s:\n%s", description, format.Object(err, 1))
+	}
 	tCtx.Fatalf("%s: %v", description, err.Error())
 }
 
