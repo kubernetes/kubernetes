@@ -19,18 +19,20 @@ limitations under the License.
 package v2
 
 import (
+	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // HorizontalPodAutoscalerStatusApplyConfiguration represents a declarative configuration of the HorizontalPodAutoscalerStatus type for use
 // with apply.
 type HorizontalPodAutoscalerStatusApplyConfiguration struct {
-	ObservedGeneration *int64                                               `json:"observedGeneration,omitempty"`
-	LastScaleTime      *v1.Time                                             `json:"lastScaleTime,omitempty"`
-	CurrentReplicas    *int32                                               `json:"currentReplicas,omitempty"`
-	DesiredReplicas    *int32                                               `json:"desiredReplicas,omitempty"`
-	CurrentMetrics     []MetricStatusApplyConfiguration                     `json:"currentMetrics,omitempty"`
-	Conditions         []HorizontalPodAutoscalerConditionApplyConfiguration `json:"conditions,omitempty"`
+	ObservedGeneration       *int64                                               `json:"observedGeneration,omitempty"`
+	LastScaleTime            *v1.Time                                             `json:"lastScaleTime,omitempty"`
+	CurrentReplicas          *int32                                               `json:"currentReplicas,omitempty"`
+	DesiredReplicas          *int32                                               `json:"desiredReplicas,omitempty"`
+	CurrentMetrics           []MetricStatusApplyConfiguration                     `json:"currentMetrics,omitempty"`
+	Conditions               []HorizontalPodAutoscalerConditionApplyConfiguration `json:"conditions,omitempty"`
+	CurrentSelectionStrategy *autoscalingv2.SelectionStrategy                     `json:"currentSelectionStrategy,omitempty"`
 }
 
 // HorizontalPodAutoscalerStatusApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerStatus type for use with
@@ -94,5 +96,13 @@ func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithConditions(values 
 		}
 		b.Conditions = append(b.Conditions, *values[i])
 	}
+	return b
+}
+
+// WithCurrentSelectionStrategy sets the CurrentSelectionStrategy field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the CurrentSelectionStrategy field is set to the value of the last call.
+func (b *HorizontalPodAutoscalerStatusApplyConfiguration) WithCurrentSelectionStrategy(value autoscalingv2.SelectionStrategy) *HorizontalPodAutoscalerStatusApplyConfiguration {
+	b.CurrentSelectionStrategy = &value
 	return b
 }
