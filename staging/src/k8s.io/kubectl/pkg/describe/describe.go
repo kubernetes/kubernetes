@@ -51,6 +51,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
@@ -75,6 +76,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	utilcsr "k8s.io/client-go/util/certificate/csr"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
@@ -86,6 +88,7 @@ import (
 	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 	"k8s.io/kubectl/pkg/util/slice"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
+	"k8s.io/utils/ptr"
 )
 
 // Each level has 2 spaces for PrefixWriter
@@ -3762,7 +3765,13 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		}
 	}
 
-	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d})
+	// Fetch ResourceSlices
+	var resourceSlices []resourcev1beta1.ResourceSlice
+	if sliceList, err := d.ResourceV1beta1().ResourceSlices().List(context.TODO(), metav1.ListOptions{}); err == nil {
+		resourceSlices = sliceList.Items
+	}
+
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d}, resourceSlices)
 }
 
 type LeaseDescriber struct {
@@ -3770,7 +3779,7 @@ type LeaseDescriber struct {
 }
 
 func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList,
-	canViewPods bool, ld *LeaseDescriber) (string, error) {
+	canViewPods bool, ld *LeaseDescriber, resourceSlices []resourcev1beta1.ResourceSlice) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -3832,6 +3841,9 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			w.Write(LEVEL_0, "Allocatable:\n")
 			printResourceList(node.Status.Allocatable)
 		}
+		if len(resourceSlices) > 0 {
+			describeNodeResourceSlices(w, node, resourceSlices)
+		}
 
 		w.Write(LEVEL_0, "System Info:\n")
 		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
@@ -3861,11 +3873,75 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		} else {
 			w.Write(LEVEL_0, "Pods:\tnot authorized\n")
 		}
+
 		if events != nil {
 			DescribeEvents(events, w)
 		}
 		return nil
 	})
+}
+
+// Add helper function to describe ResourceSlices
+func describeNodeResourceSlices(w PrefixWriter, node *corev1.Node, resourceSlices []resourcev1beta1.ResourceSlice) {
+	w.Write(LEVEL_0, "ResourceSlices:\n")
+	w.Write(LEVEL_0, "  Name\t\tDriver\t\tPool\t\tAssociation\n")
+	w.Write(LEVEL_0, "  ----\t\t------\t\t----\t\t-----------\n")
+
+	// Sort slices by name for consistent output
+	sort.Slice(resourceSlices, func(i, j int) bool {
+		return resourceSlices[i].Name < resourceSlices[j].Name
+	})
+
+	for _, slice := range resourceSlices {
+		association := ""
+		// Determine association type
+		switch {
+		case slice.Spec.NodeName != "" && slice.Spec.NodeName == node.Name:
+			association = "Direct node match"
+		case slice.Spec.AllNodes:
+			association = "Available to all nodes"
+		case slice.Spec.NodeSelector != nil:
+			// Check if node selector matches
+			nodeSelector, err := nodeaffinity.NewNodeSelector(slice.Spec.NodeSelector)
+			if err != nil {
+				continue
+			}
+			if nodeSelector.Match(node) {
+				association = "Via node selector"
+			}
+		case slice.Spec.PerDeviceNodeSelection == ptr.To(true):
+			// Check if any devices are assigned to this node
+			hasDevices := false
+			for _, device := range slice.Spec.Devices {
+				if device.Basic.NodeName != nil && *device.Basic.NodeName == node.Name {
+					hasDevices = true
+					break
+				}
+			}
+			if hasDevices {
+				association = "Per-device selection"
+			}
+		}
+
+		// Only show slices associated with this node
+		if association != "" {
+			w.Write(LEVEL_0, "  %s\t\t%s\t\t%s\t\t%s\n",
+				slice.Name,
+				slice.Spec.Driver,
+				slice.Spec.Pool.Name,
+				association)
+
+			// If per-device selection is enabled, show assigned devices
+			if slice.Spec.PerDeviceNodeSelection == ptr.To(true) {
+				w.Write(LEVEL_1, "  Devices:\n")
+				for _, device := range slice.Spec.Devices {
+					if device.Basic.NodeName != nil && *device.Basic.NodeName == node.Name {
+						w.Write(LEVEL_2, "    - %s\n", device.Name)
+					}
+				}
+			}
+		}
+	}
 }
 
 func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
