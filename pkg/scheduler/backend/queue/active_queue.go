@@ -142,7 +142,7 @@ type activeQueue struct {
 	// When SchedulerPopFromBackoffQ feature is enabled,
 	// condition is also notified when the pod is added to backoffQ.
 	// It is used with lock.
-	cond sync.Cond
+	// cond sync.Cond
 
 	// inFlightPods holds the UID of all pods which have been popped out for which Done
 	// hasn't been called yet - in other words, all pods that are currently being
@@ -184,6 +184,9 @@ type activeQueue struct {
 	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
 	// It is non-nil only when SchedulerPopFromBackoffQ feature is enabled.
 	backoffQPopper backoffQPopper
+
+	notifyCh chan struct{}
+	closeCh  chan struct{}
 }
 
 func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
@@ -195,8 +198,10 @@ func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueu
 		metricsRecorder:              metricRecorder,
 		unlockedQueue:                newUnlockedActiveQueue(queue),
 		backoffQPopper:               backoffQPopper,
+		notifyCh:                     make(chan struct{}, 1),
+		closeCh:                      make(chan struct{}),
 	}
-	aq.cond.L = &aq.lock
+	// aq.cond.L = &aq.lock
 
 	return aq
 }
@@ -241,45 +246,62 @@ func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 	return aq.queue.Delete(pInfo)
 }
 
-// pop removes the head of the queue and returns it.
-// It blocks if the queue is empty and waits until a new item is added to the queue.
-// It increments scheduling cycle when a pod is popped.
+// // pop removes the head of the queue and returns it.
+// // It blocks if the queue is empty and waits until a new item is added to the queue.
+// // It increments scheduling cycle when a pod is popped.
+// func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
+// 	aq.lock.Lock()
+// 	defer aq.lock.Unlock()
+
+// 	return aq.unlockedPop(logger)
+// }
+
 func (aq *activeQueue) pop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-	aq.lock.Lock()
-	defer aq.lock.Unlock()
+	for {
+		aq.lock.Lock()
 
-	return aq.unlockedPop(logger)
-}
-
-func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-	var pInfo *framework.QueuedPodInfo
-	for aq.queue.Len() == 0 {
-		// backoffQPopper is non-nil only if SchedulerPopFromBackoffQ feature is enabled.
-		// In case of non-empty backoffQ, try popping from there.
-		if aq.backoffQPopper != nil && aq.backoffQPopper.lenBackoff() != 0 {
-			break
-		}
-		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
-		// When Close() is called, the p.closed is set and the condition is broadcast,
-		// which causes this loop to continue and return from the Pop().
 		if aq.closed {
+			aq.lock.Unlock()
 			logger.V(2).Info("Scheduling queue is closed")
 			return nil, nil
 		}
-		aq.cond.Wait()
+
+		if aq.hasSomething() {
+			pInfo, err := aq.popLocked(logger)
+			aq.lock.Unlock()
+			if err != nil {
+				return nil, err
+			}
+			if pInfo == nil {
+				continue
+			}
+			return pInfo, nil
+		}
+
+		aq.lock.Unlock()
+		select {
+		case <-aq.notifyCh:
+			continue
+		case <-aq.closeCh:
+			logger.V(2).Info("Scheduling queue is closed")
+			return nil, nil
+		}
 	}
+}
+
+func (aq *activeQueue) popLocked(logger klog.Logger) (*framework.QueuedPodInfo, error) {
 	pInfo, err := aq.queue.Pop()
 	if err != nil {
 		if aq.backoffQPopper == nil {
 			return nil, err
 		}
-		// Try to pop from backoffQ when activeQ is empty.
 		pInfo, err = aq.backoffQPopper.popBackoff()
 		if err != nil {
 			return nil, err
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
 	}
+
 	pInfo.Attempts++
 	// In flight, no concurrent events yet.
 	if aq.isSchedulingQueueHintEnabled {
@@ -290,7 +312,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 			// because it likely doesn't cause any visible issues from the scheduling perspective.
 			logger.Error(nil, "the same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
 			// Just ignore/discard this duplicated pod and try to pop the next one.
-			return aq.unlockedPop(logger)
+			return nil, nil
 		}
 
 		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
@@ -309,6 +331,83 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 
 	return pInfo, nil
 }
+
+func (aq *activeQueue) hasSomething() bool {
+	if aq.queue.Len() > 0 {
+		return true
+	}
+	return aq.backoffQPopper != nil && aq.backoffQPopper.lenBackoff() > 0
+}
+
+// func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo, error) {
+// 	var pInfo *framework.QueuedPodInfo
+// 	for aq.queue.Len() == 0 {
+// 		// backoffQPopper is non-nil only if SchedulerPopFromBackoffQ feature is enabled.
+// 		// In case of non-empty backoffQ, try popping from there.
+// 		if aq.backoffQPopper != nil && aq.backoffQPopper.lenBackoff() != 0 {
+// 			break
+// 		}
+// 		// When the queue is empty, invocation of Pop() is blocked until new item is enqueued.
+// 		// When Close() is called, the p.closed is set and the condition is broadcast,
+// 		// which causes this loop to continue and return from the Pop().
+// 		if aq.closed {
+// 			logger.V(2).Info("Scheduling queue is closed")
+// 			return nil, nil
+// 		}
+// 		aq.cond.Wait()
+
+// 		select {
+// 		case <-aq.notifyCh:
+// 		case <-aq.closeCh:
+// 			logger.V(2).Info("Scheduling queue is closed")
+// 			return nil, nil
+// 		}
+// 	}
+// 	select {
+// 	case <-aq.notifyCh:
+// 	default:
+// 	}
+// 	pInfo, err := aq.queue.Pop()
+// 	if err != nil {
+// 		if aq.backoffQPopper == nil {
+// 			return nil, err
+// 		}
+// 		// Try to pop from backoffQ when activeQ is empty.
+// 		pInfo, err = aq.backoffQPopper.popBackoff()
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
+// 	}
+// 	pInfo.Attempts++
+// 	// In flight, no concurrent events yet.
+// 	if aq.isSchedulingQueueHintEnabled {
+// 		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
+// 		// https://github.com/kubernetes/kubernetes/pull/127016
+// 		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
+// 			// Just report it as an error, but no need to stop the scheduler
+// 			// because it likely doesn't cause any visible issues from the scheduling perspective.
+// 			logger.Error(nil, "the same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
+// 			// Just ignore/discard this duplicated pod and try to pop the next one.
+// 			return aq.unlockedPop(logger)
+// 		}
+
+// 		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
+// 		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
+// 	}
+// 	aq.schedCycle++
+
+// 	// Update metrics and reset the set of unschedulable plugins for the next attempt.
+// 	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+// 		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+// 	}
+// 	pInfo.UnschedulablePlugins.Clear()
+// 	pInfo.PendingPlugins.Clear()
+// 	pInfo.GatingPlugin = ""
+// 	pInfo.GatingPluginEvents = nil
+
+// 	return pInfo, nil
+// }
 
 // list returns all pods that are in the queue.
 func (aq *activeQueue) list() []*v1.Pod {
@@ -490,9 +589,14 @@ func (aq *activeQueue) close() {
 		aq.unlockedDone(pod)
 	}
 	aq.closed = true
+	close(aq.closeCh)
 }
 
 // broadcast notifies the pop() operation that new pod(s) was added to the activeQueue.
 func (aq *activeQueue) broadcast() {
-	aq.cond.Broadcast()
+	// aq.cond.Broadcast()
+	select {
+	case aq.notifyCh <- struct{}{}:
+	default:
+	}
 }
