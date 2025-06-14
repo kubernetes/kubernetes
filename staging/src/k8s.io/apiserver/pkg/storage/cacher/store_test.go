@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -156,6 +157,10 @@ func testStorageElement(key, value string, rv int) *storeElement {
 	return &storeElement{Key: key, Object: fakeObj{value: value, rv: rv}}
 }
 
+func testStorageElementWithSize(key string, size int64) *storeElement {
+	return &storeElement{Key: key, Size: size, Object: fakeObj{value: "", rv: 0}}
+}
+
 type fakeObj struct {
 	value string
 	rv    int
@@ -174,4 +179,36 @@ func testStoreIndexers() *cache.Indexers {
 	indexers := cache.Indexers{}
 	indexers["by_val"] = testStoreIndexFunc
 	return &indexers
+}
+
+func TestStoreStats(t *testing.T) {
+	store := newThreadedBtreeStoreIndexer(storeElementIndexers(testStoreIndexers()), btreeDegree)
+	assert.Equal(t, storage.Stats{}, store.Stats())
+
+	require.NoError(t, store.Add(testStorageElementWithSize("foo1", 10)))
+	assert.Equal(t, storage.Stats{ObjectCount: 1, ObjectSize: 10}, store.Stats())
+
+	require.NoError(t, store.Add(testStorageElementWithSize("foo2", 20)))
+	assert.Equal(t, storage.Stats{ObjectCount: 2, ObjectSize: 30}, store.Stats())
+
+	require.NoError(t, store.Update(testStorageElementWithSize("foo1", 100)))
+	assert.Equal(t, storage.Stats{ObjectCount: 2, ObjectSize: 120}, store.Stats())
+
+	require.NoError(t, store.Update(testStorageElementWithSize("foo2", 200)))
+	assert.Equal(t, storage.Stats{ObjectCount: 2, ObjectSize: 300}, store.Stats())
+
+	require.NoError(t, store.Delete(testStorageElementWithSize("foo1", 10)))
+	assert.Equal(t, storage.Stats{ObjectCount: 1, ObjectSize: 200}, store.Stats())
+
+	require.NoError(t, store.Replace([]interface{}{testStorageElementWithSize("foo1", 10)}, ""))
+	assert.Equal(t, storage.Stats{ObjectCount: 1, ObjectSize: 10}, store.Stats())
+
+	require.NoError(t, store.Delete(testStorageElementWithSize("foo2", 20)))
+	assert.Equal(t, storage.Stats{ObjectCount: 1, ObjectSize: 10}, store.Stats())
+
+	require.NoError(t, store.Delete(testStorageElementWithSize("foo1", 100)))
+	assert.Equal(t, storage.Stats{}, store.Stats())
+
+	require.NoError(t, store.Delete(testStorageElementWithSize("foo1", 10)))
+	assert.Equal(t, storage.Stats{}, store.Stats())
 }

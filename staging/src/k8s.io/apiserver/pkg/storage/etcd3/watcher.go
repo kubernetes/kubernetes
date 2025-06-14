@@ -31,6 +31,7 @@ import (
 	grpcstatus "google.golang.org/grpc/status"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -86,11 +87,13 @@ type watchChan struct {
 	initialRev        int64
 	recursive         bool
 	progressNotify    bool
+	withObjectSize    bool
 	internalPred      storage.SelectionPredicate
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
 	resultChan        chan watch.Event
+	accessor          meta.MetadataAccessor
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -111,7 +114,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	if err != nil {
 		return nil, err
 	}
-	wc := w.createWatchChan(ctx, key, startWatchRV, opts.Recursive, opts.ProgressNotify, opts.Predicate)
+	wc := w.createWatchChan(ctx, key, startWatchRV, opts)
 	go wc.run(isInitialEventsEndBookmarkRequired(opts), areInitialEventsRequired(rev, opts))
 
 	// For etcd watch we don't have an easy way to answer whether the watch
@@ -124,18 +127,20 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, opts storage
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive, progressNotify bool, pred storage.SelectionPredicate) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, opts storage.ListOptions) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
 		initialRev:        rev,
-		recursive:         recursive,
-		progressNotify:    progressNotify,
-		internalPred:      pred,
+		recursive:         opts.Recursive,
+		progressNotify:    opts.ProgressNotify,
+		internalPred:      opts.Predicate,
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
+		withObjectSize:    opts.WithObjectSize,
+		accessor:          meta.NewAccessor(),
 	}
-	if pred.Empty() {
+	if opts.Predicate.Empty() {
 		// The filter doesn't filter out any object.
 		wc.internalPred = storage.Everything
 	}
@@ -601,7 +606,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 				Type:   watch.Modified,
 				Object: curObj,
 			}
-			return res, nil
+			break
 		}
 		curObjPasses := wc.filter(curObj)
 		oldObjPasses := wc.filter(oldObj)
@@ -621,6 +626,12 @@ func (wc *watchChan) transform(e *event) (res *watch.Event, err error) {
 				Type:   watch.Deleted,
 				Object: oldObj,
 			}
+		}
+	}
+	if wc.withObjectSize {
+		err := storage.SetObjectSizeLabel(wc.accessor, res.Object, int64(len(e.value)))
+		if err != nil {
+			return nil, err
 		}
 	}
 	return res, nil

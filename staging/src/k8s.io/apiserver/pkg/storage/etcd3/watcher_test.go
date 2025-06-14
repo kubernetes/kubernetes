@@ -311,9 +311,7 @@ func TestWatchChanSync(t *testing.T) {
 				origCtx,
 				testCase.watchKey,
 				0,
-				true,
-				false,
-				storage.Everything)
+				storage.ListOptions{Recursive: true, Predicate: storage.Everything})
 
 			err = w.sync()
 			if err != nil {
