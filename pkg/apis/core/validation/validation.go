@@ -265,7 +265,12 @@ var ValidateReplicationControllerName = apimachineryvalidation.NameIsDNSSubdomai
 // ValidateServiceName can be used to check whether the given service name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
 // trailing dashes are allowed.
-var ValidateServiceName = apimachineryvalidation.NameIsDNS1035Label
+var ValidateServiceName = func(name string, prefix bool) []string {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RelaxedServiceNameValidation) {
+		return apimachineryvalidation.NameIsDNSLabel(name, prefix)
+	}
+	return apimachineryvalidation.NameIsDNS1035Label(name, prefix)
+}
 
 // ValidateNodeName can be used to check whether the given node name is valid.
 // Prefix indicates this name will be used as part of generation, in which case
@@ -5926,7 +5931,14 @@ var supportedServiceIPFamilyPolicy = sets.New(
 // ValidateService tests if required fields/annotations of a Service are valid.
 func ValidateService(service, oldService *core.Service) field.ErrorList {
 	metaPath := field.NewPath("metadata")
-	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, metaPath)
+
+	// Avoid re-validating the name on update, to avoid problems when rolling back RelaxedServiceNameValidation.
+	nameFn := ValidateServiceName
+	if oldService != nil {
+		nameFn = func(_ string, _ bool) []string { return nil }
+	}
+
+	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, nameFn, metaPath)
 
 	topologyHintsVal, topologyHintsSet := service.Annotations[core.DeprecatedAnnotationTopologyAwareHints]
 	topologyModeVal, topologyModeSet := service.Annotations[core.AnnotationTopologyMode]
