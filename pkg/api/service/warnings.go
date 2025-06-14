@@ -18,14 +18,13 @@ package service
 
 import (
 	"fmt"
-
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
-func GetWarningsForService(service, oldService *api.Service) []string {
+func GetWarningsForService(service *api.Service) []string {
 	if service == nil {
 		return nil
 	}
@@ -38,6 +37,15 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 	if helper.IsServiceIPSet(service) {
 		for i, clusterIP := range service.Spec.ClusterIPs {
 			warnings = append(warnings, utilvalidation.GetWarningsForIP(field.NewPath("spec").Child("clusterIPs").Index(i), clusterIP)...)
+		}
+	}
+
+	if isHeadlessService(service) && (service.Spec.LoadBalancerIP != "" || len(service.Spec.ExternalIPs) > 0) {
+		if service.Spec.LoadBalancerIP != "" {
+			warnings = append(warnings, "The spec.loadBalancerIP is not supported when the service is set as headless")
+		}
+		if len(service.Spec.ExternalIPs) > 0 {
+			warnings = append(warnings, "The spec.externalIPs is not supported when the service is set as headless")
 		}
 	}
 
@@ -61,4 +69,8 @@ func GetWarningsForService(service, oldService *api.Service) []string {
 	}
 
 	return warnings
+}
+
+func isHeadlessService(service *api.Service) bool {
+	return service != nil && service.Spec.Type == api.ServiceTypeClusterIP && service.Spec.ClusterIP == api.ClusterIPNone
 }
