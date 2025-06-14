@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"sync"
 	"time"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -366,6 +367,18 @@ func (o LogsOptions) RunLogs() error {
 		requests, err = o.LogsForObject(o.RESTClientGetter, o.Object, o.Options, o.GetPodTimeout, o.AllContainers)
 	}
 	if err != nil {
+		msg := err.Error()
+		if strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "node") {
+			// Extract pod name from the ObjectReference keys
+			var podName string
+			for ref := range requests {
+				podName = ref.Name
+				break
+			}
+			return fmt.Errorf("Error from server (NotFound): pods %q not found", podName)
+		}
 		return err
 	}
 
