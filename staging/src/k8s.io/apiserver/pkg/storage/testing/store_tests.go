@@ -32,6 +32,7 @@ import (
 	"github.com/google/go-cmp/cmp" //nolint:depguard
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/etcd/client/v3/kubernetes"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -39,8 +40,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -624,7 +627,7 @@ func RunTestPreconditionalDeleteWithOnlySuggestionPass(ctx context.Context, t *t
 	expectNoDiff(t, "incorrect pod:", updatedPod, out)
 }
 
-func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, ignoreWatchCacheTests bool) {
+func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, watchCacheEnabled bool, recorder *KubernetesRecorder) {
 	initialRV, createdPods, updatedPod, err := seedMultiLevelData(ctx, store)
 	if err != nil {
 		t.Fatal(err)
@@ -670,6 +673,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 		expectRVTooLarge           bool
 		expectRV                   string
 		expectRVFunc               func(string) error
+		expectEtcdRequest          func() []RecordedList
 	}{
 		{
 			name:        "rejects invalid resource version",
@@ -677,6 +681,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			pred:        storage.Everything,
 			rv:          "abc",
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "rejects resource version and continue token",
@@ -689,18 +696,34 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			rv:          "1",
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:             "rejects resource version set too high",
 			prefix:           "/pods",
 			rv:               strconv.FormatInt(math.MaxInt64, 10),
 			expectRVTooLarge: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key",
 			prefix:      "/pods/first/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key: "/registry/pods/first/",
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0",
@@ -708,6 +731,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			pred:                 storage.Everything,
 			expectedAlternatives: [][]example.Pod{{}, {*updatedPod}},
 			rv:                   "0",
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set before first write, match=Exact",
@@ -717,6 +743,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          initialRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    initialRV,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/first/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(initialRevision)},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:                 "test List on existing key with resource version set to 0, match=NotOlderThan",
@@ -725,6 +762,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedAlternatives: [][]example.Pod{{}, {*updatedPod}},
 			rv:                   "0",
 			rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set to 0, match=Invalid",
@@ -733,6 +773,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          "0",
 			rvMatch:     "Invalid",
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:                 "test List on existing key with resource version set before first write, match=NotOlderThan",
@@ -741,6 +784,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedAlternatives: [][]example.Pod{{}, {*updatedPod}},
 			rv:                   initialRV,
 			rvMatch:              metav1.ResourceVersionMatchNotOlderThan,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set before first write, match=Invalid",
@@ -749,6 +795,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          initialRV,
 			rvMatch:     "Invalid",
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version",
@@ -756,6 +805,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod},
 			rv:          list.ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=Exact",
@@ -765,6 +817,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    list.ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/first/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV)},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List on existing key with resource version set to current resource version, match=NotOlderThan",
@@ -773,12 +836,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut: []example.Pod{*updatedPod},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test List on non-existing key",
 			prefix:      "/pods/non-existing/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key: "/registry/pods/non-existing/",
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with pod name matching",
@@ -788,6 +864,16 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
 			},
 			expectedOut: []example.Pod{},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key: "/registry/pods/first/",
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with pod name matching with resource version set to current resource version, match=NotOlderThan",
@@ -799,6 +885,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut: []example.Pod{},
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit",
@@ -813,6 +902,26 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
 			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectEtcdRequest: func() []RecordedList {
+				// Invalid fallback described in https://github.com/kubernetes/kubernetes/issues/132132
+				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit at current resource version",
@@ -828,6 +937,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         list.ResourceVersion,
 			expectRV:                   list.ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit at current resource version and match=Exact",
@@ -844,6 +964,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   list.ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit at current resource version and match=NotOlderThan",
@@ -859,6 +990,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:                         list.ResourceVersion,
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit at resource version 0",
@@ -878,6 +1012,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedRemainingItemCount: utilpointer.Int64(1),
 			rv:                         "0",
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit at resource version 0 match=NotOlderThan",
@@ -898,6 +1035,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:                         "0",
 			rvMatch:                    metav1.ResourceVersionMatchNotOlderThan,
 			expectRVFunc:               resourceVersionNotOlderThan(list.ResourceVersion),
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit at resource version before first write and match=Exact",
@@ -912,6 +1052,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:             initialRV,
 			rvMatch:        metav1.ResourceVersionMatchExact,
 			expectRV:       initialRV,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(initialRevision), Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with pregenerated continue token",
@@ -923,6 +1074,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Continue: secondContinuation,
 			},
 			expectedOut: []example.Pod{*createdPods[2]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "ignores resource version 0 for List with pregenerated continue token",
@@ -935,12 +1097,33 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			rv:          "0",
 			expectedOut: []example.Pod{*createdPods[2]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/second/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/second/foo"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result",
 			prefix:      "/pods/second/",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key: "/registry/pods/second/",
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with multiple levels of directories and expect flattened result with current resource version and match=NotOlderThan",
@@ -949,6 +1132,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2]},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned",
@@ -960,6 +1146,41 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: true,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Limit: 1},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2, Continue: "/registry/pods/first/bar\x00"},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2, Continue: "/registry/pods/first/bar\x00"},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, ensure only a single page returned with current resource version and match=NotOlderThan",
@@ -974,6 +1195,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectRVFunc:   resourceVersionNotOlderThan(list.ResourceVersion),
 			expectContinue: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list",
@@ -985,6 +1209,33 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: false,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list with current resource version and match=NotOlderThan",
@@ -999,6 +1250,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectRVFunc:   resourceVersionNotOlderThan(list.ResourceVersion),
 			expectContinue: false,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning only one item, covers the entire list, with resource version 0",
@@ -1011,6 +1265,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:                   "0",
 			expectedAlternatives: [][]example.Pod{{}, {*createdPods[3]}},
 			expectContinue:       false,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible",
@@ -1022,6 +1279,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectContinue: true,
 			expectedOut:    []example.Pod{*updatedPod, *createdPods[1]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with filter returning two items, more pages possible with current resource version and match=NotOlderThan",
@@ -1035,6 +1311,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rvMatch:        metav1.ResourceVersionMatchNotOlderThan,
 			expectContinue: true,
 			expectedOut:    []example.Pod{*updatedPod, *createdPods[1]},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "filter returns two items split across multiple pages",
@@ -1045,6 +1324,33 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Limit: 2,
 			},
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "filter returns two items split across multiple pages with current resource version and match=NotOlderThan",
@@ -1057,6 +1363,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "filter returns one item for last page, ends on last item, not full",
@@ -1068,6 +1377,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
 			expectedOut: []example.Pod{*createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, full",
@@ -1079,6 +1399,21 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
 			expectedOut: []example.Pod{*createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 1, Continue: "/registry/pods/third/barfoo"},
+						},
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "filter returns one item for last page, starts on last item, partial page",
@@ -1090,6 +1425,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Continue: encodeContinueOrDie("third/barfoo", int64(continueRV)),
 			},
 			expectedOut: []example.Pod{*createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 2, Continue: "/registry/pods/third/barfoo"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size",
@@ -1100,6 +1446,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Limit: 5,
 			},
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 5},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 5},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "filter returns two items, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1112,6 +1477,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size",
@@ -1122,6 +1490,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Limit: 5,
 			},
 			expectedOut: []example.Pod{*createdPods[3]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 5},
+						},
+					}
+				}
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 5},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1134,12 +1521,25 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*createdPods[3]},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "list all items",
 			prefix:      "/pods",
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key: "/registry/pods/",
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "list all items with current resource version and match=NotOlderThan",
@@ -1148,6 +1548,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "verify list returns updated version of object; filter returns one item, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1160,6 +1563,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{*updatedPod},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "verify list does not return deleted object; filter for deleted object, page size equal to total list size with current resource version and match=NotOlderThan",
@@ -1172,6 +1578,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          list.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchNotOlderThan,
 			expectedOut: []example.Pod{},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:        "test consistent List",
@@ -1180,6 +1589,16 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          "",
 			expectRV:    currentRV,
 			expectedOut: []example.Pod{},
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
+					return []RecordedList{
+						{
+							Key: "/registry/pods/empty/",
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:         "test non-consistent List",
@@ -1188,6 +1607,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:           "0",
 			expectRVFunc: resourceVersionNotOlderThan(initialRV),
 			expectedOut:  []example.Pod{},
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		// match=Exact
 		{
@@ -1198,6 +1620,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          initialRV,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    initialRV,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of first write, match=Exact",
@@ -1207,6 +1640,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          createdPods[0].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[0].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 2},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of second write, match=Exact",
@@ -1216,6 +1660,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          createdPods[1].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[1].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 3},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of third write, match=Exact",
@@ -1225,6 +1680,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          createdPods[2].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[2].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 4},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of fourth write, match=Exact",
@@ -1234,6 +1700,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          createdPods[3].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[3].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 5},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of fifth write, match=Exact",
@@ -1243,6 +1720,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          createdPods[4].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[4].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 6},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of six write, match=Exact",
@@ -1252,6 +1740,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          createdPods[5].ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    createdPods[5].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 7},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of seventh write, match=Exact",
@@ -1261,6 +1760,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          updatedPod.ResourceVersion,
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    updatedPod.ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 8},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version of eight write, match=Exact",
@@ -1270,6 +1780,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          fmt.Sprint(continueRV),
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV)},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:        "test List with resource version after writes, match=Exact",
@@ -1279,6 +1800,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          fmt.Sprint(continueRV + 1),
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV + 1),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:             "test List with future resource version, match=Exact",
@@ -1287,6 +1819,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:               fmt.Sprint(continueRV + 2),
 			rvMatch:          metav1.ResourceVersionMatchExact,
 			expectRVTooLarge: true,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 2},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		// limit, match=Exact
 		{
@@ -1304,6 +1847,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rvMatch:                    metav1.ResourceVersionMatchExact,
 			expectRV:                   createdPods[1].ResourceVersion,
 			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 3, Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version of third write, match=Exact",
@@ -1320,6 +1874,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[2].ResourceVersion))),
 			expectRV:                   createdPods[2].ResourceVersion,
 			expectedRemainingItemCount: utilpointer.Int64(1),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 4, Limit: 2},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version of fourth write, match=Exact",
@@ -1333,6 +1898,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectedOut: []example.Pod{*createdPods[0], *createdPods[1], *createdPods[2], *createdPods[3]},
 			expectRV:    createdPods[3].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 5, Limit: 4},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version of fifth write, match=Exact",
@@ -1349,6 +1925,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 6, Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version of six write, match=Exact",
@@ -1365,6 +1952,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 7, Limit: 2},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version of seventh write, match=Exact",
@@ -1381,6 +1979,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(updatedPod.ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 8, Limit: 4},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version of eight write, match=Exact",
@@ -1394,6 +2003,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			rv:          fmt.Sprint(continueRV),
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV), Limit: 8},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with limit, resource version after writes, match=Exact",
@@ -1410,6 +2030,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: utilpointer.Int64(4),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		// Continue
 		{
@@ -1423,6 +2054,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut: []example.Pod{*createdPods[1]},
 			expectRV:    createdPods[1].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 3, Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue, resource version of third write",
@@ -1435,6 +2077,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut: []example.Pod{*createdPods[2]},
 			expectRV:    createdPods[2].ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 4, Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue, resource version of fifth write",
@@ -1450,6 +2103,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(mustAtoi(createdPods[4].ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(3),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 6, Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue, resource version of six write",
@@ -1465,6 +2129,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(mustAtoi(createdPods[5].ResourceVersion))),
 			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 7, Limit: 2, Continue: "/registry/pods/second/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue, resource version of seventh write",
@@ -1477,6 +2152,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
 			expectRV:    updatedPod.ResourceVersion,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: 8, Limit: 4, Continue: "/registry/pods/second/foo\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue, resource version after writes",
@@ -1492,6 +2178,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinue:             true,
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: utilpointer.Int64(3),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 1, Continue: "/registry/pods/first/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue from second pod, negative resource version gives consistent read",
@@ -1503,6 +2200,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 			expectRV:    currentRV,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/first/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue from second pod and limit, negative resource version gives consistent read",
@@ -1518,6 +2226,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			expectContinueExact:        encodeContinueOrDie(createdPods[2].Namespace+"/"+createdPods[2].Name+"\x00", int64(continueRV+1)),
 			expectRV:                   currentRV,
 			expectedRemainingItemCount: utilpointer.Int64(2),
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Limit: 2, Continue: "/registry/pods/first/bar\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue from third pod, negative resource version gives consistent read",
@@ -1529,6 +2248,17 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			},
 			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
 			expectRV:    currentRV,
+			expectEtcdRequest: func() []RecordedList {
+				if !utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || !utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+					return []RecordedList{
+						{
+							Key:         "/registry/pods/",
+							ListOptions: kubernetes.ListOptions{Continue: "/registry/pods/second/foo\x00"},
+						},
+					}
+				}
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue from empty fails",
@@ -1539,6 +2269,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Continue: encodeContinueOrDie("", int64(continueRV)),
 			},
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with continue from first pod, empty resource version fails",
@@ -1549,6 +2282,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Continue: encodeContinueOrDie(createdPods[0].Namespace+"/"+createdPods[0].Name+"\x00", 0),
 			},
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 		{
 			name:   "test List with negative rv fails",
@@ -1559,6 +2295,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Field: fields.Everything(),
 			},
 			expectError: true,
+			expectEtcdRequest: func() []RecordedList {
+				return nil
+			},
 		},
 	}
 
@@ -1574,7 +2313,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			// doesn't automatically preclude some scenarios from happening.
 			t.Parallel()
 
-			if ignoreWatchCacheTests && tt.ignoreForWatchCache {
+			if watchCacheEnabled && tt.ignoreForWatchCache {
 				t.Skip()
 			}
 
@@ -1589,7 +2328,9 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 				Predicate:            tt.pred,
 				Recursive:            true,
 			}
-			err := store.GetList(ctx, tt.prefix, storageOpts, out)
+			recorderKey := t.Name()
+			listCtx := context.WithValue(ctx, recorderContextKey, recorderKey)
+			err := store.GetList(listCtx, tt.prefix, storageOpts, out)
 			if tt.expectRVTooLarge {
 				// TODO: Clasify etcd future revision error as TooLargeResourceVersion
 				if err == nil || !(storage.IsTooLargeResourceVersion(err) || strings.Contains(err.Error(), "etcdserver: mvcc: required revision is a future revision")) {
@@ -1635,6 +2376,13 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, inc
 			}
 			if !cmp.Equal(tt.expectedRemainingItemCount, out.RemainingItemCount) {
 				t.Fatalf("unexpected remainingItemCount, diff: %s", cmp.Diff(tt.expectedRemainingItemCount, out.RemainingItemCount))
+			}
+			if watchCacheEnabled && tt.expectEtcdRequest != nil {
+				expectEtcdLists := tt.expectEtcdRequest()
+				etcdLists := recorder.ListRequestForKey(recorderKey)
+				if !cmp.Equal(expectEtcdLists, etcdLists) {
+					t.Fatalf("unexpected etcd requests, diff: %s", cmp.Diff(expectEtcdLists, etcdLists))
+				}
 			}
 		})
 	}
