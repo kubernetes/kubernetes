@@ -460,6 +460,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 	memoryUsageTimestamp := int64(666666)
 	memoryUsageWorkingSetBytes := uint64(0x11223344)
 	memoryUsageAvailableBytes := uint64(0x55667788)
+	memoryCommitBytes := uint64(0x99AABBCC)
 	memoryUsagePageFaults := uint64(200)
 	logStatsUsed := uint64(5000)
 	logStatsInodesUsed := uint64(5050)
@@ -503,6 +504,9 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 			WorkingSetBytes: &runtimeapi.UInt64Value{
 				Value: memoryUsageWorkingSetBytes,
 			},
+			CommitMemoryBytes: &runtimeapi.UInt64Value{
+				Value: memoryCommitBytes,
+			},
 			PageFaults: &runtimeapi.UInt64Value{
 				Value: memoryUsagePageFaults,
 			},
@@ -538,6 +542,7 @@ func Test_criStatsProvider_makeWinContainerStats(t *testing.T) {
 		Memory: &statsapi.MemoryStats{
 			Time:            v1.NewTime(time.Unix(0, memoryUsageTimestamp)),
 			AvailableBytes:  toP(memoryUsageAvailableBytes),
+			UsageBytes:      toP(memoryCommitBytes),
 			WorkingSetBytes: toP(memoryUsageWorkingSetBytes),
 			PageFaults:      toP(memoryUsagePageFaults),
 		},
