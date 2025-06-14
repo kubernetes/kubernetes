@@ -224,7 +224,6 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 			warnings = append(warnings, fmt.Sprintf(`%s: non-functional in v1.27+; use the "seccompProfile" field instead`, fieldPath.Child("metadata", "annotations").Key(api.SeccompPodAnnotationKey)))
 		}
 	}
-	hasPodAppArmorProfile := podSpec.SecurityContext != nil && podSpec.SecurityContext.AppArmorProfile != nil
 
 	pods.VisitContainersWithPath(podSpec, fieldPath.Child("spec"), func(c *api.Container, p *field.Path) bool {
 		// use of container seccomp annotation without accompanying field
@@ -237,7 +236,7 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		// use of container AppArmor annotation without accompanying field
 
 		isPodTemplate := fieldPath != nil // Pod warnings are emitted through applyAppArmorVersionSkew instead.
-		hasAppArmorField := hasPodAppArmorProfile || (c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil)
+		hasAppArmorField := c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != nil
 		if isPodTemplate && !hasAppArmorField {
 			key := api.DeprecatedAppArmorAnnotationKeyPrefix + c.Name
 			if _, exists := meta.Annotations[key]; exists {
