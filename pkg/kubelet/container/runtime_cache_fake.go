@@ -27,10 +27,10 @@ type TestRuntimeCache struct {
 }
 
 // UpdateCacheWithLock updates the cache with the lock.
-func (r *TestRuntimeCache) UpdateCacheWithLock() error {
+func (r *TestRuntimeCache) UpdateCacheWithLock(ctx context.Context) error {
 	r.Lock()
 	defer r.Unlock()
-	return r.updateCache(context.Background())
+	return r.updateCache(ctx)
 }
 
 // GetCachedPods returns the cached pods.
