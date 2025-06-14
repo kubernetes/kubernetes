@@ -5525,6 +5525,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	// The kubelet will never restart ephemeral containers, so treat them like they have an implicit RestartPolicyNever.
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"), core.RestartPolicyNever)...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
+	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, newPod.Spec.Containers, fldPath.Child("extendedResourceClaimStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
@@ -5588,6 +5589,37 @@ func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, po
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.ResourceClaimName, detail))
 			}
 		}
+	}
+
+	return allErrs
+}
+
+// validatePodExtendedResourceClaimStatus validates the ExtendedResourceClaimStatus in a pod status.
+func validatePodExtendedResourceClaimStatus(status *core.PodExtendedResourceClaimStatus, containers []core.Container, fldPath *field.Path) field.ErrorList {
+	if status == nil {
+		return nil
+	}
+	var allErrs field.ErrorList
+
+	for i, rm := range status.RequestMapping {
+		idxPath := fldPath.Index(i)
+		match := false
+		for _, c := range containers {
+			if rm.ContainerName == c.Name {
+				if _, ok := c.Resources.Requests[core.ResourceName(rm.ExtendedResourceName)]; !ok {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), rm.ExtendedResourceName, "must match the extended resource name of an entry in spec.containers.resources.requests"))
+				}
+				match = true
+				break
+			}
+		}
+		if !match {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), rm.ContainerName, "must match the name of an entry in spec.containers.name"))
+		}
+		allErrs = append(allErrs, ValidateDNS1123Label(rm.RequestName, fldPath.Child("name"))...)
+	}
+	for _, detail := range ValidateResourceClaimName(status.ResourceClaimName, false) {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), status.ResourceClaimName, detail))
 	}
 
 	return allErrs
