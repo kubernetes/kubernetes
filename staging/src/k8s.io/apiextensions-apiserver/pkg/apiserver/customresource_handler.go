@@ -818,6 +818,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			return nil, fmt.Errorf("the server could not properly serve the list kind")
 		}
 
+		// Do not construct storage if version is neither served nor stored
+		if !v.Storage && !v.Served {
+			continue
+		}
+
 		storages[v.Name], err = customresource.NewStorage(
 			resource.GroupResource(),
 			singularResource.GroupResource(),
