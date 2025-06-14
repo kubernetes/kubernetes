@@ -327,3 +327,12 @@ func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFi
 	}
 	return allErrs.ToAggregate()
 }
+
+// ValidateDynamicResourcesArgs validates that DynamicResourcesArgs are correct.
+func ValidateDynamicResourcesArgs(path *field.Path, args *config.DynamicResourcesArgs) error {
+	var allErrs field.ErrorList
+	if args.FilterTimeout != nil && args.FilterTimeout.Duration < 0 {
+		allErrs = append(allErrs, field.Invalid(path.Child("filterTimeout"), args.FilterTimeout, "must be positive"))
+	}
+	return allErrs.ToAggregate()
+}

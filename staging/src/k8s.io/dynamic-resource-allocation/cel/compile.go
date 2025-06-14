@@ -126,6 +126,9 @@ type Options struct {
 	// DisableCostEstimation can be set to skip estimating the worst-case CEL cost.
 	// If disabled or after an error, [CompilationResult.MaxCost] will be set to [math.Uint64].
 	DisableCostEstimation bool
+
+	// DisableInterrupts can be set to skip checking of the context for cancellation during evaluation.
+	DisableInterrupts bool
 }
 
 // CompileCELExpression returns a compiled CEL expression. It evaluates to bool.
@@ -162,13 +165,16 @@ func (c compiler) CompileCELExpression(expression string, options Options) Compi
 		// should be impossible since env.Compile returned no issues
 		return resultError("unexpected compilation error: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
-	prog, err := env.Program(ast,
+	opts := []cel.ProgramOption{
 		// The Kubernetes CEL base environment sets the VAP limit as runtime cost limit.
 		// DRA has its own default cost limit and also allows the caller to change that
 		// limit.
 		cel.CostLimit(ptr.Deref(options.CostLimit, resourceapi.CELSelectorExpressionMaxCost)),
-		cel.InterruptCheckFrequency(celconfig.CheckFrequency),
-	)
+	}
+	if !options.DisableInterrupts {
+		opts = append(opts, cel.InterruptCheckFrequency(celconfig.CheckFrequency))
+	}
+	prog, err := env.Program(ast, opts...)
 	if err != nil {
 		return resultError("program instantiation failed: "+err.Error(), apiservercel.ErrorTypeInternal)
 	}
@@ -260,6 +266,10 @@ func (c CompilationResult) DeviceMatches(ctx context.Context, input Device) (boo
 
 	result, details, err := c.Program.ContextEval(ctx, variables)
 	if err != nil {
+		// CEL does not wrap the context error. We have to deduce why it failed.
+		if strings.Contains(err.Error(), "operation interrupted") && ctx.Err() != nil {
+			return false, details, fmt.Errorf("%w: %w", err, ctx.Err())
+		}
 		return false, details, err
 	}
 	resultAny, err := result.ConvertToNative(boolType)
