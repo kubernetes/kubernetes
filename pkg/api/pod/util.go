@@ -369,7 +369,7 @@ func hasInvalidTopologySpreadConstraintLabelSelector(spec *api.PodSpec) bool {
 // hasInvalidTopologySpreadConstrainMatchLabelKeys return true if spec.TopologySpreadConstraints have any entry with invalid MatchLabelKeys
 func hasInvalidTopologySpreadConstrainMatchLabelKeys(spec *api.PodSpec) bool {
 	for _, constraint := range spec.TopologySpreadConstraints {
-		errs := apivalidation.ValidateMatchLabelKeysAndMismatchLabelKeys(nil, constraint.MatchLabelKeys, nil, constraint.LabelSelector)
+		errs := apivalidation.ValidateMatchLabelKeysAndMismatchLabelKeys(nil, constraint.MatchLabelKeys, nil, constraint.LabelSelector, true)
 		if len(errs) != 0 {
 			return true
 		}
