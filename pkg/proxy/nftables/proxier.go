@@ -278,6 +278,13 @@ func NewProxier(ctx context.Context,
 	// We need to pass *some* maxInterval to NewBoundedFrequencyRunner. time.Hour is arbitrary.
 	proxier.syncRunner = async.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, proxyutil.FullSyncPeriod, burstSyncs)
 
+	go func() {
+		// force conntrack cleanup every 5 second
+		for {
+			conntrack.CleanStaleEntries(proxier.conntrack, proxier.ipFamily, proxier.svcPortMap, proxier.endpointsMap)
+			time.Sleep(10 * time.Second)
+		}
+	}()
 	return proxier, nil
 }
 
