@@ -31,6 +31,7 @@ type EndpointConditionsApplyConfiguration struct {
 func EndpointConditions() *EndpointConditionsApplyConfiguration {
 	return &EndpointConditionsApplyConfiguration{}
 }
+func (b EndpointConditionsApplyConfiguration) IsApplyConfiguration() {}
 
 // WithReady sets the Ready field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

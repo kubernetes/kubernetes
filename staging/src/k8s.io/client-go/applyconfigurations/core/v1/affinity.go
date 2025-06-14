@@ -31,6 +31,7 @@ type AffinityApplyConfiguration struct {
 func Affinity() *AffinityApplyConfiguration {
 	return &AffinityApplyConfiguration{}
 }
+func (b AffinityApplyConfiguration) IsApplyConfiguration() {}
 
 // WithNodeAffinity sets the NodeAffinity field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

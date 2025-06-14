@@ -474,3 +474,5 @@ func anyEqual(t *testing.T, a, b interface{}) bool {
 	}
 	return true
 }
+
+var _ runtime.ApplyConfiguration = (*unstructured.Unstructured)(nil)

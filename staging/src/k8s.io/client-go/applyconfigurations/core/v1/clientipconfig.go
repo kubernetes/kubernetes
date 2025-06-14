@@ -29,6 +29,7 @@ type ClientIPConfigApplyConfiguration struct {
 func ClientIPConfig() *ClientIPConfigApplyConfiguration {
 	return &ClientIPConfigApplyConfiguration{}
 }
+func (b ClientIPConfigApplyConfiguration) IsApplyConfiguration() {}
 
 // WithTimeoutSeconds sets the TimeoutSeconds field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

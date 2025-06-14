@@ -29,6 +29,7 @@ type LoadBalancerStatusApplyConfiguration struct {
 func LoadBalancerStatus() *LoadBalancerStatusApplyConfiguration {
 	return &LoadBalancerStatusApplyConfiguration{}
 }
+func (b LoadBalancerStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithIngress adds the given value to the Ingress field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

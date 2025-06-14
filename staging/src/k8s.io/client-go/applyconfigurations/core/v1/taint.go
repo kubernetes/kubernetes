@@ -37,6 +37,7 @@ type TaintApplyConfiguration struct {
 func Taint() *TaintApplyConfiguration {
 	return &TaintApplyConfiguration{}
 }
+func (b TaintApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKey sets the Key field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

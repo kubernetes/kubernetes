@@ -36,6 +36,7 @@ type JobTemplateSpecApplyConfiguration struct {
 func JobTemplateSpec() *JobTemplateSpecApplyConfiguration {
 	return &JobTemplateSpecApplyConfiguration{}
 }
+func (b JobTemplateSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithName sets the Name field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -191,4 +192,10 @@ func (b *JobTemplateSpecApplyConfiguration) WithSpec(value *JobSpecApplyConfigur
 func (b *JobTemplateSpecApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *JobTemplateSpecApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

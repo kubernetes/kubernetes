@@ -31,6 +31,7 @@ type ImageReviewStatusApplyConfiguration struct {
 func ImageReviewStatus() *ImageReviewStatusApplyConfiguration {
 	return &ImageReviewStatusApplyConfiguration{}
 }
+func (b ImageReviewStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAllowed sets the Allowed field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

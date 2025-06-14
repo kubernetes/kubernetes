@@ -29,6 +29,7 @@ type CustomResourceValidationApplyConfiguration struct {
 func CustomResourceValidation() *CustomResourceValidationApplyConfiguration {
 	return &CustomResourceValidationApplyConfiguration{}
 }
+func (b CustomResourceValidationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithOpenAPIV3Schema sets the OpenAPIV3Schema field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

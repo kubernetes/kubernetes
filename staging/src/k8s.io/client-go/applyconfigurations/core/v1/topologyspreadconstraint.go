@@ -41,6 +41,7 @@ type TopologySpreadConstraintApplyConfiguration struct {
 func TopologySpreadConstraint() *TopologySpreadConstraintApplyConfiguration {
 	return &TopologySpreadConstraintApplyConfiguration{}
 }
+func (b TopologySpreadConstraintApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMaxSkew sets the MaxSkew field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

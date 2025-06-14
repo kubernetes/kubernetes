@@ -81,6 +81,7 @@ func extractRuntimeClass(runtimeClass *nodev1.RuntimeClass, fieldManager string,
 	b.WithAPIVersion("node.k8s.io/v1")
 	return b, nil
 }
+func (b RuntimeClassApplyConfiguration) IsApplyConfiguration() {}
 
 // WithKind sets the Kind field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
@@ -264,8 +265,24 @@ func (b *RuntimeClassApplyConfiguration) WithScheduling(value *SchedulingApplyCo
 	return b
 }
 
+// GetKind retrieves the value of the Kind field in the declarative configuration.
+func (b *RuntimeClassApplyConfiguration) GetKind() *string {
+	return b.TypeMetaApplyConfiguration.Kind
+}
+
+// GetAPIVersion retrieves the value of the APIVersion field in the declarative configuration.
+func (b *RuntimeClassApplyConfiguration) GetAPIVersion() *string {
+	return b.TypeMetaApplyConfiguration.APIVersion
+}
+
 // GetName retrieves the value of the Name field in the declarative configuration.
 func (b *RuntimeClassApplyConfiguration) GetName() *string {
 	b.ensureObjectMetaApplyConfigurationExists()
 	return b.ObjectMetaApplyConfiguration.Name
+}
+
+// GetNamespace retrieves the value of the Namespace field in the declarative configuration.
+func (b *RuntimeClassApplyConfiguration) GetNamespace() *string {
+	b.ensureObjectMetaApplyConfigurationExists()
+	return b.ObjectMetaApplyConfiguration.Namespace
 }

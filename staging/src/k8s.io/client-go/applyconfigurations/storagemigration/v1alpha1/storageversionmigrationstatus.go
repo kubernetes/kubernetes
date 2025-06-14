@@ -30,6 +30,7 @@ type StorageVersionMigrationStatusApplyConfiguration struct {
 func StorageVersionMigrationStatus() *StorageVersionMigrationStatusApplyConfiguration {
 	return &StorageVersionMigrationStatusApplyConfiguration{}
 }
+func (b StorageVersionMigrationStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

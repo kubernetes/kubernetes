@@ -34,6 +34,7 @@ type RollingUpdateDeploymentApplyConfiguration struct {
 func RollingUpdateDeployment() *RollingUpdateDeploymentApplyConfiguration {
 	return &RollingUpdateDeploymentApplyConfiguration{}
 }
+func (b RollingUpdateDeploymentApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMaxUnavailable sets the MaxUnavailable field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

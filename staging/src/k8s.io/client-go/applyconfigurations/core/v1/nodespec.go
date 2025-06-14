@@ -35,6 +35,7 @@ type NodeSpecApplyConfiguration struct {
 func NodeSpec() *NodeSpecApplyConfiguration {
 	return &NodeSpecApplyConfiguration{}
 }
+func (b NodeSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithPodCIDR sets the PodCIDR field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

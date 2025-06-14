@@ -30,6 +30,7 @@ type ExampleSpecApplyConfiguration struct {
 func ExampleSpec() *ExampleSpecApplyConfiguration {
 	return &ExampleSpecApplyConfiguration{}
 }
+func (b ExampleSpecApplyConfiguration) IsApplyConfiguration() {}
 
 // WithFoo sets the Foo field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

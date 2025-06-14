@@ -30,6 +30,7 @@ type CertificateSigningRequestStatusApplyConfiguration struct {
 func CertificateSigningRequestStatus() *CertificateSigningRequestStatusApplyConfiguration {
 	return &CertificateSigningRequestStatusApplyConfiguration{}
 }
+func (b CertificateSigningRequestStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithConditions adds the given value to the Conditions field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

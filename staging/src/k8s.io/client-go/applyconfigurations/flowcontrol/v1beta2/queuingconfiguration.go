@@ -31,6 +31,7 @@ type QueuingConfigurationApplyConfiguration struct {
 func QueuingConfiguration() *QueuingConfigurationApplyConfiguration {
 	return &QueuingConfigurationApplyConfiguration{}
 }
+func (b QueuingConfigurationApplyConfiguration) IsApplyConfiguration() {}
 
 // WithQueues sets the Queues field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
