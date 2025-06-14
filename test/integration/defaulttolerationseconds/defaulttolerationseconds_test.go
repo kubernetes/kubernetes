@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
+	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds/apis/defaulttolerationseconds"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -33,7 +34,15 @@ func TestAdmission(t *testing.T) {
 	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
 		ModifyServerConfig: func(cfg *controlplane.Config) {
 			cfg.ControlPlane.Generic.EnableProfiling = true
-			cfg.ControlPlane.Generic.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
+			var defaultNotReadyTolerationSeconds int64 = 300
+			var defaultUnreachableTolerationSeconds int64 = 300
+			pluginConfig := &pluginapi.Configuration{
+				DefaultTolerationSecondsConfig: pluginapi.DefaultTolerationSecondsConfig{
+					NotReadyTolerationSeconds:    &defaultNotReadyTolerationSeconds,
+					UnreachableTolerationSeconds: &defaultUnreachableTolerationSeconds,
+				},
+			}
+			cfg.ControlPlane.Generic.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds(pluginConfig)
 		},
 	})
 	defer tearDownFn()
