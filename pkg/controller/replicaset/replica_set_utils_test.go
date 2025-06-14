@@ -343,8 +343,9 @@ func TestCalculateStatusConditions(t *testing.T) {
 			fmt.Errorf("fake manageReplicasErr"),
 			[]apps.ReplicaSetCondition{
 				{
-					Type:   apps.ReplicaSetReplicaFailure,
-					Status: v1.ConditionTrue,
+					Type:    apps.ReplicaSetReplicaFailure,
+					Status:  v1.ConditionTrue,
+					Message: "fake manageReplicasErr",
 				},
 			},
 		},
@@ -356,6 +357,21 @@ func TestCalculateStatusConditions(t *testing.T) {
 			},
 			nil,
 			nil,
+		},
+		{
+			"manageReplicasErr != nil && failureCond != nil, failure msg updated",
+			replicaFailureRS,
+			[]*v1.Pod{
+				newPod("pod1", replicaFailureRS, v1.PodRunning, nil, true),
+			},
+			fmt.Errorf("new fake manageReplicasErr"),
+			[]apps.ReplicaSetCondition{
+				{
+					Type:    apps.ReplicaSetReplicaFailure,
+					Status:  v1.ConditionTrue,
+					Message: "new fake manageReplicasErr",
+				},
+			},
 		},
 	}
 
