@@ -47,29 +47,29 @@ func (rc *reconciler) readyToUnmount() bool {
 // directories from the disk. For the volumes that cannot support or fail reconstruction, it will
 // put the volumes to volumesFailedReconstruction to be cleaned up later when DesiredStateOfWorld
 // is populated.
-func (rc *reconciler) reconstructVolumes() {
+func (rc *reconciler) reconstructVolumes(logger klog.Logger) {
 	// Get volumes information by reading the pod's directory
-	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
+	podVolumes, err := getVolumesFromPodDir(logger, rc.kubeletPodsDir)
 	if err != nil {
-		klog.ErrorS(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
+		logger.Error(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
 		return
 	}
 	reconstructedVolumes := make(map[v1.UniqueVolumeName]*globalVolumeInfo)
 	reconstructedVolumeNames := []v1.UniqueVolumeName{}
 	for _, volume := range podVolumes {
 		if rc.actualStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
-			klog.V(4).InfoS("Volume exists in actual state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
+			logger.V(4).Info("Volume exists in actual state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 			// There is nothing to reconstruct
 			continue
 		}
 		reconstructedVolume, err := rc.reconstructVolume(volume)
 		if err != nil {
-			klog.InfoS("Could not construct volume information", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
+			logger.Info("Could not construct volume information", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
 			// We can't reconstruct the volume. Remember to check DSW after it's fully populated and force unmount the volume when it's orphaned.
 			rc.volumesFailedReconstruction = append(rc.volumesFailedReconstruction, volume)
 			continue
 		}
-		klog.V(4).InfoS("Adding reconstructed volume to actual state and node status", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
+		logger.V(4).Info("Adding reconstructed volume to actual state and node status", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 		gvl := &globalVolumeInfo{
 			volumeName:        reconstructedVolume.volumeName,
 			volumeSpec:        reconstructedVolume.volumeSpec,
@@ -89,21 +89,21 @@ func (rc *reconciler) reconstructVolumes() {
 
 	if len(reconstructedVolumes) > 0 {
 		// Add the volumes to ASW
-		rc.updateStates(reconstructedVolumes)
+		rc.updateStates(logger, reconstructedVolumes)
 
 		// Remember to update devicePath from node.status.volumesAttached
 		rc.volumesNeedUpdateFromNodeStatus = reconstructedVolumeNames
 	}
-	klog.V(2).InfoS("Volume reconstruction finished")
+	logger.V(2).Info("Volume reconstruction finished")
 }
 
-func (rc *reconciler) updateStates(reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
+func (rc *reconciler) updateStates(logger klog.Logger, reconstructedVolumes map[v1.UniqueVolumeName]*globalVolumeInfo) {
 	for _, gvl := range reconstructedVolumes {
 		err := rc.actualStateOfWorld.AddAttachUncertainReconstructedVolume(
 			//TODO: the devicePath might not be correct for some volume plugins: see issue #54108
-			gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
+			logger, gvl.volumeName, gvl.volumeSpec, rc.nodeName, gvl.devicePath)
 		if err != nil {
-			klog.ErrorS(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
+			logger.Error(err, "Could not add volume information to actual state of world", "volumeName", gvl.volumeName)
 			continue
 		}
 		var seLinuxMountContext string
@@ -123,31 +123,31 @@ func (rc *reconciler) updateStates(reconstructedVolumes map[v1.UniqueVolumeName]
 
 			_, err = rc.actualStateOfWorld.CheckAndMarkVolumeAsUncertainViaReconstruction(markVolumeOpts)
 			if err != nil {
-				klog.ErrorS(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
+				logger.Error(err, "Could not add pod to volume information to actual state of world", "pod", klog.KObj(volume.pod))
 				continue
 			}
 			seLinuxMountContext = volume.seLinuxMountContext
-			klog.V(2).InfoS("Volume is marked as uncertain and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName, "seLinuxMountContext", volume.seLinuxMountContext)
+			logger.V(2).Info("Volume is marked as uncertain and added into the actual state", "pod", klog.KObj(volume.pod), "podName", volume.podName, "volumeName", volume.volumeName, "seLinuxMountContext", volume.seLinuxMountContext)
 		}
 		// If the volume has device to mount, we mark its device as uncertain.
 		if gvl.deviceMounter != nil || gvl.blockVolumeMapper != nil {
 			deviceMountPath, err := getDeviceMountPath(gvl)
 			if err != nil {
-				klog.ErrorS(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
+				logger.Error(err, "Could not find device mount path for volume", "volumeName", gvl.volumeName)
 				continue
 			}
 			err = rc.actualStateOfWorld.MarkDeviceAsUncertain(gvl.volumeName, gvl.devicePath, deviceMountPath, seLinuxMountContext)
 			if err != nil {
-				klog.ErrorS(err, "Could not mark device is uncertain to actual state of world", "volumeName", gvl.volumeName, "deviceMountPath", deviceMountPath)
+				logger.Error(err, "Could not mark device is uncertain to actual state of world", "volumeName", gvl.volumeName, "deviceMountPath", deviceMountPath)
 				continue
 			}
-			klog.V(2).InfoS("Volume is marked device as uncertain and added into the actual state", "volumeName", gvl.volumeName, "deviceMountPath", deviceMountPath)
+			logger.V(2).Info("Volume is marked device as uncertain and added into the actual state", "volumeName", gvl.volumeName, "deviceMountPath", deviceMountPath)
 		}
 	}
 }
 
 // cleanOrphanVolumes tries to clean up all volumes that failed reconstruction.
-func (rc *reconciler) cleanOrphanVolumes() {
+func (rc *reconciler) cleanOrphanVolumes(logger klog.Logger) {
 	if len(rc.volumesFailedReconstruction) == 0 {
 		return
 	}
@@ -156,14 +156,14 @@ func (rc *reconciler) cleanOrphanVolumes() {
 		if rc.desiredStateOfWorld.VolumeExistsWithSpecName(volume.podName, volume.volumeSpecName) {
 			// Some pod needs the volume, don't clean it up and hope that
 			// reconcile() calls SetUp and reconstructs the volume in ASW.
-			klog.V(4).InfoS("Volume exists in desired state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
+			logger.V(4).Info("Volume exists in desired state, skip cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
 			continue
 		}
-		klog.InfoS("Cleaning up mounts for volume that could not be reconstructed", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
-		rc.cleanupMounts(volume)
+		logger.Info("Cleaning up mounts for volume that could not be reconstructed", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName)
+		rc.cleanupMounts(logger, volume)
 	}
 
-	klog.V(2).InfoS("Orphan volume cleanup finished")
+	logger.V(2).Info("Orphan volume cleanup finished")
 	// Clean the cache, cleanup is one shot operation.
 	rc.volumesFailedReconstruction = make([]podVolume, 0)
 }
@@ -171,21 +171,22 @@ func (rc *reconciler) cleanOrphanVolumes() {
 // updateReconstructedFromNodeStatus tries to file devicePaths of reconstructed volumes from
 // node.Status.VolumesAttached. This can be done only after connection to the API
 // server is established, i.e. it can't be part of reconstructVolumes().
-func (rc *reconciler) updateReconstructedFromNodeStatus() {
-	klog.V(4).InfoS("Updating reconstructed devicePaths")
+func (rc *reconciler) updateReconstructedFromNodeStatus(ctx context.Context) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Updating reconstructed devicePaths")
 
 	if rc.kubeClient == nil {
 		// Skip reconstructing devicePath from node objects if kubelet is in standalone mode.
 		// Such kubelet is not expected to mount any attachable volume or Secrets / ConfigMap.
-		klog.V(2).InfoS("Skipped reconstruction of DevicePaths from node.status in standalone mode")
+		logger.V(2).Info("Skipped reconstruction of DevicePaths from node.status in standalone mode")
 		rc.volumesNeedUpdateFromNodeStatus = nil
 		return
 	}
 
-	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(context.TODO(), string(rc.nodeName), metav1.GetOptions{})
+	node, fetchErr := rc.kubeClient.CoreV1().Nodes().Get(ctx, string(rc.nodeName), metav1.GetOptions{})
 	if fetchErr != nil {
 		// This may repeat few times per second until kubelet is able to read its own status for the first time.
-		klog.V(4).ErrorS(fetchErr, "Failed to get Node status to reconstruct device paths")
+		logger.V(4).Error(fetchErr, "Failed to get Node status to reconstruct device paths")
 		return
 	}
 
@@ -197,11 +198,11 @@ func (rc *reconciler) updateReconstructedFromNodeStatus() {
 			}
 			rc.actualStateOfWorld.UpdateReconstructedDevicePath(volumeID, attachedVolume.DevicePath)
 			attachable = true
-			klog.V(4).InfoS("Updated devicePath from node status for volume", "volumeName", attachedVolume.Name, "path", attachedVolume.DevicePath)
+			logger.V(4).Info("Updated devicePath from node status for volume", "volumeName", attachedVolume.Name, "path", attachedVolume.DevicePath)
 		}
 		rc.actualStateOfWorld.UpdateReconstructedVolumeAttachability(volumeID, attachable)
 	}
 
-	klog.V(2).InfoS("DevicePaths of reconstructed volumes updated")
+	logger.V(2).Info("DevicePaths of reconstructed volumes updated")
 	rc.volumesNeedUpdateFromNodeStatus = nil
 }
