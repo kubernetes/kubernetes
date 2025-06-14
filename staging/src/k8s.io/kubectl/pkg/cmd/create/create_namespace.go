@@ -19,6 +19,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/cmd/util/nstld"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -139,6 +141,16 @@ func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 // Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
 func (o *NamespaceOptions) Run() error {
 	namespace := o.createNamespace()
+
+	// Check if namespace name is a TLD and print warning if necessary.
+	// This helps users avoid DNS resolution issues caused by using common
+	// top-level domains as namespace names.
+	tldWar := nstld.GetTLDWarningMessage(namespace.Name)
+
+	if tldWar != "" {
+		fmt.Fprintf(os.Stdout, "%s", tldWar)
+	}
+
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, namespace, scheme.DefaultJSONEncoder()); err != nil {
 		return err
 	}
