@@ -85,7 +85,7 @@ func TestNewHealthChecker(t *testing.T) {
 				enabledErr: tt.mockErr,
 			}
 
-			_, err := NewHealthChecker(&mockSyncLoopHealthChecker{}, WithWatchdogClient(mockClient))
+			_, err := NewHealthChecker(WithWatchdogClient(mockClient))
 			if (err != nil) != tt.wantErr {
 				t.Errorf("NewHealthChecker() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -99,6 +99,7 @@ func TestHealthCheckerStart(t *testing.T) {
 	tests := []struct {
 		name           string
 		enabledVal     time.Duration
+		noCheckers     bool
 		healthCheckErr error
 		notifyAck      bool
 		notifyErr      error
@@ -136,6 +137,15 @@ func TestHealthCheckerStart(t *testing.T) {
 			notifyErr:      nil,
 			expectedLogs:   []string{"Starting systemd watchdog with interval", "Do not notify watchdog this iteration as the kubelet is reportedly not healthy"},
 		},
+		{
+			name:       "Watchdog enabled and no checkers added, notify succeeds",
+			enabledVal: interval,
+			noCheckers: true,
+			notifyAck:  true,
+			notifyErr:  nil,
+			expectedLogs: []string{
+				"Starting systemd watchdog with interval", "Watchdog plugin notified"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -162,9 +172,12 @@ func TestHealthCheckerStart(t *testing.T) {
 			}
 
 			// Create a healthChecker
-			hc, err := NewHealthChecker(&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, WithWatchdogClient(mockClient))
+			hc, err := NewHealthChecker(WithWatchdogClient(mockClient))
 			if err != nil {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
+			}
+			if !tt.noCheckers {
+				hc.SetHealthCheckers(&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, nil)
 			}
 
 			// Start the health checker
