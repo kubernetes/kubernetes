@@ -15474,11 +15474,12 @@ func TestValidateServiceCreate(t *testing.T) {
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
 
 	testCases := []struct {
-		name           string
-		tweakSvc       func(svc *core.Service) // given a basic valid service, each test case can customize it
-		numErrs        int
-		legacyIPs      bool
-		newTrafficDist bool
+		name                string
+		tweakSvc            func(svc *core.Service) // given a basic valid service, each test case can customize it
+		numErrs             int
+		legacyIPs           bool
+		newTrafficDist      bool
+		relaxedServiceNames bool
 	}{{
 		name:     "default",
 		tweakSvc: func(s *core.Service) {},
@@ -16764,12 +16765,27 @@ func TestValidateServiceCreate(t *testing.T) {
 				s.Spec.TrafficDistribution = ptr.To("PreferSameNode")
 			},
 			numErrs: 1,
+		}, {
+
+			name:                "valid: service name begins with a digit feature gate enabled",
+			relaxedServiceNames: true,
+			tweakSvc: func(s *core.Service) {
+				s.Name = "1-test-service"
+			},
+			numErrs: 0,
+		}, {
+			name: "invalid: service name begins with a digit feature gate disabled",
+			tweakSvc: func(s *core.Service) {
+				s.Name = "1-test-service"
+			},
+			numErrs: 1,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, tc.newTrafficDist)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, tc.relaxedServiceNames)
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictIPCIDRValidation, !tc.legacyIPs)
 			svc := makeValidService()
 			tc.tweakSvc(&svc)
@@ -19477,6 +19493,14 @@ func TestValidateServiceUpdate(t *testing.T) {
 				newSvc.Annotations[core.AnnotationLoadBalancerSourceRangesKey] = "010.0.0.0/8, 1.2.3.0/24"
 			},
 			numErrs: 1,
+		}, {
+			name: "can modify a pre-existing relaxed service name without error",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Name = "1-test-service"
+				newSvc.Name = "1-test-service"
+				newSvc.Labels["foo"] = "bar"
+			},
+			numErrs: 0,
 		},
 	}
 
