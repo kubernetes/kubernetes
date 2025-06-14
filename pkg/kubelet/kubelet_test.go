@@ -1407,6 +1407,109 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 }
 
+func TestPodStartDurationCountMetric(t *testing.T) {
+	metrics.Register()
+
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	// Pod with a pending status.
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "uid1",
+			Annotations: map[string]string{
+				kubetypes.ConfigFirstSeenAnnotationKey: kubetypes.NewTimestamp().GetString(),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "container1"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodPending,
+		},
+	}
+	// Pod with a running status.
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "uid2",
+			Annotations: map[string]string{
+				kubetypes.ConfigFirstSeenAnnotationKey: kubetypes.NewTimestamp().GetString(),
+			},
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Name: "container2"},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+		},
+	}
+	// Pod1 container's status
+	pod1Status := &kubecontainer.PodStatus{
+		ID: pod1.UID,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "container1",
+				State: kubecontainer.ContainerStateCreated,
+			},
+		},
+	}
+	// Pod2 container's status
+	pod2Status := &kubecontainer.PodStatus{
+		ID: pod2.UID,
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				Name:  "container2",
+				State: kubecontainer.ContainerStateRunning,
+			},
+		},
+	}
+
+	// In the first sync process, pod1 is pending.
+	_, err := kubelet.SyncPod(context.Background(), kubetypes.SyncPodSync, pod1, nil, pod1Status)
+	if err != nil {
+		t.Errorf("Unexpected err: %v", err)
+	}
+
+	// No pod is running - the counter is zero.
+	testutil.AssertHistogramTotalCount(t, "kubelet_pod_start_duration_seconds", map[string]string{}, 0)
+
+	// In this sync process, pod2 is running.
+	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodSync, pod2, nil, pod2Status)
+	if err != nil {
+		t.Errorf("Unexpected err: %v", err)
+	}
+
+	// Pod2 should be counted by the metric.
+	testutil.AssertHistogramTotalCount(t, "kubelet_pod_start_duration_seconds", map[string]string{}, 1)
+
+	// Make pod1 running.
+	pod1.Status.Phase = v1.PodRunning
+	pod1Status.ContainerStatuses[0].State = kubecontainer.ContainerStateRunning
+
+	// Now, pod1 is running.
+	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodSync, pod1, nil, pod1Status)
+	if err != nil {
+		t.Errorf("Unexpected err: %v", err)
+	}
+
+	// Pod1 should be also counted by the metric.
+	testutil.AssertHistogramTotalCount(t, "kubelet_pod_start_duration_seconds", map[string]string{}, 2)
+
+	// Pod1 is still running.
+	_, err = kubelet.SyncPod(context.Background(), kubetypes.SyncPodSync, pod1, nil, pod1Status)
+	if err != nil {
+		t.Errorf("Unexpected err: %v", err)
+	}
+
+	// Pod1 should not be counted again by the metric.
+	testutil.AssertHistogramTotalCount(t, "kubelet_pod_start_duration_seconds", map[string]string{}, 2)
+}
+
 func TestDeleteOutdatedMirrorPod(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
