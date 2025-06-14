@@ -583,6 +583,84 @@ func processDeltas(
 	return nil
 }
 
+// Multiplexes updates in the form of a list of Deltas into a Store, and informs
+// a given handler of events OnUpdate, OnAdd, OnDelete
+func processDeltasInBatch(
+	// Object which receives event notifications from the given deltas
+	handler ResourceEventHandler,
+	clientState Store,
+	deltasList []Deltas,
+	isInInitialList bool,
+) error {
+	// from oldest to newest
+	txns := make([]Transaction, 0)
+	callbacks := make([]func(), 0)
+	txnStore, txnSupported := clientState.(TransactionStore)
+	for _, deltas := range deltasList {
+		for _, d := range deltas {
+			obj := d.Object
+			switch d.Type {
+			case Sync, Replaced, Added, Updated:
+				if old, exists, err := clientState.Get(obj); err == nil && exists {
+					if txnSupported {
+						txns = append(txns, Transaction{
+							OpType: Updated,
+							Object: obj,
+						})
+						callbacks = append(callbacks, func() {
+							handler.OnUpdate(old, obj)
+						})
+					} else {
+						if err := clientState.Update(obj); err != nil {
+							return err
+						}
+						handler.OnUpdate(old, obj)
+					}
+				} else {
+					if txnSupported {
+						txns = append(txns, Transaction{
+							OpType: Added,
+							Object: obj,
+						})
+						callbacks = append(callbacks, func() {
+							handler.OnAdd(obj, isInInitialList)
+						})
+					} else {
+						if err := clientState.Add(obj); err != nil {
+							return err
+						}
+						handler.OnAdd(obj, isInInitialList)
+					}
+				}
+			case Deleted:
+				if txnSupported {
+					txns = append(txns, Transaction{
+						OpType: Deleted,
+						Object: obj,
+					})
+					callbacks = append(callbacks, func() {
+						handler.OnDelete(obj)
+					})
+				} else {
+					if err := clientState.Delete(obj); err != nil {
+						return err
+					}
+					handler.OnDelete(obj)
+				}
+			}
+		}
+	}
+	defer func() {
+		for _, callback := range callbacks {
+			callback()
+		}
+	}()
+	if txnSupported {
+		return txnStore.Transaction(txns...)
+	}
+	return nil
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
@@ -615,6 +693,9 @@ func newInformer(clientState Store, options InformerOptions) Controller {
 		Process: func(obj interface{}, isInInitialList bool) error {
 			if deltas, ok := obj.(Deltas); ok {
 				return processDeltas(options.Handler, clientState, deltas, isInInitialList)
+			}
+			if deltaList, ok := obj.([]Deltas); ok {
+				return processDeltasInBatch(options.Handler, clientState, deltaList, isInInitialList)
 			}
 			return errors.New("object given as Process argument is not Deltas")
 		},
