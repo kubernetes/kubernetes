@@ -35,8 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-helpers/storage/ephemeral"
-	migrationplugins "k8s.io/csi-translation-lib/plugins" // volume plugin names are exported nicely there
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -351,38 +350,15 @@ func waitForAllPVCsBound(ctx context.Context, cs clientset.Interface, timeout ti
 func getNodeLimits(ctx context.Context, cs clientset.Interface, config *storageframework.PerTestConfig, nodeName string, driver storageframework.DynamicPVTestDriver) (int, error) {
 	driverInfo := driver.GetDriverInfo()
 	if len(driverInfo.InTreePluginName) > 0 {
-		return getInTreeNodeLimits(ctx, cs, nodeName, driverInfo.InTreePluginName)
+		csiTranslator := csitrans.New()
+		driverName, err := csiTranslator.GetCSINameFromInTreeName(driverInfo.InTreePluginName)
+		if err != nil {
+			return 0, err
+		}
+		return getCSINodeLimits(ctx, cs, config, nodeName, driverName)
 	}
-
 	sc := driver.GetDynamicProvisionStorageClass(ctx, config, "")
 	return getCSINodeLimits(ctx, cs, config, nodeName, sc.Provisioner)
-}
-
-func getInTreeNodeLimits(ctx context.Context, cs clientset.Interface, nodeName, driverName string) (int, error) {
-	node, err := cs.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
-	if err != nil {
-		return 0, err
-	}
-
-	var allocatableKey string
-	switch driverName {
-	case migrationplugins.AWSEBSInTreePluginName:
-		allocatableKey = volumeutil.EBSVolumeLimitKey
-	case migrationplugins.GCEPDInTreePluginName:
-		allocatableKey = volumeutil.GCEVolumeLimitKey
-	case migrationplugins.CinderInTreePluginName:
-		allocatableKey = volumeutil.CinderVolumeLimitKey
-	case migrationplugins.AzureDiskInTreePluginName:
-		allocatableKey = volumeutil.AzureVolumeLimitKey
-	default:
-		return 0, fmt.Errorf("unknown in-tree volume plugin name: %s", driverName)
-	}
-
-	limit, ok := node.Status.Allocatable[v1.ResourceName(allocatableKey)]
-	if !ok {
-		return 0, fmt.Errorf("node %s does not contain status.allocatable[%s] for volume plugin %s", nodeName, allocatableKey, driverName)
-	}
-	return int(limit.Value()), nil
 }
 
 func getCSINodeLimits(ctx context.Context, cs clientset.Interface, config *storageframework.PerTestConfig, nodeName, driverName string) (int, error) {
