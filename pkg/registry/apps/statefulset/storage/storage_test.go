@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	"k8s.io/utils/ptr"
 )
 
 // TODO: allow for global factory override
@@ -68,13 +69,15 @@ func validNewStatefulSet() *apps.StatefulSet {
 				Spec: api.PodSpec{
 					Containers: []api.Container{
 						{
-							Name:            "test",
-							Image:           "test_image",
-							ImagePullPolicy: api.PullIfNotPresent,
+							Name:                     "test",
+							Image:                    "test_image",
+							ImagePullPolicy:          api.PullIfNotPresent,
+							TerminationMessagePolicy: api.TerminationMessageReadFile,
 						},
 					},
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
+					RestartPolicy:                 api.RestartPolicyAlways,
+					DNSPolicy:                     api.DNSClusterFirst,
+					TerminationGracePeriodSeconds: ptr.To[int64](30),
 				},
 			},
 			Replicas:       7,
