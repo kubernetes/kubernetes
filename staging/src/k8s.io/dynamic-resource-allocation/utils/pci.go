@@ -113,7 +113,7 @@ func (p *PCIAddress) resolveSysDevicesPath(sysfs Sysfs) (string, error) {
 
 	// targetAbs must be /sys/devices/pci0000:01/...<intermediate PCI devices>.../0000:00:1f.0
 	devicePathPrefix := sysfs.Devices("pci")
-	if !strings.HasPrefix(targetAbs, devicePathPrefix) || !(filepath.Base(targetAbs) == p.String()) {
+	if !strings.HasPrefix(targetAbs, devicePathPrefix) || filepath.Base(targetAbs) != p.String() {
 		return "", fmt.Errorf("invalid symlink target for PCI device %s: %s", sysBusPath, targetAbs)
 	}
 
