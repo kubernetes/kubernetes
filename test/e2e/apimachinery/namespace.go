@@ -481,7 +481,12 @@ var _ = SIGDescribe("OrderedNamespaceDeletion", func() {
 	f := framework.NewDefaultFramework("namespacedeletion")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 
-	f.It("namespace deletion should delete pod first", framework.WithFeatureGate(features.OrderedNamespaceDeletion), framework.WithSerial(), func(ctx context.Context) {
+	/*
+		Release : v1.34
+		Testname: Ordered Namespace Deletion
+		Description: Pods must be deleted before other objects when deleting a namespace. See https://kep.k8s.io/5080
+	*/
+	f.It("namespace deletion should delete pod first", framework.WithFeatureGate(features.OrderedNamespaceDeletion), framework.WithConformance(), framework.WithSerial(), func(ctx context.Context) {
 		ensurePodsAreRemovedFirstInOrderedNamespaceDeletion(ctx, f)
 	})
 })
