@@ -262,28 +262,28 @@ func getErrorAsStatus(err error) *framework.Status {
 
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
-func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]framework.ClusterEventWithHint, error) {
+func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	// A new node or updating a node's volume zone labels may make a pod schedulable.
 	// A note about UpdateNodeTaint event:
 	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
 	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
 	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := framework.Add | framework.UpdateNodeLabel | framework.UpdateNodeTaint
+	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
 	if pl.enableSchedulingQueueHint {
 		// preCheck is not used when QHint is enabled.
-		nodeActionType = framework.Add | framework.UpdateNodeLabel
+		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
 	}
 
-	return []framework.ClusterEventWithHint{
+	return []fwk.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
-		{Event: framework.ClusterEvent{Resource: framework.StorageClass, ActionType: framework.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
-		{Event: framework.ClusterEvent{Resource: framework.Node, ActionType: nodeActionType}},
+		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 		// A new pvc may make a pod schedulable.
 		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolumeClaim, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		// A new pv or updating a pv's volume zone labels may make a pod schedulable.
-		{Event: framework.ClusterEvent{Resource: framework.PersistentVolume, ActionType: framework.Add | framework.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeChange},
 	}, nil
 }
 
@@ -303,18 +303,18 @@ func (pl *VolumeZone) getPersistentVolumeClaimNameFromPod(pod *v1.Pod) []string 
 
 // isSchedulableAfterPersistentVolumeClaimChange is invoked whenever a PersistentVolumeClaim added or updated.
 // It checks whether the change of PVC has made a previously unschedulable pod schedulable.
-func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeClaimChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, modifiedPVC, err := util.As[*v1.PersistentVolumeClaim](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeClaimChange: %w", err)
 	}
 	if pl.isPVCRequestedFromPod(logger, modifiedPVC, pod) {
 		logger.V(5).Info("PVC that is referred from the pod was created or updated, which might make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("PVC irrelevant to the Pod was created or updated, which doesn't make this pod schedulable", "pod", klog.KObj(pod), "PVC", klog.KObj(modifiedPVC))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // isPVCRequestedFromPod verifies if the PVC is requested from a given Pod.
@@ -336,41 +336,41 @@ func (pl *VolumeZone) isPVCRequestedFromPod(logger klog.Logger, pvc *v1.Persiste
 // isSchedulableAfterStorageClassAdded is invoked whenever a StorageClass is added.
 // It checks whether the addition of StorageClass has made a previously unschedulable pod schedulable.
 // Only a new StorageClass with WaitForFirstConsumer will cause a pod to become schedulable.
-func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeZone) isSchedulableAfterStorageClassAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, addedStorageClass, err := util.As[*storage.StorageClass](nil, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterStorageClassAdded: %w", err)
 	}
 	if (addedStorageClass.VolumeBindingMode == nil) || (*addedStorageClass.VolumeBindingMode != storage.VolumeBindingWaitForFirstConsumer) {
 		logger.V(5).Info("StorageClass is created, but its VolumeBindingMode is not waitForFirstConsumer, which doesn't make the pod schedulable", "storageClass", klog.KObj(addedStorageClass), "pod", klog.KObj(pod))
-		return framework.QueueSkip, nil
+		return fwk.QueueSkip, nil
 	}
 
 	logger.V(5).Info("StorageClass with waitForFirstConsumer mode was created and it might make this pod schedulable", "pod", klog.KObj(pod), "StorageClass", klog.KObj(addedStorageClass))
-	return framework.Queue, nil
+	return fwk.Queue, nil
 }
 
 // isSchedulableAfterPersistentVolumeChange is invoked whenever a PersistentVolume added or updated.
 // It checks whether the change of PV has made a previously unschedulable pod schedulable.
 // Changing the PV topology labels could cause the pod to become schedulable.
-func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (framework.QueueingHint, error) {
+func (pl *VolumeZone) isSchedulableAfterPersistentVolumeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPV, modifiedPV, err := util.As[*v1.PersistentVolume](oldObj, newObj)
 	if err != nil {
-		return framework.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPersistentVolumeChange: %w", err)
 	}
 	if originalPV == nil {
 		logger.V(5).Info("PV is newly created, which might make the pod schedulable")
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 	originalPVTopologies := pl.getPVTopologies(logger, originalPV)
 	modifiedPVTopologies := pl.getPVTopologies(logger, modifiedPV)
 	if !reflect.DeepEqual(originalPVTopologies, modifiedPVTopologies) {
 		logger.V(5).Info("PV's topology was updated, which might make the pod schedulable.", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
-		return framework.Queue, nil
+		return fwk.Queue, nil
 	}
 
 	logger.V(5).Info("PV was updated, but the topology is unchanged, which it doesn't make the pod schedulable", "pod", klog.KObj(pod), "PV", klog.KObj(modifiedPV))
-	return framework.QueueSkip, nil
+	return fwk.QueueSkip, nil
 }
 
 // getPVTopologies retrieves pvTopology from a given PV and returns the array

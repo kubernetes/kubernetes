@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	csitrans "k8s.io/csi-translation-lib"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
@@ -669,32 +670,32 @@ func TestCSILimitsQHint(t *testing.T) {
 		deletedPod             *v1.Pod
 		deletedPodNotScheduled bool
 		test                   string
-		wantQHint              framework.QueueingHint
+		wantQHint              fwk.QueueingHint
 	}{
 		{
 			newPod:     podEbs.Obj(),
 			deletedPod: st.MakePod().PVC("placeholder").Obj(),
 			test:       "return a Queue when a deleted pod has a PVC",
-			wantQHint:  framework.Queue,
+			wantQHint:  fwk.Queue,
 		},
 		{
 			newPod:     podEbs.Obj(),
 			deletedPod: st.MakePod().Volume(v1.Volume{VolumeSource: v1.VolumeSource{AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{}}}).Obj(),
 			test:       "return a Queue when a deleted pod has a inline migratable volume",
-			wantQHint:  framework.Queue,
+			wantQHint:  fwk.Queue,
 		},
 		{
 			newPod:     podEbs.Obj(),
 			deletedPod: st.MakePod().Obj(),
 			test:       "return a QueueSkip when a deleted pod doesn't have any volume",
-			wantQHint:  framework.QueueSkip,
+			wantQHint:  fwk.QueueSkip,
 		},
 		{
 			newPod:                 podEbs.Obj(),
 			deletedPod:             st.MakePod().PVC("csi-ebs.csi.aws.com-0").Obj(),
 			deletedPodNotScheduled: true,
 			test:                   "return a QueueSkip when a deleted pod is not scheduled.",
-			wantQHint:              framework.QueueSkip,
+			wantQHint:              fwk.QueueSkip,
 		},
 	}
 
@@ -731,13 +732,13 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 		test      string
 		newPod    *v1.Pod
 		addedPvc  *v1.PersistentVolumeClaim
-		wantQHint framework.QueueingHint
+		wantQHint fwk.QueueingHint
 	}{
 		{
 			test:      "a pod isn't in the same namespace as an added PVC",
 			newPod:    st.MakePod().Namespace("ns1").Obj(),
 			addedPvc:  st.MakePersistentVolumeClaim().Namespace("ns2").Obj(),
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 		{
 			test: "a pod is in the same namespace as an added PVC",
@@ -750,7 +751,7 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 					},
 				}).Obj(),
 			addedPvc:  st.MakePersistentVolumeClaim().Name("pvc1").Namespace("ns1").Obj(),
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			test: "a pod has an ephemeral volume related to an added PVC",
@@ -763,7 +764,7 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 				},
 			).Obj(),
 			addedPvc:  st.MakePersistentVolumeClaim().Name("pod1-ephemeral").Namespace("ns1").Obj(),
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			test: "a pod doesn't have the same PVC as an added PVC",
@@ -777,13 +778,13 @@ func TestCSILimitsAddedPVCQHint(t *testing.T) {
 				},
 			).Obj(),
 			addedPvc:  st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").Obj(),
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 		{
 			test:      "a pod doesn't have any PVC attached",
 			newPod:    st.MakePod().Namespace("ns1").Obj(),
 			addedPvc:  st.MakePersistentVolumeClaim().Name("pvc2").Namespace("ns1").Obj(),
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 	}
 
@@ -809,7 +810,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 		newPod      *v1.Pod
 		existingPVC *v1.PersistentVolumeClaim
 		deletedVA   *storagev1.VolumeAttachment
-		wantQHint   framework.QueueingHint
+		wantQHint   fwk.QueueingHint
 	}{
 		{
 			test: "a pod has PVC when VolumeAttachment is deleting",
@@ -828,7 +829,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 				NodeName("fake-node").
 				Attacher("test.storage.gke.io").
 				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pv1")}).Obj(),
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			test: "a pod has an Inline Migratable volume (AWSEBSDriver) when VolumeAttachment (AWSEBSDriver) is deleting (match)",
@@ -853,7 +854,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 						},
 					},
 				}).Obj(),
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			test: "a pod has an Inline Migratable volume (GCEPDDriver) when VolumeAttachment (AWSEBSDriver) is deleting (no match)",
@@ -878,7 +879,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 						},
 					},
 				}).Obj(),
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 		{
 			test: "a pod has an Inline Migratable volume (AWSEBSDriver) and PVC when VolumeAttachment (AWSEBSDriver) is deleting",
@@ -913,7 +914,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 						},
 					},
 				}).Obj(),
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			test: "a pod has an Inline Migratable volume (AWSEBSDriver) and PVC when VolumeAttachment (AWSEBSDriver)  is deleting",
@@ -940,7 +941,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 				NodeName("fake-node").
 				Attacher("test.storage.gke.io").
 				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pv1")}).Obj(),
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			test:   "a pod has no PVC when VolumeAttachment is deleting",
@@ -949,7 +950,7 @@ func TestCSILimitsDeletedVolumeAttachmentQHint(t *testing.T) {
 				NodeName("fake-node").
 				Attacher("test.storage.gke.io").
 				Source(storagev1.VolumeAttachmentSource{PersistentVolumeName: ptr.To("pv1")}).Obj(),
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 	}
 
@@ -987,7 +988,7 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 		name       string
 		oldDrivers []storagev1.CSINodeDriver
 		newDrivers []storagev1.CSINodeDriver
-		wantQHint  framework.QueueingHint
+		wantQHint  fwk.QueueingHint
 	}{
 		{
 			name: "limit raised, queue",
@@ -1005,7 +1006,7 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 					Count: ptr.To(int32(2)),
 				},
 			}},
-			wantQHint: framework.Queue,
+			wantQHint: fwk.Queue,
 		},
 		{
 			name: "limit decreased, skip queueing",
@@ -1023,7 +1024,7 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 					Count: ptr.To(int32(1)),
 				},
 			}},
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 		{
 			name: "limit unchanged, skip queueing",
@@ -1041,7 +1042,7 @@ func TestCSILimitsAfterCSINodeUpdatedQHint(t *testing.T) {
 					Count: ptr.To(int32(1)),
 				},
 			}},
-			wantQHint: framework.QueueSkip,
+			wantQHint: fwk.QueueSkip,
 		},
 	}
 

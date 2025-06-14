@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -362,47 +363,47 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 		pod          *v1.Pod
 		oldObj       interface{}
 		newObj       interface{}
-		expectedHint framework.QueueingHint
+		expectedHint fwk.QueueingHint
 		wantErr      bool
 	}{
 		{
 			name:         "backoff-wrong-new-object",
 			newObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			wantErr:      true,
 		},
 		{
 			name:         "backoff-wrong-old-object",
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
 			oldObj:       "not-a-node",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			wantErr:      true,
 		},
 		{
 			name:         "skip-queue-on-untoleratedtaint-node-added",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "queue-on-toleratedtaint-node-added",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "skip-unrelated-change",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}, {Key: "dedicated", Value: "user3", Effect: "NoSchedule"}}),
 			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "queue-on-taint-change",
 			pod:          podWithTolerations("pod1", []v1.Toleration{{Key: "dedicated", Operator: "Equal", Value: "user2", Effect: "NoSchedule"}}),
 			newObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user2", Effect: "NoSchedule"}}),
 			oldObj:       nodeWithTaints("nodeA", []v1.Taint{{Key: "dedicated", Value: "user1", Effect: "NoSchedule"}}),
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 		},
 	}
 
@@ -425,20 +426,20 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
-		expectedHint   framework.QueueingHint
+		expectedHint   fwk.QueueingHint
 		expectedErr    bool
 	}{
 		"backoff-wrong-new-object": {
 			pod:          &v1.Pod{},
 			newObj:       "not-a-pod",
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"backoff-wrong-old-object": {
 			pod:          &v1.Pod{},
 			oldObj:       "not-a-pod",
 			newObj:       &v1.Pod{},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  true,
 		},
 		"skip-updates-other-pod": {
@@ -469,7 +470,7 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 					},
 				},
 			},
-			expectedHint: framework.QueueSkip,
+			expectedHint: fwk.QueueSkip,
 			expectedErr:  false,
 		},
 		"queue-on-toleration-added": {
@@ -497,7 +498,7 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 					},
 				},
 			},
-			expectedHint: framework.Queue,
+			expectedHint: fwk.Queue,
 			expectedErr:  false,
 		},
 	}
