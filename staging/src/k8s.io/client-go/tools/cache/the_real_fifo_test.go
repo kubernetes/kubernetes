@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -38,7 +39,7 @@ const closedFIFOName = "FIFO WAS CLOSED"
 func popN(queue Queue, count int) []interface{} {
 	result := []interface{}{}
 	for i := 0; i < count; i++ {
-		queue.Pop(func(obj interface{}, isInInitialList bool) error {
+		queue.Pop(context.Background(), func(obj interface{}, isInInitialList bool) error {
 			result = append(result, obj)
 			return nil
 		})
@@ -48,7 +49,7 @@ func popN(queue Queue, count int) []interface{} {
 
 // helper function to reduce stuttering
 func testRealFIFOPop(f *RealFIFO) testFifoObject {
-	val := Pop(f)
+	val := Pop(context.Background(), f)
 	if val == nil {
 		return testFifoObject{name: closedFIFOName}
 	}
@@ -404,7 +405,7 @@ func TestRealFIFO_transformer(t *testing.T) {
 	}
 
 	for i := 0; i < len(expected1); i++ {
-		obj, err := f.Pop(func(o interface{}, isInInitialList bool) error { return nil })
+		obj, err := f.Pop(context.Background(), func(o interface{}, isInInitialList bool) error { return nil })
 		if err != nil {
 			t.Fatalf("got nothing on try %v?", i)
 		}
@@ -593,7 +594,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -622,7 +623,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -653,7 +654,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -685,7 +686,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for i, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("%d Expected %#v, got %#v", i, e, a)
 		}
@@ -707,7 +708,7 @@ func TestRealFIFO_ReplaceMakesDeletions(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -738,7 +739,7 @@ func TestRealFIFO_ReplaceMakesDeletionsReplaced(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -764,7 +765,7 @@ func TestRealFIFO_UpdateResyncRace(t *testing.T) {
 	}
 
 	for _, expected := range expectedList {
-		cur := Pop(f).(Deltas)
+		cur := Pop(context.Background(), f).(Deltas)
 		if e, a := expected, cur; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %#v, got %#v", e, a)
 		}
@@ -900,15 +901,15 @@ func TestRealFIFO_HasSynced(t *testing.T) {
 		{
 			actions: []func(f *RealFIFO){
 				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *RealFIFO) { Pop(f) },
+				func(f *RealFIFO) { Pop(context.Background(), f) },
 			},
 			expectedSynced: false,
 		},
 		{
 			actions: []func(f *RealFIFO){
 				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("b", 2)}, "0") },
-				func(f *RealFIFO) { Pop(f) },
-				func(f *RealFIFO) { Pop(f) },
+				func(f *RealFIFO) { Pop(context.Background(), f) },
+				func(f *RealFIFO) { Pop(context.Background(), f) },
 			},
 			expectedSynced: true,
 		},
@@ -917,9 +918,9 @@ func TestRealFIFO_HasSynced(t *testing.T) {
 			// there cannot be duplicate keys in the list or apiserver is broken.
 			actions: []func(f *RealFIFO){
 				func(f *RealFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("a", 2)}, "0") },
-				func(f *RealFIFO) { Pop(f) },
+				func(f *RealFIFO) { Pop(context.Background(), f) },
 				// ATTENTION: difference with delta_fifo_test, every event is delivered, so a is listed twice and must be popped twice to remove both
-				func(f *RealFIFO) { Pop(f) },
+				func(f *RealFIFO) { Pop(context.Background(), f) },
 			},
 			expectedSynced: true,
 		},
@@ -956,7 +957,7 @@ func TestRealFIFO_PopShouldUnblockWhenClosed(t *testing.T) {
 	const jobs = 10
 	for i := 0; i < jobs; i++ {
 		go func() {
-			f.Pop(func(obj interface{}, isInInitialList bool) error {
+			f.Pop(context.Background(), func(obj interface{}, isInInitialList bool) error {
 				return nil
 			})
 			c <- struct{}{}
