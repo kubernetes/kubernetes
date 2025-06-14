@@ -41,15 +41,15 @@ var (
 // Format provides a CEL library exposing common named Kubernetes string
 // validations. Can be used in CRD ValidationRules messageExpression.
 //
-//  Example:
+// Example:
 //
 //    rule:              format.dns1123label.validate(object.metadata.name).hasValue()
 //    messageExpression: format.dns1123label.validate(object.metadata.name).value().join("\n")
 //
 // format.named(name: string) -> ?Format
 //
-//  Returns the Format with the given name, if it exists. Otherwise, optional.none
-//  Allowed names are:
+// Returns the Format with the given name, if it exists. Otherwise, optional.none
+// Allowed names are:
 // 	 - `dns1123Label`
 // 	 - `dns1123Subdomain`
 // 	 - `dns1035Label`
@@ -66,9 +66,10 @@ var (
 //
 // format.<formatName>() -> Format
 //
-//  Convenience functions for all the named formats are also available
+// Convenience functions for all the named formats are also available.
 //
-//  Examples:
+// Examples:
+//
 //      format.dns1123Label().validate("my-label-name")
 //      format.dns1123Subdomain().validate("apiextensions.k8s.io")
 //      format.dns1035Label().validate("my-label-name")
@@ -83,11 +84,11 @@ var (
 //      format.date().validate("2021-01-01")
 //      format.datetime().validate("2021-01-01T00:00:00Z")
 //
-
+//
 // <Format>.validate(str: string) -> ?list<string>
 //
-//	Validates the given string against the given format. Returns optional.none
-//	if the string is valid, otherwise a list of validation error strings.
+// Validates the given string against the given format. Returns optional.none
+// if the string is valid, otherwise a list of validation error strings.
 func Format() cel.EnvOption {
 	return cel.Lib(formatLib)
 }

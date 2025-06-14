@@ -99,30 +99,30 @@ import (
 //
 // Examples:
 //
-// ip('127.0.0.1').family() // returns '4”
-// ip('::1').family() // returns '6'
-// ip('127.0.0.1').family() == 4 // returns true
-// ip('::1').family() == 6 // returns true
-// ip('0.0.0.0').isUnspecified() // returns true
-// ip('127.0.0.1').isUnspecified() // returns false
-// ip('::').isUnspecified() // returns true
-// ip('::1').isUnspecified() // returns false
-// ip('127.0.0.1').isLoopback() // returns true
-// ip('192.168.0.1').isLoopback() // returns false
-// ip('::1').isLoopback() // returns true
-// ip('2001:db8::abcd').isLoopback() // returns false
-// ip('224.0.0.1').isLinkLocalMulticast() // returns true
-// ip('224.0.1.1').isLinkLocalMulticast() // returns false
-// ip('ff02::1').isLinkLocalMulticast() // returns true
-// ip('fd00::1').isLinkLocalMulticast() // returns false
-// ip('169.254.169.254').isLinkLocalUnicast() // returns true
-// ip('192.168.0.1').isLinkLocalUnicast() // returns false
-// ip('fe80::1').isLinkLocalUnicast() // returns true
-// ip('fd80::1').isLinkLocalUnicast() // returns false
-// ip('192.168.0.1').isGlobalUnicast() // returns true
-// ip('255.255.255.255').isGlobalUnicast() // returns false
-// ip('2001:db8::abcd').isGlobalUnicast() // returns true
-// ip('ff00::1').isGlobalUnicast() // returns false
+//	ip('127.0.0.1').family() // returns '4”
+//	ip('::1').family() // returns '6'
+//	ip('127.0.0.1').family() == 4 // returns true
+//	ip('::1').family() == 6 // returns true
+//	ip('0.0.0.0').isUnspecified() // returns true
+//	ip('127.0.0.1').isUnspecified() // returns false
+//	ip('::').isUnspecified() // returns true
+//	ip('::1').isUnspecified() // returns false
+//	ip('127.0.0.1').isLoopback() // returns true
+//	ip('192.168.0.1').isLoopback() // returns false
+//	ip('::1').isLoopback() // returns true
+//	ip('2001:db8::abcd').isLoopback() // returns false
+//	ip('224.0.0.1').isLinkLocalMulticast() // returns true
+//	ip('224.0.1.1').isLinkLocalMulticast() // returns false
+//	ip('ff02::1').isLinkLocalMulticast() // returns true
+//	ip('fd00::1').isLinkLocalMulticast() // returns false
+//	ip('169.254.169.254').isLinkLocalUnicast() // returns true
+//	ip('192.168.0.1').isLinkLocalUnicast() // returns false
+//	ip('fe80::1').isLinkLocalUnicast() // returns true
+//	ip('fd80::1').isLinkLocalUnicast() // returns false
+//	ip('192.168.0.1').isGlobalUnicast() // returns true
+//	ip('255.255.255.255').isGlobalUnicast() // returns false
+//	ip('2001:db8::abcd').isGlobalUnicast() // returns true
+//	ip('ff00::1').isGlobalUnicast() // returns false
 func IP() cel.EnvOption {
 	return cel.Lib(ipLib)
 }
