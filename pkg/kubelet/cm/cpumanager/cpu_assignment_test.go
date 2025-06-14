@@ -685,7 +685,7 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			1,
 			"",
-			cpuset.New(2),
+			cpuset.New(1),
 		},
 		{
 			"take first available UncoreCache from first socket",
