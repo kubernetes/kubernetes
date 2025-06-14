@@ -1,5 +1,5 @@
 kind: ResourceSlice
-apiVersion: resource.k8s.io/v1beta1
+apiVersion: resource.k8s.io/v1beta2
 metadata:
   name: resourceslice-{{.Index}}
 spec:
@@ -29,97 +29,91 @@ spec:
   devices:
   # 2 counter devices
   - name: device-2-counters-1
-    basic:
-      attributes:
-        preallocate:
-          bool: true
-        dra.example.com/slice:
-          int: {{.Index}}
-      capacity:
-        counters: 
-          value: "2"
-      consumesCounters:
-      - counterSet: counter-set
-        counters:
-          counter1:
-            value: "1"
-          counter2:
-            value: "1"
+    attributes:
+      preallocate:
+        bool: true
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "2"
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter1:
+          value: "1"
+        counter2:
+          value: "1"
   - name: device-2-counters-2
-    basic:
-      attributes:
-        preallocate:
-          bool: false
-        dra.example.com/slice:
-          int: {{.Index}}
-      capacity:
-        counters:
-          value: "2"
-      consumesCounters:
-      - counterSet: counter-set
-        counters:
-          counter3:
-            value: "1"
-          counter4:
-            value: "1"
+    attributes:
+      preallocate:
+        bool: false
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "2"
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter3:
+          value: "1"
+        counter4:
+          value: "1"
   # 1 counter devices
   - name: device-1-counter-1
-    basic:
-      attributes:
-        preallocate:
-          bool: false
-        dra.example.com/slice:
-          int: {{.Index}}
-      capacity:
-        counters: 
+    attributes:
+      preallocate:
+        bool: false
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "1"
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter1:
           value: "1"
-      consumesCounters:
-      - counterSet: counter-set
-        counters:
-          counter1:
-            value: "1"
   - name: device-1-counter-2
-    basic:
-      attributes:
-        preallocate:
-          bool: false
-        dra.example.com/slice:
-          int: {{.Index}}
-      capacity:
-        counters: 
+    attributes:
+      preallocate:
+        bool: false
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "1"
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter2:
           value: "1"
-      consumesCounters:
-      - counterSet: counter-set
-        counters:
-          counter2:
-            value: "1"
   - name: device-1-counter-3
-    basic:
-      attributes:
-        preallocate:
-          bool: false
-        dra.example.com/slice:
-          int: {{.Index}}
-      capacity:
-        counters: 
+    attributes:
+      preallocate:
+        bool: false
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "1"
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter3:
           value: "1"
-      consumesCounters:
-      - counterSet: counter-set
-        counters:
-          counter3:
-            value: "1"
   - name: device-1-counter-4
-    basic:
-      attributes:
-        preallocate:
-          bool: false
-        dra.example.com/slice:
-          int: {{.Index}}
-      capacity:
-        counters:
+    attributes:
+      preallocate:
+        bool: false
+      dra.example.com/slice:
+        int: {{.Index}}
+    capacity:
+      counters:
+        value: "1"
+    consumesCounters:
+    - counterSet: counter-set
+      counters:
+        counter4:
           value: "1"
-      consumesCounters:
-      - counterSet: counter-set
-        counters:
-          counter4:
-            value: "1"

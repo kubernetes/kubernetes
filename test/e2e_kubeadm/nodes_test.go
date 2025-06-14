@@ -52,7 +52,7 @@ var _ = Describe("nodes", func() {
 			List(ctx, metav1.ListOptions{})
 		framework.ExpectNoError(err, "error reading nodes")
 
-		var nodeLocalCRISocketEnabled bool
+		nodeLocalCRISocketEnabled := true
 		cc := getClusterConfiguration(f.ClientSet)
 		if _, ok := cc["featureGates"]; ok {
 			fgCC := cc["featureGates"].(map[interface{}]interface{})

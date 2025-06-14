@@ -45,7 +45,6 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/consistencydetector"
 	"k8s.io/client-go/util/watchlist"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -98,7 +97,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		expectedSecrets[0] = secret
 		verifyStore(ctx, expectedSecrets, secretInformer.GetStore())
 	})
-	ginkgo.It("should be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
+	ginkgo.It("should NOT be requested by client-go's List method when WatchListClient is enabled", func(ctx context.Context) {
 		featuregatetesting.SetFeatureGateDuringTest(ginkgo.GinkgoTB(), utilfeature.DefaultFeatureGate, featuregate.Feature(clientfeatures.WatchListClient), true)
 
 		expectedSecrets := addWellKnownSecrets(ctx, f)
@@ -107,16 +106,16 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		wrappedKubeClient, err := kubernetes.NewForConfig(clientConfig)
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Streaming secrets from the server")
+		ginkgo.By("Getting secrets from the server")
 		secretList, err := wrappedKubeClient.CoreV1().Secrets(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Verifying if the secret list was properly streamed")
-		streamedSecrets := secretList.Items
-		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(streamedSecrets))).To(gomega.BeTrueBecause("data received via watchlist must match the added data"))
+		ginkgo.By("Verifying retrieved secrets")
+		actualSecrets := secretList.Items
+		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
 
 		ginkgo.By("Verifying if expected requests were sent to the server")
-		expectedRequestsMadeByKubeClient := getExpectedRequestsMadeByClientFor(secretList.ResourceVersion)
+		expectedRequestsMadeByKubeClient := []string{expectedListRequestMadeByClient}
 		gomega.Expect(rt.actualRequests).To(gomega.Equal(expectedRequestsMadeByKubeClient))
 	})
 	ginkgo.It("should NOT be requested by dynamic client's List method when WatchListClient is enabled", func(ctx context.Context) {
@@ -133,7 +132,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		secretList, err := wrappedDynamicClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Verifying if the secret list was properly streamed")
+		ginkgo.By("verifying retrieved secrets")
 		actualSecrets := secretList.Items
 		gomega.Expect(cmp.Equal(expectedSecrets, toSecretPointerSlice(actualSecrets))).To(gomega.BeTrueBecause("data received via list must match the added data"))
 		gomega.Expect(secretList.GetObjectKind().GroupVersionKind()).To(gomega.Equal(v1.SchemeGroupVersion.WithKind("SecretList")))
@@ -162,7 +161,7 @@ var _ = SIGDescribe("API Streaming (aka. WatchList)", framework.WithFeatureGate(
 		secretMetaList, err := wrappedMetaClient.Resource(v1.SchemeGroupVersion.WithResource("secrets")).Namespace(f.Namespace.Name).List(ctx, metav1.ListOptions{LabelSelector: "watchlist=true"})
 		framework.ExpectNoError(err)
 
-		ginkgo.By("Verifying if the secret meta list was properly streamed")
+		ginkgo.By("verifying retrieved secrets")
 		actualMetaSecrets := secretMetaList.Items
 		gomega.Expect(cmp.Equal(expectedMetaSecrets, actualMetaSecrets)).To(gomega.BeTrueBecause("data received via list must match the added data"))
 
@@ -287,41 +286,11 @@ func verifyStore[T any](ctx context.Context, expectedSecrets []*T, store cache.S
 	framework.ExpectNoError(err)
 }
 
-// corresponds to a streaming request made by the client to stream the secrets
-var expectedStreamingRequestMadeByClient = func() string {
-	params := url.Values{}
-	params.Add("allowWatchBookmarks", "true")
-	params.Add("labelSelector", "watchlist=true")
-	params.Add("resourceVersionMatch", "NotOlderThan")
-	params.Add("sendInitialEvents", "true")
-	params.Add("watch", "true")
-	return params.Encode()
-}()
-
 var expectedListRequestMadeByClient = func() string {
 	params := url.Values{}
 	params.Add("labelSelector", "watchlist=true")
 	return params.Encode()
 }()
-
-func getExpectedListRequestMadeByConsistencyDetectorFor(rv string) string {
-	params := url.Values{}
-	params.Add("labelSelector", "watchlist=true")
-	params.Add("resourceVersion", rv)
-	params.Add("resourceVersionMatch", "Exact")
-	return params.Encode()
-}
-
-func getExpectedRequestsMadeByClientFor(rv string) []string {
-	expectedRequestMadeByClient := []string{
-		expectedStreamingRequestMadeByClient,
-	}
-	if consistencydetector.IsDataConsistencyDetectionForWatchListEnabled() {
-		// corresponds to a standard list request made by the consistency detector build in into the client
-		expectedRequestMadeByClient = append(expectedRequestMadeByClient, getExpectedListRequestMadeByConsistencyDetectorFor(rv))
-	}
-	return expectedRequestMadeByClient
-}
 
 func addWellKnownSecrets(ctx context.Context, f *framework.Framework) []*v1.Secret {
 	ginkgo.By(fmt.Sprintf("Adding 5 secrets to %s namespace", f.Namespace.Name))

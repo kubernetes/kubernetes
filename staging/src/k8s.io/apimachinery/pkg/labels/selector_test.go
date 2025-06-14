@@ -1008,6 +1008,26 @@ func BenchmarkRequirementString(b *testing.B) {
 	}
 }
 
+func BenchmarkRequirementMatches(b *testing.B) {
+	r := Requirement{
+		key:      "environment",
+		operator: selection.NotIn,
+		strValues: []string{
+			"dev",
+		},
+	}
+	labels := Set(map[string]string{
+		"key":         "value",
+		"environment": "dev",
+	})
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.Matches(labels)
+	}
+}
+
 func TestRequirementEqual(t *testing.T) {
 	tests := []struct {
 		name string
