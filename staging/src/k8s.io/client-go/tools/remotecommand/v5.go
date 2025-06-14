@@ -30,6 +30,10 @@ func newStreamProtocolV5(options StreamOptions) streamProtocolHandler {
 	}
 }
 
+func (p *streamProtocolV5) streams() (count int) {
+	return p.streamProtocolV4.streams()
+}
+
 func (p *streamProtocolV5) stream(conn streamCreator) error {
 	return p.streamProtocolV4.stream(conn)
 }
