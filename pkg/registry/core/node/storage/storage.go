@@ -143,6 +143,8 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, kubeletClientConfig client
 		}
 		return externalNode, nil
 	})
+	// TODO: DROP this commit, it is just for testing against CI
+	kubeletClientConfig.TLSClientConfig.ValidateNodeName = len(kubeletClientConfig.TLSClientConfig.CAFile) > 0
 	connectionInfoGetter, err := client.NewNodeConnectionInfoGetter(nodeGetter, kubeletClientConfig)
 	if err != nil {
 		return nil, err
