@@ -113,7 +113,12 @@ func mustCreateStore(numObjects int, numMatching int, labels map[string]string) 
 
 func benchmarkLister(b *testing.B, numObjects int, numMatching int, label map[string]string) {
 	store := mustCreateStore(numObjects, numMatching, label)
-	selector := labels.SelectorFromSet(label)
+	var selector labels.Selector
+	if label == nil {
+		selector = labels.Nothing()
+	} else {
+		selector = labels.SelectorFromSet(label)
+	}
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		err := ListAll(store, selector, func(m interface{}) {
@@ -137,4 +142,8 @@ func BenchmarkLister_Match_100k_100(b *testing.B) {
 
 func BenchmarkLister_Match_1M_100(b *testing.B) {
 	benchmarkLister(b, 1000000, 100, map[string]string{"match": "true"})
+}
+
+func BenchmarkLister_Match_1M_0(b *testing.B) {
+	benchmarkLister(b, 1000000, 0, nil)
 }
