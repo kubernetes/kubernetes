@@ -58,6 +58,8 @@ var _ = Describe("nodes", func() {
 			fgCC := cc["featureGates"].(map[interface{}]interface{})
 			if fg, ok := fgCC["NodeLocalCRISocket"]; ok {
 				nodeLocalCRISocketEnabled = fg.(bool)
+			} else {
+				nodeLocalCRISocketEnabled = true
 			}
 		}
 
