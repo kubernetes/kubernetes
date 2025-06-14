@@ -452,3 +452,7 @@ func (f *fakeKubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, label
 
 	return fullSet.Bytes(), nil
 }
+
+func (f *fakeKubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, podUID types.UID, volumeName string, sourceIndex int) ([]byte, []byte, error) {
+	return []byte("key\n"), []byte("cert\n"), nil
+}

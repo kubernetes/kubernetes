@@ -531,6 +531,21 @@ Usage:
 ```
 
 
+### podcertificatesigner
+
+Runs a controller that signs PodCertificateRequests addressed to the signer name specified in the `--signer-name` flag.  It generates a CA hierarchy in-memory at startup.
+
+```console
+    kubectl run test-agnhost \
+      --generator=run-pod/v1 \
+      --image=registry.k8s.io/e2e-test-images/agnhost:2.40 \
+      --restart=Always \
+      -- \
+      podcertificatesigner \
+      --signer-name=agnhost.k8s.io/testsigner
+```
+
+
 ### port-forward-tester
 
 Listens for TCP connections on a given address and port, optionally checks the data received,
