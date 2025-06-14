@@ -195,8 +195,24 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 			gb.graphChanges.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
-			// TODO: check if there are differences in the ownerRefs,
-			// finalizers, and DeletionTimestamp; if not, ignore the update.
+			oldMeta, err := meta.Accessor(oldObj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("cannot access oldObj: %v", err))
+				return
+			}
+			newMeta, err := meta.Accessor(newObj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("cannot access newObj: %v", err))
+				return
+			}
+
+			if oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+				if len(oldMeta.GetResourceVersion()) == 0 {
+					klog.Warningf("Graph builder throwing out update with empty RV. this is likely to happen if a test did not supply a resource version on an updated object")
+				}
+				return
+			}
+
 			event := &event{
 				eventType: updateEvent,
 				obj:       newObj,
