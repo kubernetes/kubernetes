@@ -4325,8 +4325,25 @@ unknown: baz`)
 	}
 }
 
-// BenchmarkFieldValidation benchmarks the create, update, and patch handlers for performance distinctions between
+// BenchmarkFieldValidation benchmarks the create, update, and
+// patch handlers for performance distinctions between
 // strict, warn, and ignore field validation handling.
+//
+// This test commonly runs out of ephemeral ports on MacOS.
+// To fix this, increase the number of ephemeral ports and
+// decrease the length of time each port is held open:
+//
+//	sudo sysctl -w net.inet.ip.portrange.first=32768
+//	sudo sysctl -w net.inet.tcp.msl=5000
+//
+// To revert:
+//
+//	sudo sysctl -w net.inet.ip.portrange.first=49152
+//	sudo sysctl -w net.inet.tcp.msl=15000
+//
+// References:
+// - https://web.archive.org/web/20180129235834/http://danielmendel.github.io/blog/2013/04/07/benchmarkers-beware-the-ephemeral-port-limit/
+// - https://web.archive.org/web/20181015070746/https://www.metabrew.com/article/a-million-user-comet-application-with-mochiweb-part-1
 func BenchmarkFieldValidation(b *testing.B) {
 	var (
 		validJSONDataPost = []byte(`{"kind":"Simple", "apiVersion":"test.group/version", "metadata":{}, "other":"foo"}`)
@@ -4415,15 +4432,18 @@ other: bar`)
 		},
 	}))
 	defer server.Close()
+	baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 	for _, test := range fieldValidationBenchmarks {
 		b.Run(test.name, func(b *testing.B) {
-			for n := 0; n < b.N; n++ {
-				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-				response := runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
-				defer apitesting.Close(b, response.Body)
-				if response.StatusCode != test.expectedStatusCode {
-					b.Fatalf("unexpected status code: %d, expected: %d", response.StatusCode, test.expectedStatusCode)
-				}
+			url := baseURL + test.path + test.queryParams
+			for b.Loop() {
+				func() {
+					response := runRequest(b, url, test.verb, test.data, test.contentType)
+					defer apitesting.Close(b, response.Body)
+					if response.StatusCode != test.expectedStatusCode {
+						b.Fatalf("unexpected status code: %d, expected: %d", response.StatusCode, test.expectedStatusCode)
+					}
+				}()
 			}
 		})
 	}
