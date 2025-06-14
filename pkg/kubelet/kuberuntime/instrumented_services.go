@@ -272,6 +272,15 @@ func (in instrumentedRuntimeService) PortForward(ctx context.Context, req *runti
 	return resp, err
 }
 
+func (in instrumentedRuntimeService) ImagePullProgress(ctx context.Context, req *runtimeapi.ImagePullProgressRequest) (*runtimeapi.ImagePullProgressResponse, error) {
+	const operation = "image_pull_progress"
+	defer recordOperation(operation, time.Now())
+
+	resp, err := in.service.ImagePullProgress(ctx, req)
+	recordError(operation, err)
+	return resp, err
+}
+
 func (in instrumentedRuntimeService) UpdatePodSandboxResources(ctx context.Context, req *runtimeapi.UpdatePodSandboxResourcesRequest) (*runtimeapi.UpdatePodSandboxResourcesResponse, error) {
 	const operation = "update_podsandbox_resources"
 	defer recordOperation(operation, time.Now())
