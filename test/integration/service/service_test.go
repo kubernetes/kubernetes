@@ -1215,3 +1215,95 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	}
 	t.Logf("Service %s deleted", testSvcName)
 }
+
+func Test_ServiceValidation_FeatureGateEnableDisable(t *testing.T) {
+
+	////////////////////////////////////////////////////////////////////////////
+	// Start kube-apiserver with RelaxedServiceNameValidation feature-gate
+	// enabled.
+	////////////////////////////////////////////////////////////////////////////
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, true)
+
+	sharedEtcd := framework.SharedEtcd()
+	server1 := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), sharedEtcd)
+
+	client1, err := clientset.NewForConfig(server1.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Create services with names that start with a digit and a letter.
+	//
+	// Assert that the services are created successfully with the feature gate enabled
+	////////////////////////////////////////////////////////////////////////////
+
+	ns := framework.CreateNamespaceOrDie(client1, "test-service-traffic-distribution", t)
+	makeService := func(serviceName string) *corev1.Service {
+		return &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      serviceName,
+				Namespace: ns.GetName(),
+			},
+			Spec: corev1.ServiceSpec{
+				Ports: []corev1.ServicePort{{Port: 443}},
+			},
+		}
+	}
+
+	// Expected to pass, as the feature gate is enabled
+	_, err = client1.CoreV1().Services(ns.Name).Create(t.Context(), makeService("test-service-1"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test service: %v", err)
+	}
+
+	// Expected to pass, as the feature gate is enabled
+	_, err = client1.CoreV1().Services(ns.Name).Create(t.Context(), makeService("9-test-service-1"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Successfully created service, but shouldn't have: %v", err)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Restart the kube-apiserver with RelaxedServiceNameValidation feature-gate
+	// disabled.
+	//
+	// Assert that the services are created using previous validation only
+	////////////////////////////////////////////////////////////////////////////
+
+	server1.TearDownFn()
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedServiceNameValidation, false)
+
+	server2 := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), sharedEtcd)
+	client2, err := clientset.NewForConfig(server2.ClientConfig)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	// Expected to pass, as the feature gate is disabled
+	_, err = client2.CoreV1().Services(ns.Name).Create(t.Context(), makeService("test-service-2"), metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create test service: %v", err)
+	}
+
+	// Expected to fail, as the feature gate is disabled and this name requires relaxed validation
+	_, err = client2.CoreV1().Services(ns.Name).Create(t.Context(), makeService("9-test-service-2"), metav1.CreateOptions{})
+	if err == nil {
+		t.Fatalf("Successfully created service, but shouldn't have: %v", err)
+	}
+
+	////////////////////////////////////////////////////////////////////////////
+	// Assert that the services created prior to the feature gate being disabled
+	// can still be patched successfully even though it requires relaxed validation.
+	////////////////////////////////////////////////////////////////////////////
+
+	// Expected to pass as the service was created before the feature gate was disabled
+	patch := []byte(`{"spec":{"selector":{"foo":"baz"}}}`)
+	_, err = client2.CoreV1().Services(ns.Name).Patch(t.Context(), "9-test-service-1", types.StrategicMergePatchType, patch, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("Failed to patch selector of service '9-test-service-1': %v", err)
+	}
+
+	server2.TearDownFn()
+}
