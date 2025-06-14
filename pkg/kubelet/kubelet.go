@@ -2024,7 +2024,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	// Fetch the pull secrets for the pod
-	pullSecrets := kl.getPullSecretsForPod(pod)
+	pullSecrets, missingPullSecretNames := kl.getPullSecretsForPod(pod)
 
 	// Ensure the pod is being probed
 	kl.probeManager.AddPod(pod)
@@ -2039,6 +2039,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	result := kl.containerRuntime.SyncPod(sctx, pod, podStatus, pullSecrets, kl.crashLoopBackOff)
 	kl.reasonCache.Update(pod.UID, result)
 
+	hasPullFailures := false
 	for _, r := range result.SyncResults {
 		if r.Action == kubecontainer.ResizePodInPlace {
 			if r.Error == nil {
@@ -2048,6 +2049,17 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, false)
 			}
 		}
+
+		// Record if this sync attempted any pulls that failed so we can emit an event about missing pull secrets only once.
+		// This only triggers if the sync actually attempted a pull - if the sync didn't pull due to a backoff it won't trigger again.
+		if errors.Is(r.Error, images.ErrImagePull) {
+			hasPullFailures = true
+		}
+	}
+
+	// If this sync had any image pull errors, and there are named pull secrets which couldn't be found, emit an event because it may be useful for debugging a configuration error.
+	if hasPullFailures && len(missingPullSecretNames) > 0 {
+		kl.recorder.Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets %v; attempting to pull the image might not succeed.", missingPullSecretNames)
 	}
 
 	return false, result.Error()
