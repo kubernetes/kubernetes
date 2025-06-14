@@ -42,8 +42,23 @@ import (
 //
 // Test failures are not propagated to the parent context.
 func WithError(tCtx TContext, err *error) (TContext, func()) {
+	return withError(tCtx, err, true)
+}
+
+// WithErrorLogging, in contrast to WithError, uses the normal ExpectNoError implementation
+// where an error is first logged and then the context is marked as failed.
+//
+// This is only useful if ExpectNoError is only called once. If is is called repeatedly
+// and the resulting error is handled by the caller (for example, in a polling
+// function), then WithError is more suitable.
+func WithErrorLogging(tCtx TContext, err *error) (TContext, func()) {
+	return withError(tCtx, err, false)
+}
+
+func withError(tCtx TContext, err *error, suppressUnexpectedErrorLogging bool) (TContext, func()) {
 	eCtx := &errorContext{
-		TContext: tCtx,
+		TContext:                       tCtx,
+		suppressUnexpectedErrorLogging: suppressUnexpectedErrorLogging,
 	}
 
 	return eCtx, func() {
@@ -64,9 +79,17 @@ func WithError(tCtx TContext, err *error) (TContext, func()) {
 type errorContext struct {
 	TContext
 
-	mutex  sync.Mutex
-	errors []error
-	failed bool
+	mutex                          sync.Mutex
+	errors                         []error
+	failed                         bool
+	suppressUnexpectedErrorLogging bool
+}
+
+func (eCtx *errorContext) Value(key any) any {
+	if key == suppressUnexpectedErrorLoggingKey {
+		return eCtx.suppressUnexpectedErrorLogging
+	}
+	return eCtx.TContext.Value(key)
 }
 
 func (eCtx *errorContext) finalize(err *error) {
