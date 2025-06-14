@@ -31,7 +31,14 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega"
+	gtypes "github.com/onsi/gomega/types"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -126,6 +133,12 @@ func (c *Cluster) LoadConfig(tCtx ktesting.TContext) *restclient.Config {
 //
 // This corresponds conceptually to https://gist.github.com/aojea/2c94034f8e86d08842e5916231eb3fe1.
 func (c *Cluster) UpdateAll(tCtx ktesting.TContext, dockerTag, releaseImagesDir string, kubeletBinary string) {
+	// Ensure that we have a client for the cluster.
+	restConfig := c.LoadConfig(tCtx)
+	restConfig.UserAgent = fmt.Sprintf("%s -- kindcluster", restclient.DefaultKubernetesUserAgent())
+	tCtx = ktesting.WithRESTConfig(tCtx, restConfig)
+
+	// In the order in which they need to be upgraded: apiserver first, rest doesn't matter.
 	controlPlaneComponents := []string{"kube-apiserver", "kube-controller-manager", "kube-scheduler"}
 	nodes := regexp.MustCompile(`[[:space:]]+`).Split(runKind(tCtx, "get", "nodes", "--name", c.name), -1)
 	workerNodes := make([]string, 0, len(nodes)-1)
@@ -141,17 +154,34 @@ func (c *Cluster) UpdateAll(tCtx ktesting.TContext, dockerTag, releaseImagesDir 
 	for _, node := range controlPlaneNodes {
 		for _, component := range controlPlaneComponents {
 			runKind(tCtx, "load", "image-archive", path.Join(releaseImagesDir, component+".tar"), "--name", c.name, "--nodes", node)
-			runCmd(tCtx, "docker", "exec", node, "sed", "-i", "-r", fmt.Sprintf(`s|^(.*image\:.*)\:.*$|\1-amd64\:%s|`, dockerTag), "/etc/kubernetes/manifests/"+component+".yaml")
+			manifestPath := "/etc/kubernetes/manifests/" + component + ".yaml"
+			manifest := runCmd(tCtx, "docker", "exec", node, "cat", manifestPath)
+			runAndLogCmd(tCtx, "docker", "exec", node, "sed", "-i", "-r", fmt.Sprintf(`s|^(.*image\:.*)\:.*$|\1-amd64\:%s|`, dockerTag), manifestPath)
+			modifiedManifest := runCmd(tCtx, "docker", "exec", node, "cat", manifestPath)
+			tCtx.Logf("Patched %s on node %s. Before:\n%s\n\nDiff:\n%s", manifestPath, node, manifest, cmp.Diff(manifest, modifiedManifest))
+			ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) *v1.Pod {
+				pod, err := tCtx.Client().CoreV1().Pods("kube-system").Get(tCtx, fmt.Sprintf("%s-%s-control-plane", component, c.name), metav1.GetOptions{})
+				tCtx.ExpectNoError(err)
+				return pod
+			}).WithTimeout(5*time.Minute).Should(useImage(dockerTag), "%s should have restarted with image %s", component, dockerTag)
 		}
 	}
 
-	// TODO: wait for restart
-
 	for _, node := range workerNodes {
-		runCmd(tCtx, "docker", "cp", kubeletBinary, node+":/usr/bin/kubelet")
+		runAndLogCmd(tCtx, "docker", "cp", kubeletBinary, node+":/usr/bin/kubelet")
 		// systemctl restart checks that the service comes up.
-		runCmd(tCtx, "docker", "exec", node, "systemctl", "restart", "kubelet")
+		runAndLogCmd(tCtx, "docker", "exec", node, "systemctl", "restart", "kubelet")
 	}
+}
+
+// useImage asserts that a pod's container runs with a certain image, identified via a substring (for example, the image version).
+func useImage(imageSubString string) gtypes.GomegaMatcher {
+	return gomega.HaveField("Status.ContainerStatuses", gomega.ConsistOf(
+		gomega.And(
+			gomega.HaveField("State.Running", gomega.Not(gomega.BeNil())),
+			gomega.HaveField("Image", gomega.ContainSubstring(imageSubString)),
+		),
+	))
 }
 
 // BuildImage ensures that there is a kind node image for the given version
@@ -191,10 +221,10 @@ func ServerDownloadURL(tCtx ktesting.TContext, major, minor uint) string {
 
 func runKind(tCtx ktesting.TContext, args ...string) string {
 	tCtx.Helper()
-	return runCmd(tCtx, "kind", args...)
+	return runAndLogCmd(tCtx, "kind", args...)
 }
 
-func runCmd(tCtx ktesting.TContext, name string, args ...string) string {
+func runAndLogCmd(tCtx ktesting.TContext, name string, args ...string) string {
 	tCtx.Helper()
 	tCtx.Logf("Running command: %s %s", name, strings.Join(args, " "))
 	cmd := exec.CommandContext(tCtx, name, args...)
@@ -222,4 +252,13 @@ func runCmd(tCtx ktesting.TContext, name string, args ...string) string {
 	tCtx.ExpectNoError(scanner.Err(), "read %s command output", name)
 
 	return output.String()
+}
+
+func runCmd(tCtx ktesting.TContext, name string, args ...string) string {
+	tCtx.Helper()
+	tCtx.Logf("Running command: %s %s", name, strings.Join(args, " "))
+	cmd := exec.CommandContext(tCtx, name, args...)
+	output, err := cmd.CombinedOutput()
+	tCtx.ExpectNoError(err, "command %s failed\noutput:\n%s", name, string(output))
+	return string(output)
 }

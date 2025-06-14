@@ -166,7 +166,7 @@ func buildReleaseImages(tCtx ktesting.TContext, repoRoot string) (string, string
 
 func runCmdIn(tCtx ktesting.TContext, dir string, name string, args ...string) string {
 	tCtx.Helper()
-	tCtx.Logf("Running command: %s %s", strings.Join(args, " "))
+	tCtx.Logf("Running command: %s %s", name, strings.Join(args, " "))
 	cmd := exec.CommandContext(tCtx, name, args...)
 	cmd.Dir = dir
 	var output strings.Builder
