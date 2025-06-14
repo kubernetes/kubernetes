@@ -146,9 +146,16 @@ func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containe
 				continue
 			}
 		}
-		if err := cgc.manager.removeContainer(ctx, containers[i].id); err != nil {
-			klog.ErrorS(err, "Failed to remove container", "containerID", containers[i].id)
-		}
+		go func() {
+			for attempt := 1; attempt <= 10; attempt++ {
+				if err := cgc.manager.removeContainer(ctx, containers[i].id); err != nil {
+					klog.ErrorS(err, "Failed to remove container", "containerID", containers[i].id, "try", attempt, "times")
+					time.Sleep(time.Duration(attempt) * time.Second)
+					continue
+				}
+				break
+			}
+		}()
 	}
 
 	// Assume we removed the containers so that we're not too aggressive.
