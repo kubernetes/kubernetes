@@ -62,6 +62,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 )
 
@@ -117,6 +118,8 @@ type ReplicaSetController struct {
 	// Controllers that need to be synced
 	queue workqueue.TypedRateLimitingInterface[string]
 
+	clock clock.PassiveClock
+
 	// Controller specific features; see ReplicaSetControllerFeatures for details.
 	controllerFeatures ReplicaSetControllerFeatures
 }
@@ -169,6 +172,7 @@ func NewBaseController(logger klog.Logger, rsInformer appsinformers.ReplicaSetIn
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: queueName},
 		),
+		clock:              clock.RealClock{},
 		controllerFeatures: controllerFeatures,
 	}
 
@@ -726,7 +730,7 @@ func (rsc *ReplicaSetController) getRSPods(rs *apps.ReplicaSet, orphanedPods boo
 // invoked concurrently with the same key.
 func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	logger := klog.FromContext(ctx)
-	startTime := time.Now()
+	startTime := rsc.clock.Now()
 	defer func() {
 		logger.V(4).Info("Finished syncing", "kind", rsc.Kind, "key", key, "duration", time.Since(startTime))
 	}()
@@ -778,7 +782,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string)
 		manageReplicasErr = rsc.manageReplicas(ctx, activePods, rs)
 	}
 	rs = rs.DeepCopy()
-	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr, rsc.controllerFeatures)
+	newStatus := calculateStatus(rs, activePods, terminatingPods, manageReplicasErr, rsc.controllerFeatures, rsc.clock)
 
 	// Always updates status as pods come up or die.
 	updatedRS, err := updateReplicaSetStatus(logger, rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace), rs, newStatus, rsc.controllerFeatures)
