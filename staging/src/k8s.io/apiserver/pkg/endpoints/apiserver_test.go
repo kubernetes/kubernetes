@@ -702,15 +702,6 @@ func (storage *SimpleTypedStorage) GetSingularName() string {
 	return "simple"
 }
 
-func bodyOrDie(response *http.Response) string {
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
-	return string(body)
-}
-
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	return extractBodyDecoder(response, object, codec)
 }
@@ -821,9 +812,7 @@ func TestNotFound(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, response.Body)
-			if response.StatusCode != test.Status {
-				t.Errorf("Expected %d for %s, Got %#v", test.Status, test.Method, response)
-			}
+			expectStatusCode(t, test.Status, response)
 		})
 	}
 }
@@ -894,12 +883,10 @@ func TestUnimplementedRESTStorage(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, response.Body)
-			data, err := io.ReadAll(response.Body)
+			expectStatusCode(t, test.ErrCode, response)
+			_, err = io.ReadAll(response.Body)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-			if response.StatusCode != test.ErrCode {
-				t.Fatalf("expected %d for %s, Got %s", test.ErrCode, test.Method, string(data))
 			}
 		})
 	}
@@ -965,12 +952,10 @@ func TestSomeUnimplementedRESTStorage(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, response.Body)
-			data, err := io.ReadAll(response.Body)
+			expectStatusCode(t, test.ErrCode, response)
+			_, err = io.ReadAll(response.Body)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
-			}
-			if response.StatusCode != test.ErrCode {
-				t.Fatalf("expected %d for %s, Got %s", test.ErrCode, test.Method, string(data))
 			}
 		})
 	}
@@ -1133,15 +1118,7 @@ func TestList(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, test.url, http.StatusOK, resp)
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				t.Logf("body: %s", string(body))
-				return
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 			if !simpleStorage.namespacePresent {
 				t.Error("namespace not set")
 			} else if simpleStorage.actualNamespace != test.namespace {
@@ -1192,14 +1169,7 @@ func TestRequestsWithInvalidQuery(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusBadRequest {
-				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, url, http.StatusBadRequest, resp)
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				t.Logf("body: %s", string(body))
-			}
+			expectStatusCode(t, http.StatusBadRequest, resp)
 		})
 	}
 }
@@ -1257,15 +1227,7 @@ func TestListCompression(t *testing.T) {
 				t.Fatalf("%d: unexpected error: %v", testIndex, err)
 			}
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				t.Errorf("unexpected status: %d from url %s, Expected: %d, %#v", resp.StatusCode, test.url, http.StatusOK, resp)
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-				t.Logf("body: %s", string(body))
-				return
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 			if !simpleStorage.namespacePresent {
 				t.Error("namespace not set")
 			} else if simpleStorage.actualNamespace != test.namespace {
@@ -1341,10 +1303,7 @@ func TestErrorList(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusInternalServerError, resp)
-	}
+	expectStatusCode(t, http.StatusInternalServerError, resp)
 }
 
 func TestNonEmptyList(t *testing.T) {
@@ -1371,15 +1330,7 @@ func TestNonEmptyList(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", resp.StatusCode, http.StatusOK, resp)
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		t.Logf("Data: %s", string(body))
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 
 	var listOut genericapitesting.SimpleList
 	body, err := extractBody(resp, &listOut)
@@ -1455,9 +1406,7 @@ func TestGet(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
@@ -1495,9 +1444,7 @@ func BenchmarkGet(b *testing.B) {
 				b.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(b, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				b.Fatalf("unexpected response: %#v", resp)
-			}
+			expectStatusCode(b, http.StatusOK, resp)
 			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 				b.Fatalf("unable to read body")
 			}
@@ -1542,9 +1489,7 @@ func BenchmarkGetNoCompression(b *testing.B) {
 				b.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(b, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				b.Fatalf("unexpected response: %#v", resp)
-			}
+			expectStatusCode(b, http.StatusOK, resp)
 			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 				b.Fatalf("unable to read body")
 			}
@@ -1591,9 +1536,7 @@ func TestGetCompression(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("unexpected response: %#v", resp)
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 			var decoder *json.Decoder
 			if test.acceptEncoding == "gzip" {
 				gzipReader, err := gzip.NewReader(resp.Body)
@@ -1673,9 +1616,7 @@ func TestGetPretty(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatal(err)
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 			var itemOut genericapitesting.Simple
 			body, err := extractBody(resp, &itemOut)
 			if err != nil {
@@ -1874,9 +1815,7 @@ func TestGetTable(t *testing.T) {
 				t.Fatal(err)
 			}
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Errorf("unexpected response: %#v", resp)
-				}
+				expectStatusCode(t, test.statusCode, resp)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 				if err != nil {
 					t.Fatalf("unexpected body read error: %v", err)
@@ -1887,9 +1826,7 @@ func TestGetTable(t *testing.T) {
 				}
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Errorf("unexpected response: %#v", resp)
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 			var itemOut metav1.Table
 			body, err := extractBody(resp, &itemOut)
 			if err != nil {
@@ -2086,9 +2023,7 @@ func TestWatchTable(t *testing.T) {
 			}
 			defer apitesting.Close(t, resp.Body)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Fatalf("unexpected response: %#v", resp)
-				}
+				expectStatusCode(t, test.statusCode, resp)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 				if err != nil {
 					t.Fatalf("unexpected body read error: %v", err)
@@ -2099,9 +2034,7 @@ func TestWatchTable(t *testing.T) {
 				}
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("unexpected response: %#v", resp)
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 
 			go func() {
 				defer simpleStorage.fakeWatch.Stop()
@@ -2283,9 +2216,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 			}
 			defer apitesting.Close(t, resp.Body)
 			if test.statusCode != 0 {
-				if resp.StatusCode != test.statusCode {
-					t.Errorf("unexpected response: %#v", resp)
-				}
+				expectStatusCode(t, test.statusCode, resp)
 				obj, _, err := extractBodyObject(resp, unstructured.UnstructuredJSONScheme)
 				if err != nil {
 					t.Fatalf("unexpected body read error: %v", err)
@@ -2296,9 +2227,7 @@ func TestGetPartialObjectMetadata(t *testing.T) {
 				}
 				return
 			}
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("invalid status: %#v\n%s", resp, bodyOrDie(resp))
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 			body := ""
 			if test.expected != nil {
 				itemOut, d, err := extractBodyObject(resp, metainternalversionscheme.Codecs.LegacyCodec(metav1beta1.SchemeGroupVersion))
@@ -2349,9 +2278,7 @@ func TestGetBinary(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2497,9 +2424,7 @@ func TestGetWithOptions(t *testing.T) {
 				t.Fatalf("%s: %v", test.name, err)
 			}
 			defer apitesting.Close(t, resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("%s: unexpected response: %#v", test.name, resp)
-			}
+			expectStatusCode(t, http.StatusOK, resp)
 
 			var itemOut runtime.Object
 			if test.rootScoped {
@@ -2559,9 +2484,7 @@ func TestGetMissing(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", resp)
-	}
+	expectStatusCode(t, http.StatusNotFound, resp)
 }
 
 func TestGetRetryAfter(t *testing.T) {
@@ -2583,9 +2506,7 @@ func TestGetRetryAfter(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("Unexpected response %#v", resp)
-	}
+	expectStatusCode(t, http.StatusInternalServerError, resp)
 	if resp.Header.Get("Retry-After") != "2" {
 		t.Errorf("Unexpected Retry-After header: %v", resp.Header)
 	}
@@ -2616,9 +2537,7 @@ func TestConnect(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -2657,9 +2576,7 @@ func TestConnectResponderObject(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusCreated {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusCreated, resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -2701,9 +2618,7 @@ func TestConnectResponderError(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusForbidden {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusForbidden, resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -2773,9 +2688,7 @@ func TestConnectWithOptions(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -2826,9 +2739,7 @@ func TestConnectWithOptionsAndPath(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -2866,14 +2777,12 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	res, err := client.Do(request)
+	resp, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer apitesting.Close(t, res.Body)
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %#v", res)
-	}
+	defer apitesting.Close(t, resp.Body)
+	expectStatusCode(t, http.StatusOK, resp)
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
@@ -2903,19 +2812,12 @@ func TestDeleteWithOptions(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	res, err := client.Do(request)
+	resp, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer apitesting.Close(t, res.Body)
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		t.Log(string(s))
-	}
+	defer apitesting.Close(t, resp.Body)
+	expectStatusCode(t, http.StatusOK, resp)
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
@@ -2945,19 +2847,12 @@ func TestDeleteWithOptionsQuery(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	res, err := client.Do(request)
+	resp, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer apitesting.Close(t, res.Body)
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		t.Log(string(s))
-	}
+	defer apitesting.Close(t, resp.Body)
+	expectStatusCode(t, http.StatusOK, resp)
 	if simpleStorage.deleted != ID {
 		t.Fatalf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
@@ -2990,19 +2885,12 @@ func TestDeleteWithOptionsQueryAndBody(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	res, err := client.Do(request)
+	resp, err := client.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer apitesting.Close(t, res.Body)
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("unexpected response: %s %#v", request.URL, res)
-		s, err := io.ReadAll(res.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		t.Log(string(s))
-	}
+	defer apitesting.Close(t, resp.Body)
+	expectStatusCode(t, http.StatusOK, resp)
 	if simpleStorage.deleted != ID {
 		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
@@ -3036,9 +2924,7 @@ func TestDeleteInvokesAdmissionControl(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, response.Body)
-			if response.StatusCode != http.StatusForbidden {
-				t.Errorf("Unexpected response %#v", response)
-			}
+			expectStatusCode(t, http.StatusForbidden, response)
 		})
 	}
 }
@@ -3065,9 +2951,7 @@ func TestDeleteMissing(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusNotFound, response)
 }
 
 func TestUpdate(t *testing.T) {
@@ -3151,9 +3035,7 @@ func TestUpdateInvokesAdmissionControl(t *testing.T) {
 			dump, _ := httputil.DumpResponse(response, true)
 			t.Log(string(dump))
 
-			if response.StatusCode != http.StatusForbidden {
-				t.Errorf("Unexpected response %#v", response)
-			}
+			expectStatusCode(t, http.StatusForbidden, response)
 		})
 	}
 }
@@ -3187,11 +3069,7 @@ func TestUpdateRequiresMatchingName(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		dump, _ := httputil.DumpResponse(response, true)
-		t.Log(string(dump))
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 }
 
 func TestUpdateAllowsMissingNamespace(t *testing.T) {
@@ -3228,10 +3106,7 @@ func TestUpdateAllowsMissingNamespace(t *testing.T) {
 	defer apitesting.Close(t, response.Body)
 	dump, _ := httputil.DumpResponse(response, true)
 	t.Log(string(dump))
-
-	if response.StatusCode != http.StatusOK {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusOK, response)
 }
 
 // when the object name and namespace can't be retrieved, don't update.  It isn't safe.
@@ -3309,9 +3184,7 @@ func TestUpdatePreventsMismatchedNamespace(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 }
 
 func TestUpdateMissing(t *testing.T) {
@@ -3348,9 +3221,7 @@ func TestUpdateMissing(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusNotFound, response)
 }
 
 func TestCreateNotFound(t *testing.T) {
@@ -3381,9 +3252,7 @@ func TestCreateNotFound(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusNotFound {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusNotFound, response)
 }
 
 func TestCreateChecksDecode(t *testing.T) {
@@ -3407,9 +3276,7 @@ func TestCreateChecksDecode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3529,9 +3396,7 @@ func TestNamedCreaterWithName(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusCreated, response)
 	if storage.createdName != pathName {
 		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
 	}
@@ -3578,9 +3443,7 @@ func TestNamedCreaterWithoutName(t *testing.T) {
 	}
 	defer apitesting.Close(t, response.Body)
 	// empty name is not allowed for NamedCreater
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 }
 
 type namePopulatorAdmissionControl struct {
@@ -3653,9 +3516,7 @@ func TestNamedCreaterWithGenerateName(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	expectStatusCode(t, http.StatusCreated, response)
 
 	var itemOut genericapitesting.Simple
 	body, err := extractBody(response, &itemOut)
@@ -3694,9 +3555,7 @@ func TestUpdateChecksDecode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v\n%s", response, readBodyOrDie(response.Body))
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -3756,9 +3615,7 @@ func TestCreate(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	expectStatusCode(t, http.StatusCreated, response)
 }
 
 func TestCreateYAML(t *testing.T) {
@@ -3822,9 +3679,7 @@ func TestCreateYAML(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	expectStatusCode(t, http.StatusCreated, response)
 }
 
 func TestCreateInNamespace(t *testing.T) {
@@ -3878,9 +3733,7 @@ func TestCreateInNamespace(t *testing.T) {
 	if !reflect.DeepEqual(&itemOut, simple) {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simple, string(body))
 	}
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusOK, response)
-	}
+	expectStatusCode(t, http.StatusCreated, response)
 }
 
 func TestCreateInvokeAdmissionControl(t *testing.T) {
@@ -3917,9 +3770,7 @@ func TestCreateInvokeAdmissionControl(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(t, response.Body)
-			if response.StatusCode != http.StatusForbidden {
-				t.Errorf("Unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusForbidden, response)
-			}
+			expectStatusCode(t, http.StatusForbidden, response)
 		})
 	}
 }
@@ -3945,9 +3796,7 @@ func expectAPIStatus(t *testing.T, method, url string, data []byte, code int) *m
 		t.Fatalf("unexpected error on %s %s: %v\nbody:\n%s", method, url, err, body)
 		return nil
 	}
-	if code != response.StatusCode {
-		t.Fatalf("Expected %s %s to return %d, Got %d: %v", method, url, code, response.StatusCode, body)
-	}
+	expectStatusCode(t, code, response)
 	return &status
 }
 
@@ -4019,10 +3868,7 @@ func TestWriteRAWJSONMarshalError(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("unexpected status code %d", resp.StatusCode)
-	}
+	expectStatusCode(t, http.StatusInternalServerError, resp)
 }
 
 func TestCreateTimeout(t *testing.T) {
@@ -4074,9 +3920,7 @@ func TestCreateChecksAPIVersion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -4117,9 +3961,7 @@ func TestCreateDefaultsAPIVersion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusCreated {
-		t.Errorf("unexpected status: %d, Expected: %d, %#v", response.StatusCode, http.StatusCreated, response)
-	}
+	expectStatusCode(t, http.StatusCreated, response)
 }
 
 func TestUpdateChecksAPIVersion(t *testing.T) {
@@ -4143,9 +3985,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, response.Body)
-	if response.StatusCode != http.StatusBadRequest {
-		t.Errorf("Unexpected response %#v", response)
-	}
+	expectStatusCode(t, http.StatusBadRequest, response)
 	b, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -4306,8 +4146,9 @@ unknown: baz`)
 			defer apitesting.Close(t, response.Body)
 			buf := new(bytes.Buffer)
 			buf.ReadFrom(response.Body)
+			expectStatusCode(t, test.expectedStatusCode, response)
 
-			if response.StatusCode != test.expectedStatusCode || !strings.Contains(buf.String(), test.expectedErr) {
+			if !strings.Contains(buf.String(), test.expectedErr) {
 				t.Fatalf("unexpected response: %#v, expected err: %#v", response, test.expectedErr)
 			}
 
@@ -4421,9 +4262,7 @@ other: bar`)
 				baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
 				response := runRequest(b, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
 				defer apitesting.Close(b, response.Body)
-				if response.StatusCode != test.expectedStatusCode {
-					b.Fatalf("unexpected status code: %d, expected: %d", response.StatusCode, test.expectedStatusCode)
-				}
+				expectStatusCode(b, test.expectedStatusCode, response)
 			}
 		})
 	}
@@ -4515,9 +4354,7 @@ func TestXGSubresource(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	defer apitesting.Close(t, resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected response: %#v", resp)
-	}
+	expectStatusCode(t, http.StatusOK, resp)
 	var itemOut genericapitesting.SimpleXGSubresource
 	body, err := extractBody(resp, &itemOut)
 	if err != nil {
@@ -4545,14 +4382,6 @@ func TestXGSubresource(t *testing.T) {
 	if itemOut.Name != subresourceStorage.item.Name {
 		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, subresourceStorage.item, string(body))
 	}
-}
-
-func readBodyOrDie(r io.Reader) []byte {
-	body, err := io.ReadAll(r)
-	if err != nil {
-		panic(err)
-	}
-	return body
 }
 
 // BenchmarkUpdateProtobuf measures the cost of processing an update on the server in proto
@@ -4592,10 +4421,7 @@ func BenchmarkUpdateProtobuf(b *testing.B) {
 				b.Fatalf("unexpected error: %v", err)
 			}
 			defer apitesting.Close(b, response.Body)
-			if response.StatusCode != http.StatusBadRequest {
-				body, _ := io.ReadAll(response.Body)
-				b.Fatalf("Unexpected response %#v\n%s", response, body)
-			}
+			expectStatusCode(b, http.StatusBadRequest, response)
 			_, _ = io.ReadAll(response.Body)
 		}()
 	}
@@ -4623,4 +4449,29 @@ func benchmarkItems(b *testing.B) []example.Pod {
 		clientapiObjectFuzzer.Fill(&items[i])
 	}
 	return items
+}
+
+// testingT matches *testing.T and *testing.B
+type testingT interface {
+	Errorf(format string, args ...any)
+	FailNow()
+}
+
+// expectStatusCode tests that the response status code matches the expectedStatusCode,
+// otherwise it reads the body, closes the body, fails the test, and prints the
+// response body for debugging.
+func expectStatusCode(t testingT, expectedStatusCode int, response *http.Response) {
+	if response.StatusCode != expectedStatusCode {
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			t.Errorf("failed to read body: %v", err)
+		}
+		err = response.Body.Close()
+		if err != nil {
+			t.Errorf("failed to close body: %v", err)
+		}
+		t.Errorf("Unexpected response status: expected %v, but got %v: body:\n%s",
+			expectedStatusCode, response.StatusCode, string(body))
+		t.FailNow()
+	}
 }
