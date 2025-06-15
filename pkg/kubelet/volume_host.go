@@ -18,7 +18,6 @@ package kubelet
 
 import (
 	"fmt"
-	"net"
 	"runtime"
 
 	"k8s.io/klog/v2"
@@ -221,14 +220,6 @@ func (kvh *kubeletVolumeHost) GetMounter(pluginName string) mount.Interface {
 
 func (kvh *kubeletVolumeHost) GetHostName() string {
 	return kvh.kubelet.hostname
-}
-
-func (kvh *kubeletVolumeHost) GetHostIP() (net.IP, error) {
-	hostIPs, err := kvh.kubelet.GetHostIPs()
-	if err != nil {
-		return nil, err
-	}
-	return hostIPs[0], err
 }
 
 func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {

@@ -18,7 +18,6 @@ package selinuxwarning
 
 import (
 	"fmt"
-	"net"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -79,10 +78,6 @@ func (c *Controller) GetMounter(pluginName string) mount.Interface {
 
 func (c *Controller) GetHostName() string {
 	return ""
-}
-
-func (c *Controller) GetHostIP() (net.IP, error) {
-	return nil, fmt.Errorf("GetHostIP() not supported by SELinux controller VolumeHost implementation")
 }
 
 func (c *Controller) GetNodeAllocatable() (v1.ResourceList, error) {
