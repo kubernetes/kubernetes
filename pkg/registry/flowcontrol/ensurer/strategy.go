@@ -21,12 +21,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/google/go-cmp/cmp" //nolint:depguard
 	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 )
@@ -285,13 +285,13 @@ func EnsureConfiguration[ObjectType configurationObjectType](ctx context.Context
 	if !update {
 		if klogV := klog.V(5); klogV.Enabled() {
 			klogV.InfoS("No update required", "wrapper", bootstrap.GetObjectKind().GroupVersionKind().Kind, "type", configurationType, "name", name,
-				"diff", cmp.Diff(current, bootstrap))
+				"diff", diff.Diff(current, bootstrap))
 		}
 		return nil
 	}
 
 	if _, err = ops.Update(ctx, newObject, metav1.UpdateOptions{FieldManager: fieldManager}); err == nil {
-		klog.V(2).Infof("Updated the %T type=%s name=%q diff: %s", bootstrap, configurationType, name, cmp.Diff(current, bootstrap))
+		klog.V(2).Infof("Updated the %T type=%s name=%q diff: %s", bootstrap, configurationType, name, diff.Diff(current, bootstrap))
 		return nil
 	}
 
