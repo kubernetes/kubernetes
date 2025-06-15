@@ -40,7 +40,7 @@ type PodFilter interface {
 	Name() string
 	WithRESTMapper(mapper apimeta.RESTMapper) PodFilter
 	WithCache(cache *ControllerCache) PodFilter
-	WithDynamicClient(client *dynamic.DynamicClient) PodFilter
+	WithDynamicClient(client dynamic.Interface) PodFilter
 }
 
 // OwnerReferencesFilter filters pods by ownership chain
@@ -49,7 +49,7 @@ type OwnerReferencesFilter struct {
 	Client        appsv1client.AppsV1Interface
 	RESTMapper    apimeta.RESTMapper
 	Cache         *ControllerCache
-	dynamicClient *dynamic.DynamicClient
+	dynamicClient dynamic.Interface
 }
 
 func (f *OwnerReferencesFilter) WithClient(client appsv1client.AppsV1Interface) PodFilter {
@@ -71,7 +71,7 @@ func (f *OwnerReferencesFilter) WithCache(cache *ControllerCache) PodFilter {
 	return f
 }
 
-func (f *OwnerReferencesFilter) WithDynamicClient(client *dynamic.DynamicClient) PodFilter {
+func (f *OwnerReferencesFilter) WithDynamicClient(client dynamic.Interface) PodFilter {
 	f.dynamicClient = client
 	return f
 }
@@ -208,7 +208,7 @@ func (f *LabelSelectorFilter) Name() string {
 	return string(autoscalingv2.LabelSelector)
 }
 
-func (f *LabelSelectorFilter) WithDynamicClient(client *dynamic.DynamicClient) PodFilter {
+func (f *LabelSelectorFilter) WithDynamicClient(client dynamic.Interface) PodFilter {
 	// No-op for label selector
 	return f
 }

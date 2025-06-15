@@ -133,7 +133,7 @@ type HorizontalController struct {
 	// Storage of HPAs and their selectors.
 	hpaSelectors    *selectors.BiMultimap
 	hpaSelectorsMux sync.Mutex
-	dynamicClient   *dynamic.DynamicClient
+	dynamicClient   dynamic.Interface
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -151,7 +151,7 @@ func NewHorizontalController(
 	tolerance float64,
 	cpuInitializationPeriod,
 	delayOfInitialReadinessStatus time.Duration,
-	dynamicClient *dynamic.DynamicClient,
+	dynamicClient dynamic.Interface,
 ) *HorizontalController {
 	broadcaster := record.NewBroadcaster(record.WithContext(ctx))
 	broadcaster.StartStructuredLogging(3)
