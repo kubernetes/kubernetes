@@ -1813,12 +1813,29 @@ func (e *WorkloadExecutor) runChurnOp(opIndex int, op *churnOp) error {
 			dynRes = e.tCtx.Dynamic().Resource(gvr)
 		}
 
+		capturedGVK := *gvk
+		capturedNamespace := namespace
+		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
+			capturedNamespace = ""
+		}
+
 		churnFns = append(churnFns, func(name string) string {
 			if name != "" {
-				if err := dynRes.Delete(e.tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
-					e.tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
+				shouldDelete := true
+				if capturedGVK.Kind == "Pod" && capturedGVK.Group == "" {
+					pod, err := e.tCtx.Client().CoreV1().Pods(capturedNamespace).Get(e.tCtx, name, metav1.GetOptions{})
+					if err == nil {
+						shouldDelete = len(pod.Spec.NodeName) > 0
+					}
 				}
-				return ""
+
+				if shouldDelete {
+					if err := dynRes.Delete(e.tCtx, name, metav1.DeleteOptions{}); err != nil && !errors.Is(err, context.Canceled) {
+						e.tCtx.Errorf("op %d: unable to delete %v: %v", opIndex, name, err)
+					}
+					return ""
+				}
+				return name
 			}
 
 			live, err := dynRes.Create(e.tCtx, unstructuredObj, metav1.CreateOptions{})
