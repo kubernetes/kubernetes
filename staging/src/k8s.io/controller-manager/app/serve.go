@@ -62,6 +62,7 @@ func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, healthzHandle
 		routes.Profiling{}.Install(mux)
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
+			goruntime.SetMutexProfileFraction(1)
 		}
 		routes.DebugFlags{}.Install(mux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
