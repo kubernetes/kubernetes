@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/ptr"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -315,7 +316,7 @@ func GetIndexOfContainerStatus(statuses []v1.ContainerStatus, name string) (int,
 // Precondition for an available pod is that it must be ready. On top
 // of that, there are two cases when a pod can be considered available:
 // 1. minReadySeconds == 0, or
-// 2. LastTransitionTime (is set) + minReadySeconds < current time
+// 2. LastTransitionTime (is set) + minReadySeconds <= current time
 func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 	if !IsPodReady(pod) {
 		return false
@@ -323,10 +324,27 @@ func IsPodAvailable(pod *v1.Pod, minReadySeconds int32, now metav1.Time) bool {
 
 	c := GetPodReadyCondition(pod.Status)
 	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
-	if minReadySeconds == 0 || (!c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Before(now.Time)) {
+	if minReadySeconds == 0 || (!c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(minReadySecondsDuration).Compare(now.Time) <= 0) {
 		return true
 	}
 	return false
+}
+
+func NextPodAvailabilityCheck(pod *v1.Pod, minReadySeconds int32, now time.Time) *time.Duration {
+	if !IsPodReady(pod) || minReadySeconds <= 0 {
+		return nil
+	}
+
+	c := GetPodReadyCondition(pod.Status)
+	if c.LastTransitionTime.IsZero() {
+		return nil
+	}
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	nextCheck := c.LastTransitionTime.Add(minReadySecondsDuration).Sub(now)
+	if nextCheck > 0 {
+		return ptr.To(nextCheck)
+	}
+	return nil
 }
 
 // IsPodReady returns true if a pod is ready; false otherwise.
