@@ -96,6 +96,13 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 		})
 	}
 
+	if pod.Spec.RestartPolicy != api.RestartPolicyAlways {
+		// RestartPolicy for static pods can only be Always,
+		// since the Kubelet doesn't track the pod status in a persistent way.
+		pod.Spec.RestartPolicy = api.RestartPolicyAlways
+		klog.V(5).InfoS("Set restartPolicy for static pod as Always", "pod", klog.KObj(pod), "source", source)
+	}
+
 	// Set the default status to pending.
 	pod.Status.Phase = api.PodPending
 	return nil
