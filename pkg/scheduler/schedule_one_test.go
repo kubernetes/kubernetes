@@ -4199,7 +4199,7 @@ func setupTestScheduler(ctx context.Context, t *testing.T, queuedPodStore *clien
 		nodeInfoSnapshot:         snapshot,
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 		NextPod: func(logger klog.Logger) (*framework.QueuedPodInfo, error) {
-			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(queuedPodStore).(*v1.Pod))}, nil
+			return &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(t, clientcache.Pop(context.Background(), queuedPodStore).(*v1.Pod))}, nil
 		},
 		SchedulingQueue: schedulingQueue,
 		Profiles:        profile.Map{testSchedulerName: fwk},
