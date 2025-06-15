@@ -51,6 +51,10 @@ func (p *streamProtocolV4) handleResizes() {
 	p.streamProtocolV3.handleResizes()
 }
 
+func (p *streamProtocolV4) streams() (count int) {
+	return p.streamProtocolV3.streams()
+}
+
 func (p *streamProtocolV4) stream(conn streamCreator) error {
 	if err := p.createStreams(conn); err != nil {
 		return err
