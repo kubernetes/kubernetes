@@ -39,8 +39,16 @@ declare -A QEMUARCHS=( ["amd64"]="x86_64" ["arm"]="arm" ["arm64"]="aarch64" ["pp
 # NOTE(claudiub): In the test image build jobs, this script is not being run in a git repository,
 # which would cause git log to fail. Instead, we can use the GIT_COMMIT_ID set in cloudbuild.yaml.
 GIT_COMMIT_ID=$(git log -1 --format=%h || echo "${GIT_COMMIT_ID}")
-windows_os_versions=(1809 ltsc2022)
+windows_os_versions=(1809 ltsc2022 ltsc2025)
 declare -A WINDOWS_OS_VERSIONS_MAP
+
+# Get the version of busybox from the VERSION file.
+# This is used to replace the BUSYBOX-VERSION placeholder in the BASEIMAGE file.
+BUSYBOX_VERSION=$(<"${KUBE_ROOT}/test/images/busybox/VERSION")
+
+# Get the version of agnhost from the VERSION file.
+# This is used to replace the AGNHOST-VERSION placeholder in the BASEIMAGE file.
+AGNHOST_VERSION=$(<"${KUBE_ROOT}/test/images/agnhost/VERSION")
 
 initWindowsOsVersions() {
   for os_version in "${windows_os_versions[@]}"; do
@@ -56,7 +64,10 @@ initWindowsOsVersions
 # Returns list of all supported architectures from BASEIMAGE file
 listOsArchs() {
   local image=${1}
-  cut -d "=" -f 1 "${image}"/BASEIMAGE
+  sed \
+  -e "s/BUSYBOX-VERSION/${BUSYBOX_VERSION}/g" \
+  -e "s/AGNHOST-VERSION/${AGNHOST_VERSION}/g" \
+  "${image}/BASEIMAGE" | cut -d "=" -f 1
 }
 
 splitOsArch() {
@@ -84,7 +95,10 @@ splitOsArch() {
 # Returns baseimage need to used in Dockerfile for any given architecture
 getBaseImage() {
   os_arch=$1
-  grep "${os_arch}=" BASEIMAGE | cut -d= -f2
+  sed \
+  -e "s/BUSYBOX-VERSION/${BUSYBOX_VERSION}/g" \
+  -e "s/AGNHOST-VERSION/${AGNHOST_VERSION}/g" \
+  BASEIMAGE | grep "${os_arch}=" | cut -d= -f2
 }
 
 # This function will build test image for all the architectures
