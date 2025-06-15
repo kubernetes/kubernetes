@@ -488,6 +488,9 @@ type namespacedName struct {
 
 func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions) (watch.Interface, error) {
 	pred := opts.Predicate
+	if opts.WithObjectSize {
+		return nil, fmt.Errorf("unexpected: Watch with object size sent do cache")
+	}
 	requestedWatchRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
 		return nil, err
@@ -726,6 +729,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 	preparedKey := key
 	if opts.Recursive && !strings.HasSuffix(key, "/") {
 		preparedKey += "/"
+	}
+	if opts.WithObjectSize {
+		return fmt.Errorf("unexpected: List request with object size sent do cache")
 	}
 	listRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
@@ -1374,6 +1380,10 @@ func (c *Cacher) ShouldDelegateConsistentRead() (delegator.Result, error) {
 		ConsistentRead: true,
 		ShouldDelegate: !delegator.ConsistentReadSupported(),
 	}, nil
+}
+
+func (c *Cacher) Stats(ctx context.Context, resourceVersion uint64) (storage.Stats, error) {
+	return c.watchCache.WaitUntilFreshAndStats(ctx, resourceVersion)
 }
 
 // Implements watch.Interface.

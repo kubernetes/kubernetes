@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 )
@@ -72,6 +73,10 @@ type storeIndexer interface {
 	ByIndex(indexName, indexedValue string) ([]interface{}, error)
 }
 
+type statser interface {
+	Stats() storage.Stats
+}
+
 type orderedLister interface {
 	ListPrefix(prefix, continueKey string) []interface{}
 	Count(prefix, continueKey string) (count int)
@@ -95,6 +100,7 @@ type storeElement struct {
 	Object runtime.Object
 	Labels labels.Set
 	Fields fields.Set
+	Size   int64
 }
 
 func storeElementKey(obj interface{}) (string, error) {

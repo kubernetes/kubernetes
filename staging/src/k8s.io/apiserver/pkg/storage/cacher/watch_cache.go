@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -156,6 +157,8 @@ type watchCache struct {
 
 	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
 	snapshots Snapshotter
+
+	accessor meta.MetadataAccessor
 }
 
 func newWatchCache(
@@ -186,6 +189,7 @@ func newWatchCache(
 		versioner:           versioner,
 		groupResource:       groupResource,
 		waitingUntilFresh:   progressRequester,
+		accessor:            meta.NewAccessor(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		wc.snapshots = newStoreSnapshotter()
@@ -273,13 +277,7 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 // at any point in time.
 func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
 	metrics.EventsReceivedCounter.WithLabelValues(w.groupResource.Group, w.groupResource.Resource).Inc()
-
-	key, err := w.keyFunc(event.Object)
-	if err != nil {
-		return fmt.Errorf("couldn't compute key: %v", err)
-	}
-	elem := &storeElement{Key: key, Object: event.Object}
-	elem.Labels, elem.Fields, err = w.getAttrsFunc(event.Object)
+	elem, err := w.newElement(event.Object)
 	if err != nil {
 		return err
 	}
@@ -289,7 +287,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		Object:          elem.Object,
 		ObjLabels:       elem.Labels,
 		ObjFields:       elem.Fields,
-		Key:             key,
+		Key:             elem.Key,
 		ResourceVersion: resourceVersion,
 		RecordTime:      w.clock.Now(),
 	}
@@ -345,6 +343,27 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 	}
 	metrics.RecordResourceVersion(w.groupResource, resourceVersion)
 	return nil
+}
+
+func (w *watchCache) newElement(obj runtime.Object) (*storeElement, error) {
+	key, err := w.keyFunc(obj)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't compute key: %w", err)
+	}
+	elem := &storeElement{Key: key, Object: obj}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.SizeBasedListCostEstimate) {
+		elem.Size, err = storage.ReadAndRemoveObjectSizeLabel(w.accessor, obj)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	elem.Labels, elem.Fields, err = w.getAttrsFunc(obj)
+	if err != nil {
+		return nil, err
+	}
+	return elem, nil
 }
 
 // Assumes that lock is already held for write.
@@ -631,6 +650,26 @@ func (w *watchCache) ListKeys() []string {
 	return w.store.ListKeys()
 }
 
+func (w *watchCache) WaitUntilFreshAndStats(ctx context.Context, resourceVersion uint64) (storage.Stats, error) {
+	var err error
+	if delegator.ConsistentReadSupported() && w.notFresh(resourceVersion) {
+		w.waitingUntilFresh.Add()
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+		w.waitingUntilFresh.Remove()
+	} else {
+		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
+	}
+	defer w.RUnlock()
+	if err != nil {
+		return storage.Stats{}, err
+	}
+	statser, ok := w.store.(statser)
+	if !ok {
+		return statser.Stats(), fmt.Errorf("Stats() not supported for store")
+	}
+	return statser.Stats(), nil
+}
+
 // Get takes runtime.Object as a parameter. However, it returns
 // pointer to <storeElement>.
 func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
@@ -664,20 +703,11 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		if !ok {
 			return fmt.Errorf("didn't get runtime.Object for replace: %#v", obj)
 		}
-		key, err := w.keyFunc(object)
-		if err != nil {
-			return fmt.Errorf("couldn't compute key: %v", err)
-		}
-		objLabels, objFields, err := w.getAttrsFunc(object)
+		elem, err := w.newElement(object)
 		if err != nil {
 			return err
 		}
-		toReplace = append(toReplace, &storeElement{
-			Key:    key,
-			Object: object,
-			Labels: objLabels,
-			Fields: objFields,
-		})
+		toReplace = append(toReplace, elem)
 	}
 
 	w.Lock()
