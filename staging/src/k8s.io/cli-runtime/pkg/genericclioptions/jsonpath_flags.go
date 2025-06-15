@@ -18,8 +18,9 @@ package genericclioptions
 
 import (
 	"fmt"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -48,12 +49,7 @@ type JSONPathPrintFlags struct {
 
 // AllowedFormats returns slice of string of allowed JSONPath printing format
 func (f *JSONPathPrintFlags) AllowedFormats() []string {
-	formats := make([]string, 0, len(jsonFormats))
-	for format := range jsonFormats {
-		formats = append(formats, format)
-	}
-	sort.Strings(formats)
-	return formats
+	return slices.Sorted(maps.Keys(jsonFormats))
 }
 
 // ToPrinter receives an templateFormat and returns a printer capable of

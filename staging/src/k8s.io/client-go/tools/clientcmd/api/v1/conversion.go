@@ -18,6 +18,8 @@ package v1
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 
 	"k8s.io/apimachinery/pkg/conversion"
@@ -44,11 +46,7 @@ func Convert_Slice_v1_NamedCluster_To_Map_string_To_Pointer_api_Cluster(in *[]Na
 }
 
 func Convert_Map_string_To_Pointer_api_Cluster_To_Slice_v1_NamedCluster(in *map[string]*api.Cluster, out *[]NamedCluster, s conversion.Scope) error {
-	allKeys := make([]string, 0, len(*in))
-	for key := range *in {
-		allKeys = append(allKeys, key)
-	}
-	sort.Strings(allKeys)
+	allKeys := slices.Sorted(maps.Keys(*in))
 
 	for _, key := range allKeys {
 		newCluster := (*in)[key]
@@ -118,11 +116,7 @@ func Convert_Slice_v1_NamedContext_To_Map_string_To_Pointer_api_Context(in *[]Na
 }
 
 func Convert_Map_string_To_Pointer_api_Context_To_Slice_v1_NamedContext(in *map[string]*api.Context, out *[]NamedContext, s conversion.Scope) error {
-	allKeys := make([]string, 0, len(*in))
-	for key := range *in {
-		allKeys = append(allKeys, key)
-	}
-	sort.Strings(allKeys)
+	allKeys := slices.Sorted(maps.Keys(*in))
 
 	for _, key := range allKeys {
 		newContext := (*in)[key]
@@ -155,11 +149,7 @@ func Convert_Slice_v1_NamedExtension_To_Map_string_To_runtime_Object(in *[]Named
 }
 
 func Convert_Map_string_To_runtime_Object_To_Slice_v1_NamedExtension(in *map[string]runtime.Object, out *[]NamedExtension, s conversion.Scope) error {
-	allKeys := make([]string, 0, len(*in))
-	for key := range *in {
-		allKeys = append(allKeys, key)
-	}
-	sort.Strings(allKeys)
+	allKeys := slices.Sorted(maps.Keys(*in))
 
 	for _, key := range allKeys {
 		newExtension := (*in)[key]
