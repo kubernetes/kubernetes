@@ -30,6 +30,7 @@ type IPBlockApplyConfiguration struct {
 func IPBlock() *IPBlockApplyConfiguration {
 	return &IPBlockApplyConfiguration{}
 }
+func (b IPBlockApplyConfiguration) IsApplyConfiguration() {}
 
 // WithCIDR sets the CIDR field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

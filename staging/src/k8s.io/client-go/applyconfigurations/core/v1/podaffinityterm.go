@@ -38,6 +38,7 @@ type PodAffinityTermApplyConfiguration struct {
 func PodAffinityTerm() *PodAffinityTermApplyConfiguration {
 	return &PodAffinityTermApplyConfiguration{}
 }
+func (b PodAffinityTermApplyConfiguration) IsApplyConfiguration() {}
 
 // WithLabelSelector sets the LabelSelector field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

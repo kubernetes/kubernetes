@@ -34,6 +34,7 @@ type CapabilitiesApplyConfiguration struct {
 func Capabilities() *CapabilitiesApplyConfiguration {
 	return &CapabilitiesApplyConfiguration{}
 }
+func (b CapabilitiesApplyConfiguration) IsApplyConfiguration() {}
 
 // WithAdd adds the given value to the Add field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.

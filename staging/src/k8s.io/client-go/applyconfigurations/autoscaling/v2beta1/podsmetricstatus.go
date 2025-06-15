@@ -36,6 +36,7 @@ type PodsMetricStatusApplyConfiguration struct {
 func PodsMetricStatus() *PodsMetricStatusApplyConfiguration {
 	return &PodsMetricStatusApplyConfiguration{}
 }
+func (b PodsMetricStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithMetricName sets the MetricName field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

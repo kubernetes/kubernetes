@@ -33,6 +33,7 @@ type FlowDistinguisherMethodApplyConfiguration struct {
 func FlowDistinguisherMethod() *FlowDistinguisherMethodApplyConfiguration {
 	return &FlowDistinguisherMethodApplyConfiguration{}
 }
+func (b FlowDistinguisherMethodApplyConfiguration) IsApplyConfiguration() {}
 
 // WithType sets the Type field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.

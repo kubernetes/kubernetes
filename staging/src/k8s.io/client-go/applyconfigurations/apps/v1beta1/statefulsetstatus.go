@@ -38,6 +38,7 @@ type StatefulSetStatusApplyConfiguration struct {
 func StatefulSetStatus() *StatefulSetStatusApplyConfiguration {
 	return &StatefulSetStatusApplyConfiguration{}
 }
+func (b StatefulSetStatusApplyConfiguration) IsApplyConfiguration() {}
 
 // WithObservedGeneration sets the ObservedGeneration field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
