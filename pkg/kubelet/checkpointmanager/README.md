@@ -7,19 +7,23 @@ caused by the checkpointing.
 
 ## Introduction
 This folder contains a framework & primitives, Checkpointing Manager, which is
-used by several other Kubelet submodules, `dockershim`, `devicemanager`, `pods`
-and `cpumanager`, to implement checkpointing at each submodule level. As already
-explained in above `Disclaimer` section, think twice before introducing any further
-checkpointing in Kubelet. If still checkpointing is required, then this folder
-provides the common APIs and the framework for implementing checkpointing.
-Using same APIs across all the submodules will help maintaining consistency at
-Kubelet level.
+used by several other Kubelet submodules, `dockershim`, `devicemanager`, `pods`,
+`cpumanager`, `memorymanager`, `dra` and `allocationmanager`, to implement 
+checkpointing at each submodule level. As already explained in above `Disclaimer`
+section, think twice before introducing any further checkpointing in Kubelet.
+If still checkpointing is required, then this folder provides the common APIs
+and the framework for implementing checkpointing. Using same APIs across all
+the submodules will help maintaining consistency at Kubelet level.
 
 Below is the history of checkpointing support in Kubelet.
 
 | Package | First checkpointing support merged on | PR link |
 | ------- | --------------------------------------| ------- |
-|kubelet/dockershim | Feb 3, 2017 | [[CRI] Implement Dockershim Checkpoint](https://github.com/kubernetes/kubernetes/pull/39903)
-|devicemanager| Sep 6, 2017 | [Deviceplugin checkpoint](https://github.com/kubernetes/kubernetes/pull/51744)
+| kubelet/dockershim | Feb 3, 2017 | [[CRI] Implement Dockershim Checkpoint](https://github.com/kubernetes/kubernetes/pull/39903)
+| devicemanager | Sep 6, 2017 | [Deviceplugin checkpoint](https://github.com/kubernetes/kubernetes/pull/51744)
 | kubelet/pod | Nov 22, 2017 | [Initial basic bootstrap-checkpoint support](https://github.com/kubernetes/kubernetes/pull/50984)
-|cpumanager| Oct 27, 2017 |[Add file backed state to cpu manager ](https://github.com/kubernetes/kubernetes/pull/54408)
+| cpumanager | Oct 27, 2017 |[Add file backed state to cpu manager](https://github.com/kubernetes/kubernetes/pull/54408)
+| memorymanager| Feb 9, 2021 |[Memory manager](https://github.com/kubernetes/kubernetes/pull/95479)
+| dra | Mar 12, 2023 |[kubelet dra: Add checkpointing mechanism in the DRA Manager ](https://github.com/kubernetes/kubernetes/pull/115912)
+| dra | Jul 24, 2024 |[DRA:refactor checkpointing](https://github.com/kubernetes/kubernetes/pull/126303)
+| allocationmanager | Feb 28, 2025 |[Move pod resource allocation management out of the status manager](https://github.com/kubernetes/kubernetes/pull/130254)
