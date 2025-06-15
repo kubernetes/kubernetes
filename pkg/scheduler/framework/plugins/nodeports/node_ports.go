@@ -65,11 +65,11 @@ func (pl *NodePorts) Name() string {
 }
 
 // PreFilter invoked at the prefilter extension point.
-func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *NodePorts) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	s := util.GetHostPorts(pod)
 	// Skip if a pod has no ports.
 	if len(s) == 0 {
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, preFilterState(s))
 	return nil, nil
@@ -154,15 +154,15 @@ func (pl *NodePorts) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Po
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *NodePorts) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	wantPorts, err := getPreFilterState(cycleState)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	fits := fitsPorts(wantPorts, nodeInfo)
 	if !fits {
-		return framework.NewStatus(framework.Unschedulable, ErrReason)
+		return fwk.NewStatus(fwk.Unschedulable, ErrReason)
 	}
 
 	return nil

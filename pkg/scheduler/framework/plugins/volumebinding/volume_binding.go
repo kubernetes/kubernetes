@@ -350,24 +350,24 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 // PreFilter invoked at the prefilter extension point to check if pod has all
 // immediate PVCs bound. If not all immediate PVCs are bound, an
 // UnschedulableAndUnresolvable is returned.
-func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *framework.Status) {
+func (pl *VolumeBinding) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) (*framework.PreFilterResult, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 	// If pod does not reference any PVC, we don't need to do anything.
 	if hasPVC, err := pl.podHasPVCs(pod); err != nil {
-		return nil, framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, err.Error())
 	} else if !hasPVC {
 		state.Write(stateKey, &stateData{})
-		return nil, framework.NewStatus(framework.Skip)
+		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	podVolumeClaims, err := pl.Binder.GetPodVolumeClaims(logger, pod)
 	if err != nil {
-		return nil, framework.AsStatus(err)
+		return nil, fwk.AsStatus(err)
 	}
 	if len(podVolumeClaims.unboundClaimsImmediate) > 0 {
 		// Return UnschedulableAndUnresolvable error if immediate claims are
 		// not bound. Pod will be moved to active/backoff queues once these
 		// claims are bound by PV controller.
-		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
+		status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable)
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
 		return nil, status
 	}
@@ -414,23 +414,23 @@ func getStateData(cs fwk.CycleState) (*stateData, error) {
 //
 // The predicate returns true if all bound PVCs have compatible PVs with the node, and if all unbound
 // PVCs can be matched with an available and node-compatible PV.
-func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *fwk.Status {
 	logger := klog.FromContext(ctx)
 	node := nodeInfo.Node()
 
 	state, err := getStateData(cs)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	podVolumes, reasons, err := pl.Binder.FindPodVolumes(logger, pod, state.podVolumeClaims, node)
 
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 
 	if len(reasons) > 0 {
-		status := framework.NewStatus(framework.UnschedulableAndUnresolvable)
+		status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable)
 		for _, reason := range reasons {
 			status.AppendReason(string(reason))
 		}
@@ -446,28 +446,28 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs fwk.CycleState, pod *v1.
 }
 
 // PreScore invoked at the preScore extension point. It checks whether volumeBinding can skip Score
-func (pl *VolumeBinding) PreScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *framework.Status {
+func (pl *VolumeBinding) PreScore(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodes []*framework.NodeInfo) *fwk.Status {
 	if pl.scorer == nil {
-		return framework.NewStatus(framework.Skip)
+		return fwk.NewStatus(fwk.Skip)
 	}
 	state, err := getStateData(cs)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	if state.hasStaticBindings || pl.fts.EnableStorageCapacityScoring {
 		return nil
 	}
-	return framework.NewStatus(framework.Skip)
+	return fwk.NewStatus(fwk.Skip)
 }
 
 // Score invoked at the score extension point.
-func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *framework.Status) {
+func (pl *VolumeBinding) Score(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) (int64, *fwk.Status) {
 	if pl.scorer == nil {
 		return 0, nil
 	}
 	state, err := getStateData(cs)
 	if err != nil {
-		return 0, framework.AsStatus(err)
+		return 0, fwk.AsStatus(err)
 	}
 	nodeName := nodeInfo.Node().Name
 	podVolumes, ok := state.podVolumesByNode[nodeName]
@@ -521,17 +521,17 @@ func (pl *VolumeBinding) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // Reserve reserves volumes of pod and saves binding status in cycle state.
-func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	state, err := getStateData(cs)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	// we don't need to hold the lock as only one node will be reserved for the given pod
 	podVolumes, ok := state.podVolumesByNode[nodeName]
 	if ok {
 		allBound, err := pl.Binder.AssumePodVolumes(klog.FromContext(ctx), pod, nodeName, podVolumes)
 		if err != nil {
-			return framework.AsStatus(err)
+			return fwk.AsStatus(err)
 		}
 		state.allBound = allBound
 	} else {
@@ -546,10 +546,10 @@ func (pl *VolumeBinding) Reserve(ctx context.Context, cs fwk.CycleState, pod *v1
 //
 // If binding errors, times out or gets undone, then an error will be returned to
 // retry scheduling.
-func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	s, err := getStateData(cs)
 	if err != nil {
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	if s.allBound {
 		// no need to bind volumes
@@ -558,14 +558,14 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs fwk.CycleState, pod *v1
 	// we don't need to hold the lock as only one node will be pre-bound for the given pod
 	podVolumes, ok := s.podVolumesByNode[nodeName]
 	if !ok {
-		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
+		return fwk.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Trying to bind volumes for pod", "pod", klog.KObj(pod))
 	err = pl.Binder.BindPodVolumes(ctx, pod, podVolumes)
 	if err != nil {
 		logger.V(5).Info("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
-		return framework.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	logger.V(5).Info("Success binding volumes for pod", "pod", klog.KObj(pod))
 	return nil
